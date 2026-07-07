@@ -44,9 +44,9 @@ index file until ≥3 exist).
 
 | PRD | Feature | Phase | Status |
 |---|---|---|---|
-| PRD-01 | Tier-1/2 Deterministic ACMG Scorer | 1 | Draft |
-| PRD-02 | Variant Ingestion & Normalization | 0 | backlog |
-| PRD-03 | Provenance Ledger & KB schema | 0 | backlog |
+| PRD-01 | Tier-1/2 Deterministic ACMG Scorer | 1 | **Signed off** |
+| PRD-02 | Variant Ingestion & Normalization | 0 | **Signed off** |
+| PRD-03 | KB Schema & Provenance Ledger | 0 | **Signed off** |
 | PRD-04 | VCEP Triage Worklist | 1 | backlog |
 | PRD-05 | Pipeline & Orchestration skeleton | 0 | backlog |
 
@@ -57,3 +57,4 @@ index file until ≥3 exist).
 - (Open) Confirm worker vCPU allocation at deploy (EPYC/Xeon 8-vCPU VM vs full silicon).
 - (Open) **Build core risk controls before trusting any automated output** — canary set, heartbeat/dead-man's switch, hard spend cap, source-contract tests, **answer-key/trace-cribbing lint, assertion-lock** (RISK_REGISTER.md §1; risks R-C1/R-A2/H1).
 - (Open) ADR — reuse `biomcp` / `paper-search-mcp` MCP connectors for Tier-3 retrieval (ARCHITECTURE.md §8; gated on GP-10/GP-9).
+- (Open) **Environment:** Python 3.12.10 installed on Windows; **WSL not yet installed** (needs an elevated `wsl --install` + reboot by the operator). Per operator instruction, **module builds (PRD-01/02/03) are deferred until WSL is set up and the operator confirms**; code to be written OS-portable. Cross-machine fleet = deferred (Tier-3 only; not needed for Tiers 1/2).

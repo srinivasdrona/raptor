@@ -76,6 +76,32 @@ substitutes for the human/oracle sign-off** (STRATEGY §9). Abstentions are firs
 | AC6 | forbidden-path audit (§4) | G2 | no oracle/label read (manual audit until lint) |
 | AC7 | config-schema / licensing tags / provenance / perf | G5/G7 | all checks pass |
 
+### 3.3 Acceptance-criteria → check mapping (PRD-02 ingestion & normalization)
+
+| PRD-02 AC | Check | OP-MODEL gate | Pass rule |
+|---|---|---|---|
+| AC1 | count reconciliation: input = normalized + manual-queue | G5 | 0 silent drops |
+| AC2 | deterministic-content re-run diff (run metadata excluded) | — | content-identical |
+| AC3 | frozen canary fixture: raw → expected `variant_id`/HGVS/SPDI | G3 | reproduces exactly |
+| AC4 | `source_ref` pinned-snapshot-resolvable on 100% | G7 | 0 null/unresolvable |
+| AC5 | forbidden-path audit | G2 | no oracle/label read (manual until lint) |
+| AC6 | source-contract: real fixture passes, malformed fails loud | G5 | both hold |
+| AC7 | config-schema / provenance / perf recorded | G5/G7 | checks pass; perf non-gating |
+
+### 3.4 Acceptance-criteria → check mapping (PRD-03 KB schema & provenance ledger)
+
+| PRD-03 AC | Check | OP-MODEL gate | Pass rule |
+|---|---|---|---|
+| AC1 | insert without valid `source_refs` FK (NULL or malformed) rejected | G7 | both rejected |
+| AC2 | UPDATE/DELETE rejected on every history table; correction = new event | G1 | proven per table |
+| AC3 | failed run → published-state hash = last-good; success = atomic | G5 | no partial state |
+| AC4 | replay to watermark reconstructs v1.0→v1.1→v2.0 | G3 | each reconstructable |
+| AC5 | storage determinism with pinned fixture rule | — | record-identical |
+| AC6 | row missing a provenance field rejected | G7 | rejection proven |
+| AC7 | Tier-3 evidence + cross-linkage stub rows insert, no migration | G3 | no schema change |
+| AC8 | manual_queue conforms to PRD-02 FR6; scorer-includable row fails | G5 | both hold |
+| AC9 | migrations + runtime contract verified; forbidden-path audit | G2/G5 | checks pass |
+
 ## 4. Protocol — how a run is evaluated
 
 - **Label comparison** on the held-out set → the metrics in §3.
