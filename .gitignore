@@ -1,0 +1,34 @@
+# Local-only pre-build deliberation & session exports — never commit
+pre-build/
+
+# Secrets & credentials
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+credentials.json
+secrets.*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Node
+node_modules/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Temp / logs
+tmp/
+*.tmp
+*.log
