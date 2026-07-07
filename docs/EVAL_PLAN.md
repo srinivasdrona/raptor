@@ -36,6 +36,11 @@ best-available labels, ranked, and is **frozen by date + source snapshot**.
 - **Provenance** — every benchmark label records source + snapshot version + date (GP-9).
 - **Size (v1) ≈ 50 variants** — *acknowledged limitation*: small and not fully representative; passing
   it is necessary, not sufficient. Expansion plan tracked as the benchmark grows.
+- **Statistical operationalization:** record the train/dev vs held-out **split sizes** and the P/LP vs
+  B/LB **class balance**; define a **minimum held-out count per class** below which precision/recall are
+  reported as **descriptive only (non-gating), with confidence intervals** — not a pass/fail gate. A
+  ~50-variant benchmark will often be below that minimum; each result must say so rather than imply
+  significance. Variants the scorer cannot call are recorded as **no-call/abstain**, never forced.
 
 ## 3. Metrics (Tier-1/2)
 
@@ -43,12 +48,33 @@ best-available labels, ranked, and is **frozen by date + source snapshot**.
 |---|---|---|
 | **Precision / Recall** | Tier-1/2-implied LP/LB vs benchmark label | held-out set |
 | **Concordance** | % agreement overall + separately for pathogenic-direction and benign-direction | held-out set |
-| **Per-criterion accuracy** | where a criterion has a checkable truth (e.g. PM2 vs gnomAD absence) | full set |
+| **Per-criterion accuracy** | where a criterion has a checkable truth (e.g. PM2 vs gnomAD absence) | full set — **diagnostic only, non-gating, never used for tuning** |
 | **Determinism** | record-identical output on re-run of pinned inputs (R-A11) | every run |
 
 **Pre-registered thresholds:** **not yet set.** They will be fixed *with the Oracle (GP-3) before
 Tier-1/2 is trusted*, and recorded here. Per GP-9/H13 no target numbers are invented in advance — an
 empty threshold is honest; a fabricated one is a defect.
+
+### 3.1 "Tier-1/2-implied LP/LB" (eval-only)
+
+For measurement only, criterion calls are combined into an **implied direction** — LP / LB / **no-call** —
+by a deterministic rule (e.g. Tavtigian-2018 point/LR combination over the *automatable* criteria only).
+This implied call is **non-authoritative**: it is used solely to compute AC1 metrics against benchmark
+labels, and is **never shown as a classification, never crosses an external threshold, and never
+substitutes for the human/oracle sign-off** (STRATEGY §9). Abstentions are first-class (no forced call).
+
+### 3.2 Acceptance-criteria → metric / gate mapping (PRD-01)
+
+| PRD-01 AC | Eval metric / check | OP-MODEL gate | Pass rule |
+|---|---|---|---|
+| AC1a | precision/recall/concordance on held-out (§3) | G4 | computed + reported, min-count rule (§2) applied |
+| AC1b | same, vs Oracle thresholds | G4 | **BLOCKED** until thresholds pre-registered (GP-3) |
+| AC2 | `source_ref` resolvable on 100% of records | G7 | 0 null/unresolvable |
+| AC3 | determinism re-run diff (§4) | — | record-identical |
+| AC4 | criterion-fires-≤once audit on canary (§4) | G3 | 0 double-counts |
+| AC5 | edge-case fixtures route to manual (§4) | G5 | 0 silent auto-scores |
+| AC6 | forbidden-path audit (§4) | G2 | no oracle/label read (manual audit until lint) |
+| AC7 | config-schema / licensing tags / provenance / perf | G5/G7 | all checks pass |
 
 ## 4. Protocol — how a run is evaluated
 
@@ -57,7 +83,7 @@ empty threshold is honest; a fabricated one is a defect.
   must not also be scored PVS1-strong), allele-frequency sanity, criterion-firing sanity. Laundering
   the answer can't pass a check that never sees the answer (R-A2/H1).
 - **Canary set** — a fixed set of known-answer variants run **every** pipeline; drift → halt + alert (R-C1).
-- **No trace-cribbing** — the scorer never reads the benchmark/label files; enforced by the G2 lint (H1).
+- **No trace-cribbing** — the scorer never reads the benchmark/label files; the G2 forbidden-path check (interim: **checker-run manual audit** until the lint script exists — OPERATING_MODEL §10) (H1).
 - **Determinism check** — re-run on pinned inputs must be record-identical (R-A11).
 
 ## 5. Reporting

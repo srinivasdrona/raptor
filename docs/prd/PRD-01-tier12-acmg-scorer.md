@@ -11,22 +11,30 @@
 
 ## 1. Context / problem
 
-TSC1/TSC2 carry ~6,700 VUS with **0 expert-panel reviews**. The 19-of-28 ACMG/AMP criteria that are
-*automatable from public data* (BIAS-2015) have never been applied systematically to TSC. This
-feature computes that **deterministic evidence layer** — the measurable half (GP-2) that anchors the
-whole system: it is the baseline every later tier is measured against, and the substrate the VCEP
-triage worklist (PRD-04) is built from.
+TSC1/TSC2 carry ~6,700 VUS with **0 expert-panel reviews** (TSC2 alone: 4,445). The 19-of-28 ACMG/AMP
+criteria that are *automatable from public data* (BIAS-2015) have never been applied systematically to
+TSC. This feature computes that **deterministic evidence layer** — the measurable half (GP-2) that
+anchors the whole system: the baseline every later tier is measured against, and the substrate the
+VCEP triage worklist (PRD-04) is built from.
+
+**v1 scope: TSC2 only** (aligns with STRATEGY §7 Phase-1 "Tier 1/2 on TSC2"); **TSC1 is a fast-follow**
+once TSC2 clears its gates. The v1 ACMG criterion set = the BIAS-2015-automated criteria, with the
+**exact included/deferred list pinned in `configs/acmg/` before build** (see §9).
 
 ## 2. Goal & non-goals
 
-**Goal:** for every normalized TSC1/TSC2 variant, compute the automatable ACMG criteria and emit a
-deterministic, fully-provenanced evidence record, measurable against the frozen benchmark.
+**Goal:** for every normalized **TSC2** variant (v1), compute the automatable ACMG criteria and emit a
+deterministic, fully-provenanced evidence record, measurable against the frozen benchmark. *(TSC1 fast-follow.)*
 
 **Non-goals (explicit):**
 - Tier-3 literature/PS3 evidence (separate PRD).
 - Any *final* classification or VUS→LP/LB decision (human/oracle gated — STRATEGY §9).
 - Cross-linkage / gap-map.
 - The benchmark itself (EVAL_PLAN.md) and ingestion/normalization (PRD-02) — consumed, not built here.
+
+> *"Tier-1/2-implied LP/LB" (used in AC1) is an **eval-only, non-authoritative** mapping from criterion
+> calls to an implied direction — defined in EVAL_PLAN §3.1. It is never shown as a classification and
+> never crosses an external threshold (STRATEGY §9).*
 
 ## 3. Users & need
 
@@ -45,33 +53,41 @@ deterministic, fully-provenanced evidence record, measurable against the frozen 
 - **FR5 — Emit evidence records** into the KB (dep: PRD-03) with full provenance and a **resolvable `source_ref`** on every criterion call (GP-9).
 - **FR6 — Deterministic:** no LLM in this tier; same input → identical output.
 - **FR7 — Per-gene calibration in config** (GP-6): thresholds, haploinsufficiency, per-gene frequency cutoffs in `configs/acmg/*.yaml`; no hardcoded values.
-- **FR8 — Edge-case routing:** PVS1 terminal-exon, ambiguous transcript, and mosaicism-flagged variants route to **manual review**, never silent scoring (R-A3).
+- **FR8 — Edge-case routing:** PVS1 terminal-exon, ambiguous/non-MANE transcript, **splice-region**, and mosaicism-flagged variants route to **manual review**, never silent scoring (R-A3). Each predicate is defined in `configs/acmg/edge_cases.yaml` and covered by named canary fixtures (EVAL_PLAN §4).
 
 ## 5. Non-functional requirements
 
-- **Performance:** batch all ~6,700 TSC1/TSC2 VUS in seconds (BIAS-2015 ≈ 1,327 variants/s).
+- **Performance:** the BIAS-2015 scoring step batches all TSC2 VUS (~4,445) in seconds (≈ 1,327 variants/s). *Assumes locally-cached, pinned predictor sources;* the **integrated** scorer's wall-clock (predictor lookups + provenance writes) has its own measured target + benchmark command — not assumed from BIAS alone.
 - **Provenance (GP-5):** every criterion call stores `{source, source_snapshot_version, tool_version, timestamp}`.
-- **Licensing (R-B2):** CADD/SpliceAI/REVEL are research-use-only; tag every derived field in the licensing matrix.
+- **Licensing (R-B2):** predictor annotations (CADD/SpliceAI/REVEL) are non-commercial/research-use per the **canonical licensing matrix (ARCHITECTURE §8)**; every derived field is tagged to that matrix (single source of truth).
 - **Config-driven (GP-6):** all rules/thresholds in versioned, schema-validated config.
 - **Reproducibility (R-A11):** record-for-record identical output on re-run of the same pinned inputs.
 
 ## 6. Acceptance criteria *(→ EVAL_PLAN.md; these become the OPERATING_MODEL gates)*
 
-- **AC1 — Accuracy:** on the frozen benchmark **held-out** set, Tier-1/2-implied LP/LB vs best-available labels meets the pre-registered precision/recall thresholds (thresholds defined in EVAL_PLAN.md).
+- **AC1a — Metrics computed:** precision/recall/concordance are computed and reported on the frozen **held-out** set for Tier-1/2-implied LP/LB vs best-available labels (EVAL_PLAN §3), with the minimum-count rule (EVAL_PLAN §2) applied.
+- **AC1b — Trust gate (blocked on Oracle):** the accuracy gate passes **only** once the Oracle (GP-3) has pre-registered thresholds and held-out metrics meet them. Until then AC1b is `BLOCKED` — the feature is *buildable* but not *validated* (§7, R-E1). No target number is invented (GP-9/H13).
 - **AC2 — Grounding (GP-9):** 100% of emitted records carry a resolvable `source_ref`; **0** null/unresolvable refs.
 - **AC3 — Determinism (R-A11):** two runs on identical pinned inputs produce record-identical output.
 - **AC4 — No double-counting:** audit shows each ACMG criterion fires ≤ once per variant; verified on the canary set.
-- **AC5 — Edge-case safety (R-A3):** every enumerated edge case routes to manual review; **0** silent auto-scores in those classes.
-- **AC6 — No trace-cribbing (H1):** the scorer never reads benchmark/label/oracle files (G2 lint clean).
+- **AC5 — Edge-case safety (R-A3):** every predicate in `edge_cases.yaml` (terminal-exon, non-MANE transcript, splice-region, mosaicism) routes its named canary fixtures to manual review; **0** silent auto-scores in those classes.
+- **AC6 — No trace-cribbing (H1):** the scorer reads no benchmark/label/oracle file — verified by the G2 forbidden-path check (**checker-run manual audit until the G2 lint script exists**, OPERATING_MODEL §10; that script is a dependency, §7).
+- **AC7 — NFR checks:** config schema-validates with **no hardcoded thresholds** (GP-6); every predictor field carries a licensing tag (R-B2); every criterion call has complete provenance fields (GP-5); the integrated-scorer performance benchmark meets its stated wall-clock target.
 
 ## 7. Dependencies
 
 | Dependency | Status | Blocking? |
 |---|---|---|
-| PRD-02 · Variant ingestion & normalization | backlog | Yes (FR1) |
-| PRD-03 · Provenance ledger & KB schema | backlog | Yes (FR5) |
-| Frozen benchmark + metrics (EVAL_PLAN.md) | in progress | Yes (AC1) |
+| PRD-02 · Variant ingestion & normalization | backlog | Yes (FR1) — or a minimal stub input schema + fixtures for scorer-only dev |
+| PRD-03 · Provenance ledger & KB schema | backlog | Yes (FR5) — or a minimal evidence-record schema stub |
+| Frozen benchmark + split (EVAL_PLAN.md) | in progress | Yes (AC1a) |
+| **Oracle-pre-registered thresholds** (GP-3) | not started | Yes (AC1b) — validation blocked until set |
+| G2 trace-cribbing lint script | planned | AC6 *mechanical* check (interim: manual audit) |
 | BIAS-2015 install; ClinGen Dosage BED; gnomAD/CADD/REVEL/SpliceAI | not started | Yes |
+
+> **Buildable vs validated:** PRD-01 can be **built and unit-tested** against minimal PRD-02/03 stub
+> interfaces + fixtures; it cannot be **validated** (AC1b) until the benchmark is frozen and the Oracle
+> sets thresholds. Ship the build; gate the trust.
 
 ## 8. Risks (see RISK_REGISTER for mitigations)
 
@@ -82,6 +98,6 @@ validation ceiling here (AC1), not trust-transfer.
 
 ## 9. Open questions
 
-- Which of the 19/28 automatable criteria are in **v1** vs deferred?
-- Per-gene thresholds + haploinsufficiency source: confirm ClinGen Dosage BED record for TSC2 (and TSC1).
-- Final benchmark **label hierarchy** (EVAL_PLAN.md) — needed to make AC1 concrete.
+- **Enumerate the exact v1 ACMG criteria** (included vs deferred) in `configs/acmg/` — required before the PRD is Ready.
+- Per-gene thresholds + haploinsufficiency source: confirm ClinGen Dosage BED record for TSC2.
+- **Frozen benchmark snapshot + held-out split** (EVAL_PLAN §2) and **Oracle-set thresholds** (AC1b) — the two items that make the accuracy gate concrete. *(The label hierarchy itself is already defined in EVAL_PLAN §2.)*
