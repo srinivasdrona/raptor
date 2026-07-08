@@ -167,3 +167,23 @@ def test_duplicate_variant_id_fails_loud():
         assert store.conn.execute("SELECT COUNT(*) FROM manual_queue").fetchone()[0] == 0
     finally:
         store.close()
+
+
+def test_failed_duplicate_run_leaves_no_published_state_change():
+    """[major] Auditability: a run that fails a source-contract check must be a
+    no-op on PUBLISHED state — including `evidence_kinds` vocabulary registration.
+    A duplicate variant_id must abort BEFORE any KB mutation, so
+    `published_state_hash()` is identical before and after (validate-before-mutate)."""
+    store = KBStore(":memory:")
+    try:
+        before = store.published_state_hash()
+        recs = [  # PM4 is unseeded — registering it would change evidence_kinds/state
+            _rec("chr16:601:A:T", "TSC2", "missense_variant", {"pm4": (2, "PM4_moderate")}),
+            _rec("chr16:601:A:T", "TSC2", "missense_variant", {"pm2": (1, "PM2:")}),
+        ]
+        with pytest.raises(Exception):
+            run_scorer(_cfg(), _Source(recs), store)
+        after = store.published_state_hash()
+        assert after == before, "failed duplicate run mutated published state (e.g. evidence_kinds)"
+    finally:
+        store.close()
