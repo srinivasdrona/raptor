@@ -147,3 +147,23 @@ def test_zero_fired_variant_is_accounted_in_report():
         )
     finally:
         store.close()
+
+
+def test_duplicate_variant_id_fails_loud():
+    """[major] BIAS output is a source-contract: exactly one row per variant. A
+    duplicate variant_id is drift/corruption -> FAIL LOUD with a clear message
+    (not a cryptic UNIQUE-constraint crash), and nothing partially published."""
+    store = KBStore(":memory:")
+    try:
+        recs = [
+            _rec("chr16:601:A:T", "TSC2", "missense_variant", {"pm2": (1, "PM2:")}),
+            _rec("chr16:601:A:T", "TSC2", "missense_variant", {"pm4": (2, "PM4_moderate")}),
+        ]
+        with pytest.raises(Exception) as exc:
+            run_scorer(_cfg(), _Source(recs), store)
+        msg = str(exc.value).lower()
+        assert "duplicate" in msg and "variant" in msg, f"unclear duplicate-variant error: {exc.value!r}"
+        assert store.conn.execute("SELECT COUNT(*) FROM evidence").fetchone()[0] == 0
+        assert store.conn.execute("SELECT COUNT(*) FROM manual_queue").fetchone()[0] == 0
+    finally:
+        store.close()
