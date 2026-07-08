@@ -10,7 +10,7 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "hypothesis>=6.0"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -18,3 +18,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "requires_reference: tests requiring real SeqRepo/chr16 reference data (e.g. AC3 genomic)",
+    "requires_uta: tests requiring UTA transcript projection DB (e.g. AC3 c./p.)"
+]

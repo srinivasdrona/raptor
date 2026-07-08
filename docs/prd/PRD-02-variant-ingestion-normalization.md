@@ -197,10 +197,12 @@ reference + independent oracle — never the fake.** Real-reference markers:
 Expected `variant_id`/SPDI/`hgvs_g` in the **frozen AC3 fixture** are derived **independently of the
 normalizer under test** — never by freezing our own normalizer's output (that is the confirmation-bias
 trap that hid PRD-03's bugs):
-- **Primary oracle:** ClinVar's own **`CanonicalSPDI`** column in `variant_summary` (NCBI-computed —
-  a different implementation) for each fixture variant.
-- **Cross-check:** a handful cross-validated against **Mutalyzer** / NCBI Variation Services SPDI API,
-  cached for offline replay (§5).
+- **Primary oracle:** the **NCBI Variation Services SPDI API** (`/spdi/.../canonical_representation`,
+  NCBI-computed — a different implementation), queried with each fixture variant's VCF coordinates,
+  and **frozen into the fixture** for offline replay (§5). *(Note: ClinVar's `variant_summary.txt.gz`
+  does not currently expose a `CanonicalSPDI` column, so the SPDI API is the independent source.)*
+- **Cross-check:** where available, corroborated against Mutalyzer; any value that cannot be
+  independently verified is **excluded, not guessed** (GP-9).
 - Fixture must include: ≥1 SNV, ≥1 **small deletion needing left-alignment** (the case that actually
   exercises the reference), ≥1 insertion/dup, ≥1 non-coding (SPDI-only, c./p. null-with-reason), ≥1
   case that **must route to manual queue** (FR3), and **≥1 variant per gene (TSC1 *and* TSC2)** so both

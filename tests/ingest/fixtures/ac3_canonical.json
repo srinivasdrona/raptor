@@ -1,0 +1,70 @@
+[
+  {
+    "variation_id": "5098",
+    "raw_coords": "NC_000009.12:132912446:A:T",
+    "gene": "TSC1",
+    "variant_class": "SNV",
+    "expected_variant_id": "NC_000009.12:132912445:A:T",
+    "expected_hgvs_g": "NC_000009.12:g.132912446A>T",
+    "expected_hgvs_c": null,
+    "expected_hgvs_p": null,
+    "expected_hgvs_c_null_reason": "awaiting_uta_projection",
+    "expected_hgvs_p_null_reason": "awaiting_uta_projection"
+  },
+  {
+    "variation_id": "12393",
+    "raw_coords": "NC_000016.10:2087897:C:T",
+    "gene": "TSC2",
+    "variant_class": "SNV",
+    "expected_variant_id": "NC_000016.10:2087896:C:T",
+    "expected_hgvs_g": "NC_000016.10:g.2087897C>T",
+    "expected_hgvs_c": null,
+    "expected_hgvs_p": null,
+    "expected_hgvs_c_null_reason": "awaiting_uta_projection",
+    "expected_hgvs_p_null_reason": "awaiting_uta_projection"
+  },
+  {
+    "variation_id": "5097",
+    "raw_coords": "NC_000009.12:132905686:GCTTT:G",
+    "gene": "TSC1",
+    "variant_class": "SMALL_INDEL",
+    "expected_variant_id": "NC_000009.12:132905686:CTTTCTTT:CTTT",
+    "expected_hgvs_g": null,
+    "expected_hgvs_c": null,
+    "expected_hgvs_p": null,
+    "expected_hgvs_c_null_reason": "awaiting_uta_projection",
+    "expected_hgvs_p_null_reason": "awaiting_uta_projection"
+  },
+  {
+    "variation_id": "12395",
+    "raw_coords": "NC_000016.10:2071892:C:CTACT",
+    "gene": "TSC2",
+    "variant_class": "SMALL_INDEL",
+    "expected_variant_id": "NC_000016.10:2071892:TACT:TACTTACT",
+    "expected_hgvs_g": null,
+    "expected_hgvs_c": null,
+    "expected_hgvs_p": null,
+    "expected_hgvs_c_null_reason": "awaiting_uta_projection",
+    "expected_hgvs_p_null_reason": "awaiting_uta_projection"
+  },
+  {
+    "variation_id": "12402",
+    "raw_coords": "NC_000016.10:2088292:CCGGCTCCGCCACATCAAG:C",
+    "gene": "TSC2",
+    "variant_class": "SMALL_INDEL",
+    "expected_variant_id": "NC_000016.10:2088292:CGGCTCCGCCACATCAAGCGGCTCCGCCA:CGGCTCCGCCA",
+    "expected_hgvs_g": null,
+    "expected_hgvs_c": null,
+    "expected_hgvs_p": null,
+    "expected_hgvs_c_null_reason": "awaiting_uta_projection",
+    "expected_hgvs_p_null_reason": "awaiting_uta_projection"
+  },
+  {
+    "variation_id": "33205",
+    "raw_coords": "NC_000009.12:-1:na:na",
+    "gene": "TSC1",
+    "variant_class": "IMPRECISE_SV",
+    "expected_variant_id": null,
+    "expected_manual_queue": true
+  }
+]
