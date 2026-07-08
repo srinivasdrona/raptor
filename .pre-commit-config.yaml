@@ -1,0 +1,16 @@
+# Local fast-feedback gate (developer convenience). Enable with:
+#   pip install pre-commit && pre-commit install
+#
+# NOTE: the ENFORCED, environment-independent gate is GitHub Actions CI
+# (.github/workflows/ci.yml). This hook is best-effort local feedback and
+# assumes WSL with the `~/raptor` venv (tests run there, not on native Windows).
+# If your local setup differs, adjust the entry or rely on CI.
+repos:
+  - repo: local
+    hooks:
+      - id: raptor-offline-suite
+        name: RAPTOR offline test + conformance suite (WSL)
+        entry: wsl -e bash -lc "source ~/raptor/bin/activate && cd /mnt/d/AIProjects/raptor && python -m pytest -q"
+        language: system
+        pass_filenames: false
+        always_run: true
