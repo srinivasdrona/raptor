@@ -44,9 +44,9 @@ index file until ≥3 exist).
 
 | PRD | Feature | Phase | Status |
 |---|---|---|---|
-| PRD-01 | Tier-1/2 Deterministic ACMG Scorer | 1 | **Signed off** |
-| PRD-02 | Variant Ingestion & Normalization | 0 | **Signed off** |
-| PRD-03 | KB Schema & Provenance Ledger | 0 | **Signed off** |
+| PRD-01 | Tier-1/2 Deterministic ACMG Scorer | 1 | **Signed off** (spec) · module: next |
+| PRD-02 | Variant Ingestion & Normalization | 0 | **Signed off · module built ✓** (`a889710`, 125 tests) |
+| PRD-03 | KB Schema & Provenance Ledger | 0 | **Signed off · module built ✓** (`b627073`) |
 | PRD-04 | VCEP Triage Worklist | 1 | backlog |
 | PRD-05 | Pipeline & Orchestration skeleton | 0 | backlog |
 | PRD-06 | **Benchmark & Evaluation Harness** (build known-variant benchmark + train/dev/held-out split + P/R/concordance, class-stratified; **gates any VUS run**) | 1 | backlog |
@@ -62,4 +62,8 @@ index file until ≥3 exist).
 - (Open) Confirm worker vCPU allocation at deploy (EPYC/Xeon 8-vCPU VM vs full silicon).
 - (Open) **Build core risk controls before trusting any automated output** — canary set, heartbeat/dead-man's switch, hard spend cap, source-contract tests, **answer-key/trace-cribbing lint, assertion-lock** (RISK_REGISTER.md §1; risks R-C1/R-A2/H1).
 - (Open) ADR — reuse `biomcp` / `paper-search-mcp` MCP connectors for Tier-3 retrieval (ARCHITECTURE.md §8; gated on GP-10/GP-9).
-- (Open) **Environment:** Python 3.12.10 on Windows; **WSL2 Ubuntu 24.04.4 LTS (aarch64) ready**, venv **`raptor`** at `~/raptor` (Python 3.12.3, pytest 9.1.1, gcc 13.3/make). Code lives at `/mnt/d/AIProjects/raptor`; venv on Linux fs. Building modules PRD-03 → PRD-02 → PRD-01 via plan/build/check. Cross-machine fleet = deferred (Tier-3 only; not needed for Tiers 1/2).
+- (Open) **Reference-data reproducibility (R-A11):** AC3-genomic validates against a local pinned
+  reference (chr9 `NC_000009.12` + chr16 `NC_000016.10`) at `~/raptor-refseq`, checksums pinned in
+  `configs/ingest/tsc.yaml`. Add a committed `scripts/` fetch-and-verify step so a fresh clone can
+  reproduce it (until then AC3 `requires_reference` tests skip without the local data).
+- (Open) **Environment:** Python 3.12.10 on Windows; **WSL2 Ubuntu 24.04.4 LTS (aarch64) ready**, venv **`raptor`** at `~/raptor` (Python 3.12.3, pytest 9.1.1, gcc 13.3/make). Code lives at `/mnt/d/AIProjects/raptor`; venv on Linux fs. Modules built via plan/build/check: **PRD-03 ✓, PRD-02 ✓ (signed off, GPT checker r3); PRD-01 next** (then PRD-06 gate). Cross-machine fleet = deferred (Tier-3 only; not needed for Tiers 1/2).
