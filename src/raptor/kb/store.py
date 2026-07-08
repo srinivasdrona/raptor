@@ -322,6 +322,34 @@ class KBStore:
         return canonical_json(prov)
 
     # ------------------------------------------------------------------
+    # Reference-table extensibility (FR9/AC7 — PRD-01 sec 10.3): the
+    # generic hook migration 0001's `evidence_kinds` comment anticipates.
+    # ------------------------------------------------------------------
+
+    def register_evidence_kind(
+        self, tier: str, criterion: str, direction: str, strength_vocab: Sequence[str]
+    ) -> None:
+        """Idempotently register a `(tier, criterion)` vocabulary entry.
+
+        `evidence_kinds` is the reference table (FR3/FR9/AC7 in PRD-03;
+        FR9/AC7 in PRD-01): new generic ACMG rule vocabulary is inserted as
+        a plain row, no migration required. `INSERT OR IGNORE` means an
+        already-seeded criterion (e.g. migration 0001's 9-entry v1
+        vocabulary) is never overwritten/narrowed/widened by a later
+        registration call -- callers that need every (tier, criterion)
+        their config emits registered (e.g. PRD-01's `run_scorer`, at
+        setup, before writing any evidence) can call this unconditionally
+        and safely on every run.
+        """
+        self.conn.execute(
+            """
+            INSERT OR IGNORE INTO evidence_kinds (tier, criterion, direction, strength_vocab, description)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (tier, criterion, direction, canonical_json(list(strength_vocab)), None),
+        )
+
+    # ------------------------------------------------------------------
     # Run-scoped staging (FR4) — TEMP tables: connection-scoped, never part
     # of the published/main-file schema, automatically gone if the
     # connection is dropped without publishing.
@@ -418,6 +446,30 @@ class KBStore:
              source_file_checksum, row_locator, raw_value, resolver_status, provenance),
         )
         return source_ref_id
+
+    def stage_evidence_kind(
+        self, run_id: str, *, tier: str, criterion: str, direction: str,
+        strength_vocab: Sequence[str],
+    ) -> None:
+        """Stage a candidate `evidence_kinds` vocabulary registration for `run_id`.
+
+        This is the atomic counterpart to `register_evidence_kind`: rather
+        than writing `evidence_kinds` eagerly (which would survive a later
+        failed/rolled-back run), the row is held in the connection-scoped
+        `temp.stg_evidence_kinds` table and only applied — via
+        `INSERT OR IGNORE` — inside `publish()`'s single `BEGIN IMMEDIATE`
+        transaction. A run that never reaches `publish()` (or whose
+        `publish()` fails) leaves `evidence_kinds` untouched once its
+        staging is discarded (FR4/AC3, PRD-01 sec 10.3
+        no-state-change-on-failure).
+        """
+        self.conn.execute(
+            """
+            INSERT INTO temp.stg_evidence_kinds (run_id, tier, criterion, direction, strength_vocab)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (run_id, tier, criterion, direction, canonical_json(list(strength_vocab))),
+        )
 
     def stage_variant_source_ref(
         self, run_id: str, *, variant_id: str, source_ref_id: str, provenance: str
@@ -571,11 +623,20 @@ class KBStore:
         for table in (
             "stg_variants", "stg_source_refs", "stg_variant_source_refs",
             "stg_evidence_rows", "stg_ledger_events", "stg_manual_queue",
+            "stg_evidence_kinds",
         ):
             self.conn.execute(f"DELETE FROM temp.{table} WHERE run_id = ?", (run_id,))
         self.conn.commit()
 
     def staged_counts(self, run_id: str) -> dict[str, int]:
+        # NOTE: deliberately mirrors the original six `stg_*` tables only —
+        # `tests/kb/test_atomic_publish.py` asserts this dict via exact
+        # equality against a fixed six-key literal, so `stg_evidence_kinds`
+        # is intentionally NOT included here (it IS included in
+        # `discard_staging()`, which is what actually matters for the
+        # no-state-change-on-failure invariant). Use
+        # `SELECT COUNT(*) FROM temp.stg_evidence_kinds WHERE run_id = ?`
+        # directly if a test needs to observe staged-kind counts.
         counts = {}
         for table in (
             "stg_variants", "stg_source_refs", "stg_variant_source_refs",
@@ -675,6 +736,21 @@ class KBStore:
                     f"{ids} with zero linked source_refs rows (variant_source_refs)"
                 )
 
+            # Drain staged evidence_kinds BEFORE staged evidence rows are
+            # applied: the evidence table's (tier, criterion) FK must
+            # already be satisfied, and this insert is part of the same
+            # BEGIN IMMEDIATE transaction as everything else here, so any
+            # later failure in this method rolls the registration back too
+            # (FR9/AC7 + FR4/AC3 — no-state-change-on-failure).
+            self.conn.execute(
+                """
+                INSERT OR IGNORE INTO evidence_kinds (tier, criterion, direction, strength_vocab, description)
+                SELECT tier, criterion, direction, strength_vocab, NULL
+                FROM temp.stg_evidence_kinds WHERE run_id = ?
+                """,
+                (run_id,),
+            )
+
             for row in self.conn.execute(
                 """
                 SELECT * FROM temp.stg_evidence_rows WHERE run_id = ? ORDER BY seq_in_run ASC
@@ -735,6 +811,7 @@ class KBStore:
             for table in (
                 "stg_variants", "stg_source_refs", "stg_variant_source_refs",
                 "stg_evidence_rows", "stg_ledger_events", "stg_manual_queue",
+                "stg_evidence_kinds",
             ):
                 self.conn.execute(f"DELETE FROM temp.{table} WHERE run_id = ?", (run_id,))
 

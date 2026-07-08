@@ -81,6 +81,21 @@ CREATE TEMP TABLE IF NOT EXISTS stg_ledger_events (
     timestamp TEXT NOT NULL
 );
 
+-- Candidate `evidence_kinds` vocabulary registrations for a run (FR9/AC7 —
+-- PRD-01 sec 10.3 extensibility hook). Staged here rather than written
+-- eagerly so a failed run leaves `evidence_kinds` (and therefore
+-- `published_state_hash()`) byte-identical: drained (INSERT OR IGNORE)
+-- inside `KBStore.publish()`'s single BEGIN IMMEDIATE transaction, before
+-- staged `evidence` rows are applied (their `(tier, criterion)` FK must
+-- already be satisfied), and discarded on any failure/rollback.
+CREATE TEMP TABLE IF NOT EXISTS stg_evidence_kinds (
+    run_id TEXT NOT NULL,
+    tier TEXT NOT NULL,
+    criterion TEXT NOT NULL,
+    direction TEXT NOT NULL,
+    strength_vocab TEXT NOT NULL
+);
+
 CREATE TEMP TABLE IF NOT EXISTS stg_manual_queue (
     run_id TEXT NOT NULL,
     raw_input TEXT NOT NULL,

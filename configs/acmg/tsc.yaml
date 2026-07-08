@@ -1,0 +1,100 @@
+# PRD-01 sec 10.3 — v1 ACMG scorer policy + pins for TSC2 (v1 scope; TSC1 is
+# a fast-follow, sec 10.6). This is POLICY + PINS, not re-derived ACMG
+# thresholds (ADR-0007/0008): BIAS-2015 owns the thresholds; this file only
+# says which of BIAS's fired criteria RAPTOR emits as KB evidence and how
+# BIAS's strength ints normalize into RAPTOR's KB vocabulary.
+#
+# Pins marked `confirm` below are not yet locked against a real BIAS-2015
+# release/data snapshot (sec 9) -- they do not block the offline build
+# (sec 10.6), but MUST be confirmed before a real-corpus run (GP-9).
+
+bias_version: "confirm-pending-bias-release"   # confirm: pin the exact BIAS-2015 release RAPTOR wraps
+bias_data_version: "confirm-pending-bias-data" # confirm: pin BIAS's own reference-data snapshot version
+
+# FR7/AC7: which of BIAS's automatable criteria (of the 19-of-28, sec 1)
+# RAPTOR actually emits as KB evidence. Default = all automatable EXCEPT
+# PP5/BP6 (R-A2 circularity policy, sec 10.3): both are ClinVar-classification
+# -derived, and the frozen benchmark (EVAL_PLAN sec 2) uses ClinVar-derived
+# labels -- emitting them as evidence risks grading against an answer key
+# RAPTOR partly copied. `parse.py` still parses PP5/BP6 faithfully (the
+# oracle fixture expects that); only this policy list decides emission.
+included_criteria:
+  - PVS1
+  - PS1
+  - PS4   # ClinVar-submitter-count-derived form flagged for the Oracle to rule on (sec 10.3) -- included, not excluded, by default
+  - PM1
+  - PM2
+  - PM4
+  - PM5
+  - PP2
+  - PP3
+  - BA1
+  - BS1
+  - BS3
+  - BS4
+  - BP1
+  - BP3
+  - BP4
+  - BP7
+  # Deliberately NOT included by default: PP5, BP6 (R-A2 circularity).
+
+# BIAS fired-strength-int -> RAPTOR KB strength vocab (PRD-01 sec 10.3).
+# This is the generic BIAS<->RAPTOR strength-int convention (1..5), not a
+# per-criterion or per-variant mapping.
+strength_map:
+  "1": supporting
+  "2": moderate
+  "3": strong
+  "4": very_strong
+  "5": stand_alone
+
+# Generic ACMG rule vocabulary (criterion -> direction + allowed KB
+# strengths): registers `evidence_kinds` at `run_scorer` setup (FR9/AC7).
+# The full automatable 19-criterion set (sec 1), including PP5/BP6 so their
+# (tier, criterion) exists in the registry even though the default policy
+# above does not emit them.
+acmg_criteria:
+  PVS1: {direction: pathogenic, strength_vocab: [very_strong, strong, moderate, supporting]}
+  PS1:  {direction: pathogenic, strength_vocab: [strong]}
+  PS4:  {direction: pathogenic, strength_vocab: [strong, moderate, supporting]}
+  PM1:  {direction: pathogenic, strength_vocab: [moderate, supporting]}
+  PM2:  {direction: pathogenic, strength_vocab: [moderate, supporting]}
+  PM4:  {direction: pathogenic, strength_vocab: [moderate]}
+  PM5:  {direction: pathogenic, strength_vocab: [strong, moderate]}
+  PP2:  {direction: pathogenic, strength_vocab: [supporting]}
+  PP3:  {direction: pathogenic, strength_vocab: [strong, moderate, supporting]}
+  PP5:  {direction: pathogenic, strength_vocab: [strong, moderate, supporting]}
+  BA1:  {direction: benign, strength_vocab: [stand_alone]}
+  BS1:  {direction: benign, strength_vocab: [strong, moderate]}
+  BS3:  {direction: benign, strength_vocab: [strong]}
+  BS4:  {direction: benign, strength_vocab: [supporting]}
+  BP1:  {direction: benign, strength_vocab: [supporting]}
+  BP3:  {direction: benign, strength_vocab: [supporting]}
+  BP4:  {direction: benign, strength_vocab: [supporting]}
+  BP6:  {direction: benign, strength_vocab: [stand_alone, strong, moderate, supporting]}
+  BP7:  {direction: benign, strength_vocab: [supporting]}
+
+# FR8/R-A3 edge-case routing predicates (the "edge_cases.yaml" policy keys,
+# sec 10.3) -- each overrides a BIAS auto-score with a manual-review
+# routing (never a silent auto-score, AC5). Implemented generically in
+# `policy.check_edge_cases`, gated purely by these flags + the record's own
+# fields (never a fixture-specific literal).
+edge_cases:
+  pvs1_terminal_exon: true
+  non_mane_transcript: true
+  splice_region: true
+  mosaicism: true
+
+# v1 scope: TSC2 only (sec 1/10.6); TSC1 is a fast-follow.
+genes:
+  TSC2: NM_000548.5   # confirm .version against the locked MANE Select release (matches configs/ingest/tsc.yaml)
+
+# R-B2/AC7: every predictor field RAPTOR's evidence provenance touches is
+# tagged to the ARCHITECTURE sec 8 licensing matrix (single source of
+# truth) -- this is the per-field tag, not a re-statement of the matrix.
+licensing:
+  revel: non-commercial
+  cadd: non-commercial
+  splice_ai: non-commercial
+  alpha_missense: non-commercial
+  gnomad: open
