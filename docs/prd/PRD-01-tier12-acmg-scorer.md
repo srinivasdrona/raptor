@@ -194,6 +194,14 @@ store in tests — grounding verified against the real schema).
 - **Manual review:** `manual_queue` has **no `variant_id` column** — a routed variant records its
   identifier in `raw_input`/`attempted_coords` and grounds via `source_ref_id`. Tests associate by
   those, not a `variant_id` column.
+- **R-A2 circularity policy (eval integrity):** BIAS's `PP5`/`BP6` are derived from ClinVar
+  *classification assertions*, and `PS4` approximates evidence from ClinVar submitter counts. Since the
+  benchmark (EVAL_PLAN §2) uses ClinVar-derived labels, emitting these as evidence risks **circular
+  validation** (R-A2 — grading against an answer key we partly copied). Therefore the default
+  `included_criteria` **excludes `PP5` and `BP6`** (deprecated by ClinGen SVI anyway) and **flags
+  `PS4`'s ClinVar-derived form** for the Oracle to rule on. `parse` still parses them faithfully (the
+  oracle fixture includes them); the **policy layer filters what becomes KB evidence** — so parsing
+  completeness and emission policy are tested separately.
 
 ### 10.5 Oracle & anti-circularity (the PRD-03/PRD-02 lesson)
 

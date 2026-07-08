@@ -1,0 +1,37 @@
+[
+    {
+        "variant_id": "chr1:171605476:TGTC:TA",
+        "evidence": [
+            {"criterion": "PVS1", "strength": "strong", "direction": "pathogenic"},
+            {"criterion": "PM2", "strength": "supporting", "direction": "pathogenic"}
+        ]
+    },
+    {
+        "variant_id": "chr2:26684723:G:A",
+        "evidence": [
+            {"criterion": "PS4", "strength": "supporting", "direction": "pathogenic"},
+            {"criterion": "PM2", "strength": "moderate", "direction": "pathogenic"},
+            {"criterion": "PM5", "strength": "strong", "direction": "pathogenic"},
+            {"criterion": "PP2", "strength": "supporting", "direction": "pathogenic"},
+            {"criterion": "PP3", "strength": "strong", "direction": "pathogenic"},
+            {"criterion": "PP5", "strength": "moderate", "direction": "pathogenic"}
+        ]
+    },
+    {
+        "variant_id": "chr2:28999810:C:G",
+        "evidence": [
+            {"criterion": "PS4", "strength": "strong", "direction": "pathogenic"},
+            {"criterion": "PM1", "strength": "supporting", "direction": "pathogenic"},
+            {"criterion": "PM2", "strength": "supporting", "direction": "pathogenic"},
+            {"criterion": "PP3", "strength": "moderate", "direction": "pathogenic"},
+            {"criterion": "PP5", "strength": "strong", "direction": "pathogenic"}
+        ]
+    },
+    {
+        "variant_id": "chr2:203241274:A:G",
+        "evidence": [
+            {"criterion": "BS1", "strength": "strong", "direction": "benign"},
+            {"criterion": "BP6", "strength": "stand_alone", "direction": "benign"}
+        ]
+    }
+]

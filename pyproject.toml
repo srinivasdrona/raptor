@@ -24,5 +24,6 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 markers = [
     "requires_reference: tests requiring real SeqRepo/chr16 reference data (e.g. AC3 genomic)",
-    "requires_uta: tests requiring UTA transcript projection DB (e.g. AC3 c./p.)"
+    "requires_uta: tests requiring UTA transcript projection DB (e.g. AC3 c./p.)",
+    "blocked_ac1: BLOCKED: AC1 accuracy tests waiting for oracle pre-registered thresholds"
 ]
