@@ -183,13 +183,14 @@ store in tests — grounding verified against the real schema).
   → pathogenic; BA/BS/BP → benign). `tier = "tier1"` (matches the KB's seeded vocabulary).
 - **`evidence_kinds` FK:** every `(tier, criterion)` written to `evidence` must first exist in
   `evidence_kinds`. Migration 0001 seeds only 9 criteria; the scorer emits more (PS4, PM1, PP2, PP5,
-  …). So the scorer **registers its full criterion vocabulary** at `run_scorer` setup via a new,
-  idempotent KB API method **`KBStore.register_evidence_kind(tier, criterion, direction,
-  strength_vocab)`** (the doer adds this small method + a KB test — the migration comment explicitly
-  anticipates runtime `INSERT`s to `evidence_kinds`; this is *generic ACMG rule vocabulary*, not
-  benchmark data). The vocabulary (criterion → direction + allowed strengths) lives in
-  `configs/acmg/*.yaml` (GP-6), and each emitted `strength` must be within that criterion's
-  `strength_vocab`.
+  …). So the scorer **registers its full criterion vocabulary** via `KBStore.register_evidence_kind(...)`
+  — but registration MUST be **staged and applied atomically inside `publish()`** (a `stg_evidence_kinds`
+  TEMP table drained within the publish transaction), NOT an eager immediate write. **Invariant
+  (`no-state-change-on-failure`):** ANY `run_scorer` exception must leave published state (incl.
+  `evidence_kinds` / `published_state_hash()`) byte-identical — a failed run mutates nothing (this
+  retires the whole *raise-after-register* class, not one instance). The vocabulary (criterion →
+  direction + allowed strengths) lives in `configs/acmg/*.yaml` (GP-6), and each emitted `strength` must
+  be within that criterion's `strength_vocab`.
 - **Grounding:** `source_refs` PK is `source_ref_id`; `evidence.source_ref_id` FK-resolves there.
 - **Manual review:** `manual_queue` has **no `variant_id` column** — a routed variant records its
   identifier in `raw_input`/`attempted_coords` and grounds via `source_ref_id`. Tests associate by

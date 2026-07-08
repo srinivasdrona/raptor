@@ -187,3 +187,27 @@ def test_failed_duplicate_run_leaves_no_published_state_change():
         assert after == before, "failed duplicate run mutated published state (e.g. evidence_kinds)"
     finally:
         store.close()
+
+
+@pytest.mark.parametrize("records, trigger", [
+    ([_rec("chr16:601:A:T", "TSC2", "missense_variant", {"pm4": (2, "PM4_moderate")}),
+      _rec("chr16:601:A:T", "TSC2", "missense_variant", {"pm2": (1, "PM2:")})], "duplicate_variant_id"),
+    ([_rec("chr16:700:A:T", "TSC2", "missense_variant", {"pm4": (9, "PM4_unmapped")})], "unmapped_strength_int"),
+])
+def test_failed_run_never_mutates_published_state(records, trigger):
+    """[class invariant — 'no-state-change-on-failure'] ANY exception raised by
+    run_scorer must leave published state byte-identical, including evidence_kinds
+    vocabulary registration. This is the CLASS test (multiple raise triggers), not
+    a single instance — evidence_kind registration must be staged+atomic with
+    publish so a failed run mutates nothing. (`PM4` is unseeded, so eager
+    registration WOULD change state.)"""
+    store = KBStore(":memory:")
+    try:
+        before = store.published_state_hash()
+        with pytest.raises(Exception):
+            run_scorer(_cfg(), _Source(records), store)
+        assert store.published_state_hash() == before, (
+            f"failed run ({trigger}) mutated published state (e.g. evidence_kinds)"
+        )
+    finally:
+        store.close()
