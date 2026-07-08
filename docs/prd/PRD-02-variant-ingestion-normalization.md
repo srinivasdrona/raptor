@@ -16,7 +16,9 @@ mismatches across ClinVar ↔ BIAS-2015 ↔ LitVar2 (**R-A10**) — the same var
 identities and its evidence splits or collides. This feature is the **data foundation** of the
 measurable half: one canonical identity per variant.
 
-**v1 scope: TSC2 only** (aligns PRD-01 v1); **TSC1 fast-follow.**
+**v1 ingestion scope: TSC1 + TSC2** (gene-agnostic engine, GP-6); the first **validation gate**
+(PRD-06) is **TSC2-first** — TSC1 is the rarer gene with fewer knowns, so its metric gate is a
+fast-follow once the methodology is proven on the better-powered TSC2 set (EVAL_PLAN §1.2).
 
 ## 2. Goal & non-goals
 
@@ -110,30 +112,39 @@ H7 (config drift) · **GP-10/R-G4** (only public coordinates leave, if an extern
 
 ### 10.1 Reference-data strategy (resolves §9 normalizer + reference)
 
-**v1 uses a minimal, pinned, checksummed reference — NOT the full ~13 GB SeqRepo snapshot.** For
-TSC2-only, the only sequences needed are **GRCh38 chr16 (`NC_000016.10`)** for genomic
-left-alignment/SPDI and the **MANE transcript/protein (`NM_000548.5`/`NP_000539.2`)** for c./p. This
-is ~30 MB, offline-friendly, and *more* reproducible than a moving full-snapshot (R-A11). Full
-SeqRepo/fleet reference is deferred to TSC1+ / Tier-3.
+**v1 uses a minimal, pinned, checksummed reference — NOT the full ~13 GB SeqRepo snapshot.** The engine
+is **gene-agnostic** (GP-6); for the v1 gene set **{TSC1, TSC2}** the only sequences needed are the two
+gene chromosomes and their MANE transcripts:
 
-- **`variant_id` = genomic SPDI needs only the genomic sequence (chr16) — no UTA.** This is the join
-  key (§2.1) and is buildable+validatable now.
-- **c./p. projection needs transcript↔genome alignment = UTA** (Postgres + pinned dump). This is a
-  **separate adapter, gated on the UTA setup step**; not on the offline/genomic critical path.
+| Gene | Chromosome (genomic, for SPDI) | MANE transcript / protein (for c./p.) |
+|---|---|---|
+| TSC2 | GRCh38 chr16 — `NC_000016.10` | `NM_000548.5` / `NP_000539.2` |
+| TSC1 | GRCh38 chr9 — `NC_000009.12` (minus strand) | `NM_000368.5` / `NP_000359.2` |
 
-### 10.2 Config pins → `configs/ingest/tsc2.yaml` (FR8; nothing hardcoded)
+Total ~70 MB (two chromosomes + two transcripts), offline-friendly, and *more* reproducible than a
+moving full-snapshot (R-A11). Full SeqRepo/fleet reference is deferred to more-genes / Tier-3.
+
+- **`variant_id` = genomic SPDI needs only the genomic sequence — no UTA, strand-independent.** This is
+  the join key (§2.1), buildable+validatable now for **both** genes (TSC1's minus strand does not affect
+  genomic SPDI).
+- **c./p. projection needs transcript↔genome alignment = UTA** (Postgres + pinned dump); TSC1's minus
+  strand matters here. **Separate adapter, gated on the UTA setup step**; not on the genomic critical path.
+
+### 10.2 Config = gene-list → `configs/ingest/*.yaml` (FR8; nothing hardcoded, GP-6)
+
+Config is **gene-list-driven** (never a hardcoded single gene). Shared pins + a per-gene block:
 
 | Key | Value | Note |
 |---|---|---|
-| `gene` | `TSC2` | v1 scope |
+| `genes` | `[TSC1, TSC2]` | v1 ingestion set; gene-agnostic engine |
 | `assembly` / `assembly_patch` | `GRCh38` / `p14` | `confirm` patch |
-| `genome_accession` | `NC_000016.10` | chr16, RefSeq GRCh38 |
 | `mane_release` | `1.4` | `confirm` against locked MANE release |
-| `transcript_accession` | `NM_000548.5` | `confirm` .version vs MANE release |
-| `protein_accession` | `NP_000539.2` | |
-| `clinvar_snapshot_id` / `_date` / `_file_checksum` | *(set when snapshot pinned)* | FR1 |
-| `reference_checksums` | `{NC_000016.10: <sha256>, NM_000548.5: <sha256>}` | R-A11 |
 | `normalizer` | `{tool: <hgvs\|bcftools>, version: <pinned>}` | doer picks; `confirm` |
+| `clinvar_snapshot_id` / `_date` / `_file_checksum` | *(set when snapshot pinned)* | FR1 |
+| **per gene → `genome_accession`** | TSC2 `NC_000016.10` · TSC1 `NC_000009.12` | RefSeq GRCh38 |
+| **per gene → `transcript_accession`** | TSC2 `NM_000548.5` · TSC1 `NM_000368.5` | `confirm` .version |
+| **per gene → `protein_accession`** | TSC2 `NP_000539.2` · TSC1 `NP_000359.2` | |
+| `reference_checksums` | `{NC_000016.10, NC_000009.12, NM_000548.5, NM_000368.5: <sha256>}` | R-A11 |
 
 Config **schema-validates**; a missing/blank required pin **fails loudly** (AC7). `confirm` pins do
 not block the offline build; they gate a real-corpus / c./p. run.
@@ -191,10 +202,16 @@ trap that hid PRD-03's bugs):
 - **Cross-check:** a handful cross-validated against **Mutalyzer** / NCBI Variation Services SPDI API,
   cached for offline replay (§5).
 - Fixture must include: ≥1 SNV, ≥1 **small deletion needing left-alignment** (the case that actually
-  exercises the reference), ≥1 insertion/dup, ≥1 non-coding (SPDI-only, c./p. null-with-reason), and
-  ≥1 case that **must route to manual queue** (FR3).
+  exercises the reference), ≥1 insertion/dup, ≥1 non-coding (SPDI-only, c./p. null-with-reason), ≥1
+  case that **must route to manual queue** (FR3), and **≥1 variant per gene (TSC1 *and* TSC2)** so both
+  chromosomes are exercised.
 
 ### 10.6 v1 increment scope (what the loop builds now)
+
+### 10.6 v1 increment scope (what the loop builds now)
+
+**Gene scope: ingestion/normalization covers BOTH TSC1 + TSC2** (gene-agnostic, chr16 + chr9); the
+first **validation gate is TSC2-first** (PRD-06, EVAL_PLAN §1.2) — TSC1's gate is a fast-follow.
 
 - **Built + validated offline now:** FR1, FR3, FR5–FR9; AC1, AC2, AC4, AC5, AC6, AC7.
 - **Built + validated on real data in this increment:** AC3 **genomic** (`variant_id` + `hgvs_g`) —
