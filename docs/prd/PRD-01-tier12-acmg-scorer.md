@@ -229,3 +229,20 @@ store in tests — grounding verified against the real schema).
 - **BLOCKED (not invented):** **AC1a/AC1b** (accuracy metrics + trust gate) — need the frozen benchmark
   (PRD-06) + Oracle-pre-registered thresholds. Buildable ≠ validated (§7); no target number invented
   (GP-9/H13).
+
+### 10.7 Fix-round decisions (checker round 1) — R-A3 safety + R-A10 accounting
+
+- **Splice-region routing** matches `splice_region_variant` as a **token** within a (possibly
+  compound/VEP) `consequence` (`missense_variant,splice_region_variant`, `splice_region_variant&intron_variant`),
+  not by exact-string equality.
+- **Out-of-scope gene:** a record whose `gene_name` is not in `config.genes` **routes to manual review**
+  (never silently scored) — a v1-scope safety invariant (always on, not an `edge_cases` toggle).
+- **Strength-vocab enforcement:** an emitted `strength` must be within that criterion's
+  `strength_vocab`; a fired criterion whose mapped strength is out-of-vocab **routes to manual review**
+  (`strength_out_of_vocab`), never emitted with a nonsensical strength.
+- **Direction/family consistency:** `load_config` **fails loud** if a criterion's configured
+  `direction` disagrees with its ACMG family (P\* → pathogenic, B\* → benign) — the registered
+  `evidence_kinds` direction and the emitted evidence direction must not diverge.
+- **Zero-fired accounting (R-A10):** every input record gets a durable per-variant outcome in
+  `ScorerReport.variant_outcomes` (`scored` / `manual_review` / `no_evidence`), included in
+  `content_hash()` — a variant with 0 fired/included criteria is explicitly accounted, not dropped.
