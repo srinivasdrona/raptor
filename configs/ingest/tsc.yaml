@@ -1,0 +1,46 @@
+# PRD-02 sec 10.2 — v1 gene-list config (TSC1 + TSC2). Gene-agnostic engine
+# (GP-6): nothing gene-specific is hardcoded in code, only here.
+#
+# Pins marked `confirm` below are not yet locked against a real ClinVar
+# snapshot / MANE release review (sec 9/10.2) -- they do not block the
+# offline build or the AC3-genomic real-reference validation (sec 10.6),
+# but MUST be confirmed before a real-corpus ingestion run.
+
+genes: [TSC1, TSC2]
+
+assembly: GRCh38
+assembly_patch: p14  # confirm: pin against the exact GRCh38 patch used to build the reference FASTA
+
+mane_release: "1.4"  # confirm: pin against the locked MANE release
+
+normalizer:
+  tool: bioutils+pysam   # bioutils.normalize (biocommons) EXPAND-mode SPDI algebra over a
+                          # pysam.FastaFile-indexed local reference (sec 10.1/10.3)
+  version: "bioutils-0.6.1"  # confirm: repin exactly when normalizer/library version changes (R-A11)
+
+# ClinVar variant_summary.txt.gz snapshot identity (FR1). Placeholder until
+# a real snapshot is pinned for a full-corpus run (see PRD-02 sec 7
+# dependency: "Pinned ClinVar snapshot (TSC2) - not started").
+clinvar_snapshot_id: "confirm-pending-snapshot"
+clinvar_snapshot_date: "confirm-pending-date"
+clinvar_snapshot_file_checksum: "confirm-pending-checksum"
+
+TSC1:
+  genome_accession: NC_000009.12
+  transcript_accession: NM_000368.5  # confirm .version against locked MANE Select release
+  protein_accession: NP_000359.2
+
+TSC2:
+  genome_accession: NC_000016.10
+  transcript_accession: NM_000548.5  # confirm .version against locked MANE Select release
+  protein_accession: NP_000539.2
+
+# sha256 of the pinned reference FASTAs (sec 10.1/R-A11). Genomic
+# accessions are locked (fetched + indexed during this build); transcript
+# FASTA is not yet fetched in this increment (c./p. deferred to UTA, sec
+# 10.6), so its checksum is `confirm-pending` until that step.
+reference_checksums:
+  NC_000016.10: "22dc1bb93de407e0653791c36e4097fbaf64c9efa2510c83b7777f607a61e4d0"
+  NC_000009.12: "650011382f44e91b90c85271833737af2afdb6f9e92ef56f1f8f58f2389e3351"
+  NM_000548.5: "confirm-pending"
+  NM_000368.5: "confirm-pending"

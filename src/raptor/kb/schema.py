@@ -28,6 +28,19 @@ def _migration_files() -> list[Path]:
     return sorted(MIGRATIONS_DIR.glob("*.sql"), key=lambda p: p.name)
 
 
+def _is_memory_database(conn: sqlite3.Connection) -> bool:
+    """True for `:memory:` (or other in-process-only) SQLite connections.
+
+    ``PRAGMA database_list`` reports an empty ``file`` for the ``main``
+    database when it lives only in memory (no backing file) — this covers
+    the KB's connection is *not* on disk, so WAL (which requires a
+    filesystem-backed database) is structurally unavailable regardless of
+    what pragma we ask for.
+    """
+    row = conn.execute("PRAGMA database_list").fetchone()
+    return row is not None and not row[2]
+
+
 def configure_connection(conn: sqlite3.Connection) -> None:
     """Apply the §5.1 runtime contract pragmas to a connection.
 
@@ -49,13 +62,22 @@ def verify_runtime_contract(conn: sqlite3.Connection) -> None:
     setting like ``foreign_keys`` — it does not persist across reconnects
     either — so it is verified here on the same connection ``KBStore`` uses
     for ``publish()``, immediately after ``configure_connection`` applies it.
+
+    Exception: an in-memory (``:memory:``) database can never report
+    ``journal_mode=wal`` — SQLite does not support WAL without a backing
+    file, so it silently stays on ``memory`` regardless of the pragma
+    request. WAL exists for crash-durability across process restarts, which
+    is moot for a connection with no persistent file to recover from, so
+    ``journal_mode=memory`` is accepted there instead (used by fast,
+    isolated test-only `KBStore(":memory:")` instances).
     """
     (fk,) = conn.execute("PRAGMA foreign_keys").fetchone()
     if not fk:
         raise RuntimeContractError("runtime contract violated: PRAGMA foreign_keys is OFF")
 
     (journal_mode,) = conn.execute("PRAGMA journal_mode").fetchone()
-    if str(journal_mode).lower() != "wal":
+    journal_mode = str(journal_mode).lower()
+    if journal_mode != "wal" and not (journal_mode == "memory" and _is_memory_database(conn)):
         raise RuntimeContractError(
             f"runtime contract violated: journal_mode={journal_mode!r}, expected 'wal'"
         )

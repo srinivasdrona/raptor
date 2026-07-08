@@ -7,7 +7,11 @@ name = "raptor"
 version = "0.1.0"
 description = "RAPTOR: TSC1/TSC2 variant curation pipeline (KB schema & provenance ledger, PRD-03)."
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "PyYAML>=6.0",
+    "bioutils>=0.6.0",
+    "pysam>=0.22",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "hypothesis>=6.0"]
