@@ -393,3 +393,37 @@ def test_reader_reads_gzipped_snapshot(tmp_path):
     rows_plain = list(ClinVarVariantSummaryReader(slice_path, "TSC2", cfg_plain))
     rows_gz = list(ClinVarVariantSummaryReader(gz_path, "TSC2", cfg_gz))
     assert len(rows_gz) == len(rows_plain) > 0
+
+
+# --- Fix-round 2 (checker round 2): checksum fail-loud must hold end-to-end ---
+@pytest.mark.requires_reference
+def test_pipeline_fails_loud_on_reference_checksum_mismatch(real_normalizer, tmp_path):
+    """[major] R-A11/FR8: a wrong `reference_checksums` pin must fail the WHOLE RUN
+    through `run_ingest` — NOT get swallowed into a manual-queue item. Verified
+    end-to-end (the unit-level normalizer test alone missed the pipeline path)."""
+    cfg = _config_with(tmp_path, reference_checksums={"NC_000016.10": "0" * 64})
+    store = KBStore(":memory:")
+    try:
+        variants = [_raw(1, "NC_000016.10", 2087897, "TSC2", ref="C", alt="T")]
+        with pytest.raises(Exception) as exc:
+            run_ingest(cfg, DummyReader(variants), real_normalizer, store)
+        assert "checksum" in str(exc.value).lower()
+        # fail-loud discards staging: nothing partially published or queued
+        assert store.conn.execute("SELECT COUNT(*) FROM variants").fetchone()[0] == 0
+        assert store.conn.execute("SELECT COUNT(*) FROM manual_queue").fetchone()[0] == 0
+    finally:
+        store.close()
+
+
+@pytest.mark.requires_reference
+def test_reused_normalizer_reverifies_checksum_per_config(real_normalizer, tmp_path):
+    """[major] the checksum-verified cache must not mask a later wrong pin: a
+    normalizer first used with no/correct pin must STILL fail loud when later
+    handed a config whose `reference_checksums` pin is wrong."""
+    raw = _raw(1, "NC_000016.10", 2087897, "TSC2", ref="C", alt="T")
+    first = real_normalizer.normalize(raw, _config_with(tmp_path, reference_checksums={}))
+    assert first.__class__.__name__ == "NormalizedVariant"  # no pin -> normalizes, caches accession
+    bad_cfg = _config_with(tmp_path, reference_checksums={"NC_000016.10": "0" * 64})
+    with pytest.raises(Exception) as exc:
+        real_normalizer.normalize(raw, bad_cfg)
+    assert "checksum" in str(exc.value).lower()
