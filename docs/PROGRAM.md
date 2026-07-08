@@ -44,7 +44,7 @@ index file until ≥3 exist).
 
 | PRD | Feature | Phase | Status |
 |---|---|---|---|
-| PRD-01 | Tier-1/2 Deterministic ACMG Scorer | 1 | **Signed off** (spec) · module: next |
+| PRD-01 | Tier-1/2 Deterministic ACMG Scorer | 1 | **Signed off · module built ✓** (`1d2444e`, 149 tests; arm's-length BIAS) |
 | PRD-02 | Variant Ingestion & Normalization | 0 | **Signed off · module built ✓** (`a889710`, 125 tests) |
 | PRD-03 | KB Schema & Provenance Ledger | 0 | **Signed off · module built ✓** (`b627073`) |
 | PRD-04 | VCEP Triage Worklist | 1 | backlog |
@@ -66,4 +66,9 @@ index file until ≥3 exist).
   reference (chr9 `NC_000009.12` + chr16 `NC_000016.10`) at `~/raptor-refseq`, checksums pinned in
   `configs/ingest/tsc.yaml`. Add a committed `scripts/` fetch-and-verify step so a fresh clone can
   reproduce it (until then AC3 `requires_reference` tests skip without the local data).
-- (Open) **Environment:** Python 3.12.10 on Windows; **WSL2 Ubuntu 24.04.4 LTS (aarch64) ready**, venv **`raptor`** at `~/raptor` (Python 3.12.3, pytest 9.1.1, gcc 13.3/make). Code lives at `/mnt/d/AIProjects/raptor`; venv on Linux fs. Modules built via plan/build/check: **PRD-03 ✓, PRD-02 ✓ (signed off, GPT checker r3); PRD-01 next** (then PRD-06 gate). Cross-machine fleet = deferred (Tier-3 only; not needed for Tiers 1/2).
+- (Open) **Build-process hardening (approved):** stand up `tests/kit/` executable conformance kit
+  (universal invariants + adversarial generators) + `catalog.yaml` registry (promotion threshold, rule
+  of 2/3) + meta-tests (catalog↔kit↔manifest sync + discovery) + pre-commit/CI gate (pytest + mypy +
+  conformance) + checker gate-0 (kit-wired presence check). Retrofit PRD-01/02/03. Turns the recurring
+  bug-classes into *enforced* gates instead of prompt-memory. (todo `build-conformance-kit`.)
+- (Open) **Environment:** Python 3.12.10 on Windows; **WSL2 Ubuntu 24.04.4 LTS (aarch64) ready**, venv **`raptor`** at `~/raptor` (Python 3.12.3, pytest 9.1.1, gcc 13.3/make). Code lives at `/mnt/d/AIProjects/raptor`; venv on Linux fs. Modules built via plan/build/check: **PRD-03 ✓, PRD-02 ✓, PRD-01 ✓ (signed off)**. Next: build-process hardening (conformance kit + CI) → PRD-06 (eval-gate) → PRD-04/05. **Deferred data setup:** reference-fetch script (R-A11); UTA on x64 worker (c./p.); BIAS+Nirvana on x64 worker (ADR-0008, live scoring). Cross-machine fleet = deferred.
