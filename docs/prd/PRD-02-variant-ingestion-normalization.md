@@ -1,6 +1,6 @@
 # PRD-02 — Variant Ingestion & Normalization
 
-> **Status:** Draft · **Owner:** @sdrona_microsoft · **Phase:** 0 (STRATEGY §7) · **Last updated:** 2026-07-08
+> **Status:** Ready (v1 increment — build contract §10) · **Owner:** @sdrona_microsoft · **Phase:** 0 (STRATEGY §7) · **Last updated:** 2026-07-08
 >
 > **Format:** standard lean PRD; acceptance criteria feed the build-loop gates (OPERATING_MODEL §4)
 > and the eval mapping (EVAL_PLAN §3.2). One feature per PRD.
@@ -99,4 +99,104 @@ H7 (config drift) · **GP-10/R-G4** (only public coordinates leave, if an extern
 
 - **Normalizer choice** (implementation detail): local `hgvs` (biocommons) + pinned **UTA** *(default, for R-A11/GP-5)* vs mutalyzer vs `bcftools norm`. An external SPDI API is used **only** via cached replay (§5).
 - VCV XML as a fast-follow source for richer accessions (v1 uses `variant_summary.txt.gz`).
-- **Exact pin values** (MANE Select version, transcript/protein `accession.version`, GRCh38 patch, reference/UTA checksum, normalizer version) must be filled into `configs/ingest/` **before the PRD is Ready** — they are config keys (FR8), not code.
+- **Exact pin values** (MANE Select version, transcript/protein `accession.version`, GRCh38 patch, reference/UTA checksum, normalizer version) must be filled into `configs/ingest/` **before the PRD is Ready** — they are config keys (FR8), not code. *(Resolved in §10.2, values flagged `confirm`.)*
+
+## 10. Build contract (v1 increment) — resolves §9; feeds the loop
+
+> Written by the planner (OPERATING_MODEL §2). The test-author writes tests to this public
+> surface; the doer implements to pass them; nothing here is trace/oracle. Every pin marked
+> `confirm` is a **config key** to lock before a real-corpus run (GP-9 — not fabricated, not gating
+> the offline build). This section makes PRD-02 **Ready**.
+
+### 10.1 Reference-data strategy (resolves §9 normalizer + reference)
+
+**v1 uses a minimal, pinned, checksummed reference — NOT the full ~13 GB SeqRepo snapshot.** For
+TSC2-only, the only sequences needed are **GRCh38 chr16 (`NC_000016.10`)** for genomic
+left-alignment/SPDI and the **MANE transcript/protein (`NM_000548.5`/`NP_000539.2`)** for c./p. This
+is ~30 MB, offline-friendly, and *more* reproducible than a moving full-snapshot (R-A11). Full
+SeqRepo/fleet reference is deferred to TSC1+ / Tier-3.
+
+- **`variant_id` = genomic SPDI needs only the genomic sequence (chr16) — no UTA.** This is the join
+  key (§2.1) and is buildable+validatable now.
+- **c./p. projection needs transcript↔genome alignment = UTA** (Postgres + pinned dump). This is a
+  **separate adapter, gated on the UTA setup step**; not on the offline/genomic critical path.
+
+### 10.2 Config pins → `configs/ingest/tsc2.yaml` (FR8; nothing hardcoded)
+
+| Key | Value | Note |
+|---|---|---|
+| `gene` | `TSC2` | v1 scope |
+| `assembly` / `assembly_patch` | `GRCh38` / `p14` | `confirm` patch |
+| `genome_accession` | `NC_000016.10` | chr16, RefSeq GRCh38 |
+| `mane_release` | `1.4` | `confirm` against locked MANE release |
+| `transcript_accession` | `NM_000548.5` | `confirm` .version vs MANE release |
+| `protein_accession` | `NP_000539.2` | |
+| `clinvar_snapshot_id` / `_date` / `_file_checksum` | *(set when snapshot pinned)* | FR1 |
+| `reference_checksums` | `{NC_000016.10: <sha256>, NM_000548.5: <sha256>}` | R-A11 |
+| `normalizer` | `{tool: <hgvs\|bcftools>, version: <pinned>}` | doer picks; `confirm` |
+
+Config **schema-validates**; a missing/blank required pin **fails loudly** (AC7). `confirm` pins do
+not block the offline build; they gate a real-corpus / c./p. run.
+
+### 10.3 Module layout + public API (the test contract) — `src/raptor/ingest/`
+
+- **`config.py`** — `IngestConfig` (frozen dataclass) + `load_config(path) -> IngestConfig`;
+  schema-validates, raises on missing pin (AC7/FR8).
+- **`model.py`** — `RawVariant` (parsed ClinVar row + source-ref fields), `VariantClass` (enum: `SNV`,
+  `MNV`, `SMALL_INDEL`, `NONCODING_SPDI_ONLY`, `SPLICE_REGION`, `IMPRECISE_SV`, `COMPLEX_MULTIGENE`,
+  `PROJECTION_FAILURE`), `NormalizedVariant` (`variant_id`, `hgvs_g/c/p` + null_reasons,
+  `variant_class`), `ManualQueueItem` (FR6 fields), `NormalizationOutcome = NormalizedVariant | ManualQueueItem`.
+- **`contract.py`** — `VariantSummaryContract.assert_columns(header)`; raises `SourceContractError`
+  on drift (FR9/AC6).
+- **`reader.py`** — `ClinVarVariantSummaryReader(path, gene, config)`: contract-check then yield
+  `RawVariant` filtered to gene, each carrying `{VariationID, snapshot_id, snapshot_date,
+  source_file_checksum, row_locator, raw_source_value}` (FR1/FR5).
+- **`normalizer.py`** — `Normalizer` **Protocol port** (FR2): `normalize(raw, config) -> NormalizationOutcome`.
+  Real impl `SeqRepoGenomicNormalizer` (chr16-backed: `variant_id` + `hgvs_g`; c./p. via UTA adapter
+  when present, else `hgvs_c/p = None` with null_reason `"awaiting_uta_projection"`). FR3 class-routing
+  lives here (`classify.py` optional).
+- **`pipeline.py`** — `run_ingest(config, reader, normalizer, store) -> IngestReport`: read →
+  contract → normalize → route → write-to-KB (`store.stage_source_ref` → `store.stage_variant(source_ref_ids=…)`
+  **or** `store.stage_manual_queue`, then `store.publish`). **Enforces AC1 conservation:**
+  `|input| = |normalized| + |queued|`, 0 dropped.
+- **`report.py`** — `IngestReport`: deterministic content (counts, sorted `variant_id` list, class
+  histogram, manual-queue summary) **separate** from run metadata (`run_id`, `generated_at`);
+  `content_hash()` excludes run metadata (FR7/AC2).
+
+Writes go through the **committed PRD-03 KB API** (`KBStore`): `stage_source_ref(...) -> id`,
+`stage_variant(run_id, variant_id=, gene=, class_=, provenance=, source_ref_ids=, hgvs_*=, *_null_reason=)`,
+`stage_manual_queue(...)`, `build_provenance(...)`, `publish(run_id)`. The store is **injected** (tests
+use a real in-memory/temp `KBStore` — grounding is verified against the actual schema, not a mock).
+
+### 10.4 Normalizer port = offline testability
+
+The `Normalizer` is **dependency-injected**. Structural ACs (AC1/AC2/AC4/AC5/AC6/AC7) run offline with
+a **deterministic fake normalizer** (fixed raw → fixed outcome, no reference data). Real-reference ACs
+are marked so they collect now and run when data lands:
+- `@pytest.mark.requires_reference` — AC3 **genomic** (`variant_id` + `hgvs_g`) via the real
+  `SeqRepoGenomicNormalizer` on the pinned chr16 reference (~30 MB, fetched on demand).
+- `@pytest.mark.requires_uta` — AC3 **c./p.** correctness (Track C).
+
+### 10.5 AC3 independent oracle (anti-circularity — the PRD-03 lesson)
+
+Expected `variant_id`/SPDI/`hgvs_g` in the **frozen AC3 fixture** are derived **independently of the
+normalizer under test** — never by freezing our own normalizer's output (that is the confirmation-bias
+trap that hid PRD-03's bugs):
+- **Primary oracle:** ClinVar's own **`CanonicalSPDI`** column in `variant_summary` (NCBI-computed —
+  a different implementation) for each fixture variant.
+- **Cross-check:** a handful cross-validated against **Mutalyzer** / NCBI Variation Services SPDI API,
+  cached for offline replay (§5).
+- Fixture must include: ≥1 SNV, ≥1 **small deletion needing left-alignment** (the case that actually
+  exercises the reference), ≥1 insertion/dup, ≥1 non-coding (SPDI-only, c./p. null-with-reason), and
+  ≥1 case that **must route to manual queue** (FR3).
+
+### 10.6 v1 increment scope (what the loop builds now)
+
+- **Built + validated offline now:** FR1, FR3, FR5–FR9; AC1, AC2, AC4, AC5, AC6, AC7.
+- **Built now, validated when the pinned reference is present (fast):** AC3 **genomic** (`variant_id`
+  + `hgvs_g`).
+- **Deferred to the UTA step:** `hgvs_c/hgvs_p` projection + AC3 c./p.. Until UTA, coding variants
+  publish with a valid `variant_id` + `hgvs_g` + class and **`hgvs_c/p = null` WITH reason
+  `"awaiting_uta_projection"`** — an explicit FR3 null-with-reason, **not** a silent gap and **not**
+  manual-queue (the join key is valid; only the annotation is deferred). PRD-01 joins on `variant_id`
+  (§2.1), so this increment is already useful to the scorer.
