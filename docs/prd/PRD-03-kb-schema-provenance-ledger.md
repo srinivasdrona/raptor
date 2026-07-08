@@ -125,3 +125,13 @@ downstream module cannot write an ungrounded record even by mistake.
 - **Staging mechanism:** attached per-run DB vs `stg_*` tables — both satisfy FR4/AC3; decide at build.
 - **Immutability enforcement:** triggers (default, hard guarantee) vs app-layer + tests.
 - **`knowledge_assertions`** cross-linkage stub: minimal columns now, full shape when Tier-3/cross-linkage is designed (GP-7).
+
+## 10. Known limitations (signed-off scope)
+
+- **`published_state_hash()` is scoped to AC3 (same-DB atomic-publish detection)** — ADR-0006. It also
+  provides a *best-effort* cross-DB canonical logical fingerprint (surrogate-, order-, type-invariant,
+  ledger-sequence-sensitive), fully test-covered (Gemini property tests + determinism tests, 100
+  green), with **one deferred gap**: JSON TEXT columns other than `ledger.payload` (`provenance`,
+  `approvals`, `config_pins`, `strength_vocab`) are hashed raw, so two *different* DBs whose JSON
+  differs only by key order can hash differently. **AC3 is unaffected** (same-DB, values unchanged).
+  Full JSON canonicalization is deferred to R-A11 reproducibility work (a `_JSON_COLUMNS` registry).

@@ -9,12 +9,115 @@
 
 | ID | Title | Status | Date |
 |----|-------|--------|------|
+| [ADR-0006](#adr-0006--scope-published_state_hash-to-ac3-defer-full-cross-db-canonical-fingerprint) | Scope `published_state_hash()` to AC3; defer full cross-DB canonical fingerprint | Accepted | 2026-07-08 |
+| [ADR-0005](#adr-0005--test-strategy-separated-authorship-model-diversity-frameworks--domain-truth-data) | Test strategy: separated authorship, model diversity, frameworks & domain truth-data | Accepted | 2026-07-08 |
 | [ADR-0004](#adr-0004--runtime-stack-litellm--prefect--sqlite--ollama-no-ray-no-langgraph) | Runtime stack: LiteLLM + Prefect + SQLite + Ollama (no Ray, no LangGraph) | Accepted | 2026-07-08 |
 | [ADR-0003](#adr-0003--loop-operating-model-planner--doer--checker-across-three-model-families) | Loop operating model: planner / doer / checker across three model families | Accepted | 2026-07-08 |
 | [ADR-0002](#adr-0002--vision--strategy-doc-format-pichler-vision-board--rumelt-kernel) | Vision & strategy doc format: Pichler Vision Board + Rumelt Kernel | Accepted | 2026-07-08 |
 | [ADR-0001](#adr-0001--strategic-framing-narrow-buildable-claim-with-broad-north-star) | Strategic framing: narrow-buildable claim with broad north-star | Accepted | 2026-07-08 |
 
 ---
+
+## ADR-0006 — Scope `published_state_hash()` to AC3; defer full cross-DB canonical fingerprint
+
+- **Status:** Accepted
+- **Date:** 2026-07-08
+- **Deciders:** @sdrona_microsoft
+
+### Context
+
+PRD-03 AC3 requires detecting a partial/failed publish — a **same-DB before/after** hash comparison.
+During the build, `published_state_hash()` was additionally engineered as a **cross-DB canonical
+logical fingerprint** (two different DBs with the same logical content hash equal). That stronger
+property proved to be a deep serialization problem: six checker rounds each found a real but
+progressively narrower cross-DB edge case (ledger-order, evidence_id, source_ref_id + snapshot_id,
+content-rank tie-breaking, snapshot scope, `str()` type-coercion, and finally JSON-TEXT key-order).
+The surrogate-leak *class* was verified closed (complete registry); the remaining gap is JSON-column
+key-order canonicalization. **Every one of these edge cases affects only cross-DB comparison — none
+affects AC3** (within one DB across a failed publish, values do not change).
+
+### Decision
+
+**Scope the binding contract of `published_state_hash()` to AC3 (same-DB atomic-publish detection),
+which is fully met (100 tests green).** The cross-DB canonical fingerprint is retained as a
+**best-effort** capability with **one documented known limitation** — JSON TEXT columns other than
+`ledger.payload` (`provenance`, `approvals`, `config_pins`, `strength_vocab`) are hashed raw, so
+different DBs whose JSON differs only by key order may hash differently. **Full JSON canonicalization
+(a `_JSON_COLUMNS` registry) is DEFERRED** to the reproducibility work (R-A11), where a cross-DB
+"same logical KB?" check would actually be consumed. A **hard stop** was invoked after round 6 to
+prevent open-ended iteration on a property nothing yet depends on (GP-7).
+
+### Consequences
+
+- **Good:** PRD-03 signs off on its actual ACs without further iteration; the ~95%-complete
+  fingerprint + its property tests (Gemini-authored) are kept and green; the gap is documented in
+  code (`published_state_hash` docstring) + PRD-03 §10, not hidden (anti-H4).
+- **Bad / deferred:** the cross-DB fingerprint is not fully canonical yet; anything that later relies
+  on it for reproducibility (R-A11) must first finish JSON canonicalization.
+- **Process note:** the six-round saga validated the loop — the different-family checker + Gemini's
+  schema-enumerated tests caught defects the doer's own 78→100 green suite never did. It also showed
+  the value of a pre-committed **hard stop** to convert an open-ended rabbit hole into a bounded,
+  documented scope decision.
+
+### Confirmation
+
+Satisfied: AC3 tests green; the known limitation is documented in `store.py` and PRD-03 §10; a
+follow-up (R-A11 JSON canonicalization) is tracked.
+
+## ADR-0005 — Test strategy: separated authorship, model diversity, frameworks & domain truth-data
+
+- **Status:** Accepted
+- **Date:** 2026-07-08
+- **Deciders:** @sdrona_microsoft
+- **Refines:** ADR-0003 (adds a 4th role + test-tooling to the loop)
+
+### Context
+
+The PRD-03 (KB) build shipped 78 green tests that hid 5 real bugs, caught only by the different-family
+checker. Root cause: the doer wrote code **and** tests in one pass, so the tests inherited the code's
+blind spots (confirmation bias — RISK_REGISTER H2/H4). The checker is post-facto; we want pre-facto
+defenses, and to keep the planner's context clear of operational test-writing.
+
+### Decision
+
+1. **Separated test authorship with model diversity.** For foundational/high-assurance modules a
+   dedicated **test-author agent = Gemini** writes the acceptance tests **from the spec only** (never
+   seeing the doer's code), *before* the doer builds. Roles now span **four families** — planner
+   (Opus) · test-author (Gemini) · doer (Sonnet) · checker (GPT) — so the test-author differs from
+   both the doer and the checker. Gemini is chosen for **family-independence** (the doer is Claude, so
+   a Claude test-author would re-share the blind spot) and its spec/doc-driven strength — not because
+   it is the single best test-writer (Claude is). The **planner owns the test *contract*** (which
+   ACs/invariants) but **delegates the test *code***, staying context-clean.
+2. **Local models are NOT used for foundational test authoring.** A weaker author can't catch a
+   stronger doer's bugs; Windows-ARM Ollama is CPU-bound; heavy models want the 64GB workers, not the
+   32GB Queen. Reserve local models (**Qwen2.5-Coder-14B/32B**) for Tier-3 abstract screening and
+   later low-stakes/bulk generation.
+3. **Adopt two SE frameworks** (dev-only deps): **Hypothesis** (property-based tests for core
+   invariants — ~50× more mutant-killing than examples, and harder to game) and **mutation testing**
+   (`mutmut`, run selectively on core modules) as the *mechanical* anti-hollow-green control — it
+   fails when tests don't catch injected mutations.
+4. **Domain truth-data & reusable fixtures — scoped honestly.** RAPTOR *classifies* variants, it does
+   **not call** them, so variant-**calling** benchmarks (GIAB, hap.py, vcfeval, nf-test) are **out of
+   scope**. Reuse instead: **`biocommons/hgvs` test vectors** (independent normalization fixtures →
+   seed PRD-02 AC3, breaking the self-verification circularity), **`bitscopic/BIAS-2015` test suite**
+   (how the 19/28 ACMG criteria are validated → PRD-01), **GA4GH normalization *concepts*** for
+   representation equivalence (R-A10), and **ClinGen/ClinVar expert labels** as classification truth
+   (already the EVAL_PLAN label hierarchy).
+
+### Consequences
+
+- **Good:** attacks the confirmation-bias root cause pre-facto; keeps planner context clean; mutation
+  testing gives a mechanical hollow-green detector; independent domain fixtures remove AC3 circularity.
+- **Cost:** one more agent per foundational build (slower + more spend) — applied to foundational
+  modules only; lighter for low-risk ones (GP-7). Mutation testing is slow → selective, not every run.
+- **Open:** whether the test-author sees the *checker's* prior verdicts on re-runs (leaning yes, to
+  target regressions) without seeing the doer's code.
+
+### Confirmation
+
+Satisfied when a foundational module's acceptance tests are authored by Gemini from the spec, the
+Sonnet doer passes them without weakening, `hypothesis` covers the core invariants, and `mutmut` on
+the core module reports no surviving mutants in the critical paths.
 
 ## ADR-0004 — Runtime stack: LiteLLM + Prefect + SQLite + Ollama (no Ray, no LangGraph)
 

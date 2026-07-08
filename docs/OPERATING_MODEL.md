@@ -56,9 +56,10 @@ VERIFICATION block, and a verdict are all written and persisted).
 
 | Role | Model / who | Owns |
 |---|---|---|
-| **Planner** | Claude **Opus** | Decompose; write Task Spec + acceptance criteria; keep context lean. **No production code.** |
-| **Doer** | Claude **Sonnet 5** | Implement against the spec; own the change end-to-end; emit VERIFICATION. |
-| **Checker** | **GPT (5.x)** | Adversarially run the gates; pass or return with a *named* failure mode. |
+| **Planner** | Claude **Opus** | Decompose; write Task Spec + the acceptance-test *contract* (which ACs/invariants); long-range reasoning. **No production code, no test code** — stays context-clean. |
+| **Test-author** | **Gemini** (3.x) | Turn the spec's ACs into executable, assertion-specific tests **from the spec only (never sees the doer's code)**. Delegated/detached so planner context stays clean. |
+| **Doer** | Claude **Sonnet 5** | Implement against the spec to pass the pre-authored tests; may *add* but not weaken them; own the change end-to-end; emit VERIFICATION. |
+| **Checker** | **GPT (5.x)** | Adversarially run the gates; re-run independently; pass or return with a *named* failure mode. |
 | **Operator** | @sdrona (human) | Accountable for the whole loop; merges; approves internal records. |
 | **Oracle** | molecular geneticist (GP-3) | Domain-truth sign-off for any externally-meaningful output. |
 
@@ -73,7 +74,9 @@ VERIFICATION block, and a verdict are all written and persisted).
 
 **Hard rules**
 1. **Checker family ≠ doer family** — adversarial review, not self-review (R-D1). GPT checks Sonnet's work; never Sonnet checks Sonnet.
-2. Model *roles* are fixed; specific *versions* are config (GP-6), not hardcoded.
+2. **Test-author family ≠ doer family** — the tests must not share the code's blind spots (H2/H4 confirmation bias). Sonnet builds; **Gemini writes the tests**; GPT checks. Four families (Opus/Gemini/Sonnet/GPT) = maximal independence.
+3. **The test-author writes from the spec only and never sees the doer's implementation** — tests encode the *requirement*, not the code.
+4. Model *roles* are fixed; specific *versions* are config (GP-6), not hardcoded.
 3. The **checker validates form, consistency, spec-conformance, and evidence — not domain truth.** Domain truth needs the Oracle (H11); acceptance criteria are typed accordingly (§3.1, §4 G4).
 
 ### 2.1 Escalation & disagreement
@@ -154,6 +157,37 @@ Adapted from OpenCell's 5-gate critique, extended with the RAPTOR failure modes:
 
 Every gate result cited in a CLEAN verdict must be **checker-run evidence**, not the doer's report.
 
+### 4.1 Test-authorship separation *(pre-facto defense — the highest-leverage rule)*
+
+The PRD-03 build shipped 78 green tests that hid 5 real bugs, because the **doer wrote the code and
+its tests in one pass** — the tests inherited the code's blind spots (confirmation bias; RISK_REGISTER
+H2/H4). Post-facto the different-family checker caught them, but the cheaper fix is pre-facto:
+
+- **For foundational / high-assurance modules, a dedicated *test-author* agent (Gemini — a different
+  family from the Sonnet doer *and* the GPT checker) writes the acceptance-test contract — the spec's
+  AC1..N as executable, assertion-specific tests — *before* the doer builds, and *from the spec only*
+  (never seeing the doer's code).** The **planner owns the test *contract* (which ACs/invariants to
+  cover) but delegates the test *code*** — keeping the planner context-clean for long-range reasoning
+  while still breaking the confirmation-bias loop at build time (the test author ≠ the code author).
+  Why Gemini and not the best single test-writer (Claude): the doer is Claude-family, so a Claude
+  test-author would re-share the blind spot; independence beats raw single-model quality here.
+- **The doer implements to make those tests pass; it may *add* tests but must not weaken, modify, or
+  delete the pre-authored ones** (G1 preservation still applies).
+- **Test the real API/publish path, not direct-table SQL** — integration gaps hid the `run_id` bug.
+- **Property-based invariants** (`hypothesis`, allowed as a dev-only dep) are preferred for core
+  invariants (e.g. "no variant publishes without a source_ref") — harder to game than hand-picked
+  examples.
+- **Self-audit / lint tests must be proven to catch a *known injected* violation** — the GP-6 audit
+  that missed its own `CREATE TEMP TABLE` violation would have failed this meta-test.
+- **Local models are NOT used for foundational test authoring** (quality risk: a weaker author can't
+  catch a stronger doer's bugs; ARM/Ollama immaturity; heavy models want the 64GB workers not the
+  32GB Queen). Reserve local models (Qwen2.5-Coder-14B/32B) for Tier-3 screening and later
+  low-stakes/bulk generation — see ADR-0005.
+
+This does **not** retire the checker — it is defense-in-depth (pre-facto lowers introduction; the
+checker catches the remainder), and it moves confirmation-bias risk onto the test author, so the
+planner derives tests strictly from the spec's ACs and the checker still re-runs independently.
+
 ## 5. Prompt composition — three slots *(guards H10)*
 
 Slots **1 and 2 are always present**; **slot 3 is required whenever the doer can modify existing code
@@ -179,6 +213,8 @@ or tests**, else the manifest records an explicit `slot3_na_reason`. Slot presen
 | Post-merge CLEAN audit | R-D2 | planned | Random re-check of merged CLEAN units; a wrong CLEAN reopens the unit **and** graduates a rule (§8). |
 | Operator-fatigue guard | R-D5 | manual | No domain-impacting or external merge at the end of a long session; sleep-on-it for any reclassification-affecting change. |
 | Model/version pinning | R-C6 | manual | Persist `{provider, model_id, version/date, prompt-hash}` per task; a mid-task model change forces a rerun / new task. |
+| Property-based tests (**Hypothesis**) | H2/H4 | dev-dep | Core invariants as properties over generated inputs; auto-shrinks failures. Preferred over example-only tests for critical invariants (ADR-0005). |
+| Mutation testing (**mutmut**) | H2/H4, R-D2 | planned | Selective, on core modules: inject mutations; a surviving mutant = a hollow test. The mechanical anti-hollow-green detector (ADR-0005). |
 | Agent least-privilege | R-C5, R-G4 | policy | A delegated agent is **workspace-confined**; destructive or external ops (file delete, dependency install, remote/DB write, external submit) **require approval**; **auto-approve is never shipped** for these. *(Adopted from ai4s/open-science safety defaults.)* |
 | VERIFIED/UNVERIFIED labelling | H13/R-A6 | manual | Every quantitative claim labelled; "I don't know" is allowed. |
 
@@ -204,6 +240,25 @@ a named class, *or a CLEAN later found wrong*, must trigger escalation. When suc
 4. Add a **checker gate** if it can't be linted mechanically.
 
 Every rule is "paid for" by exactly one real failure. One failure → one durable rule.
+
+### 8.1 Graduated rules v1 — from the PRD-03 (KB) build
+
+The five DO-NOT-MERGE failure modes, generalised into permanent slot-2 rules (apply to every module):
+
+1. **Grounding on *every* groundable table, incl. many-source ones.** If "≥1 child" can't be a
+   declarative FK (e.g. `variants`→`variant_source_refs`), enforce it at **publish-time validation**
+   *and* the write API — plus a negative test that an ungrounded row fails. *(bug 1)*
+2. **Every FR that names an API/publish path gets an integration test on that path, not just
+   direct-table SQL.** *(bug 2 — dropped `run_id`)*
+3. **Ledger-is-source-of-truth: any projection table is written via a ledger event; its test
+   reconstructs it by replay** (incl. secondary fields like approvals). *(bug 3)*
+4. **Schema/DDL lives in SQL/config, never hardcoded in Python** — and the GP-6 audit catches
+   `CREATE TEMP/TEMPORARY TABLE`, not just `CREATE TABLE`. *(bug 4)*
+5. **The full runtime contract is *verified*, not assumed** (e.g. `synchronous=FULL`), with a test
+   that fails on downgrade. *(bug 5)*
+6. **Self-audit/lint tests must catch a known injected violation** before they count (meta-test). *(cross-cutting)*
+
+Until `docs/prompts/` templates exist, these live here and are pasted into build prompts as slot 2.
 
 ## 9. Artifacts & locations
 

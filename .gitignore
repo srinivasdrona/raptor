@@ -17,6 +17,11 @@ __pycache__/
 .venv/
 venv/
 .ipynb_checkpoints/
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+*.db
 
 # Node
 node_modules/

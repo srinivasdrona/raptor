@@ -17,6 +17,30 @@ Quantify how well the deterministic layer (Tier-1/2) reproduces **best-available
 establish the **frozen baseline** the harder tiers are measured against, and **gate** Tier-3 trust:
 no Tier-3 value is claimed until Tier-1/2 clears its thresholds on the held-out set.
 
+### 1.1 The validation gate — measured on KNOWNS, then applied to VUS *(binding sequence)*
+
+**You cannot measure metrics on VUS** — a VUS has no ground-truth label. Validation is therefore done
+on **known-classification** variants and only *then* applied to the unknowns:
+
+```
+KNOWN TSC1/TSC2 variants (P/LP + B/LB, high review status)   ← the answer key
+        │  split (no leakage)
+        ├─ train/dev  → calibrate config thresholds (per-gene freq, PP3/BP4 cutoffs)
+        └─ held-out   → MEASURE precision / recall / concordance (thresholds frozen)
+                          │
+                   metrics clear pre-registered thresholds? (AC1b, Oracle-set)
+                          │ yes                                   │ no
+                          ▼                                       ▼
+   run scorer on the ~6,700 VUS  →  PROPOSALS,             stop; recalibrate /
+   human-reviewed, never auto-final (§9)                   widen benchmark / reassess
+```
+
+**Note — Tier-1/2 is a deterministic ACMG rule engine, not a trained model.** "train/dev" calibrates
+*configurable thresholds*, not weights; the held-out discipline still applies because threshold
+calibration can overfit. **No VUS is classified until the gate is passed.** The benchmark-construction
++ metric harness that runs this is a buildable module — **PRD-06 (Benchmark & Evaluation Harness)**,
+which **gates** any VUS run.
+
 ## 2. The frozen benchmark (ground truth — honestly, *proxy* labels)
 
 TSC has **0 expert-panel (3★) reviews**, so there is no gold standard. The benchmark uses the
@@ -130,6 +154,15 @@ substitutes for the human/oracle sign-off** (STRATEGY §9). Abstentions are firs
 ## 7. Honest limitations
 
 - Ground truth is **proxy** (best-available), not gold — TSC has no 3★ panel.
+- **Distribution shift — the deepest threat (R-A2c).** The known variants used for validation are
+  enriched for **truncating/null** variants (easy PVS1 calls); the VUS deployment set is enriched for
+  **missense** (the hard cases). Metrics on knowns can therefore **overestimate** real VUS
+  performance. Mitigations: **stratify** metrics by variant class (report missense-only P/R
+  separately), weight the benchmark toward missense where labels allow, and treat the *missense*
+  held-out number — not the overall — as the gating metric.
 - The v1 benchmark (~50) is **small**; a pass bounds risk, it does not prove generalisation.
 - Thresholds are **unset** pending the Oracle; until then, every Tier-1/2 result is `UNVERIFIED`
   against a target (GP-9) and treated as provisional (RISK_REGISTER §9).
+- **Predictor leakage/circularity:** CADD/REVEL/BIAS-2015 may have seen ClinVar labels in training;
+  evaluating against ClinVar is partly circular. Track and, where possible, report on variants
+  outside the predictors' training data.

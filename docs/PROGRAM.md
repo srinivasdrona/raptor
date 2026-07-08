@@ -49,6 +49,11 @@ index file until ≥3 exist).
 | PRD-03 | KB Schema & Provenance Ledger | 0 | **Signed off** |
 | PRD-04 | VCEP Triage Worklist | 1 | backlog |
 | PRD-05 | Pipeline & Orchestration skeleton | 0 | backlog |
+| PRD-06 | **Benchmark & Evaluation Harness** (build known-variant benchmark + train/dev/held-out split + P/R/concordance, class-stratified; **gates any VUS run**) | 1 | backlog |
+
+> **Validation gate (binding):** no classification is run on the ~6,700 TSC VUS until PRD-06 shows
+> Tier-1/2 clears pre-registered thresholds on the **held-out known-variant** set — reported
+> **stratified by variant class** (missense gated separately; R-A2c). See EVAL_PLAN §1.1.
 
 ## Active Decisions & Bottlenecks
 - (Resolved 2026-07-08) Loop-engineering operating model → planner/doer/checker, see ADR-0003.
@@ -57,4 +62,4 @@ index file until ≥3 exist).
 - (Open) Confirm worker vCPU allocation at deploy (EPYC/Xeon 8-vCPU VM vs full silicon).
 - (Open) **Build core risk controls before trusting any automated output** — canary set, heartbeat/dead-man's switch, hard spend cap, source-contract tests, **answer-key/trace-cribbing lint, assertion-lock** (RISK_REGISTER.md §1; risks R-C1/R-A2/H1).
 - (Open) ADR — reuse `biomcp` / `paper-search-mcp` MCP connectors for Tier-3 retrieval (ARCHITECTURE.md §8; gated on GP-10/GP-9).
-- (Open) **Environment:** Python 3.12.10 installed on Windows; **WSL not yet installed** (needs an elevated `wsl --install` + reboot by the operator). Per operator instruction, **module builds (PRD-01/02/03) are deferred until WSL is set up and the operator confirms**; code to be written OS-portable. Cross-machine fleet = deferred (Tier-3 only; not needed for Tiers 1/2).
+- (Open) **Environment:** Python 3.12.10 on Windows; **WSL2 Ubuntu 24.04.4 LTS (aarch64) ready**, venv **`raptor`** at `~/raptor` (Python 3.12.3, pytest 9.1.1, gcc 13.3/make). Code lives at `/mnt/d/AIProjects/raptor`; venv on Linux fs. Building modules PRD-03 → PRD-02 → PRD-01 via plan/build/check. Cross-machine fleet = deferred (Tier-3 only; not needed for Tiers 1/2).
