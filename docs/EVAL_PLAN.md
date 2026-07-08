@@ -41,6 +41,30 @@ calibration can overfit. **No VUS is classified until the gate is passed.** The 
 + metric harness that runs this is a buildable module — **PRD-06 (Benchmark & Evaluation Harness)**,
 which **gates** any VUS run.
 
+### 1.2 Known-set scope — TSC2-first; extend for *power*, not for a better number
+
+A recurring instinct is "if metrics are weak, add more variants." For a **deterministic** scorer this
+is a category error worth stating explicitly:
+
+- **More known variants → tighter confidence intervals (precision), NOT a better metric.** The scorer
+  is fixed rules; adding data measures it more precisely, it does not make it more accurate.
+- **Broadening across genes cannot rescue a poor TSC2 result — it averages it away.** A metric pooled
+  over many genes can look healthy while TSC2 missense is bad (**R-A2c** distribution shift). That is a
+  hollow green (category H). **The gate is always the TSC2-specific held-out (missense-stratified),
+  even if the known set is broadened.**
+- **The legitimate reason to extend is statistical power, concentrated on the *benign* side.** Disease
+  genes like TSC2 carry many P/LP knowns but **thin B/LB**, so specificity gets a wide CI. If TSC2's
+  known set is too small to measure precisely, extend the *known* set — other well-curated genes, or
+  **gnomAD common variants as proxy-benign** — **for power / generality**, still reporting the
+  TSC2-specific gate.
+- **The engine is gene-agnostic** (ACMG criteria are general), so extending is a config +
+  reference-data addition, not a rewrite — but not free (each gene adds its chromosome sequence, MANE
+  transcript, and gene-specific criteria: PM1 hotspot, PP2/BP1 missense-mechanism, PVS1 LoF-mechanism).
+
+**Sequence:** TSC2-first end-to-end; extend the known set **only if** TSC2 power is insufficient
+(wide specificity CI), **never** to move an unacceptable number. If TSC2 metrics are genuinely poor,
+the fix is the **scorer/calibration**, not more genes.
+
 ## 2. The frozen benchmark (ground truth — honestly, *proxy* labels)
 
 TSC has **0 expert-panel (3★) reviews**, so there is no gold standard. The benchmark uses the

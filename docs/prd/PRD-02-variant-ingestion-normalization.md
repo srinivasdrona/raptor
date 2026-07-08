@@ -171,11 +171,15 @@ use a real in-memory/temp `KBStore` — grounding is verified against the actual
 ### 10.4 Normalizer port = offline testability
 
 The `Normalizer` is **dependency-injected**. Structural ACs (AC1/AC2/AC4/AC5/AC6/AC7) run offline with
-a **deterministic fake normalizer** (fixed raw → fixed outcome, no reference data). Real-reference ACs
-are marked so they collect now and run when data lands:
+a **deterministic fake normalizer** — a *test double for the plumbing*, never a correctness oracle
+(fixed raw → fixed outcome, no reference data; also used to force edge cases like "normalizer raises →
+routes to manual-queue"). **Correctness (AC3) is validated only against the real normalizer + real
+reference + independent oracle — never the fake.** Real-reference markers:
 - `@pytest.mark.requires_reference` — AC3 **genomic** (`variant_id` + `hgvs_g`) via the real
-  `SeqRepoGenomicNormalizer` on the pinned chr16 reference (~30 MB, fetched on demand).
-- `@pytest.mark.requires_uta` — AC3 **c./p.** correctness (Track C).
+  `SeqRepoGenomicNormalizer`. **The ~30 MB chr16 reference is fetched during the build, so this runs
+  for real in this increment** (not deferred — the reference is trivial to obtain).
+- `@pytest.mark.requires_uta` — AC3 **c./p.** correctness only (genuinely needs UTA: Postgres + pinned
+  dump). This is the one piece deferred to the UTA setup step.
 
 ### 10.5 AC3 independent oracle (anti-circularity — the PRD-03 lesson)
 
@@ -193,10 +197,11 @@ trap that hid PRD-03's bugs):
 ### 10.6 v1 increment scope (what the loop builds now)
 
 - **Built + validated offline now:** FR1, FR3, FR5–FR9; AC1, AC2, AC4, AC5, AC6, AC7.
-- **Built now, validated when the pinned reference is present (fast):** AC3 **genomic** (`variant_id`
-  + `hgvs_g`).
-- **Deferred to the UTA step:** `hgvs_c/hgvs_p` projection + AC3 c./p.. Until UTA, coding variants
-  publish with a valid `variant_id` + `hgvs_g` + class and **`hgvs_c/p = null` WITH reason
-  `"awaiting_uta_projection"`** — an explicit FR3 null-with-reason, **not** a silent gap and **not**
-  manual-queue (the join key is valid; only the annotation is deferred). PRD-01 joins on `variant_id`
-  (§2.1), so this increment is already useful to the scorer.
+- **Built + validated on real data in this increment:** AC3 **genomic** (`variant_id` + `hgvs_g`) —
+  the ~30 MB pinned chr16 reference is fetched during the build and the real `SeqRepoGenomicNormalizer`
+  is run against ClinVar's independent `CanonicalSPDI` oracle (§10.5). **Not deferred.**
+- **Deferred to the UTA step (the one genuinely heavy dependency):** `hgvs_c/hgvs_p` projection + AC3
+  c./p.. Until UTA, coding variants publish with a valid `variant_id` + `hgvs_g` + class and
+  **`hgvs_c/p = null` WITH reason `"awaiting_uta_projection"`** — an explicit FR3 null-with-reason,
+  **not** a silent gap and **not** manual-queue (the join key is valid; only the annotation is
+  deferred). PRD-01 joins on `variant_id` (§2.1), so this increment is already useful to the scorer.
