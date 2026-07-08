@@ -83,6 +83,7 @@ These are **new work items** the register depends on; without them, many mitigat
 | **R-B3** | Copyright — non-OA full text sent to cloud models | M | H | 🟠 | Full-text policy audit; source flag | Automated extraction restricted to PMC OA; non-OA → manual queue | Purge; incident review |
 | **R-B4** | Freshness lag — stale synthesis launders outdated claims | M | M | 🟠 | Freshness-lag KPI breaches threshold | Designed-in re-validation loop (GP-5); freshness is a KPI | Flag stale records; prioritise re-run |
 | **R-B5** | Retraction/superseded source not caught → bad evidence persists | M | M | 🟡 | Retraction-feed trigger | Retraction trigger → invalidate + recompute + audit diff | Manual sweep; posterior recompute |
+| **R-B6** | Tier-1/2 annotation-host dependency — BIAS-2015/Nirvana are x64-only + AGPL, can't run on the ARM Queen; cross-machine hop couples Tier-1/2 to an x64 worker | M | M | 🟡 | Worker unreachable / annotator version drift | Run BIAS+Nirvana on a pinned x64 worker at arm's-length (ADR-0007/0008); scorer talks to a BIAS *port*; treat BIAS output as a source-contract (version-pinned, R-B1-style); v1 builds/validates the wrapping layer against BIAS fixtures so the hop isn't on the build critical path | Fail loud on port/contract drift; queue affected variants; re-run on a healthy worker |
 
 ## 4. C · Technical / operational failures — *the system breaks or can't run*
 

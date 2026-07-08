@@ -9,12 +9,84 @@
 
 | ID | Title | Status | Date |
 |----|-------|--------|------|
+| [ADR-0008](#adr-0008--tier-12-annotation-pipeline-bias-2015--nirvana-runs-on-an-x64-worker-not-the-arm-queen) | Tier-1/2 annotation pipeline (BIAS-2015 + Nirvana) runs on an x64 worker, not the ARM Queen | Accepted | 2026-07-08 |
+| [ADR-0007](#adr-0007--bias-2015-integrated-at-arms-length-only-agpl) | BIAS-2015 integrated at arm's-length only (AGPL) | Accepted | 2026-07-08 |
 | [ADR-0006](#adr-0006--scope-published_state_hash-to-ac3-defer-full-cross-db-canonical-fingerprint) | Scope `published_state_hash()` to AC3; defer full cross-DB canonical fingerprint | Accepted | 2026-07-08 |
 | [ADR-0005](#adr-0005--test-strategy-separated-authorship-model-diversity-frameworks--domain-truth-data) | Test strategy: separated authorship, model diversity, frameworks & domain truth-data | Accepted | 2026-07-08 |
 | [ADR-0004](#adr-0004--runtime-stack-litellm--prefect--sqlite--ollama-no-ray-no-langgraph) | Runtime stack: LiteLLM + Prefect + SQLite + Ollama (no Ray, no LangGraph) | Accepted | 2026-07-08 |
 | [ADR-0003](#adr-0003--loop-operating-model-planner--doer--checker-across-three-model-families) | Loop operating model: planner / doer / checker across three model families | Accepted | 2026-07-08 |
 | [ADR-0002](#adr-0002--vision--strategy-doc-format-pichler-vision-board--rumelt-kernel) | Vision & strategy doc format: Pichler Vision Board + Rumelt Kernel | Accepted | 2026-07-08 |
 | [ADR-0001](#adr-0001--strategic-framing-narrow-buildable-claim-with-broad-north-star) | Strategic framing: narrow-buildable claim with broad north-star | Accepted | 2026-07-08 |
+
+---
+
+## ADR-0008 — Tier-1/2 annotation pipeline (BIAS-2015 + Nirvana) runs on an x64 worker, not the ARM Queen
+
+- **Status:** Accepted
+- **Date:** 2026-07-08
+- **Deciders:** @sdrona_microsoft
+
+### Context
+
+PRD-01 (Tier-1/2 scorer) reuses **BIAS-2015** (GP-4), which requires **Illumina Nirvana** (annotator)
++ **.NET 6** + multi-GB annotation data to turn a VCF into the annotated JSON it scores. **Nirvana
+has no official ARM64 build** (x64 Linux/macOS/Windows only) and is **proprietary** (cannot recompile
+for aarch64). The primary dev/build machine (the "Queen") is a Snapdragon **aarch64**. QEMU emulation
+of Nirvana on ARM is unsupported, slow, and fragile.
+
+### Decision
+
+The **BIAS-2015 + Nirvana annotation pipeline runs on an x64 host** (an EPYC/Xeon fleet worker or a
+cloud x64 VM), which also hosts the multi-GB Nirvana/BIAS data. The **ARM Queen** runs only RAPTOR's
+own pure-Python scorer **wrapping/policy layer** and orchestration. RAPTOR's scorer reaches the
+pipeline through a **BIAS port** (PRD-01 build contract); the machine boundary lands at that port.
+
+### Consequences
+
+- (+) Solves three problems at once: ARM incompatibility, AGPL arm's-length isolation (ADR-0007 — a
+  separate process on a separate host is the strongest boundary), and keeping GBs off the Queen.
+- (+) Matches the fleet model (STRATEGY/ARCHITECTURE): heavy x64 annotation on workers, light
+  orchestration on the Queen.
+- (−) Adds a cross-machine hop for Tier-1/2 (previously assumed single-machine). Mitigated: the live
+  pipeline is **deferred** — PRD-01 v1 builds+validates the wrapping layer against BIAS's own
+  expected-output fixtures (independent oracle); the x64 worker integration is a later step.
+- **Risk:** R-B6 (annotation-host x64 dependency / cross-machine coupling) — see RISK_REGISTER.
+
+---
+
+## ADR-0007 — BIAS-2015 integrated at arm's-length only (AGPL)
+
+- **Status:** Accepted
+- **Date:** 2026-07-08
+- **Deciders:** @sdrona_microsoft
+
+### Context
+
+BIAS-2015 (bitscopic) is the reused Tier-1/2 ACMG engine (GP-4), **dual-licensed AGPL-3.0 / commercial**
+(free for academic use). AGPL is strong copyleft with a **network clause (§13)**: if code that
+`import`s BIAS forms a *combined work* and is offered to users **over a network**, the complete source
+of the **combined work** (i.e. RAPTOR itself) must be released under AGPL. That would foreclose any
+future commercial/proprietary licensing of RAPTOR and force RAPTOR's source disclosure the moment it
+is offered as a VCEP service — a one-way door incompatible with RAPTOR's clinical ambitions.
+
+### Decision
+
+RAPTOR integrates BIAS-2015 **at arm's-length only**: invoke it as a **separate program** (its CLI /
+a service on a separate host — ADR-0008), exchanging data via files (VCF/JSON/TSV). RAPTOR **never
+imports BIAS-2015 modules** and never copies its source into the RAPTOR tree. The boundary is the
+PRD-01 **BIAS port** (a clean data interface). This is "mere aggregation" (FSF arm's-length doctrine)
+— RAPTOR keeps its own license, unencumbered by AGPL.
+
+### Consequences
+
+- (+) RAPTOR's licensing stays free of AGPL copyleft; future commercial/proprietary options preserved.
+- (+) The port boundary also enables ADR-0008 (run BIAS on an x64 worker) and swapping annotators
+  (BIAS supports Nirvana **or** VEP) without touching RAPTOR core.
+- (−) No in-process calls to BIAS internals; all interaction is through its documented CLI/output
+  contract (which is a data boundary, not a stable API — pin the BIAS version, treat output as a
+  source-contract like R-B1).
+- **GP-10/R-B2:** commercial *deployment* of BIAS still requires Bitscopic's commercial license — a
+  procurement item, tracked, not a code concern for academic build/validation.
 
 ---
 
