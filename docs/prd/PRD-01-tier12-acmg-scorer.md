@@ -177,6 +177,24 @@ Writes go through the committed PRD-03 KB API (`stage_source_ref`, `stage_eviden
 `stage_manual_queue`, `build_provenance`, `publish`); the `KBStore` is **injected** (real temp/in-memory
 store in tests — grounding verified against the real schema).
 
+**KB-write specifics (verified against the committed schema — the doer MUST honor these):**
+- **`evidence.strength` enum:** exactly one of `stand_alone | very_strong | strong | moderate |
+  supporting` (note `stand_alone`, not "standalone"). `direction ∈ {pathogenic, benign}` (PVS/PS/PM/PP
+  → pathogenic; BA/BS/BP → benign). `tier = "tier1"` (matches the KB's seeded vocabulary).
+- **`evidence_kinds` FK:** every `(tier, criterion)` written to `evidence` must first exist in
+  `evidence_kinds`. Migration 0001 seeds only 9 criteria; the scorer emits more (PS4, PM1, PP2, PP5,
+  …). So the scorer **registers its full criterion vocabulary** at `run_scorer` setup via a new,
+  idempotent KB API method **`KBStore.register_evidence_kind(tier, criterion, direction,
+  strength_vocab)`** (the doer adds this small method + a KB test — the migration comment explicitly
+  anticipates runtime `INSERT`s to `evidence_kinds`; this is *generic ACMG rule vocabulary*, not
+  benchmark data). The vocabulary (criterion → direction + allowed strengths) lives in
+  `configs/acmg/*.yaml` (GP-6), and each emitted `strength` must be within that criterion's
+  `strength_vocab`.
+- **Grounding:** `source_refs` PK is `source_ref_id`; `evidence.source_ref_id` FK-resolves there.
+- **Manual review:** `manual_queue` has **no `variant_id` column** — a routed variant records its
+  identifier in `raw_input`/`attempted_coords` and grounds via `source_ref_id`. Tests associate by
+  those, not a `variant_id` column.
+
 ### 10.5 Oracle & anti-circularity (the PRD-03/PRD-02 lesson)
 
 - **Parsing/mapping correctness:** a **frozen fixture** of real BIAS output rows (from BIAS-2015's own
