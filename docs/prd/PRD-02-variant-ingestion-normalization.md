@@ -216,11 +216,20 @@ trap that hid PRD-03's bugs):
 first **validation gate is TSC2-first** (PRD-06, EVAL_PLAN §1.2) — TSC1's gate is a fast-follow.
 
 - **Built + validated offline now:** FR1, FR3, FR5–FR9; AC1, AC2, AC4, AC5, AC6, AC7.
-- **Built + validated on real data in this increment:** AC3 **genomic** (`variant_id` + `hgvs_g`) —
-  the ~30 MB pinned chr16 reference is fetched during the build and the real `SeqRepoGenomicNormalizer`
-  is run against ClinVar's independent `CanonicalSPDI` oracle (§10.5). **Not deferred.**
+- **Built + validated on real data in this increment:** AC3 **genomic** `variant_id` (canonical SPDI)
+  — the ~70 MB pinned chr16+chr9 reference is fetched during the build and the real
+  `SeqRepoGenomicNormalizer` is run against the independent **NCBI SPDI-API** oracle (§10.5). **Not
+  deferred.** Integrity guards validated on real reference: an input **REF that disagrees with the
+  reference genome** → manual queue (R-A10, never silently re-based); a **reference FASTA whose
+  checksum ≠ the pin** → fail loud (R-A11); **symbolic/non-ACGT ALT** (`<DEL>`, `.`) → manual queue.
+- **`hgvs_g` scope:** emitted (and oracle-checked) for **SNVs** now. **Indel/MNV `hgvs_g` is deferred**
+  alongside c./p.: proper genomic HGVS for indels uses **3′-anchored** nomenclature (opposite to the
+  left-anchored VCF/SPDI representation) and has **no independent oracle** in this increment, so it is
+  left `None` rather than **guessed** (GP-9). The `variant_id` (SPDI) — the actual join key — is fully
+  validated; indel `hgvs_g` is an annotation-completeness fast-follow (Mutalyzer-oracled), tracked with
+  c./p.
 - **Deferred to the UTA step (the one genuinely heavy dependency):** `hgvs_c/hgvs_p` projection + AC3
-  c./p.. Until UTA, coding variants publish with a valid `variant_id` + `hgvs_g` + class and
+  c./p.. Until UTA, coding variants publish with a valid `variant_id` + class and
   **`hgvs_c/p = null` WITH reason `"awaiting_uta_projection"`** — an explicit FR3 null-with-reason,
   **not** a silent gap and **not** manual-queue (the join key is valid; only the annotation is
   deferred). PRD-01 joins on `variant_id` (§2.1), so this increment is already useful to the scorer.

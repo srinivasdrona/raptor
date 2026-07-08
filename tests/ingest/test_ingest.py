@@ -288,3 +288,108 @@ def test_ac3_canonical_correctness_genomic(dummy_config):
 def test_ac3_canonical_correctness_uta():
     """AC3: c./p. correctness using UTA — deferred until the UTA setup step."""
     pass
+
+
+# ===========================================================================
+# Fix-round tests (checker findings, round 1). Planner-authored from concrete
+# checker probes; assert SPEC-correct GENERAL invariants (not the impl's current
+# buggy output). RED against the pre-fix implementation.
+# ===========================================================================
+import hashlib
+import yaml as _yaml
+
+
+def _config_with(tmp_path, **overrides):
+    base = {
+        "genes": ["TSC1", "TSC2"],
+        "assembly": "GRCh38", "assembly_patch": "p14", "mane_release": "1.4",
+        "normalizer": {"tool": "hgvs", "version": "1.0"},
+        "clinvar_snapshot_id": "snap1", "clinvar_snapshot_date": "2026-07-08",
+        "clinvar_snapshot_file_checksum": "chk1",
+        "reference_checksums": {},
+        "TSC1": {"genome_accession": "NC_000009.12", "transcript_accession": "NM_000368.5", "protein_accession": "NP_000359.2"},
+        "TSC2": {"genome_accession": "NC_000016.10", "transcript_accession": "NM_000548.5", "protein_accession": "NP_000539.2"},
+    }
+    base.update(overrides)
+    p = tmp_path / "cfg_override.yaml"
+    p.write_text(_yaml.safe_dump(base))
+    return load_config(str(p))
+
+
+@pytest.fixture
+def real_normalizer():
+    try:
+        return SeqRepoGenomicNormalizer()
+    except Exception:
+        pytest.skip("real reference (~/raptor-refseq) not present")
+
+
+@pytest.mark.requires_reference
+def test_ref_mismatch_routes_to_manual_queue(real_normalizer, dummy_config):
+    """[blocker] R-A10: an input REF that disagrees with the reference genome is a
+    coordinate/build mismatch -> manual queue, NEVER silently 'corrected' into the
+    reference-derived variant. Reference base at NC_000016.10:2087897 is C."""
+    ok = real_normalizer.normalize(_raw(1, "NC_000016.10", 2087897, "TSC2", ref="C", alt="T"), dummy_config)
+    assert ok.__class__.__name__ == "NormalizedVariant"
+    assert ok.variant_id == "NC_000016.10:2087896:C:T"  # control: correct REF normalizes
+    bad = real_normalizer.normalize(_raw(2, "NC_000016.10", 2087897, "TSC2", ref="A", alt="T"), dummy_config)
+    assert bad.__class__.__name__ == "ManualQueueItem", f"REF mismatch must manual-queue, got {bad!r}"
+
+
+@pytest.mark.requires_reference
+@pytest.mark.parametrize("bad_alt", ["<DEL>", ".", "<INS>", "<DUP>", "N", "*"])
+def test_symbolic_or_invalid_alt_routes_to_manual_queue(real_normalizer, dummy_config, bad_alt):
+    """[major] FR3: symbolic / non-ACGT ALTs (imprecise SV/CNV or no-call) must
+    route to manual queue, never be treated as literal inserted sequence."""
+    raw = _raw(1, "NC_000016.10", 2087897, "TSC2", ref="C", alt=bad_alt)
+    outcome = real_normalizer.normalize(raw, dummy_config)
+    assert outcome.__class__.__name__ == "ManualQueueItem", f"{bad_alt!r} must manual-queue, got {outcome!r}"
+
+
+@pytest.mark.requires_reference
+def test_wrong_reference_checksum_fails_loud(real_normalizer, tmp_path):
+    """[major] R-A11/FR8: a reference FASTA whose sha256 != the pinned
+    reference_checksums entry is a reproducibility breach -> FAIL LOUD, never
+    proceed on an unverified reference."""
+    cfg = _config_with(tmp_path, reference_checksums={"NC_000016.10": "0" * 64})
+    raw = _raw(1, "NC_000016.10", 2087897, "TSC2", ref="C", alt="T")
+    with pytest.raises(Exception) as exc:
+        real_normalizer.normalize(raw, cfg)
+    assert "checksum" in str(exc.value).lower()
+
+
+def test_reader_fails_loud_on_source_checksum_mismatch(tmp_path):
+    """[major] FR1/FR5/AC4: if the config pins a source_file_checksum that does not
+    match the file being read, the reader must fail loud (it is ingesting a
+    different file than pinned), not silently record the placeholder."""
+    slice_path = FIXTURES_DIR / "clinvar_tsc_slice.tsv"
+    cfg = _config_with(tmp_path, clinvar_snapshot_file_checksum="deadbeef" * 8)
+    with pytest.raises(Exception) as exc:
+        list(ClinVarVariantSummaryReader(slice_path, "TSC2", cfg))
+    assert "checksum" in str(exc.value).lower()
+
+
+def test_reader_records_real_file_checksum(tmp_path):
+    """[major] FR5/AC4: the source_file_checksum recorded on every emitted row is
+    the ACTUAL sha256 of the ingested file (resolvable grounding)."""
+    slice_path = FIXTURES_DIR / "clinvar_tsc_slice.tsv"
+    real_sha = hashlib.sha256(slice_path.read_bytes()).hexdigest()
+    cfg = _config_with(tmp_path, clinvar_snapshot_file_checksum=real_sha)
+    rows = list(ClinVarVariantSummaryReader(slice_path, "TSC2", cfg))
+    assert rows, "reader yielded no TSC2 rows from the slice"
+    assert all(r.source_file_checksum == real_sha for r in rows)
+
+
+def test_reader_reads_gzipped_snapshot(tmp_path):
+    """[major] FR1: the real snapshot is variant_summary.txt.gz — the reader must
+    read gzip and yield the same rows as the uncompressed form."""
+    import gzip as _gz
+    slice_path = FIXTURES_DIR / "clinvar_tsc_slice.tsv"
+    data = slice_path.read_bytes()
+    gz_path = tmp_path / "slice.tsv.gz"
+    gz_path.write_bytes(_gz.compress(data))
+    cfg_plain = _config_with(tmp_path, clinvar_snapshot_file_checksum=hashlib.sha256(data).hexdigest())
+    cfg_gz = _config_with(tmp_path, clinvar_snapshot_file_checksum=hashlib.sha256(gz_path.read_bytes()).hexdigest())
+    rows_plain = list(ClinVarVariantSummaryReader(slice_path, "TSC2", cfg_plain))
+    rows_gz = list(ClinVarVariantSummaryReader(gz_path, "TSC2", cfg_gz))
+    assert len(rows_gz) == len(rows_plain) > 0

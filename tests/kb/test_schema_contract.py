@@ -23,6 +23,7 @@ from raptor.kb.schema import (
 )
 
 SRC_ROOT = Path(raptor.kb.__file__).resolve().parent.parent  # src/raptor (whole package, not just kb/)
+KB_SRC = SRC_ROOT / "kb"  # the KB package only
 
 
 def test_migrations_apply_cleanly_and_are_idempotent(tmp_path):
@@ -144,14 +145,52 @@ def _iter_source_files():
     return sorted(SRC_ROOT.rglob("*.py"))
 
 
+def _iter_kb_source_files():
+    return sorted(KB_SRC.rglob("*.py"))
+
+
 def test_no_forbidden_file_read_calls_in_kb_source():
+    """The KB is a pure DB layer: it must not do ad-hoc file I/O (open/loadmat/
+    np.load/read_csv/...). Scoped to ``kb/`` only — the blanket ``open(`` ban is a
+    KB-package property (its .sql is read via ``Path.read_text``), NOT a whole-tree
+    rule: other packages (e.g. ``ingest/``) legitimately read pinned data files
+    (FR1) and stream gzip. Whole-tree trace-cribbing is enforced instead by
+    ``test_no_benchmark_label_oracle_path_literals_in_kb_source`` (oracle/benchmark
+    path literals) + each module's own AC5-style no-oracle-field test."""
     offenders: list[str] = []
-    for path in _iter_source_files():
+    for path in _iter_kb_source_files():
         text = path.read_text(encoding="utf-8")
         for pattern in FORBIDDEN_CALL_PATTERNS:
             if pattern.search(text):
                 offenders.append(f"{path}: matched {pattern.pattern!r}")
     assert offenders == [], f"forbidden file-read calls found: {offenders}"
+
+
+def test_file_db_still_requires_wal_after_memory_relaxation(tmp_path):
+    """The in-memory WAL relaxation must NOT weaken the file-DB durability
+    guarantee: a FILE-backed connection in a non-WAL journal mode must still
+    fail the runtime contract."""
+    db = tmp_path / "delete_mode.sqlite3"
+    conn = sqlite3.connect(str(db))
+    try:
+        conn.execute("PRAGMA foreign_keys=ON")
+        conn.execute("PRAGMA journal_mode=DELETE")
+        with pytest.raises(RuntimeContractError):
+            verify_runtime_contract(conn)
+    finally:
+        conn.close()
+
+
+def test_memory_db_accepts_memory_journal_mode():
+    """An in-memory KB connection (used by fast, isolated tests) cannot do WAL;
+    ``journal_mode=memory`` must be accepted there."""
+    conn = sqlite3.connect(":memory:")
+    try:
+        conn.execute("PRAGMA foreign_keys=ON")
+        conn.execute("PRAGMA journal_mode=MEMORY")
+        verify_runtime_contract(conn)  # must not raise
+    finally:
+        conn.close()
 
 
 def test_no_benchmark_label_oracle_path_literals_in_kb_source():
