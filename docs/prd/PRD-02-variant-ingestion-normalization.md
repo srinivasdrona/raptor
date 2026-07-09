@@ -1,6 +1,6 @@
 # PRD-02 — Variant Ingestion & Normalization
 
-> **Status:** Ready (v1 increment — build contract §10) · **Owner:** @sdrona_microsoft · **Phase:** 0 (STRATEGY §7) · **Last updated:** 2026-07-08
+> **Status:** Ready (v1 increment — build contract §10) · **Owner:** @dronasrinivas · **Phase:** 0 (STRATEGY §7) · **Last updated:** 2026-07-08
 >
 > **Format:** standard lean PRD; acceptance criteria feed the build-loop gates (OPERATING_MODEL §4)
 > and the eval mapping (EVAL_PLAN §3.2). One feature per PRD.

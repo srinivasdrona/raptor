@@ -1,6 +1,6 @@
 # PRD-06 — Benchmark & Evaluation Harness
 
-> **Status:** Ready (v1 increment — build contract §10) · **Owner:** @sdrona_microsoft · **Phase:** 1 (STRATEGY §7) · **Last updated:** 2026-07-09
+> **Status:** Ready (v1 increment — build contract §10) · **Owner:** @dronasrinivas · **Phase:** 1 (STRATEGY §7) · **Last updated:** 2026-07-09
 >
 > **Format:** standard lean PRD; acceptance criteria feed the build-loop gates (OPERATING_MODEL §4) and
 > are the mechanical realization of EVAL_PLAN (this PRD *builds* what EVAL_PLAN specifies).

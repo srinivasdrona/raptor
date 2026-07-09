@@ -1,6 +1,6 @@
 # RAPTOR — Evaluation Plan
 
-> **Status:** DRAFT v0.1 · **Owner:** @sdrona_microsoft · **Last updated:** 2026-07-08 · **Review cadence:** per phase
+> **Status:** DRAFT v0.1 · **Owner:** @dronasrinivas · **Last updated:** 2026-07-08 · **Review cadence:** per phase
 >
 > **Scope now:** the **frozen benchmark** + **Tier-1/2** metrics (PRD-01). Extensible to Tier-3 and
 > cross-linkage (§6) — those sections are stubs until those tiers exist (GP-7: don't spec what isn't built).

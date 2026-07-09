@@ -1,6 +1,6 @@
 # RAPTOR — Operating Model (the build loop)
 
-> **Status:** DRAFT v0.1 · **Owner:** @sdrona_microsoft · **Last updated:** 2026-07-08 · **Review cadence:** monthly + rule-graduation on any new failure class
+> **Status:** DRAFT v0.1 · **Owner:** @dronasrinivas · **Last updated:** 2026-07-08 · **Review cadence:** monthly + rule-graduation on any new failure class
 >
 > **Format:** recognized building blocks, not a bespoke invention — **RACI** (responsibility
 > assignment), Scrum **Definition of Ready / Definition of Done** (the hand-off gates), the

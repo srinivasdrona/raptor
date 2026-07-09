@@ -1,6 +1,6 @@
 # RAPTOR — Risk Register (Failure-Mode Analysis)
 
-> **Status:** DRAFT v0.1 · **Owner:** @sdrona_microsoft (solo — see R-D5 bus-factor) · **Last updated:** 2026-07-08 · **Review cadence:** monthly + on any Sev-High trigger
+> **Status:** DRAFT v0.1 · **Owner:** @dronasrinivas (solo — see R-D5 bus-factor) · **Last updated:** 2026-07-08 · **Review cadence:** monthly + on any Sev-High trigger
 >
 > **Format:** standard risk register (ISO 31000-aligned): each risk has a *likelihood*, *impact*,
 > *severity*, **leading indicator (how we detect it early)**, *preventive mitigation*, and

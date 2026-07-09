@@ -1,6 +1,6 @@
 # RAPTOR — Architecture
 
-> **Status:** DRAFT v0.1 · **Owner:** @sdrona_microsoft · **Last updated:** 2026-07-08 · **Review cadence:** monthly
+> **Status:** DRAFT v0.1 · **Owner:** @dronasrinivas · **Last updated:** 2026-07-08 · **Review cadence:** monthly
 >
 > **Format:** Structured to the **arc42** template ([arc42.org](https://arc42.org)) with **C4-model**
 > diagram levels (Context → Container → Component; Simon Brown, [c4model.com](https://c4model.com)).

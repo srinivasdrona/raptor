@@ -24,7 +24,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-07-08
-- **Deciders:** @sdrona_microsoft
+- **Deciders:** @dronasrinivas
 
 ### Context
 
@@ -58,7 +58,7 @@ pipeline through a **BIAS port** (PRD-01 build contract); the machine boundary l
 
 - **Status:** Accepted
 - **Date:** 2026-07-08
-- **Deciders:** @sdrona_microsoft
+- **Deciders:** @dronasrinivas
 
 ### Context
 
@@ -94,7 +94,7 @@ PRD-01 **BIAS port** (a clean data interface). This is "mere aggregation" (FSF a
 
 - **Status:** Accepted
 - **Date:** 2026-07-08
-- **Deciders:** @sdrona_microsoft
+- **Deciders:** @dronasrinivas
 
 ### Context
 
@@ -140,7 +140,7 @@ follow-up (R-A11 JSON canonicalization) is tracked.
 
 - **Status:** Accepted
 - **Date:** 2026-07-08
-- **Deciders:** @sdrona_microsoft
+- **Deciders:** @dronasrinivas
 - **Refines:** ADR-0003 (adds a 4th role + test-tooling to the loop)
 
 ### Context
@@ -195,7 +195,7 @@ the core module reports no surviving mutants in the critical paths.
 
 - **Status:** Accepted
 - **Date:** 2026-07-08
-- **Deciders:** @sdrona_microsoft
+- **Deciders:** @dronasrinivas
 
 ### Context
 
@@ -240,7 +240,7 @@ LiteLLM and state persisted in `variants.db`. Encoded in `ARCHITECTURE.md` §4�
 
 - **Status:** Accepted
 - **Date:** 2026-07-08
-- **Deciders:** @sdrona_microsoft
+- **Deciders:** @dronasrinivas
 
 ### Context
 
@@ -287,7 +287,7 @@ checker's pass is gated on acceptance criteria.
 
 - **Status:** Accepted
 - **Date:** 2026-07-08
-- **Deciders:** @sdrona_microsoft
+- **Deciders:** @dronasrinivas
 
 ### Context
 
@@ -319,7 +319,7 @@ layer (Vision §1, Target Group/Needs §4, Product §6, Business Goals §8).
 
 - **Status:** Accepted
 - **Date:** 2026-07-08
-- **Deciders:** @sdrona_microsoft
+- **Deciders:** @dronasrinivas
 
 ### Context
 

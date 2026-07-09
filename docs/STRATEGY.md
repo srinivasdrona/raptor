@@ -1,6 +1,6 @@
 # RAPTOR — Vision & Strategy
 
-> **Status:** DRAFT v0.1 · **Owner:** @sdrona_microsoft · **Last updated:** 2026-07-08 · **Review cadence:** monthly
+> **Status:** DRAFT v0.1 · **Owner:** @dronasrinivas · **Last updated:** 2026-07-08 · **Review cadence:** monthly
 >
 > **Format:** This document follows two established, citable standards — Roman Pichler's
 > **Product Vision Board** (Vision · Target Group · Needs · Product · Business Goals) wrapped around

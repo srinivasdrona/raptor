@@ -1,6 +1,6 @@
 # PRD-01 — Tier-1/2 Deterministic ACMG Scorer
 
-> **Status:** Ready (v1 increment — build contract §10) · **Owner:** @sdrona_microsoft · **Phase:** 1 (STRATEGY §7) · **Last updated:** 2026-07-08
+> **Status:** Ready (v1 increment — build contract §10) · **Owner:** @dronasrinivas · **Phase:** 1 (STRATEGY §7) · **Last updated:** 2026-07-08
 >
 > **Format:** standard lean PRD (Context · Goals/Non-goals · Users · Functional · Non-functional ·
 > Acceptance · Dependencies · Risks · Open questions). One feature per PRD; acceptance criteria are
