@@ -1,0 +1,145 @@
+# RAPTOR golden domain corpus — machine-readable fixture (PRD-07 loader oracle).
+#
+# Frozen, CITABLE independent oracle for the ClinVar knowns loader
+# (`raptor.eval.knowns`) and its benchmark exclusion coupling
+# (`raptor.eval.benchmark`). Derived from authoritative public specs (NCBI
+# GTR/ClinVar standard terms, ClinVar docs, HGVS nomenclature) — NOT from the
+# implementation under test. Full provenance + citations:
+# `docs/reference/clinvar-hgvs-golden-corpus.md`.
+#
+# Governance decisions encoded here (ACMG/AMP 2015 five-tier standard only; no
+# new classes/tiers invented):
+#   * Risk-allele terms (Established/Likely/Uncertain risk allele, mixed forms)
+#     are NOT on the Mendelian pathogenic<->benign axis -> NON_SCOREABLE
+#     (included as tested inputs, excluded from the scored truth set).
+#   * VUS sub-tiers (VUS-high/mid/low) are an OPTIONAL ClinGen point-based
+#     refinement, not an ACMG standard tier -> normalized to the standard `VUS`
+#     term, then excluded from the scored set like any VUS.
+#   * NON_SCOREABLE is the loader sentinel; build_benchmark excludes it.
+
+# ---------------------------------------------------------------------------
+# 1. ClinVar `ClinicalSignificance` -> label  (map_clinical_significance)
+# ---------------------------------------------------------------------------
+label_map:
+  # -- scoreable --
+  - {sig: "Pathogenic", expected: "P"}
+  - {sig: "Likely pathogenic", expected: "LP"}
+  - {sig: "Likely benign", expected: "LB"}
+  - {sig: "Benign", expected: "B"}
+  - {sig: "Pathogenic/Likely pathogenic", expected: "P"}
+  - {sig: "Benign/Likely benign", expected: "B"}
+  - {sig: "Uncertain significance", expected: "VUS"}
+  - {sig: "Conflicting interpretations of pathogenicity", expected: "Conflicting"}
+  - {sig: "Conflicting classifications of pathogenicity", expected: "Conflicting"}
+  # -- low-penetrance suffix stripped -> base class --
+  - {sig: "Pathogenic, low penetrance", expected: "P"}
+  - {sig: "Likely pathogenic, low penetrance", expected: "LP"}
+  - {sig: "Pathogenic/Likely pathogenic, low penetrance", expected: "P"}
+  # -- whitespace / case robust --
+  - {sig: "Pathogenic ", expected: "P"}
+  - {sig: "  Benign", expected: "B"}
+  - {sig: "likely pathogenic", expected: "LP"}
+  - {sig: "UNCERTAIN SIGNIFICANCE", expected: "VUS"}
+  # -- VUS sub-tiers: normalize to the standard VUS term (governance decision) --
+  - {sig: "VUS-high", expected: "VUS"}
+  - {sig: "VUS-mid", expected: "VUS"}
+  - {sig: "VUS-low", expected: "VUS"}
+  # -- non-scoreable: pharmacogenomic / GWAS / phenotype / provenance --
+  - {sig: "drug response", expected: "NON_SCOREABLE"}
+  - {sig: "not provided", expected: "NON_SCOREABLE"}
+  - {sig: "association", expected: "NON_SCOREABLE"}
+  - {sig: "association not found", expected: "NON_SCOREABLE"}
+  - {sig: "confers sensitivity", expected: "NON_SCOREABLE"}
+  - {sig: "protective", expected: "NON_SCOREABLE"}
+  - {sig: "Affects", expected: "NON_SCOREABLE"}
+  - {sig: "other", expected: "NON_SCOREABLE"}
+  - {sig: "conflicting data from submitters", expected: "NON_SCOREABLE"}
+  - {sig: "-", expected: "NON_SCOREABLE"}
+  - {sig: "Pathogenic; drug response", expected: "NON_SCOREABLE"}
+  # -- risk-allele terms: off the Mendelian axis (governance decision: exclude) --
+  - {sig: "Established risk allele", expected: "NON_SCOREABLE"}
+  - {sig: "Likely risk allele", expected: "NON_SCOREABLE"}
+  - {sig: "Uncertain risk allele", expected: "NON_SCOREABLE"}
+  - {sig: "risk factor", expected: "NON_SCOREABLE"}
+  - {sig: "Uncertain significance/Uncertain risk allele", expected: "NON_SCOREABLE"}
+  - {sig: "Pathogenic/Established risk allele", expected: "NON_SCOREABLE"}
+
+# ---------------------------------------------------------------------------
+# 2. HGVS `Name` -> variant_class  (classify_variant)
+#    missense = simple single-aa SUBSTITUTION only (R-A2c gated stratum).
+# ---------------------------------------------------------------------------
+variant_class:
+  # -- missense --
+  - {name: "NM_000548.5(TSC2):c.1832G>A (p.Arg611Gln)", expected: "missense"}
+  - {name: "NM_000548.5(TSC2):c.1832G>A (p.R611Q)", expected: "missense"}
+  - {name: "NM_000548.5(TSC2):c.1832G>A (p.(Arg611Gln))", expected: "missense"}
+  - {name: "NM_000548.5(TSC2):c.1832G>A (p.arg611gln)", expected: "missense"}
+  - {name: "NM_004985.5(KRAS):c.35G>A (p.Gly12Asp)", expected: "missense"}
+  - {name: "NM_000548.5(TSC1):c.29C>G (p.Ala10Gly)", expected: "missense"}
+  # -- truncating: nonsense --
+  - {name: "NM_000548.5(TSC2):c.1831C>T (p.Arg611Ter)", expected: "truncating"}
+  - {name: "NM_000548.5(TSC2):c.4507C>T (p.Gln1503*)", expected: "truncating"}
+  - {name: "NM_1(TSC1):c.1A>G (p.Arg611ter)", expected: "truncating"}
+  # -- truncating: frameshift --
+  - {name: "NM_000548.5(TSC2):c.3128delA (p.Ser1043fs)", expected: "truncating"}
+  - {name: "NM_000548.5(TSC1):c.28_29del (p.Ala10AlafsTer3)", expected: "truncating"}
+  - {name: "NP_0123456.1:p.Arg97ProfsTer23", expected: "truncating"}
+  - {name: "NP_003997.1:p.Ile327Argfs*?", expected: "truncating"}
+  # -- other: synonymous --
+  - {name: "NM_000548.5(TSC2):c.1833A>G (p.=)", expected: "other"}
+  - {name: "NM_000548.5(TSC2):c.1833A>G (p.Gly12=)", expected: "other"}
+  # -- other: start-loss (initiator Met) --
+  - {name: "NM_000548.5(TSC1):c.1A>G (p.Met1Val)", expected: "other"}
+  - {name: "NM_000548.5(TSC1):c.1A>G (p.M1V)", expected: "other"}
+  - {name: "NM_1(TSC1):c.1A>G (p.met1val)", expected: "other"}
+  - {name: "NM_000548.5(TSC1):c.1A>? (p.Met1?)", expected: "other"}
+  # -- other: stop-loss / C-terminal extension (Ter as REF) --
+  - {name: "NM_000548.5(TSC2):c.5422T>C (p.Ter1808Arg)", expected: "other"}
+  - {name: "NM_000548.5(TSC2):c.5422T>C (p.*1808Arg)", expected: "other"}
+  - {name: "NP_003997.2:p.Ter1808ArgextTer3", expected: "other"}
+  - {name: "NM_1(TSC1):c.1A>G (p.ter1808arg)", expected: "other"}
+  # -- other: in-frame del / dup --
+  - {name: "NM_000548.5(TSC2):c.1831_1833del (p.Arg611del)", expected: "other"}
+  - {name: "NM_000548.5(TSC2):c.1831_1833dup (p.Arg611dup)", expected: "other"}
+  - {name: "NM_1(TSC1):c.1A>G (p.R611del)", expected: "other"}
+  # -- other: delins (even single-aa is NOT missense, by design) --
+  - {name: "NM_000548.5(TSC2):c.1831_1833delinsCAG (p.Arg611delinsGln)", expected: "other"}
+  # -- other: unknown / placeholder amino acid --
+  - {name: "NM_1(TSC1):c.1A>G (p.Xaa123Gln)", expected: "other"}
+  - {name: "NM_1(TSC1):c.1A>G (p.X123Q)", expected: "other"}
+  - {name: "NM_1(TSC1):c.1A>G (p.Arg611Zzz)", expected: "other"}
+  # -- other: no p. token (splice / intronic / UTR) --
+  - {name: "NM_000548.5(TSC2):c.1832+1G>A", expected: "other"}
+  - {name: "NM_000548.5(TSC2):c.5422-3C>G", expected: "other"}
+  - {name: "NM_000548.5(TSC2):c.1-164C>T", expected: "other"}
+  # -- other: unparseable / uncertain --
+  - {name: "unparseable string p.????", expected: "other"}
+  - {name: "NM_000548.5(TSC2):c.1832del (p.?)", expected: "other"}
+
+# ---------------------------------------------------------------------------
+# 3. ClinVar `ReviewStatus` -> confidence  (benchmark._excluded)
+# ---------------------------------------------------------------------------
+review_status:
+  - {status: "practice guideline", expected: "KEEP"}
+  - {status: "reviewed by expert panel", expected: "KEEP"}
+  - {status: "criteria provided, multiple submitters, no conflicts", expected: "KEEP"}
+  - {status: "criteria provided, single submitter", expected: "EXCLUDE"}
+  - {status: "criteria provided, conflicting classifications", expected: "EXCLUDE"}
+  - {status: "criteria provided, conflicting interpretations of pathogenicity", expected: "EXCLUDE"}
+  - {status: "no assertion criteria provided", expected: "EXCLUDE"}
+  - {status: "no assertion provided", expected: "EXCLUDE"}
+  - {status: "no classification provided", expected: "EXCLUDE"}
+  - {status: "no classification for the individual variant", expected: "EXCLUDE"}
+  - {status: "no classifications from unflagged records", expected: "EXCLUDE"}
+
+# ---------------------------------------------------------------------------
+# 4. ClinVar `GeneSymbol` -> matched target gene  (gene filter)
+# ---------------------------------------------------------------------------
+gene_symbol:
+  - {field: "TSC1", matches: "TSC1"}
+  - {field: "TSC2", matches: "TSC2"}
+  - {field: "subset of 2 genes: TSC1:PKD1", matches: "TSC1"}
+  - {field: "subset of 3 genes: BRCA1:TSC2:TP53", matches: "TSC2"}
+  - {field: "subset of 2 genes: PKD1:PKD2", matches: null}
+  - {field: "BRCA1", matches: null}
+  - {field: "", matches: null}

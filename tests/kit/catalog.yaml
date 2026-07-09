@@ -38,6 +38,8 @@ classes:
       A domain classifier/validator must reject out-of-vocabulary input against an
       explicit canonical set (whitelist), never accept-then-harden. Property: the
       classifier never emits an in-vocabulary output for a known out-of-vocabulary input.
+      Backed by the golden corpus (tests/fixtures/clinvar_hgvs_golden.yaml) as the
+      full-vocabulary oracle -- exercises every real ClinVar/HGVS class, not hand-picked cases.
     invariant: assert_never_emits
     applies_to: [knowns]              # classify_variant / map_clinical_significance surface
 

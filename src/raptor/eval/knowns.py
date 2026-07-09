@@ -46,6 +46,13 @@ _CLINSIG_MAP: dict[str, str] = {
     "Pathogenic/Likely pathogenic": "P",
     "Benign/Likely benign": "B",
     "Uncertain significance": "VUS",
+    # VUS sub-tiers (VUS-high/mid/low) are an OPTIONAL ClinGen point-based
+    # refinement, NOT an ACMG/AMP 2015 standard tier -- normalize to the
+    # standard `VUS` term (no new tier invented). VUS is excluded from the
+    # scored truth set like any Uncertain-significance call.
+    "VUS-high": "VUS",
+    "VUS-mid": "VUS",
+    "VUS-low": "VUS",
     "Conflicting interpretations of pathogenicity": "Conflicting",
     "Conflicting classifications of pathogenicity": "Conflicting",
 }
@@ -126,9 +133,14 @@ def _is_canonical_aa(code: str) -> bool:
     return False
 
 
-#: Extracts the `p.` HGVS token out of a ClinVar `Name` field, e.g.
-#: `"NM_000548.5(TSC2):c.1832G>A (p.Arg611Gln)"` -> `"Arg611Gln"`.
+#: Extracts the `p.` HGVS token out of a ClinVar `Name` field. ClinVar's
+#: `c.`-form `Name` wraps the protein consequence in parentheses, e.g.
+#: `"NM_000548.5(TSC2):c.1832G>A (p.Arg611Gln)"` -> `"Arg611Gln"`. HGVS
+#: protein-accession forms present a BARE `p.` with no wrapping parens, e.g.
+#: `"NP_0123456.1:p.Arg97ProfsTer23"` -> `"Arg97ProfsTer23"`; both must be
+#: parsed (the paren form is tried first, then the bare form).
 _PROTEIN_TOKEN_RE = re.compile(r"\(p\.([^)]*)\)")
+_PROTEIN_TOKEN_BARE_RE = re.compile(r"(?<![A-Za-z])p\.(\(?[A-Za-z0-9_?*=^]+\)?)")
 
 
 def map_clinical_significance(sig: str, cfg: EvalConfig | None = None) -> str:
@@ -167,6 +179,10 @@ def classify_variant(name: str) -> str:
     predicted-consequence token like `p.(Arg611Gln)` down to its inner
     substitution."""
     match = _PROTEIN_TOKEN_RE.search(name or "")
+    if not match:
+        # No parenthesized `(p...)`: try a bare `p.` token (HGVS protein-
+        # accession form, e.g. `NP_0123456.1:p.Arg97ProfsTer23`).
+        match = _PROTEIN_TOKEN_BARE_RE.search(name or "")
     if not match:
         return "other"
     # Strip surrounding parentheses and whitespace, e.g. a predicted
