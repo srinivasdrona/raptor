@@ -11,12 +11,14 @@
 # FR3: which of the scorer's automatable criteria feed the eval-only
 # implied-direction combiner (`combine.implied_direction`). Mirrors the
 # automatable set from `configs/acmg/tsc.yaml` (`included_criteria`), minus
-# PP5/BP6 (R-A2 circularity: ClinVar-classification-derived criteria must
-# not feed a combiner that is then graded against ClinVar-derived labels).
+# PP5/BP6/PS4 (R-A2 direct-copy circularity: criteria derived from a variant's
+# OWN ClinVar assertion must not feed a combiner graded against ClinVar-derived
+# labels). PS4 excluded per Oracle decision (BIAS-3.0.0 derives it from ClinVar
+# submitter counts when no GWAS data exists). Transitive-ClinVar criteria
+# (PM5/PM1/PP2) remain pending the full-held-out audit ruling.
 automatable_criteria:
   - PVS1
   - PS1
-  - PS4
   - PM1
   - PM2
   - PM4

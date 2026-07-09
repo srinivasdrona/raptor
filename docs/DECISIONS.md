@@ -9,6 +9,7 @@
 
 | ID | Title | Status | Date |
 |----|-------|--------|------|
+| [ADR-0009](#adr-0009--clinvar-derived-acmg-criteria-direct-copy-banned-pp5bp6ps4-transitive-deferred-to-audit) | ClinVar-derived ACMG criteria: direct-copy banned (PP5/BP6/PS4), transitive deferred to audit | Accepted | 2026-07-10 |
 | [ADR-0008](#adr-0008--tier-12-annotation-pipeline-bias-2015--nirvana-runs-on-an-x64-worker-not-the-arm-queen) | Tier-1/2 annotation pipeline (BIAS-2015 + Nirvana) runs on an x64 worker, not the ARM Queen | Accepted | 2026-07-08 |
 | [ADR-0007](#adr-0007--bias-2015-integrated-at-arms-length-only-agpl) | BIAS-2015 integrated at arm's-length only (AGPL) | Accepted | 2026-07-08 |
 | [ADR-0006](#adr-0006--scope-published_state_hash-to-ac3-defer-full-cross-db-canonical-fingerprint) | Scope `published_state_hash()` to AC3; defer full cross-DB canonical fingerprint | Accepted | 2026-07-08 |
@@ -20,7 +21,66 @@
 
 ---
 
-## ADR-0008 — Tier-1/2 annotation pipeline (BIAS-2015 + Nirvana) runs on an x64 worker, not the ARM Queen
+## ADR-0009 — ClinVar-derived ACMG criteria: direct-copy banned (PP5/BP6/PS4), transitive deferred to audit
+
+- **Status:** Accepted
+- **Date:** 2026-07-10
+- **Deciders:** @dronasrinivas (Oracle)
+
+### Context
+
+The frozen benchmark (EVAL_PLAN §2) uses **ClinVar-derived labels**. The Tier-1/2 scorer is
+**BIAS-2015 v3.0.0** (ADR-0007/0008). The first real x64-devbox BIAS output (2026-07) revealed which
+of BIAS's per-criterion rationales are **sourced from ClinVar's own classifications** — grading such a
+criterion against ClinVar labels reads the answer key (R-A2 circularity). Two distinct kinds surfaced:
+
+- **Direct copy** — the criterion reads the *variant's own* ClinVar assertion: **PP5** ("reported
+  pathogenic in ClinVar"), **BP6** ("reported benign in ClinVar"), and **PS4** — BIAS v3.0.0 falls
+  back to counting ClinVar submitters ("No GWAS data found. N independent ClinVar submitters
+  classify…") when no GWAS/case-control data exists, which for a rare Mendelian disorder is nearly
+  always. (PP5/BP6 are also ClinGen-SVI-2018-deprecated.)
+- **Transitive / aggregate** — the criterion reads *other* variants' ClinVar data: **PM5**
+  (same-residue variant reported pathogenic), **PM1** (domain ClinVar pathogenic/benign rate), **PP2**
+  (gene missense pathogenic/benign proportions). These are how the criteria legitimately work in ACMG
+  practice; excluding them strips real evidence — notably PM5, prime **missense** signal (the gated
+  stratum).
+
+### Considered options
+
+1. **Ban only the direct-copy criteria now (PP5/BP6/PS4); decide the transitive bucket with data** —
+   build an automated ClinVar-derivation guard, run it on the full held-out to get real firing counts,
+   then rule on PM5/PM1/PP2.
+2. **Ban every ClinVar-touching criterion** (maximal purity) — safest against circularity but strips
+   legitimate missense evidence and likely lowers measured missense recall.
+3. **Keep transitive as legitimate ACMG** and instead enforce held-out independence.
+4. **Re-annotate with ClinVar stripped from Nirvana** (data-level) — bulletproof but breaks
+   eval=production parity, is the bluntest instrument, and costs a devbox re-run (see the Option-C
+   analysis in-session).
+
+### Decision
+
+Adopt **option 1**. **PP5, BP6, and PS4** are added to `eval.config.FORBIDDEN_CRITERIA` (structurally
+banned from `automatable_criteria` at load *and* skipped in the combiner — case/whitespace-robust) and
+removed from both `configs/eval/tsc2.yaml` (`automatable_criteria`) and `configs/acmg/tsc.yaml`
+(`included_criteria`) so eval and production stay identical. The **transitive** criteria (PM5/PM1/PP2)
+are **deferred**: an automated ClinVar-derivation guard/audit (built next, via the loop) enumerates
+every ClinVar-sourced *scored* criterion on the full held-out output; the Oracle then rules on the
+transitive bucket **with real firing counts in hand**, not blind.
+
+### Consequences
+
+- (+) Closes the unambiguous direct-copy leak before any benchmark scoring; excluding a pathogenic
+  criterion can only make measured performance *lower*, never inflated — the correct bias for a gate.
+- (+) Keeps eval = production (both exclude PP5/BP6/PS4), so the gate faithfully measures the deployed
+  classifier.
+- (−) Loses BIAS's case-control PS4 — negligible for TSC (BIAS produces PS4 almost exclusively via the
+  ClinVar fallback for a rare disorder).
+- (−) The transitive question stays open until the full-held-out audit; the first gate run is blocked
+  on that audit + ruling.
+- **Follow-up:** `ps4-clinvar-circularity` (done here), `gate-ci-lower-bound`, and the ClinVar-
+  derivation guard/audit (the mechanized full-output audit) — see session todos.
+
+---
 
 - **Status:** Accepted
 - **Date:** 2026-07-08

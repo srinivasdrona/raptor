@@ -33,7 +33,7 @@ def make_eval_config(**overrides) -> EvalConfig:
     """Build a valid, frozen `EvalConfig`; `overrides` replace individual pins
     (so tests never mutate the frozen instance)."""
     base = dict(
-        automatable_criteria=["PVS1", "PS4", "PM1", "PM2", "PP3", "BA1", "BS1", "BS2", "BP4", "BP7"],
+        automatable_criteria=["PVS1", "PS3", "PM1", "PM2", "PP3", "BA1", "BS1", "BS2", "BP4", "BP7"],
         tavtigian_points={
             "supporting": 1, "moderate": 2, "strong": 4, "very_strong": 8, "stand_alone": 8,
         },
