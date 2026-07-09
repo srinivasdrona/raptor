@@ -1,0 +1,81 @@
+# Conformance-kit promotion catalog (kit-catalog / kit-promotion).
+#
+# Rule-of-2/3: a finding CLASS seen in >=2 independent modules PROMOTES from a
+# per-module bug into an enforced, cross-module kit invariant that every module
+# with the relevant surface must wire. `test_catalog_meta.py` enforces this
+# (checker-gate0): a `promote`/`mandatory` class whose invariant is missing, or
+# not wired in an `applies_to` module, FAILS the build.
+#
+# Seeded from PRD-01..07 cross-family checker findings. See
+# session files/kit-promotion-catalog-seed.md for the derivation.
+
+promotion_rule:
+  watch: 1        # recorded, not yet enforced (may be module-specific)
+  promote: 2      # add a kit invariant; every `applies_to` module must wire it
+  mandatory: 3    # meta-test FAILS if any `applies_to` module omits it
+
+# Each kit-wired module and the conformance test that must wire its invariants.
+kit_modules:
+  scorer:  tests/scorer/test_kit_conformance_scorer.py
+  ingest:  tests/ingest/test_kit_conformance_ingest.py
+  eval:    tests/eval/test_kit_conformance_eval.py
+  knowns:  tests/eval/test_kit_conformance_knowns.py
+
+# Universal invariants already enforced (predate the catalog; no longer recur).
+baseline_invariants:
+  - assert_conservation            # R-A10 no silent drops
+  - assert_grounding               # GP-9 source_ref resolves
+  - assert_determinism             # R-A11 identical inputs -> identical hash
+  - assert_fail_loud_propagates    # contract/repro breach raises
+  - assert_no_state_change_on_failure
+
+classes:
+  - id: C1
+    name: strict-canonical-whitelist-validation
+    status: promote
+    occurrences: [prd-06, prd-07]     # ACMG-code normalization (06 r4/5/6); AA/protein + review-status (07 r2/3/6)
+    summary: >
+      A domain classifier/validator must reject out-of-vocabulary input against an
+      explicit canonical set (whitelist), never accept-then-harden. Property: the
+      classifier never emits an in-vocabulary output for a known out-of-vocabulary input.
+    invariant: assert_never_emits
+    applies_to: [knowns]              # classify_variant / map_clinical_significance surface
+
+  - id: C2
+    name: label-blindness-separation
+    status: promote
+    occurrences: [prd-06, prd-07]     # PP5/BP6 + AC6 (06); label leaked into normalizer via raw_source_value (07 r1)
+    summary: >
+      No label/oracle value may reach a scorer-side object (H1 anti-circularity). The
+      scorer/normalization path never imports the label loader (forbidden-import) and no
+      object handed to it carries a label value in any field (forbidden-field).
+    invariant: assert_no_label_leak
+    applies_to: [knowns]
+
+  - id: C3
+    name: provenance-completeness
+    status: watch                     # recurred (06 r1/r4, 07 r2) but adapters not yet built; promote next
+    occurrences: [prd-06, prd-07]
+    summary: >
+      Every emitted artifact carries the full set of reproducing pins (snapshot id, code
+      version, config pins, source checksum) beyond the determinism/content-hash check.
+    invariant: assert_provenance_complete
+    applies_to: [eval, knowns]
+
+  - id: C4
+    name: fail-closed-decision-boundary
+    status: watch                     # 1 module (PRD-06 gate); promote if a 2nd decision module appears
+    occurrences: [prd-06]
+    summary: >
+      A decision/authorization boundary never emits an authorizing result on
+      missing/NaN/degenerate/ambiguous input.
+    invariant: null
+
+  - id: C5
+    name: finite-domain-exclusion-completeness
+    status: watch                     # instance of C1 (PRD-07 review-status); fold into C1's golden-corpus vocabulary
+    occurrences: [prd-07]
+    summary: >
+      Exclusion/filter policy enumerates the whole finite domain vocabulary at once
+      (sourced from the golden corpus), never one member per review round.
+    invariant: null
