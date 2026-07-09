@@ -1,16 +1,24 @@
 import pytest
+import gzip
 from raptor.ingest.contract import VariantSummaryContract
 
-def write_variant_summary(tmp_path, rows):
+def _rows_to_text(rows):
     header = VariantSummaryContract.REQUIRED_COLUMNS
+    lines = ["\t".join(header)]
+    for row in rows:
+        lines.append("\t".join(str(row.get(col, "")) for col in header))
+    return "\n".join(lines) + "\n"
+
+def write_variant_summary(tmp_path, rows):
     file_path = tmp_path / "variant_summary.txt"
-    with open(file_path, "w", encoding="utf-8") as f:
-        f.write("\t".join(header) + "\n")
-        for row in rows:
-            out_row = []
-            for col in header:
-                out_row.append(str(row.get(col, "")))
-            f.write("\t".join(out_row) + "\n")
+    file_path.write_text(_rows_to_text(rows), encoding="utf-8")
+    return file_path
+
+def write_variant_summary_gz(tmp_path, rows):
+    """Write a gzipped variant_summary.txt.gz -- the REAL ClinVar snapshot format."""
+    file_path = tmp_path / "variant_summary.txt.gz"
+    with gzip.open(file_path, "wt", encoding="utf-8", newline="") as f:
+        f.write(_rows_to_text(rows))
     return file_path
 
 class FakeNormalizer:
