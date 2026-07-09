@@ -49,11 +49,28 @@ index file until ≥3 exist).
 | PRD-03 | KB Schema & Provenance Ledger | 0 | **Signed off · module built ✓** (`b627073`) |
 | PRD-04 | VCEP Triage Worklist | 1 | backlog |
 | PRD-05 | Pipeline & Orchestration skeleton | 0 | backlog |
-| PRD-06 | **Benchmark & Evaluation Harness** (build known-variant benchmark + train/dev/held-out split + P/R/concordance, class-stratified; **gates any VUS run**) | 1 | backlog |
+| PRD-06 | **Benchmark & Evaluation Harness** (build known-variant benchmark + train/dev/held-out split + P/R/concordance, class-stratified; **gates any VUS run**) | 1 | **Signed off · module built ✓** (`e026422`, PR #1, 222 tests; 7-round cross-family checker sign-off) |
 
 > **Validation gate (binding):** no classification is run on the ~6,700 TSC VUS until PRD-06 shows
 > Tier-1/2 clears pre-registered thresholds on the **held-out known-variant** set — reported
 > **stratified by variant class** (missense gated separately; R-A2c). See EVAL_PLAN §1.1.
+
+## Path to first VUS run (post-PRD-06)
+
+PRD-06 completes the **code** path to the gated run — no further module builds are on the critical
+path. What remains are **three independent non-code tracks** that can run **in parallel**, then a
+terminal join:
+
+| # | Track | Type | Blocks on | Parallel? |
+|---|---|---|---|---|
+| A | **Benchmark data** — ingest real ClinVar TSC1/TSC2 *knowns* → frozen labeled benchmark (excl. conflicting/single-submitter/RAPTOR-influenced; label hierarchy) | data | ClinVar snapshot pull | ✅ independent |
+| B | **x64 live-scoring infra** — BIAS-2015 (arm's-length, ADR-0007) + Nirvana (x64-only, ADR-0008) + local pinned UTA for `hgvs` | infra | x64 worker stand-up | ✅ independent |
+| C | **Oracle thresholds (GP-3)** — pre-register precision/recall targets into `configs/eval/tsc2.yaml` (currently `{}` → gate reads `UNVERIFIED`) | governance | molecular-geneticist sign-off | ✅ independent |
+| J | **Terminal join** — run PRD-06 eval on the held-out known set; gate must `PASS` (missense-stratified, **both directions** clear pre-registered thresholds) → authorizes the 6,700-VUS run | — | A ∧ B ∧ C | join |
+
+> A/B/C share one upstream nicety (ingest the knowns once, reused by A and the eval), but have **no
+> code dependency on each other**. The gate stays `UNVERIFIED` until C lands thresholds, and cannot
+> `PASS` until A provides the benchmark and B produces real scores.
 
 ## Active Decisions & Bottlenecks
 - (Resolved 2026-07-08) Loop-engineering operating model → planner/doer/checker, see ADR-0003.
@@ -62,13 +79,13 @@ index file until ≥3 exist).
 - (Open) Confirm worker vCPU allocation at deploy (EPYC/Xeon 8-vCPU VM vs full silicon).
 - (Open) **Build core risk controls before trusting any automated output** — canary set, heartbeat/dead-man's switch, hard spend cap, source-contract tests, **answer-key/trace-cribbing lint, assertion-lock** (RISK_REGISTER.md §1; risks R-C1/R-A2/H1).
 - (Open) ADR — reuse `biomcp` / `paper-search-mcp` MCP connectors for Tier-3 retrieval (ARCHITECTURE.md §8; gated on GP-10/GP-9).
-- (Open) **Reference-data reproducibility (R-A11):** AC3-genomic validates against a local pinned
-  reference (chr9 `NC_000009.12` + chr16 `NC_000016.10`) at `~/raptor-refseq`, checksums pinned in
-  `configs/ingest/tsc.yaml`. Add a committed `scripts/` fetch-and-verify step so a fresh clone can
-  reproduce it (until then AC3 `requires_reference` tests skip without the local data).
+- (Resolved) **Reference-data reproducibility (R-A11):** committed `scripts/fetch_reference.py`
+  fetch-and-verify utility (`a80f759`, PR #2) so a fresh clone can reproduce the local pinned
+  reference (chr9 `NC_000009.12` + chr16 `NC_000016.10`), checksums pinned in `configs/ingest/tsc.yaml`.
+  AC3 `requires_reference` tests still skip on CI without the local data (expected).
 - (Open) **Build-process hardening (approved):** stand up `tests/kit/` executable conformance kit
   (universal invariants + adversarial generators) + `catalog.yaml` registry (promotion threshold, rule
   of 2/3) + meta-tests (catalog↔kit↔manifest sync + discovery) + pre-commit/CI gate (pytest + mypy +
   conformance) + checker gate-0 (kit-wired presence check). Retrofit PRD-01/02/03. Turns the recurring
   bug-classes into *enforced* gates instead of prompt-memory. (todo `build-conformance-kit`.)
-- (Open) **Environment:** Python 3.12.10 on Windows; **WSL2 Ubuntu 24.04.4 LTS (aarch64) ready**, venv **`raptor`** at `~/raptor` (Python 3.12.3, pytest 9.1.1, gcc 13.3/make). Code lives at `/mnt/d/AIProjects/raptor`; venv on Linux fs. Modules built via plan/build/check: **PRD-03 ✓, PRD-02 ✓, PRD-01 ✓ (signed off)**. Next: build-process hardening (conformance kit + CI) → PRD-06 (eval-gate) → PRD-04/05. **Deferred data setup:** reference-fetch script (R-A11); UTA on x64 worker (c./p.); BIAS+Nirvana on x64 worker (ADR-0008, live scoring). Cross-machine fleet = deferred.
+- (Open) **Environment:** Python 3.12.10 on Windows; **WSL2 Ubuntu 24.04.4 LTS (aarch64) ready**, venv **`raptor`** at `~/raptor` (Python 3.12.3, pytest 9.1.1, gcc 13.3/make). Code lives at `/mnt/d/AIProjects/raptor`; venv on Linux fs. Modules built via plan/build/check: **PRD-03 ✓, PRD-02 ✓, PRD-01 ✓, PRD-06 ✓ (all signed off)**; CI gate live ✓; reference-fetch script ✓. Next: the three parallel non-code tracks to the first VUS run (see *Path to first VUS run* above) — (A) real ClinVar knowns benchmark, (B) BIAS+Nirvana+UTA on x64 worker (ADR-0008), (C) Oracle thresholds (GP-3). Deferred: conformance-kit *governance* (catalog/promotion/meta-tests/mypy/gate-0); PRD-04/05; cross-machine fleet.
