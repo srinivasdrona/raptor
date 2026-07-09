@@ -50,6 +50,7 @@ index file until ≥3 exist).
 | PRD-04 | VCEP Triage Worklist | 1 | backlog |
 | PRD-05 | Pipeline & Orchestration skeleton | 0 | backlog |
 | PRD-06 | **Benchmark & Evaluation Harness** (build known-variant benchmark + train/dev/held-out split + P/R/concordance, class-stratified; **gates any VUS run**) | 1 | **Signed off · module built ✓** (`e026422`, PR #1, 222 tests; 7-round cross-family checker sign-off) |
+| PRD-07 | **ClinVar Knowns → Benchmark Labels Loader** (Track A1: label-side `variant_summary` → `LabeledVariant` for PRD-06; reuses PRD-02 contract+normalizer; keeps scorer label-blind, H1) | 1 | **Ready** — building via loop |
 
 > **Validation gate (binding):** no classification is run on the ~6,700 TSC VUS until PRD-06 shows
 > Tier-1/2 clears pre-registered thresholds on the **held-out known-variant** set — reported
