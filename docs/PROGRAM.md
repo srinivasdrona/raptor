@@ -50,7 +50,7 @@ index file until ≥3 exist).
 | PRD-04 | VCEP Triage Worklist | 1 | backlog |
 | PRD-05 | Pipeline & Orchestration skeleton | 0 | backlog |
 | PRD-06 | **Benchmark & Evaluation Harness** (build known-variant benchmark + train/dev/held-out split + P/R/concordance, class-stratified; **gates any VUS run**) | 1 | **Signed off · module built ✓** (`e026422`, PR #1, 222 tests; 7-round cross-family checker sign-off) |
-| PRD-07 | **ClinVar Knowns → Benchmark Labels Loader** (Track A1: label-side `variant_summary` → `LabeledVariant` for PRD-06; reuses PRD-02 contract+normalizer; keeps scorer label-blind, H1) | 1 | **Ready** — building via loop |
+| PRD-07 | **ClinVar Knowns → Benchmark Labels Loader** (Track A1: label-side `variant_summary` → `LabeledVariant` for PRD-06; reuses PRD-02 contract+normalizer; keeps scorer label-blind, H1) | 1 | **Signed off · module built ✓** (`499f479`, PR #3, 274 tests; 7-round checker sign-off) |
 
 > **Validation gate (binding):** no classification is run on the ~6,700 TSC VUS until PRD-06 shows
 > Tier-1/2 clears pre-registered thresholds on the **held-out known-variant** set — reported
@@ -64,7 +64,7 @@ terminal join:
 
 | # | Track | Type | Blocks on | Parallel? |
 |---|---|---|---|---|
-| A | **Benchmark data** — ingest real ClinVar TSC1/TSC2 *knowns* → frozen labeled benchmark (excl. conflicting/single-submitter/RAPTOR-influenced; label hierarchy) | data | ClinVar snapshot pull | ✅ independent |
+| A | **Benchmark data** — ingest real ClinVar TSC1/TSC2 *knowns* → frozen labeled benchmark (excl. conflicting/single-submitter/RAPTOR-influenced; label hierarchy) | data | **A1 loader built ✓ (PRD-07, `499f479`)**; A2 = ClinVar snapshot pull (governance) | ✅ independent |
 | B | **x64 live-scoring infra** — BIAS-2015 (arm's-length, ADR-0007) + Nirvana (x64-only, ADR-0008) + local pinned UTA for `hgvs` | infra | x64 worker stand-up | ✅ independent |
 | C | **Oracle thresholds (GP-3)** — pre-register precision/recall targets into `configs/eval/tsc2.yaml` (currently `{}` → gate reads `UNVERIFIED`) | governance | molecular-geneticist sign-off | ✅ independent |
 | J | **Terminal join** — run PRD-06 eval on the held-out known set; gate must `PASS` (missense-stratified, **both directions** clear pre-registered thresholds) → authorizes the 6,700-VUS run | — | A ∧ B ∧ C | join |
