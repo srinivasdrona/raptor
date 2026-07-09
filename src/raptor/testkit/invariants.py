@@ -121,6 +121,49 @@ def assert_no_state_change_on_failure(
         _close(store)
 
 
+def assert_never_emits(
+    classify: Callable[[Any], Any],
+    protected_output: Any,
+    out_of_vocabulary_inputs: Iterable[Any],
+    *,
+    label: str = "",
+) -> None:
+    """C1 (strict-canonical-whitelist validation): a domain classifier/validator must
+    NEVER emit ``protected_output`` for a known out-of-vocabulary input. Retires the
+    normalization/whitelist bug class (accept-then-harden). Example: a variant-consequence
+    classifier must never return ``"missense"`` for a non-substitution token (del/dup/
+    unknown-aa/stop-loss)."""
+    offenders = [x for x in out_of_vocabulary_inputs if classify(x) == protected_output]
+    tag = f" [{label}]" if label else ""
+    assert not offenders, (
+        f"strict-whitelist violated (C1){tag}: classifier emitted {protected_output!r} for "
+        f"out-of-vocabulary input(s) {offenders!r} -- validate against a canonical set, "
+        "never accept-then-harden"
+    )
+
+
+def assert_no_label_leak(
+    run_capturing: Callable[[], Iterable[Any]],
+    label_values: Iterable[str],
+    *,
+    label: str = "",
+) -> None:
+    """C2 (H1 anti-circularity / label-blindness): no known label value may reach a
+    scorer-side object. ``run_capturing()`` runs the pipeline and returns EVERY object
+    handed to the scorer/normalizer path; assert none of them carries any ``label_values``
+    string in any field (via ``repr``). Retires the trace-cribbing/label-leak class
+    (e.g. a label smuggled through a ``raw_source_value`` provenance field)."""
+    values = list(label_values)
+    tag = f" [{label}]" if label else ""
+    for obj in run_capturing():
+        blob = repr(obj)
+        for lv in values:
+            assert lv not in blob, (
+                f"label-blindness violated (C2/H1){tag}: label {lv!r} reached a scorer-side "
+                f"object handed to the identity/normalizer path: {obj!r}"
+            )
+
+
 def _raises(run: Callable[[Sequence[Any], Any], Any], items: Sequence[Any], store: Any) -> bool:
     try:
         run(items, store)

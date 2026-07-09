@@ -4,8 +4,10 @@ from raptor.testkit.invariants import (
     assert_determinism,
     assert_conservation,
     assert_fail_loud_propagates,
+    assert_never_emits,
+    assert_no_label_leak,
 )
-from raptor.eval.knowns import LabeledVariantReader
+from raptor.eval.knowns import LabeledVariantReader, classify_variant
 from raptor.ingest.model import NormalizedVariant, ManualQueueItem, VariantClass
 from conftest import make_eval_config
 from _knowns_fixtures import write_variant_summary, FakeNormalizer
@@ -90,3 +92,58 @@ def test_grounding(tmp_path):
     emitted = list(reader)
     assert len(emitted) == 1
     assert emitted[0].variant_id == "canonical_spdi_123", "Grounding violated: emitted variant_id must be normalizer's real output"
+
+
+# --- promoted kit invariants (catalog.yaml) ---------------------------------
+
+#: A frozen adversarial corpus of NON-substitution ClinVar `Name` tokens (del/dup,
+#: unknown aa, nonsense, frameshift, start-loss, stop-loss, extension, synonymous,
+#: splice, delins). classify_variant must never call any of these "missense".
+_C1_NON_MISSENSE_NAMES = [
+    "NM_1(TSC1):c.1A>G (p.Arg611del)",
+    "NM_1(TSC1):c.1A>G (p.Arg611dup)",
+    "NM_1(TSC1):c.1A>G (p.Xaa123Gln)",
+    "NM_1(TSC1):c.1A>G (p.Arg611Zzz)",
+    "NM_1(TSC1):c.1A>G (p.Arg611Ter)",
+    "NM_1(TSC1):c.1A>G (p.Gln1503*)",
+    "NM_1(TSC1):c.1A>G (p.Ser1043fs)",
+    "NM_1(TSC1):c.1A>G (p.Met1Val)",
+    "NM_1(TSC1):c.1A>G (p.Ter1808Arg)",
+    "NM_1(TSC1):c.1A>G (p.Ter1808ArgextTer3)",
+    "NM_1(TSC1):c.1A>G (p.=)",
+    "NM_1(TSC1):c.1832+1G>A",
+    "NM_1(TSC1):c.1A>G (p.Arg611delinsGly)",
+]
+
+
+def test_c1_classify_never_false_missense():
+    """C1 (strict-canonical-whitelist): classify_variant must NEVER return "missense" for a
+    non-substitution token -- a permanent backstop for the PRD-07 r3/r6 false-missense class."""
+    assert_never_emits(classify_variant, "missense", _C1_NON_MISSENSE_NAMES, label="knowns.classify_variant")
+
+
+def test_c2_label_never_reaches_normalizer(tmp_path):
+    """C2 (H1 anti-circularity): no ClinVar label value (ClinicalSignificance / ReviewStatus)
+    may reach the normalizer (scorer-side identity path) -- backstop for the PRD-07 r1 leak."""
+    rows = [{
+        "VariationID": "1", "GeneSymbol": "TSC1", "ClinicalSignificance": "Pathogenic",
+        "ReviewStatus": "reviewed by expert panel", "NumberSubmitters": "3",
+        "Name": "NM_1(TSC1):c.1A>G (p.Arg611Gln)", "ChromosomeAccession": "NC_000009.12",
+        "PositionVCF": "100", "ReferenceAlleleVCF": "A", "AlternateAlleleVCF": "G",
+    }]
+    fp = write_variant_summary(tmp_path, rows)
+    norm = NormalizedVariant(
+        variant_id="vid", hgvs_g=None, hgvs_c=None, hgvs_p=None, hgvs_c_null_reason=None,
+        hgvs_p_null_reason=None, variant_class=VariantClass.SNV, gene="TSC1", variation_id="1",
+        snapshot_id="s", snapshot_date="d", source_file_checksum="", row_locator="1", raw_source_value="",
+    )
+    fake = FakeNormalizer({"1": norm})
+
+    def run_capturing():
+        reader = LabeledVariantReader(fp, make_eval_config(labels_snapshot="s1"), fake,
+                                      snapshot_id="s1", snapshot_date="d")
+        list(reader)
+        return fake.calls  # the RawVariant objects handed to the normalizer
+
+    assert_no_label_leak(run_capturing, ["Pathogenic", "reviewed by expert panel"],
+                         label="knowns.LabeledVariantReader")
