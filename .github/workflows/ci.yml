@@ -1,0 +1,26 @@
+name: CI
+
+# The enforced build-process gate (todo: ci-gate). Runs the OFFLINE test +
+# conformance suite on every push/PR in a clean Linux env — independent of any
+# developer's machine. Reference/UTA/BIAS-dependent tests (`requires_reference`,
+# `requires_uta`) and the `blocked_ac1` placeholder SKIP here (no reference data
+# on the runner) — CI enforces the offline conformance; the data-backed tests
+# run locally / on the x64 worker (ADR-0008).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install (package + dev deps)
+        run: pip install -e ".[dev]"
+      - name: Offline test + conformance suite
+        run: python -m pytest -q
