@@ -51,6 +51,17 @@ _LOW_CONFIDENCE_REVIEW_MARKERS: tuple[str, ...] = (
     "no classification",
 )
 
+#: HIGH-confidence review statuses (2-star concordant / expert panel / practice
+#: guideline). Confidence is REVIEW-STATUS-driven -- a high-confidence label is
+#: kept even when `NumberSubmitters == 1` (a single expert-panel submission is
+#: legitimate). Raw `submitter_count` is only a FALLBACK proxy, applied to an
+#: UNRECOGNIZED review status (never to override a known high/low tier).
+_HIGH_CONFIDENCE_REVIEW_MARKERS: tuple[str, ...] = (
+    "practice guideline",
+    "reviewed by expert panel",
+    "multiple submitters, no conflicts",
+)
+
 
 def _source_rank(source: str) -> int:
     return _SOURCE_RANK.get(source, len(_SOURCE_RANK))
@@ -59,13 +70,19 @@ def _source_rank(source: str) -> int:
 def _excluded(variant: LabeledVariant) -> bool:
     if variant.label == "Conflicting":
         return True
-    if variant.submitter_count < 2:
-        return True
     if variant.raptor_influenced:
         return True
-    if any(marker in (variant.review_status or "").lower() for marker in _LOW_CONFIDENCE_REVIEW_MARKERS):
-        return True
     if variant.label not in _SCOREABLE_LABELS:
+        return True
+    rs = (variant.review_status or "").lower()
+    if any(marker in rs for marker in _LOW_CONFIDENCE_REVIEW_MARKERS):
+        return True
+    # Confidence is review-status-driven: a high-confidence status is kept
+    # regardless of submitter count. The raw-count proxy applies ONLY to an
+    # unrecognized status (a conservative fallback for placeholder/unknown data).
+    if any(marker in rs for marker in _HIGH_CONFIDENCE_REVIEW_MARKERS):
+        return False
+    if variant.submitter_count < 2:
         return True
     return False
 
