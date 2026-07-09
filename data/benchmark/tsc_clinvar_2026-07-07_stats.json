@@ -10,28 +10,30 @@
   "labels_emitted": 17989,
   "rows_skipped_unnormalizable": 104,
   "benchmark_size": 3681,
-  "train_dev_size": 2577,
-  "holdout_size": 1104,
+  "train_dev_size": 1104,
+  "holdout_size": 2577,
   "benchmark_by_direction": {
     "pathogenic": 565,
     "benign": 3116,
     "total": 3681
   },
   "holdout_by_direction": {
-    "pathogenic": 161,
-    "benign": 943,
-    "total": 1104
+    "pathogenic": 378,
+    "benign": 2199,
+    "total": 2577
   },
   "holdout_by_class_direction": {
-    "missense|benign|B": 31,
-    "missense|benign|LB": 7,
-    "missense|pathogenic|LP": 1,
-    "missense|pathogenic|P": 18,
-    "other|benign|B": 556,
-    "other|benign|LB": 349,
-    "other|pathogenic|LP": 2,
-    "other|pathogenic|P": 44,
-    "truncating|pathogenic|P": 96
+    "missense|benign|B": 93,
+    "missense|benign|LB": 10,
+    "missense|pathogenic|LP": 9,
+    "missense|pathogenic|P": 42,
+    "other|benign|B": 1316,
+    "other|benign|LB": 779,
+    "other|pathogenic|LP": 7,
+    "other|pathogenic|P": 110,
+    "truncating|benign|B": 1,
+    "truncating|pathogenic|LP": 1,
+    "truncating|pathogenic|P": 209
   },
   "benchmark_by_class_direction": {
     "missense|benign|B": 139,
@@ -47,13 +49,13 @@
     "truncating|pathogenic|P": 317
   },
   "holdout_missense": {
-    "pathogenic": 19,
-    "benign": 38,
-    "total": 57
+    "pathogenic": 51,
+    "benign": 103,
+    "total": 154
   },
   "holdout_truncating": {
-    "pathogenic": 96,
-    "benign": 0,
-    "total": 96
+    "pathogenic": 210,
+    "benign": 1,
+    "total": 211
   }
 }

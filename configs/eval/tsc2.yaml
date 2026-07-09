@@ -53,18 +53,34 @@ tavtigian_cutoffs:
   benign_max: -7            # points <= -7 -> Benign
 
 # FR5/EVAL_PLAN sec 2: a stratum's per-truth-class held-out count below this
-# is reported descriptive-only + CI, never gating. Defensible v1 default
-# (confirm with the Oracle as the benchmark grows, sec 9).
-min_count_per_class: 20
+# is reported descriptive-only + CI, never gating. Set to the EVAL_RUBRIC power
+# floor -- 0.90 precision at a 95% CI lower bound needs >=35 held-out calls
+# (Clopper-Pearson). Below this a stratum reads UNDERPOWERED (FR5).
+min_count_per_class: 35
 
 # FR2: deterministic no-leakage split. Pinned seed + fraction (R-A11).
+# holdout=0.7: RAPTOR Tier-1/2 is a DETERMINISTIC rule engine (it learns nothing
+# from the benchmark), so a large held-out does not starve any training -- the
+# 30% reserve is only a development/sanity set. 0.7 puts ~51 known pathogenic
+# missense in held-out (>=35), powering the 0.90 missense bar (EVAL_RUBRIC §3a).
 split:
   seed: 20260701
-  holdout_fraction: 0.3
+  holdout_fraction: 0.7
 
-# FR6/AC5/GP-9/H13: EMPTY until the Oracle pre-registers thresholds. Never
-# invent a target -- the gate reads UNVERIFIED while this is empty.
-oracle_thresholds: {}
+# FR6/AC5/GP-9/H13: pre-registered BLIND to held-out results (no BIAS/Nirvana
+# scores exist yet -- Track B is not run), by the domain owner (@dronasrinivas)
+# per EVAL_RUBRIC §3/§5. Missense gating stratum:
+#   precision >= 0.90  -> ACMG/AMP PP3/BP4-grade correctness, both directions
+#                         (Richards 2015; Pejaver 2022 calibrated evidence).
+#   recall    >= 0.85  -> clinical sensitivity floor (InterVar/CardioClassifier
+#                         missense sensitivity band).
+# Truncating stratum target is 0.95 (IARC) but is REPORTED, not gated here --
+# per-stratum thresholds need a config extension (logged follow-up); truncating
+# is already >=210 held-out and not the binding constraint. These values are
+# LOCKED once merged; changing them post-hoc breaks pre-registration (R-A2).
+oracle_thresholds:
+  precision: 0.90
+  recall: 0.85
 
 # FR1/GP-9: the labels snapshot this benchmark is frozen against (R-A11).
 # Pinned ClinVar variant_summary.txt.gz snapshot:
