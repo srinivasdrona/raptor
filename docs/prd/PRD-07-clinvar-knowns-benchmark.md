@@ -131,26 +131,39 @@ rows for PRD-06 — keeping the scorer path structurally label-blind (H1).
 - **AC2 variant_class** = hand-computed from HGVS `p.` (not the parser's own output).
 - **AC3 identity** = PRD-02 `Normalizer`'s canonical SPDI (the existing, independently-tested join key).
 
-### 10.2 Config → extend `configs/eval/tsc2.yaml` (or a sibling `configs/eval/knowns.yaml`; GP-6)
-Pins (nothing hardcoded): `labels_snapshot` (must equal PRD-06's), `clinvar_snapshot_file_checksum`,
-the gene list (reuse PRD-02's TSC1/TSC2), and the two mapping tables as data:
-- **ClinicalSignificance → label:** `Pathogenic→P`, `Likely pathogenic→LP`, `Likely benign→LB`,
-  `Benign→B`, `Pathogenic/Likely pathogenic→P` (or a pinned policy), `Benign/Likely benign→B`,
-  `Uncertain significance→VUS`, `Conflicting interpretations of pathogenicity→Conflicting`; anything
-  else (`drug response`, `risk factor`, `not provided`, `association`, `other`, multi-condition
-  combos) → a non-scoreable sentinel (excluded downstream), **never** force-fit.
-- **ReviewStatus → source rank / star:** as FR5.
+### 10.2 Config (GP-6)
+- **Snapshot pins on `EvalConfig`** (benchmark-source provenance, co-located with `labels_snapshot`):
+  add an **optional** field `clinvar_snapshot_file_checksum: str = ""` to `EvalConfig` (default `""`
+  = no pin / skip the guard). `make_eval_config(**overrides)` passes it through unchanged (no conftest
+  edit needed). The loader reads the checksum pin from `config` and reuses the ingest reader's
+  checksum-guard semantics (a 64-hex pin that disagrees with the file's real sha256 → raise).
+- **Label + variant_class vocabularies are CANONICAL BUILT-INS**, not config knobs — ClinVar's
+  aggregate-classification vocabulary and the HGVS-`p.` consequence rules are fixed standards (like the
+  ACMG-2015 code set in `config.VALID_CRITERIA`); they are pinned in code with the AC1/AC2 tests as the
+  independent oracle. Same for the `ReviewStatus → source-rank` map (FR5). This keeps GP-6's intent
+  (no *policy* hardcoded) while not pretending a fixed vocabulary is a tunable.
+  - `ClinicalSignificance → label`: `Pathogenic→P`, `Likely pathogenic→LP`, `Likely benign→LB`,
+    `Benign→B`, `Pathogenic/Likely pathogenic→P`, `Benign/Likely benign→B`, `Uncertain significance→VUS`,
+    `Conflicting interpretations of pathogenicity→Conflicting`; anything else (`drug response`,
+    `risk factor`, `not provided`, `association`, `other`, multi-condition combos) → a non-scoreable
+    sentinel (excluded downstream), **never** force-fit.
+  - `ReviewStatus → source rank`: as FR5 (expert panel/practice guideline→`clingen_vcep`; multiple
+    submitters no conflicts→`clinvar_2star_concordant`; single submitter/conflicting→`clinvar`).
 
 ### 10.3 Module layout + public API (the test contract) — eval-side, e.g. `src/raptor/eval/knowns.py`
-- `map_clinical_significance(sig: str, cfg) -> str` — label ∈ {P,LP,LB,B,VUS,Conflicting,<non-scoreable>}.
+- `map_clinical_significance(sig: str, cfg=None) -> str` — canonical built-in map; `cfg` optional/ignored.
 - `classify_variant(name: str) -> str` — variant_class ∈ {missense, truncating, other} from the p. HGVS.
-- `LabeledVariantReader(path, config, normalizer, *, snapshot_id, snapshot_date)` — iterable yielding
-  `raptor.eval.model.LabeledVariant`; contract-checks, gene-filters, normalizes to `variant_id`, maps
-  label + class + review status; surfaces skipped-with-reason (never silent drop, R-A10-style).
+- `LabeledVariantReader(path, config, normalizer, *, snapshot_id=None, snapshot_date=None)` — iterable
+  yielding `raptor.eval.model.LabeledVariant`; contract-checks, reads the checksum pin from
+  `config.clinvar_snapshot_file_checksum` (guard), gene-filters, normalizes to `variant_id`, maps
+  label + class + review status; `LabeledVariant.snapshot = snapshot_id or config.labels_snapshot`;
+  surfaces skipped-with-reason (a `.skipped` list — never a silent drop, R-A10-style).
 - `load_known_labels(path, config, normalizer) -> list[LabeledVariant]` — the frozen, order-stable
-  materialization (feeds `build_benchmark`).
-- Reuses `raptor.ingest.contract.VariantSummaryContract`, `raptor.ingest.reader`'s checksum guard, and
-  an injected `raptor.ingest.normalizer.Normalizer` (dependency-injected, not imported into scorer).
+  materialization (feeds `build_benchmark`); `snapshot = config.labels_snapshot`.
+- The doer also adds the optional `EvalConfig.clinvar_snapshot_file_checksum: str = ""` field (§10.2).
+- Reuses `raptor.ingest.contract.VariantSummaryContract`, `raptor.ingest.reader`'s checksum guard
+  (`SourceChecksumMismatchError`), and an injected `raptor.ingest.normalizer.Normalizer`
+  (dependency-injected, never imported into the scorer path).
 
 ### 10.4 Conformance kit (wired from the start)
 `tests/eval/test_kit_conformance_knowns.py` wires `raptor.testkit.invariants`:
