@@ -66,22 +66,52 @@ PRD-06 FR5). We do **not** pre-register a pass/fail bar a stratum cannot statist
 
 ## 3. Benchmark composition — the pinned snapshot (informs powering, blind to results)
 
-From the pinned ClinVar snapshot (§4), TSC1/TSC2, GRCh38, **high-confidence only** (expert panel /
-practice guideline / 2-star multiple-submitters-no-conflicts — the truth-set tier per PRD-07),
-scoreable knowns available BEFORE the train/held-out split:
+Frozen from the pinned ClinVar snapshot (§4) via `scripts/build_tsc_benchmark.py` (deterministic;
+real genomic-SPDI normalizer for the identity join; PRD-07 label/class/review mapping + PRD-06
+exclusions + label hierarchy; seed `20260701`, holdout `0.3`). **These are actual frozen counts, not
+estimates** — knowing them is design-time information (composition), blind to how the model performs.
 
-| | Pathogenic (P + LP) | Benign (B + LB) |
+**Benchmark (3,681 scoreable knowns after exclusions) → held-out (1,104):**
+
+| Held-out stratum | Pathogenic (P/LP) | Benign (B/LB) |
 |---|---|---|
-| **Truncating** | ~325 | ~1 |
-| **Missense / other** | ~240 | ~3,100 |
-| **(VUS, not scored — the targets)** | 2,583 | — |
+| **Missense** (gating, R-A2c) | **19** | 38 |
+| **Truncating** | 96 | 0 |
+| Other (splice / synonymous / in-frame / no-`p.`) | 46 | 905 |
+| **All** | 161 | 943 |
 
-Implications (design-time, not outcome): the **benign** and **truncating-pathogenic** strata are
-large enough to support a **0.95** lower-bound; **missense-pathogenic** comfortably supports **0.90**
-and likely **0.95** after the split; **truncating-benign is essentially empty** (expected biology —
-benign LoF in a tumor suppressor is rare), so the truncating benign-direction bar is **reported, not
-gated**. Final per-stratum held-out N (post-split, after the real loader's exact missense/truncating
-classification) is produced by the benchmark-freeze step and appended here before adoption.
+(Full benchmark, pre-split: missense P/LP = **75**, missense B/LB = 152, truncating P/LP = **319**,
+truncating B = 1, other P/LP = 171, other B/LB = 2,963.)
+
+### 3a. Power verdict (the decisive finding)
+
+- **Truncating is robustly powered:** 96 held-out pathogenic → supports the **0.95** lower-bound
+  (needs ≥72 with 0 errors). Truncating classification can be validated to standard.
+- **Benign direction is massively powered** (943 held-out) in missense/other; supports ≥0.95.
+- **Missense-pathogenic is UNDERPOWERED at holdout 0.3:** only **19** held-out (< `min_count` 20, and
+  < the **35** needed for even a 0.90 lower bound). TSC's mechanism is LoF-dominated, so
+  high-confidence known **pathogenic missense** are genuinely scarce (75 in the whole benchmark). At
+  the current split the gate will honestly read **`UNDERPOWERED`** on the gating (missense) stratum
+  and **refuse to authorize** — correct behavior (GP-9/FR5), not a defect.
+- **Truncating-benign cannot be validated** (n=1) — expected biology (benign LoF in a tumor
+  suppressor is rare); report-only, never gated.
+
+### 3b. Options to resolve the missense-power gap (governance decision)
+
+1. **Enlarge the held-out fraction.** RAPTOR Tier-1/2 is a *deterministic* rule engine — it learns
+   nothing from the benchmark, so there is no over-fitting to protect against; anti-circularity is
+   preserved purely by pre-registering thresholds blind. A larger holdout (e.g. 0.7–0.8) is defensible
+   and would put ~52–60 missense-pathogenic in held-out → powers **0.90**, still short of 0.95 (needs
+   72 with 0 errors). *Cheapest; validates missense to the ACMG-minimum 0.90 only.*
+2. **Broaden known-pathogenic-missense sources.** Add the TSC1/TSC2 VCEP curated set (Symonds 2022),
+   published functional-assay-backed missense, and LOVD/TSC-specific databases to raise N. *The real
+   path to robust (≥0.95) missense validation; requires a curation extension to Track A.*
+3. **Accept a missense-`UNDERPOWERED` gate** and authorize only on the powered strata
+   (truncating/benign), with missense classification flagged *not validated to standard* until (2).
+   *Most conservative; honest but limits the first run.*
+
+Recommendation: pursue **(1) + (2)** — raise the holdout now to validate missense to 0.90, and curate
+more known pathogenic missense to reach 0.95; hard-gate truncating at 0.95 (already powered).
 
 ## 4. Pinned snapshot provenance (R-A11)
 
