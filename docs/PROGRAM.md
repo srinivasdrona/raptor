@@ -84,9 +84,12 @@ terminal join:
   fetch-and-verify utility (`a80f759`, PR #2) so a fresh clone can reproduce the local pinned
   reference (chr9 `NC_000009.12` + chr16 `NC_000016.10`), checksums pinned in `configs/ingest/tsc.yaml`.
   AC3 `requires_reference` tests still skip on CI without the local data (expected).
-- (Open) **Build-process hardening (approved):** stand up `tests/kit/` executable conformance kit
-  (universal invariants + adversarial generators) + `catalog.yaml` registry (promotion threshold, rule
-  of 2/3) + meta-tests (catalog↔kit↔manifest sync + discovery) + pre-commit/CI gate (pytest + mypy +
-  conformance) + checker gate-0 (kit-wired presence check). Retrofit PRD-01/02/03. Turns the recurring
-  bug-classes into *enforced* gates instead of prompt-memory. (todo `build-conformance-kit`.)
+- (Open) **Build-process hardening (in progress):** conformance kit + **promotion machinery LIVE** —
+  `tests/kit/catalog.yaml` (findings registry, rule-of-2/3) + promoted invariants C1 (strict-whitelist
+  `assert_never_emits`) / C2 (label-blindness `assert_no_label_leak`) wired into modules +
+  `tests/kit/test_catalog_meta.py` (checker-gate0: fails the build if a promoted invariant is unwired).
+  **ClinVar/HGVS golden corpus** (`tests/fixtures/clinvar_hgvs_golden.yaml` + cited
+  `docs/reference/clinvar-hgvs-golden-corpus.md`) is the full-vocabulary loader oracle — it caught a
+  real bare-`p.` parser bug on wiring. Remaining: kit-mypy (type gate), strict-first spec standard,
+  C3 provenance promotion. Turns recurring bug-classes into *enforced* gates.
 - (Open) **Environment:** Python 3.12.10 on Windows; **WSL2 Ubuntu 24.04.4 LTS (aarch64) ready**, venv **`raptor`** at `~/raptor` (Python 3.12.3, pytest 9.1.1, gcc 13.3/make). Code lives at `/mnt/d/AIProjects/raptor`; venv on Linux fs. Modules built via plan/build/check: **PRD-03 ✓, PRD-02 ✓, PRD-01 ✓, PRD-06 ✓ (all signed off)**; CI gate live ✓; reference-fetch script ✓. Next: the three parallel non-code tracks to the first VUS run (see *Path to first VUS run* above) — (A) real ClinVar knowns benchmark, (B) BIAS+Nirvana+UTA on x64 worker (ADR-0008), (C) Oracle thresholds (GP-3). Deferred: conformance-kit *governance* (catalog/promotion/meta-tests/mypy/gate-0); PRD-04/05; cross-machine fleet.
