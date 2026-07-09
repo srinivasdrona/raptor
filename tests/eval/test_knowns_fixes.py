@@ -123,9 +123,11 @@ def test_classify_stop_loss_extension_is_not_truncating():
 def test_source_hierarchy_2star_outranks_default_clinvar():
     """A ClinVar 2-star concordant label must win the dedup over a plain/default clinvar
     label for the same variant -- higher-quality source wins, never tie-break by order."""
-    # default clinvar listed FIRST, so an order-only tie-break would wrongly keep it
+    # default clinvar listed FIRST, so an order-only tie-break would wrongly keep it.
+    # (review status is a KEPT one -- not single-submitter/conflicting -- so the test
+    # exercises the SOURCE-RANK tie-break, not an exclusion.)
     labels = [
-        LabeledVariant("v", "B", "criteria provided, single submitter", 3, "clinvar", "s1", False, "missense"),
+        LabeledVariant("v", "B", "criteria provided, multiple submitters, no conflicts", 3, "clinvar", "s1", False, "missense"),
         LabeledVariant("v", "P", "criteria provided, multiple submitters, no conflicts", 3,
                        "clinvar_2star_concordant", "s1", False, "missense"),
     ]

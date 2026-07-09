@@ -22,9 +22,9 @@ _SOURCE_RANK: dict[str, int] = {
     "clingen_vcep": 0,
     "clingen_3star": 0,
     "clinvar_2star_concordant": 1,
-    "clinvar": 1,
-    "curated_literature": 2,
-    "oracle_adjudication": 3,
+    "clinvar": 2,
+    "curated_literature": 3,
+    "oracle_adjudication": 4,
 }
 
 
@@ -46,6 +46,11 @@ def _excluded(variant: LabeledVariant) -> bool:
     if variant.raptor_influenced:
         return True
     if "conflicting" in (variant.review_status or "").lower():
+        return True
+    if "single submitter" in (variant.review_status or "").lower():
+        # A ClinVar 1-star "criteria provided, single submitter" label is low-confidence
+        # and excluded even when NumberSubmitters>1 (extra no-criteria submissions can
+        # inflate the count while the germline review stays single-submitter).
         return True
     if variant.label not in _SCOREABLE_LABELS:
         return True
