@@ -1,0 +1,13 @@
+##fileformat=VCFv4.2
+##source=RAPTOR-devbox-smoke-test (label-free TSC held-out SNVs, GRCh38)
+##contig=<ID=chr9,assembly=GRCh38>
+##contig=<ID=chr16,assembly=GRCh38>
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+chr9	132896255	.	T	A	.	.	CLASS=missense
+chr9	132896425	.	C	G	.	.	CLASS=missense
+chr9	132896440	.	C	T	.	.	CLASS=missense
+chr9	132896597	.	G	C	.	.	CLASS=missense
+chr16	2053388	.	C	T	.	.	CLASS=missense
+chr16	2053391	.	A	T	.	.	CLASS=missense
+chr16	2058764	.	C	T	.	.	CLASS=missense
+chr16	2058778	.	G	A	.	.	CLASS=missense
