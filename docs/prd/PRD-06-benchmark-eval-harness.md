@@ -216,3 +216,16 @@ evidence source; **labels are a separate input** and never reach the evidence so
 - **The harness reads labels; the scorer never does** (FR8/AC6) — the single most important separation
   in the system; tested structurally (labels object never passed to the evidence source) + audit.
 - **Held-out never tunes** (FR2/AC2); **thresholds never fit** (FR6/AC5, `UNVERIFIED` while empty).
+
+### 10.6 API specifics pinned by the test contract (the doer must honor these)
+- `evidence_source.get_evidence(variant_id) -> Iterable[(criterion, strength, direction)]` — the injected
+  read interface; the harness calls it **by `variant_id` only** (never passes a label / `LabeledVariant`).
+- `implied_direction(calls, config) -> ImpliedCall` with `.implied ∈ {LP, LB, no_call}` and `.points:int`
+  (signed Tavtigian sum); the **caller** assigns `variant_id`. 0 fired criteria → `(0, "no_call")`.
+- `compute_metrics(implied, benchmark, config) -> dict[str, Metrics]` keyed by stratum; `Metrics.counts`
+  includes `total_called` and `abstain`; a below-`min_count_per_class` stratum has `gating=False`.
+- `GateDecision.status ∈ {PASS, FAIL, UNVERIFIED, UNDERPOWERED}`; empty `oracle_thresholds` → `UNVERIFIED`;
+  a non-gating (under-min-count) missense stratum → **not** `PASS`; `vus_authorized == (status == "PASS")`.
+- `EvalReport.render()` states the **labels snapshot**, **held-out size**, metrics, and **threshold status**
+  (AC9); `EvalReport.content_hash()` excludes run metadata.
+- `EvalConfig` is **frozen** (tests build variants via a factory, never mutate).
