@@ -66,7 +66,11 @@ split:
 # invent a target -- the gate reads UNVERIFIED while this is empty.
 oracle_thresholds: {}
 
-# FR1/GP-9: the labels snapshot id/date this benchmark is frozen against
-# (fixture id for the offline v1 build; a real ClinVar snapshot id once the
-# live knowns pipeline lands, PRD-06 sec 7).
-labels_snapshot: "clinvar_2026-07-01"
+# FR1/GP-9: the labels snapshot this benchmark is frozen against (R-A11).
+# Pinned ClinVar variant_summary.txt.gz snapshot:
+#   date   : 2026-07-07 (NCBI weekly release)
+#   md5    : bd3720834b62733a6a1c81d7e1eef941  (NCBI-published, verified on download)
+#   sha256 : 5fe4fe10783391d01dc414dc5583a3e63487b67f8cd3c8429d59227cd5f4f37f
+# The benchmark-freeze script (scripts/build_tsc_benchmark.py) verifies the raw
+# snapshot sha256 before deriving the GRCh38/TSC benchmark.
+labels_snapshot: "clinvar_2026-07-07"
