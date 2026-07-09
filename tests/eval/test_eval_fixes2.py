@@ -66,9 +66,14 @@ def test_config_requires_precision_and_recall_when_thresholds_set(tmp_path):
 
 
 def test_gate_still_passes_with_precision_and_recall_met():
-    """Control: a genuinely-passing case (precision+recall thresholds met) still PASSes."""
+    """Control: a genuinely-passing case (precision+recall thresholds met on BOTH
+    directions, with adequate per-class CALLED coverage) still PASSes."""
     cfg = make_eval_config(oracle_thresholds={"precision": 0.9, "recall": 0.9})
-    metrics = {"missense": Metrics(0.95, 0.95, 0.95, {}, "missense", True)}
+    counts = {"tp": 20, "fp": 0, "tn": 20, "fn": 0, "abstain": 0, "total_called": 40,
+              "total": 40, "path_actual": 20, "benign_actual": 20,
+              "path_called": 20, "benign_called": 20}
+    metrics = {"missense": Metrics(0.95, 0.95, 0.95, counts, "missense", True,
+                                   benign_precision=0.95, benign_recall=0.95)}
     d = decide_gate(metrics, cfg)
     assert d.status == "PASS"
     assert d.vus_authorized is True
@@ -79,15 +84,21 @@ def test_gate_still_passes_with_precision_and_recall_met():
 # --------------------------------------------------------------------------
 def test_combiner_sign_from_family_not_supplied_direction():
     """The pathogenic/benign sign is a property of the ACMG criterion family
-    (P*→pathogenic, B*→benign); a mislabeled `direction` arg must NOT flip it
-    (a laundering vector)."""
+    (P*→pathogenic, B*→benign), NEVER a launderable `direction` arg. Round-3 MAJOR-1
+    corrected this invariant: a `direction` that CONTRADICTS the family (e.g. BA1 is
+    benign-evidence but labeled `pathogenic`) is corrupt upstream data -- it would also
+    blind checks.py (which keys on `direction`) -- so it must FAIL LOUD, not be silently
+    resolved. A laundering attempt therefore RAISES (it can never flip the sign)."""
     cfg = make_eval_config()
-    # BA1 mislabeled pathogenic must still be benign (-8 / LB), never +8/LP
-    r = implied_direction([("BA1", "stand_alone", "pathogenic")], cfg)
-    assert (r.points, r.implied) == (-8, "LB")
-    # PVS1 mislabeled benign must still be pathogenic (+8 / LP)
-    r = implied_direction([("PVS1", "very_strong", "benign")], cfg)
-    assert (r.points, r.implied) == (8, "LP")
+    # BA1 mislabeled pathogenic is corrupt -> raise (a laundering attempt cannot flip the sign)
+    with pytest.raises(ValueError):
+        implied_direction([("BA1", "stand_alone", "pathogenic")], cfg)
+    # PVS1 mislabeled benign is corrupt -> raise
+    with pytest.raises(ValueError):
+        implied_direction([("PVS1", "very_strong", "benign")], cfg)
+    # a CONSISTENT direction still scores by family
+    assert implied_direction([("BA1", "stand_alone", "benign")], cfg).points == -8
+    assert implied_direction([("PVS1", "very_strong", "pathogenic")], cfg).points == 8
 
 
 # --------------------------------------------------------------------------

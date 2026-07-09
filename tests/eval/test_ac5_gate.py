@@ -25,10 +25,14 @@ def test_ac5_gate_is_missense_stratified():
     assert d.status == "FAIL", "gate must fail when the missense stratum fails, even if overall passes"
     assert d.vus_authorized is False
 
-    # missense passes -> PASS + authorized
+    # missense passes on BOTH directions with adequate per-class CALLED coverage -> PASS
+    _pass_counts = {"tp": 20, "fp": 0, "tn": 20, "fn": 0, "abstain": 0,
+                    "total_called": 40, "total": 40, "path_actual": 20, "benign_actual": 20,
+                    "path_called": 20, "benign_called": 20}
     ok = {
         "overall": Metrics(0.95, 0.95, 0.95, {}, "overall", True),
-        "missense": Metrics(0.95, 0.95, 0.95, {}, "missense", True),
+        "missense": Metrics(0.95, 0.95, 0.95, _pass_counts, "missense", True,
+                            benign_precision=0.95, benign_recall=0.95),
     }
     d = decide_gate(ok, cfg)
     assert d.status == "PASS"

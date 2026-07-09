@@ -6,13 +6,13 @@ from conftest import LabeledVariant
 def test_ac2_build_benchmark_exclusions(valid_eval_config):
     variants = [
         # Should be included
-        LabeledVariant("v1", "P", "reviewed", 2, "clinvar", "snap", False, "missense"),
+        LabeledVariant("v1", "P", "reviewed", 2, "clinvar", "clinvar_2026-07-01", False, "missense"),
         # Conflicting - EXCLUDE
-        LabeledVariant("v2", "Conflicting", "reviewed", 5, "clinvar", "snap", False, "missense"),
+        LabeledVariant("v2", "Conflicting", "reviewed", 5, "clinvar", "clinvar_2026-07-01", False, "missense"),
         # Single submitter (< 2) - EXCLUDE
-        LabeledVariant("v3", "LB", "reviewed", 1, "clinvar", "snap", False, "missense"),
+        LabeledVariant("v3", "LB", "reviewed", 1, "clinvar", "clinvar_2026-07-01", False, "missense"),
         # Raptor influenced - EXCLUDE
-        LabeledVariant("v4", "P", "reviewed", 3, "clinvar", "snap", True, "truncating")
+        LabeledVariant("v4", "P", "reviewed", 3, "clinvar", "clinvar_2026-07-01", True, "truncating")
     ]
     
     bm = build_benchmark(variants, valid_eval_config)
@@ -22,7 +22,7 @@ def test_ac2_build_benchmark_exclusions(valid_eval_config):
 
 def test_ac2_split_no_leakage_and_determinism(valid_eval_config):
     variants = [
-        LabeledVariant(f"v{i}", "P", "reviewed", 2, "clinvar", "snap", False, "missense") 
+        LabeledVariant(f"v{i}", "P", "reviewed", 2, "clinvar", "clinvar_2026-07-01", False, "missense") 
         for i in range(100)
     ]
     bm = build_benchmark(variants, valid_eval_config)
