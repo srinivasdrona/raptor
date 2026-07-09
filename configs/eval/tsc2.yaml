@@ -1,0 +1,72 @@
+# PRD-06 sec 10.2 — v1 eval-harness config for TSC2 (v1 scope). This is
+# POLICY + PINS for the eval-only implied-direction combiner and the gate --
+# it does not compute ACMG criteria (that's PRD-01/BIAS-2015) and it does
+# not set pass/fail targets (those are Oracle pre-registered, GP-3).
+#
+# `oracle_thresholds` below is INTENTIONALLY EMPTY. Per GP-9/H13 no target
+# is invented in advance -- until the Oracle pre-registers thresholds here,
+# `raptor.eval.gate.decide_gate` MUST return `UNVERIFIED`, never `PASS`
+# (AC5). This is by design, not an omission (PRD-06 sec 7/dependencies).
+
+# FR3: which of the scorer's automatable criteria feed the eval-only
+# implied-direction combiner (`combine.implied_direction`). Mirrors the
+# automatable set from `configs/acmg/tsc.yaml` (`included_criteria`), minus
+# PP5/BP6 (R-A2 circularity: ClinVar-classification-derived criteria must
+# not feed a combiner that is then graded against ClinVar-derived labels).
+automatable_criteria:
+  - PVS1
+  - PS1
+  - PS4
+  - PM1
+  - PM2
+  - PM4
+  - PM5
+  - PP2
+  - PP3
+  - BA1
+  - BS1
+  - BS3
+  - BS4
+  - BP1
+  - BP3
+  - BP4
+  - BP7
+
+# Tavtigian-2018 point system (an INDEPENDENT published rule set, not
+# self-derived -- AC1 tests reproduce it exactly, sec 10.5).
+tavtigian_points:
+  supporting: 1
+  moderate: 2
+  strong: 4
+  very_strong: 8
+  stand_alone: 8
+
+# Tavtigian-2018 category cutoffs on the signed point sum (`confirm` vs the
+# published paper before a real-corpus run, sec 9; pinned here as config,
+# not code, so the doer/checker never hardcode a value).
+tavtigian_cutoffs:
+  pathogenic_min: 10        # points >= 10 -> Pathogenic
+  likely_pathogenic_min: 6  # 6 <= points < 10 -> Likely Pathogenic
+  vus_min: 0                # 0 <= points <= vus_max -> VUS / no_call
+  vus_max: 5
+  likely_benign_max: -1     # benign_max < points <= -1 -> Likely Benign
+  benign_max: -7            # points <= -7 -> Benign
+
+# FR5/EVAL_PLAN sec 2: a stratum's per-truth-class held-out count below this
+# is reported descriptive-only + CI, never gating. Defensible v1 default
+# (confirm with the Oracle as the benchmark grows, sec 9).
+min_count_per_class: 20
+
+# FR2: deterministic no-leakage split. Pinned seed + fraction (R-A11).
+split:
+  seed: 20260701
+  holdout_fraction: 0.3
+
+# FR6/AC5/GP-9/H13: EMPTY until the Oracle pre-registers thresholds. Never
+# invent a target -- the gate reads UNVERIFIED while this is empty.
+oracle_thresholds: {}
+
+# FR1/GP-9: the labels snapshot id/date this benchmark is frozen against
+# (fixture id for the offline v1 build; a real ClinVar snapshot id once the
+# live knowns pipeline lands, PRD-06 sec 7).
+labels_snapshot: "clinvar_2026-07-01"
