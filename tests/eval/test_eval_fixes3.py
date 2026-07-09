@@ -38,7 +38,7 @@ from conftest import make_eval_config, make_labeled, evidence_for
 
 def _valid_raw() -> dict:
     return {
-        "automatable_criteria": ["PVS1", "PS4", "PM1", "PM2", "PP3", "BA1", "BS1", "BS2", "BP4", "BP7"],
+        "automatable_criteria": ["PVS1", "PS3", "PM1", "PM2", "PP3", "BA1", "BS1", "BS2", "BP4", "BP7"],
         "tavtigian_points": {"supporting": 1, "moderate": 2, "strong": 4, "very_strong": 8, "stand_alone": 8},
         "tavtigian_cutoffs": {"pathogenic_min": 10, "likely_pathogenic_min": 6, "vus_min": 0,
                               "vus_max": 5, "likely_benign_max": -1, "benign_max": -7},
@@ -171,20 +171,22 @@ def test_combiner_family_direction_mismatch_fails_loud():
 # [MAJOR-2] PP5/BP6 ClinVar-circularity must be STRUCTURALLY excluded
 # --------------------------------------------------------------------------
 def test_config_forbids_clinvar_circular_criteria(tmp_path):
-    """PP5/BP6 derive from ClinVar assertions (R-A2 circularity). Their exclusion must
+    """PP5/BP6/PS4 derive from a variant's own ClinVar assertion (R-A2 circularity;
+    PS4 via BIAS-3.0.0's ClinVar-submitter fallback). Their exclusion must
     be structural, not merely absent-by-convention -- listing them in
     automatable_criteria must fail loud at load."""
-    for bad in (["PVS1", "PM2", "PP5"], ["PVS1", "PM2", "BP6"]):
+    for bad in (["PVS1", "PM2", "PP5"], ["PVS1", "PM2", "BP6"], ["PVS1", "PM2", "PS4"]):
         with pytest.raises(ConfigError):
             load_config(_write_config(tmp_path, automatable_criteria=bad))
 
 
 def test_combiner_never_scores_forbidden_criteria_even_if_listed():
-    """Defense-in-depth: even a hand-built config that lists PP5/BP6 must never score
-    them (they contribute zero points -- never a laundered ClinVar signal)."""
-    cfg = make_eval_config(automatable_criteria=["PVS1", "PM2", "PP5", "BP6"])
+    """Defense-in-depth: even a hand-built config that lists PP5/BP6/PS4 must never
+    score them (they contribute zero points -- never a laundered ClinVar signal)."""
+    cfg = make_eval_config(automatable_criteria=["PVS1", "PM2", "PP5", "BP6", "PS4"])
     assert implied_direction([("PP5", "strong", "pathogenic")], cfg).points == 0
     assert implied_direction([("BP6", "strong", "benign")], cfg).points == 0
+    assert implied_direction([("PS4", "strong", "pathogenic")], cfg).points == 0
 
 
 # --------------------------------------------------------------------------

@@ -13,7 +13,7 @@ bias_data_version: "confirm-pending-bias-data" # confirm: pin BIAS's own referen
 
 # FR7/AC7: which of BIAS's automatable criteria (of the 19-of-28, sec 1)
 # RAPTOR actually emits as KB evidence. Default = all automatable EXCEPT
-# PP5/BP6 (R-A2 circularity policy, sec 10.3): both are ClinVar-classification
+# PP5/BP6/PS4 (R-A2 circularity policy, sec 10.3): all are ClinVar-classification
 # -derived, and the frozen benchmark (EVAL_PLAN sec 2) uses ClinVar-derived
 # labels -- emitting them as evidence risks grading against an answer key
 # RAPTOR partly copied. `parse.py` still parses PP5/BP6 faithfully (the
@@ -21,7 +21,6 @@ bias_data_version: "confirm-pending-bias-data" # confirm: pin BIAS's own referen
 included_criteria:
   - PVS1
   - PS1
-  - PS4   # ClinVar-submitter-count-derived form flagged for the Oracle to rule on (sec 10.3) -- included, not excluded, by default
   - PM1
   - PM2
   - PM4
@@ -36,7 +35,9 @@ included_criteria:
   - BP3
   - BP4
   - BP7
-  # Deliberately NOT included by default: PP5, BP6 (R-A2 circularity).
+  # Deliberately NOT included by default: PP5, BP6, PS4 (R-A2 direct-copy
+  # circularity -- all derive from the variant's OWN ClinVar assertion; PS4
+  # via BIAS-3.0.0's ClinVar-submitter fallback). Oracle decision 2026-07.
 
 # BIAS fired-strength-int -> RAPTOR KB strength vocab (PRD-01 sec 10.3).
 # This is the generic BIAS<->RAPTOR strength-int convention (1..5), not a

@@ -35,7 +35,7 @@ from conftest import make_eval_config, make_labeled
 
 def _valid_raw() -> dict:
     return {
-        "automatable_criteria": ["PVS1", "PS4", "PM1", "PM2", "PP3", "BA1", "BS1", "BS2", "BP4", "BP7"],
+        "automatable_criteria": ["PVS1", "PS3", "PM1", "PM2", "PP3", "BA1", "BS1", "BS2", "BP4", "BP7"],
         "tavtigian_points": {"supporting": 1, "moderate": 2, "strong": 4, "very_strong": 8, "stand_alone": 8},
         "tavtigian_cutoffs": {"pathogenic_min": 10, "likely_pathogenic_min": 6, "vus_min": 0,
                               "vus_max": 5, "likely_benign_max": -1, "benign_max": -7},
@@ -139,13 +139,17 @@ def test_config_forbids_clinvar_circular_criteria_case_insensitive(tmp_path):
     """A lowercase 'pp5' is still PP5 -- structurally forbidden regardless of casing."""
     with pytest.raises(ConfigError):
         load_config(_write_config(tmp_path, automatable_criteria=["PVS1", "PM2", "pp5"]))
+    # PS4 (BIAS-3.0.0 ClinVar-submitter fallback) inherits the same case-insensitive ban.
+    with pytest.raises(ConfigError):
+        load_config(_write_config(tmp_path, automatable_criteria=["PVS1", "PM2", "ps4"]))
 
 
 def test_combiner_never_scores_forbidden_criteria_case_insensitive():
-    """Even a lowercase 'pp5'/'bp6' must never be scored (case-insensitive R-A2 ban)."""
-    cfg = make_eval_config(automatable_criteria=["PVS1", "PM2", "pp5", "bp6"])
+    """Even a lowercase 'pp5'/'bp6'/'ps4' must never be scored (case-insensitive R-A2 ban)."""
+    cfg = make_eval_config(automatable_criteria=["PVS1", "PM2", "pp5", "bp6", "ps4"])
     assert implied_direction([("pp5", "strong", "pathogenic")], cfg).points == 0
     assert implied_direction([("bp6", "strong", "benign")], cfg).points == 0
+    assert implied_direction([("ps4", "strong", "pathogenic")], cfg).points == 0
 
 
 # --------------------------------------------------------------------------

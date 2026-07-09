@@ -49,10 +49,18 @@ _REQUIRED_CUTOFF_KEYS: tuple[str, ...] = (
     "benign_max",
 )
 
-#: PP5/BP6 derive from ClinVar assertions themselves (R-A2 circularity) --
-#: structurally forbidden from `automatable_criteria` at load time, never
-#: merely absent-by-convention (MAJOR-2).
-FORBIDDEN_CRITERIA: frozenset[str] = frozenset({"PP5", "BP6"})
+#: PP5/BP6/PS4 derive DIRECTLY from a variant's OWN ClinVar assertion (R-A2
+#: circularity) -- PP5/BP6 are the reputable-source criteria (ClinGen-SVI-2018
+#: deprecated), and BIAS-3.0.0's PS4 falls back to counting ClinVar submitters
+#: ("No GWAS data found. N independent ClinVar submitters classify...") when no
+#: GWAS/case-control data exists, which for a rare Mendelian disorder is nearly
+#: always. Grading such a criterion against ClinVar-derived labels reads the
+#: answer key (Oracle decision, real BIAS-3.0.0 devbox evidence 2026-07). All
+#: are structurally forbidden from `automatable_criteria` at load time, never
+#: merely absent-by-convention (MAJOR-2). NOTE: the TRANSITIVE ClinVar criteria
+#: (PM5 same-residue, PM1 domain-rate, PP2 gene-rate) are a SEPARATE, deferred
+#: ruling pending the full-held-out audit -- not banned here.
+FORBIDDEN_CRITERIA: frozenset[str] = frozenset({"PP5", "BP6", "PS4"})
 
 #: The exact canonical ACMG/AMP-2015 code set (28 codes). `strip().upper()`
 #: alone does not remove hidden/internal whitespace (e.g. a zero-width space

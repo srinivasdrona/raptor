@@ -28,13 +28,13 @@ def test_ac1_tavtigian_points_and_direction(valid_eval_config):
     r = _call([("BS1", "strong", "benign"), ("BP4", "supporting", "benign")], cfg)
     assert (r.points, r.implied) == (-5, "LB")
 
-    # PS4(+4) + PM1(+2) + PM2(+2) + PP3(+1) = +9 -> LP
-    r = _call([("PS4", "strong", "pathogenic"), ("PM1", "moderate", "pathogenic"),
+    # PS3(+4) + PM1(+2) + PM2(+2) + PP3(+1) = +9 -> LP
+    r = _call([("PS3", "strong", "pathogenic"), ("PM1", "moderate", "pathogenic"),
                ("PM2", "moderate", "pathogenic"), ("PP3", "supporting", "pathogenic")], cfg)
     assert (r.points, r.implied) == (9, "LP")
 
-    # PVS1(+8) + PS4(+4) = +12 (Pathogenic >=10) -> LP
-    r = _call([("PVS1", "very_strong", "pathogenic"), ("PS4", "strong", "pathogenic")], cfg)
+    # PVS1(+8) + PS3(+4) = +12 (Pathogenic >=10) -> LP
+    r = _call([("PVS1", "very_strong", "pathogenic"), ("PS3", "strong", "pathogenic")], cfg)
     assert (r.points, r.implied) == (12, "LP")
 
 

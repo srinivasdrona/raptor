@@ -26,7 +26,7 @@ from conftest import make_eval_config, make_labeled, evidence_for
 # --------------------------------------------------------------------------
 def _valid_raw() -> dict:
     return {
-        "automatable_criteria": ["PVS1", "PS4", "PM1", "PM2", "PP3", "BA1", "BS1", "BS2", "BP4", "BP7"],
+        "automatable_criteria": ["PVS1", "PS3", "PM1", "PM2", "PP3", "BA1", "BS1", "BS2", "BP4", "BP7"],
         "tavtigian_points": {"supporting": 1, "moderate": 2, "strong": 4, "very_strong": 8, "stand_alone": 8},
         "tavtigian_cutoffs": {"pathogenic_min": 10, "likely_pathogenic_min": 6, "vus_min": 0,
                               "vus_max": 5, "likely_benign_max": -1, "benign_max": -7},
