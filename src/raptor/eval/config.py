@@ -99,6 +99,12 @@ class EvalConfig:
     split: Mapping[str, Any]  # {"seed": int, "holdout_fraction": float}
     oracle_thresholds: Mapping[str, float]  # metric -> threshold; EMPTY until GP-3
     labels_snapshot: str
+    #: PRD-07 sec 10.2/10.3 -- optional real sha256 pin for the ClinVar
+    #: `variant_summary` snapshot the labels come from (benchmark-source
+    #: provenance, co-located with `labels_snapshot`). Default "" means
+    #: unpinned (no checksum guard); a non-hex-64 placeholder is likewise
+    #: treated as unpinned (see `knowns.LabeledVariantReader`).
+    clinvar_snapshot_file_checksum: str = ""
 
 
 def _validate_points(points: Any) -> None:
@@ -233,4 +239,5 @@ def load_config(path: str | Path) -> EvalConfig:
         split=dict(raw["split"]),
         oracle_thresholds={str(k): float(v) for k, v in oracle_thresholds.items()},
         labels_snapshot=str(raw["labels_snapshot"]),
+        clinvar_snapshot_file_checksum=str(raw.get("clinvar_snapshot_file_checksum", "") or ""),
     )
