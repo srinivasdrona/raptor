@@ -17,14 +17,17 @@ from .model import BenchmarkRow, LabeledVariant
 
 #: Label-source hierarchy, highest confidence first (EVAL_PLAN sec 2). Used
 #: only to resolve a variant identity that appears more than once in the
-#: labels source -- never to change the label value itself.
+#: labels source -- never to change the label value itself. Lower rank number
+#: = higher priority: expert adjudication / ClinGen outrank curated literature,
+#: which outranks a 2-star ClinVar consensus, which outranks a default ClinVar
+#: entry (a default DB entry must never win a dedup over an expert/curated call).
 _SOURCE_RANK: dict[str, int] = {
-    "clingen_vcep": 0,
-    "clingen_3star": 0,
-    "clinvar_2star_concordant": 1,
-    "clinvar": 2,
-    "curated_literature": 3,
-    "oracle_adjudication": 4,
+    "oracle_adjudication": 0,
+    "clingen_vcep": 1,
+    "clingen_3star": 1,
+    "curated_literature": 2,
+    "clinvar_2star_concordant": 3,
+    "clinvar": 4,
 }
 
 
@@ -32,6 +35,21 @@ _SOURCE_RANK: dict[str, int] = {
 #: not_provided, etc.) is unmappable and must be excluded, never silently
 #: mis-counted.
 _SCOREABLE_LABELS: frozenset[str] = frozenset({"P", "LP", "LB", "B"})
+
+#: The FINITE set of ClinVar review-status markers that indicate a
+#: low-confidence assertion unfit for a truth set (EVAL_PLAN sec 2). A label
+#: whose `review_status` contains ANY of these (case-insensitive) is excluded:
+#: 1-star `single submitter`, any `conflicting` status, and 0-star
+#: `no assertion` / `no classification` records. The high-confidence remainder
+#: (2-star `multiple submitters, no conflicts`, `reviewed by expert panel`,
+#: `practice guideline`) is kept. ClinVar's review vocabulary is finite, so this
+#: enumerates the whole low-quality set at once (never a per-status patch).
+_LOW_CONFIDENCE_REVIEW_MARKERS: tuple[str, ...] = (
+    "single submitter",
+    "conflicting",
+    "no assertion",
+    "no classification",
+)
 
 
 def _source_rank(source: str) -> int:
@@ -45,12 +63,7 @@ def _excluded(variant: LabeledVariant) -> bool:
         return True
     if variant.raptor_influenced:
         return True
-    if "conflicting" in (variant.review_status or "").lower():
-        return True
-    if "single submitter" in (variant.review_status or "").lower():
-        # A ClinVar 1-star "criteria provided, single submitter" label is low-confidence
-        # and excluded even when NumberSubmitters>1 (extra no-criteria submissions can
-        # inflate the count while the germline review stays single-submitter).
+    if any(marker in (variant.review_status or "").lower() for marker in _LOW_CONFIDENCE_REVIEW_MARKERS):
         return True
     if variant.label not in _SCOREABLE_LABELS:
         return True
