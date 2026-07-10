@@ -353,14 +353,13 @@ class/tier or threshold re-derivation (BIAS owns thresholds).
 > synthetic label-free fixtures + property invariants. A **real** run additionally needs the local FASTA,
 > the real BIAS output, and the Oracle ruling. Ship the bridge; the measurement is gated on data + Oracle.
 
-## 8. Open questions
-- **Contig-naming pin location.** `accession→VCF contig` as a small `configs/eval/export.yaml` block vs a
-  pinned constant validated against `configs/ingest/tsc.yaml`. Either is GP-6-compliant; pick the smaller.
-- **Marker-vocabulary home.** Dedicated `configs/eval/clinvar_markers.yaml` (BIAS-version-pinned) vs a block
-  in `configs/eval/tsc2.yaml`. Prefer the dedicated file: it is tied to the BIAS annotator version, not the
-  eval policy, and must re-pin on a BIAS bump (FR-C6).
-- **Manifest secondary TSV.** JSONL is the source of record; a TSV mirror is optional — a doer convenience,
-  not a contract.
+## 8. Resolved design decisions
+- **Contig naming:** dedicated, ordered, schema-validated `configs/eval/export.yaml` (§10.2); no
+  hardcoded accession/contig map.
+- **Marker vocabulary:** dedicated `configs/eval/clinvar_markers.yaml`, because it is tied to the BIAS
+  annotator version and must re-pin on a BIAS bump (FR-C6).
+- **Manifest format:** JSONL only, with exactly four per-row fields; no TSV mirror and no metadata row.
+  File-level metadata lives in `{prefix}.provenance.json`.
 
 ## 9. Preservation set *(H3 / G1)*
 
@@ -399,8 +398,12 @@ class/tier or threshold re-derivation (BIAS owns thresholds).
   implementation's own output.
 
 ### 10.2 Config (GP-6; nothing policy-bearing hardcoded)
-- **Contig map** (`accession→VCF contig`), validated against `configs/ingest/tsc.yaml`; recorded in manifest
-  header provenance. (§8 open — dedicated file vs constant.)
+- **Contig map** — dedicated `configs/eval/export.yaml`, schema-validated with
+  `assembly: GRCh38` and an ordered `contigs` list of
+  `{accession: NC_000009.12, vcf_contig: chr9}` then
+  `{accession: NC_000016.10, vcf_contig: chr16}`. List order is the deterministic VCF sort order;
+  accessions are validated against `configs/ingest/tsc.yaml`. The pins are recorded in the
+  provenance sidecar.
 - **ClinVar marker vocabulary** — `configs/eval/clinvar_markers.yaml` (proposed), **schema-validated,
   version-pinned**: `bias_version: "3.0.0"`; a `markers:` list (case-insensitive tokens/**bounded** phrases
   tied to BIAS v3.0.0 — e.g. `clinvar`, `vcv`, `clinvar pathogenic rate`, `clinvar benign rate`,
@@ -416,6 +419,10 @@ class/tier or threshold re-derivation (BIAS owns thresholds).
 > unchanged and makes the label-free boundary one auditable module.
 
 - **`src/raptor/eval/export.py`** — SPDI→VCF 4.2 + identity manifest.
+  - `ExportConfig` + `load_export_config(path, ingest_config)` — frozen/schema-validated view of
+    `configs/eval/export.yaml`; rejects blank/duplicate accession or VCF-contig pins and any assembly
+    other than `ingest_config.assembly`, and requires its accession set to equal the ingest config's
+    configured genomic accessions. Tests may construct `ExportConfig` directly.
   - `spdi_to_vcf(variant_id, reference) -> (contig, pos, ref, alt)` — per FR-A2; verifies
     deleted-vs-reference; raises `ExportReferenceMismatchError`/`ContigStartAnchorError` (fail-loud).
     `reference` is an injected FASTA-access port (DI: offline uses a tiny synthetic FASTA; real uses the
@@ -424,12 +431,16 @@ class/tier or threshold re-derivation (BIAS owns thresholds).
     `(contig, POS, REF, ALT)` (pinned contig order) + manifest rows + provenance/hashes; enforces
     conservation + bijection (fatal on collision, FR-A6).
   - `ExportResult` = `{vcf_text, manifest_rows, conservation_count, vcf_hash, manifest_hash, provenance}`;
-    `write(out_dir)` emits `.vcf` + `.manifest.jsonl` + `.provenance.json` (+ optional `.tsv`).
+    `write(out_dir, prefix="holdout_input")` emits exactly
+    `{prefix}.vcf`, `{prefix}.manifest.jsonl`, and `{prefix}.provenance.json`.
     Manifest per-row fields = exactly `{variant_id, vcf_key, accession, contig}` (FR-A4/A7); provenance
     never masquerades as a manifest data row.
-- **`scripts/export_holdout_vcf.py`** — CLI: reads the frozen held-out JSONL (accessing only
-  `row["variant_id"]`), loads the checksum-verified reference, writes the label-free VCF + manifest, prints
-  the conservation count (2,577) + hashes. Supersedes `make_sample_vcf.py`.
+- **`scripts/export_holdout_vcf.py`** — CLI:
+  `--heldout <jsonl> --out-dir <dir> [--prefix holdout_input]
+  [--export-config configs/eval/export.yaml] [--ingest-config configs/ingest/tsc.yaml]
+  [--reference-root <path>]`. It reads the frozen held-out JSONL (accessing only
+  `row["variant_id"]`), loads the checksum-verified reference, writes the three pinned output files,
+  and prints the conservation count (2,577) + hashes. Supersedes `make_sample_vcf.py`.
 - **`src/raptor/eval/live_source.py`** — the arm's-length adapter.
   - `BiasEvidenceSource(bias_tsv_path, manifest_path, eval_config, scorer_config, normalizer)` — preflights
     at construction (manifest+BIAS load, canonical-SPDI normalization + join via `normalizer` (FR-B8),
