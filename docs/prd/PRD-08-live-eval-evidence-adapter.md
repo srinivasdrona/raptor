@@ -75,7 +75,9 @@ class/tier or threshold re-derivation (BIAS owns thresholds).
   ALT=anchor+inserted`; **pure deletion (inserted empty)** → verify `deleted`, anchor `= reference[pos0-1]`,
   `POS=pos0, REF=anchor+deleted, ALT=anchor`; **contig-start (`pos0==0`) pure indel** → **fail loud** (typed
   error): no left anchor exists, never guess or silently switch to a right-anchor rule (out of scope unless
-  separately oracle-proven).
+  separately oracle-proven). A fetched anchor must be **exactly one uppercase A/C/G/T base**; an empty,
+  multi-base, lowercase, or ambiguous anchor raises `ExportReferenceMismatchError` before REF/ALT
+  construction — never emit an invalid VCF allele.
 - **FR-A3 — Reference pinned, verified, never hardcoded.** Bases read from the pinned checksummed GRCh38
   FASTA(s) (`configs/ingest/tsc.yaml::reference_checksums` for `NC_000009.12`/`NC_000016.10`), reusing
   `ingest.normalizer`'s FASTA access + checksum-verify (`ReferenceChecksumMismatchError`). A
@@ -235,8 +237,10 @@ class/tier or threshold re-derivation (BIAS owns thresholds).
   every shape (SNV, MNV, both-non-empty delins, pure insertion, pure deletion), each VCF row equals the
   **hand-computed** `(POS, REF, ALT)` per FR-A2; anchors read from the (stub/pinned) reference, not
   fabricated.
-- **AC-A2 (mechanical) — Contig-start anchor fails loud.** A pure indel at `pos0==0` raises a typed error
-  (no guessed anchor, no silent right-anchor fallback).
+- **AC-A2 (mechanical) — Missing/invalid anchor fails loud.** A pure indel at `pos0==0` raises
+  `ContigStartAnchorError` (no guessed anchor/right-anchor fallback); an injected reference returning an
+  empty, multi-base, lowercase, or non-ACGT left anchor raises `ExportReferenceMismatchError` before
+  REF/ALT construction.
 - **AC-A3 (mechanical) — Reference mismatch fails loud (R-A10).** A row whose `deleted` disagrees with the
   pinned reference raises a `REF_MISMATCH`-class error; no silent correction, no emitted row.
 - **AC-A4 (evidence-form) — Structural no-truth boundary.** Given a synthetic input row carrying **sentinel
@@ -491,7 +495,8 @@ Evidence flows to `run_eval` only as `variant_id`-keyed `(criterion, strength, d
 
 ### 10.6 API specifics pinned by the test contract (the doer must honor these)
 - `spdi_to_vcf` treats SPDI position as **0-based**; both-non-empty → `POS=pos0+1`; pure indels → left anchor
-  at `pos0-1`, `POS=pos0`; `pos0==0` pure indel → raise; deleted-vs-reference mismatch → raise.
+  at `pos0-1`, `POS=pos0`; `pos0==0` pure indel → raise; deleted-vs-reference mismatch or an anchor other
+  than exactly one uppercase A/C/G/T base → `ExportReferenceMismatchError`.
 - `spdi_to_vcf(variant_id, reference)` returns the SPDI **accession** as tuple element 1; only
   `export_holdout(..., config)` maps that accession to the configured VCF contig name. This preserves
   the minimal conversion API without a hidden global contig map.
@@ -531,7 +536,7 @@ reference_files:                              # <=4
   - src/raptor/scorer/bias_source.py          # the vcf_key format the manifest must match
 acceptance_criteria:
   - {text: "AC-A1 all-shape conversion hand-computed", type: mechanical}
-  - {text: "AC-A2 contig-start anchor fails loud", type: mechanical}
+  - {text: "AC-A2 contig-start and short/malformed anchor fail loud", type: mechanical}
   - {text: "AC-A3 reference mismatch fails loud (R-A10)", type: mechanical}
   - {text: "AC-A4 structural no-truth boundary; INFO=='.'; manifest field-set pinned", type: evidence-form}
   - {text: "AC-A5 determinism + total sort key (contig,POS,REF,ALT)", type: mechanical}
