@@ -9,6 +9,7 @@
 
 | ID | Title | Status | Date |
 |----|-------|--------|------|
+| [ADR-0010](#adr-0010--generic-platform-uniqueness-premise-falsified-vertical-tscmtor-research-evidence-strategy) | Generic-platform uniqueness premise falsified; vertical TSC/mTOR research-evidence strategy | Accepted | 2026-07-10 |
 | [ADR-0009](#adr-0009--clinvar-derived-acmg-criteria-direct-copy-banned-pp5bp6ps4-transitive-deferred-to-audit) | ClinVar-derived ACMG criteria: direct-copy banned (PP5/BP6/PS4), transitive deferred to audit | Accepted | 2026-07-10 |
 | [ADR-0008](#adr-0008--tier-12-annotation-pipeline-bias-2015--nirvana-runs-on-an-x64-worker-not-the-arm-queen) | Tier-1/2 annotation pipeline (BIAS-2015 + Nirvana) runs on an x64 worker, not the ARM Queen | Accepted | 2026-07-08 |
 | [ADR-0007](#adr-0007--bias-2015-integrated-at-arms-length-only-agpl) | BIAS-2015 integrated at arm's-length only (AGPL) | Accepted | 2026-07-08 |
@@ -18,6 +19,76 @@
 | [ADR-0003](#adr-0003--loop-operating-model-planner--doer--checker-across-three-model-families) | Loop operating model: planner / doer / checker across three model families | Accepted | 2026-07-08 |
 | [ADR-0002](#adr-0002--vision--strategy-doc-format-pichler-vision-board--rumelt-kernel) | Vision & strategy doc format: Pichler Vision Board + Rumelt Kernel | Accepted | 2026-07-08 |
 | [ADR-0001](#adr-0001--strategic-framing-narrow-buildable-claim-with-broad-north-star) | Strategic framing: narrow-buildable claim with broad north-star | Accepted | 2026-07-08 |
+
+---
+
+## ADR-0010 — Generic-platform uniqueness premise falsified; vertical TSC/mTOR research-evidence strategy
+
+- **Status:** Accepted
+- **Date:** 2026-07-10
+- **Deciders:** @dronasrinivas (operator)
+- **Supersedes (in part):** [ADR-0001](#adr-0001--strategic-framing-narrow-buildable-claim-with-broad-north-star) — the *differentiation* ("blue ocean") and *generalise-across-rare-disease north-star* framing only. ADR-0001's layered-validation-ceiling decision (GP-1/GP-2/GP-3) **stands**.
+
+### Context
+
+ADR-0001 framed RAPTOR as a narrow-buildable TSC claim with a **broad cross-disease north-star**, and
+STRATEGY.md leaned on a **"blue ocean / no synthesis layer / no public deployed system"**
+differentiation. Two things changed:
+
+1. **The uniqueness premise was falsified.** A grounded competitor scan found multiple capable
+   variant-interpretation / LLM-ACMG platforms (Deriva, Virtual Geneticist, Breakthrough Genomics,
+   3billion AIVARI, eVai, VarChat, Golden Helix VSClinical, SeqOne DiagAI, Variant Bio — sources and
+   claim-type classification in `docs/reference/competitive-landscape-2026-07.md`). The only claim that
+   survives is narrow and dated: a **PubMed E-utilities search verified 2026-06-16** found **no
+   indexed TSC-specific automated-classification campaign**, and **TSC VCEP ClinVar submissions were
+   0** — an under-served vertical + unresolved *institutional/adoption* question, **not** "no capable
+   platform exists" and **not** automatic demand.
+2. **The first complete deterministic TSC1/TSC2 evidence census was executed** (6,618 VUS;
+   `data/census/tsc_vus_clinvar_2026-07-07_stats.json`) — internal, eval-only, non-authoritative
+   candidate directions, not classifications.
+
+Continuing to justify RAPTOR by uniqueness, or to hold a generalise-to-all-rare-disease north-star,
+is no longer defensible (GP-8).
+
+### Considered options
+
+1. **Vertical TSC/mTOR research-evidence product** — withdraw the uniqueness claim, freeze horizontal
+   platform expansion, finish the deterministic TSC evidence program, reuse/buy generic engines, and
+   gate any mTOR extension one at a time.
+2. **Double down as a generic rare-disease variant-interpretation platform** — compete head-on with
+   funded vendors on breadth. Rejected: no differentiated advantage, high burn, contradicts GP-4/GP-7.
+3. **Abandon the effort because competitors exist** — rejected as competitor-overreaction; it discards
+   a valuable open TSC benchmark/census and the auditability/freshness discipline.
+
+### Decision
+
+Adopt **option 1**:
+
+- **The generic-platform uniqueness diagnosis is falsified** and withdrawn from STRATEGY.md.
+- **Freeze horizontal/platform expansion** — no generic ACMG engine, generic literature-agent stack,
+  or generic NGS pipeline (STRATEGY §9); freeze PRD-05/generic orchestration and generic Tier-3
+  platform work (PROGRAM.md).
+- **Retain and finish the deterministic TSC evidence program** — census done; the held-out validation
+  gate (ADR-0009 audit + PRD-06 PASS) still governs any authoritative output.
+- **Vertical TSC/mTOR research-evidence strategy** — the product is expert-reviewable candidate
+  evidence packets, a TSC evidence/functional-assay/contradiction atlas, and gated mTOR-condition
+  hypothesis packets (STRATEGY §1/§6).
+- **Reuse/buy generic engines** (GP-4); the moat is the TSC-vertical evidence, not generic methodology.
+- **Expansion / user / oracle gates** — new binding **GP-13**: every feature names a TSC/mTOR user,
+  artifact, expert validator, falsifier, and why a generic product cannot supply it; mTOR extensions
+  are admitted one at a time; a domain oracle is recruited before the layer that needs it (GP-3).
+
+### Consequences
+
+- (+) The strategy no longer depends on a falsified uniqueness claim; it rests on a defensible
+  vertical contribution (open benchmark, auditability, freshness) that survives competitor existence.
+- (+) Scope is bounded: GP-13 + §9 out-of-scope stop "all things TSC/mTOR" vertical-washing.
+- (+) Preserves the sunk assets (census, benchmark, deterministic engine) without over-claiming them.
+- (−) Drops the fundable-sounding "generalise across rare disease" headline (as ADR-0001 already
+  cautioned) and the "blue ocean" story.
+- (−) Adds governance load: each mTOR extension needs a full GP-13 gate + oracle before it ships.
+- **History preserved:** ADR-0001 remains immutable; only its differentiation/north-star framing is
+  superseded. New/updated risks: R-A12, R-D7, R-E4, R-F4/F5/F6, R-G5 (RISK_REGISTER.md).
 
 ---
 
@@ -39,17 +110,20 @@ criterion against ClinVar labels reads the answer key (R-A2 circularity). Two di
   back to counting ClinVar submitters ("No GWAS data found. N independent ClinVar submitters
   classify…") when no GWAS/case-control data exists, which for a rare Mendelian disorder is nearly
   always. (PP5/BP6 are also ClinGen-SVI-2018-deprecated.)
-- **Transitive / aggregate** — the criterion reads *other* variants' ClinVar data: **PM5**
-  (same-residue variant reported pathogenic), **PM1** (domain ClinVar pathogenic/benign rate), **PP2**
-  (gene missense pathogenic/benign proportions). These are how the criteria legitimately work in ACMG
-  practice; excluding them strips real evidence — notably PM5, prime **missense** signal (the gated
-  stratum).
+- **Transitive / aggregate (comparator-dependent)** — the criterion reads *other* variants' ClinVar
+  data. **Static criterion lineage identifies five:** **PS1** (same amino-acid change previously
+  reported pathogenic), **PM5** (same-residue variant reported pathogenic), **PM1** (domain ClinVar
+  pathogenic/benign rate), **PP2** (gene missense pathogenic/benign proportions), and **BP1** (gene-level
+  truncating-vs-missense proportions). These are how the criteria legitimately work in ACMG
+  practice; excluding them strips real evidence — notably PS1/PM5, prime **missense** signal (the gated
+  stratum). Held-out validation must **mask** the held-out variants from these comparator resources;
+  actual VUS production legitimately uses the **full** comparator resources.
 
 ### Considered options
 
 1. **Ban only the direct-copy criteria now (PP5/BP6/PS4); decide the transitive bucket with data** —
    build an automated ClinVar-derivation guard, run it on the full held-out to get real firing counts,
-   then rule on PM5/PM1/PP2.
+   then rule on PS1/PM5/PM1/PP2/BP1.
 2. **Ban every ClinVar-touching criterion** (maximal purity) — safest against circularity but strips
    legitimate missense evidence and likely lowers measured missense recall.
 3. **Keep transitive as legitimate ACMG** and instead enforce held-out independence.
@@ -62,15 +136,18 @@ criterion against ClinVar labels reads the answer key (R-A2 circularity). Two di
 Adopt **option 1**. **PP5, BP6, and PS4** are added to `eval.config.FORBIDDEN_CRITERIA` (structurally
 banned from `automatable_criteria` at load *and* skipped in the combiner — case/whitespace-robust) and
 removed from both `configs/eval/tsc2.yaml` (`automatable_criteria`) and `configs/acmg/tsc.yaml`
-(`included_criteria`) so eval and production stay identical. The **transitive** criteria (PM5/PM1/PP2)
+(`included_criteria`) so eval and production stay identical. The **transitive / comparator-dependent**
+criteria (PS1/PM5/PM1/PP2/BP1, per static criterion lineage)
 are **deferred**: an automated ClinVar-derivation guard/audit (built next, via the loop) enumerates
 every ClinVar-sourced *scored* criterion on the full held-out output; the Oracle then rules on the
-transitive bucket **with real firing counts in hand**, not blind.
+comparator-dependent bucket **with real firing counts in hand**, not blind. Held-out validation reruns
+on comparator resources with the held-out variants **masked**; VUS production uses the full resources.
 
 ### Consequences
 
-- (+) Closes the unambiguous direct-copy leak before any benchmark scoring; excluding a pathogenic
-  criterion can only make measured performance *lower*, never inflated — the correct bias for a gate.
+- (+) Closes the unambiguous direct-copy leak before benchmark metrics. Removing circular evidence may
+  move precision and recall in different directions; the justification is **measurement validity**,
+  not a guaranteed conservative numeric bias.
 - (+) Keeps eval = production (both exclude PP5/BP6/PS4), so the gate faithfully measures the deployed
   classifier.
 - (−) Loses BIAS's case-control PS4 — negligible for TSC (BIAS produces PS4 almost exclusively via the
@@ -81,6 +158,8 @@ transitive bucket **with real firing counts in hand**, not blind.
   derivation guard/audit (the mechanized full-output audit) — see session todos.
 
 ---
+
+## ADR-0008 — Tier-1/2 annotation pipeline (BIAS-2015 + Nirvana) runs on an x64 worker, not the ARM Queen
 
 - **Status:** Accepted
 - **Date:** 2026-07-08
@@ -377,7 +456,7 @@ layer (Vision §1, Target Group/Needs §4, Product §6, Business Goals §8).
 
 ## ADR-0001 — Strategic framing: narrow-buildable claim with broad north-star
 
-- **Status:** Accepted
+- **Status:** Accepted · **Superseded in part by** [ADR-0010](#adr-0010--generic-platform-uniqueness-premise-falsified-vertical-tscmtor-research-evidence-strategy) (the "blue ocean" differentiation + generalise-across-rare-disease north-star framing only; the layered-validation-ceiling decision below **stands**)
 - **Date:** 2026-07-08
 - **Deciders:** @dronasrinivas
 

@@ -85,6 +85,34 @@
     "pathogenic_direction_only": 2870,
     "benign_direction_only": 9
   },
+  "candidate_pattern_compression": {
+    "candidate_LP_review": {
+      "variants": 238,
+      "exact_strength_patterns": 20,
+      "patterns_covering_90_percent": 6,
+      "largest_pattern": {
+        "criteria": [
+          "PM2 Supporting",
+          "PVS1 Very Strong"
+        ],
+        "points": 9,
+        "variants": 115
+      }
+    },
+    "candidate_LB_review": {
+      "variants": 1333,
+      "exact_strength_patterns": 10,
+      "patterns_covering_90_percent": 1,
+      "largest_pattern": {
+        "criteria": [
+          "BP4 Strong",
+          "PM2 Supporting"
+        ],
+        "points": -3,
+        "variants": 1222
+      }
+    }
+  },
   "known_policy_gaps": [
     "candidate directions use the eval-only Tavtigian combiner and are not classifications",
     "PS1 and PM5 use ClinVar-derived comparator resources; validation requires held-out masking",
