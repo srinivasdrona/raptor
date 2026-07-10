@@ -1,0 +1,16 @@
+# PRD-08 sec 10.2 — accession -> VCF contig pins for the label-free
+# held-out export (Task A). List order IS the deterministic VCF sort order
+# (FR-A5): NC_000009.12 (TSC1) before NC_000016.10 (TSC2), never accidental
+# lexical string order ("chr16" < "chr9" would sort backwards).
+#
+# `assembly` must equal `configs/ingest/tsc.yaml::assembly`; the accession
+# set must exactly equal that config's genomic accessions
+# (`gene_configs[*].genome_accession`) -- `load_export_config` rejects any
+# drift (missing/extra/blank/duplicate accession or vcf_contig pin).
+
+assembly: GRCh38
+contigs:
+  - accession: NC_000009.12
+    vcf_contig: chr9
+  - accession: NC_000016.10
+    vcf_contig: chr16
