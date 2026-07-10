@@ -1,0 +1,23 @@
+{
+  "task_id": "revise-pre-results-progress-blog",
+  "model_role": "writer",
+  "model_family": "Claude",
+  "model_target": "claude-opus-4.8",
+  "intent_block_present": true,
+  "slots": {
+    "slot1": {
+      "path": "docs/prompts/progress-blog/slot1-writer.md",
+      "sha256": "6c21f086d5ff1accc3acc1b0b9601a554a056cfd4654867301e430b6f5aaebdd"
+    },
+    "slot2": {
+      "path": "docs/prompts/progress-blog-revision/slot2-revision.md",
+      "sha256": "184744b1a2921371181caef5b267d8c9dabcf6beac00fd6b3b5f32a812b1566f"
+    },
+    "slot3": {
+      "path": "docs/prompts/progress-blog-revision/slot3-preservation.md",
+      "sha256": "78f1d28badf8fbbd4f08cbdb1b9109686cbeff112a77ed330c6c9ed3c14cee64"
+    }
+  },
+  "output": "docs/blog/2026-07-10-before-the-first-score.md",
+  "review": "adversarial rubber-duck review: five wording/credibility corrections"
+}

@@ -1,0 +1,30 @@
+{
+  "task_id": "live-eval-export-invalid-anchor-fix",
+  "model_role": "doer",
+  "model_family": "Claude",
+  "model_target": "claude-sonnet-5",
+  "intent_block_present": true,
+  "slots": {
+    "slot1": {
+      "path": "docs/prompts/prd08-task-a/slot1-prefix.md",
+      "sha256": "991a73b8bc11cc60702ef0b057b7bf7df031da96554ba889e816d8da91248074"
+    },
+    "slot2": {
+      "path": "docs/prompts/prd08-anchor-fix/slot2-anchor-fix.md",
+      "sha256": "010e49aa1352b840d1df12712e0a43173378ef5d1ded109cdb67b4c27a08709d"
+    },
+    "slot3": {
+      "path": "docs/prompts/prd08-anchor-fix/slot3-preservation.md",
+      "sha256": "8755e2a274e4c119aaaf455c636c7d1a8cec5fccec7ae5f773338d0c690b2d9d"
+    }
+  },
+  "contract": {
+    "prd_commit": "52d09f9",
+    "regression_test_commit": "3fcbb58",
+    "frozen_test_sha256": {
+      "tests/eval/test_live_eval_export.py": "dc4437d91f9d3c98f6dbfaaceb5f7f55ecfd7e3d42468e14da7bac9c0e729585",
+      "tests/eval/test_kit_conformance_export.py": "487c21a3b09e87535b785eaec49151f6a54408bf14a0516420e9c534efc854b1",
+      "tests/eval/test_live_eval_export_anchor_regression.py": "76e6acc07019f33f20a7b4e0d73717a07082d58aaae4cf71d76ef81d94d2f0d2"
+    }
+  }
+}

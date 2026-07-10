@@ -21,21 +21,34 @@ checker passes it against pre-stated acceptance criteria. *(Spec/verdict schema 
 pending `OPERATING_MODEL.md` — ADR-0003.)*
 
 ## Health Rollup
-- Tier 1/2 (Deterministic): 🔴 NOT STARTED
-- Tier 3 (LLM Extraction): 🔴 NOT STARTED
+
+> *Module built ≠ live run executed.* The Tier-1/2 code path and the validation harness are **built and
+> signed off**; the **gated held-out eval has not yet been run**, so no VUS classification is authorized.
+
+- Tier 1/2 (Deterministic): 🟡 **MODULE BUILT** (PRD-01 scorer `1d2444e`; arm's-length BIAS port) — *live x64 held-out scoring not yet run*
+- Tier 3 (LLM Extraction): 🔴 NOT STARTED (Phase 2)
 - Consensus/Adjudication: 🔴 NOT STARTED
-- Validation Framework: 🔴 NOT STARTED
+- Validation Framework: 🟡 **BUILT + PRE-REGISTERED** (PRD-06 harness `e026422`, PRD-07 loader `499f479`, frozen benchmark `2e3477f`, thresholds `8662499`) — *terminal held-out eval not yet run*
 
 ## Operations (Current Run)
+
+> No held-out eval has been scored yet — metrics stay **N/A** until the full 2,577-variant held-out set
+> is scored on the x64 worker (terminal join).
+
 - Last Batch Size: N/A
 - Precision: N/A
 - Recall: N/A
 - Suspended (Human Review): N/A
 
-## Priorities (This Week) — Phase 0 (STRATEGY.md §7)
-1. Lock ~50-variant frozen benchmark from best-available TSC1/TSC2 expert / high-review-status labels
-2. Build MVP pipeline skeleton: LiteLLM router + Prefect flow test
-3. Stand up fleet: Snapdragon (Queen + SQLite state), EPYC + Xeon (Ollama batch workers)
+## Priorities (This Week) — terminal join to the first VUS run
+
+The three parallel tracks (A benchmark · B x64 smoke infra · C oracle thresholds) are **done**; the
+critical path is now the single-threaded **terminal join** (see *Path to first VUS run*):
+1. Build the **real arm's-length eval `EvidenceSource` adapter** + an **automated ClinVar-derivation guard/audit** (ADR-0009 follow-up).
+2. Emit the **label-free full held-out VCF** (2,577 variants; H1 anti-circularity boundary — no labels cross to the x64 worker).
+3. Score the 2,577 held-out variants on the **x64 devbox** (BIAS-2015 v3.0.0 + Nirvana; ADR-0008).
+4. Run the **ClinVar-derivation audit** on the full output → real PM5/PM1/PP2 firing counts → **Oracle ruling** on the transitive bucket (ADR-0009).
+5. Run the **terminal PRD-06 held-out eval**; gate must return **PASS** (missense-stratified, both directions ≥0.90 precision / ≥0.85 recall) — only a PASS authorizes the first ~6,700-VUS run, then the PRD-04 triage worklist.
 
 ## PRD backlog (feature specs — `docs/prd/`)
 
@@ -56,30 +69,38 @@ index file until ≥3 exist).
 > Tier-1/2 clears pre-registered thresholds on the **held-out known-variant** set — reported
 > **stratified by variant class** (missense gated separately; R-A2c). See EVAL_PLAN §1.1.
 
-## Path to first VUS run (post-PRD-06)
+## Path to first VUS run
 
-PRD-06 completes the **code** path to the gated run — no further module builds are on the critical
-path. What remains are **three independent non-code tracks** that can run **in parallel**, then a
-terminal join:
+The three parallel tracks (A benchmark · B x64 scoring infra · C oracle thresholds) are **done**. What
+remains is the **terminal join**: a small amount of eval-side code (the arm's-length `EvidenceSource`
+adapter + the automated ClinVar-derivation guard/audit — ADR-0009), the label-free held-out scoring
+run on x64, the transitive-criteria audit + Oracle ruling, then the gated PRD-06 held-out eval.
 
-| # | Track | Type | Blocks on | Parallel? |
-|---|---|---|---|---|
-| A | **Benchmark data** — ingest real ClinVar TSC1/TSC2 *knowns* → frozen labeled benchmark (excl. conflicting/single-submitter/RAPTOR-influenced; label hierarchy) | data | **A1 loader built ✓ (PRD-07, `499f479`)**; A2 = ClinVar snapshot pull (governance) | ✅ independent |
-| B | **x64 live-scoring infra** — BIAS-2015 (arm's-length, ADR-0007) + Nirvana (x64-only, ADR-0008) + local pinned UTA for `hgvs` | infra | x64 worker stand-up | ✅ independent |
-| C | **Oracle thresholds (GP-3)** — pre-register precision/recall targets into `configs/eval/tsc2.yaml` (currently `{}` → gate reads `UNVERIFIED`) | governance | molecular-geneticist sign-off | ✅ independent |
-| J | **Terminal join** — run PRD-06 eval on the held-out known set; gate must `PASS` (missense-stratified, **both directions** clear pre-registered thresholds) → authorizes the 6,700-VUS run | — | A ∧ B ∧ C | join |
+| # | Track | Type | Status |
+|---|---|---|---|
+| A | **Benchmark data** — real ClinVar TSC1/TSC2 *knowns* → frozen labeled benchmark (excl. conflicting/single-submitter/low-review; label hierarchy) | data | **DONE ✓** — frozen snapshot `clinvar_2026-07-07`; **3,681** scoreable knowns → **2,577** held-out / **1,104** dev reserve at `holdout 0.7` (PR #7 `2e3477f`, Track A2; A1 loader PRD-07 `499f479`) |
+| B | **x64 live-scoring infra** — BIAS-2015 (arm's-length, ADR-0007) + Nirvana (x64-only, ADR-0008) | infra | **Smoke-tested ✓ (operator-confirmed)** — BIAS-2015 v3.0.0 + Nirvana 3.18.1 produced an 8-record TSV that passed `BiasTsvSource`'s 18-column contract with identity preserved. Large external artifacts intentionally out of repo; versions/hashes live in the operator's external reports (handoff bundle PR #8 `3556548`) |
+| C | **Oracle thresholds (GP-3)** — pre-register precision/recall targets into `configs/eval/tsc2.yaml` | governance | **DONE ✓** — `oracle_thresholds {precision: 0.90, recall: 0.85}` pre-registered *blind* to held-out results; `min_count_per_class: 35`, `split.holdout_fraction: 0.7` (PR #10 `8662499`) |
+| J | **Terminal join** — build the eval adapter + derivation guard, emit label-free held-out VCF, score 2,577 on x64, audit transitive PM5/PM1/PP2 → Oracle ruling, run PRD-06 held-out eval; gate must `PASS` (missense-stratified, **both directions**) → authorizes the ~6,700-VUS run | code + eval | **PENDING** — see *Priorities* above; A ∧ B ∧ C are met |
 
-> A/B/C share one upstream nicety (ingest the knowns once, reused by A and the eval), but have **no
-> code dependency on each other**. The gate stays `UNVERIFIED` until C lands thresholds, and cannot
-> `PASS` until A provides the benchmark and B produces real scores.
+> A/B/C are complete and had **no code dependency on each other**. Thresholds are now pre-registered
+> (C done), so the gate no longer reads `UNVERIFIED` for a missing target — but it **cannot `PASS`
+> until real held-out scores exist** (terminal join) and the transitive-ClinVar audit + Oracle ruling
+> on PM5/PM1/PP2 land (ADR-0009).
 
 ## Active Decisions & Bottlenecks
 - (Resolved 2026-07-08) Loop-engineering operating model → planner/doer/checker, see ADR-0003.
 - (Resolved 2026-07-08) Runtime architecture depth → LiteLLM + Prefect + SQLite + Ollama; no Ray/LangGraph, see ADR-0004 / ARCHITECTURE.md.
+- (Resolved 2026-07-10) **ClinVar direct-copy circularity** → **PP5/BP6/PS4 banned** from `automatable_criteria` (eval == production; structurally rejected in `eval.config.FORBIDDEN_CRITERIA`); transitive **PM5/PM1/PP2 deferred** to the full-held-out audit — ADR-0009 (PR #11 `2766e33`). Real BIAS v3.0.0 output showed PS4 falls back to counting ClinVar submitters for rare Mendelian variants.
+- (Open) **Full-output circularity audit** — build the mechanized ClinVar-derivation guard that enumerates every ClinVar-sourced *scored* criterion on the full held-out output; the Oracle then rules on PM5/PM1/PP2 with **real firing counts** in hand before the gate run (ADR-0009). *On the terminal-join critical path.*
+- (Open) **Gate fidelity — Clopper-Pearson lower bound** — the gate currently checks the **point estimate**, not the 95% CI lower bound the rubric frames; `min_count_per_class: 35` is the underpowered floor that approximates it. Making the gate compute the Clopper-Pearson lower bound is a tracked PRD-06 follow-up (EVAL_RUBRIC §6).
+- (Open) **Per-stratum truncating 0.95 gate** — truncating ≥0.95 (210 held-out, powered) is **reported, not gated**; hard-gating it needs a PRD-06 per-stratum `oracle_thresholds` extension (EVAL_RUBRIC §5). Missense (≥0.90) is the binding constraint.
+- (Open) **Loader GRCh38 assembly filter** — confirm the PRD-07 knowns loader strictly filters to the GRCh38 assembly (the freeze script already filters GRCh38+TSC1/TSC2; harden the loader-side guard).
 - (Open) Cross-linkage oracle — recruit molecular geneticist before Phase 3 (STRATEGY.md GP-3; risk R-E1).
 - (Open) Confirm worker vCPU allocation at deploy (EPYC/Xeon 8-vCPU VM vs full silicon).
 - (Open) **Build core risk controls before trusting any automated output** — canary set, heartbeat/dead-man's switch, hard spend cap, source-contract tests, **answer-key/trace-cribbing lint, assertion-lock** (RISK_REGISTER.md §1; risks R-C1/R-A2/H1).
 - (Open) ADR — reuse `biomcp` / `paper-search-mcp` MCP connectors for Tier-3 retrieval (ARCHITECTURE.md §8; gated on GP-10/GP-9).
+- (Open) **Backlog — PRD-04 (VCEP triage worklist) / PRD-05 (pipeline & orchestration skeleton)** — deferred until a gate PASS authorizes the first VUS run.
 - (Resolved) **Reference-data reproducibility (R-A11):** committed `scripts/fetch_reference.py`
   fetch-and-verify utility (`a80f759`, PR #2) so a fresh clone can reproduce the local pinned
   reference (chr9 `NC_000009.12` + chr16 `NC_000016.10`), checksums pinned in `configs/ingest/tsc.yaml`.
@@ -92,4 +113,11 @@ terminal join:
   `docs/reference/clinvar-hgvs-golden-corpus.md`) is the full-vocabulary loader oracle — it caught a
   real bare-`p.` parser bug on wiring. Remaining: kit-mypy (type gate), strict-first spec standard,
   C3 provenance promotion. Turns recurring bug-classes into *enforced* gates.
-- (Open) **Environment:** Python 3.12.10 on Windows; **WSL2 Ubuntu 24.04.4 LTS (aarch64) ready**, venv **`raptor`** at `~/raptor` (Python 3.12.3, pytest 9.1.1, gcc 13.3/make). Code lives at `/mnt/d/AIProjects/raptor`; venv on Linux fs. Modules built via plan/build/check: **PRD-03 ✓, PRD-02 ✓, PRD-01 ✓, PRD-06 ✓ (all signed off)**; CI gate live ✓; reference-fetch script ✓. Next: the three parallel non-code tracks to the first VUS run (see *Path to first VUS run* above) — (A) real ClinVar knowns benchmark, (B) BIAS+Nirvana+UTA on x64 worker (ADR-0008), (C) Oracle thresholds (GP-3). Deferred: conformance-kit *governance* (catalog/promotion/meta-tests/mypy/gate-0); PRD-04/05; cross-machine fleet.
+- (Open) **Environment:** Python 3.12.10 on Windows; **WSL2 Ubuntu 24.04.4 LTS (aarch64) ready**, venv **`raptor`** at `~/raptor` (Python 3.12.3, pytest 9.1.1, gcc 13.3/make). Code lives at `/mnt/d/AIProjects/raptor`; venv on Linux fs. Modules built via plan/build/check: **PRD-03 ✓, PRD-02 ✓, PRD-01 ✓, PRD-06 ✓, PRD-07 ✓ (all signed
+  off)**; CI gate live ✓; reference-fetch script ✓. The three parallel non-code tracks are now **done**
+  — (A) real ClinVar knowns benchmark frozen (`2e3477f`), (B) BIAS-2015 v3.0.0 + Nirvana smoke-tested
+  on the x64 devbox (operator-confirmed, ADR-0008), (C) Oracle thresholds pre-registered (`8662499`).
+  Next: the **terminal join** (see *Path to first VUS run* / *Priorities*) — eval `EvidenceSource`
+  adapter + ClinVar-derivation audit, label-free held-out VCF, x64 scoring of the 2,577 held-out
+  variants, Oracle transitive ruling, then the gated PRD-06 held-out eval. Deferred: conformance-kit
+  *governance* (kit-mypy/strict-first/C3 provenance/gate-0); PRD-04/05; cross-machine fleet.
