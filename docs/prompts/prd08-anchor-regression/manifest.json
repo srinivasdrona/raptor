@@ -1,0 +1,30 @@
+{
+  "task_id": "live-eval-export-invalid-anchor-regression",
+  "model_role": "test-author",
+  "model_family": "Gemini",
+  "model_target": "gemini-3.1-pro-preview",
+  "intent_block_present": true,
+  "slots": {
+    "slot1": {
+      "path": "docs/prompts/prd08-anchor-regression/slot1-test-author.md",
+      "sha256": "f3d15ecb0acdc3e4adeba1459f7f27bc29df80151ba10c8987bd1addbdb0e4f1"
+    },
+    "slot2": {
+      "path": "docs/prompts/prd08-anchor-regression/slot2-anchor-test.md",
+      "sha256": "a1df7c98f8a9703b84eec0b2c7e55f2840e43653486131b1b788071b0416406a"
+    },
+    "slot3": {
+      "path": "docs/prompts/prd08-anchor-regression/slot3-preservation.md",
+      "sha256": "15c24cfcbbdf9c3b0059e5703ec93a2d974270d72ea62ab6bd901fa5d3e5d36b"
+    }
+  },
+  "contract": {
+    "prd_commit": "52d09f9",
+    "checker": "gpt-5.5",
+    "checker_verdict": "WITH-CHANGES",
+    "frozen_test_sha256": {
+      "tests/eval/test_live_eval_export.py": "dc4437d91f9d3c98f6dbfaaceb5f7f55ecfd7e3d42468e14da7bac9c0e729585",
+      "tests/eval/test_kit_conformance_export.py": "487c21a3b09e87535b785eaec49151f6a54408bf14a0516420e9c534efc854b1"
+    }
+  }
+}
