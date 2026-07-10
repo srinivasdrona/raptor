@@ -1,0 +1,23 @@
+{
+  "task_id": "publish-pre-results-progress-blog",
+  "model_role": "writer",
+  "model_family": "Claude",
+  "model_target": "claude-opus-4.8",
+  "intent_block_present": true,
+  "slots": {
+    "slot1": {
+      "path": "docs/prompts/progress-blog/slot1-writer.md",
+      "sha256": "6c21f086d5ff1accc3acc1b0b9601a554a056cfd4654867301e430b6f5aaebdd"
+    },
+    "slot2": {
+      "path": "docs/prompts/progress-blog/slot2-post-contract.md",
+      "sha256": "79ed9a590fa3df57043b2b57f4833a7ee86be79f35bc3f70d9018238ca9ad88a"
+    },
+    "slot3": {
+      "path": "docs/prompts/progress-blog/slot3-overclaim-guard.md",
+      "sha256": "c621d02956d51c259587c0f8d07c47f64b70eb58e895b2cba191867c8434b0f1"
+    }
+  },
+  "output": "docs/blog/2026-07-10-before-the-first-score.md",
+  "branch_head_before_write": "4965104"
+}
