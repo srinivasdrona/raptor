@@ -427,9 +427,10 @@ class/tier or threshold re-derivation (BIAS owns thresholds).
     deleted-vs-reference; raises `ExportReferenceMismatchError`/`ContigStartAnchorError` (fail-loud).
     `reference` is an injected FASTA-access port (DI: offline uses a tiny synthetic FASTA; real uses the
     checksummed `ingest.normalizer` reference).
-  - `export_holdout(variant_ids, reference, config) -> ExportResult` — deterministic VCF sorted by
-    `(contig, POS, REF, ALT)` (pinned contig order) + manifest rows + provenance/hashes; enforces
-    conservation + bijection (fatal on collision, FR-A6).
+  - `export_holdout(variant_ids, reference, config, *, provenance=None) -> ExportResult` —
+    deterministic VCF sorted by `(contig, POS, REF, ALT)` (pinned contig order) + manifest rows +
+    provenance/hashes; enforces conservation + bijection (fatal on collision, FR-A6).
+    `provenance` is an explicit file-level mapping only; it is never copied into manifest data rows.
   - `ExportResult` = `{vcf_text, manifest_rows, conservation_count, vcf_hash, manifest_hash, provenance}`;
     `write(out_dir, prefix="holdout_input")` emits exactly
     `{prefix}.vcf`, `{prefix}.manifest.jsonl`, and `{prefix}.provenance.json`.
@@ -437,10 +438,14 @@ class/tier or threshold re-derivation (BIAS owns thresholds).
     never masquerades as a manifest data row.
 - **`scripts/export_holdout_vcf.py`** — CLI:
   `--heldout <jsonl> --out-dir <dir> [--prefix holdout_input]
+  --benchmark-snapshot <id>
   [--export-config configs/eval/export.yaml] [--ingest-config configs/ingest/tsc.yaml]
   [--reference-root <path>]`. It reads the frozen held-out JSONL (accessing only
-  `row["variant_id"]`), loads the checksum-verified reference, writes the three pinned output files,
-  and prints the conservation count (2,577) + hashes. Supersedes `make_sample_vcf.py`.
+  `row["variant_id"]`), takes the benchmark snapshot explicitly from the CLI argument (never from a
+  label-bearing row), loads the checksum-verified reference, and supplies file-level provenance
+  `{benchmark_snapshot, reference_checksums, code_version}` to `export_holdout`. It writes the three
+  pinned output files and prints the conservation count (2,577) + hashes. Supersedes
+  `make_sample_vcf.py`.
 - **`src/raptor/eval/live_source.py`** — the arm's-length adapter.
   - `BiasEvidenceSource(bias_tsv_path, manifest_path, eval_config, scorer_config, normalizer)` — preflights
     at construction (manifest+BIAS load, canonical-SPDI normalization + join via `normalizer` (FR-B8),
@@ -487,6 +492,9 @@ Evidence flows to `run_eval` only as `variant_id`-keyed `(criterion, strength, d
 ### 10.6 API specifics pinned by the test contract (the doer must honor these)
 - `spdi_to_vcf` treats SPDI position as **0-based**; both-non-empty → `POS=pos0+1`; pure indels → left anchor
   at `pos0-1`, `POS=pos0`; `pos0==0` pure indel → raise; deleted-vs-reference mismatch → raise.
+- `spdi_to_vcf(variant_id, reference)` returns the SPDI **accession** as tuple element 1; only
+  `export_holdout(..., config)` maps that accession to the configured VCF contig name. This preserves
+  the minimal conversion API without a hidden global contig map.
 - The manifest `vcf_key` format is exactly `"{contig}:{POS}:{REF}:{ALT}"`, kept for audit/conservation + raw
   reporting; the adapter's **semantic join is by canonical GRCh38 SPDI** after normalizing BIAS coordinates
   through the injected normalizer (FR-B8) — **not** a raw `vcf_key` string lookup.
