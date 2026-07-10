@@ -1,0 +1,30 @@
+{
+  "task_id": "live-eval-holdout-export",
+  "model_role": "doer",
+  "model_family": "Claude",
+  "model_target": "claude-sonnet-5",
+  "intent_block_present": true,
+  "slots": {
+    "slot1": {
+      "path": "docs/prompts/prd08-task-a/slot1-prefix.md",
+      "sha256": "991a73b8bc11cc60702ef0b057b7bf7df031da96554ba889e816d8da91248074"
+    },
+    "slot2": {
+      "path": "docs/prompts/prd08-task-a/slot2-export-task.md",
+      "sha256": "9c7e60c80bfb55ddcabbf175c0c2c9195592a42913c23cc66cd79903517f83ee"
+    },
+    "slot3": {
+      "path": "docs/prompts/prd08-task-a/slot3-preservation.md",
+      "sha256": "af71373a0fc515d8a864290ccc81a3d7b5a7f1cde02d96a068ea4f655e58ac95"
+    }
+  },
+  "contract": {
+    "prd_path": "docs/prd/PRD-08-live-eval-evidence-adapter.md",
+    "prd_commit": "0ae9e9d",
+    "tests_commit": "1b1672e9a5a8a4b716da92eeaa2ab9bdb8aaf09e",
+    "frozen_test_sha256": {
+      "tests/eval/test_live_eval_export.py": "dc4437d91f9d3c98f6dbfaaceb5f7f55ecfd7e3d42468e14da7bac9c0e729585",
+      "tests/eval/test_kit_conformance_export.py": "487c21a3b09e87535b785eaec49151f6a54408bf14a0516420e9c534efc854b1"
+    }
+  }
+}

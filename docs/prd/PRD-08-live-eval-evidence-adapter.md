@@ -546,10 +546,11 @@ invert_failure_modes:
   - "Pure-indel anchor guessed at contig start / deleted seq not verified -> wrong-variant VCF (R-A10)."
 out_of_scope: running BIAS/Nirvana; the adapter; the audit; threshold changes.
 na_allowed: false
-prompt_manifest:                              # placeholders — MUST be filled at Ready preflight
-  slot1_id+hash: "<prefix/intent-block: TBD at Ready preflight>"
-  slot2_id+hash: "<eval-export task template: TBD at Ready preflight>"
-  slot3: "Preserve build_tsc_benchmark.py + trace-cribbing audit byte-unchanged; do NOT reuse the CLASS-leaking make_sample_vcf path; all 2,577, all allele shapes."
+prompt_manifest:
+  manifest: "docs/prompts/prd08-task-a/manifest.json"
+  slot1_id+hash: "slot1-prefix.md@991a73b8bc11cc60702ef0b057b7bf7df031da96554ba889e816d8da91248074"
+  slot2_id+hash: "slot2-export-task.md@9c7e60c80bfb55ddcabbf175c0c2c9195592a42913c23cc66cd79903517f83ee"
+  slot3_id+hash: "slot3-preservation.md@af71373a0fc515d8a864290ccc81a3d7b5a7f1cde02d96a068ea4f655e58ac95"
   intent_block_present: true
 ```
 
