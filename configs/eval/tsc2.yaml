@@ -15,7 +15,16 @@
 # OWN ClinVar assertion must not feed a combiner graded against ClinVar-derived
 # labels). PS4 excluded per Oracle decision (BIAS-3.0.0 derives it from ClinVar
 # submitter counts when no GWAS data exists). Transitive-ClinVar criteria
-# (PM5/PM1/PP2) remain pending the full-held-out audit ruling.
+# (PS1/PM5/PM1/PP2/BP1) remain scored here pending the full-held-out audit
+# ruling, but are `requires_heldout_mask` in the bias-lineage validation
+# policy (configs/eval/bias_lineage.yaml) -- the lineage audit
+# (raptor.eval.lineage_audit) fail-closed-blocks any run that scores them
+# against the ClinVar-labelled benchmark. BS3/BS4 (bias-lineage audit D2)
+# were REMOVED -- BIAS-3.0.0 internal stubs that can never fire (phantom
+# automation); PS3/BS2 (the can-fire criteria the scorer's `acmg_criteria`
+# registry now carries) stay NOT automated -- both are `deferred` in the
+# lineage policy (PS3: assay-validity review; BS2: decision_dependency
+# `bs2-policy`).
 automatable_criteria:
   - PVS1
   - PS1
@@ -27,8 +36,6 @@ automatable_criteria:
   - PP3
   - BA1
   - BS1
-  - BS3
-  - BS4
   - BP1
   - BP3
   - BP4

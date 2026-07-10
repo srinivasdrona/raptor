@@ -1,0 +1,82 @@
+{
+  "status": "static_lineage_gate_complete_dynamic_incidence_non_authoritative",
+  "audit_date": "2026-07-10",
+  "bias": {
+    "version": "3.0.0",
+    "commit": "ade13f206f3e2c2efe3ec92715d974645fc8da8f"
+  },
+  "policy": {
+    "path": "configs/eval/bias_lineage.yaml",
+    "sha256": "743a0248c2415010b22c5e1c7f1a35924c8b4b26521f58be09e677ddbb58aeeb",
+    "can_fire": 19,
+    "internal_stubs": 9,
+    "validation_dispositions": {
+      "allowed": 9,
+      "requires_heldout_mask": 5,
+      "forbidden": 3,
+      "deferred": 2
+    }
+  },
+  "runs": {
+    "tsc_vus_clinvar_2026-07-07": {
+      "bias_output_sha256": "0a55cab470d3de93f06cd87ba30957fd1674c0ae2098ec86350f5aaac1a1162e",
+      "rows": 6618,
+      "blocked": true,
+      "blocking_criteria": [
+        "PM5",
+        "PS1"
+      ],
+      "detailed_report_sha256": "e863963b965b182aa06a83688e6cf0990b0ce1d05a8f3b609b4e76838950373d",
+      "criterion_firing": {
+        "BA1": 1,
+        "BP3": 7,
+        "BP4": 3696,
+        "BP7": 127,
+        "BS2": 34,
+        "PM2": 6609,
+        "PM4": 176,
+        "PM5": 147,
+        "PP3": 2226,
+        "PP5": 3,
+        "PS1": 110,
+        "PS3": 46,
+        "PVS1": 150
+      }
+    },
+    "tsc_holdout_clinvar_2026-07-07": {
+      "bias_output_sha256": "6e055fe1a4f7d18e428c62739e3b60fa55362f72aa6322429d2f4ff93076dd9c",
+      "rows": 2577,
+      "blocked": true,
+      "blocking_criteria": [
+        "PM5",
+        "PS1"
+      ],
+      "detailed_report_sha256": "8d90bdcd3b813867e6216d85ed70ed620d557155acb417848c506ac3f479ea57",
+      "criterion_firing": {
+        "BA1": 57,
+        "BP3": 2,
+        "BP4": 1929,
+        "BP6": 2174,
+        "BP7": 1849,
+        "BS1": 66,
+        "BS2": 300,
+        "PM2": 2414,
+        "PM4": 7,
+        "PM5": 13,
+        "PP3": 134,
+        "PP5": 353,
+        "PS1": 116,
+        "PS3": 85,
+        "PS4": 288,
+        "PVS1": 306
+      }
+    }
+  },
+  "interpretation_limits": [
+    "Dynamic incidence quantifies use but never establishes criterion lineage.",
+    "PM1, PP2, and BP1 remain requires_heldout_mask even though they fired zero times in these two runs.",
+    "PS3 and BS2 are reported but not scored because their policy dispositions remain deferred.",
+    "PP5, BP6, and PS4 are reported but structurally excluded from scoring.",
+    "A blocked report is a technical validation result, not a variant classification."
+  ]
+}

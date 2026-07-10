@@ -1,0 +1,90 @@
+{
+  "task_id": "bias-lineage-audit-and-fail-closed-gate-plan",
+  "model_role": "planner",
+  "model_family": "Claude",
+  "model_target": "claude-opus-4.8",
+  "intent_block_present": true,
+  "slots": {
+    "slot1": {
+      "path": "docs/prompts/bias-lineage/slot1-planner.md",
+      "sha256": "2794d3f24989b37a41f0cb07d13ae4bf8b269b49899a386e865be18d36f232fe"
+    },
+    "slot2": {
+      "path": "docs/prompts/bias-lineage/slot2-lineage-contract.md",
+      "sha256": "d1e3bc3b948cc09e25a5427975478ff71d077529d662594326e738e2ec475e96"
+    },
+    "slot3": {
+      "path": "docs/prompts/bias-lineage/slot3-preservation.md",
+      "sha256": "57f187621a7223df9f88f378ad3c604f9d4853e0e0eaa4848eff18e8e430dca5"
+    }
+  },
+  "source_commit": "d2b92f4",
+  "bias_source_commit": "ade13f206f3e2c2efe3ec92715d974645fc8da8f",
+  "bias_version": "3.0.0",
+  "amended_prd": "docs/prd/PRD-08-live-eval-evidence-adapter.md",
+  "amendment_summary": "Resolved transitive_suspect discrepancy: PM5/PM1/PP2 -> full ADR-0009 static-lineage set PS1/PM5/PM1/PP2/BP1 (BP1 is marker-invisible; omission would leak two scored ClinVar-derived criteria).",
+  "source_contract_corrections": [
+    "audit/enforcement split: audit_lineage(records,policy,scorer_config,eval_config)->LineageAuditReport is total (always returns, blocked=True included, never raises on blockers); enforce_lineage(report)->None raises LineageGateError(report) iff blocked. Adapter: audit then enforce. CLI: audit, persist+print, then enforce/exit nonzero.",
+    "detection_source is advisory enum {static_lineage, marker_detected, transitive_suspect_only}, separate from policy lineage_class taxonomy; BP1 lineage_class=aggregate_clinvar, detection_source=transitive_suspect_only (exact test value).",
+    "markers vocab embedded directly in configs/eval/bias_lineage.yaml (single source of truth); configs/eval/clinvar_markers.yaml does not exist and is not referenced; every record's rationale_markers validated against embedded markers.",
+    "assert_registry_consistency also asserts set(scorer_config.acmg_criteria)==policy.can_fire (kind registry_can_fire_drift); corrected registry replaces phantom BS3/BS4 with source-derived PS3/BS2 (not included); included/automatable stay the 14-criterion subset; BS2 deferred.",
+    "authorized existing-config corrections: configs/acmg/tsc.yaml + configs/eval/tsc2.yaml only.",
+    "AC-L8 clarified against corrected config: scored requires_heldout_mask PS1/PM5/PM1/PP2/BP1 block+enforce raises; PS3/BS2 reported would_be_scored=False, do not block; direct-copy PS4/PP5/BP6 reported-not-scored.",
+    "CLI exact: positional BIAS TSV + required --output REPORT_JSON; stdout emits same canonical JSON; exit 0 clean / nonzero blocked; report always persisted; BiasTsvSource 18-column contract.",
+    "unknown/stub nonzero supplemental firing classified from the raw fired mapping (not gated on parse_rationale succeeding on unknown codes): audit reports+sets blocked, enforce raises."
+  ],
+  "derived_can_fire_set": [
+    "PVS1", "PS1", "PS3", "PS4", "PM1", "PM2", "PM4", "PM5", "PP2", "PP3",
+    "PP5", "BA1", "BS1", "BS2", "BP1", "BP3", "BP4", "BP6", "BP7"
+  ],
+  "derived_can_fire_count": 19,
+  "structurally_forbidden_stubs": ["PS2", "PM3", "PM6", "PP1", "PP4", "BS3", "BS4", "BP2", "BP5"],
+  "disposition_rollup": {
+    "allowed": ["PVS1", "PM2", "PM4", "PP3", "BA1", "BS1", "BP3", "BP4", "BP7"],
+    "requires_heldout_mask": ["PS1", "PM5", "PM1", "PP2", "BP1"],
+    "forbidden": ["PS4", "PP5", "BP6"],
+    "deferred": ["PS3", "BS2"]
+  },
+  "disposition_rollup_note": "label_independent + policy-approved (allowed) = 9; requires_heldout_mask = 5; forbidden = 3; deferred = 2 (PS3 assay-validity review; BS2 decision_dependency: bs2-policy — label-independent population/control source is not policy approval, so BS2 stays deferred and is NOT included/automatable by this task). Total = 19.",
+  "authorized_implementation_outputs": [
+    "configs/eval/bias_lineage.yaml",
+    "configs/acmg/tsc.yaml",
+    "configs/eval/tsc2.yaml",
+    "src/raptor/eval/lineage_policy.py",
+    "src/raptor/eval/lineage_registry.py",
+    "src/raptor/eval/lineage_audit.py",
+    "scripts/bias_lineage_audit.py",
+    "tests/eval/test_bias_lineage_policy.py",
+    "tests/eval/test_bias_lineage_registry.py",
+    "tests/eval/test_bias_lineage_audit.py",
+    "tests/eval/test_bias_lineage_forbidden_import_audit.py",
+    "tests/fixtures/bias_lineage_source_oracle.json"
+  ],
+  "authorized_existing_config_corrections": {
+    "configs/acmg/tsc.yaml": "Remove BS3/BS4 from included_criteria (->14); replace BS3/BS4 acmg_criteria registry entries with source-derived PS3/BS2 (direction/strength-vocab only, not included) so acmg_criteria == can_fire (19). BS2 stays deferred.",
+    "configs/eval/tsc2.yaml": "Remove BS3/BS4 from automatable_criteria (keep included_criteria == automatable_criteria)."
+  },
+  "roles": {
+    "planner": {
+      "model_target": "claude-opus-4.8",
+      "outputs": [
+        "docs/prompts/bias-lineage/slot1-planner.md",
+        "docs/prompts/bias-lineage/slot2-lineage-contract.md",
+        "docs/prompts/bias-lineage/slot3-preservation.md",
+        "docs/prompts/bias-lineage/manifest.json"
+      ]
+    },
+    "tester": {
+      "model_target": "gemini-3.1-pro-preview",
+      "responsibility": "Author executable AC tests (AC-L1..AC-L13) from slot 2 + slot-1 source surfaces only, before the doer. Derive the can-fire oracle statically from pinned BIAS classifiers, never from the census or RAPTOR config. AC-L13 proves BS2 stays deferred (decision_dependency: bs2-policy) and cannot be included/scored without a separate named policy decision."
+    },
+    "doer": {
+      "model_target": "claude-sonnet-5",
+      "responsibility": "Implement the config + three modules + CLI to pass the tester's ACs, in sequence bias-lineage-policy -> bias-lineage-registry -> bias-lineage-audit. May add tests, never weaken; honor slot 3 preservation."
+    },
+    "checker": {
+      "model_target": "gpt-5.6-sol",
+      "responsibility": "Re-verify all ACs pass, the frozen preservation set is byte-unchanged, and none of the four slot-3 inversion failures are present (static oracle, BP1 transitive net, no phantom-19, no lineage-laundering of BS2 source-independence into policy approval)."
+    }
+  }
+}

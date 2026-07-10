@@ -38,8 +38,8 @@
   static criterion lineage (ADR-0009) — PM1/PP2/BP1 depend on them too; all five need held-out masking for
   the leakage-safe validation bundle. *(The census itself used the **full** comparator resources —
   legitimate for non-authoritative VUS directions, but **not** leakage-safe for held-out validation.)*
-  BS2 fired 34× but is omitted from policy without a recorded rationale; PS3 fired 46× but is
-  deferred pending assay-validity review; 30 TSC2-region inputs annotated as **NTHL1** need manual
+  BS2 fired 34× and is explicitly deferred pending a TSC penetrance/age/mosaicism decision; PS3 fired
+  46× and is deferred pending assay-validity review; 30 TSC2-region inputs annotated as **NTHL1** need manual
   resolution; BIAS emits transcript `.4` while production pins `.5`; the production scorer currently
   scopes to TSC2 only. **No externally usable candidate worklist may be released before leakage-safe
   validation + expert sign-off.**
@@ -89,9 +89,9 @@ The generic-platform roadmap is retired ([ADR-0010](DECISIONS.md#adr-0010--gener
 the vertical worklist below replaces it. **Census candidate directions stay non-authoritative until the
 held-out gate PASSes.**
 
-1. **BIAS criterion lineage** — the static per-criterion lineage is **mapped**: ClinVar dependence is identified in **PS1, PM5, PM1, PP2, BP1** (comparator-resource) plus the direct-copy **PP5/BP6/PS4** (already forbidden, ADR-0009); what remains is the full-output derivation audit with real firing counts (item 3) — the ADR-0009 derivation map.
+1. **BIAS criterion lineage — COMPLETE.** The pinned source-derived **28-slot / 19-can-fire / 9-internal-stub** policy, exact-set registry gate, total audit + fail-closed enforcement, and portable source-oracle fixture are implemented. Real 6,618-VUS and 2,577-held-out audits both block on **PS1/PM5**; zero firing does not clear the statically mask-required **PM1/PP2/BP1**. See `data/census/tsc_bias_lineage_audit_2026-07-10.json`.
 2. **Held-out-masked BIAS validation bundle** — the label-free held-out VCF was already emitted and scored on the x64 worker (BIAS-2015 v3.0.0 + Nirvana; 2,577 parsed records; ADR-0008; H1 no-labels boundary) using the **full** comparator resources; what remains is **regenerating the ClinVar-derived comparator resources (PS1/PM5/PM1/PP2/BP1) with the held-out variants masked** and **re-scoring** on those masked resources.
-3. **ClinVar audit** — run the automated ClinVar-derivation guard on the full held-out output → real PS1/PM5/PM1/PP2/BP1 firing counts → **Oracle ruling** on the comparator-dependent bucket (ADR-0009).
+3. **ClinVar audit — COMPLETE; ruling/masking pending.** The mechanized audit ran on the full held-out output: **PS1 116**, **PM5 13**, **PM1/PP2/BP1 0**; the report fails closed on PS1/PM5. Static lineage still requires masking all five. Remaining: masked-resource rerun + Oracle ruling (ADR-0009).
 4. **Canonical adapter** — the arm's-length eval `EvidenceSource` adapter joining BIAS rows by canonical SPDI (not raw VCF strings).
 5. **Clopper-Pearson gate** — make the PRD-06 gate compute the 95% CI lower bound, not just the point estimate (EVAL_RUBRIC §6).
 6. **BS2 policy** — record a rationale for BS2 (fired 34× in the census, currently omitted from policy).
@@ -135,9 +135,9 @@ index file until ≥3 exist).
 The three parallel tracks (A benchmark · B x64 scoring infra · C oracle thresholds) are **done**. What
 remains is the **terminal join**: the raw label-free held-out scoring run on x64 is **done** (2,577
 parsed records on full comparator resources); still pending are the held-out-masked comparator-resource
-regeneration + masked rerun, a small amount of eval-side code (the arm's-length `EvidenceSource`
-canonical adapter + the automated ClinVar-derivation guard/audit — ADR-0009), the criterion audit +
-Oracle ruling, the missense-stratified metrics, then the gated PRD-06 held-out eval.
+regeneration + masked rerun, the arm's-length `EvidenceSource` canonical adapter, the Oracle ruling,
+the missense-stratified metrics, then the gated PRD-06 held-out eval. The static lineage gate and
+full-output ClinVar-derivation audit are complete (ADR-0009).
 
 | # | Track | Type | Status |
 |---|---|---|---|
@@ -149,8 +149,8 @@ Oracle ruling, the missense-stratified metrics, then the gated PRD-06 held-out e
 > A/B/C are complete and had **no code dependency on each other**. Thresholds are now pre-registered
 > (C done), so the gate no longer reads `UNVERIFIED` for a missing target — the **raw** held-out score
 > now exists, but the gate still **cannot `PASS`** until the leakage-safe **masked rerun** produces
-> leakage-safe scores and the ClinVar-derivation audit + Oracle ruling on **PS1/PM5/PM1/PP2/BP1** land
-> (ADR-0009).
+> leakage-safe scores and the Oracle ruling on **PS1/PM5/PM1/PP2/BP1** lands; the derivation audit is
+> complete and confirms the current unmasked held-out output must not proceed (ADR-0009).
 
 ## Active Decisions & Bottlenecks
 - (Resolved 2026-07-10) **Strategy premise falsified → vertical TSC/mTOR reset** — generic-platform *uniqueness* premise withdrawn; horizontal/platform expansion **frozen**; RAPTOR repositioned as a vertical TSC/mTOR research-evidence product (candidate packets · atlas · gated mTOR hypotheses) — **ADR-0010**. Census (PR #12 `253c9fd`, `5a307df`) complete but **non-authoritative**; held-out gate still governs.
@@ -158,7 +158,7 @@ Oracle ruling, the missense-stratified metrics, then the gated PRD-06 held-out e
 - (Resolved 2026-07-08) Loop-engineering operating model → planner/doer/checker, see ADR-0003.
 - (Resolved 2026-07-08) Runtime architecture depth → LiteLLM + Prefect + SQLite + Ollama; no Ray/LangGraph, see ADR-0004 / ARCHITECTURE.md.
 - (Resolved 2026-07-10) **ClinVar direct-copy circularity** → **PP5/BP6/PS4 banned** from `automatable_criteria` (eval == production; structurally rejected in `eval.config.FORBIDDEN_CRITERIA`); comparator-dependent **PS1/PM5/PM1/PP2/BP1 deferred** to the full-held-out audit (static criterion lineage — ADR-0009, PR #11 `2766e33`). Real BIAS v3.0.0 output showed PS4 falls back to counting ClinVar submitters for rare Mendelian variants.
-- (Open) **Full-output circularity audit** — build the mechanized ClinVar-derivation guard that enumerates every ClinVar-sourced *scored* criterion on the full held-out output; the Oracle then rules on PS1/PM5/PM1/PP2/BP1 with **real firing counts** in hand before the gate run (ADR-0009). *On the terminal-join critical path.*
+- (Resolved 2026-07-10) **Full-output circularity audit** — machine-enforced 28/19/9 lineage policy + exact-set registry + fail-closed audit landed. Held-out incidence: PS1 116, PM5 13, PM1/PP2/BP1 0; the unmasked report blocks on PS1/PM5, while static lineage keeps all five in the masked-resource requirement. Oracle ruling + masked rerun remain on the terminal-join path (ADR-0009).
 - (Open) **Gate fidelity — Clopper-Pearson lower bound** — the gate currently checks the **point estimate**, not the 95% CI lower bound the rubric frames; `min_count_per_class: 35` is the underpowered floor that approximates it. Making the gate compute the Clopper-Pearson lower bound is a tracked PRD-06 follow-up (EVAL_RUBRIC §6).
 - (Open) **Per-stratum truncating 0.95 gate** — truncating ≥0.95 (210 held-out, powered) is **reported, not gated**; hard-gating it needs a PRD-06 per-stratum `oracle_thresholds` extension (EVAL_RUBRIC §5). Missense (≥0.90) is the binding constraint.
 - (Open) **Loader GRCh38 assembly filter** — confirm the PRD-07 knowns loader strictly filters to the GRCh38 assembly (the freeze script already filters GRCh38+TSC1/TSC2; harden the loader-side guard).

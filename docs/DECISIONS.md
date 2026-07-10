@@ -143,6 +143,13 @@ every ClinVar-sourced *scored* criterion on the full held-out output; the Oracle
 comparator-dependent bucket **with real firing counts in hand**, not blind. Held-out validation reruns
 on comparator resources with the held-out variants **masked**; VUS production uses the full resources.
 
+**Audit outcome (2026-07-10).** The source-derived BIAS-3.0.0 policy establishes 28 rationale slots,
+19 internally can-fire criteria, and 9 internal stubs. It corrects the prior coincidental registry:
+BS3/BS4 are stubs; PS3/BS2 can fire but remain deferred. The full 2,577-row held-out audit recorded
+PS1=116, PM5=13, PM1=0, PP2=0, BP1=0 and failed closed on PS1/PM5. Zero incidence does not revise
+static lineage: masked validation resources remain required for all five comparator-dependent
+criteria. Aggregate record: `data/census/tsc_bias_lineage_audit_2026-07-10.json`.
+
 ### Consequences
 
 - (+) Closes the unambiguous direct-copy leak before benchmark metrics. Removing circular evidence may
