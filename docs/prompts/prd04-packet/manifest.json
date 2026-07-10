@@ -1,0 +1,23 @@
+{
+  "task_id": "prd04-candidate-evidence-packet-plan",
+  "model_role": "planner",
+  "model_family": "Claude",
+  "model_target": "claude-opus-4.8",
+  "intent_block_present": true,
+  "slots": {
+    "slot1": {
+      "path": "docs/prompts/prd04-packet/slot1-planner.md",
+      "sha256": "961ed05073c22bc48e354becedfd3931784b3bb8389a27c10c941f136300bbc8"
+    },
+    "slot2": {
+      "path": "docs/prompts/prd04-packet/slot2-packet-contract.md",
+      "sha256": "9bca9af5dc044e85ffe68cb5dffae456829fd78adecfd4b29e6aada75dcc7c52"
+    },
+    "slot3": {
+      "path": "docs/prompts/prd04-packet/slot3-preservation.md",
+      "sha256": "9f54d526711b1f0a7d269305fe1a9862be756b4c3a4a884b8112976341174fb1"
+    }
+  },
+  "source_commit": "63505f5",
+  "authorized_output": "docs/prd/PRD-04-candidate-evidence-packet.md"
+}
