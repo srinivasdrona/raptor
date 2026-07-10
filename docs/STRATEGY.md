@@ -97,7 +97,7 @@ across disease areas, and specifically for TSC:
 > An earlier version of this document claimed a **"blue ocean / no synthesis layer / no public
 > deployed system."** That uniqueness claim is **withdrawn.** Capable general variant-interpretation
 > and LLM/ACMG platforms exist (Deriva, Virtual Geneticist, Breakthrough Genomics, 3billion AIVARI,
-> eVai, VarChat, Golden Helix VSClinical, SeqOne DiagAI, Variant Bio). RAPTOR's case does **not** rest
+> eVai, AAVC, VarChat, Golden Helix VSClinical, SeqOne DiagAI, Variant Bio). RAPTOR's case does **not** rest
 > on being the only one — it rests on being a **vertical TSC/mTOR evidence program** with an open
 > benchmark, auditability, and freshness. Detailed, source-classified competitor evidence lives in
 > **[reference/competitive-landscape-2026-07.md](reference/competitive-landscape-2026-07.md)** (kept
@@ -202,7 +202,8 @@ oracle-poor: the literature grounds every *premise* but cannot validate the *inf
 trusted — not after.
 
 **GP-4 — Reuse, don't rebuild.** BIAS-2015 (19/28 ACMG criteria), AcmGENTIC (PS3 extraction), Every
-Cure KG, ClinGen criteria are foundations, not competitors. RAPTOR's contribution is
+Cure KG and ClinGen criteria are foundations, while AAVC is a frozen external comparator (not an
+oracle and, under its PolyForm Strict licence, not reusable code). RAPTOR's contribution is
 *integration + scale + auditability + freshness*, not methodology novelty. **Reuse is not trust
 transfer:** an inherited tool still earns its own local validation ceiling (GP-1) and benchmark
 before its outputs are trusted for TSC.

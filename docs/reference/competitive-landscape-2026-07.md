@@ -49,6 +49,7 @@ benchmark — but each is a capable adjacent product, and several could extend t
 | **Breakthrough Genomics** | Interpreted-literature DB + new AI/ACMG capabilities | "Largest interpreted literature database"; new AI capabilities unveiled at ASHG 2025 | **Vendor press release** | [PRNewswire (ASHG 2025)](https://www.prnewswire.com/news-releases/breakthrough-genomics-showcases-largest-interpreted-literature-database-and-unveils-new-ai-capabilities-at-ashg-2025-302588432.html) |
 | **3billion — AIVARI / GEBRA** | LLM-powered variant interpretation | AIVARI won **best presentation at KSMGG 2025**. 3billion is a **public rare-disease diagnostics company founded 2016** (not a recent startup); GEBRA / AIVARI are newer products | **Vendor** (award abstract + company pages) | [AIVARI (KSMGG 2025)](https://3billion.io/news/llm-powered-variant-interpretation-3billions-aivari-wins-best-presentation-at-ksmgg-2025) · [company](https://3billion.io/company) · [GEBRA](https://3billion.io/gebra) |
 | **eVai** | ACMG classification engine | ACMG-criteria automation study | **Peer-reviewed** | [PMC8847497](https://pmc.ncbi.nlm.nih.gov/articles/PMC8847497/) |
+| **AAVC** (Ozcelik Lab) | Source-available automated ACMG classifier + population-scale result release | README claims 99.3% FDA concordance and ~710K/1.38M VUS resolved; pinned release independently contains 750,318 P/LP/B/LB calls among 1,354,015 source VUS | **Project claim + CC-BY dataset; no benchmark protocol or peer-reviewed validation found** | [repository](https://github.com/OzcelikLab/AAVC) · [Zenodo release](https://doi.org/10.5281/zenodo.17201194) · [RAPTOR audit](aavc-prior-art-audit-2026-07.md) |
 | **VarChat** | LLM literature-summarisation for variants | Variant-literature synthesis | **Peer-reviewed** | [PMC11055464](https://pmc.ncbi.nlm.nih.gov/articles/PMC11055464/) |
 | **Golden Helix VSClinical** | Commercial ACMG clinical interpretation (VarSeq) | Guided ACMG/AMP interpretation workflow | **Vendor** (product page) | [VSClinical](https://www.goldenhelix.com/platform/varseq/clinical-interpretation) |
 | **SeqOne DiagAI** | AI-assisted diagnostic interpretation | Diagnostic-yield / interpretation claims | **Preprint (not yet peer-reviewed)** | [medRxiv 2025.02.04.25321641v3](https://www.medrxiv.org/content/10.1101/2025.02.04.25321641v3) |
@@ -65,6 +66,10 @@ benchmark — but each is a capable adjacent product, and several could extend t
   independent validation.
 - **eVai / VarChat:** peer-reviewed, but **generic** (not TSC-specific) and not continuously-updated
   auditable programs.
+- **AAVC:** material generic prior art. Its September-2024 release contains 4,532 TSC VUS and
+  machine-calls 808 outside VUS, but the outputs are a separate dataset—not expert-reviewed ClinVar
+  submissions. Its 99.3% claim has no published benchmark identities/masking protocol, and its code
+  uses ClinVar-derived criteria extensively; see the [script-reproduced overlap and code audit](aavc-prior-art-audit-2026-07.md).
 - **SeqOne DiagAI:** a **preprint** — treat as provisional until peer review.
 - **Variant Bio Inference:** **drug discovery**, adjacent to variant classification; a press-release
   positioning claim.
