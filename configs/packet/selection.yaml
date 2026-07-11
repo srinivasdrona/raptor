@@ -1,0 +1,28 @@
+# PRD-04 Task B calibration-batch selection policy (FR16/FR17). Loaded by
+# `raptor.packet.config.load_selection_config`; strict schema -- exactly
+# these five top-level keys. `required_dimensions` is exactly the four
+# independent observed-atom dimensions (pattern | gene | variant_class |
+# edge_flag); `census_snapshot_id` cites the pinned census snapshot as
+# selection-metadata provenance only (FR16) -- it is never a direction
+# cutoff. `expected_atoms` may declare known-but-possibly-unpopulated
+# catalog atoms per dimension for the coverage report's
+# impossible/unpopulated column; it never manufactures a Cartesian product.
+# The census source of record (data/census/tsc_vus_clinvar_2026-07-07_stats.json)
+# records 30 observed exact-strength patterns (20 candidate_LP_review +
+# 10 candidate_LB_review) as aggregate counts only, with no enumerated
+# per-pattern id catalog, so this pinned policy declares no extra
+# known-but-unpopulated atoms here; a calibration run's own injected
+# `PacketInput` universe supplies the populated atoms actually covered.
+config_version: "1"
+census_snapshot_id: "clinvar_2026-07-07"
+seed: 42
+required_dimensions:
+  - pattern
+  - gene
+  - variant_class
+  - edge_flag
+expected_atoms:
+  pattern: []
+  gene: []
+  variant_class: []
+  edge_flag: []

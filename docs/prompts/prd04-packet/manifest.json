@@ -4,20 +4,87 @@
   "model_family": "Claude",
   "model_target": "claude-opus-4.8",
   "intent_block_present": true,
+  "revision": {
+    "status": "revised_nogo_findings_closed",
+    "revision": "r3",
+    "revised_at": "2026-07-11",
+    "prior_verdict": "rubber_duck_NO_GO",
+    "findings_closed": 5,
+    "findings_reference": "docs/prd/PRD-04-candidate-evidence-packet.md#0b-no-go-findings-closed-r3",
+    "slots_updated": ["slot1", "slot2", "slot3"],
+    "history": [
+      {
+        "revision": "r2",
+        "status": "revised_nogo_findings_closed",
+        "revised_at": "2026-07-11",
+        "prior_verdict": "rubber_duck_NO_GO",
+        "findings_closed": 10,
+        "findings_reference": "docs/prd/PRD-04-candidate-evidence-packet.md#0a-no-go-findings-closed",
+        "slots_updated": ["slot1", "slot2", "slot3"]
+      },
+      {
+        "revision": "r3",
+        "status": "revised_nogo_findings_closed",
+        "revised_at": "2026-07-11",
+        "prior_verdict": "rubber_duck_NO_GO",
+        "findings_closed": 5,
+        "findings_reference": "docs/prd/PRD-04-candidate-evidence-packet.md#0b-no-go-findings-closed-r3",
+        "slots_updated": ["slot1", "slot2", "slot3"]
+      }
+    ]
+  },
   "slots": {
     "slot1": {
       "path": "docs/prompts/prd04-packet/slot1-planner.md",
-      "sha256": "961ed05073c22bc48e354becedfd3931784b3bb8389a27c10c941f136300bbc8"
+      "sha256": "6fbd1137f048d9baf172aa2b8302f54a42a40c1a1e19b3010addba153db5987c"
     },
     "slot2": {
       "path": "docs/prompts/prd04-packet/slot2-packet-contract.md",
-      "sha256": "9bca9af5dc044e85ffe68cb5dffae456829fd78adecfd4b29e6aada75dcc7c52"
+      "sha256": "5eefa66c923e9f352a93b81c31bdd55346e9bceb4614cde0c4e7989f885e6efe"
     },
     "slot3": {
       "path": "docs/prompts/prd04-packet/slot3-preservation.md",
-      "sha256": "9f54d526711b1f0a7d269305fe1a9862be756b4c3a4a884b8112976341174fb1"
+      "sha256": "3864d88a037bd2f4dc0e6cd4867c7986cbd891a1df5fd55cadec0e8a4a01d473"
     }
   },
-  "source_commit": "63505f5",
-  "authorized_output": "docs/prd/PRD-04-candidate-evidence-packet.md"
+  "source_commit": "9adbd7b",
+  "authorized_output": "docs/prd/PRD-04-candidate-evidence-packet.md",
+  "authorized_planning_outputs": [
+    "docs/prd/PRD-04-candidate-evidence-packet.md",
+    "docs/prompts/prd04-packet/**",
+    "docs/prompts/prd04-core/**",
+    "docs/prompts/prd04-surfaces/**",
+    "docs/prompts/prd04-workflow/**"
+  ],
+  "ready_preflight": {
+    "performed_at": "2026-07-11",
+    "operating_model_ref": "OPERATING_MODEL §3.1",
+    "source_commit": "9adbd7b",
+    "prd_revision": "r3",
+    "prd_r3_sha256": "9799522945d995ea737e0e597d148c4a1fa76792f15719a32db6cba11d6223be",
+    "action": "Filled PRD §11.1-11.3 prompt_manifest placeholders with persisted slot ids + SHA-256 and created three sequenced implementation-contract families (A/B/C) with Gemini 3.1 Pro tester, Claude Sonnet 5 doer, GPT-5.5 checker roles. Parent planner slots unchanged.",
+    "prompt_families": [
+      {
+        "task_id": "prd04-packet-core",
+        "sequence": "A",
+        "path": "docs/prompts/prd04-core/",
+        "manifest": "docs/prompts/prd04-core/manifest.json",
+        "depends_on": []
+      },
+      {
+        "task_id": "prd04-packet-surfaces",
+        "sequence": "B",
+        "path": "docs/prompts/prd04-surfaces/",
+        "manifest": "docs/prompts/prd04-surfaces/manifest.json",
+        "depends_on": ["prd04-packet-core"]
+      },
+      {
+        "task_id": "prd04-packet-workflow",
+        "sequence": "C",
+        "path": "docs/prompts/prd04-workflow/",
+        "manifest": "docs/prompts/prd04-workflow/manifest.json",
+        "depends_on": ["prd04-packet-core", "prd04-packet-surfaces"]
+      }
+    ]
+  }
 }

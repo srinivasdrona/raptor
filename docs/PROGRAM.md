@@ -97,7 +97,12 @@ held-out gate PASSes.**
 6. **BS2 policy** — record a rationale for BS2 (fired 34× in the census, currently omitted from policy).
 7. **Transcript / NTHL1 resolution** — reconcile BIAS `.4` vs production `.5` transcripts; resolve the 30 TSC2-region inputs mis-annotated as NTHL1.
 8. **Production candidate policy** — pin the production candidate-direction policy (gene scope, combiner, criteria set) consistent with eval.
-9. **PRD-04 output contract** — the **candidate evidence packet / output contract is active and unblocked now**; provisional representative (and even all-VUS) candidate packets may be generated **before** expert review; only the **full externally usable worklist** is gated on validation, policy correction, and expert sign-off.
+9. **PRD-04 evidence packet — BUILT.** The r3 contract and three sequenced implementations (core,
+   deterministic render/queue/calibration surfaces, and state/decision/comparator workflow) are complete.
+   Packets are immutable, direction-null/`POLICY_BLOCKED` while production policy is unapproved,
+   first-pass double-blinded, and backed by a variant-scoped append-only decision log. Real calibration
+   batch generation is the next task; external use remains gated on validation, policy correction, and
+   per-variant expert sign-off.
 10. **Expert validation + named adopter** — recruit the validating oracle (GP-3) and name a first TSC adopter (R-F1/R-F6).
 
 > **Provisional packets now vs externally usable worklist after PASS:** items 1–8 and the PRD-04 output
@@ -121,7 +126,7 @@ index file until ≥3 exist).
 | PRD-01 | Tier-1/2 Deterministic ACMG Scorer | 1 | **Signed off · module built ✓** (`1d2444e`, 149 tests; arm's-length BIAS) |
 | PRD-02 | Variant Ingestion & Normalization | 0 | **Signed off · module built ✓** (`a889710`, 125 tests) |
 | PRD-03 | KB Schema & Provenance Ledger | 0 | **Signed off · module built ✓** (`b627073`) |
-| PRD-04 | **Candidate Evidence Packet / Output Contract** (per-variant candidate *direction* + full evidence trail; *contract active/unblocked now*; provisional representative/all-VUS packets may be built before expert review; the full **externally usable** worklist waits for a gate PASS + policy correction + expert sign-off) | 1/2 | **active — contract now** (external worklist release gated on PRD-06 PASS) |
+| PRD-04 | **Candidate Evidence Packet / Output Contract** (immutable evidence core; nullable candidate direction; deterministic first-pass render/queue; populated-atom calibration selector; variant-scoped review log; reveal-only comparator) | 1/2 | **Built ✓ — provisional/internal only** (34 packet tests; external worklist release gated on PRD-06 PASS + policy correction + per-variant sign-off) |
 | PRD-05 | Pipeline & Orchestration skeleton | 0 | **frozen** — generic orchestration out of scope (ADR-0010) |
 | PRD-06 | **Benchmark & Evaluation Harness** (build known-variant benchmark + train/dev/held-out split + P/R/concordance, class-stratified; **gates any VUS run**) | 1 | **Signed off · module built ✓** (`e026422`, PR #1, 222 tests; 7-round cross-family checker sign-off) |
 | PRD-07 | **ClinVar Knowns → Benchmark Labels Loader** (Track A1: label-side `variant_summary` → `LabeledVariant` for PRD-06; reuses PRD-02 contract+normalizer; keeps scorer label-blind, H1) | 1 | **Signed off · module built ✓** (`499f479`, PR #3, 274 tests; 7-round checker sign-off) |
@@ -166,7 +171,7 @@ full-output ClinVar-derivation audit are complete (ADR-0009).
 - (Open) Confirm worker vCPU allocation at deploy (EPYC/Xeon 8-vCPU VM vs full silicon).
 - (Open) **Build core risk controls before trusting any automated output** — canary set, heartbeat/dead-man's switch, hard spend cap, source-contract tests, **answer-key/trace-cribbing lint, assertion-lock** (RISK_REGISTER.md §1; risks R-C1/R-A2/H1).
 - (Open) ADR — reuse `biomcp` / `paper-search-mcp` MCP connectors for Tier-3 retrieval (ARCHITECTURE.md §8; gated on GP-10/GP-9).
-- (Open) **PRD-04 (Candidate Evidence Packet / Output Contract)** — output contract *active/unblocked now*; provisional representative/all-VUS packets may be built before expert review; release the full **externally usable** worklist **only after** a gate PASS + policy correction + expert sign-off. **PRD-05 (pipeline & generic orchestration) frozen** as generic/out-of-scope (ADR-0010).
+- (Resolved 2026-07-11) **PRD-04 packet contract + implementation** — r3 contract passed two rubber-duck rounds; core/surfaces/workflow landed with first-pass double-blinding, exact lineage precedence, strict two-level provenance, immutable hash domains, populated-atom selection, variant-scoped append-only decisions, and decision-before-comparator-reveal. Real 30-pattern calibration generation remains next. **PRD-05 (pipeline & generic orchestration) stays frozen** as generic/out-of-scope (ADR-0010).
 - (Resolved) **Reference-data reproducibility (R-A11):** committed `scripts/fetch_reference.py`
   fetch-and-verify utility (`a80f759`, PR #2) so a fresh clone can reproduce the local pinned
   reference (chr9 `NC_000009.12` + chr16 `NC_000016.10`), checksums pinned in `configs/ingest/tsc.yaml`.

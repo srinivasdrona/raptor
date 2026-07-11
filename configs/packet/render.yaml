@@ -1,0 +1,15 @@
+# PRD-04 Task B deterministic-render config (FR10/FR14/FR14.1/FR27). Loaded
+# by `raptor.packet.config.load_render_config`; strict schema -- exactly
+# these six top-level keys. `narrative_templates_path` is repository-relative
+# (resolved against the process working directory / repository root) and
+# replaces the loaded `NarrativeCatalog` object on the returned `RenderConfig`.
+config_version: "1"
+# FR14: the marker that makes every OPERATOR/RECONCILIATION candidate
+# direction unavoidably non-authoritative (never a standalone classification).
+non_authoritative_marker: "NON-AUTHORITATIVE EVIDENCE REVIEW"
+# FR14.1/AC20: the only heading a first-pass reviewer ever sees; the render
+# carries no candidate direction / signed points / comparator (FR27).
+first_pass_heading: "FIRST-PASS BLINDED EVIDENCE REVIEW"
+operator_heading: "OPERATOR PACKET"
+reconciliation_heading: "RECONCILIATION PACKET"
+narrative_templates_path: "configs/packet/narrative_templates.yaml"

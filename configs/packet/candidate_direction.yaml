@@ -1,0 +1,17 @@
+# PRD-04 Task A production candidate-direction policy (FR5). Loaded by
+# `raptor.packet.config.load_candidate_direction_policy`; strict schema --
+# exactly these eight top-level keys, no more, no less.
+#
+# The committed first-increment policy is UNAPPROVED: no candidate-direction
+# review recommendation may be released before expert sign-off. An unapproved
+# policy always resolves to `candidate_direction=null`,
+# `null_reason=production_policy_unapproved`, and `ReviewState.POLICY_BLOCKED`
+# (never a silent classification, never the eval-only Tavtigian combiner).
+policy_id: "tsc-candidate-direction-v1"
+version: "0"
+approval_status: "unapproved"
+approved_by: null
+approval_ref: null
+criterion_strength_points: {}
+candidate_lp_min: null
+candidate_lb_max: null

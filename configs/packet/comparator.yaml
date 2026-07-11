@@ -1,0 +1,21 @@
+# PRD-04 Task C AAVC comparator config (sec 4.11 FR27). Loaded by
+# `raptor.packet.comparator.load_comparator_config`; strict schema -- exactly
+# these seven top-level keys, no more, no less. AAVC is a reveal-only
+# disagreement baseline (excluded from the evidence core + stripped from the
+# FIRST_PASS view) -- it never enters criteria, the candidate-direction
+# policy, or grounding.
+config_version: "1"
+source_name: "AAVC"
+source_snapshot: "ClinVar September 2024"
+source_doi: "10.5281/zenodo.17201194"
+# The pinned AAVC classification-release archive checksum
+# (docs/reference/aavc-prior-art-audit-2026-07.md, `extracted_file_sha256`).
+source_archive_sha256: "b89f3e45340bcfc3a0ed0518a04cb4fc943df66214e0ef9f075293545d0ac424"
+# The pinned AAVC repository commit reviewed for the audit.
+source_commit: "8da2b5ac7cf92830b792d521818a2ace50a0e2e1"
+# scripts/audit_aavc_overlap.py's implemented SPDI/VCF-key match methods.
+# Full reference-backed SPDI repeat-normalization equivalence is not yet
+# implemented and is therefore not listed here.
+match_methods:
+  - exact_vcf_key
+  - common_trim_equivalent
