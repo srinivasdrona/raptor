@@ -93,7 +93,7 @@
       "task_id": "policy-blocker-D-unapproved-production-candidate-direction-policy",
       "dir": "docs/prompts/policy-blockers/D-production-candidate-policy/",
       "manifest": "docs/prompts/policy-blockers/D-production-candidate-policy/manifest.json",
-      "manifest_sha256": "612fda78efa53c4904eb109c4e1a4d5a540ad7da3d211d2b05c1c12f7b5ee467",
+      "manifest_sha256": "f3c8871f858b2e5a069223e06107afdc97d77affe6ed3d8d6917ba039235509c",
       "depends_on": ["A", "B", "C"],
       "summary": "Join A (corrected strengths) + B (BS2 deferred) + C (SPDI scope) into a populated but UNAPPROVED, non-authoritative candidate-direction policy, strictly separate from the eval combiner."
     }

@@ -32,7 +32,15 @@ from typing import Mapping, Optional, Tuple
 
 import yaml
 
+from raptor.eval.config import FORBIDDEN_CRITERIA, VALID_CRITERIA
 from raptor.eval.lineage_policy import LineagePolicy, load_lineage_policy
+
+#: BS2 stays structurally excluded from the production candidate-direction
+#: policy regardless of the eval-config candidate set: its `deferred`
+#: disposition (decision B, `decision_dependency: bs2-policy`) is a policy
+#: fact this loader enforces directly, not merely something callers must
+#: remember to omit (validator hardening, D slot 2 sec 2).
+_BS2_CRITERION = "BS2"
 
 _HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 
@@ -150,9 +158,15 @@ def _require_mapping(raw: Mapping[str, object], key: str, *, label: str) -> Mapp
 @dataclass(frozen=True)
 class CandidateDirectionPolicy:
     """FR5 production candidate-direction policy. `approval_status` is
-    `unapproved | approved`. Unapproved requires null approval fields, empty
-    points, and null cutoffs. Approved requires non-blank approval fields,
-    non-empty points, integer cutoffs, and `candidate_lb_max < candidate_lp_min`."""
+    `unapproved | approved`. `criterion_strength_points` keys must always be
+    a subset of `VALID_CRITERIA - FORBIDDEN_CRITERIA` and must never include
+    the deferred `BS2` criterion (decision B), regardless of approval
+    status. Unapproved requires null approval fields and null cutoffs, but
+    MAY carry a populated `criterion_strength_points` map (D slot 2: pinning
+    the joined-policy content is safe precisely because the compute path
+    stays null while unapproved). Approved requires non-blank approval
+    fields, non-empty points, integer cutoffs, and
+    `candidate_lb_max < candidate_lp_min`."""
 
     policy_id: str
     version: str
@@ -197,14 +211,28 @@ class CandidateDirectionPolicy:
             points[criterion] = MappingProxyType(strength_points)
         object.__setattr__(self, "criterion_strength_points", MappingProxyType(points))
 
+        # Validator hardening (D slot 2 sec 2): keys must be a subset of
+        # VALID_CRITERIA - FORBIDDEN_CRITERIA, and BS2 (deferred, decision B)
+        # must never appear -- regardless of approval_status, so a future
+        # approval can never silently smuggle in a forbidden/deferred code.
+        allowed_criteria = VALID_CRITERIA - FORBIDDEN_CRITERIA
+        criterion_keys = frozenset(self.criterion_strength_points.keys())
+        if _BS2_CRITERION in criterion_keys:
+            raise PacketConfigError(
+                "CandidateDirectionPolicy.criterion_strength_points must not include the "
+                "deferred BS2 criterion (decision B, decision_dependency: bs2-policy)"
+            )
+        disallowed = criterion_keys - allowed_criteria
+        if disallowed:
+            raise PacketConfigError(
+                "CandidateDirectionPolicy.criterion_strength_points key(s) "
+                f"{sorted(disallowed)!r} are not in VALID_CRITERIA - FORBIDDEN_CRITERIA"
+            )
+
         if self.approval_status == "unapproved":
             if self.approved_by is not None or self.approval_ref is not None:
                 raise PacketConfigError(
                     "an unapproved CandidateDirectionPolicy must have null approved_by/approval_ref"
-                )
-            if self.criterion_strength_points:
-                raise PacketConfigError(
-                    "an unapproved CandidateDirectionPolicy must have empty criterion_strength_points"
                 )
             if self.candidate_lp_min is not None or self.candidate_lb_max is not None:
                 raise PacketConfigError("an unapproved CandidateDirectionPolicy must have null cutoffs")

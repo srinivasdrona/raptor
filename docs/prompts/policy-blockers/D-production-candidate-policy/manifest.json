@@ -14,7 +14,7 @@
     },
     "slot2": {
       "path": "docs/prompts/policy-blockers/D-production-candidate-policy/slot2-candidate-policy-contract.md",
-      "sha256": "7325340e48c55c9b3f92aeb4c67c07801e547cbb4995cdfc7fb7ff93216e428e"
+      "sha256": "b3e563c0820b65e8c5a6715ff30c017a63cbd01e2fa9397b5b29caf679726a92"
     },
     "slot3": {
       "path": "docs/prompts/policy-blockers/D-production-candidate-policy/slot3-preservation.md",

@@ -62,16 +62,19 @@ approved_by: null
 approval_ref: null
 criterion_strength_points:          # over candidate_set (Probe 2); PP3/BP4 from A's corrected strengths;
   # ...pinned point map, BS2 ABSENT, FORBIDDEN absent, unruled-transitive absent...
-candidate_lp_min: <int>             # pinned but inert while unapproved
-candidate_lb_max: <int>             # pinned but inert while unapproved
+candidate_lp_min: null              # requires future Oracle approval; no cutoff invented
+candidate_lb_max: null              # requires future Oracle approval; no cutoff invented
 ```
 
 - No 9th key (schema rejects). Gene/transcript scope is enforced upstream by C — referenced in a
   provenance note/commit message, not by adding schema keys.
 - `criterion_strength_points` keys are exactly the Probe-2 `candidate_set`; PP3/BP4 strength→point rows
   reflect A's corrected aggregation (a variant's PP3/BP4 strength is the corrected one before it is scored).
-- `candidate_lp_min`/`candidate_lb_max` are pinned as a **separate** set from the eval Tavtigian cutoffs
-  (they may coincide numerically only by independent derivation, never by importing eval config).
+- `candidate_lp_min`/`candidate_lb_max` remain **null** while unapproved. A future approved policy must
+  derive and pin them independently from the eval Tavtigian cutoffs; this task does not invent them.
+- Loader invariant refinement: `unapproved` may carry a populated `criterion_strength_points` map for
+  review, but requires null cutoffs/approver fields and still returns null direction. `approved` requires
+  non-empty points, integer cutoffs, and non-null approver/reference.
 
 The doer MAY add a validator (in `packet/config.py`) asserting: keys ⊆ `VALID_CRITERIA` ∖ `FORBIDDEN_CRITERIA`;
 BS2 ∉ keys; `approval_status ∈ {unapproved, approved}` with `approved` requiring non-null `approved_by` +
