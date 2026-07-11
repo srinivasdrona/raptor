@@ -1,0 +1,74 @@
+{
+  "task_id": "policy-blocker-D-unapproved-production-candidate-direction-policy",
+  "decision": "D",
+  "title": "Join A+B+C into an unapproved, non-authoritative production candidate-direction policy separate from eval",
+  "model_role": "planner",
+  "model_family": "Claude",
+  "model_target": "claude-opus-4.8",
+  "intent_block_present": true,
+  "source_commit": "e52e855",
+  "slots": {
+    "slot1": {
+      "path": "docs/prompts/policy-blockers/D-production-candidate-policy/slot1-planner.md",
+      "sha256": "4e937b376100e40dd7f1006514095c5a592fce517c461dcba9dbf23968005393"
+    },
+    "slot2": {
+      "path": "docs/prompts/policy-blockers/D-production-candidate-policy/slot2-candidate-policy-contract.md",
+      "sha256": "b3e563c0820b65e8c5a6715ff30c017a63cbd01e2fa9397b5b29caf679726a92"
+    },
+    "slot3": {
+      "path": "docs/prompts/policy-blockers/D-production-candidate-policy/slot3-preservation.md",
+      "sha256": "a7a23a140534df3f762226e1cbe0b4b271e11663715a7830f3cc4178a338783d"
+    }
+  },
+  "join_inputs": {
+    "A": "PP3/BP4 point contributions use eval.predictor_aggregation corrected strengths, not BIAS emitted",
+    "B": "BS2 excluded from criterion_strength_points (deferred, decision_dependency bs2-policy)",
+    "C": "gene/transcript scope TSC1/TSC2 MANE .5 via SPDI reconciliation; NTHL1 / base-mismatch excluded upstream"
+  },
+  "invariants": {
+    "unapproved_null": "approval_status stays 'unapproved' -> compute_candidate_direction returns null / production_policy_unapproved / ReviewState.POLICY_BLOCKED for every variant; non-authoritative; no external worklist released",
+    "separation_from_eval": "packet.direction imports no raptor.eval.combine and does not reuse eval Tavtigian cutoffs; candidate points/thresholds independently pinned; strict 8-key schema preserved (PRD-04 slot-3 fm6)"
+  },
+  "roles": {
+    "planner": { "model_target": "claude-opus-4.8" },
+    "tester": { "model_target": "gemini-3.1-pro-preview", "responsibility": "Author AC tests (AC-D1..AC-D7) from slot 2 + slot-1 surfaces only. Derive candidate_set from config (not a magic list); assert unapproved-null, no eval.combine import, BS2/NTHL1/forbidden excluded, corrected PP3/BP4 strengths." },
+    "doer": { "model_target": "claude-sonnet-5", "responsibility": "Pin candidate_direction.yaml (stays unapproved) + harden packet/config.py validator, in sequence parity-probe -> policy-pin -> separation-guard. May add tests, never weaken; honor slot 3." },
+    "checker": { "model_target": "gpt-5.6-sol", "responsibility": "Re-verify all ACs; confirm approval_status unchanged, null for every variant, no eval.combine import, corrected strengths used, BS2/NTHL1/forbidden excluded, no clinical classification, no worklist release, no fixture patch." }
+  },
+  "depends_on": [
+    "policy-blocker-A-bp4-pp3-predictor-aggregation-defect",
+    "policy-blocker-B-bs2-penetrance-age-mosaicism-policy",
+    "policy-blocker-C-transcript-mane5-bias4-nthl1-reconciliation"
+  ],
+  "reference_files": [
+    "docs/prompts/policy-blockers/A-bp4-pp3-aggregation/manifest.json",
+    "docs/prompts/policy-blockers/B-bs2-policy/manifest.json",
+    "docs/prompts/policy-blockers/C-transcript-nthl1/manifest.json",
+    "configs/packet/candidate_direction.yaml",
+    "src/raptor/packet/direction.py",
+    "src/raptor/packet/config.py",
+    "src/raptor/packet/state.py",
+    "src/raptor/eval/config.py",
+    "configs/eval/tsc2.yaml",
+    "configs/eval/bias_lineage.yaml",
+    "data/census/tsc_vus_clinvar_2026-07-07_stats.json"
+  ],
+  "authorized_outputs": {
+    "config": ["configs/packet/candidate_direction.yaml (populated, stays unapproved)"],
+    "production": ["src/raptor/packet/config.py (validator hardening only)"],
+    "test": ["tests/packet/test_candidate_direction_policy.py", "tests/packet/test_candidate_separation_from_eval.py"]
+  },
+  "acceptance_criteria": ["AC-D1", "AC-D2", "AC-D3", "AC-D4", "AC-D5", "AC-D6", "AC-D7"],
+  "preservation_set": [
+    "src/raptor/packet/direction.py (unapproved-null invariant; imports no eval.combine)",
+    "configs/packet/candidate_direction.yaml (strict 8-key schema; approval_status stays unapproved)",
+    "src/raptor/packet/state.py (ReviewState.POLICY_BLOCKED)",
+    "src/raptor/eval/combine.py (eval combiner never becomes production oracle)"
+  ],
+  "blockers": [
+    "Hard dependency: A, B, and C must all land first; D cannot be pinned before their outputs exist.",
+    "External worklist release remains gated on the PRD-06 held-out gate PASS + ADR-0009 policy correction + per-variant expert sign-off (out of scope here).",
+    "Approval (approval_status=approved) requires a named Oracle/expert sign-off that does not yet exist (GP-3 open); the policy stays unapproved by design."
+  ]
+}

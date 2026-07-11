@@ -1,0 +1,82 @@
+{
+  "task_id": "policy-blocker-A-bp4-pp3-predictor-aggregation-defect",
+  "decision": "A",
+  "title": "BIAS BP4/PP3 predictor-aggregation defect: specify, measure, choose wrapper vs upstream (no AGPL edit)",
+  "model_role": "planner",
+  "model_family": "Claude",
+  "model_target": "claude-opus-4.8",
+  "intent_block_present": true,
+  "revision": {
+    "status": "revised_nogo_findings_closed",
+    "revision": "r1",
+    "revised_at": "2026-07-12",
+    "prior_verdict": "rubber_duck_NO_GO",
+    "findings_closed": 1,
+    "finding": "MAJOR: removed the false claim that pathogenic_classifiers.py L405-433 is a get_pp3/phyloP-window helper or a direct correct-idiom proof. L405-433 is get_pm1 (a DIFFERENT criterion's domain max-aggregation), cited only as corroboration. Defecthood is now grounded PRIMARILY in get_pp3 L944-954 / get_bp4 L491-503 own code+comments (dead best_score sentinel, permanently-false BP4 `best_score>1` guard, `>=`-loop last-tool resolution vs 'best score'/'same max score' comments and downstream tie/consensus logic).",
+    "slots_updated": ["slot1", "slot2"],
+    "ac_updated": ["AC-A1"]
+  },
+  "source_commit": "e52e855",
+  "bias_source_commit": "ade13f206f3e2c2efe3ec92715d974645fc8da8f",
+  "bias_version": "3.0.0",
+  "slots": {
+    "slot1": {
+      "path": "docs/prompts/policy-blockers/A-bp4-pp3-aggregation/slot1-planner.md",
+      "sha256": "4d4e416150e055bb252c5884e966f5580f540581b7d52a8eb058abafcec00a59"
+    },
+    "slot2": {
+      "path": "docs/prompts/policy-blockers/A-bp4-pp3-aggregation/slot2-aggregation-contract.md",
+      "sha256": "e32d5403c686d59bf99ac6a51a18901517da7903e9296257ce0fcb6061ddd889"
+    },
+    "slot3": {
+      "path": "docs/prompts/policy-blockers/A-bp4-pp3-aggregation/slot3-preservation.md",
+      "sha256": "4798adf1cf7b0f2982a9e0beb81d506bfb11da95cec12eb99e400a992bd3022f"
+    }
+  },
+  "defect_anchors": {
+    "pp3": "pathogenic_classifiers.py::get_pp3 L944-954 (best_score=0 never reassigned; score=last tool; +1 on any >=2 tools)",
+    "bp4": "benign_classifiers.py::get_bp4 L491-503 (best_score=0 never reassigned; score=last tool; consensus bump never fires because best_score>1 always false)",
+    "correct_idiom_reference": "pathogenic_classifiers.py::get_pm1 L405-433 (if score > best_score: best_score = score) is a DIFFERENT criterion's generic domain max-aggregation idiom — corroborating context only that BIAS authors knew the correct pattern; it is NOT a get_pp3/phyloP-window helper and NOT proof by itself",
+    "defecthood_grounding": "proven inside get_pp3 L944-954 / get_bp4 L491-503 themselves: best_score sentinel init 0 and never reassigned (dead); get_bp4 consensus guard `best_score>1` permanently false (BP4 never bumps); `>=` loop with no reassignment yields the last tool not the max — contradicting the blocks' own 'best score'/'same max score' comments and downstream tie/consensus logic",
+    "constants": "constants.py score_to_hum_readable L13-, pp3_tools/pp3_weighting L159-160, bp4_tools/bp4_weighting L63-64"
+  },
+  "correction_route_decision": {
+    "primary_expected": "RAPTOR-side arm's-length wrapper (recompute corrected strength from observable rationale) when Probe 3 shows undecidable==0",
+    "fallback": "propose upstream PR to bitscopic/BIAS-2015 for any undecidable class; adoption gated on separate re-pin + full re-score + re-validation (out of scope here)",
+    "constraint": "never edit the vendored AGPL source; never import bias_2015; pinned BIAS commit stays byte-unchanged (ADR-0007)"
+  },
+  "roles": {
+    "planner": { "model_target": "claude-opus-4.8" },
+    "tester": { "model_target": "gemini-3.1-pro-preview", "responsibility": "Author AC tests (AC-A1..AC-A7) from slot 2 + slot-1 surfaces only, before the doer. Author the intended-aggregation synthetic oracle (Probe 1) independently; never import bias_2015." },
+    "doer": { "model_target": "claude-sonnet-5", "responsibility": "Build the config + wrapper + probe to pass the ACs, in sequence predictor-aggregation-spec -> wrapper -> probe. May add tests, never weaken; honor slot 3." },
+    "checker": { "model_target": "gpt-5.6-sol", "responsibility": "Re-verify all ACs; run Probe 2/3 over census + held-out TSVs; confirm no AGPL edit / no bias_2015 import / pin byte-unchanged; confirm emitted strength stays visible and no clinical classification is produced." }
+  },
+  "depends_on": [],
+  "reference_files": [
+    "D:/AIProjects/raptor-data/sources/BIAS-2015/src/bias_2015/pathogenic_classifiers.py",
+    "D:/AIProjects/raptor-data/sources/BIAS-2015/src/bias_2015/benign_classifiers.py",
+    "D:/AIProjects/raptor-data/sources/BIAS-2015/src/bias_2015/constants.py",
+    "src/raptor/scorer/parse.py",
+    "src/raptor/eval/combine.py",
+    "src/raptor/eval/config.py",
+    "configs/eval/bias_lineage.yaml",
+    "data/census/tsc_vus_clinvar_2026-07-07_stats.json"
+  ],
+  "authorized_outputs": {
+    "config": ["configs/eval/predictor_aggregation.yaml"],
+    "production": ["src/raptor/eval/predictor_aggregation.py", "scripts/probe_predictor_aggregation.py"],
+    "test": ["tests/eval/test_predictor_aggregation_oracle.py", "tests/eval/test_predictor_aggregation_wrapper.py"],
+    "data": ["data/census/tsc_predictor_aggregation_report_<date>.json"]
+  },
+  "acceptance_criteria": ["AC-A1", "AC-A2", "AC-A3", "AC-A4", "AC-A5", "AC-A6", "AC-A7"],
+  "preservation_set": [
+    "D:/AIProjects/raptor-data/sources/BIAS-2015/**  (vendored AGPL, byte-frozen)",
+    "src/raptor/scorer/parse.py",
+    "src/raptor/eval/combine.py",
+    "src/raptor/eval/config.py",
+    "configs/eval/bias_lineage.yaml (BP4/PP3 records: label_independent_reference_or_predictor / allowed)"
+  ],
+  "blockers": [
+    "Requires the committed 6,618-VUS census BIAS output TSV and the 2,577-record held-out TSV to run Probes 2/3 (materiality + decidability). Absent them, only the synthetic oracle (Probe 1) runs and the route decision cannot be finalized."
+  ]
+}

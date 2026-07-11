@@ -14,7 +14,29 @@ from __future__ import annotations
 import re
 from typing import Any, Sequence
 
+from raptor.ingest.transcript_reconcile import (
+    RECONCILED_VERSION_DELTA,
+    reconcile_transcript_identity,
+)
+
 from .model import BiasRecord, CriterionCall
+
+
+def _canonical_spdi(record: BiasRecord) -> str:
+    """The canonical genomic SPDI a reference-backed normalizer or an
+    upstream canonical-adapter/manifest enrichment step has already
+    computed and staged into `record.provenance["canonical_spdi"]` -- the
+    ONLY accepted identity PROOF for `reconcile_transcript_identity`.
+
+    NEVER falls back to building a raw `chrom:pos:ref:alt` echo of the
+    record's own already-known coordinates: that string is exactly what
+    BIAS itself emitted, not an independently reference-validated
+    identity. A record whose provenance carries no `canonical_spdi` (e.g.
+    direct `BiasTsvSource` output, which parses BIAS's raw TSV columns
+    only and never invokes a normalizer) yields `""` here, which
+    `reconcile_transcript_identity` fails closed on
+    (`canonical_identity_unverified`) rather than silently trusting."""
+    return str(record.provenance.get("canonical_spdi") or "")
 
 
 class DoubleCountError(ValueError):
@@ -66,14 +88,37 @@ def check_edge_cases(record: BiasRecord, config: Any) -> str | None:
 
     # non-MANE / ambiguous transcript: compare against this gene's pinned
     # transcript (config.genes, GP-6) -- never a hardcoded accession.
+    #
+    # Policy-blocker C: BIAS emits each record's raw `.4` transcript while
+    # `config.genes` pins the MANE Select `.5` -- a pure version delta on
+    # the SAME base accession describes the identical genomic change (the
+    # canonical SPDI is version-independent, `ingest/normalizer.py`) and is
+    # reconciled here rather than dumped to manual review
+    # (`reconcile_transcript_identity`, `ingest/transcript_reconcile.py`).
+    # A genuinely different base accession still fails loud -- this is a
+    # correction of an over-block, never a weakening: only an exact base
+    # match, backed by a VERIFIED canonical SPDI (read from
+    # `record.provenance["canonical_spdi"]`, never a raw chr:pos echo), is
+    # ever let through; the raw emitted transcript is kept as-is (never
+    # silently coerced to the pinned accession). A record with no
+    # canonical-adapter/manifest-supplied SPDI (e.g. direct `BiasTsvSource`
+    # output) fails closed here (`canonical_identity_unverified`) instead
+    # of being silently reconciled.
     if edge_cases.get("non_mane_transcript"):
         pinned_transcript = dict(getattr(config, "genes", None) or {}).get(record.gene_name)
         if pinned_transcript and record.transcript != pinned_transcript:
-            return (
-                f"non_mane_transcript: record transcript {record.transcript!r} != "
-                f"gene {record.gene_name!r}'s pinned transcript {pinned_transcript!r} "
-                "-- routed to manual review per edge_cases.yaml (FR8/R-A3)"
+            reconciliation = reconcile_transcript_identity(
+                record,
+                _canonical_spdi(record),
+                {record.gene_name: {"transcript_accession": pinned_transcript}},
             )
+            if reconciliation.disposition != RECONCILED_VERSION_DELTA:
+                return (
+                    f"non_mane_transcript: record transcript {record.transcript!r} != "
+                    f"gene {record.gene_name!r}'s pinned transcript {pinned_transcript!r} "
+                    f"(reconciliation: {reconciliation.disposition}) "
+                    "-- routed to manual review per edge_cases.yaml (FR8/R-A3)"
+                )
 
     # mosaicism: BIAS's `consequence`/annotation text flags this explicitly
     # when present -- no mosaic-specific field exists in the v1 BIAS output

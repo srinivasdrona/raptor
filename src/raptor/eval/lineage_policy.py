@@ -118,7 +118,9 @@ class LineageRecord:
     ClinVar-labelled benchmark audit, `production_disposition` gates real
     VUS scoring (they legitimately differ for the transitive-ClinVar set,
     ADR-0009). A `deferred` disposition always carries a non-empty
-    `decision_dependency`."""
+    `decision_dependency` and a non-empty `decision_rationale`; every
+    deferral must state both what decision is owed and why the criterion is
+    not currently authorized."""
 
     criterion: str
     lineage_class: str
@@ -130,6 +132,7 @@ class LineageRecord:
     rationale_markers: tuple[str, ...]
     notes: str
     decision_dependency: str
+    decision_rationale: str = ""
 
 
 @dataclass(frozen=True)
@@ -323,10 +326,18 @@ def load_lineage_policy(path: str | Path) -> LineagePolicy:
                 )
 
         decision_dependency = str(entry.get("decision_dependency") or "").strip()
-        if _DEFERRING_DISPOSITION in (validation_disposition, production_disposition) and not decision_dependency:
+        is_deferred = _DEFERRING_DISPOSITION in (validation_disposition, production_disposition)
+        if is_deferred and not decision_dependency:
             raise LineagePolicyError(
                 f"records[{criterion!r}] carries a `deferred` disposition but no non-empty "
                 "`decision_dependency` -- a deferral must name the decision it awaits"
+            )
+
+        decision_rationale = str(entry.get("decision_rationale") or "").strip()
+        if is_deferred and not decision_rationale:
+            raise LineagePolicyError(
+                f"records[{criterion!r}] carries a `deferred` disposition but no non-empty "
+                "`decision_rationale` -- every deferral must state why it is not authorized"
             )
 
         source_deps_raw = _require(entry, "source_dependencies")
@@ -348,6 +359,7 @@ def load_lineage_policy(path: str | Path) -> LineagePolicy:
             rationale_markers=rationale_markers,
             notes=str(entry.get("notes") or ""),
             decision_dependency=decision_dependency,
+            decision_rationale=decision_rationale,
         )
 
     oracle_allowed_list = [str(c) for c in raw["oracle_allowed"]]

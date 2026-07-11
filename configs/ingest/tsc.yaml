@@ -25,15 +25,30 @@ clinvar_snapshot_id: "confirm-pending-snapshot"
 clinvar_snapshot_date: "confirm-pending-date"
 clinvar_snapshot_file_checksum: "confirm-pending-checksum"
 
+# policy-blocker C: BIAS-3.0.0 emits each TSC1/TSC2 record's raw .4
+# transcript version while production pins the MANE Select .5 (above); the
+# pure version delta is reconciled via canonical genomic SPDI
+# (transcript-version-independent, ingest/normalizer.py) rather than
+# routed to manual review, provided the MANE base accession matches --
+# see src/raptor/ingest/transcript_reconcile.py. This is an explicit,
+# pinned, reviewable policy: no wildcard/default gene->transcript mapping.
+version_reconciliation: spdi_equivalent
+
 TSC1:
   genome_accession: NC_000009.12
   transcript_accession: NM_000368.5  # confirm .version against locked MANE Select release
   protein_accession: NP_000359.2
+  mane_base_accession: NM_000368
+  pinned_version: "5"
+  bias_emitted_version: "4"
 
 TSC2:
   genome_accession: NC_000016.10
   transcript_accession: NM_000548.5  # confirm .version against locked MANE Select release
   protein_accession: NP_000539.2
+  mane_base_accession: NM_000548
+  pinned_version: "5"
+  bias_emitted_version: "4"
 
 # sha256 of the pinned reference FASTAs (sec 10.1/R-A11). Genomic
 # accessions are locked (fetched + indexed during this build); transcript
