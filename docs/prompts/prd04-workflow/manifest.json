@@ -1,0 +1,77 @@
+{
+  "task_id": "prd04-packet-workflow",
+  "sequence": "C",
+  "intent_block_present": true,
+  "na_allowed": false,
+  "roles": {
+    "tester": {
+      "model_family": "Gemini",
+      "model_target": "gemini-3.1-pro",
+      "responsibility": "Authors the acceptance-criteria tests first (RED), from the spec only."
+    },
+    "doer": {
+      "model_family": "Claude",
+      "model_target": "claude-sonnet-5",
+      "responsibility": "Implements the smallest coherent solution to pass the tests (may add, never weaken)."
+    },
+    "checker": {
+      "model_family": "GPT",
+      "model_target": "gpt-5.5",
+      "responsibility": "Re-verifies every acceptance criterion and the frozen preservation set."
+    }
+  },
+  "slots": {
+    "slot1": {
+      "path": "docs/prompts/prd04-workflow/slot1-intent.md",
+      "sha256": "ad08e12ca349fc59ad346c70144a40e7e4a9080008dc5a245c87ad01e4562062"
+    },
+    "slot2": {
+      "path": "docs/prompts/prd04-workflow/slot2-workflow-contract.md",
+      "sha256": "6c722bdebea05d5525b96d66f43d8d4dc06aa0ccb7063050da4a3d182e9ab348"
+    },
+    "slot3": {
+      "path": "docs/prompts/prd04-workflow/slot3-preservation.md",
+      "sha256": "0267af8157815b6a7053f733c307e74a393ae3cb61ca973d2dbf118d0e3b31c9"
+    }
+  },
+  "contract": {
+    "prd_path": "docs/prd/PRD-04-candidate-evidence-packet.md",
+    "prd_revision": "r3",
+    "prd_r3_sha256": "9799522945d995ea737e0e597d148c4a1fa76792f15719a32db6cba11d6223be",
+    "source_commit": "9adbd7b",
+    "task_spec_section": "docs/prd/PRD-04-candidate-evidence-packet.md#113-task-spec--review-workflow-state-machine--decision-log--comparator-c"
+  },
+  "depends_on": [
+    "prd04-packet-core",
+    "prd04-packet-surfaces"
+  ],
+  "reference_files": [
+    "src/raptor/packet/model.py",
+    "src/raptor/packet/hashing.py",
+    "docs/prd/PRD-06-benchmark-eval-harness.md",
+    "docs/reference/aavc-prior-art-audit-2026-07.md"
+  ],
+  "reference_files_count": 4,
+  "authorized_outputs": {
+    "production": [
+      "src/raptor/packet/state.py",
+      "src/raptor/packet/decisions.py",
+      "src/raptor/packet/comparator.py"
+    ],
+    "config": [
+      "configs/packet/comparator.yaml"
+    ],
+    "test": [
+      "tests/packet/test_packet_workflow.py"
+    ]
+  },
+  "acceptance_criteria": [
+    "AC10", "AC11", "AC14", "AC15", "AC16", "AC17", "AC18", "AC20", "AC23"
+  ],
+  "preservation_set": [
+    "src/raptor/scorer/**",
+    "src/raptor/eval/**",
+    "src/raptor/kb/store.py",
+    "src/raptor/packet/model.py"
+  ]
+}

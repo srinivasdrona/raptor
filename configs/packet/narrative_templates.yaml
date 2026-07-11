@@ -1,0 +1,20 @@
+# PRD-04 Task B approved narrative template catalog (FR7). Loaded by
+# `raptor.packet.config.load_narrative_catalog`; strict schema -- exactly
+# `config_version` + `templates` at the top level, and exactly `template_id,
+# body, required_bindings` per template. The model may only select and
+# order these approved template ids and bind packet field paths; it never
+# authors freeform factual text (AC9).
+config_version: "1"
+templates:
+  criterion_summary:
+    template_id: criterion_summary
+    body: "Gene {gene} has criterion {criterion}."
+    required_bindings: [gene, criterion]
+  variant_identity_summary:
+    template_id: variant_identity_summary
+    body: "Variant {spdi} in {gene} is annotated as {variant_class} ({consequence})."
+    required_bindings: [spdi, gene, variant_class, consequence]
+  criterion_grounding_summary:
+    template_id: criterion_grounding_summary
+    body: "Criterion {criterion} ({strength}, {direction}) has primary grounding: {grounding}."
+    required_bindings: [criterion, strength, direction, grounding]

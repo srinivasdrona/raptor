@@ -34,10 +34,30 @@ _REQUIRED_TOP_KEYS: tuple[str, ...] = (
 #: load time, never a `KeyError` deep in the combiner at runtime.
 _REQUIRED_POINT_KEYS: tuple[str, ...] = ("supporting", "moderate", "strong", "very_strong", "stand_alone")
 
-#: Whitelist of metric names an `oracle_thresholds` key may name (sec 10.3 --
-#: `gate.py` only ever reads these off a `Metrics` instance). Any other key
-#: is a bogus/laundered pin and must never reach the gate (BLOCKER 1).
-_ORACLE_METRIC_KEYS: frozenset[str] = frozenset({"precision", "recall", "concordance"})
+#: Gate-fidelity (Arm C, BREAKING nested-schema migration): the two ACMG
+#: strata whose per-stratum threshold VALUES are Oracle-pre-registered
+#: (`docs/EVAL_RUBRIC.md` §1) and therefore LOCKED -- a config that pins a
+#: different value for a metric these name is rejected at load (R-A2
+#: pre-registration; the `min_count_per_class` 35->36 power-floor correction
+#: is the sole sanctioned exception, and it is NOT part of this per-stratum
+#: value lock). `concordance` is not part of the nested per-stratum gating
+#: schema at all -- precision/recall (both directions) are the only gated
+#: metrics now (the old flat `concordance`-only threshold path is removed).
+_PINNED_STRATUM_THRESHOLDS: Mapping[str, Mapping[str, float]] = {
+    "missense": {"precision": 0.90, "recall": 0.85},
+    "truncating": {"precision": 0.95, "recall": 0.95},
+}
+
+#: The gating stratum `decide_gate` binds on; a non-empty `oracle_thresholds`
+#: block MUST define it (else it is functionally unset -- UNVERIFIED).
+_REQUIRED_GATING_STRATUM = "missense"
+
+#: The only directions a per-stratum `directions` list may name.
+_VALID_DIRECTIONS: frozenset[str] = frozenset({"pathogenic", "benign"})
+_PINNED_STRATUM_SEMANTICS: Mapping[str, tuple[bool, tuple[str, ...]]] = {
+    "missense": (True, ("pathogenic", "benign")),
+    "truncating": (True, ("pathogenic",)),
+}
 
 #: Required Tavtigian category-cutoff keys (PRD-06 sec 10.2/AC1).
 _REQUIRED_CUTOFF_KEYS: tuple[str, ...] = (
@@ -105,7 +125,12 @@ class EvalConfig:
     tavtigian_cutoffs: Mapping[str, int]  # category cutoff name -> int
     min_count_per_class: int
     split: Mapping[str, Any]  # {"seed": int, "holdout_fraction": float}
-    oracle_thresholds: Mapping[str, float]  # metric -> threshold; EMPTY until GP-3
+    #: Gate-fidelity (Arm C, BREAKING migration): nested per-stratum schema
+    #: `{confidence: float, strata: {name: {precision, recall, gating,
+    #: directions}}}` -- replaces the flat `{metric: float}` map. EMPTY `{}`
+    #: until GP-3 pre-registers (AC5/H13 -> `UNVERIFIED`); the flat schema is
+    #: no longer accepted (`load_config` rejects it structurally).
+    oracle_thresholds: Mapping[str, Any]
     labels_snapshot: str
     #: PRD-07 sec 10.2/10.3 -- optional real sha256 pin for the ClinVar
     #: `variant_summary` snapshot the labels come from (benchmark-source
@@ -149,37 +174,122 @@ def _validate_split(split: Any) -> None:
         )
 
 
-#: When `oracle_thresholds` is non-empty it MUST pin both of these metrics
-#: (BLOCKER 1) -- concordance alone (or precision/recall alone) is a
-#: cherry-picked, launderable gating target and must fail loud at load time,
-#: never reach the gate.
-_ORACLE_REQUIRED_METRIC_KEYS: frozenset[str] = frozenset({"precision", "recall"})
-
-
+#: Gate-fidelity (Arm C, BREAKING nested-schema migration): `oracle_thresholds`
+#: is now `{confidence: float, strata: {name: {precision, recall, gating,
+#: directions}}}`. Empty `{}` stays the honest pre-Oracle state (AC5/H13 ->
+#: `UNVERIFIED`). A non-empty block MUST carry a valid `confidence` and a
+#: non-empty `strata` map that includes the `missense` gating stratum; each
+#: stratum MUST pin finite `precision`/`recall` in `(0.0, 1.0]`, a boolean
+#: `gating`, and an optional `directions` subset of {pathogenic, benign}. A
+#: stratum named in `_PINNED_STRATUM_THRESHOLDS` (missense/truncating) MUST
+#: match the Oracle-pre-registered value exactly (R-A2 pre-registration
+#: lock) -- no post-hoc threshold change, however small.
 def _validate_oracle_thresholds(thresholds: Any) -> None:
     if not isinstance(thresholds, dict):
         raise ConfigError("`oracle_thresholds` must be a mapping (may be empty)")
-    for key, value in thresholds.items():
-        if key not in _ORACLE_METRIC_KEYS:
+    if not thresholds:
+        return  # AC5/H13: empty is the honest pre-Oracle state -> UNVERIFIED
+
+    confidence = thresholds.get("confidence")
+    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
+        raise ConfigError(f"`oracle_thresholds.confidence` must be a real number, got {confidence!r}")
+    confidence = float(confidence)
+    if not math.isfinite(confidence) or not (0.0 < confidence < 1.0):
+        raise ConfigError(
+            f"`oracle_thresholds.confidence` must be strictly between 0.0 and 1.0, got {confidence!r}"
+        )
+
+    strata = thresholds.get("strata")
+    if not isinstance(strata, dict) or not strata:
+        raise ConfigError("`oracle_thresholds.strata` must be a non-empty mapping when oracle_thresholds is set")
+    if _REQUIRED_GATING_STRATUM not in strata:
+        raise ConfigError(
+            f"`oracle_thresholds.strata` must include the gating {_REQUIRED_GATING_STRATUM!r} stratum"
+        )
+
+    for name, spec in strata.items():
+        if not isinstance(spec, dict):
+            raise ConfigError(f"`oracle_thresholds.strata[{name!r}]` must be a mapping")
+
+        for metric_key in ("precision", "recall"):
+            if metric_key not in spec:
+                raise ConfigError(
+                    f"`oracle_thresholds.strata[{name!r}]` missing required {metric_key!r} "
+                    "(precision and recall are both mandatory -- concordance is not part of "
+                    "the per-stratum gating schema and can never substitute, BLOCKER 1)"
+                )
+            value = spec[metric_key]
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ConfigError(
+                    f"`oracle_thresholds.strata[{name!r}][{metric_key!r}]` must be a real number, "
+                    f"got {value!r}"
+                )
+            value = float(value)
+            if not math.isfinite(value) or not (0.0 < value <= 1.0):
+                raise ConfigError(
+                    f"`oracle_thresholds.strata[{name!r}][{metric_key!r}]` must be a finite value "
+                    f"in (0.0, 1.0] -- 0.0/negative authorizes on zero performance, got {value!r}"
+                )
+
+        gating = spec.get("gating")
+        if not isinstance(gating, bool):
+            raise ConfigError(f"`oracle_thresholds.strata[{name!r}].gating` must be a bool, got {gating!r}")
+
+        directions = spec.get("directions", [])
+        if not isinstance(directions, list) or not all(isinstance(d, str) for d in directions):
             raise ConfigError(
-                f"`oracle_thresholds` key {key!r} is not a known metric "
-                f"(must be one of {sorted(_ORACLE_METRIC_KEYS)})"
+                f"`oracle_thresholds.strata[{name!r}].directions` must be a list of strings"
             )
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            raise ConfigError(f"`oracle_thresholds[{key!r}]` must be a real number, got {value!r}")
-        value = float(value)
-        if not math.isfinite(value) or not (0.0 < value <= 1.0):
+        bad_directions = set(directions) - _VALID_DIRECTIONS
+        if bad_directions:
             raise ConfigError(
-                f"`oracle_thresholds[{key!r}]` must be a finite, strictly positive value in "
-                f"(0.0, 1.0] -- 0.0/negative authorizes on zero performance, got {value!r}"
+                f"`oracle_thresholds.strata[{name!r}].directions` names unknown direction(s): "
+                f"{sorted(bad_directions)} (must be a subset of {sorted(_VALID_DIRECTIONS)})"
             )
-    if thresholds:
-        missing = _ORACLE_REQUIRED_METRIC_KEYS - thresholds.keys()
-        if missing:
-            raise ConfigError(
-                "`oracle_thresholds` is non-empty and must pin both `precision` and "
-                f"`recall` (concordance is optional-additional); missing: {sorted(missing)}"
-            )
+
+        pinned = _PINNED_STRATUM_THRESHOLDS.get(name)
+        if pinned is not None:
+            for metric_key, pinned_value in pinned.items():
+                actual = float(spec[metric_key])
+                if not math.isclose(actual, pinned_value, rel_tol=0.0, abs_tol=1e-9):
+                    raise ConfigError(
+                        f"`oracle_thresholds.strata[{name!r}][{metric_key!r}]`={actual!r} does not "
+                        f"match the pinned pre-registered rubric value {pinned_value!r} for stratum "
+                        f"{name!r} (pre-registration lock, R-A2) -- changing a threshold post-hoc "
+                        "breaks pre-registration; the min_count_per_class 35->36 power-floor "
+                        "correction is the sole sanctioned exception and is not a per-stratum value"
+                    )
+        pinned_semantics = _PINNED_STRATUM_SEMANTICS.get(name)
+        if pinned_semantics is not None:
+            pinned_gating, pinned_directions = pinned_semantics
+            if gating is not pinned_gating or tuple(directions) != pinned_directions:
+                raise ConfigError(
+                    f"`oracle_thresholds.strata[{name!r}]` gating/directions "
+                    f"{gating!r}/{directions!r} do not match pinned pre-registered semantics "
+                    f"{pinned_gating!r}/{list(pinned_directions)!r}"
+                )
+
+
+def _build_oracle_thresholds(thresholds: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Coerce a schema-validated nested `oracle_thresholds` block to its
+    typed form -- `confidence`/`precision`/`recall` -> `float`, `gating` ->
+    `bool`, `directions` -> `list[str]`. NEVER calls `float()` on a stratum
+    dict (the bug this migration removes: the old flat builder's final
+    `float(v)`-per-key comprehension would raise `TypeError: float()
+    argument must be a string or a real number, not 'dict'` the instant a
+    stratum value reached it)."""
+    if not thresholds:
+        return {}
+    strata = {
+        str(name): {
+            "precision": float(spec["precision"]),
+            "recall": float(spec["recall"]),
+            "gating": bool(spec["gating"]),
+            "directions": [str(d) for d in spec.get("directions", [])],
+        }
+        for name, spec in thresholds["strata"].items()
+    }
+    return {"confidence": float(thresholds["confidence"]), "strata": strata}
 
 
 def load_config(path: str | Path) -> EvalConfig:
@@ -245,7 +355,7 @@ def load_config(path: str | Path) -> EvalConfig:
         tavtigian_cutoffs={str(k): int(v) for k, v in raw["tavtigian_cutoffs"].items()},
         min_count_per_class=int(min_count),
         split=dict(raw["split"]),
-        oracle_thresholds={str(k): float(v) for k, v in oracle_thresholds.items()},
+        oracle_thresholds=_build_oracle_thresholds(oracle_thresholds),
         labels_snapshot=str(raw["labels_snapshot"]),
         clinvar_snapshot_file_checksum=str(raw.get("clinvar_snapshot_file_checksum", "") or ""),
     )

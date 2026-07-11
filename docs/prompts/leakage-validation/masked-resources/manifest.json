@@ -1,0 +1,72 @@
+{
+  "task_id": "leakage-validation-masked-clinvar-comparator-regeneration",
+  "arm": "A",
+  "model_role": "planner",
+  "model_family": "Claude",
+  "model_target": "claude-opus-4.8",
+  "intent_block_present": true,
+  "goal": "Regenerate held-out-masked BIAS comparator resources (PS1/PM5/PM1/PP2/BP1) + mask the direct-copy ClinVar fallback inputs (PS4/PP5/BP6) by masking the upstream ClinVar source, arm's-length, leaving the full VUS resources byte-untouched.",
+  "slots": {
+    "slot1": {
+      "path": "docs/prompts/leakage-validation/masked-resources/slot1-planner.md",
+      "sha256": "ee2de91794cc4836e755ae9a62e070dd73ac18c790bbc8a4adb96f9eae9f9b20"
+    },
+    "slot2": {
+      "path": "docs/prompts/leakage-validation/masked-resources/slot2-masking-contract.md",
+      "sha256": "a5364748184fd73de277fbf3089dc244fac9b80e209f4a6681896028b0011505"
+    },
+    "slot3": {
+      "path": "docs/prompts/leakage-validation/masked-resources/slot3-preservation.md",
+      "sha256": "a2ce80b41430b2783b810ca60f87e23e6c5df18d0b129f14127ca71df2944ff7"
+    }
+  },
+  "source_pins": {
+    "bias_source_commit": "ade13f206f3e2c2efe3ec92715d974645fc8da8f",
+    "bias_version": "3.0.0",
+    "repo_head": "e52e855",
+    "bias_lineage_yaml_sha256": "743a0248c2415010b22c5e1c7f1a35924c8b4b26521f58be09e677ddbb58aeeb",
+    "lineage_audit_json_sha256": "cef6b2dc749c9d0a1f3b227c5002a7fdc7704a331c1c64bbae0b67bc2331604e",
+    "heldout_full_resource_bias_output_sha256": "6e055fe1a4f7d18e428c62739e3b60fa55362f72aa6322429d2f4ff93076dd9c",
+    "vus_full_resource_bias_output_sha256": "0a55cab470d3de93f06cd87ba30957fd1674c0ae2098ec86350f5aaac1a1162e",
+    "benchmark_snapshot": "clinvar_2026-07-07",
+    "heldout_count": 2577
+  },
+  "mask_set": {
+    "requires_heldout_mask": ["PS1", "PM5", "PM1", "PP2", "BP1"],
+    "direct_copy_fallbacks": ["PS4", "PP5", "BP6"],
+    "note": "PM1/PP2/BP1 fired 0 on the full-resource held-out run; static lineage keeps all five masked regardless."
+  },
+  "authorized_implementation_outputs": [
+    "src/raptor/eval/mask_clinvar.py",
+    "scripts/mask_clinvar_source.py",
+    "configs/eval/mask.yaml",
+    "tests/eval/test_mask_clinvar.py",
+    "tests/eval/test_mask_conservation_audit.py",
+    "tests/eval/test_mask_clinvar_forbidden_import_audit.py"
+  ],
+  "reference_files": [
+    "docs/DECISIONS.md",
+    "docs/prompts/bias-lineage/slot2-lineage-contract.md",
+    "src/raptor/ingest/normalizer.py",
+    "scripts/build_tsc_benchmark.py"
+  ],
+  "roles": {
+    "tester": {
+      "model_target": "gemini-3.1-pro-preview",
+      "responsibility": "Author executable AC tests (AC-M1..AC-M9) from slot 2 + slot-1 surfaces only, before the doer. Derive the mask/conservation oracle from canonical-SPDI set membership and hand-computed domain/gene aggregates, never from the tool's own ledger. AC-M3 proves a non-firing held-out variant injected into an aggregate is still flagged (zero-incidence mask). AC-M7 proves full VUS resources are byte-unchanged."
+    },
+    "doer": {
+      "model_target": "claude-sonnet-5",
+      "responsibility": "Implement mask_clinvar.py + CLI + config to pass the ACs. Mask the upstream ClinVar source (VCF/Nirvana JSON + summary tables) by canonical SPDI + VariationID; emit masked namespace + manifest + provenance + independent conservation audit. Never import bias_2015 or reimplement a generator's aggregation. Honor slot 3."
+    },
+    "checker": {
+      "model_target": "gpt-5.6-sol",
+      "responsibility": "Re-verify all ACs pass, the frozen preservation set + full-resource hashes are byte-unchanged, and none of the five slot-3 inversion failures are present (incidence-driven mask shrink, raw-coordinate miss, silent over-removal, full-resource contamination, aggregate laundering)."
+    }
+  },
+  "dependencies": {
+    "builds_now": true,
+    "blocks": ["operator BIAS-generator rerun on masked ClinVar (x64 devbox, ADR-0007/0008)", "masked held-out re-score"],
+    "blocked_by": []
+  }
+}

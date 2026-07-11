@@ -1,0 +1,95 @@
+{
+  "status": "prior_art_comparison_non_authoritative",
+  "comparison_date": "2026-07-10",
+  "sources": {
+    "aavc_repository": {
+      "url": "https://github.com/OzcelikLab/AAVC",
+      "commit": "8da2b5ac7cf92830b792d521818a2ace50a0e2e1"
+    },
+    "aavc_classification_release": {
+      "doi": "10.5281/zenodo.17201194",
+      "source_snapshot": "ClinVar September 2024",
+      "archive_file": "AAVC_Classification_ClinVar_September2024.zip",
+      "archive_bytes": 87193970,
+      "archive_md5": "39308efd7694e2dacc9c1ac281f27a66",
+      "extracted_file_sha256": "b89f3e45340bcfc3a0ed0518a04cb4fc943df66214e0ef9f075293545d0ac424"
+    },
+    "raptor_corpus": {
+      "source_snapshot": "ClinVar 2026-07-07",
+      "manifest_sha256": "7f9937521a425e73b31422fa9191c90e67fa80cc58f351517ac732b1d32fcbba",
+      "bias_output_sha256": "0a55cab470d3de93f06cd87ba30957fd1674c0ae2098ec86350f5aaac1a1162e"
+    }
+  },
+  "method": {
+    "script": "scripts/audit_aavc_overlap.py",
+    "primary_match": "exact GRCh38 VCF key: chromosome-position-reference-alternate",
+    "secondary_match": "common-prefix/suffix-trim equivalence for differently anchored VCF indels",
+    "secondary_match_limit": "not full reference-backed SPDI repeat normalization",
+    "raptor_direction": "current eval-only Tavtigian point combiner; manual queue retained",
+    "aavc_direction": "PATHOGENIC/LIKELY_PATHOGENIC -> LP; BENIGN/LIKELY_BENIGN -> LB; VUS-* -> no_call"
+  },
+  "aavc_release": {
+    "rows": 2665537,
+    "clinvar_vus_rows": 1354015,
+    "clinvar_vus_machine_called_non_vus": 750318,
+    "clinvar_vus_machine_called_non_vus_fraction": 0.554143,
+    "tsc1_vus_rows": 1865,
+    "tsc2_vus_rows": 2667,
+    "tsc_vus_rows": 4532,
+    "tsc_vus_machine_called_non_vus": 808,
+    "tsc_vus_machine_called_non_vus_fraction": 0.178288
+  },
+  "raptor_overlap": {
+    "raptor_vus_rows": 6618,
+    "exact_vcf_key_matches": 4010,
+    "common_trim_equivalent_matches": 159,
+    "combined_matches": 4169,
+    "combined_match_fraction": 0.629949,
+    "unmatched": 2449,
+    "aavc_classes_on_combined_matches": {
+      "PATHOGENIC": 2,
+      "LIKELY_PATHOGENIC": 113,
+      "VUS_HIGH": 147,
+      "VUS_MID": 691,
+      "VUS_LOW": 2615,
+      "LIKELY_BENIGN": 601,
+      "BENIGN": 0
+    },
+    "aavc_directional_calls": 716,
+    "aavc_directional_call_fraction": 0.171744,
+    "direction_cross_tab": {
+      "raptor_candidate_LP": {
+        "aavc_LP": 45,
+        "aavc_LB": 1,
+        "aavc_no_call": 80
+      },
+      "raptor_candidate_LB": {
+        "aavc_LP": 7,
+        "aavc_LB": 289,
+        "aavc_no_call": 521
+      },
+      "raptor_no_call": {
+        "aavc_LP": 61,
+        "aavc_LB": 305,
+        "aavc_no_call": 2842
+      },
+      "raptor_manual": {
+        "aavc_LP": 2,
+        "aavc_LB": 6,
+        "aavc_no_call": 10
+      }
+    },
+    "both_systems_directional": 342,
+    "direction_agreements": 334,
+    "direction_disagreements": 8,
+    "agreement_fraction_when_both_directional": 0.976608
+  },
+  "interpretation_limits": [
+    "RAPTOR candidate directions and AAVC machine classes are not expert classifications.",
+    "Agreement is not accuracy because the systems use overlapping public sources and AAVC target-label masking is undocumented.",
+    "The snapshots are 22 months apart; unmatched variants cannot be assumed to be absent from AAVC solely because of method differences.",
+    "One common-trim match was PLP in AAVC's September-2024 source but VUS in RAPTOR's July-2026 source.",
+    "AAVC VUS-HIGH, VUS-MID and VUS-LOW remain VUS and are not standard external ClinVar classes.",
+    "AAVC's software license does not permit redistribution, modification or derivative software; no AAVC code may be copied into RAPTOR."
+  ]
+}

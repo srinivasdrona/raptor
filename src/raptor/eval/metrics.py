@@ -7,6 +7,12 @@ concordance per stratum -- `overall` plus one per `variant_class` present
 P/R denominators and counted as `abstain`. A stratum whose per-truth-class
 held-out counts fall below `config.min_count_per_class` is tagged
 `gating=False` (FR5): descriptive/CI only, never a gate input.
+
+Gate-fidelity (Arm C): alongside each point estimate, also computes the
+95%-CI Clopper-Pearson LOWER bound per direction
+(`precision_lb`/`recall_lb`/`benign_precision_lb`/`benign_recall_lb`, via
+`raptor.eval.stats.clopper_pearson_lower`) -- the gate (`gate.py`) reads the
+lower bound, never the point estimate.
 """
 from __future__ import annotations
 
@@ -15,9 +21,34 @@ from typing import Dict, Iterable, List
 
 from .config import EvalConfig
 from .model import BenchmarkRow, ImpliedCall, Metrics
+from .stats import clopper_pearson_lower
 
 _PATHOGENIC_LABELS = frozenset({"P", "LP"})
 _BENIGN_LABELS = frozenset({"B", "LB"})
+
+
+def _lower_bound(k: int, n: int, confidence: float) -> float:
+    """`clopper_pearson_lower` wrapper for a metrics denominator that may
+    legitimately be zero (e.g. no calls in a direction) -- 0 calls is
+    reported as a 0.0 lower bound (matching the 0.0 point estimate), never
+    `InsufficientCountError` (that guard is for the stats-module API
+    contract itself, AC-G1, not for a metrics denominator that is
+    genuinely empty)."""
+    if n <= 0:
+        return 0.0
+    return clopper_pearson_lower(k, n, confidence=confidence)
+
+
+def _gate_confidence(config: EvalConfig) -> float:
+    """The 95%-CI confidence level `oracle_thresholds.confidence` pins
+    (nested per-stratum schema, gate-fidelity slot 2 §2); defaults to 0.95
+    when `oracle_thresholds` is empty (AC5 -- metrics are still reported
+    with a lower bound even pre-Oracle, the gate itself reads UNVERIFIED)."""
+    thresholds = config.oracle_thresholds or {}
+    confidence = thresholds.get("confidence")
+    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
+        return 0.95
+    return float(confidence)
 
 
 def _compute_stratum(
@@ -61,6 +92,16 @@ def _compute_stratum(
     benign_precision = tn / (tn + fn) if (tn + fn) else 0.0
     benign_recall = tn / (tn + fp) if (tn + fp) else 0.0
 
+    # Gate-fidelity (Arm C): the 95%-CI Clopper-Pearson LOWER bound per
+    # direction, alongside the point estimate above -- the gate compares
+    # THESE, never the point estimate (EVAL_RUBRIC §2/§6, corrected anchors
+    # n>=36/72/368).
+    confidence = _gate_confidence(config)
+    precision_lb = _lower_bound(tp, tp + fp, confidence)
+    recall_lb = _lower_bound(tp, tp + fn, confidence)
+    benign_precision_lb = _lower_bound(tn, tn + fn, confidence)
+    benign_recall_lb = _lower_bound(tn, tn + fp, confidence)
+
     # BLOCKER-1 (abstain-laundering): a stratum where the model CALLED
     # (LP/LB, never abstained) an adequate count of BOTH truth classes --
     # not merely HAD an adequate count of held-out truth rows. Abstaining
@@ -97,6 +138,10 @@ def _compute_stratum(
         gating=gating,
         benign_precision=benign_precision,
         benign_recall=benign_recall,
+        precision_lb=precision_lb,
+        recall_lb=recall_lb,
+        benign_precision_lb=benign_precision_lb,
+        benign_recall_lb=benign_recall_lb,
     )
 
 

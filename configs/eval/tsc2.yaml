@@ -15,7 +15,16 @@
 # OWN ClinVar assertion must not feed a combiner graded against ClinVar-derived
 # labels). PS4 excluded per Oracle decision (BIAS-3.0.0 derives it from ClinVar
 # submitter counts when no GWAS data exists). Transitive-ClinVar criteria
-# (PM5/PM1/PP2) remain pending the full-held-out audit ruling.
+# (PS1/PM5/PM1/PP2/BP1) remain scored here pending the full-held-out audit
+# ruling, but are `requires_heldout_mask` in the bias-lineage validation
+# policy (configs/eval/bias_lineage.yaml) -- the lineage audit
+# (raptor.eval.lineage_audit) fail-closed-blocks any run that scores them
+# against the ClinVar-labelled benchmark. BS3/BS4 (bias-lineage audit D2)
+# were REMOVED -- BIAS-3.0.0 internal stubs that can never fire (phantom
+# automation); PS3/BS2 (the can-fire criteria the scorer's `acmg_criteria`
+# registry now carries) stay NOT automated -- both are `deferred` in the
+# lineage policy (PS3: assay-validity review; BS2: decision_dependency
+# `bs2-policy`).
 automatable_criteria:
   - PVS1
   - PS1
@@ -27,8 +36,6 @@ automatable_criteria:
   - PP3
   - BA1
   - BS1
-  - BS3
-  - BS4
   - BP1
   - BP3
   - BP4
@@ -55,34 +62,54 @@ tavtigian_cutoffs:
   benign_max: -7            # points <= -7 -> Benign
 
 # FR5/EVAL_PLAN sec 2: a stratum's per-truth-class held-out count below this
-# is reported descriptive-only + CI, never gating. Set to the EVAL_RUBRIC power
-# floor -- 0.90 precision at a 95% CI lower bound needs >=35 held-out calls
-# (Clopper-Pearson). Below this a stratum reads UNDERPOWERED (FR5).
-min_count_per_class: 35
+# is reported descriptive-only + CI, never gating. Set to the CORRECTED
+# EVAL_RUBRIC power floor -- 0.90 precision at a 95% CI lower bound
+# (exact Clopper-Pearson, `scipy.stats.beta.ppf`) needs >=36 zero-error
+# held-out calls (LB(35,35)=0.899968 < 0.90 <= LB(36,36)=0.902606). Below
+# this a stratum reads UNDERPOWERED (FR5).
+min_count_per_class: 36
 
 # FR2: deterministic no-leakage split. Pinned seed + fraction (R-A11).
 # holdout=0.7: RAPTOR Tier-1/2 is a DETERMINISTIC rule engine (it learns nothing
 # from the benchmark), so a large held-out does not starve any training -- the
 # 30% reserve is only a development/sanity set. 0.7 puts ~51 known pathogenic
-# missense in held-out (>=35), powering the 0.90 missense bar (EVAL_RUBRIC §3a).
+# missense in held-out (>=36), powering the 0.90 missense bar (EVAL_RUBRIC §3a).
 split:
   seed: 20260701
   holdout_fraction: 0.7
 
 # FR6/AC5/GP-9/H13: pre-registered BLIND to held-out results (no BIAS/Nirvana
 # scores exist yet -- Track B is not run), by the domain owner (@dronasrinivas)
-# per EVAL_RUBRIC §3/§5. Missense gating stratum:
-#   precision >= 0.90  -> ACMG/AMP PP3/BP4-grade correctness, both directions
-#                         (Richards 2015; Pejaver 2022 calibrated evidence).
-#   recall    >= 0.85  -> clinical sensitivity floor (InterVar/CardioClassifier
-#                         missense sensitivity band).
-# Truncating stratum target is 0.95 (IARC) but is REPORTED, not gated here --
-# per-stratum thresholds need a config extension (logged follow-up); truncating
-# is already >=210 held-out and not the binding constraint. These values are
-# LOCKED once merged; changing them post-hoc breaks pre-registration (R-A2).
+# per EVAL_RUBRIC §3/§5. Gate-fidelity (Arm C, BREAKING nested-schema
+# migration): `oracle_thresholds` is now `{confidence, strata: {name: {precision,
+# recall, gating, directions}}}` -- the flat `{precision, recall}` map is
+# removed; the gate now compares the 95% Clopper-Pearson LOWER bound (never the
+# point estimate) against these values. VALUE-PRESERVING migration -- neither
+# stratum's pinned precision/recall changed:
+#   missense (binding, both directions):
+#     precision >= 0.90  -> ACMG/AMP PP3/BP4-grade correctness, both directions
+#                           (Richards 2015; Pejaver 2022 calibrated evidence).
+#     recall    >= 0.85  -> clinical sensitivity floor (InterVar/CardioClassifier
+#                           missense sensitivity band).
+#   truncating (secondary, hard-gated, pathogenic direction only -- benign n=1
+#   is report-only and never gates): precision/recall >= 0.95 (IARC); already
+#   >=210 held-out and not the binding constraint.
+# These values are LOCKED once merged; changing them post-hoc breaks
+# pre-registration (R-A2) -- `load_config` rejects any per-stratum value that
+# differs from the pinned value below.
 oracle_thresholds:
-  precision: 0.90
-  recall: 0.85
+  confidence: 0.95
+  strata:
+    missense:
+      precision: 0.90
+      recall: 0.85
+      gating: true
+      directions: [pathogenic, benign]
+    truncating:
+      precision: 0.95
+      recall: 0.95
+      gating: true
+      directions: [pathogenic]
 
 # FR1/GP-9: the labels snapshot this benchmark is frozen against (R-A11).
 # Pinned ClinVar variant_summary.txt.gz snapshot:

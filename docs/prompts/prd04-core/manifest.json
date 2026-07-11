@@ -1,0 +1,80 @@
+{
+  "task_id": "prd04-packet-core",
+  "sequence": "A",
+  "intent_block_present": true,
+  "na_allowed": false,
+  "roles": {
+    "tester": {
+      "model_family": "Gemini",
+      "model_target": "gemini-3.1-pro",
+      "responsibility": "Authors the acceptance-criteria tests first (RED), from the spec only."
+    },
+    "doer": {
+      "model_family": "Claude",
+      "model_target": "claude-sonnet-5",
+      "responsibility": "Implements the smallest coherent solution to pass the tests (may add, never weaken)."
+    },
+    "checker": {
+      "model_family": "GPT",
+      "model_target": "gpt-5.5",
+      "responsibility": "Re-verifies every acceptance criterion and the frozen preservation set."
+    }
+  },
+  "slots": {
+    "slot1": {
+      "path": "docs/prompts/prd04-core/slot1-intent.md",
+      "sha256": "16e5b3e0a9be010f513b262926d455cecf9a6f9a120b351a43364dd5a6d0a08f"
+    },
+    "slot2": {
+      "path": "docs/prompts/prd04-core/slot2-core-contract.md",
+      "sha256": "3add348cee4f078b87d7369a59a628f7845c205fcd233cc348ba2c7393261330"
+    },
+    "slot3": {
+      "path": "docs/prompts/prd04-core/slot3-preservation.md",
+      "sha256": "953e3168029ef95051ecff012f83a5280da1e7a4f23a082243aad06f8c71fdfc"
+    }
+  },
+  "contract": {
+    "prd_path": "docs/prd/PRD-04-candidate-evidence-packet.md",
+    "prd_revision": "r3",
+    "prd_r3_sha256": "9799522945d995ea737e0e597d148c4a1fa76792f15719a32db6cba11d6223be",
+    "source_commit": "9adbd7b",
+    "task_spec_section": "docs/prd/PRD-04-candidate-evidence-packet.md#111-task-spec--packet-core-a"
+  },
+  "depends_on": [],
+  "reference_files": [
+    "src/raptor/scorer/model.py",
+    "src/raptor/eval/lineage_policy.py",
+    "src/raptor/scorer/report.py",
+    "data/census/tsc_vus_clinvar_2026-07-07_stats.json"
+  ],
+  "reference_files_count": 4,
+  "authorized_outputs": {
+    "production": [
+      "src/raptor/packet/__init__.py",
+      "src/raptor/packet/model.py",
+      "src/raptor/packet/build.py",
+      "src/raptor/packet/direction.py",
+      "src/raptor/packet/hashing.py",
+      "src/raptor/packet/config.py"
+    ],
+    "config": [
+      "configs/packet/schema.yaml",
+      "configs/packet/candidate_direction.yaml"
+    ],
+    "test": [
+      "tests/packet/test_packet_core.py",
+      "tests/packet/test_kit_conformance_packet.py"
+    ]
+  },
+  "acceptance_criteria": [
+    "AC1", "AC2", "AC3", "AC4", "AC5", "AC6", "AC7", "AC8", "AC19", "AC21", "AC22"
+  ],
+  "preservation_set": [
+    "src/raptor/scorer/**",
+    "src/raptor/eval/**",
+    "src/raptor/kb/store.py",
+    "configs/eval/bias_lineage.yaml",
+    "tests/scorer/test_ac6_no_trace_cribbing.py"
+  ]
+}

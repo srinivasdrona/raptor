@@ -1,0 +1,51 @@
+{
+  "gene_distribution": {
+    "TSC1": 29,
+    "TSC2": 5
+  },
+  "pathogenic_cofires": {
+    "PM2": 30,
+    "PP3": 4
+  },
+  "signals": {
+    "healthy_individual_counts": [
+      6,
+      6,
+      7,
+      7,
+      7,
+      9,
+      9,
+      12,
+      12,
+      13,
+      14,
+      16,
+      16,
+      17,
+      18,
+      18,
+      19,
+      21,
+      23,
+      25,
+      25,
+      29,
+      29,
+      30,
+      33,
+      41,
+      51,
+      51,
+      60,
+      70,
+      85,
+      88,
+      99,
+      6115
+    ]
+  },
+  "source_sha256": "0a55cab470d3de93f06cd87ba30957fd1674c0ae2098ec86350f5aaac1a1162e",
+  "total_bs2_firings": 34,
+  "total_rows": 6618
+}

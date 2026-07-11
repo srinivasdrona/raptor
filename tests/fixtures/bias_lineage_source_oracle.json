@@ -1,0 +1,179 @@
+{
+  "schema_version": "1.0",
+  "bias_version": "3.0.0",
+  "bias_commit": "ade13f206f3e2c2efe3ec92715d974645fc8da8f",
+  "files": {
+    "src/bias_2015/pathogenic_classifiers.py": "960783d542d63c9e9c72ad099dc4de2932fe3084cc93e30e0fb91f675cb171ef",
+    "src/bias_2015/benign_classifiers.py": "9f33066d74d0af3216850a58ba665f9d881c6281433a8feb708027136446fb71"
+  },
+  "criteria": [
+    {
+      "criterion": "PVS1",
+      "file": "src/bias_2015/pathogenic_classifiers.py",
+      "symbol": "get_pvs",
+      "status": "can_fire"
+    },
+    {
+      "criterion": "PS1",
+      "file": "src/bias_2015/pathogenic_classifiers.py",
+      "symbol": "get_ps1",
+      "status": "can_fire"
+    },
+    {
+      "criterion": "PS2",
+      "file": "src/bias_2015/pathogenic_classifiers.py",
+      "symbol": "get_ps2",
+      "status": "internal_stub"
+    },
+    {
+      "criterion": "PS3",
+      "file": "src/bias_2015/pathogenic_classifiers.py",
+      "symbol": "get_ps3",
+      "status": "can_fire"
+    },
+    {
+      "criterion": "PS4",
+      "file": "src/bias_2015/pathogenic_classifiers.py",
+      "symbol": "get_ps4",
+      "status": "can_fire"
+    },
+    {
+      "criterion": "PM1",
+      "file": "src/bias_2015/pathogenic_classifiers.py",
+      "symbol": "get_pm1",
+      "status": "can_fire"
+    },
+    {
+      "criterion": "PM2",
+      "file": "src/bias_2015/pathogenic_classifiers.py",
+      "symbol": "get_pm2",
+      "status": "can_fire"
+    },
+    {
+      "criterion": "PM3",
+      "file": "src/bias_2015/pathogenic_classifiers.py",
+      "symbol": "get_pm3",
+      "status": "internal_stub"
+    },
+    {
+      "criterion": "PM4",
+      "file": "src/bias_2015/pathogenic_classifiers.py",
+      "symbol": "get_pm4",
+      "status": "can_fire"
+    },
+    {
+      "criterion": "PM5",
+      "file": "src/bias_2015/pathogenic_classifiers.py",
+      "symbol": "get_pm5",
+      "status": "can_fire"
+    },
+    {
+      "criterion": "PM6",
+      "file": "src/bias_2015/pathogenic_classifiers.py",
+      "symbol": "get_pm6",
+      "status": "internal_stub"
+    },
+    {
+      "criterion": "PP1",
+      "file": "src/bias_2015/pathogenic_classifiers.py",
+      "symbol": "get_pp1",
+      "status": "internal_stub"
+    },
+    {
+      "criterion": "PP2",
+      "file": "src/bias_2015/pathogenic_classifiers.py",
+      "symbol": "get_pp2",
+      "status": "can_fire"
+    },
+    {
+      "criterion": "PP3",
+      "file": "src/bias_2015/pathogenic_classifiers.py",
+      "symbol": "get_pp3",
+      "status": "can_fire"
+    },
+    {
+      "criterion": "PP4",
+      "file": "src/bias_2015/pathogenic_classifiers.py",
+      "symbol": "get_pp4",
+      "status": "internal_stub"
+    },
+    {
+      "criterion": "PP5",
+      "file": "src/bias_2015/pathogenic_classifiers.py",
+      "symbol": "get_pp5",
+      "status": "can_fire"
+    },
+    {
+      "criterion": "BA1",
+      "file": "src/bias_2015/benign_classifiers.py",
+      "symbol": "get_ba1",
+      "status": "can_fire"
+    },
+    {
+      "criterion": "BS1",
+      "file": "src/bias_2015/benign_classifiers.py",
+      "symbol": "get_bs1",
+      "status": "can_fire"
+    },
+    {
+      "criterion": "BS2",
+      "file": "src/bias_2015/benign_classifiers.py",
+      "symbol": "get_bs2",
+      "status": "can_fire"
+    },
+    {
+      "criterion": "BS3",
+      "file": "src/bias_2015/benign_classifiers.py",
+      "symbol": "get_bs3",
+      "status": "internal_stub"
+    },
+    {
+      "criterion": "BS4",
+      "file": "src/bias_2015/benign_classifiers.py",
+      "symbol": "get_bs4",
+      "status": "internal_stub"
+    },
+    {
+      "criterion": "BP1",
+      "file": "src/bias_2015/benign_classifiers.py",
+      "symbol": "get_bp1",
+      "status": "can_fire"
+    },
+    {
+      "criterion": "BP2",
+      "file": "src/bias_2015/benign_classifiers.py",
+      "symbol": "get_bp2",
+      "status": "internal_stub"
+    },
+    {
+      "criterion": "BP3",
+      "file": "src/bias_2015/benign_classifiers.py",
+      "symbol": "get_bp3",
+      "status": "can_fire"
+    },
+    {
+      "criterion": "BP4",
+      "file": "src/bias_2015/benign_classifiers.py",
+      "symbol": "get_bp4",
+      "status": "can_fire"
+    },
+    {
+      "criterion": "BP5",
+      "file": "src/bias_2015/benign_classifiers.py",
+      "symbol": "get_bp5",
+      "status": "internal_stub"
+    },
+    {
+      "criterion": "BP6",
+      "file": "src/bias_2015/benign_classifiers.py",
+      "symbol": "get_bp6",
+      "status": "can_fire"
+    },
+    {
+      "criterion": "BP7",
+      "file": "src/bias_2015/benign_classifiers.py",
+      "symbol": "get_bp7",
+      "status": "can_fire"
+    }
+  ]
+}

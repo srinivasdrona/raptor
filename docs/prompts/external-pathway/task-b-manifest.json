@@ -1,0 +1,62 @@
+{
+  "task_id": "external-pathway-conformance",
+  "sequence": "B",
+  "goal": "Offline dry-run conformance validator producing a machine-readable report and NEVER an SCV (no network client)",
+  "depends_on": ["external-pathway-clinvar-map"],
+  "planning_only": true,
+  "no_submission": true,
+  "no_contact": true,
+  "no_push": true,
+  "no_production_classification": true,
+  "no_network": true,
+  "produces_scv": false,
+  "branch": "track/external-pathway-2026-07",
+  "worktree": "D:/AIProjects/raptor-worktrees/external-pathway",
+  "source_commit": "e52e855",
+  "pinned_contract_ref": "docs/prd/PRD-09-clinvar-vcep-submission-preparation.md §15.4 (+ §16 tester-correction)",
+  "slots": {
+    "tester": {
+      "model_role": "tester",
+      "model_family": "Gemini",
+      "model_target": "gemini-2.5-pro",
+      "authors": "tests/external/test_task_b_conformance.py",
+      "order": 1,
+      "mandate": "Author AC4/AC5/AC6/AC12 tests BEFORE the doer, against the frozen §15.4 contract. validate_conformance returns ConformanceReport; guards RAISE (SchemaFreshnessError/ClinvarShapeError/PhiDetectedError/NoScvInvariantError), business rules are REPORTED as RuleResult. Prove no-SCV/no-network invariants structurally (emitted_scv/network_used False; no production-POST path). AC9 does NOT belong here (it is Task C, structural)."
+    },
+    "doer": {
+      "model_role": "doer",
+      "model_family": "Sonnet",
+      "model_target": "claude-sonnet-4.5",
+      "implements": ["src/raptor/external/conformance.py", "configs/external/clinvar_conformance.yaml", "configs/external/clinvar_submission_schema.snapshot.json"],
+      "order": 2,
+      "mandate": "Implement §15.4 exactly: ConformanceConfig + load_conformance_config (strict; pin == PINNED_SCHEMA_SHA256); RuleResult; ConformanceReport (is_valid/is_authoritative=False/review_status='1-star'/rule_results/emitted_scv=False/network_used=False); validate_conformance(record, *, config=None, live_hash=None, pinned_hash=PINNED_SCHEMA_SHA256). Offline/deterministic. NO production or dry-run network client in the automated path. Schema-freshness guard refuses to run on hash drift."
+    },
+    "checker": {
+      "model_role": "checker",
+      "model_family": "GPT",
+      "model_target": "gpt-5-class",
+      "verifies": "cross-family re-verification (OPERATING_MODEL §4)",
+      "order": 3,
+      "mandate": "Re-verify per-rule pass/targeted-fail, PHI scan, new-shape pin + freshness-guard refusal on drift, legacy/mixed rejection, and the no-SCV/no-network invariants. Confirm the validator opens no socket and emits only a report."
+    }
+  },
+  "reference_files": [
+    "docs/prd/PRD-09-clinvar-vcep-submission-preparation.md",
+    "docs/reference/clinvar-vcep-primary-sources-2026-07.md",
+    "src/raptor/external/models.py",
+    "src/raptor/external/clinvar_map.py"
+  ],
+  "authorized_outputs": [
+    "src/raptor/external/conformance.py",
+    "configs/external/clinvar_conformance.yaml",
+    "configs/external/clinvar_submission_schema.snapshot.json",
+    "tests/external/test_task_b_conformance.py"
+  ],
+  "acceptance_criteria": ["AC4", "AC5", "AC6", "AC12"],
+  "must_not_edit": ["docs/PROGRAM.md", "docs/STRATEGY.md", "docs/DECISIONS.md", "docs/RISK_REGISTER.md", "src/raptor/packet/**"],
+  "pinned_symbols": {
+    "conformance.py": ["ConformanceConfig", "load_conformance_config", "RuleResult", "ConformanceReport", "validate_conformance", "ConformanceError", "ClinvarShapeError", "PhiDetectedError", "NoScvInvariantError", "SchemaFreshnessError"]
+  },
+  "revised_at": "2026-07-12",
+  "revision_note": "Materialized task-specific three-slot (tester/doer/checker = Gemini/Sonnet/GPT) manifest with <=4 references. Pins frozen §15.4 API surface; disambiguates raise-vs-report; no network client in automated implementation."
+}

@@ -196,8 +196,13 @@ class/tier or threshold re-derivation (BIAS owns thresholds).
 - **FR-C6 — Version-pinned vocabulary + declared limits.** Schema-validated config, **pinned to BIAS
   v3.0.0**, documented limits: BIAS v3.0.0 exposes **no structured source field**, so detection is heuristic
   English-sentence matching; a version bump requires re-deriving the vocabulary. To keep the block
-  fail-closed despite that fragility the config also declares the ADR-0009 `transitive_suspect` set
-  (PM5/PM1/PP2), so those criteria block even if a phrasing evades the markers (CP-2). Whole rationale is
+  fail-closed despite that fragility the config also declares the ADR-0009 `transitive_suspect` set —
+  the **full static-lineage set `PS1, PM5, PM1, PP2, BP1`** (ADR-0009; `bias-lineage` slot 2 §0.6),
+  **not** the earlier `PM5/PM1/PP2`. *Discrepancy resolved:* PS1 and BP1 are ClinVar-comparator-derived
+  and currently scored, and **BP1's rationale carries no ClinVar marker** (`benign_classifiers.get_bp1`;
+  `truncating_gene_to_data` ← `find_missense_pathogenic_genes_and_path_trunc_genes.py`, a ClinVar VCF),
+  so only the transitive net blocks it — omitting PS1/BP1 would leak two scored ClinVar-derived criteria.
+  Those criteria block even if a phrasing evades the markers (CP-2). Whole rationale is
   preserved for the Oracle.
 - **FR-C7 — Standalone CLI/report.** A standalone command runs the audit on the **full BIAS TSV before
   labels/eval**, exits non-zero iff `report.blocked`, and **persists + prints the complete deterministic
@@ -412,7 +417,8 @@ class/tier or threshold re-derivation (BIAS owns thresholds).
   version-pinned**: `bias_version: "3.0.0"`; a `markers:` list (case-insensitive tokens/**bounded** phrases
   tied to BIAS v3.0.0 — e.g. `clinvar`, `vcv`, `clinvar pathogenic rate`, `clinvar benign rate`,
   `independent clinvar submitters` — **no regex wildcard / catch-all**); a `transitive_suspect:` list
-  (`[PM5, PM1, PP2]` — fail-closed, FR-C6); an `oracle_allowed:` list (**empty**, FR-C5). Reuses
+  (`[PS1, PM5, PM1, PP2, BP1]` — the full ADR-0009 static-lineage set, fail-closed, FR-C6; includes BP1,
+  which has no ClinVar marker); an `oracle_allowed:` list (**empty**, FR-C5). Reuses
   `configs/acmg/tsc.yaml::strength_map` + `configs/eval/tsc2.yaml::automatable_criteria` for CP-1.
 - **Reference** — reuse `configs/ingest/tsc.yaml::reference_checksums` + the ingest normalizer; no new pin.
 - **Thresholds** — untouched (consumed, never set — GP-3).

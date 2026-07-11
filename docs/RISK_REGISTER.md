@@ -1,6 +1,6 @@
 # RAPTOR — Risk Register (Failure-Mode Analysis)
 
-> **Status:** DRAFT v0.1 · **Owner:** @dronasrinivas (solo — see R-D5 bus-factor) · **Last updated:** 2026-07-08 · **Review cadence:** monthly + on any Sev-High trigger
+> **Status:** DRAFT v0.2 — *vertical TSC/mTOR reset* ([ADR-0010](DECISIONS.md#adr-0010--generic-platform-uniqueness-premise-falsified-vertical-tscmtor-research-evidence-strategy)) · **Owner:** @dronasrinivas (solo — see R-D5 bus-factor) · **Last updated:** 2026-07-10 · **Review cadence:** monthly + on any Sev-High trigger
 >
 > **Format:** standard risk register (ISO 31000-aligned): each risk has a *likelihood*, *impact*,
 > *severity*, **leading indicator (how we detect it early)**, *preventive mitigation*, and
@@ -73,6 +73,7 @@ These are **new work items** the register depends on; without them, many mitigat
 | **R-A9** | Reference-data errors inherited silently (gnomAD/CADD/REVEL/ClinVar) | M | M | 🟡 | Canary; cross-source disagreement | Cross-source sanity checks; record source version | Flag variant; exclude suspect field |
 | **R-A10** | Genome-build / transcript mismatch → silent wrong-variant evidence | M | H | 🟠 | Normalization mismatch counters | Normalization as first-class stage (pinned MANE + build) before scoring/matching | Halt affected variants; renormalize |
 | **R-A11** | Non-reproducibility — same input, different output (LLM nondeterminism) | M | M | 🟠 | Re-run diff on fixed input | Temperature 0; pinned model/prompt versions; deterministic Tier 1/2; store provenance | Mark record non-reproducible; re-extract with pinned config |
+| **R-A12** | **Absence-of-output misread as absence-of-demand or of capability** — zero indexed TSC-specific campaigns / zero VCEP ClinVar submissions read as a market opening or as "no competitor exists" (falsified-premise residue, ADR-0010) | M | M | 🟠 | Strategy claims rest on "no one else"/"they need us" with no named adopter | Treat the 2026-06-16 metric as **narrow + dated** (no *indexed TSC-specific campaign* found + unresolved institutional/adoption question); capable general platforms exist (`docs/reference/competitive-landscape-2026-07.md`); require a **named adopter** before assuming demand (R-F1) | Re-scope to "under-served vertical"; withdraw uniqueness language; validate demand with a real user |
 
 ## 3. B · Data / dependency failures — *external inputs break or bind us legally*
 
@@ -105,7 +106,8 @@ These are **new work items** the register depends on; without them, many mitigat
 | **R-D3** | Documentation rot / internal contradiction | H | M | 🟡 | Milestone doc review | Rubber-duck/checker pass on docs each milestone (done 2026-07-08) | Fix + re-review |
 | **R-D4** | Context loss across sessions/compactions | M | M | 🟡 | Re-litigated decisions reappear | Docs + ADRs + config as durable source of truth; preserve session artifacts | Rebuild context from docs, not memory |
 | **R-D5** | **Bus factor — one operator; illness/burnout/job change** | M | H | 🔴 | Cadence slips; long inactivity | Everything in git + docs + config so project is *resumable by another*; sessions preserved | Documented handoff; graceful pause, not silent death |
-| **R-D6** | Scope creep — building north-star before measurable half is proven (violates GP-2) | M | M | 🟠 | Phase-gate check | Hard phase gates (STRATEGY §7); Tier-1/2 proven before Tier-3 trusted; oracle-first gate for Phase 3 | Re-sequence; shelve premature work |
+| **R-D6** | Scope creep — building the gated mTOR extension before the measurable half is proven (violates GP-2/GP-13) | M | M | 🟠 | Phase-gate check | Hard phase gates (STRATEGY §7); Tier-1/2 proven before Tier-3 trusted; oracle-first gate for Phase 3 | Re-sequence; shelve premature work |
+| **R-D7** | **Vertical-scope creep / vertical-washing** — "all things TSC/mTOR" re-inflates the frozen horizontal scope; generic ambition relabelled as "TSC" (Slot-3 failure mode 1) | M | H | 🟠 | A feature lacks a named user / artifact / validator / falsifier / why-not-generic; >1 mTOR condition opened at once | **GP-13** gate on every feature; mTOR extensions **one at a time**; §9 out-of-scope list; ADR required to widen scope | Reject/park the feature; re-derive scope from GP-13; superseding ADR only if scope truly must change |
 
 ## 6. E · Human / domain-expertise failures
 
@@ -114,6 +116,7 @@ These are **new work items** the register depends on; without them, many mitigat
 | **R-E1** | **No domain oracle ever recruited** | M | H | 🔴 | Phase-3 gate blocked; no candidate by milestone | Oracle-first gate (GP-3): Phase 3 cannot start without one; begin recruitment early | **Graceful degradation:** ship as TSC evidence engine only (narrow version still valuable); shelve cross-linkage |
 | **R-E2** | Operator-as-oracle overreach (non-biologist makes calls beyond competence) | M | H | 🟠 | Oracle audit finds errors | Two-key rule; codified criteria only; explicit "not a biologist" boundary | Restrict operator authority to internal records |
 | **R-E3** | Expert disagrees at the *premise* level (rejects the evidence grammar) | M | M | 🟠 | Oracle review of grammar | Pre-register grammar *with* the geneticist before building the layer | Revise grammar; delay layer until agreed |
+| **R-E4** | **Expert-oracle bottleneck** — expert review is the throughput limit for candidate packets/atlas; the whole vertical is rate-limited by scarce expert time | H | M | 🟠 | Review backlog grows; packets emitted ≫ packets reviewed | Rank for highest expert-value-per-hour; batch/triage; recruit the oracle early (GP-3); success measured in **reviewed** packets, not emitted ones (STRATEGY §8) | Narrow to the highest-yield stratum; defer low-value packets; add reviewers |
 
 ## 7. F · Adoption / sustainability / competitive failures — *even if it works, it dies*
 
@@ -121,7 +124,10 @@ These are **new work items** the register depends on; without them, many mitigat
 |---|---|---|---|---|---|---|---|
 | **R-F1** | **Built but unused / unfunded** | M | H | 🔴 | No named first users; no funding path | Name a wedge (first 10 users); TSC VCEP triage as concrete hook; sustainability answer by Phase 4 | Pivot to the one adopting user segment; reduce scope to what's used |
 | **R-F2** | Sustainability — public tier has no funding model | M | H | 🟠 | Cost > runway | Constrain architecture for near-$0 ops now; explicit Phase-4 funding answer | Narrow to self-funding core; pause public tier |
-| **R-F3** | Competitor/obsolescence — well-funded team ships first, or TSC VCEP suddenly activates | M | M | 🟠 | Landscape monitor (PubMed/ClinVar/GitHub) | Monitor under search protocol; differentiate on auditability + freshness + generalisation | Reposition as the auditable/continuous layer; collaborate |
+| **R-F3** | Competitor/obsolescence — a funded team ships a TSC-capable product first, or the TSC VCEP suddenly activates | M | M | 🟠 | Landscape monitor (the named vendors; PubMed/ClinVar/GitHub) | Uniqueness premise already **withdrawn** (ADR-0010); differentiate on **open benchmark + auditability + freshness**, not on being first/only; monitor `docs/reference/competitive-landscape-2026-07.md` | Reposition as the auditable/continuous TSC layer; collaborate; do **not** abandon TSC assets (competitor-overreaction, Slot-3 failure mode 3) |
+| **R-F4** | **Commoditized generic engine** — a funded generic variant-interpretation platform commoditizes the reused ACMG/LLM layer | M | M | 🟠 | A vendor offers the generic layer cheaper/better than RAPTOR could build | **Reuse/buy** the generic engine (GP-4), don't rebuild it; keep the moat in the **TSC-vertical evidence/atlas**, not generic methodology | Swap in the commodity engine behind the vertical; re-anchor value on TSC evidence |
+| **R-F5** | **Vendor substitution** — a vendor ships a TSC-specific vertical that substitutes RAPTOR outright | L | H | 🟠 | A competitor announces a TSC-specific evidence/curation product | Move first on the open TSC benchmark + auditability + freshness; build curator relationships; stay collaboration-ready | Collaborate/integrate; contribute the open benchmark; narrow to the still-unserved niche |
+| **R-F6** | **Community/adoption dependency** — the vertical needs a TSC curator/research community that may not engage | M | H | 🟠 | No curator/researcher trials packets or the atlas | Name a wedge; make packets low-friction and expert-reviewable; sustainability answer (Phase 4) | Reduce scope to the one engaged user segment; direct outreach |
 
 ## 8. G · Trust / legal / ethical failures — *the trust that is the product*
 
@@ -131,6 +137,7 @@ These are **new work items** the register depends on; without them, many mitigat
 | **R-G2** | Misuse — a hypothesis treated as a clinical decision → downstream harm/liability | M | H | 🟠 | Misuse report; access pattern | Explicit ceilings on every output; "cited hypothesis" labelling; not patient-facing | Access controls; usage terms; incident response |
 | **R-G3** | Regulatory reclassification as SaMD despite disclaimers | L | H | 🟠 | Regulatory guidance shifts | Keep out-of-scope boundary bright (§9); document intended use; no clinical claims | Legal counsel; adjust scope/features |
 | **R-G4** | **Privacy / human-subjects** — patient-level, lab-private, or controlled-access data enters RAPTOR, or any such data is sent to a cloud model | L | H | 🟠 | Data-source audit; ingest allowlist | **GP-10**: public-data-only; any exception is governed (consent/IRB/DUA) with a record; controlled/private data never sent to third-party models | Purge; incident review; notify data owner |
+| **R-G5** | **False authority from polished non-authoritative output** — eval-only candidate packets/atlas *look* authoritative and get treated as classifications (Slot-3 failure mode 2) | M | H | 🟠 | Downstream use of a packet as a verdict; missing non-authoritative labelling | Non-authoritative/eval-only labelling on every candidate direction; no volume/throughput headline (STRATEGY §8); human sign-off before any external classification (§9); "candidate direction ≠ (re)classification" | Withdraw/relabel the output; add ceilings; incident review (links R-A6, H4, H13) |
 
 ---
 

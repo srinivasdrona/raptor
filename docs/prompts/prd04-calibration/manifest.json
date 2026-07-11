@@ -1,0 +1,145 @@
+{
+  "task_id": "prd04-tsc-calibration-batch-plan",
+  "model_role": "planner",
+  "model_family": "Claude",
+  "model_target": "claude-opus-4.8",
+  "intent_block_present": true,
+  "increment": "real-tsc-provisional-calibration-batch",
+  "description": "Plan (contract only) a deterministic real provisional TSC calibration batch built on the frozen PRD-04 packet library from the pinned clinvar_2026-07-07 VUS run. Selection/evidence review only; candidate_direction stays null / POLICY_BLOCKED; conservation asserted fail-loud; outputs outside repo.",
+  "source_commit": "7e03ca4",
+  "source_commit_full": "7e03ca4b55cdf6d1ca4971d75b560af3a44d7520",
+  "branch": "strategy/tsc-mtor-reset",
+  "prd_reference": {
+    "path": "docs/prd/PRD-04-candidate-evidence-packet.md",
+    "sha256": "9799522945d995ea737e0e597d148c4a1fa76792f15719a32db6cba11d6223be",
+    "sections": ["4.6 FR16/FR17", "4.10 FR26", "10.3", "10.5", "11.2"]
+  },
+  "slots": {
+    "slot1": {
+      "path": "docs/prompts/prd04-calibration/slot1-intent.md",
+      "sha256": "01d7f4e59dd4f1ee9127bb57a985e07d98df1dd06ebc21aadeebb2d98e786e84"
+    },
+    "slot2": {
+      "path": "docs/prompts/prd04-calibration/slot2-calibration-contract.md",
+      "sha256": "de5c60eaf18b3f34383abe4ce303f292072b98bd563f7096f678d2f701a3e416"
+    },
+    "slot3": {
+      "path": "docs/prompts/prd04-calibration/slot3-preservation.md",
+      "sha256": "5708419e91571da512605be67ef87292e65e1a615262fb9def022af8bf7bf03f"
+    }
+  },
+  "authorized_planning_outputs": [
+    "docs/prompts/prd04-calibration/slot1-intent.md",
+    "docs/prompts/prd04-calibration/slot2-calibration-contract.md",
+    "docs/prompts/prd04-calibration/slot3-preservation.md",
+    "docs/prompts/prd04-calibration/manifest.json"
+  ],
+  "authorized_implementation_outputs": [
+    "scripts/build_tsc_calibration_batch.py",
+    "tests/packet/test_tsc_calibration_batch.py",
+    "src/raptor/packet/build.py",
+    "tests/packet/test_packet_core.py",
+    "configs/packet/calibration.yaml"
+  ],
+  "authorized_implementation_notes": "configs/packet/calibration.yaml only if a genuinely separate run-artifact/version pin is required; otherwise reuse existing configs. No src/raptor/packet/** edits unless a demonstrated missing reusable API blocks the script (record as a blocker, do not silently patch).",
+  "authorized_data_commit": {
+    "path_glob": "data/census/*.json",
+    "constraint": "exactly one AGGREGATE, NON-IDENTIFYING source-of-record JSON, committed only AFTER the real run + checker; no per-variant SPDI, no patient data",
+    "gate": "script flag --emit-census-record"
+  },
+  "roles": {
+    "tester": {"model": "Gemini 3.1 Pro", "duty": "authors CAL-AC1..CAL-AC8 as executable tests (synthetic oracle + optional real integration) BEFORE implementation; portable, no external data by default"},
+    "doer": {"model": "Claude Sonnet 5", "duty": "implements scripts/build_tsc_calibration_batch.py to pass the tests; may add, never weaken; reuses frozen packet/scorer/eval public APIs"},
+    "checker": {"model": "GPT-5.5", "duty": "re-verifies conservation, redaction, determinism, boundary, and eval-only reuse; the real run occurs only after this checker passes"}
+  },
+  "public_functions": [
+    "load_manifest(path) -> tuple[ManifestEntry, ...]",
+    "reproduce_census_strata(bias_rows, scorer_config, eval_config) -> tuple[StratumEntry, ...]",
+    "assert_source_of_record_conservation(manifest, bias_rows, strata, census_stats, provenance) -> None",
+    "build_scorer_provenance(bias_row, run_pins) -> ScorerProvenance",
+    "derive_quality_flags(bias_row, identity, calls) -> tuple[str, ...]",
+    "build_packet_input(identity, bias_row, stratum_entry, packet_config, run_pins) -> PacketInput",
+    "build_candidate_universe(strata, bias_rows, manifest, packet_config, run_pins) -> tuple[CandidateEvidencePacket, ...]",
+    "select_batch(universe, selection_config) -> Batch",
+    "assert_batch_coverage(batch, strata) -> None",
+    "canonical_json(obj) -> str",
+    "assert_census_record_boundary(path) -> Path",
+    "write_outputs(output_dir, universe, batch, render_config, manifests) -> None",
+    "build_batch_manifest(...) -> dict",
+    "build_census_source_of_record(...) -> dict",
+    "main(argv=None) -> int"
+  ],
+  "reused_public_apis": [
+    "raptor.scorer.bias_source.BiasTsvSource",
+    "raptor.scorer.config.load_config",
+    "raptor.scorer.parse.parse_rationale",
+    "raptor.eval.config.load_config",
+    "raptor.eval.combine.implied_direction (script scope only, outside src/raptor/packet)",
+    "raptor.eval.lineage_policy.load_lineage_policy",
+    "raptor.packet.config.load_packet_config",
+    "raptor.packet.config.load_selection_config",
+    "raptor.packet.config.load_render_config",
+    "raptor.packet.config.load_narrative_catalog",
+    "raptor.packet.build.build_packet",
+    "raptor.packet.queue.select_calibration_batch",
+    "raptor.packet.queue.coverage_report",
+    "raptor.packet.queue.build_queue_index",
+    "raptor.packet.render.render_markdown",
+    "raptor.packet.model.redact_for_first_pass"
+  ],
+  "cli": {
+    "command": "python scripts/build_tsc_calibration_batch.py",
+    "required_args": ["--manifest", "--bias-tsv", "--provenance", "--census-stats", "--lineage-audit", "--packet-config", "--selection-config", "--render-config", "--narrative-catalog", "--scorer-config", "--eval-config", "--output-dir"],
+    "optional_args": ["--aavc-comparator", "--emit-census-record"],
+    "output_dir_constraint": "REQUIRED; must be outside the repository tree; no patient data",
+    "exit_contract": "ConservationError or coverage/boundary failure -> non-zero exit before/without partial output"
+  },
+  "conservation_pins": {
+    "manifest_identities": 6618,
+    "bias_rows": 6618,
+    "queue_candidate_LP_review": 238,
+    "queue_candidate_LB_review": 1333,
+    "candidate_universe": 1571,
+    "lp_patterns": 20,
+    "lb_patterns": 10,
+    "total_patterns": 30,
+    "both_direction_variants": 3739,
+    "largest_lb_pattern_members": 1222,
+    "bias_version": "3.0.0",
+    "bias_commit": "ade13f206f3e2c2efe3ec92715d974645fc8da8f",
+    "nirvana_version": "3.18.1",
+    "input_vcf_sha256": "3fff6de7ae9b2b202642e498c4c49532cf1aaf5c2734f0e8341d5ace88fa3a09",
+    "bias_tsv_sha256": "0a55cab470d3de93f06cd87ba30957fd1674c0ae2098ec86350f5aaac1a1162e",
+    "source_snapshot": "clinvar_2026-07-07"
+  },
+  "acceptance_criteria": ["CAL-AC1", "CAL-AC2", "CAL-AC3", "CAL-AC4", "CAL-AC5", "CAL-AC6", "CAL-AC7", "CAL-AC8"],
+  "hard_boundaries": [
+    "candidate_direction=null, null_reason=production_policy_unapproved, review_state=POLICY_BLOCKED for every packet",
+    "implied_direction reused ONLY outside src/raptor/packet; basis eval_only_census_selection_metadata",
+    "fail-loud source-of-record conservation before any output",
+    "BIAS BP4/PP3 aggregation defect pinned as a limitation, never silently corrected",
+    "every criterion carries exactly one real ScorerProvenance; a BIAS row is never a PrimaryEvidenceRef; primary_grounding=absent",
+    "select_calibration_batch over the 1,571 candidate universe; coverage over populated observed atoms only; no Cartesian cells",
+    "outputs outside repo under required --output-dir; no patient data",
+    "FIRST_PASS + queue carry no direction/stratum/AAVC; operator manifest may carry census_selection_stratum",
+    "AAVC omitted unless a pinned input is supplied; no network call",
+    "no benchmark labels/knowns read; no submission/public worklist"
+  ],
+  "limitations": [
+    "bias_bp4_pp3_aggregation_defect",
+    "aavc_comparator_omitted",
+    "candidate_direction_null_policy_blocked",
+    "primary_grounding_absent",
+    "transcript_version_drift",
+    "nthl1_misannotation"
+  ],
+  "blockers": [
+    "STRENGTH-LABELING PIN: the doer must pin the exact (strength_map, tavtigian_points, tavtigian_cutoffs, automatable_criteria) tuple that reproduces the census 238 LP + 1,333 LB counts and the 20 + 10 exact-strength pattern catalog (e.g. BP4 int 3 -> strong yielding {BP4 Strong, PM2 Supporting} = -3). If no pinned config tuple reproduces the census, resolve against the census oracle; do not silently re-label.",
+    "EXTERNAL ARTIFACT AVAILABILITY: the real run requires the raptor-data manifest + BIAS TSV + provenance at CLI-supplied paths; the unit test must not depend on them (synthetic oracle + env/path-gated real integration).",
+    "MISSING REUSABLE API (conditional): if assembling per-criterion PacketCriterionInput reveals a missing public helper in the frozen packet library, record it here before any src/raptor/packet edit."
+  ],
+  "diff_scope": {
+    "this_planning_task": ["docs/prompts/prd04-calibration/**"],
+    "later_implementation": ["scripts/build_tsc_calibration_batch.py", "tests/packet/test_tsc_calibration_batch.py", "configs/packet/calibration.yaml (conditional)", "data/census/<aggregate-non-identifying>.json (after real run + checker)"]
+  }
+}

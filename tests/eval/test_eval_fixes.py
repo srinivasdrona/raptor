@@ -18,7 +18,7 @@ from raptor.eval.benchmark import build_benchmark
 from raptor.eval.split import split_benchmark
 from raptor.eval.model import BenchmarkRow, Metrics
 from raptor.eval.harness import run_eval
-from conftest import make_eval_config, make_labeled, evidence_for
+from conftest import make_eval_config, make_labeled, evidence_for, oracle_thresholds_for, with_point_estimate_lb
 
 
 # --------------------------------------------------------------------------
@@ -51,31 +51,42 @@ def _write_config(tmp_path, **overrides) -> str:
 def test_gate_nan_metric_never_passes():
     """A NaN metric must NOT satisfy a threshold (`nan < x` is False in Python) —
     the gate must treat non-finite as unmet, never PASS."""
-    cfg = make_eval_config(oracle_thresholds={"precision": 0.9, "recall": 0.9})
-    metrics = {"missense": Metrics(float("nan"), float("nan"), float("nan"), {}, "missense", True)}
+    cfg = make_eval_config(oracle_thresholds=oracle_thresholds_for(0.9, 0.9))
+    metrics = {"missense": with_point_estimate_lb(Metrics(float("nan"), float("nan"), float("nan"), {}, "missense", True))}
     d = decide_gate(metrics, cfg)
     assert d.status != "PASS"
     assert d.vus_authorized is False
 
 
 def test_gate_unknown_threshold_key_never_passes():
-    """A threshold naming a non-metric attribute (e.g. 'gating') must not be read
-    off the Metrics object and silently satisfied — never a PASS."""
-    cfg = make_eval_config(oracle_thresholds={"gating": 0.9})
-    metrics = {"missense": Metrics(1.0, 1.0, 1.0, {}, "missense", True)}
+    """A stratum spec missing the required `precision`/`recall` keys entirely
+    (the new nested schema has no free-form metric-name lookup to spoof —
+    only the fixed precision/recall fields gate) must never be silently
+    satisfied — never a PASS."""
+    cfg = make_eval_config(oracle_thresholds={
+        "confidence": 0.95,
+        "strata": {"missense": {"gating": True, "directions": ["pathogenic", "benign"]}},
+    })
+    metrics = {"missense": with_point_estimate_lb(Metrics(1.0, 1.0, 1.0, {}, "missense", True))}
     d = decide_gate(metrics, cfg)
     assert d.status != "PASS"
     assert d.vus_authorized is False
 
 
 def test_config_rejects_invalid_oracle_thresholds(tmp_path):
-    """load_config must fail loud on an unknown threshold metric, a non-finite
-    value, or an out-of-[0,1] value (else a bad pin reaches the gate)."""
-    for bad in ({"gating": 0.9}, {"precision": float("nan")}, {"precision": 1.5}, {"recall": -0.1}):
+    """load_config must fail loud on a malformed nested threshold block —
+    missing strata/missense, a non-finite value, or an out-of-(0,1] value
+    (else a bad pin reaches the gate)."""
+    for bad in (
+        {"confidence": 0.95, "strata": {}},
+        {"confidence": 0.95, "strata": {"missense": {"precision": float("nan"), "recall": 0.85, "gating": True}}},
+        {"confidence": 0.95, "strata": {"missense": {"precision": 1.5, "recall": 0.85, "gating": True}}},
+        {"confidence": 0.95, "strata": {"missense": {"precision": 0.9, "recall": -0.1, "gating": True}}},
+    ):
         with pytest.raises(ConfigError):
             load_config(_write_config(tmp_path, oracle_thresholds=bad))
-    # a valid threshold block still loads
-    load_config(_write_config(tmp_path, oracle_thresholds={"precision": 0.9, "recall": 0.9}))
+    # a valid, pinned threshold block still loads
+    load_config(_write_config(tmp_path, oracle_thresholds=oracle_thresholds_for(0.90, 0.85)))
 
 
 # --------------------------------------------------------------------------

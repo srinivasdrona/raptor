@@ -1,0 +1,126 @@
+{
+  "status": "internal_non_authoritative_evidence_census",
+  "snapshot": "clinvar_2026-07-07",
+  "corpus": {
+    "total_vus": 6618,
+    "TSC1": 2249,
+    "TSC2": 4369,
+    "missense": 5645,
+    "other": 893,
+    "truncating": 80
+  },
+  "run_integrity": {
+    "input_vcf_sha256": "3fff6de7ae9b2b202642e498c4c49532cf1aaf5c2734f0e8341d5ace88fa3a09",
+    "bias_tsv_sha256": "0a55cab470d3de93f06cd87ba30957fd1674c0ae2098ec86350f5aaac1a1162e",
+    "bias_rows": 6618,
+    "unique_raw_keys": 6618,
+    "parser_records": 6618,
+    "parser_contract_errors": 0,
+    "nirvana_seconds": 17.04,
+    "bias_seconds": 35.04
+  },
+  "worker": {
+    "nirvana": "3.18.1-0-g05f88047",
+    "bias": "3.0.0",
+    "bias_commit": "ade13f206f3e2c2efe3ec92715d974645fc8da8f"
+  },
+  "bias_gene_transcript": {
+    "TSC1|NM_000368.4": 2249,
+    "TSC2|NM_000548.4": 4339,
+    "NTHL1|NM_002528.6": 30
+  },
+  "raw_bias_combined_output": {
+    "uncertain": 6401,
+    "likely_benign": 86,
+    "benign": 5,
+    "likely_pathogenic": 90,
+    "pathogenic": 36
+  },
+  "raptor_current_policy_internal_direction": {
+    "candidate_LP_review": 238,
+    "candidate_LB_review": 1333,
+    "no_deterministic_resolution": 5017,
+    "annotation_manual_review": 30
+  },
+  "direction_by_bias_consequence_group": {
+    "missense": {
+      "candidate_LP_review": 81,
+      "candidate_LB_review": 1196,
+      "no_deterministic_resolution": 4377
+    },
+    "predicted_loss_of_function": {
+      "candidate_LP_review": 145,
+      "candidate_LB_review": 0,
+      "no_deterministic_resolution": 2
+    },
+    "other": {
+      "candidate_LP_review": 12,
+      "candidate_LB_review": 137,
+      "no_deterministic_resolution": 638
+    }
+  },
+  "criterion_firing": {
+    "BA1": 1,
+    "BP3": 7,
+    "BP4": 3696,
+    "BP7": 127,
+    "BS2": 34,
+    "PM2": 6609,
+    "PM4": 176,
+    "PM5": 147,
+    "PP3": 2226,
+    "PP5": 3,
+    "PS1": 110,
+    "PS3": 46,
+    "PVS1": 150
+  },
+  "evidence_topology": {
+    "included_evidence_count_per_variant": {
+      "1": 796,
+      "2": 5044,
+      "3": 747,
+      "4": 31
+    },
+    "both_pathogenic_and_benign_directions": 3739,
+    "pathogenic_direction_only": 2870,
+    "benign_direction_only": 9
+  },
+  "candidate_pattern_compression": {
+    "candidate_LP_review": {
+      "variants": 238,
+      "exact_strength_patterns": 20,
+      "patterns_covering_90_percent": 6,
+      "largest_pattern": {
+        "criteria": [
+          "PM2 Supporting",
+          "PVS1 Very Strong"
+        ],
+        "points": 9,
+        "variants": 115
+      }
+    },
+    "candidate_LB_review": {
+      "variants": 1333,
+      "exact_strength_patterns": 10,
+      "patterns_covering_90_percent": 1,
+      "largest_pattern": {
+        "criteria": [
+          "BP4 Strong",
+          "PM2 Supporting"
+        ],
+        "points": -3,
+        "variants": 1222
+      }
+    }
+  },
+  "known_policy_gaps": [
+    "candidate directions use the eval-only Tavtigian combiner and are not classifications",
+    "PS1 and PM5 use ClinVar-derived comparator resources; validation requires held-out masking",
+    "BS2 fired 34 times but is omitted from current RAPTOR policy without a recorded rationale",
+    "PS3 fired 46 times but remains deferred pending assay-validity review",
+    "30 TSC2-region inputs were annotated as NTHL1 and require manual resolution",
+    "BIAS emits transcript versions .4 while RAPTOR production config pins .5",
+    "RAPTOR production scorer currently scopes genes to TSC2 only",
+    "no candidate worklist may be released before leakage-safe validation and expert sign-off"
+  ]
+}

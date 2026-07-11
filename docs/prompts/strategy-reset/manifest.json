@@ -1,0 +1,29 @@
+{
+  "task_id": "tsc-mtor-vertical-strategy-reset",
+  "model_role": "strategy-writer",
+  "model_family": "Claude",
+  "model_target": "claude-opus-4.8",
+  "intent_block_present": true,
+  "slots": {
+    "slot1": {
+      "path": "docs/prompts/strategy-reset/slot1-writer.md",
+      "sha256": "25cef23c10963a5932469caba9043111b7b6160f7341498607f90d26db44fa6d"
+    },
+    "slot2": {
+      "path": "docs/prompts/strategy-reset/slot2-reset-contract.md",
+      "sha256": "fc2a6997b47b14124441170eb001be5c288baebcf09adcce71bad9a951af0455"
+    },
+    "slot3": {
+      "path": "docs/prompts/strategy-reset/slot3-preservation.md",
+      "sha256": "198e0550088ba98cbf4c22a243f348b8e3f72c8186f0f174deb1c4573f54509c"
+    }
+  },
+  "source_commit": "5a307df",
+  "authorized_outputs": [
+    "docs/STRATEGY.md",
+    "docs/PROGRAM.md",
+    "docs/DECISIONS.md",
+    "docs/RISK_REGISTER.md",
+    "docs/reference/competitive-landscape-2026-07.md"
+  ]
+}

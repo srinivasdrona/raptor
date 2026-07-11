@@ -1,0 +1,64 @@
+{
+  "task_id": "external-pathway-clinvar-map",
+  "sequence": "A",
+  "goal": "Config-driven RAPTOR->ClinVar field mapping + do-not-map deny-list (new germlineSubmission shape only)",
+  "depends_on": [],
+  "planning_only": true,
+  "no_submission": true,
+  "no_contact": true,
+  "no_push": true,
+  "no_production_classification": true,
+  "no_network": true,
+  "produces_scv": false,
+  "branch": "track/external-pathway-2026-07",
+  "worktree": "D:/AIProjects/raptor-worktrees/external-pathway",
+  "source_commit": "e52e855",
+  "pinned_contract_ref": "docs/prd/PRD-09-clinvar-vcep-submission-preparation.md §15.1-§15.3 (+ §16 tester-correction)",
+  "slots": {
+    "tester": {
+      "model_role": "tester",
+      "model_family": "Gemini",
+      "model_target": "gemini-2.5-pro",
+      "authors": "tests/external/test_task_a_mapping.py",
+      "order": 1,
+      "mandate": "Author AC1/AC2/AC3/AC10/AC12/AC13 tests BEFORE the doer, against the frozen §15 contract. NO MagicMock of external types; NO invented symbols (no DecisionEvent; use DecisionLogRecord/DecisionHistory). map_to_clinvar returns MappingResult; classification asserted only via a real VariantSignoff sourced from a verified DecisionHistory; deny-list is structural (no allow_* kwargs)."
+    },
+    "doer": {
+      "model_role": "doer",
+      "model_family": "Sonnet",
+      "model_target": "claude-sonnet-4.5",
+      "implements": ["src/raptor/external/__init__.py", "src/raptor/external/models.py", "src/raptor/external/clinvar_map.py", "configs/external/clinvar_field_map.yaml"],
+      "order": 2,
+      "mandate": "Implement the frozen §15.1-§15.3 surface exactly: ExternalError hierarchy (no catch-all); ClinvarMapConfig strict loader (unknown key -> ClinvarConfigError; schema_pin_sha256 == PINNED_SCHEMA_SHA256); VariantSignoff.from_decision_history; MappingResult; map_to_clinvar(packet, config, *, signoff=None) -> MappingResult; classification ONLY from signoff.classification; resolved-literature-only citation mapping. Pure function, deterministic, new germlineSubmission shape only."
+    },
+    "checker": {
+      "model_role": "checker",
+      "model_family": "GPT",
+      "model_target": "gpt-5-class",
+      "verifies": "cross-family re-verification (OPERATING_MODEL §4)",
+      "order": 3,
+      "mandate": "Re-verify determinism + fail-loud, direction!=classification, deny-list fail-loud, new-shape-only, non-authoritative stamping + 1-star preview. Confirm no candidate_direction-derived classification, no legacy/mixed container, no SCV, no network."
+    }
+  },
+  "reference_files": [
+    "docs/prd/PRD-09-clinvar-vcep-submission-preparation.md",
+    "docs/reference/clinvar-vcep-primary-sources-2026-07.md",
+    "src/raptor/packet/model.py",
+    "src/raptor/packet/decisions.py"
+  ],
+  "authorized_outputs": [
+    "src/raptor/external/__init__.py",
+    "src/raptor/external/models.py",
+    "src/raptor/external/clinvar_map.py",
+    "configs/external/clinvar_field_map.yaml",
+    "tests/external/test_task_a_mapping.py"
+  ],
+  "acceptance_criteria": ["AC1", "AC2", "AC3", "AC10", "AC12", "AC13"],
+  "must_not_edit": ["docs/PROGRAM.md", "docs/STRATEGY.md", "docs/DECISIONS.md", "docs/RISK_REGISTER.md", "src/raptor/packet/**"],
+  "pinned_symbols": {
+    "models.py": ["PINNED_SCHEMA_SHA256", "GERMLINE_TERM_ENUM", "DIRECTION_CLASSIFICATION_MAP", "CONDITION_DB_ENUM", "CITATION_DB_ENUM", "SCV_ACCESSION_RE", "ExternalError", "ClinvarConfigError", "ClinvarConditionRef", "AssertionCriteriaRef", "ClinvarCitation", "ClinvarMapConfig", "VariantSignoff", "MappingStatus", "MappingResult", "load_clinvar_map_config"],
+    "clinvar_map.py": ["map_to_clinvar", "ClinvarMappingError", "ClinvarDenyListError", "ClinvarSignoffError"]
+  },
+  "revised_at": "2026-07-12",
+  "revision_note": "Materialized task-specific three-slot (tester/doer/checker = Gemini/Sonnet/GPT) manifest with <=4 references. Pins frozen §15 API surface so no MagicMock/invention is possible."
+}

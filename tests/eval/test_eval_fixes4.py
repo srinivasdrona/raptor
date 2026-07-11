@@ -30,7 +30,7 @@ from raptor.eval.gate import decide_gate
 from raptor.eval.metrics import compute_metrics
 from raptor.eval.benchmark import build_benchmark
 from raptor.eval.model import BenchmarkRow, ImpliedCall, Metrics
-from conftest import make_eval_config, make_labeled
+from conftest import make_eval_config, make_labeled, oracle_thresholds_for, with_point_estimate_lb
 
 
 def _valid_raw() -> dict:
@@ -89,7 +89,7 @@ def test_gate_rejects_call_everything_pathogenic():
          [BenchmarkRow(f"b{i}", "B", "missense") for i in range(2)]
     implied = [ImpliedCall(f"p{i}", "LP", 8) for i in range(18)] + \
               [ImpliedCall(f"b{i}", "LP", 8) for i in range(2)]  # benign mislabeled LP
-    cfg = make_eval_config(oracle_thresholds={"precision": 0.85, "recall": 0.85}, min_count_per_class=2)
+    cfg = make_eval_config(oracle_thresholds=oracle_thresholds_for(0.85, 0.85), min_count_per_class=2)
     metrics = compute_metrics(implied, bm, cfg)
     m = metrics["missense"]
     assert m.precision >= 0.85 and m.recall == 1.0     # pathogenic-side looks fine...
@@ -100,12 +100,16 @@ def test_gate_rejects_call_everything_pathogenic():
 
 
 def test_gate_passes_with_good_both_direction_discrimination():
-    """Control: a model that discriminates BOTH directions well still PASSes."""
-    bm = [BenchmarkRow(f"p{i}", "P", "missense") for i in range(10)] + \
-         [BenchmarkRow(f"b{i}", "B", "missense") for i in range(10)]
-    implied = [ImpliedCall(f"p{i}", "LP", 8) for i in range(10)] + \
-              [ImpliedCall(f"b{i}", "LB", -8) for i in range(10)]
-    cfg = make_eval_config(oracle_thresholds={"precision": 0.9, "recall": 0.9}, min_count_per_class=10)
+    """Control: a model that discriminates BOTH directions well still PASSes. n=40
+    per class (not 10) -- under the real Clopper-Pearson LOWER bound (gate-fidelity,
+    Arm C) a perfect n=10 point estimate (LB(10,10)~=0.6915) no longer clears a 0.90
+    threshold; n=40 (LB(40,40)~=0.9119) genuinely does. This is the intended effect
+    of the fix, not a weakening -- an underpowered "perfect" run must no longer pass."""
+    bm = [BenchmarkRow(f"p{i}", "P", "missense") for i in range(40)] + \
+         [BenchmarkRow(f"b{i}", "B", "missense") for i in range(40)]
+    implied = [ImpliedCall(f"p{i}", "LP", 8) for i in range(40)] + \
+              [ImpliedCall(f"b{i}", "LB", -8) for i in range(40)]
+    cfg = make_eval_config(oracle_thresholds=oracle_thresholds_for(0.9, 0.9), min_count_per_class=36)
     d = decide_gate(compute_metrics(implied, bm, cfg), cfg)
     assert d.status == "PASS" and d.vus_authorized is True
 
@@ -124,9 +128,9 @@ def test_gate_fails_closed_on_nonpositive_min_count():
     """Defense-in-depth: a hand-built config with min_count<=0 disables the coverage
     floor -- the gate must refuse to authorize (a benign-abstained stratum must not
     slip through)."""
-    cfg = make_eval_config(oracle_thresholds={"precision": 0.9, "recall": 0.9}, min_count_per_class=0)
+    cfg = make_eval_config(oracle_thresholds=oracle_thresholds_for(0.9, 0.9), min_count_per_class=0)
     counts = _full_counts(path_called=20, benign_called=0)  # benign abstained-out
-    metrics = {"missense": Metrics(1.0, 1.0, 1.0, counts, "missense", gating=True)}
+    metrics = {"missense": with_point_estimate_lb(Metrics(1.0, 1.0, 1.0, counts, "missense", gating=True))}
     d = decide_gate(metrics, cfg)
     assert d.status != "PASS"
     assert d.vus_authorized is False
@@ -178,9 +182,9 @@ def test_benchmark_accepts_matching_snapshot():
 def test_gate_fail_closed_on_missing_coverage_counts():
     """The gate must not PASS a Metrics that lacks per-class CALLED coverage counts:
     it cannot confirm the model was actually measured on both classes."""
-    cfg = make_eval_config(oracle_thresholds={"precision": 0.9, "recall": 0.9})
-    metrics = {"missense": Metrics(0.95, 0.95, 0.95, {}, "missense", gating=True,
-                                   benign_precision=0.95, benign_recall=0.95)}
+    cfg = make_eval_config(oracle_thresholds=oracle_thresholds_for(0.9, 0.9), min_count_per_class=10)
+    metrics = {"missense": with_point_estimate_lb(Metrics(0.95, 0.95, 0.95, {}, "missense", gating=True,
+                                   benign_precision=0.95, benign_recall=0.95))}
     d = decide_gate(metrics, cfg)
     assert d.status != "PASS"
     assert d.vus_authorized is False

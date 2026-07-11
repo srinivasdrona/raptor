@@ -1,0 +1,407 @@
+# PRD-08 Task C / ADR-0009 — BIAS criterion lineage policy (bias-lineage slot 2).
+#
+# Single machine-readable source of truth for: (a) which of the 28 canonical
+# ACMG-2015 codes the pinned BIAS-3.0.0 engine can actually emit a non-zero
+# score for ("can_fire", statically derived from the `get_*` classifier
+# bodies — never from census incidence or RAPTOR's own included/automatable
+# config), (b) the 9 codes that are BIAS-internal stubs and can never fire
+# from BIAS's own evaluators ("structurally_forbidden"), (c) the data-lineage
+# classification + validation/production disposition of every can-fire
+# criterion, and (d) the version-pinned ClinVar-marker vocabulary used only
+# as an ADVISORY corroboration signal (`detection_source`), never as lineage
+# or disposition authority.
+#
+# ARM'S-LENGTH BOUNDARY (ADR-0007, non-negotiable): this file carries only
+# lineage FACTS and source CITATIONS (file · symbol · lines) about the
+# pinned BIAS-2015 (AGPL) source at commit `ade13f206f3e2c2efe3ec92715d974645fc8da8f`.
+# It never copies BIAS source text, never imports `bias_2015`, and never
+# opens a label/benchmark/held-out file. The census
+# (`data/census/tsc_vus_clinvar_2026-07-07_stats.json`) is incidence
+# ANNOTATION ONLY and is not read by this file or its loader.
+
+bias_version: "3.0.0"
+bias_commit: "ade13f206f3e2c2efe3ec92715d974645fc8da8f"
+
+# Exhaustive, fail-closed taxonomy of data-lineage classes (§0.6). Any
+# `lineage_class` value outside this enum must raise at load time.
+lineage_classes:
+  - label_independent_population
+  - label_independent_reference_or_predictor
+  - same_variant_clinvar
+  - cross_variant_clinvar
+  - aggregate_clinvar
+  - literature_unvalidated
+  - manual_or_external_input
+  - unknown
+
+# Exhaustive, fail-closed disposition enum (§1.1). `deferred` always
+# requires a named `decision_dependency` on the owning record (§1.2).
+dispositions:
+  - allowed
+  - requires_heldout_mask
+  - forbidden
+  - deferred
+
+# All 28 canonical ACMG-2015 rationale slots BIAS always emits (§0.1).
+all_criteria:
+  - PVS1
+  - PS1
+  - PS2
+  - PS3
+  - PS4
+  - PM1
+  - PM2
+  - PM3
+  - PM4
+  - PM5
+  - PM6
+  - PP1
+  - PP2
+  - PP3
+  - PP4
+  - PP5
+  - BA1
+  - BS1
+  - BS2
+  - BS3
+  - BS4
+  - BP1
+  - BP2
+  - BP3
+  - BP4
+  - BP5
+  - BP6
+  - BP7
+
+# Criteria whose BIAS-3.0.0 evaluator can return a non-zero score (§0.2) --
+# the static can-fire oracle. 19 codes. NOT RAPTOR's registry, NOT the
+# census fired-set (13); those are reconciled against this, never used to
+# derive it.
+can_fire:
+  - PVS1
+  - PS1
+  - PS3
+  - PS4
+  - PM1
+  - PM2
+  - PM4
+  - PM5
+  - PP2
+  - PP3
+  - PP5
+  - BA1
+  - BS1
+  - BS2
+  - BP1
+  - BP3
+  - BP4
+  - BP6
+  - BP7
+
+# BIAS-internal stubs (§0.3): the `get_*` evaluator body unconditionally
+# returns `(0, "")`. These 9 codes can never fire from BIAS's own internal
+# evaluators; a non-zero firing can only arrive via the external
+# supplemental-call injection path, which is fail-closed (never a no-op).
+structurally_forbidden:
+  - criterion: PS2
+    reason: "BIAS-internal stub -- get_ps2 unconditionally returns (0, ''); only a supplemental external call could ever set it, which is fail-closed, not silently impossible."
+    bias_anchor: "pathogenic_classifiers.get_ps2 (L198)"
+  - criterion: PM3
+    reason: "BIAS-internal stub -- get_pm3 unconditionally returns (0, '')."
+    bias_anchor: "pathogenic_classifiers.get_pm3 (L501)"
+  - criterion: PM6
+    reason: "BIAS-internal stub -- get_pm6 unconditionally returns (0, '')."
+    bias_anchor: "pathogenic_classifiers.get_pm6 (L689)"
+  - criterion: PP1
+    reason: "BIAS-internal stub -- get_pp1 unconditionally returns (0, '')."
+    bias_anchor: "pathogenic_classifiers.get_pp1 (L759)"
+  - criterion: PP4
+    reason: "BIAS-internal stub -- get_pp4 unconditionally returns (0, '')."
+    bias_anchor: "pathogenic_classifiers.get_pp4 (L968)"
+  - criterion: BS3
+    reason: "BIAS-internal stub -- get_bs3 unconditionally returns (0, ''); phantom in RAPTOR's pre-correction included_criteria/acmg_criteria registry (D2)."
+    bias_anchor: "benign_classifiers.get_bs3 (L178)"
+  - criterion: BS4
+    reason: "BIAS-internal stub -- get_bs4 unconditionally returns (0, ''); phantom in RAPTOR's pre-correction included_criteria/acmg_criteria registry (D2)."
+    bias_anchor: "benign_classifiers.get_bs4 (L189)"
+  - criterion: BP2
+    reason: "BIAS-internal stub -- get_bp2 unconditionally returns (0, '')."
+    bias_anchor: "benign_classifiers.get_bp2 (L270)"
+  - criterion: BP5
+    reason: "BIAS-internal stub -- get_bp5 unconditionally returns (0, '')."
+    bias_anchor: "benign_classifiers.get_bp5 (L518)"
+
+# Version-pinned (bias_version 3.0.0) ClinVar-marker vocabulary -- the
+# SINGLE source of truth (there is no separate `clinvar_markers.yaml`).
+# Case-insensitive, bounded literal phrases only -- no regex/wildcard.
+# `detection_source` (lineage_audit.py) is ADVISORY: a match here can only
+# raise suspicion, never clear a statically-suspect criterion (BP1 has no
+# marker and still blocks via the transitive_suspect net).
+markers:
+  - "clinvar"
+  - "vcv"
+  - "clinvar pathogenic rate"
+  - "clinvar benign rate"
+  - "independent clinvar submitters"
+
+# Fail-closed net: every can-fire criterion whose lineage_class is
+# cross_variant_clinvar or aggregate_clinvar (derived; must match the
+# records below exactly, or the registry check raises `transitive_set_drift`).
+# Includes BP1 -- its rationale text carries no ClinVar marker, so only
+# this static net (not marker-scanning) catches it (D3).
+transitive_suspect:
+  - PS1
+  - PM5
+  - PM1
+  - PP2
+  - BP1
+
+# No Oracle-authorized exceptions yet. Must never contain a wildcard.
+oracle_allowed: []
+
+# One record per can-fire criterion (exactly the 19 of `can_fire`).
+records:
+  PVS1:
+    lineage_class: label_independent_reference_or_predictor
+    source_dependencies:
+      direct: ["gnomAD LOEUF", "VEP/Nirvana consequence", "ABSplice PVS1_PP3_BP4_BP7_splice_dict"]
+      transitive: []
+    bias_anchors: ["pathogenic_classifiers.get_pvs (L6-114)"]
+    data_artifacts: ["find_lof_genes.py"]
+    validation_disposition: allowed
+    production_disposition: allowed
+    rationale_markers: []
+    notes: "Null-variant / LOF prediction -- gnomAD constraint + consequence + splice predictor, no ClinVar dependency."
+    decision_dependency: ""
+  PS1:
+    lineage_class: cross_variant_clinvar
+    source_dependencies:
+      direct: []
+      transitive: ["PS1_gene_mut_to_data (ClinVar Nirvana JSON)"]
+    bias_anchors: ["pathogenic_classifiers.get_ps1 (L146-196)"]
+    data_artifacts: ["generate_pathogenic_aa_list.py"]
+    validation_disposition: requires_heldout_mask
+    production_disposition: allowed
+    rationale_markers: []
+    notes: "Same amino-acid change previously reported pathogenic -- comparator built from ClinVar; rationale phrasing may lack a literal marker token (AA-change phrasing)."
+    decision_dependency: ""
+  PS3:
+    lineage_class: literature_unvalidated
+    source_dependencies:
+      direct: ["AVADA full-text ML extraction (~50% precision noted in source)"]
+      transitive: []
+    bias_anchors: ["pathogenic_classifiers.get_ps3 (L213-268)"]
+    data_artifacts: ["extract_from_avada_track.py"]
+    validation_disposition: deferred
+    production_disposition: deferred
+    rationale_markers: []
+    notes: "Functional-assay literature evidence via AVADA extraction -- no ClinVar dependency, but assay-validity review is a separate owed decision (D1)."
+    decision_dependency: "assay-validity-review"
+    decision_rationale: "Automated PS3 remains deferred because AVADA-derived literature extraction is unvalidated for criterion-level assay strength and no qualified assay-validity adjudication has approved these firings."
+  PS4:
+    lineage_class: same_variant_clinvar
+    source_dependencies:
+      direct: ["PS4_clinvar_submitter_counts (ClinVar submission_summary; own-variant submitter fallback when no GWAS)"]
+      transitive: []
+    bias_anchors: ["pathogenic_classifiers.get_ps4 (L271-343)"]
+    data_artifacts: ["generate_clinvar_submitter_counts.py"]
+    validation_disposition: forbidden
+    production_disposition: forbidden
+    rationale_markers: ["independent clinvar submitters"]
+    notes: "R-A2 direct copy -- BIAS-3.0.0 falls back to counting ClinVar submitters for the variant's own assertion when no GWAS/case-control data exists."
+    decision_dependency: ""
+  PM1:
+    lineage_class: aggregate_clinvar
+    source_dependencies:
+      direct: []
+      transitive: ["chrom_to_pathogenic_domain (ClinVar VCF + UniProt)"]
+    bias_anchors: ["pathogenic_classifiers.get_pm1 (L384-433)"]
+    data_artifacts: ["generate_domain_lists.py"]
+    validation_disposition: requires_heldout_mask
+    production_disposition: allowed
+    rationale_markers: []
+    notes: "Domain-level ClinVar pathogenic rate -- transitive/aggregate ClinVar comparator (ADR-0009)."
+    decision_dependency: ""
+  PM2:
+    lineage_class: label_independent_population
+    source_dependencies:
+      direct: ["gnomAD AF", "1000G AF", "LOEUF"]
+      transitive: []
+    bias_anchors: ["pathogenic_classifiers.get_pm2 (L436-499)"]
+    data_artifacts: ["gene_data_loader.py"]
+    validation_disposition: allowed
+    production_disposition: allowed
+    rationale_markers: []
+    notes: "Population-frequency absence -- gnomAD/1000G AF, no ClinVar dependency."
+    decision_dependency: ""
+  PM4:
+    lineage_class: label_independent_reference_or_predictor
+    source_dependencies:
+      direct: ["consequence", "PM4_BP3_chrom_to_repeat_regions"]
+      transitive: []
+    bias_anchors: ["pathogenic_classifiers.get_pm4 (L541-603)"]
+    data_artifacts: ["join_coding_and_repeats.py"]
+    validation_disposition: allowed
+    production_disposition: allowed
+    rationale_markers: []
+    notes: "In-frame indel/stop-loss length + repeat-region context, no ClinVar dependency."
+    decision_dependency: ""
+  PM5:
+    lineage_class: cross_variant_clinvar
+    source_dependencies:
+      direct: []
+      transitive: ["PM5_gene_aa_to_var_data (ClinVar)"]
+    bias_anchors: ["pathogenic_classifiers.get_pm5 (L622-687)"]
+    data_artifacts: ["generate_pathogenic_aa_list.py"]
+    validation_disposition: requires_heldout_mask
+    production_disposition: allowed
+    rationale_markers: []
+    notes: "Same-residue (different AA change) previously reported pathogenic -- comparator built from ClinVar."
+    decision_dependency: ""
+  PP2:
+    lineage_class: aggregate_clinvar
+    source_dependencies:
+      direct: []
+      transitive: ["PP2_missense_pathogenic_gene_to_region_list (ClinVar VCF + gnomAD RMC)"]
+    bias_anchors: ["pathogenic_classifiers.get_pp2 (L770-843)"]
+    data_artifacts: ["find_missense_pathogenic_genes_and_path_trunc_genes.py"]
+    validation_disposition: requires_heldout_mask
+    production_disposition: allowed
+    rationale_markers: []
+    notes: "Gene-level missense pathogenic/benign proportion -- transitive/aggregate ClinVar comparator (ADR-0009)."
+    decision_dependency: ""
+  PP3:
+    lineage_class: label_independent_reference_or_predictor
+    source_dependencies:
+      direct: ["computational predictors", "ABSplice splice dict"]
+      transitive: []
+    bias_anchors: ["pathogenic_classifiers.get_pp3 (L845-966)"]
+    data_artifacts: ["gene_data_loader.py"]
+    validation_disposition: allowed
+    production_disposition: allowed
+    rationale_markers: []
+    notes: "Computational-predictor consensus, no ClinVar dependency."
+    decision_dependency: ""
+  PP5:
+    lineage_class: same_variant_clinvar
+    source_dependencies:
+      direct: ["variant.clinvar_significance", "clinvar_review_status (same variant, via Nirvana)"]
+      transitive: []
+    bias_anchors: ["pathogenic_classifiers.get_pp5 (L978-997)"]
+    data_artifacts: ["bias_dataset_loader.py"]
+    validation_disposition: forbidden
+    production_disposition: forbidden
+    rationale_markers: ["clinvar", "vcv"]
+    notes: "R-A2 direct copy -- same variant's own ClinVar assertion; ClinGen-SVI-2018-deprecated."
+    decision_dependency: ""
+  BA1:
+    lineage_class: label_independent_population
+    source_dependencies:
+      direct: ["gnomAD/1000G population AF"]
+      transitive: []
+    bias_anchors: ["benign_classifiers.get_ba1 (L6-43)"]
+    data_artifacts: ["gene_data_loader.py"]
+    validation_disposition: allowed
+    production_disposition: allowed
+    rationale_markers: []
+    notes: "Population-frequency stand-alone benign threshold, no ClinVar dependency."
+    decision_dependency: ""
+  BS1:
+    lineage_class: label_independent_population
+    source_dependencies:
+      direct: ["gnomAD/1000G AF", "LOEUF"]
+      transitive: []
+    bias_anchors: ["benign_classifiers.get_bs1 (L62-114)"]
+    data_artifacts: ["gene_data_loader.py"]
+    validation_disposition: allowed
+    production_disposition: allowed
+    rationale_markers: []
+    notes: "Population-frequency excess-vs-disease-prevalence, no ClinVar dependency."
+    decision_dependency: ""
+  BS2:
+    lineage_class: label_independent_population
+    source_dependencies:
+      direct: ["gnomAD/1000G homozygous/hemizygous + control allele counts", "disease/inheritance model"]
+      transitive: []
+    bias_anchors: ["benign_classifiers.get_bs2 (L116-176)"]
+    data_artifacts: ["gene_data_loader.py"]
+    validation_disposition: deferred
+    production_disposition: deferred
+    rationale_markers: []
+    notes: "Population/control source is label-independent -- but that is NOT policy approval. A TSC-specific penetrance/age/mosaicism call is still owed (PROGRAM.md item 6) before BS2 may be scored or automated."
+    decision_dependency: "bs2-policy"
+    decision_rationale: >-
+      get_bs2 (benign_classifiers.py L116-176) is a population/control-count test
+      (homozygous/hemizygous/control allele counts vs a constants.py LOEUF-tiered
+      threshold) -- it does not phenotype the "healthy adult", exclude reduced
+      penetrance, confirm age of onset past the expected TSC presentation window,
+      or exclude mosaicism (common in TSC, especially TSC2, per GeneReviews
+      Northrup et al., https://www.ncbi.nlm.nih.gov/books/NBK1220/). The ClinGen
+      Tuberous Sclerosis Complex Variant Curation Expert Panel
+      (https://www.clinicalgenome.org/affiliation/50171/) has not published an
+      approved BS2 specification for TSC1/TSC2 (Expert Panel Status: "Develop
+      Classification Rules"), and no molecular-geneticist Oracle has been
+      recruited (GP-3 open) to authorize automated BS2 for TSC. Absent that
+      authority, BS2 stays deferred; see
+      docs/reference/bs2-tsc-penetrance-mosaicism-review.md for the full,
+      cited evidence review.
+  BP1:
+    lineage_class: aggregate_clinvar
+    source_dependencies:
+      direct: []
+      transitive: ["BP1_truncating_gene_to_data (ClinVar VCF)"]
+    bias_anchors: ["benign_classifiers.get_bp1 (L247-268)"]
+    data_artifacts: ["find_missense_pathogenic_genes_and_path_trunc_genes.py"]
+    validation_disposition: requires_heldout_mask
+    production_disposition: allowed
+    rationale_markers: []
+    notes: "Gene-level truncating-vs-missense proportion -- transitive/aggregate ClinVar comparator; rationale text ('...where {path_per} of pathogenic variants are truncating...') carries NO ClinVar token, so only the static transitive_suspect net (not marker scanning) catches it (D3, the marker-invisible case)."
+    decision_dependency: ""
+  BP3:
+    lineage_class: label_independent_reference_or_predictor
+    source_dependencies:
+      direct: ["PM4_BP3_chrom_to_repeat_regions"]
+      transitive: []
+    bias_anchors: ["benign_classifiers.get_bp3 (L299-351)"]
+    data_artifacts: ["join_coding_and_repeats.py"]
+    validation_disposition: allowed
+    production_disposition: allowed
+    rationale_markers: []
+    notes: "In-frame indel in a repeat region without a known function, no ClinVar dependency."
+    decision_dependency: ""
+  BP4:
+    lineage_class: label_independent_reference_or_predictor
+    source_dependencies:
+      direct: ["computational predictors", "ABSplice splice dict"]
+      transitive: []
+    bias_anchors: ["benign_classifiers.get_bp4 (L353-516)"]
+    data_artifacts: ["gene_data_loader.py"]
+    validation_disposition: allowed
+    production_disposition: allowed
+    rationale_markers: []
+    notes: "Computational-predictor consensus (benign direction), no ClinVar dependency."
+    decision_dependency: ""
+  BP6:
+    lineage_class: same_variant_clinvar
+    source_dependencies:
+      direct: ["variant.clinvar_significance (same variant, via Nirvana)"]
+      transitive: []
+    bias_anchors: ["benign_classifiers.get_bp6 (L526-546)"]
+    data_artifacts: ["bias_dataset_loader.py"]
+    validation_disposition: forbidden
+    production_disposition: forbidden
+    rationale_markers: ["clinvar"]
+    notes: "R-A2 direct copy -- same variant's own ClinVar assertion; ClinGen-SVI-2018-deprecated."
+    decision_dependency: ""
+  BP7:
+    lineage_class: label_independent_reference_or_predictor
+    source_dependencies:
+      direct: ["ABSplice splice dict", "phyloP", "synonymous consequence"]
+      transitive: []
+    bias_anchors: ["benign_classifiers.get_bp7 (L548-616)"]
+    data_artifacts: ["gene_data_loader.py"]
+    validation_disposition: allowed
+    production_disposition: allowed
+    rationale_markers: []
+    notes: "Synonymous/non-splice-impact prediction, no ClinVar dependency."
+    decision_dependency: ""

@@ -29,8 +29,6 @@ included_criteria:
   - PP3
   - BA1
   - BS1
-  - BS3
-  - BS4
   - BP1
   - BP3
   - BP4
@@ -38,6 +36,13 @@ included_criteria:
   # Deliberately NOT included by default: PP5, BP6, PS4 (R-A2 direct-copy
   # circularity -- all derive from the variant's OWN ClinVar assertion; PS4
   # via BIAS-3.0.0's ClinVar-submitter fallback). Oracle decision 2026-07.
+  # BS3/BS4 (bias-lineage audit D2) were REMOVED -- they are BIAS-3.0.0
+  # internal stubs (`get_bs3`/`get_bs4` unconditionally return `(0, "")`,
+  # configs/eval/bias_lineage.yaml::structurally_forbidden) and can never
+  # fire; they were phantom automation. PS3/BS2 (the can-fire criteria the
+  # registry below now carries instead) remain NOT included -- both are
+  # `deferred` in the lineage policy (PS3: assay-validity review; BS2:
+  # decision_dependency `bs2-policy`).
 
 # BIAS fired-strength-int -> RAPTOR KB strength vocab (PRD-01 sec 10.3).
 # This is the generic BIAS<->RAPTOR strength-int convention (1..5), not a
@@ -51,12 +56,18 @@ strength_map:
 
 # Generic ACMG rule vocabulary (criterion -> direction + allowed KB
 # strengths): registers `evidence_kinds` at `run_scorer` setup (FR9/AC7).
-# The full automatable 19-criterion set (sec 1), including PP5/BP6 so their
-# (tier, criterion) exists in the registry even though the default policy
-# above does not emit them.
+# The registry equals the pinned BIAS-3.0.0 static can-fire set EXACTLY
+# (configs/eval/bias_lineage.yaml::can_fire, 19 codes) -- registry presence
+# is NOT inclusion. PS3/BS2 (bias-lineage audit D1/D2 correction) replace
+# the phantom BS3/BS4 stub entries (BIAS-internal stubs that can never
+# fire) so this registry stops omitting two real can-fire criteria while
+# stopping claiming two BIAS can never emit; neither PS3 nor BS2 is added
+# to `included_criteria` above -- both stay `deferred` in the lineage
+# policy (PS3: assay-validity review; BS2: decision_dependency `bs2-policy`).
 acmg_criteria:
   PVS1: {direction: pathogenic, strength_vocab: [very_strong, strong, moderate, supporting]}
   PS1:  {direction: pathogenic, strength_vocab: [strong]}
+  PS3:  {direction: pathogenic, strength_vocab: [strong, moderate, supporting]}
   PS4:  {direction: pathogenic, strength_vocab: [strong, moderate, supporting]}
   PM1:  {direction: pathogenic, strength_vocab: [moderate, supporting]}
   PM2:  {direction: pathogenic, strength_vocab: [moderate, supporting]}
@@ -67,8 +78,7 @@ acmg_criteria:
   PP5:  {direction: pathogenic, strength_vocab: [strong, moderate, supporting]}
   BA1:  {direction: benign, strength_vocab: [stand_alone]}
   BS1:  {direction: benign, strength_vocab: [strong, moderate]}
-  BS3:  {direction: benign, strength_vocab: [strong]}
-  BS4:  {direction: benign, strength_vocab: [supporting]}
+  BS2:  {direction: benign, strength_vocab: [strong, moderate]}
   BP1:  {direction: benign, strength_vocab: [supporting]}
   BP3:  {direction: benign, strength_vocab: [supporting]}
   BP4:  {direction: benign, strength_vocab: [supporting]}
@@ -86,8 +96,12 @@ edge_cases:
   splice_region: true
   mosaicism: true
 
-# v1 scope: TSC2 only (sec 1/10.6); TSC1 is a fast-follow.
+# v1 scope: TSC1 + TSC2 (policy-blocker C: TSC1 added to scorer scope,
+# reconciled against BIAS's raw .4 emission via canonical genomic SPDI --
+# see transcript_reconcile.reconcile_transcript_identity /
+# policy.check_edge_cases's non_mane_transcript refinement).
 genes:
+  TSC1: NM_000368.5   # confirm .version against the locked MANE Select release (matches configs/ingest/tsc.yaml)
   TSC2: NM_000548.5   # confirm .version against the locked MANE Select release (matches configs/ingest/tsc.yaml)
 
 # R-B2/AC7: every predictor field RAPTOR's evidence provenance touches is

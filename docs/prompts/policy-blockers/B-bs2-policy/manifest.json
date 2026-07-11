@@ -1,0 +1,65 @@
+{
+  "task_id": "policy-blocker-B-bs2-penetrance-age-mosaicism-policy",
+  "decision": "B",
+  "title": "TSC BS2 policy grounded in penetrance/age/mosaicism; preserve deferred exclusion if authority insufficient",
+  "model_role": "planner",
+  "model_family": "Claude",
+  "model_target": "claude-opus-4.8",
+  "intent_block_present": true,
+  "source_commit": "e52e855",
+  "bias_source_commit": "ade13f206f3e2c2efe3ec92715d974645fc8da8f",
+  "bias_version": "3.0.0",
+  "slots": {
+    "slot1": {
+      "path": "docs/prompts/policy-blockers/B-bs2-policy/slot1-planner.md",
+      "sha256": "e93cbb584884d5b078cca1a34644c682840f0817b3291ed722de3ec052f92087"
+    },
+    "slot2": {
+      "path": "docs/prompts/policy-blockers/B-bs2-policy/slot2-bs2-policy-contract.md",
+      "sha256": "82d65fa85f9b84ee3c498f76fcb04821d46b79139a6f09e0190db29d135487bc"
+    },
+    "slot3": {
+      "path": "docs/prompts/policy-blockers/B-bs2-policy/slot3-preservation.md",
+      "sha256": "2be9dd13eb15669d015c52537f36f12774c02808d3b4c8e6fb2fe693087162b1"
+    }
+  },
+  "source_facts": {
+    "bias_bs2": "benign_classifiers.py::get_bs2 L116-176: population/control-count test (homozygous/hemizygous/control ACs vs constants.py threshold); label-independent source; does NOT model penetrance/age/mosaicism",
+    "census_incidence": "criterion_firing.BS2 = 34; known_policy_gaps: 'BS2 fired 34 times but omitted ... without a recorded rationale'",
+    "current_disposition": "configs/eval/bias_lineage.yaml BS2: lineage_class=label_independent_population, validation/production disposition=deferred, decision_dependency=bs2-policy",
+    "authority": "No approved/published TSC-specific CSpec/BS2 specification was located as of 2026-07-12; the TSC VCEP status is Develop Classification Rules. General ACMG/AMP 2015 BS2 requires a healthy adult where full penetrance is expected early, while TSC age-dependent expression/mosaicism make population-count-only automation insufficient without a future approved TSC specification and named expert decision."
+  },
+  "expected_outcome": "authority insufficient to license automated BS2 for TSC -> BS2 stays deferred with a required, cited decision_rationale (penetrance/age/mosaicism + missing Oracle/VCEP authority); NO invented approval; no clinical classification of the 34 variants",
+  "roles": {
+    "planner": { "model_target": "claude-opus-4.8" },
+    "tester": { "model_target": "gemini-3.1-pro-preview", "responsibility": "Author AC tests (AC-B1..AC-B6) from slot 2 + slot-1 surfaces only. Assert BS2 stays deferred, reconciles to 34 firings, and that a deferred record without decision_dependency+decision_rationale raises. Never ground any assertion in benchmark labels." },
+    "doer": { "model_target": "claude-sonnet-5", "responsibility": "Add BS2 decision_rationale (disposition unchanged), strengthen load_lineage_policy (deferred => dependency+rationale), write the firing probe + the cited authority memo. May add tests, never weaken; honor slot 3." },
+    "checker": { "model_target": "gpt-5.6-sol", "responsibility": "Re-verify all ACs; confirm BS2 not promoted/scored/classified; confirm authority citations are primary; confirm no label-grounded justification and no fixture patch." }
+  },
+  "depends_on": [],
+  "reference_files": [
+    "D:/AIProjects/raptor-data/sources/BIAS-2015/src/bias_2015/benign_classifiers.py",
+    "D:/AIProjects/raptor-data/sources/BIAS-2015/src/bias_2015/constants.py",
+    "configs/eval/bias_lineage.yaml",
+    "src/raptor/eval/lineage_policy.py",
+    "src/raptor/eval/lineage_registry.py",
+    "data/census/tsc_vus_clinvar_2026-07-07_stats.json"
+  ],
+  "authorized_outputs": {
+    "config": ["configs/eval/bias_lineage.yaml (BS2 record: add decision_rationale; disposition UNCHANGED)"],
+    "production": ["src/raptor/eval/lineage_policy.py (strengthen deferred invariant only)", "scripts/probe_bs2_firings.py"],
+    "docs": ["docs/reference/bs2-tsc-penetrance-mosaicism-review.md"],
+    "test": ["tests/eval/test_bs2_policy.py", "tests/eval/test_bs2_firing_probe.py"],
+    "data": ["data/census/tsc_bs2_firing_report_<date>.json"]
+  },
+  "acceptance_criteria": ["AC-B1", "AC-B2", "AC-B3", "AC-B4", "AC-B5", "AC-B6"],
+  "preservation_set": [
+    "configs/eval/bias_lineage.yaml (BS2 disposition stays deferred; can-fire 19 / registry / audit unchanged)",
+    "src/raptor/eval/lineage_registry.py",
+    "tests/eval/test_bias_lineage_policy.py"
+  ],
+  "blockers": [
+    "No molecular-geneticist Oracle recruited (GP-3 open) -> automated BS2 cannot be approved for TSC; the deferral is preserved by design, not resolved.",
+    "Requires retrieval of the primary ClinGen TSC VCEP BS2 specification; if the VCEP BS2 spec is unavailable, record the authority gap honestly rather than fabricate thresholds."
+  ]
+}

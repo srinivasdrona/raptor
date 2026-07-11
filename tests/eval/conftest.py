@@ -25,7 +25,7 @@ from raptor.eval.model import (
 __all__ = [
     "EvalConfig", "LabeledVariant", "BenchmarkRow", "ImpliedCall", "Metrics",
     "GateDecision", "make_eval_config", "make_labeled", "evidence_for",
-    "FakeEvidenceSource",
+    "FakeEvidenceSource", "oracle_thresholds_for", "with_point_estimate_lb",
 ]
 
 
@@ -87,6 +87,55 @@ class FakeEvidenceSource:
     def get_evidence(self, variant_id):
         self.requested.append(variant_id)
         return self.data.get(variant_id, [])
+
+
+def oracle_thresholds_for(
+    precision: float,
+    recall: float,
+    *,
+    stratum: str = "missense",
+    directions=("pathogenic", "benign"),
+    gating: bool = True,
+    confidence: float = 0.95,
+) -> dict:
+    """Gate-fidelity (Arm C) migration helper: build a nested
+    `oracle_thresholds` block from the same `(precision, recall)` pair the
+    OLD flat `{"precision": X, "recall": Y}` schema used to carry -- one
+    threshold pair governing both directions of a single gating stratum,
+    exactly matching the flat schema's original semantics, just reshaped
+    into the new `{confidence, strata: {name: {...}}}` schema `decide_gate`/
+    `load_config` now require."""
+    return {
+        "confidence": confidence,
+        "strata": {
+            stratum: {
+                "precision": precision,
+                "recall": recall,
+                "gating": gating,
+                "directions": list(directions),
+            }
+        },
+    }
+
+
+def with_point_estimate_lb(m: Metrics) -> Metrics:
+    """Gate-fidelity (Arm C) migration helper: copy a hand-built `Metrics`
+    fixture's POINT estimates into its `*_lb` (Clopper-Pearson lower-bound)
+    fields, in place, and return it. Old tests built `Metrics` fixtures
+    directly (never through `compute_metrics`, which is the only real
+    lower-bound source) -- this keeps those fixtures' original intent (a
+    stratum whose reported precision/recall is exactly X) faithful under
+    the new lower-bound-only gate comparison, without fabricating a
+    make-believe n/CI the old fixture never specified. The genuine
+    point-estimate-vs-lower-bound distinction is covered by AC-G2, a NEW
+    test written specifically to exercise that gap -- this helper does not
+    re-test it and must never be used to make an underpowered-n scenario
+    look powered."""
+    m.precision_lb = m.precision
+    m.recall_lb = m.recall
+    m.benign_precision_lb = m.benign_precision
+    m.benign_recall_lb = m.benign_recall
+    return m
 
 
 def evidence_for(variants, calls_by_id=None) -> "FakeEvidenceSource":

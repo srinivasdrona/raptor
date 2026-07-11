@@ -1,0 +1,63 @@
+# PRD-04 Task A production candidate-direction policy (FR5). Loaded by
+# `raptor.packet.config.load_candidate_direction_policy`; strict schema --
+# exactly these eight top-level keys, no more, no less.
+#
+# Decision D (policy-blocker join of A+B+C): `criterion_strength_points` is
+# now populated over the derived candidate_set = eval automatable_criteria
+# (post-lineage-correction) minus deferred BS2 (B) minus FORBIDDEN_CRITERIA
+# minus unruled-transitive requires_heldout_mask criteria (PS1/PM1/PM5/PP2/
+# BP1) -- i.e. {PVS1, PM2, PM4, PP3, BA1, BS1, BP3, BP4, BP7}. PP3/BP4
+# strength->point rows use A's CORRECTED predictor-aggregation strengths
+# (`eval.predictor_aggregation.recompute_strength`), never BIAS's emitted
+# buggy strength. TSC1/TSC2 MANE .5 / SPDI scope (C) and NTHL1 exclusion are
+# enforced upstream (ingest/scorer), not by an extra schema key here.
+#
+# The policy is still UNAPPROVED: no candidate-direction review
+# recommendation may be released before expert sign-off. An unapproved
+# policy always resolves to `candidate_direction=null`,
+# `null_reason=production_policy_unapproved`, and `ReviewState.POLICY_BLOCKED`
+# (never a silent classification, never the eval-only Tavtigian combiner) --
+# pinning the contents is safe precisely because the approval gate is off.
+# `candidate_lp_min`/`candidate_lb_max` stay null: a future approved policy
+# must derive and pin them independently from the eval Tavtigian cutoffs;
+# this task does not invent them.
+policy_id: "tsc-candidate-direction-v1"
+version: "1"
+approval_status: "unapproved"
+approved_by: null
+approval_ref: null
+criterion_strength_points:
+  PVS1:
+    supporting: 1
+    moderate: 2
+    strong: 4
+    very_strong: 8
+  PM2:
+    supporting: 1
+    moderate: 2
+    strong: 4
+  PM4:
+    supporting: 1
+    moderate: 2
+    strong: 4
+  PP3:
+    supporting: 1
+    moderate: 2
+    strong: 4
+  BA1:
+    stand_alone: -8
+  BS1:
+    strong: -4
+  BP3:
+    supporting: -1
+    moderate: -2
+    strong: -4
+  BP4:
+    supporting: -1
+    moderate: -2
+    strong: -4
+    very_strong: -8
+  BP7:
+    supporting: -1
+candidate_lp_min: null
+candidate_lb_max: null

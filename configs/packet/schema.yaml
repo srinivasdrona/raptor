@@ -1,0 +1,13 @@
+# PRD-04 Task A packet config schema (sec 10.2). Loaded by
+# `raptor.packet.config.load_packet_config`; strict schema -- exactly these
+# five top-level keys, no more, no less. Referenced paths resolve relative to
+# the repository root; the loader records the *real* SHA-256 of both
+# referenced files (never a caller-declared pin).
+packet_schema_version: "1.0"
+config_version: "1"
+lineage_policy_path: "configs/eval/bias_lineage.yaml"
+candidate_direction_policy_path: "configs/packet/candidate_direction.yaml"
+# PS3 is the functional-assay/literature-unvalidated (AVADA) claim called out
+# by PRD-04 sec 4.1 FR4.2 as always requiring primary grounding.
+primary_required_criteria:
+  - PS3

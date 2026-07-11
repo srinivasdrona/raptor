@@ -1,0 +1,78 @@
+{
+  "task_id": "prd04-packet-surfaces",
+  "sequence": "B",
+  "intent_block_present": true,
+  "na_allowed": false,
+  "roles": {
+    "tester": {
+      "model_family": "Gemini",
+      "model_target": "gemini-3.1-pro",
+      "responsibility": "Authors the acceptance-criteria tests first (RED), from the spec only."
+    },
+    "doer": {
+      "model_family": "Claude",
+      "model_target": "claude-sonnet-5",
+      "responsibility": "Implements the smallest coherent solution to pass the tests (may add, never weaken)."
+    },
+    "checker": {
+      "model_family": "GPT",
+      "model_target": "gpt-5.5",
+      "responsibility": "Re-verifies every acceptance criterion and the frozen preservation set."
+    }
+  },
+  "slots": {
+    "slot1": {
+      "path": "docs/prompts/prd04-surfaces/slot1-intent.md",
+      "sha256": "89272ea035fd494834742810a04513152c021a7f589758d37b4a98c7801c9e45"
+    },
+    "slot2": {
+      "path": "docs/prompts/prd04-surfaces/slot2-surfaces-contract.md",
+      "sha256": "78e9e446c865ad07ca2c671b6d07a5b2a33f55a3f7e9a5519aeff24b28199968"
+    },
+    "slot3": {
+      "path": "docs/prompts/prd04-surfaces/slot3-preservation.md",
+      "sha256": "7e5156db3a8a85678a1fa2b3521b5c4295e0d67d31f85e748926b06381b81acc"
+    }
+  },
+  "contract": {
+    "prd_path": "docs/prd/PRD-04-candidate-evidence-packet.md",
+    "prd_revision": "r3",
+    "prd_r3_sha256": "9799522945d995ea737e0e597d148c4a1fa76792f15719a32db6cba11d6223be",
+    "source_commit": "9adbd7b",
+    "task_spec_section": "docs/prd/PRD-04-candidate-evidence-packet.md#112-task-spec--surfaces-render--queue--calibration-b"
+  },
+  "depends_on": [
+    "prd04-packet-core"
+  ],
+  "reference_files": [
+    "src/raptor/packet/model.py",
+    "src/raptor/scorer/report.py",
+    "data/census/tsc_vus_clinvar_2026-07-07_stats.json",
+    "docs/reference/aavc-prior-art-audit-2026-07.md"
+  ],
+  "reference_files_count": 4,
+  "authorized_outputs": {
+    "production": [
+      "src/raptor/packet/config.py",
+      "src/raptor/packet/render.py",
+      "src/raptor/packet/queue.py"
+    ],
+    "config": [
+      "configs/packet/render.yaml",
+      "configs/packet/selection.yaml",
+      "configs/packet/narrative_templates.yaml"
+    ],
+    "test": [
+      "tests/packet/test_packet_surfaces.py"
+    ]
+  },
+  "acceptance_criteria": [
+    "AC9", "AC12", "AC13", "AC4", "AC20"
+  ],
+  "preservation_set": [
+    "src/raptor/scorer/**",
+    "src/raptor/eval/**",
+    "src/raptor/kb/store.py",
+    "src/raptor/packet/model.py"
+  ]
+}
