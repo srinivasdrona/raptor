@@ -1,0 +1,140 @@
+{
+  "task_id": "external-pathway-clinvar-vcep-preparation-plan",
+  "model_role": "planner",
+  "model_family": "Claude",
+  "model_target": "claude-opus-4.8",
+  "intent_block_present": true,
+  "planning_only": true,
+  "no_submission": true,
+  "no_contact": true,
+  "no_push": true,
+  "no_production_classification": true,
+  "produces_scv": false,
+  "branch": "track/external-pathway-2026-07",
+  "worktree": "D:/AIProjects/raptor-worktrees/external-pathway",
+  "source_commit": "e52e855",
+  "slots": {
+    "slot1": {
+      "path": "docs/prompts/external-pathway/slot1-planner.md",
+      "sha256": "9fcdfd476e5db93c1dec36b9c4643f9f98a0bdc033ae78431a6e5f2711c7fa0b"
+    },
+    "slot2": {
+      "path": "docs/prompts/external-pathway/slot2-preparation-contract.md",
+      "sha256": "5fe0fcac48ac599ab9f8cfb58822c5601835260a938d6312555e1f2ba9f7ad67"
+    },
+    "slot3": {
+      "path": "docs/prompts/external-pathway/slot3-preservation.md",
+      "sha256": "4592f04bcbe38b8f384660e98aa064dbf8cd9e1744969ba1a5db1d1603dd376f"
+    }
+  },
+  "authorized_output": "docs/prd/PRD-09-clinvar-vcep-submission-preparation.md",
+  "authorized_planning_outputs": [
+    "docs/prd/PRD-09-clinvar-vcep-submission-preparation.md",
+    "docs/reference/clinvar-vcep-primary-sources-2026-07.md",
+    "docs/prompts/external-pathway/**"
+  ],
+  "task_manifests": {
+    "task-a": {
+      "path": "docs/prompts/external-pathway/task-a-manifest.json",
+      "sha256": "cf0aa374a87405aec73e897372f778fa98142c3da08f408935c8c034f58e44cb"
+    },
+    "task-b": {
+      "path": "docs/prompts/external-pathway/task-b-manifest.json",
+      "sha256": "f6263852c7ae65ea6f54b59d2a29c493bfafb1c7abcbe75bd73182a815e8ddbb"
+    },
+    "task-c": {
+      "path": "docs/prompts/external-pathway/task-c-manifest.json",
+      "sha256": "82316e87b46115b75d51a63a7c56f8738f4661a0df54835b8d85df2eab318da2"
+    }
+  },
+  "authorized_outputs_hashes": {
+    "docs/prd/PRD-09-clinvar-vcep-submission-preparation.md": "2cbfea3d150e0750c10dfb1144115f1867186f6160adcb81828f9bb581a4e719",
+    "docs/reference/clinvar-vcep-primary-sources-2026-07.md": "b24bafab6325491d4569a70e5e858358ef38a1e00ef5c9468978925aa507003d"
+  },
+  "must_not_edit": [
+    "docs/PROGRAM.md",
+    "docs/STRATEGY.md",
+    "docs/DECISIONS.md",
+    "docs/RISK_REGISTER.md",
+    "src/raptor/packet/**"
+  ],
+  "future_implementation_scope": [
+    "src/raptor/external/__init__.py",
+    "src/raptor/external/models.py",
+    "src/raptor/external/clinvar_map.py",
+    "src/raptor/external/conformance.py",
+    "src/raptor/external/state.py",
+    "src/raptor/external/dryrun.py",
+    "configs/external/clinvar_field_map.yaml",
+    "configs/external/clinvar_conformance.yaml",
+    "configs/external/clinvar_submission_schema.snapshot.json",
+    "tests/external/**"
+  ],
+  "authorized_package_marker": "src/raptor/external/__init__.py",
+  "authorized_shared_contract_module": "src/raptor/external/models.py",
+  "tester_correction": {
+    "revised_at": "2026-07-12",
+    "trigger": "Tests-first authorship (Gemini) exposed an under-specified doer contract: draft tests under tests/external/ could only compile by MagicMock-ing every external type and inventing symbols (DecisionEvent instead of DecisionLogRecord; bare-dict map_to_clinvar return; boolean-kwarg PrerequisiteChecklist; pass-only AC9).",
+    "resolution": "PRD-09 §15 pins a frozen, MagicMock-proof build-contract API surface (dataclasses, enums, ExternalError(ValueError) typed hierarchy with NO catch-all, config keys, strict loaders, function signatures, result schemas) for Tasks A/B/C; §16 is a tester-correction note mapping each draft-test invention to its pinned replacement. src/raptor/external/models.py + __init__.py authorized.",
+    "spec_only": true,
+    "tests_not_edited": true,
+    "pinned_contract_ref": "docs/prd/PRD-09-clinvar-vcep-submission-preparation.md §15-§17",
+    "corrections": [
+      "map_to_clinvar returns MappingResult(payload/status/blockers/non_authoritative/review_status_preview); classification ONLY from VariantSignoff.classification sourced from a verified DecisionHistory, never from candidate_direction",
+      "VariantSignoff.from_decision_history(history, *, packet, config): QMG role + REVIEWER_DECISION + packet/evidence/variant hash match; real DecisionLogRecord/DecisionHistory (no DecisionEvent type exists)",
+      "deny-list is structural (no allow_* kwargs); resolved-literature-only PrimaryEvidenceRef->ClinvarCitation; unresolved never a citation",
+      "validate_conformance returns ConformanceReport; guards RAISE (SchemaFreshnessError/ClinvarShapeError/PhiDetectedError/NoScvInvariantError), business rules REPORT as RuleResult; emitted_scv/network_used False; no network client",
+      "ExternalStateMachine: can_transition takes ExternalReviewState; SUBMISSION_AUTHORIZED unreachable even with all-True ExternalContext (AUTHORIZATION_ENABLED_THIS_INCREMENT False); validate_record_status/validate_withdrawal @staticmethod; 'delete' always raises; withdrawal via top-level clinvarDeletion.accessionSet[]",
+      "PrerequisiteChecklist(items=(PrerequisiteItem,...)); default_checklist(**satisfied); missing_institutional(); is_ready_to_submit False while any INSTITUTIONAL/MIXED item open",
+      "AC9 structural: dryrun.LAYER_B_ENABLED is False, no production URL constant, validate_conformance has no network param (not a pass-only stub); no fake 3-star (review_status_preview 1-star unless VCEP)"
+    ]
+  },
+  "primary_sources_verified_at": "2026-07-11",
+  "primary_source_register": "docs/reference/clinvar-vcep-primary-sources-2026-07.md",
+  "open_dependencies": [
+    "PRD-06 gate PASS (masked rerun + ADR-0009 ruling)",
+    "final approved production candidate-direction policy",
+    "per-variant qualified molecular geneticist / VCEP sign-off (STRATEGY §9)",
+    "ClinVar organization registration + Terms acceptance (institutional)",
+    "service account + SP-API-KEY (out of repo)",
+    "ClinGen VCEP approval / 3-star status or named qualified submitter",
+    "published assertion-criteria (VCEP ACMG TSC specification)",
+    "canonical TSC condition identifier (MONDO/MedGen/OMIM) curator-verified",
+    "ClinGen VCEP Protocol v12 exact steps (register §6.4)",
+    "decision-log WITHDRAWAL event (frozen DecisionEventType lacks one)",
+    "current TSC VCEP roster/status/contact + CDWG engagement route (TSC VCEP exists per STRATEGY 2026-06-16; existence not in question — register §6.6)",
+    "actual submission/transmission (explicitly out of scope this increment)"
+  ],
+  "resolved_dependencies": [
+    "recordStatus enum RESOLVED (novel/update only) + withdrawal via separate top-level clinvarDeletion.accessionSet[] {accession, reason?} — live schema verified 2026-07-12 (register §2.1-2.2, §6.2)",
+    "germline classification object name RESOLVED (verified 2026-07-12): new top-level germlineSubmission[] array requires germlineClassification with required field germlineClassificationDescription; legacy clinvarSubmission/clinicalSignificance is mutually exclusive (cannot coexist). RAPTOR pins dry-run mapping/validator to the new germlineSubmission/germlineClassification shape ONLY and rejects legacy/mixed output. Schema-freshness re-pin guard added: live-schema HTML sha256 drift blocks validator/mapper generation until human review + re-pin (register §2.1-2.2, §2.5, §6.1; PRD-09 FR2/FR2.1/FR10.0/AC12)"
+  ],
+  "revised_at": "2026-07-12",
+  "second_revision_at": "2026-07-12",
+  "third_revision_at": "2026-07-12",
+  "third_revision_note": "Doer-readiness pin: tests-first authorship exposed under-specified Task A/B/C APIs (MagicMock/invention). PRD-09 §15 pins a frozen MagicMock-proof contract (dataclasses/enums/typed-error hierarchy with no catch-all/config keys/strict loaders/function signatures/result schemas); §16 tester-correction note; §17 revised Ready claim. Authorized src/raptor/external/models.py + __init__.py + dryrun.py + config snapshots. Materialized task-a/b/c three-slot manifests (tester/doer/checker = Gemini/Sonnet/GPT, <=4 refs each). Slot1/2/3 + PRD-09 hashes updated. Boundaries unchanged: no-network/no-SCV/no-contact/no-submission/no-push.",
+  "second_revision_note": "Germline classification object-name HARD-BLOCK CLOSED by live production schema (HTML sha256 3ed6b64bfff5b03c9cfe5ecf0e4f88096ff7116f0647c751027665e71a41dbad, point-in-time): pinned to new germlineSubmission/germlineClassification/germlineClassificationDescription shape; legacy clinvarSubmission/clinicalSignificance rejected + mutually exclusive; schema-freshness re-pin guard added. Object-name NO-GO removed.",
+  "schema_pin": {
+    "source": "ClinVar Submission API HTTP docs (.../docs/api_http/)",
+    "live_page_html_sha256": "3ed6b64bfff5b03c9cfe5ecf0e4f88096ff7116f0647c751027665e71a41dbad",
+    "hash_type": "point-in-time (NOT permanent; ClinVar updates weekly)",
+    "verified_at": "2026-07-12",
+    "pinned_shape": "germlineSubmission[] -> germlineClassification -> germlineClassificationDescription (required); recordStatus novel/update; separate top-level clinvarDeletion.accessionSet[] {accession, reason?}",
+    "rejects": "legacy clinvarSubmission[]/clinicalSignificance/clinicalSignificanceDescription; mixed germlineSubmission+clinvarSubmission (schema forbids coexistence)",
+    "freshness_guard": "live-schema HTML sha256 drift blocks validator/mapper generation until human review + re-pin (PRD-09 FR2.1/FR10.0)"
+  },
+  "go_claim": "GO / READY for the schema-pinned, API-pinned, buildable, non-authoritative planning increment (GP-1). All rubber-duck MAJOR/hard-block findings closed (MAJOR-1 recordStatus/withdrawal; MAJOR-2 TSC VCEP existence framing; HARD-BLOCK germline object name). Doer-readiness gap CLOSED: Task A/B/C expose a frozen MagicMock-proof contract (PRD-09 §15) with a typed-error hierarchy (no catch-all) and a tester-correction note (§16). No schema hard-block remains. Remaining items are external authority / institutional dependencies only (see open_dependencies) and do not block the build. No submission, no contact, no SCV, no push, no network, no production classification.",
+  "ready_claim": "READY (Definition-of-Ready, API-pinned) — PRD-09 §17. Tasks A/B/C are doer-ready against a closed §15 contract; tester re-authors against §15/§16 (planning task did not edit tests). models.py + package marker authorized. Boundaries preserved: no-network, no-SCV, no per-variant classification without a QMG DecisionHistory sign-off, no contact, no submission, no push.",
+  "major_findings_closed": [
+    {"id": "MAJOR-1", "finding": "withdrawal mis-modeled as recordStatus=delete", "resolution": "recordStatus enum is novel/update only; deletion is separate top-level clinvarDeletion.accessionSet[] {accession(SCV, required), reason(optional)}; corrected PRD-09 FR2/FR9/FR10.7/AC7 + register §2.1-2.2/§6.2 + slot2/slot3; no recordStatus=delete remains except quoted-rejected", "source": ".../docs/api_http/ PRIMARY-OFFICIAL verified 2026-07-12"},
+    {"id": "MAJOR-2", "finding": "TSC VCEP framed as possibly non-existent", "resolution": "TSC VCEP exists (STRATEGY verified 2026-06-16, 0 ClinVar submissions at that date); open dependency reframed to confirming current roster/status/contact + CDWG engagement route, not existence; claim typing/date preserved", "source": "STRATEGY.md INTERNAL verified 2026-06-16"},
+    {"id": "HARD-BLOCK", "finding": "germline classification object name unconfirmed (earlier drafts saw only a clinicalSignificance container)", "resolution": "CLOSED: live production schema (HTML sha256 3ed6b64bfff5b03c9cfe5ecf0e4f88096ff7116f0647c751027665e71a41dbad, point-in-time) contains new germlineSubmission[] requiring germlineClassification with required germlineClassificationDescription, alongside mutually-exclusive legacy clinvarSubmission/clinicalSignificance. RAPTOR pins dry-run mapping/validator to new shape ONLY, rejects legacy/mixed; schema-freshness re-pin guard added. Corrected PRD-09 FR2/FR2.1/FR3/FR7/FR10.0/AC2/AC3/AC12 + register §2.1-2.2/§2.5/§6.1/§7 + slot1/slot2/slot3; object-name NO-GO removed", "source": ".../docs/api_http/ PRIMARY-OFFICIAL verified 2026-07-12"}
+  ],
+  "hard_block": null,
+  "hard_block_status": "RESOLVED 2026-07-12 — germline classification object-name NO-GO closed and removed; pinned to new germlineSubmission/germlineClassification shape with schema-freshness re-pin guard (register §2.1-2.2, §2.5, §6.1). No schema hard-block remains.",
+  "prompt_families": [
+    {"task_id": "external-pathway-clinvar-map", "sequence": "A", "goal": "mapping + deny-list", "depends_on": []},
+    {"task_id": "external-pathway-conformance", "sequence": "B", "goal": "offline dry-run conformance validator (no SCV)", "depends_on": ["external-pathway-clinvar-map"]},
+    {"task_id": "external-pathway-state-lifecycle", "sequence": "C", "goal": "no-submission state machine + conflict/version/update/withdrawal", "depends_on": ["external-pathway-clinvar-map", "external-pathway-conformance"]}
+  ]
+}
