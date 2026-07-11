@@ -1,0 +1,113 @@
+{
+  "program": "RAPTOR policy blockers — sequenced three-slot contracts",
+  "task_id": "policy-blockers-2026-07-planner-suite",
+  "planner": "OPUS PLANNER (planning only; no production/tests/commit)",
+  "model_role": "planner",
+  "model_target": "claude-opus-4.8",
+  "worktree": "D:/AIProjects/raptor-worktrees/policy-blockers",
+  "branch": "track/policy-blockers-2026-07",
+  "source_commit": "e52e855",
+  "bias_source_commit": "ade13f206f3e2c2efe3ec92715d974645fc8da8f",
+  "bias_version": "3.0.0",
+  "census_snapshot": "data/census/tsc_vus_clinvar_2026-07-07_stats.json (clinvar_2026-07-07; Nirvana 3.18.1 + BIAS-2015 v3.0.0)",
+  "program_items_addressed": {
+    "A": "new — BIAS BP4/PP3 predictor-aggregation defect (feeds candidate directions; not previously numbered)",
+    "B": "PROGRAM.md item 6 — BS2 policy",
+    "C": "PROGRAM.md item 7 — transcript (.4 vs .5) + 30 NTHL1 resolution",
+    "D": "PROGRAM.md item 8 — production candidate-direction policy"
+  },
+  "rubber_duck_closure": {
+    "status": "revised_nogo_findings_closed",
+    "revision": "r1",
+    "revised_at": "2026-07-12",
+    "prior_verdict": "rubber_duck_NO_GO",
+    "findings_closed": 2,
+    "readme": "docs/prompts/policy-blockers/README.md",
+    "findings": [
+      {
+        "id": "MAJOR-A-bp4-pp3",
+        "decision": "A",
+        "summary": "Removed the false claim that pathogenic_classifiers.py L405-433 is a get_pp3/phyloP-window helper or a direct correct-idiom proof. L405-433 is get_pm1 — a DIFFERENT criterion's generic domain max-aggregation — cited ONLY as corroboration, never proof by itself. Defecthood is now grounded PRIMARILY in get_pp3 L944-954 / get_bp4 L491-503 own code+comments (dead best_score sentinel intended-but-never-reassigned, permanently-false BP4 `best_score>1` consensus guard, `>=`-loop last-tool resolution vs the blocks' own 'best score'/'same max score' comments and downstream strength/tie logic).",
+        "artifacts_updated": ["A-bp4-pp3-aggregation/slot1-planner.md", "A-bp4-pp3-aggregation/slot2-aggregation-contract.md", "A-bp4-pp3-aggregation/manifest.json"],
+        "ac_updated": ["AC-A1"]
+      },
+      {
+        "id": "MAJOR-C-transcript-nthl1",
+        "decision": "C",
+        "summary": "Restated the transcript/NTHL1 issue as a CURRENTLY ACTIVE committed production-path defect (not hypothetical): configs/acmg/tsc.yaml enables edge_cases.non_mane_transcript=true (L95) with a TSC2-only genes map pinned .5; BiasTsvSource yields raw .4; pipeline check_out_of_scope_gene + check_edge_cases misroute the full TSC2 corpus (EDGE_CASE_ROUTED) and every TSC1 row (OUT_OF_SCOPE_GENE) if the current production pipeline is run on real .4 rows. Census 30 NTHL1 manual is a separate analysis, not proof the pipeline works. Added AC-C7: a mandatory regression loading the real committed config + representative real .4 BIAS rows through the actual bias_source/policy/pipeline path, demonstrating baseline misroute then corrected behavior while the 30 NTHL1 manual rows are preserved.",
+        "artifacts_updated": ["C-transcript-nthl1/slot1-planner.md", "C-transcript-nthl1/slot2-reconciliation-contract.md", "C-transcript-nthl1/slot3-preservation.md", "C-transcript-nthl1/manifest.json"],
+        "ac_added": ["AC-C7"]
+      }
+    ],
+    "scope_note": "Planning artifacts only. No production/config/test code, no commit, no shared PROGRAM/STRATEGY/DECISIONS/RISK docs touched."
+  },
+  "shared_program_docs_untouched": [
+    "docs/PROGRAM.md", "docs/STRATEGY.md", "docs/DECISIONS.md", "docs/RISK_REGISTER.md",
+    "docs/ARCHITECTURE.md", "docs/OPERATING_MODEL.md", "docs/EVAL_PLAN.md", "docs/EVAL_RUBRIC.md",
+    "docs/prd/PRD-04-candidate-evidence-packet.md (untracked; neither modified nor deleted)"
+  ],
+  "cross_cutting_constraints": [
+    "empirical probes are defined and run BEFORE any policy is written or pinned (each contract §1)",
+    "exact outputs / APIs / tests specified with source citations (file · symbol · line)",
+    "no test-fixture patches",
+    "no clinical classification of any variant",
+    "never edit the vendored AGPL BIAS source; never import bias_2015 (ADR-0007 arm's-length)",
+    "labels/benchmark/held-out files never reachable from any policy/audit module (R-A2/H1)",
+    "config-as-policy: rules/vocab live in schema-validated configs, never hardcoded"
+  ],
+  "sequence": {
+    "parallel_wave_1": ["A", "B", "C"],
+    "wave_2": ["D"],
+    "note": "A, B, C are mutually independent and may run in parallel; D depends on all three (hard). Within each decision the doer sequence is given in that contract's slot 2 §DoR task specs."
+  },
+  "decisions": [
+    {
+      "decision": "A",
+      "task_id": "policy-blocker-A-bp4-pp3-predictor-aggregation-defect",
+      "dir": "docs/prompts/policy-blockers/A-bp4-pp3-aggregation/",
+      "manifest": "docs/prompts/policy-blockers/A-bp4-pp3-aggregation/manifest.json",
+      "manifest_sha256": "56571e9c88f386a3c5304f3c4dc274f7df3b0a75220c488f04af1ed3244a3e81",
+      "depends_on": [],
+      "summary": "Specify + empirically characterize the BP4/PP3 best_score aggregation defect; choose RAPTOR-side wrapper (expected) vs upstream PR, without editing AGPL source."
+    },
+    {
+      "decision": "B",
+      "task_id": "policy-blocker-B-bs2-penetrance-age-mosaicism-policy",
+      "dir": "docs/prompts/policy-blockers/B-bs2-policy/",
+      "manifest": "docs/prompts/policy-blockers/B-bs2-policy/manifest.json",
+      "manifest_sha256": "7e9dc7ce7dddb023225d7929c0497a54379e31951dc22c9c9722871e3000f074",
+      "depends_on": [],
+      "summary": "Ground BS2 in penetrance/age/mosaicism + primary ClinGen authority; preserve the explicit deferred exclusion with a cited rationale (expected) rather than invent approval."
+    },
+    {
+      "decision": "C",
+      "task_id": "policy-blocker-C-transcript-mane5-bias4-nthl1-reconciliation",
+      "dir": "docs/prompts/policy-blockers/C-transcript-nthl1/",
+      "manifest": "docs/prompts/policy-blockers/C-transcript-nthl1/manifest.json",
+      "manifest_sha256": "fcee9373854d624d5c6e47449fcabefb2ce42582604ba914582bebe0a2385ce1",
+      "depends_on": [],
+      "summary": "Reconcile MANE .5 identity with BIAS .4 via canonical genomic SPDI (version delta not manual-review-dumped); fail-loud route the 30 NTHL1 TSC2-region records to manual queue."
+    },
+    {
+      "decision": "D",
+      "task_id": "policy-blocker-D-unapproved-production-candidate-direction-policy",
+      "dir": "docs/prompts/policy-blockers/D-production-candidate-policy/",
+      "manifest": "docs/prompts/policy-blockers/D-production-candidate-policy/manifest.json",
+      "manifest_sha256": "612fda78efa53c4904eb109c4e1a4d5a540ad7da3d211d2b05c1c12f7b5ee467",
+      "depends_on": ["A", "B", "C"],
+      "summary": "Join A (corrected strengths) + B (BS2 deferred) + C (SPDI scope) into a populated but UNAPPROVED, non-authoritative candidate-direction policy, strictly separate from the eval combiner."
+    }
+  ],
+  "blockers_rollup": [
+    "A/C/B probes need the committed BIAS output artifacts (6,618-VUS census TSV + 2,577 held-out TSV, and per-record NTHL1 coordinates); with only aggregate census stats, materiality/decidability/locus confirmation is partially deferred.",
+    "B cannot approve automated BS2: no molecular-geneticist Oracle (GP-3 open) and the population-only BIAS signal cannot meet the ClinGen TSC VCEP penetrance/age/mosaicism bar -> deferral preserved by design.",
+    "C: confirm the MANE 1.4 pin maps to NM_000368.5 / NM_000548.5 against the locked MANE release (config marks these 'confirm').",
+    "D is hard-blocked on A ∧ B ∧ C landing; and even pinned, it stays unapproved/non-authoritative — external worklist release remains gated on the PRD-06 held-out gate PASS + ADR-0009 correction + per-variant expert sign-off."
+  ],
+  "roles_default": {
+    "planner": "claude-opus-4.8",
+    "tester": "gemini-3.1-pro-preview (authors AC tests from slot 2 + slot-1 surfaces only, before the doer)",
+    "doer": "claude-sonnet-5 (implements to pass; may add, never weaken)",
+    "checker": "gpt-5.6-sol (different family from doer; re-verifies ACs + frozen preservation + inversion guards)"
+  }
+}
