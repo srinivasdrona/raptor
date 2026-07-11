@@ -96,8 +96,12 @@ edge_cases:
   splice_region: true
   mosaicism: true
 
-# v1 scope: TSC2 only (sec 1/10.6); TSC1 is a fast-follow.
+# v1 scope: TSC1 + TSC2 (policy-blocker C: TSC1 added to scorer scope,
+# reconciled against BIAS's raw .4 emission via canonical genomic SPDI --
+# see transcript_reconcile.reconcile_transcript_identity /
+# policy.check_edge_cases's non_mane_transcript refinement).
 genes:
+  TSC1: NM_000368.5   # confirm .version against the locked MANE Select release (matches configs/ingest/tsc.yaml)
   TSC2: NM_000548.5   # confirm .version against the locked MANE Select release (matches configs/ingest/tsc.yaml)
 
 # R-B2/AC7: every predictor field RAPTOR's evidence provenance touches is

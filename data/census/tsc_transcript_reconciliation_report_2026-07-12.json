@@ -1,0 +1,157 @@
+{
+  "bias_tsv": "D:\\AIProjects\\raptor-data\\clinvar\\vus-run\\tsc-vus-2026-07-07\\tsc_vus_input.bias_output.tsv",
+  "checker_finding_correction": {
+    "correction": [
+      "reconcile_transcript_identity now requires spdi to match canonical GRCh38 syntax (NC_######.<version>:pos:ref:alt)",
+      "the parsed genomic accession must equal the in-scope gene's pinned genomic accession (config[gene]['genome_accession'], falling back to an explicit non-wildcard TSC1/TSC2 pin mirroring configs/ingest/tsc.yaml)",
+      "for SNV records, the parsed 0-based position/ref/alt must exactly match record.position-1/record.ref_allele/record.alt_allele",
+      "any missing/malformed spdi, wrong accession, or SNV coordinate mismatch now returns canonical_identity_unverified and routes to manual review, never a silent reconciliation",
+      "policy.py now reads canonical_spdi ONLY from record.provenance['canonical_spdi'] (_canonical_spdi helper) -- it no longer constructs a raw chr:pos:ref:alt key and passes it off as identity proof",
+      "direct BiasTsvSource records (no canonical-adapter/manifest enrichment) never populate provenance['canonical_spdi'], so they remain fail-closed to canonical_identity_unverified -- reconciliation only activates once a canonical adapter/manifest genuinely supplies verified identity (as tests/scorer/test_committed_pipeline_transcript_regression.py demonstrates via CanonicalManifestBiasSource)",
+      "TSC1 .5 scope addition, TSC2/NTHL1 out-of-scope routing, and same-base .4/.5 reconciliation-once-proven behavior are unchanged by this correction"
+    ],
+    "finding": "reconcile_transcript_identity accepted a raw chr:pos:ref:alt echo of the record's own coordinates as canonical SPDI proof (policy.py's _raw_genomic_coords), so every TSC1/TSC2 .4-vs-.5 version delta was silently reconciled with NO independently verified genomic identity, and the identity check never validated SPDI syntax, gene genomic accession, or (for SNVs) position/ref/alt agreement."
+  },
+  "ingest_config": "configs/ingest/tsc.yaml",
+  "known_policy_gaps_resolved": [
+    "TSC1 added to scorer scope (config.genes) alongside TSC2",
+    "pure .4-vs-pinned-.5 version delta reconciled via base-accession identity (reconcile_transcript_identity), PROVIDED a canonical-adapter/manifest step has supplied VERIFIED canonical identity proof (record.provenance['canonical_spdi'], syntax + gene genomic accession + SNV pos/ref/alt all validated) -- no longer dumped to manual review once that proof exists",
+    "direct BiasTsvSource output (no canonical-adapter/manifest enrichment) carries no canonical_spdi and is correctly fail-closed to canonical_identity_unverified -- never silently reconciled off a raw chr:pos:ref:alt echo of its own coordinates",
+    "the 30 NTHL1 rows remain out_of_scope_gene manual-queue, excluded_from_scorer=True, never scored/re-attributed/classified"
+  ],
+  "pinned_mane_transcripts": {
+    "TSC1": "NM_000368.5",
+    "TSC2": "NM_000548.5"
+  },
+  "probe1_census_arithmetic_and_version_facts": {
+    "arithmetic": {
+      "every_tsc_row_is_dot4": true,
+      "tsc1_corpus_eq_bias4": true,
+      "tsc2_bias4_plus_nthl1": 4369,
+      "tsc2_corpus_eq_bias4": true,
+      "tsc2_region_locus_total_eq_bias4_plus_nthl1": true
+    },
+    "bias_gene_transcript": {
+      "NTHL1|NM_002528.6": 30,
+      "TSC1|NM_000368.4": 2249,
+      "TSC2|NM_000548.4": 4339
+    },
+    "corpus_by_gene_name": {
+      "NTHL1": 30,
+      "TSC1": 2249,
+      "TSC2": 4339
+    },
+    "total_rows": 6618
+  },
+  "probe2_nthl1_locus_characterization": {
+    "conclusion": "TSC2-region (chr16p13.3, NC_000016.10) input mis-annotated to NTHL1 -- locus characterization only, no reclassification",
+    "nthl1_all_chr16": true,
+    "nthl1_all_within_tsc2_region_window": true,
+    "nthl1_position_range": [
+      2048008,
+      2050490
+    ],
+    "nthl1_row_count": 30,
+    "tsc2_position_range": [
+      2048616,
+      2088696
+    ],
+    "tsc2_region_window_with_slack": [
+      1998616,
+      2138696
+    ]
+  },
+  "probe3_spdi_version_invariance": {
+    "conclusion": "direct BiasTsvSource output carries no canonical_spdi provenance and is correctly fail-closed to canonical_identity_unverified; reconciliation only activates once a canonical-adapter/manifest enrichment step supplies a verified genomic SPDI (simulated above for illustration only -- never treated as trusted proof by this probe or by production policy)",
+    "direct_bias_tsv_source_disposition_counts": {
+      "canonical_identity_unverified": 2,
+      "out_of_scope_gene": 1
+    },
+    "raw_variant_has_no_transcript_field": true,
+    "sample_dispositions": [
+      {
+        "direct_bias_tsv_source_disposition": "canonical_identity_unverified",
+        "emitted_transcript": "NM_000368.4",
+        "gene": "TSC1",
+        "pinned_transcript": "NM_000368.5",
+        "simulated_canonical_adapter_disposition": "reconciled_version_delta",
+        "simulated_canonical_adapter_spdi": "NC_000009.12:132891408:T:G",
+        "simulated_version_delta": true
+      },
+      {
+        "direct_bias_tsv_source_disposition": "out_of_scope_gene",
+        "emitted_transcript": "NM_002528.6",
+        "gene": "NTHL1",
+        "pinned_transcript": null,
+        "simulated_canonical_adapter_disposition": "out_of_scope_gene",
+        "simulated_canonical_adapter_spdi": "",
+        "simulated_version_delta": false
+      },
+      {
+        "direct_bias_tsv_source_disposition": "canonical_identity_unverified",
+        "emitted_transcript": "NM_000548.4",
+        "gene": "TSC2",
+        "pinned_transcript": "NM_000548.5",
+        "simulated_canonical_adapter_disposition": "reconciled_version_delta",
+        "simulated_canonical_adapter_spdi": "NC_000016.10:2048615:A:G",
+        "simulated_version_delta": true
+      }
+    ],
+    "simulated_canonical_adapter_disposition_counts": {
+      "out_of_scope_gene": 1,
+      "reconciled_version_delta": 2
+    }
+  },
+  "scorer_config": "configs/acmg/tsc.yaml",
+  "scorer_scope_genes": {
+    "TSC1": "NM_000368.5",
+    "TSC2": "NM_000548.5"
+  },
+  "script": "scripts/probe_transcript_reconciliation.py",
+  "status": "internal_probe_report_non_authoritative",
+  "verification": {
+    "note": "Test groups were run in SEPARATE pytest invocations to avoid a pre-existing, unrelated bare-\"conftest\"-module-name collision between tests/ingest and tests/kb (neither has __init__.py, so a rootdir-wide collection of both binds the top-level `from conftest import ...` in tests/ingest/test_ingest.py and tests/ingest/test_kit_conformance_ingest.py to whichever conftest.py sys.modules loaded first) -- unrelated to, and not introduced by, this correction.",
+    "runs": [
+      {
+        "covers": [
+          "AC-C1",
+          "AC-C2",
+          "AC-C3",
+          "AC-C4",
+          "AC-C5",
+          "AC-C7"
+        ],
+        "result": "5 passed",
+        "selector": "tests/scorer/test_transcript_reconciliation.py tests/ingest/test_nthl1_out_of_scope_routing.py tests/scorer/test_committed_pipeline_transcript_regression.py"
+      },
+      {
+        "covers": [
+          "preservation: all committed scorer tests"
+        ],
+        "result": "26 passed, 1 skipped",
+        "selector": "tests/scorer"
+      },
+      {
+        "covers": [
+          "preservation: normalizer/ingest pipeline untouched"
+        ],
+        "result": "18 passed, 12 skipped",
+        "selector": "tests/ingest"
+      },
+      {
+        "covers": [
+          "preservation: KB store/schema untouched"
+        ],
+        "result": "108 passed",
+        "selector": "tests/kb"
+      },
+      {
+        "covers": [
+          "no regression introduced by the checker-finding correction"
+        ],
+        "result": "486 passed, 1 failed (pre-existing, out-of-scope: missing pysam dependency in an unrelated live_eval_export CLI-contract test), 16 skipped",
+        "selector": "tests (full rootdir suite)"
+      }
+    ]
+  }
+}
