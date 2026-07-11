@@ -21,7 +21,7 @@
     },
     "slot2": {
       "path": "docs/prompts/prd04-calibration/slot2-calibration-contract.md",
-      "sha256": "1d0ec175f7c2f3ae9bdfea24485e3f02972bc07551777013baf43556e6db3114"
+      "sha256": "de5c60eaf18b3f34383abe4ce303f292072b98bd563f7096f678d2f701a3e416"
     },
     "slot3": {
       "path": "docs/prompts/prd04-calibration/slot3-preservation.md",
@@ -37,6 +37,8 @@
   "authorized_implementation_outputs": [
     "scripts/build_tsc_calibration_batch.py",
     "tests/packet/test_tsc_calibration_batch.py",
+    "src/raptor/packet/build.py",
+    "tests/packet/test_packet_core.py",
     "configs/packet/calibration.yaml"
   ],
   "authorized_implementation_notes": "configs/packet/calibration.yaml only if a genuinely separate run-artifact/version pin is required; otherwise reuse existing configs. No src/raptor/packet/** edits unless a demonstrated missing reusable API blocks the script (record as a blocker, do not silently patch).",
@@ -51,6 +53,7 @@
     "checker": {"model": "GPT-5.5", "duty": "re-verifies conservation, redaction, determinism, boundary, and eval-only reuse; the real run occurs only after this checker passes"}
   },
   "public_functions": [
+    "load_manifest(path) -> tuple[ManifestEntry, ...]",
     "reproduce_census_strata(bias_rows, scorer_config, eval_config) -> tuple[StratumEntry, ...]",
     "assert_source_of_record_conservation(manifest, bias_rows, strata, census_stats, provenance) -> None",
     "build_scorer_provenance(bias_row, run_pins) -> ScorerProvenance",
@@ -60,6 +63,7 @@
     "select_batch(universe, selection_config) -> Batch",
     "assert_batch_coverage(batch, strata) -> None",
     "canonical_json(obj) -> str",
+    "assert_census_record_boundary(path) -> Path",
     "write_outputs(output_dir, universe, batch, render_config, manifests) -> None",
     "build_batch_manifest(...) -> dict",
     "build_census_source_of_record(...) -> dict",

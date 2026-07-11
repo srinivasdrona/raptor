@@ -7,8 +7,11 @@
 - `configs/packet/calibration.yaml` **only if** a truly separate config pin is required (else reuse
   existing configs)
 
-No packet-module edits unless a demonstrated missing reusable API blocks the script (record as a blocker;
-do not silently patch a frozen module).
+One demonstrated reusable-API correction is authorized after checker review:
+`CanonicalVariantIdentity.consequence` must accept and preserve official SO tokens such as
+`3_prime_UTR_variant` / `5_prime_UTR_variant` verbatim. The prior lowercase-leading-letter regex was
+too narrow and forced a scientifically noncanonical rewrite. Only `src/raptor/packet/build.py` plus its
+existing core regression test may change for this correction.
 
 ## Goal
 
@@ -60,6 +63,30 @@ path (portability + no baked machine layout).
 
 ## Module functions (all module-level, individually testable, deterministic)
 
+### 0. Exact input value objects
+
+```
+@dataclass(frozen=True)
+class ManifestEntry:
+    variant_id: str       # canonical SPDI
+    vcf_key: str          # chr:pos:ref:alt, exact BIAS raw-row join key
+
+@dataclass(frozen=True)
+class RunPins:
+    input_sha256: str
+    output_sha256: str
+    manifest_sha256: str
+    source_snapshot: str
+    bias_version: str
+    bias_commit: str
+    nirvana_version: str
+    code_commit: str
+```
+
+All hashes are lowercase hex-64; `bias_version`, `bias_commit`, `nirvana_version`, source snapshot and
+code commit are non-blank and must match the census/audit/config pins. `load_manifest(path)` returns
+strict `ManifestEntry` rows and rejects duplicate `variant_id` or `vcf_key`.
+
 ### 1. Census-stratum reproduction (eval-only, outside the packet path)
 
 ```
@@ -73,9 +100,10 @@ class StratumEntry:
     basis: str                 # constant "eval_only_census_selection_metadata"
 
 def reproduce_census_strata(
-    bias_rows, scorer_config, eval_config
+    bias_rows, manifest_by_vcf_key, scorer_config, eval_config
 ) -> tuple[StratumEntry, ...]:
-    # For each BIAS row: parse_rationale(row.criteria, scorer_config.strength_map) -> calls;
+    # For each BIAS row: join its exact chr:pos:ref:alt key through manifest_by_vcf_key to canonical
+    # SPDI, then parse_rationale(row.criteria, scorer_config.strength_map) -> calls;
     # keep only eval_config.automatable_criteria; implied_direction(calls, eval_config) -> ImpliedCall;
     # map implied LP/LB (points>=likely_pathogenic_min / <=likely_benign_max) to the census stratum
     # tokens; the exact-strength pattern signature = sorted "<CRITERION> <Strength Title Case>" over the
@@ -138,9 +166,11 @@ def derive_quality_flags(bias_row, identity, calls) -> tuple[str, ...]:
 ```
 def build_packet_input(identity, bias_row, stratum_entry, packet_config, run_pins) -> PacketInput:
     # criterion_inputs = one PacketCriterionInput PER FIRED BIAS CRITERION (every fired criterion,
-    #   not just the direction-contributing ones), each with exactly one real ScorerProvenance and
-    #   primary_grounding = PrimaryGrounding.ABSENT + reason "no_primary_literature_or_ps3_assay"
-    #   (PS3 / literature required-but-absent). primary_evidence_refs = () -> a BIAS row is never a ref.
+    #   not just the direction-contributing ones), each with exactly one real ScorerProvenance.
+    #   A primary-required criterion (currently PS3/literature) carries
+    #   primary_grounding=ABSENT + reason "no_primary_literature_or_ps3_assay"; all other criteria
+    #   carry primary_grounding=NOT_REQUIRED + a policy reason. primary_evidence_refs=() always in
+    #   this batch -> a BIAS row is never a primary ref.
     # identity = CanonicalVariantIdentity(canonical_spdi=manifest SPDI, gene in {TSC1,TSC2},
     #   transcript = MANE .5 production identity, consequence, variant_class in {missense,truncating,other})
     # pattern_ref = PatternRef(census_snapshot_id="clinvar_2026-07-07",
@@ -151,7 +181,9 @@ def build_packet_input(identity, bias_row, stratum_entry, packet_config, run_pin
 
 def build_candidate_universe(strata, bias_rows, manifest, packet_config, run_pins)
     -> tuple[CandidateEvidencePacket, ...]:
-    # Build exactly the 1,571 LP+LB packets via build_packet (candidate_direction null, POLICY_BLOCKED).
+    # Build exactly the 1,571 LP+LB packets via build_packet
+    # (`packet.candidate_direction.direction is None`,
+    # `packet.candidate_direction.null_reason == "production_policy_unapproved"`, POLICY_BLOCKED).
     # NTHL1 manual_review + no_deterministic_resolution variants are NOT in the candidate universe.
 ```
 
@@ -175,7 +207,11 @@ def assert_batch_coverage(batch, strata) -> None:
 ```
 def canonical_json(obj) -> str:            # sort_keys=True, separators=(",",":"), UTF-8, trailing "\n"
 
-def write_outputs(output_dir, universe, batch, render_config, manifests) -> None:
+def assert_census_record_boundary(path) -> Path:
+    # Resolve repository root from this script's location, never caller cwd. Accept only a direct
+    # `.json` child of <repo>/data/census; reject every other location.
+
+def write_outputs(output_dir, batch, render_config, batch_manifest) -> None:
     #  <output-dir>/packets/<packet_id>.json              (OPERATOR source of record, one per SELECTED packet)
     #  <output-dir>/first_pass/<packet_id>.md             (render_markdown view=FIRST_PASS)
     #  <output-dir>/queue/tsc_calibration_queue.csv|.jsonl (build_queue_index over the SELECTED batch; FIRST_PASS projection)
@@ -183,13 +219,16 @@ def write_outputs(output_dir, universe, batch, render_config, manifests) -> None
     #  <output-dir>/batch_manifest.json                   (see build_batch_manifest)
     # All writes are byte-deterministic; packet ordering by packet_id.
 
-def build_batch_manifest(...) -> dict:
+def build_batch_manifest(
+    universe, batch, packet_config, selection_config, render_config,
+    run_pins, census_stats, lineage_audit
+) -> dict:
     # source hashes (VCF/BIAS-TSV/manifest/census/audit sha256), config hashes (packet/selection/render/
     # narrative/scorer/eval/lineage sha256), code_commit, run pins (bias 3.0.0 / commit / nirvana 3.18.1),
     # conservation record (6,618 / 238 / 1,333 / 20 / 10), selected_packet_ids, coverage summary, and an
     # explicit `limitations` list (see below).
 
-def build_census_source_of_record(...) -> dict:
+def build_census_source_of_record(batch_manifest) -> dict:
     # AGGREGATE, NON-IDENTIFYING only: counts, pattern-catalog sizes, selected-batch size, source/config
     # hashes, limitations. NO per-variant SPDI, NO patient data. This is the ONLY file committed under
     # data/census, and only AFTER the real run + checker.
@@ -223,7 +262,7 @@ python scripts/build_tsc_calibration_batch.py \
   --narrative-catalog configs/packet/narrative_templates.yaml \
   --scorer-config configs/acmg/tsc.yaml \
   --eval-config configs/eval/tsc2.yaml \
-  --output-dir PATH                        # REQUIRED; must be outside the repo; no patient data \
+  --output-dir PATH                        # REQUIRED; must be outside repo root derived from script path \
   [--aavc-comparator PATH]                 # optional; omitted by default (no network) \
   [--emit-census-record data/census/NAME.json]   # gated; writes ONLY the aggregate non-identifying JSON
 ```
@@ -237,11 +276,13 @@ tree. No stdout leaks a per-variant SPDI beyond the operator artifacts under `--
   LB queue; 20 LP + 10 LB = 30 patterns; matching source hashes/versions. Dropping/adding any row, or a
   count/pattern drift, raises `ConservationError` and aborts before output.
 - **CAL-AC2 — Packet conformance.** Every packet validates against the PRD-04 schema with
-  `candidate_direction=null`, `null_reason=production_policy_unapproved`, `review_state=POLICY_BLOCKED`;
+  `candidate_direction.direction=null`, `candidate_direction.null_reason=production_policy_unapproved`,
+  `review_state=POLICY_BLOCKED`;
   carries every fired BIAS criterion; each criterion has exactly one real-format `ScorerProvenance`
   (real input/output/raw-row sha256, BIAS `3.0.0`/commit, Nirvana `3.18.1`, raw BIAS transcript) and
-  `primary_grounding=absent`; canonical SPDI from the manifest; MANE `.5` identity; observed quality/edge
-  flags. A BIAS row can never be constructed as a `PrimaryEvidenceRef`.
+  `primary_grounding=absent` for primary-required PS3/literature and `not_required` otherwise; canonical
+  SPDI from the manifest; MANE `.5` identity; observed quality/edge flags. A BIAS row can never be
+  constructed as a `PrimaryEvidenceRef`.
 - **CAL-AC3 — Selection + coverage.** `select_calibration_batch` over the 1,571 universe yields a
   deterministic batch whose coverage proves all 30 patterns + every observed gene/class/edge flag as
   independent atoms, `missing` empty, no impossible cell selected; batch may exceed 30 only to cover
@@ -259,7 +300,8 @@ tree. No stdout leaks a per-variant SPDI beyond the operator artifacts under `--
   reproduction records basis `eval_only_census_selection_metadata`.
 - **CAL-AC8 — Output boundary.** `--output-dir` required and outside the repo; the only in-repo write is
   the aggregate non-identifying `data/census` JSON (no per-variant SPDI, no patient data), gated behind
-  `--emit-census-record`.
+  `--emit-census-record`. Both checks derive repo root from `__file__`, not current working directory;
+  aggregate emission accepts only a direct `.json` child of `<repo>/data/census`.
 
 ## Test oracle (independent, portable)
 
