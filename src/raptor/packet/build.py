@@ -114,9 +114,14 @@ _VALID_VARIANT_CLASSES = frozenset({"missense", "truncating", "other"})
 # NC_######.<version>:<0-based nonnegative position>:<deleted DNA or empty>:<inserted DNA or empty>
 _CANONICAL_SPDI_RE = re.compile(r"^NC_[0-9]{6}\.[0-9]+:[0-9]+:([ACGTN]*):([ACGTN]*)$")
 
-# PRD FR2: consequence must be a lowercase Sequence-Ontology-style token
-# (syntax only -- no invented closed consequence vocabulary).
-_CONSEQUENCE_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+# PRD FR2: consequence must be one or more safe comma-separated
+# alphanumeric/underscore tokens (syntax
+# only -- no invented closed consequence vocabulary, no re-encoding). This
+# accepts every official Sequence Ontology term verbatim, including terms
+# with a leading digit or embedded uppercase acronym (e.g.
+# `3_prime_UTR_variant`, `5_prime_UTR_variant`), while still rejecting
+# punctuation and blank strings.
+_CONSEQUENCE_RE = re.compile(r"^[A-Za-z0-9_]+(?:,[A-Za-z0-9_]+)*$")
 
 # PRD FR2: per-gene canonical GRCh38 accession + MANE transcript pin.
 _GENE_ACCESSIONS = {
@@ -175,8 +180,9 @@ def _validate_packet_input(packet_input: PacketInput) -> None:
 
     if _CONSEQUENCE_RE.fullmatch(identity.consequence) is None:
         raise PacketValidationError(
-            "PacketInput.identity.consequence must be a lowercase Sequence-Ontology-style "
-            f"token matching ^[a-z][a-z0-9_]*$; got {identity.consequence!r}"
+            "PacketInput.identity.consequence must be one or more comma-separated "
+            "safe alphanumeric/underscore tokens; "
+            f"got {identity.consequence!r}"
         )
 
     if not packet_input.criterion_inputs:

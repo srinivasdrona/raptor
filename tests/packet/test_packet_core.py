@@ -354,6 +354,19 @@ def test_ac1_ac5_identity_and_primary_grounding_are_consistent() -> None:
         with pytest.raises(api["PacketValidationError"]):
             api["build_packet"](invalid, _packet_config(api))
 
+    utr = replace(valid, identity=replace(valid.identity, consequence="3_prime_UTR_variant"))
+    utr_packet = api["build_packet"](utr, _packet_config(api))
+    assert utr_packet.identity.consequence == "3_prime_UTR_variant"
+    multi = replace(
+        valid,
+        identity=replace(
+            valid.identity,
+            consequence="splice_region_variant,5_prime_UTR_variant",
+        ),
+    )
+    multi_packet = api["build_packet"](multi, _packet_config(api))
+    assert multi_packet.identity.consequence == "splice_region_variant,5_prime_UTR_variant"
+
     ps3_not_required = _packet_input(
         api,
         [
