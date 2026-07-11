@@ -1,0 +1,62 @@
+{
+  "task_id": "external-pathway-state-lifecycle",
+  "sequence": "C",
+  "goal": "No-submission state machine + conflict/version/update/withdrawal lifecycle + prerequisite checklist; SUBMISSION_AUTHORIZED unreachable by construction; Layer B structurally off",
+  "depends_on": ["external-pathway-clinvar-map", "external-pathway-conformance"],
+  "planning_only": true,
+  "no_submission": true,
+  "no_contact": true,
+  "no_push": true,
+  "no_production_classification": true,
+  "no_network": true,
+  "produces_scv": false,
+  "branch": "track/external-pathway-2026-07",
+  "worktree": "D:/AIProjects/raptor-worktrees/external-pathway",
+  "source_commit": "e52e855",
+  "pinned_contract_ref": "docs/prd/PRD-09-clinvar-vcep-submission-preparation.md §15.5-§15.6 (+ §16 tester-correction)",
+  "slots": {
+    "tester": {
+      "model_role": "tester",
+      "model_family": "Gemini",
+      "model_target": "gemini-2.5-pro",
+      "authors": "tests/external/test_task_c_lifecycle.py",
+      "order": 1,
+      "mandate": "Author AC4/AC7/AC8/AC9/AC11 tests BEFORE the doer, against the frozen §15.5-§15.6 contract. can_transition takes ExternalReviewState (packet.review_state), not a packet. AC8 must prove SUBMISSION_AUTHORIZED unreachable even with an ALL-True ExternalContext (AUTHORIZATION_ENABLED_THIS_INCREMENT is False). AC9 must be STRUCTURAL not pass: assert dryrun.LAYER_B_ENABLED is False, no production URL constant, validate_conformance has no network param. validate_record_status/validate_withdrawal are @staticmethod; 'delete' always raises. PrerequisiteChecklist(items=...); use default_checklist/missing_institutional (no boolean-kwarg constructor)."
+    },
+    "doer": {
+      "model_role": "doer",
+      "model_family": "Sonnet",
+      "model_target": "claude-sonnet-4.5",
+      "implements": ["src/raptor/external/state.py", "src/raptor/external/dryrun.py"],
+      "order": 2,
+      "mandate": "Implement §15.5-§15.6 exactly: ExternalReviewState, RecordStatus (novel/update only), ExternalContext, PrerequisiteType/PrerequisiteItem/PrerequisiteChecklist + default_checklist; ExternalStateMachine (TRANSITIONS, can_transition, next_state, static validate_record_status/validate_withdrawal/build_clinvar_deletion/review_status_preview) with AUTHORIZATION_ENABLED_THIS_INCREMENT=False; dryrun.py with LAYER_B_ENABLED=False, no production URL constant, run_layer_b raising LayerBDisabledError. Withdrawal = top-level clinvarDeletion.accessionSet[]; no fake 3-star."
+    },
+    "checker": {
+      "model_role": "checker",
+      "model_family": "GPT",
+      "model_target": "gpt-5-class",
+      "verifies": "cross-family re-verification (OPERATING_MODEL §4)",
+      "order": 3,
+      "mandate": "Re-verify SUBMISSION_AUTHORIZED unreachable-by-construction (all-True context still False), update requires SCV, delete rejected, withdrawal via top-level clinvarDeletion, checklist typing blocks 'ready' while institutional items open, Layer B default-off structural, 1-star preview only. Confirm no production-POST code path and no network."
+    }
+  },
+  "reference_files": [
+    "docs/prd/PRD-09-clinvar-vcep-submission-preparation.md",
+    "docs/reference/clinvar-vcep-primary-sources-2026-07.md",
+    "src/raptor/packet/state.py",
+    "src/raptor/external/conformance.py"
+  ],
+  "authorized_outputs": [
+    "src/raptor/external/state.py",
+    "src/raptor/external/dryrun.py",
+    "tests/external/test_task_c_lifecycle.py"
+  ],
+  "acceptance_criteria": ["AC4", "AC7", "AC8", "AC9", "AC11"],
+  "must_not_edit": ["docs/PROGRAM.md", "docs/STRATEGY.md", "docs/DECISIONS.md", "docs/RISK_REGISTER.md", "src/raptor/packet/**"],
+  "pinned_symbols": {
+    "state.py": ["ExternalReviewState", "RecordStatus", "ExternalContext", "PrerequisiteType", "PrerequisiteItem", "PrerequisiteChecklist", "default_checklist", "ExternalStateMachine", "AUTHORIZATION_ENABLED_THIS_INCREMENT", "ExternalStateError", "UpdateWithdrawalIntegrityError", "PrerequisiteError"],
+    "dryrun.py": ["LAYER_B_ENABLED", "run_layer_b", "LayerBDisabledError"]
+  },
+  "revised_at": "2026-07-12",
+  "revision_note": "Materialized task-specific three-slot (tester/doer/checker = Gemini/Sonnet/GPT) manifest with <=4 references. Pins frozen §15.5-§15.6 API surface; AC8 all-True-context unreachability + AC9 structural default-off; SCV/update/withdrawal enum pinned; no fake 3-star."
+}
