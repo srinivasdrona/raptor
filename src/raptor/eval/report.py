@@ -25,10 +25,37 @@ def _metrics_payload(metrics: Dict[str, Metrics]) -> dict:
             "concordance": m.concordance,
             "benign_precision": m.benign_precision,
             "benign_recall": m.benign_recall,
+            # Gate-fidelity (Arm C, additive): the 95% Clopper-Pearson lower
+            # bounds the gate actually compares against -- included in the
+            # content hash so two runs differing only in lower-bound math
+            # (e.g. a stats.py regression) are NOT reported identical (AC7
+            # determinism is preserved: same inputs -> same lower bounds ->
+            # same hash; it is not weakened, only made more complete).
+            "precision_lb": m.precision_lb,
+            "recall_lb": m.recall_lb,
+            "benign_precision_lb": m.benign_precision_lb,
+            "benign_recall_lb": m.benign_recall_lb,
             "counts": dict(sorted(m.counts.items())),
             "gating": m.gating,
         }
         for stratum, m in sorted(metrics.items())
+    }
+
+
+def _per_stratum_payload(per_stratum: dict) -> dict:
+    """Gate-fidelity (Arm C, additive): the `GateDecision.per_stratum` verdicts,
+    JSON-safe and sorted, folded into the content hash so a per-stratum verdict
+    change (e.g. `truncating` flipping FAIL) is never hash-invisible."""
+    return {
+        name: {
+            "precision_lb": v.precision_lb,
+            "recall_lb": v.recall_lb,
+            "threshold": dict(sorted(v.threshold.items())),
+            "met": v.met,
+            "gating": v.gating,
+            "powered": v.powered,
+        }
+        for name, v in sorted(per_stratum.items())
     }
 
 
@@ -68,6 +95,7 @@ class EvalReport:
                 "stratum": self.gate.stratum,
                 "reason": self.gate.reason,
                 "vus_authorized": self.gate.vus_authorized,
+                "per_stratum": _per_stratum_payload(self.gate.per_stratum),
             },
             "oracle_blind_findings": sorted(self.oracle_blind_findings),
             "code_version": self.code_version,
@@ -79,7 +107,14 @@ class EvalReport:
     def render(self) -> str:
         """The versioned `BENCHMARK_RESULTS`-style report text (FR10/AC9):
         states benchmark/labels snapshot, per-class held-out size, every
-        metric, and threshold status."""
+        metric, and threshold status. Gate-fidelity (Arm C): per-stratum
+        lower bound + pre-registered threshold are both shown `.4f`-formatted
+        (Python's default float repr of `0.90` is `"0.9"` -- no trailing
+        zero -- so a raw `repr()` would not satisfy an auditor grepping for
+        the exact pinned value). When `gate.status == "BLOCKED_POLICY"` (the
+        terminal masked-rerun harness only) no metrics table is printed at
+        all -- there is no authorized predictor-policy artifact, so there is
+        nothing legitimate to report a number for."""
         lines: List[str] = []
         lines.append("RAPTOR Eval Report (PRD-06)")
         lines.append(f"run_id: {self.run_id}")
@@ -94,14 +129,36 @@ class EvalReport:
             f"(by label: {dict(sorted(self.holdout_label_counts.items()))}, "
             f"by class: {dict(sorted(self.holdout_class_counts.items()))})"
         )
-        lines.append("metrics by stratum:")
-        for stratum, m in sorted(self.metrics.items()):
+        if self.gate.status == "BLOCKED_POLICY":
             lines.append(
-                f"  - {stratum}: precision={m.precision:.4f} recall={m.recall:.4f} "
-                f"concordance={m.concordance:.4f} benign_precision={m.benign_precision:.4f} "
-                f"benign_recall={m.benign_recall:.4f} counts={dict(sorted(m.counts.items()))} "
-                f"gating={m.gating}"
+                "metrics by stratum: WITHHELD -- gate status is BLOCKED_POLICY "
+                "(no approved bp4pp3-predictor-policy artifact; no metric is authorized "
+                "to be reported)"
             )
+        else:
+            lines.append("metrics by stratum:")
+            for stratum, m in sorted(self.metrics.items()):
+                lines.append(
+                    f"  - {stratum}: precision={m.precision:.4f} recall={m.recall:.4f} "
+                    f"concordance={m.concordance:.4f} benign_precision={m.benign_precision:.4f} "
+                    f"benign_recall={m.benign_recall:.4f} "
+                    f"precision_lb={m.precision_lb:.4f} recall_lb={m.recall_lb:.4f} "
+                    f"benign_precision_lb={m.benign_precision_lb:.4f} "
+                    f"benign_recall_lb={m.benign_recall_lb:.4f} "
+                    f"counts={dict(sorted(m.counts.items()))} gating={m.gating}"
+                )
+                verdict = self.gate.per_stratum.get(stratum)
+                if verdict is not None:
+                    threshold = verdict.threshold or {}
+                    precision_t = threshold.get("precision")
+                    recall_t = threshold.get("recall")
+                    precision_t_str = f"{precision_t:.4f}" if isinstance(precision_t, (int, float)) else "unset"
+                    recall_t_str = f"{recall_t:.4f}" if isinstance(recall_t, (int, float)) else "unset"
+                    lines.append(
+                        f"    threshold: precision>={precision_t_str} recall>={recall_t_str} "
+                        f"(95% CI lower bound) met={verdict.met} powered={verdict.powered} "
+                        f"gating={verdict.gating}"
+                    )
         if self.gate.status == "UNVERIFIED":
             threshold_status = "not-yet-set (UNVERIFIED)"
         elif self.gate.status == "PASS":

@@ -33,7 +33,7 @@ from raptor.eval.gate import decide_gate
 from raptor.eval.metrics import compute_metrics
 from raptor.eval.harness import run_eval
 from raptor.eval.model import BenchmarkRow, ImpliedCall, Metrics
-from conftest import make_eval_config, make_labeled, evidence_for
+from conftest import make_eval_config, make_labeled, evidence_for, oracle_thresholds_for, with_point_estimate_lb
 
 
 def _valid_raw() -> dict:
@@ -102,7 +102,7 @@ def test_gate_does_not_authorize_when_a_class_was_abstained_end_to_end():
     """Even with thresholds SET and perfect pathogenic-side metrics, a run that
     abstained on an entire truth class must NOT PASS (the gate sees a non-gating
     stratum)."""
-    cfg = make_eval_config(oracle_thresholds={"precision": 0.9, "recall": 0.9}, min_count_per_class=3)
+    cfg = make_eval_config(oracle_thresholds=oracle_thresholds_for(0.9, 0.9), min_count_per_class=3)
     bm = [BenchmarkRow(f"p{i}", "P", "missense") for i in range(4)] + \
          [BenchmarkRow(f"b{i}", "B", "missense") for i in range(4)]
     implied = [ImpliedCall(f"p{i}", "LP", 8) for i in range(4)] + \
@@ -117,9 +117,9 @@ def test_gate_defense_in_depth_rejects_abstained_class_when_counts_present():
     """Defense-in-depth: the gate is the authorization boundary and must not blindly
     trust a hand-built `gating=True`; if per-class CALLED counts are present and a
     class is below the coverage floor, it must not PASS."""
-    cfg = make_eval_config(oracle_thresholds={"precision": 0.9, "recall": 0.9}, min_count_per_class=10)
+    cfg = make_eval_config(oracle_thresholds=oracle_thresholds_for(0.9, 0.9), min_count_per_class=10)
     starved = _full_counts(path_called=20, benign_called=0)  # benign abstained-out
-    metrics = {"missense": Metrics(1.0, 1.0, 1.0, starved, "missense", gating=True)}
+    metrics = {"missense": with_point_estimate_lb(Metrics(1.0, 1.0, 1.0, starved, "missense", gating=True))}
     d = decide_gate(metrics, cfg)
     assert d.status != "PASS"
     assert d.vus_authorized is False
@@ -131,21 +131,24 @@ def test_gate_defense_in_depth_rejects_abstained_class_when_counts_present():
 def test_config_rejects_nonpositive_threshold(tmp_path):
     """A pre-registered threshold of 0.0 authorizes on zero performance -- not a real
     target. oracle_thresholds values must be strictly positive (0 < v <= 1)."""
-    for bad in ({"precision": 0.0, "recall": 0.9}, {"precision": 0.9, "recall": 0.0}):
+    for bad in (
+        {"confidence": 0.95, "strata": {"missense": {"precision": 0.0, "recall": 0.9, "gating": True}}},
+        {"confidence": 0.95, "strata": {"missense": {"precision": 0.9, "recall": 0.0, "gating": True}}},
+    ):
         with pytest.raises(ConfigError):
             load_config(_write_config(tmp_path, oracle_thresholds=bad))
-    # a genuine strictly-positive target still loads
-    load_config(_write_config(tmp_path, oracle_thresholds={"precision": 0.9, "recall": 0.9}))
+    # a genuine strictly-positive, pinned target still loads
+    load_config(_write_config(tmp_path, oracle_thresholds=oracle_thresholds_for(0.90, 0.85)))
 
 
 def test_gate_rejects_nonpositive_threshold_defense_in_depth():
     """A hand-built config bypassing load_config with a zero/negative threshold must
     never satisfy the gate -- an out-of-range threshold is treated as UNMET."""
-    for bad in ({"precision": 0.0, "recall": 0.9}, {"precision": -1.0, "recall": 0.9}):
-        cfg = make_eval_config(oracle_thresholds=bad)
-        metrics = {"missense": Metrics(0.0, 0.95, 1.0, _full_counts(), "missense", True)}
+    for bad_precision in (0.0, -1.0):
+        cfg = make_eval_config(oracle_thresholds=oracle_thresholds_for(bad_precision, 0.9))
+        metrics = {"missense": with_point_estimate_lb(Metrics(0.0, 0.95, 1.0, _full_counts(), "missense", True))}
         d = decide_gate(metrics, cfg)
-        assert d.status != "PASS", f"non-positive threshold {bad!r} must not authorize"
+        assert d.status != "PASS", f"non-positive threshold {bad_precision!r} must not authorize"
         assert d.vus_authorized is False
 
 

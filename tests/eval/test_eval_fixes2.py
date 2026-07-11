@@ -15,7 +15,7 @@ from raptor.eval.combine import implied_direction
 from raptor.eval.gate import decide_gate
 from raptor.eval.benchmark import build_benchmark
 from raptor.eval.model import Metrics
-from conftest import make_eval_config, make_labeled
+from conftest import make_eval_config, make_labeled, oracle_thresholds_for, with_point_estimate_lb
 
 
 def _valid_raw() -> dict:
@@ -44,36 +44,45 @@ def _write_config(tmp_path, **overrides) -> str:
 # precision AND recall are mandatory gating targets (concordance can't substitute)
 # --------------------------------------------------------------------------
 def test_gate_concordance_only_cannot_pass():
-    """A concordance-only threshold must NOT yield PASS while precision/recall are
-    degenerate (0) — authorizing clinical use on concordance alone is a false PASS."""
-    cfg = make_eval_config(oracle_thresholds={"concordance": 1.0})
-    metrics = {"missense": Metrics(precision=0.0, recall=0.0, concordance=1.0,
-                                   counts={}, stratum="missense", gating=True)}
+    """A stratum spec missing the mandatory `recall` key must NOT yield PASS
+    while precision/recall are degenerate (0) — concordance is not part of
+    the nested per-stratum gating schema at all (precision+recall, both
+    directions, are the only gated metrics now), so authorizing on it (or on
+    a spec that omits recall) is a false PASS."""
+    cfg = make_eval_config(oracle_thresholds={
+        "confidence": 0.95,
+        "strata": {"missense": {"precision": 0.9, "gating": True, "directions": ["pathogenic", "benign"]}},
+    })
+    metrics = {"missense": with_point_estimate_lb(Metrics(precision=0.0, recall=0.0, concordance=1.0,
+                                   counts={}, stratum="missense", gating=True))}
     d = decide_gate(metrics, cfg)
     assert d.status != "PASS"
     assert d.vus_authorized is False
 
 
 def test_config_requires_precision_and_recall_when_thresholds_set(tmp_path):
-    """A non-empty oracle_thresholds MUST include both precision and recall — a
-    concordance-only (or precision-only) threshold block fails loud at load."""
-    for bad in ({"concordance": 0.9}, {"precision": 0.9}, {"recall": 0.9}):
+    """A non-empty oracle_thresholds stratum MUST include both precision and
+    recall — a spec missing either fails loud at load."""
+    for bad in (
+        {"confidence": 0.95, "strata": {"missense": {"gating": True}}},
+        {"confidence": 0.95, "strata": {"missense": {"precision": 0.9, "gating": True}}},
+        {"confidence": 0.95, "strata": {"missense": {"recall": 0.9, "gating": True}}},
+    ):
         with pytest.raises(ConfigError):
             load_config(_write_config(tmp_path, oracle_thresholds=bad))
-    # both present -> loads (concordance optional-additional)
-    load_config(_write_config(tmp_path, oracle_thresholds={"precision": 0.9, "recall": 0.9}))
-    load_config(_write_config(tmp_path, oracle_thresholds={"precision": 0.9, "recall": 0.9, "concordance": 0.8}))
+    # both present, pinned exactly -> loads
+    load_config(_write_config(tmp_path, oracle_thresholds=oracle_thresholds_for(0.90, 0.85)))
 
 
 def test_gate_still_passes_with_precision_and_recall_met():
     """Control: a genuinely-passing case (precision+recall thresholds met on BOTH
     directions, with adequate per-class CALLED coverage) still PASSes."""
-    cfg = make_eval_config(oracle_thresholds={"precision": 0.9, "recall": 0.9})
+    cfg = make_eval_config(oracle_thresholds=oracle_thresholds_for(0.9, 0.9))
     counts = {"tp": 20, "fp": 0, "tn": 20, "fn": 0, "abstain": 0, "total_called": 40,
               "total": 40, "path_actual": 20, "benign_actual": 20,
               "path_called": 20, "benign_called": 20}
-    metrics = {"missense": Metrics(0.95, 0.95, 0.95, counts, "missense", True,
-                                   benign_precision=0.95, benign_recall=0.95)}
+    metrics = {"missense": with_point_estimate_lb(Metrics(0.95, 0.95, 0.95, counts, "missense", True,
+                                   benign_precision=0.95, benign_recall=0.95))}
     d = decide_gate(metrics, cfg)
     assert d.status == "PASS"
     assert d.vus_authorized is True
