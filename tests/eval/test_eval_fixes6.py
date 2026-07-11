@@ -22,7 +22,7 @@ from raptor.eval.config import load_config, ConfigError
 from raptor.eval.combine import implied_direction
 from raptor.eval.gate import decide_gate
 from raptor.eval.model import Metrics
-from conftest import make_eval_config
+from conftest import make_eval_config, oracle_thresholds_for, with_point_estimate_lb
 
 
 def _valid_raw() -> dict:
@@ -100,10 +100,10 @@ def test_gate_fail_closed_on_missing_truth_counts():
     """The fail-closed PASS defense must require per-truth-class counts
     (path_actual/benign_actual), not only CALLED counts -- a hand-built Metrics with
     called counts but no truth-count proof must not authorize a VUS run."""
-    cfg = make_eval_config(oracle_thresholds={"precision": 0.9, "recall": 0.9})
+    cfg = make_eval_config(oracle_thresholds=oracle_thresholds_for(0.9, 0.9))
     counts = {"path_called": 20, "benign_called": 20}  # called present, truth counts absent
-    metrics = {"missense": Metrics(0.95, 0.95, 0.95, counts, "missense", gating=True,
-                                   benign_precision=0.95, benign_recall=0.95)}
+    metrics = {"missense": with_point_estimate_lb(Metrics(0.95, 0.95, 0.95, counts, "missense", gating=True,
+                                   benign_precision=0.95, benign_recall=0.95))}
     d = decide_gate(metrics, cfg)
     assert d.status != "PASS"
     assert d.vus_authorized is False

@@ -11,6 +11,7 @@ dependencies = [
     "PyYAML>=6.0",
     "bioutils>=0.6.0",
     "pysam>=0.22",
+    "scipy>=1.10",
 ]
 
 [project.optional-dependencies]

@@ -1,0 +1,98 @@
+{
+  "task_id": "leakage-validation-clopper-pearson-per-stratum-gate-fidelity",
+  "arm": "C",
+  "model_role": "planner",
+  "model_family": "Claude",
+  "model_target": "claude-opus-4.8",
+  "intent_block_present": true,
+  "goal": "Make the PRD-06 gate compute the 95% Clopper-Pearson lower confidence bound per stratum per direction and hard-gate a per-stratum oracle_thresholds map via a BREAKING nested EvalConfig schema migration (build now); correct the Clopper-Pearson power anchors (n>=36/72/368) and the min_count_per_class floor 35->36; require an approved bp4pp3-predictor-policy artifact at the final runner (fail-closed BLOCKED_POLICY) supplied by the policy track; wire the final leakage-safe masked rerun + authoritative report onto that gate (policy-gated on BP4/PP3).",
+  "slots": {
+    "slot1": {
+      "path": "docs/prompts/leakage-validation/gate-fidelity/slot1-planner.md",
+      "sha256": "c87938da7f531565676f027714eab574b614d25ba93f3aa18747e872144ef071"
+    },
+    "slot2": {
+      "path": "docs/prompts/leakage-validation/gate-fidelity/slot2-gate-contract.md",
+      "sha256": "c5b09f3406a55c5d65788c3b7301831d5067194d92b29d2e600b3c15b9d48071"
+    },
+    "slot3": {
+      "path": "docs/prompts/leakage-validation/gate-fidelity/slot3-preservation.md",
+      "sha256": "cebcce278024f86f089cfa66cbc03257c98cf9c53c61a6fba0c8240da9ea8917"
+    }
+  },
+  "source_pins": {
+    "repo_head": "e52e855",
+    "eval_rubric": "docs/EVAL_RUBRIC.md §1 (thresholds) / §2 (Clopper-Pearson power table -- narrowly corrected to n>=36/72/368) / §3 (post-split held-out N) / §5-§6 (per-stratum + lower-bound follow-ups)",
+    "pre_registered_thresholds": {
+      "missense": {"precision": 0.90, "recall": 0.85, "gating": true, "directions": ["pathogenic", "benign"]},
+      "truncating": {"precision": 0.95, "recall": 0.95, "gating": true, "directions": ["pathogenic"]},
+      "truncating_benign": "n=1 report-only, never gated",
+      "min_count_per_class": 36,
+      "min_count_per_class_note": "CORRECTED 35->36: scipy.stats.beta.ppf(0.025,35,1)=0.8999676 < 0.90, n=36->0.9026 >= 0.90; a mathematical Clopper-Pearson power-floor fix, blind to held-out outcomes, NOT a performance tune. 51 held-out missense-pathogenic still clears 36.",
+      "split_holdout_fraction": 0.7,
+      "confidence": 0.95,
+      "schema": "nested per-stratum oracle_thresholds {confidence, strata:{name:{precision,recall,gating,directions}}} -- BREAKING migration of flat {precision,recall}; empty {} still -> UNVERIFIED; no float(dict) path"
+    },
+    "power_anchors": "CORRECTED (scipy.stats.beta.ppf(0.025,k,n-k+1)): 0.90 LB needs n>=36 (0 err; 35->0.8999676); 0.95 needs n>=72; 0.99 needs n>=368 (367->0.9899989). Prior n>=35/n>=367 were off-by-one and are not retained.",
+    "predictor_policy_schema": {
+      "id": "bp4pp3-predictor-policy",
+      "supplied_by": "policy track (Track C)",
+      "required_fields": ["schema", "status", "predictor_source_hash", "correction_hash", "decision_reference"],
+      "approved_when": "schema == 'bp4pp3-predictor-policy' AND status == 'approved' AND 64-hex predictor_source_hash/correction_hash AND non-blank decision_reference",
+      "fail_closed": "missing/malformed -> PredictorPolicyError; well-formed non-approved -> approved=false; either -> terminal runner emits GateDecision(status='BLOCKED_POLICY', vus_authorized=false) with no metrics",
+      "not_a_lineage_relabel": "BP4/PP3 data lineage stays 'allowed' in bias_lineage.yaml; algorithm-correctness is a separate policy axis enforced only at the final gate; no default-allow or default-ban"
+    },
+    "scipy_dependency": "declared scipy>=1.10 in pyproject.toml [project].dependencies regardless of local availability (verified importable: 1.18.0)",
+    "heldout_full_resource_bias_output_sha256": "6e055fe1a4f7d18e428c62739e3b60fa55362f72aa6322429d2f4ff93076dd9c"
+  },
+  "policy_gate": {
+    "decision_dependency": "bp4pp3-predictor-policy",
+    "interface": "scripts/run_masked_holdout_eval.py --predictor-policy PATH (required); artifact loaded via src/raptor/eval/predictor_policy.py::load_predictor_policy (fail-closed).",
+    "description": "BP4/PP3 fire from computational predictors/splice models trained on ClinVar-labelled data; whether that is admissible independent evidence or predictor-mediated circularity vs a ClinVar-derived benchmark is an open Oracle policy question, distinct from Arm A's ClinVar-comparator masking and NOT a lineage relabel (their bias_lineage.yaml disposition stays allowed). The final runner requires an approved bp4pp3-predictor-policy artifact supplied by Track C; missing/unapproved/malformed -> fail-closed BLOCKED_POLICY (no metrics, vus_authorized false). The loader + BLOCKED_POLICY wiring are built and tested now against synthetic approved/unapproved/malformed fixtures.",
+    "blocks": "C-final terminal masked-rerun report + PASS + VUS authorization"
+  },
+  "authorized_implementation_outputs": [
+    "src/raptor/eval/stats.py",
+    "src/raptor/eval/metrics.py",
+    "src/raptor/eval/gate.py",
+    "src/raptor/eval/report.py",
+    "src/raptor/eval/model.py",
+    "src/raptor/eval/config.py",
+    "src/raptor/eval/predictor_policy.py",
+    "configs/eval/tsc2.yaml",
+    "pyproject.toml",
+    "docs/EVAL_RUBRIC.md",
+    "tests/eval/test_clopper_pearson_gate.py",
+    "tests/eval/test_predictor_policy_gate.py",
+    "scripts/run_masked_holdout_eval.py"
+  ],
+  "reference_files": [
+    "docs/EVAL_RUBRIC.md",
+    "src/raptor/eval/gate.py",
+    "src/raptor/eval/metrics.py",
+    "configs/eval/tsc2.yaml"
+  ],
+  "roles": {
+    "tester": {
+      "model_target": "gemini-3.1-pro-preview",
+      "responsibility": "Author executable AC tests (AC-G1..AC-G9) from slot 2 + slot-1 surfaces only, before the doer. Derive the Clopper-Pearson oracle from scipy.stats.beta.ppf + the CORRECTED EVAL_RUBRIC §2 anchor points (LB(36,36)>=0.90>LB(35,35); LB(72,72)>=0.95>LB(71,71); LB(368,368)>=0.99>LB(367,367)) and hand-computed confusion matrices, never the implementation. AC-G2 proves point-clears-but-LB-fails != PASS. AC-G4 proves below min_count_per_class=36 -> UNDERPOWERED. AC-G5 proves a config threshold differing from the pinned rubric value is rejected under the nested schema. AC-G8/G9 prove the terminal runner requires an approved bp4pp3-predictor-policy artifact and emits fail-closed BLOCKED_POLICY (no metrics) on missing/unapproved/malformed synthetic fixtures, never a default-allow."
+    },
+    "doer": {
+      "model_target": "claude-sonnet-5",
+      "responsibility": "Implement stats.py (exact Beta lower bound) + predictor_policy.py (bp4pp3-predictor-policy fail-closed loader); extend metrics/gate/report/model additively; MIGRATE config.py oracle_thresholds to the nested per-stratum schema (breaking) replacing the float(v)-per-key builder so no float(dict) path exists; migrate configs/eval/tsc2.yaml (value-preserving) and correct min_count_per_class 35->36; declare scipy>=1.10 in pyproject.toml; apply the narrow docs/EVAL_RUBRIC.md §2 anchor correction. Gate on the lower bound; preserve UNVERIFIED/UNDERPOWERED/PASS/FAIL honesty; wire BLOCKED_POLICY into scripts/run_masked_holdout_eval.py. Never fit or change a POLICY threshold value; never relabel BP4/PP3 lineage in bias_lineage.yaml; never modify run_eval or docs/PROGRAM.md / docs/STRATEGY.md. Honor slot 3."
+    },
+    "checker": {
+      "model_target": "gpt-5.6-sol",
+      "responsibility": "Re-verify all ACs pass; POLICY threshold values + run_eval + harness label-blindness + BP4/PP3 lineage records are unchanged; the min_count 35->36 change and EVAL_RUBRIC §2 correction are exact scipy-derived math (not tuning) and no float(dict) path survives; and none of the six slot-3 inversion failures are present (point-estimate green, threshold drift/fitting, underpowered pass, premature terminal PASS/default-allow policy, Wald approximation, retaining a wrong anchor)."
+    }
+  },
+  "dependencies": {
+    "builds_now": true,
+    "blocked_by_at_runtime": [
+      "Arm A masked comparator resources (operator rebuild)",
+      "Arm B canonical adapter over the masked TSV",
+      "Track C approved bp4pp3-predictor-policy artifact (--predictor-policy) supplied to the final runner",
+      "Oracle ADR-0009 ruling on masked PS1/PM5/PM1/PP2/BP1 counts"
+    ]
+  }
+}

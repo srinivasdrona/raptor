@@ -29,12 +29,12 @@ Clopper-Pearson **lower confidence bound**:
 | **Missense** (gating) | Recall — benign direction | **≥ 0.85** | yes |
 | **Truncating** (secondary/reported) | Precision — both directions | **≥ 0.95** | pathogenic yes (n≈325); benign **no** (n≈1) |
 | **Truncating** (secondary/reported) | Recall — pathogenic direction | **≥ 0.95** | yes |
-| **All strata** | Min held-out count per class (else `UNDERPOWERED`) | **≥ 35** | — |
+| **All strata** | Min held-out count per class (else `UNDERPOWERED`) | **≥ 36** | — |
 
 **Why 0.90, not 0.99, for the primary bar.** ACMG/AMP 2015 (Richards) *defines* Likely Pathogenic as
 **>90%** posterior probability and Pathogenic as **>99%** — these are definitional, not invented
 (Pejaver 2022 calibrated the same). A **0.99 lower-bound claim is statistically indefensible on any
-realistic TSC benchmark**: a 95%-CI lower bound of 0.99 requires **≥367 clean calls per stratum with
+realistic TSC benchmark**: a 95%-CI lower bound of 0.99 requires **≥368 clean calls per stratum with
 zero errors** (§2). 0.90 is the minimum consistent with the LP definition and is comfortably powered.
 IARC (Plon 2008) sets LP at **0.95** — stricter; adopted here for the **truncating** stratum where we
 have the N to support it.
@@ -56,9 +56,9 @@ Minimum held-out calls **n** in a stratum to support a precision **lower bound**
 
 | Target lower bound | 0 errors | ≤1 error | ≤2 errors |
 |---|---|---|---|
-| ≥ 0.90 | n ≥ 35 | n ≥ 53 | n ≥ 90 |
-| ≥ 0.95 | n ≥ 72 | n ≥ 109 | n ≥ 175 |
-| ≥ 0.99 | n ≥ 367 | n ≥ 555 | n ≥ 880 |
+| ≥ 0.90 | n ≥ 36 | n ≥ 54 | n ≥ 70 |
+| ≥ 0.95 | n ≥ 72 | n ≥ 110 | n ≥ 142 |
+| ≥ 0.99 | n ≥ 368 | n ≥ 555 | n ≥ 720 |
 
 **Mandatory disclosure (pre-registered):** we report the **point estimate + 95% CI** for every
 stratum/direction; a stratum below the min-count is `UNDERPOWERED` (descriptive-only, never gating —
@@ -86,8 +86,8 @@ truncating B = 1, other P/LP = 171, other B/LB = 2,963.)
 ### 3a. Power verdict (after adopting holdout 0.7 — see §3b)
 
 - **Missense-pathogenic is now POWERED for 0.90:** at holdout **0.7** the gating stratum holds **51**
-  held-out pathogenic missense (≥ the `min_count` 35, and ≥ the 35 needed for a **0-error 0.90**
-  lower bound). It is *tight* — a single false call would need n ≥ 53 — and **0.95 stays out of
+  held-out pathogenic missense (≥ the `min_count` 36, and ≥ the 36 needed for a **0-error 0.90**
+  lower bound). It is *tight* — a single false call would need n ≥ 54 — and **0.95 stays out of
   reach** (needs 72 with 0 errors; the whole benchmark holds only 75 pathogenic missense). So the
   gate can honestly validate missense to the **ACMG-minimum 0.90**, not 0.95.
 - **Truncating is robustly powered:** 210 held-out pathogenic → supports the **0.95** lower bound
@@ -105,7 +105,7 @@ truncating B = 1, other P/LP = 171, other B/LB = 2,963.)
    is preserved purely by pre-registering thresholds blind. The larger held-out puts **51**
    missense-pathogenic in the exam → **powers the 0.90 missense bar** with zero downside — the 30%
    remainder is only a development/sanity reserve, **not** a training set a rule engine could be
-   starved of. `min_count_per_class` raised to **35** to match the 0.90 power floor.
+   starved of. `min_count_per_class` raised to **36** to match the 0.90 power floor.
 2. **Future path to 0.95 — broaden known-pathogenic-missense sources.** Add the TSC1/TSC2 VCEP curated
    set (Symonds 2022), functional-assay-backed missense, and LOVD/TSC databases to raise N past 72.
    *The real path to robust (≥0.95) missense validation; a curation extension to Track A — tracked,
@@ -125,14 +125,14 @@ truncating B = 1, other P/LP = 171, other B/LB = 2,963.)
 
 ## 5. How this maps to the gate (PRD-06) and what to pre-register
 
-- **Pre-registered (DONE):** `configs/eval/tsc2.yaml` `oracle_thresholds: {precision: 0.90, recall:
-  0.85}` committed **blind to held-out results** (no BIAS/Nirvana scores exist yet — Track B unrun).
-  The gate applies each to BOTH directions and gates on the missense stratum (PRD-06 FR6/AC5);
-  `min_count_per_class: 35`, `split.holdout_fraction: 0.7`. Changing these post-hoc breaks
+- **Pre-registered (DONE):** `configs/eval/tsc2.yaml` carries nested, per-stratum
+  `oracle_thresholds` at 95% confidence: missense precision ≥0.90 and recall ≥0.85 for both
+  pathogenic and benign directions; truncating precision/recall ≥0.95 for the pathogenic direction
+  (truncating-benign remains report-only). The thresholds were adopted blind to held-out metrics.
+  The gate uses exact Clopper-Pearson lower bounds and `min_count_per_class: 36`; the floor correction
+  from 35 is mathematical (`LB(35/35)=0.899967<0.90`, `LB(36/36)>0.90`), not performance tuning.
+  `split.holdout_fraction: 0.7` remains unchanged. Changing policy thresholds post-hoc breaks
   pre-registration (R-A2).
-- The **truncating** ≥0.95 target is **reported** in the eval output today; hard-gating it as a
-  second stratum needs a small PRD-06 config extension (per-stratum `oracle_thresholds`) — tracked as
-  a follow-up, not required for the first authorized run (missense is the binding constraint).
 - **Adoption is a human act (DONE):** @dronasrinivas (acting domain owner) adopted + committed the
   pinned thresholds, blind to held-out results. This doc + the cited evidence base are the
   justification of record.
@@ -140,10 +140,9 @@ truncating B = 1, other P/LP = 171, other B/LB = 2,963.)
 ## 6. Open items
 - ✅ **Post-split held-out N per stratum** appended (§3 — from the holdout-0.7 freeze).
 - ✅ **Thresholds pre-registered** into `configs/eval/tsc2.yaml` (§5).
-- The gate currently checks the **point-estimate** precision/recall against the threshold, not the
-  95% CI **lower bound** this rubric frames; `min_count_per_class: 35` is the underpowered floor that
-  approximates it. Making the gate compute the Clopper-Pearson lower bound is a tracked PRD-06
-  fidelity follow-up.
+- ✅ **Gate fidelity implemented:** exact 95% Clopper-Pearson lower bounds, per-direction coverage,
+  and nested per-stratum thresholds. A powered configured direction is evaluated even when an
+  unrelated report-only direction is sparse.
 - Confirm against the **TSC1/TSC2 VCEP specification** (Symonds 2022, *Genet Med* 24:1907) — the
   disease-specific gold standard; our high-confidence tier already privileges its 3-star calls.
-- Hard-gate the truncating stratum at 0.95 (needs the PRD-06 per-stratum config extension).
+- ✅ **Truncating-pathogenic hard gate implemented** at 0.95; truncating-benign remains report-only.
