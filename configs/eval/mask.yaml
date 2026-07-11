@@ -1,0 +1,54 @@
+# ADR-0009 / masked-resources slot 2 sec 2 — the ClinVar-source masking
+# config. Pins WHICH criteria's ClinVar comparator resources are masked and
+# WHICH upstream ClinVar input stream feeds each (masked-resources slot 1
+# leakage table); no threshold/policy value lives here.
+#
+# ARM'S-LENGTH BOUNDARY (ADR-0007, non-negotiable): this file names only
+# ClinVar INPUT STREAM identifiers + the ACMG criterion codes each feeds --
+# never BIAS source text, never a label/benchmark path.
+
+assembly: GRCh38
+
+# The five `requires_heldout_mask` transitive comparator resources
+# (bias_lineage.yaml `transitive_suspect`) -- fixed by static lineage, never
+# shrunk by dynamic (zero-)incidence (ADR-0009, masked-resources slot 3).
+mask_criteria: [PS1, PM5, PM1, PP2, BP1]
+
+# The three direct-copy own-variant fallback inputs (already
+# `FORBIDDEN_CRITERIA` in `eval/config.py` -- masking their inputs is
+# defence-in-depth, never a re-enabling).
+direct_copy_fallbacks: [PS4, PP5, BP6]
+
+# Ordered list of {stream, resources}: which upstream ClinVar input feeds
+# which comparator/fallback (masked-resources slot 1 table). `clinvar_vcf`
+# feeds PS1/PM5 (generate_pathogenic_aa_list.py's `in_vcf`) as well as
+# PM1 (generate_domain_lists.py's `clinvar_vcf`) and PP2/BP1
+# (find_missense_pathogenic_genes_and_path_trunc_genes.py's `clinvar_vcf`).
+# `clinvar_nirvana_json` feeds PS1/PM5 (the Nirvana JSON annotation) and
+# PP5/BP6 (the variant's own `clinvar_significance`/`clinvar_review_status`
+# read via Nirvana). `variant_summary`/`submission_summary` feed PS4
+# (generate_clinvar_submitter_counts.py).
+clinvar_inputs:
+  - stream: clinvar_vcf
+    resources: [PS1, PM5, PM1, PP2, BP1]
+  - stream: clinvar_nirvana_json
+    resources: [PS1, PM5, PP5, BP6]
+  - stream: variant_summary
+    resources: [PS4]
+  - stream: submission_summary
+    resources: [PS4]
+
+# The full VUS comparator resource paths that must stay byte-unchanged
+# (invariant 5) -- populated by the operator/CLI with the concrete
+# filesystem paths of the pinned full-resource comparator dicts before a
+# real run; left empty here since no such filesystem layout is checked
+# into this repo (the operator's BIAS resource directory is external).
+full_resource_paths: []
+
+# Separate output root -- `MaskConfig` refuses construction if this
+# overlaps any `full_resource_paths` entry (AC-M7).
+masked_namespace: masked/
+
+# Pin; a BIAS version bump re-derives the input contract (must match
+# `configs/eval/bias_lineage.yaml::bias_version`, load-time checked).
+bias_version: "3.0.0"

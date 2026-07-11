@@ -1,6 +1,7 @@
 import pytest
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 # Module doesn't exist yet
@@ -86,14 +87,14 @@ def test_acg8_terminal_runner_blocked_policy(tmp_path):
     # Missing/unapproved -> GateDecision(status="BLOCKED_POLICY", vus_authorized=False) and NO METRICS.
 
     # Let's run it without the flag. It should fail (exit code != 0)
-    res = subprocess.run(["python", str(script_path)], capture_output=True, text=True)
+    res = subprocess.run([sys.executable, str(script_path)], capture_output=True, text=True)
     assert res.returncode != 0
     assert "predictor-policy" in res.stderr
 
     # Let's provide a malformed policy
     bad_policy = tmp_path / "bad_policy.json"
     bad_policy.write_text("{}")
-    res2 = subprocess.run(["python", str(script_path), "--predictor-policy", str(bad_policy)], capture_output=True, text=True)
+    res2 = subprocess.run([sys.executable, str(script_path), "--predictor-policy", str(bad_policy)], capture_output=True, text=True)
     # The requirement says it emits GateDecision(status='BLOCKED_POLICY', vus_authorized=false) with no metrics.
     # We check stdout/stderr for BLOCKED_POLICY.
     assert "BLOCKED_POLICY" in res2.stdout or "BLOCKED_POLICY" in res2.stderr
@@ -111,6 +112,6 @@ def test_acg8_terminal_runner_blocked_policy(tmp_path):
         "correction_hash": "b" * 64,
         "decision_reference": "ADR-0010"
     }))
-    res3 = subprocess.run(["python", str(script_path), "--predictor-policy", str(unapproved)], capture_output=True, text=True)
+    res3 = subprocess.run([sys.executable, str(script_path), "--predictor-policy", str(unapproved)], capture_output=True, text=True)
     assert "BLOCKED_POLICY" in res3.stdout or "BLOCKED_POLICY" in res3.stderr
     assert "precision=" not in res3.stdout
