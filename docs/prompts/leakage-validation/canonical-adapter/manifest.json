@@ -1,0 +1,65 @@
+{
+  "task_id": "leakage-validation-canonical-spdi-live-eval-adapter",
+  "arm": "B",
+  "model_role": "planner",
+  "model_family": "Claude",
+  "model_target": "claude-opus-4.8",
+  "intent_block_present": true,
+  "goal": "A new arm's-length eval EvidenceSource (BiasEvidenceSource) joining the masked held-out BIAS TSV to the 2,577 held-out identities by canonical GRCh38 SPDI, serving evidence only from fired rationales, with the completed lineage gate enforced at preflight.",
+  "slots": {
+    "slot1": {
+      "path": "docs/prompts/leakage-validation/canonical-adapter/slot1-planner.md",
+      "sha256": "75eaecaf4fc446f38a753bd87820fbfaf9edc95591929fb1578c0810cba99369"
+    },
+    "slot2": {
+      "path": "docs/prompts/leakage-validation/canonical-adapter/slot2-adapter-contract.md",
+      "sha256": "c4ee9c430e77eb2a5b26c081ce27db6884f4f101fc024fc0781bfdc2780965d8"
+    },
+    "slot3": {
+      "path": "docs/prompts/leakage-validation/canonical-adapter/slot3-preservation.md",
+      "sha256": "06018e61156d12062ca0eb9c48917c1c6021557ed5b3da8d24cc3f74009f4d36"
+    }
+  },
+  "source_pins": {
+    "bias_source_commit": "ade13f206f3e2c2efe3ec92715d974645fc8da8f",
+    "bias_version": "3.0.0",
+    "repo_head": "e52e855",
+    "bias_lineage_yaml_sha256": "743a0248c2415010b22c5e1c7f1a35924c8b4b26521f58be09e677ddbb58aeeb",
+    "heldout_full_resource_bias_output_sha256": "6e055fe1a4f7d18e428c62739e3b60fa55362f72aa6322429d2f4ff93076dd9c",
+    "benchmark_snapshot": "clinvar_2026-07-07",
+    "heldout_count": 2577,
+    "allele_profile": "707 NC_000009.12 + 1870 NC_000016.10; 2416 SNV + 4 MNV + 135 delins + 3 ins + 19 del"
+  },
+  "realizes": "docs/prd/PRD-08-live-eval-evidence-adapter.md §3.B / §10.3 / §11.2 (adapter task B), in leakage-safe framing (join over the masked TSV).",
+  "authorized_implementation_outputs": [
+    "src/raptor/eval/live_source.py",
+    "tests/eval/test_live_source.py",
+    "tests/eval/test_live_adapter_forbidden_import_audit.py",
+    "tests/eval/test_kit_conformance_live_source.py"
+  ],
+  "reference_files": [
+    "src/raptor/scorer/parse.py",
+    "src/raptor/scorer/bias_source.py",
+    "src/raptor/ingest/normalizer.py",
+    "src/raptor/eval/lineage_audit.py"
+  ],
+  "roles": {
+    "tester": {
+      "model_target": "gemini-3.1-pro-preview",
+      "responsibility": "Author executable AC tests (AC-B1..AC-B9) from slot 2 + slot-1 surfaces only, before the doer. Derive the evidence oracle from hand-computed parse_rationale output and the 2,577 allele-profile conservation counts, never the adapter's echo. AC-B7 covers equivalent-indel canonical join + canonical-duplicate fatal. AC-B8 proves the completed lineage gate blocks a full-resource (unmasked) TSV at preflight."
+    },
+    "doer": {
+      "model_target": "claude-sonnet-5",
+      "responsibility": "Implement live_source.py: preflight (manifest+BIAS load, canonical-SPDI normalize+join, exact-set/bijection, config-consistency, audit_lineage->enforce_lineage), then get_evidence from fired rationales only. Reuse BiasTsvSource/parse_rationale; never read acmg_classification; never modify run_eval; join by canonical SPDI. Honor slot 3."
+    },
+    "checker": {
+      "model_target": "gpt-5.6-sol",
+      "responsibility": "Re-verify all ACs pass, run_eval + the frozen preservation set are byte-unchanged, and none of the five slot-3 inversion failures are present (raw-string indel mis-join, partial-eval hollow green, combined-answer import, eval!=production drift, running on the leaky TSV)."
+    }
+  },
+  "dependencies": {
+    "builds_now": true,
+    "blocks": ["C-final terminal masked-rerun eval"],
+    "blocked_by_at_runtime": ["Arm A masked resources + operator masked re-score TSV"]
+  }
+}
