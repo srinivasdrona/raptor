@@ -1,0 +1,66 @@
+{
+  "bias_commit": "ade13f206f3e2c2efe3ec92715d974645fc8da8f",
+  "bias_version": "3.0.0",
+  "criteria": {
+    "BP4": {
+      "category_flips": {
+        "to_LB": 0,
+        "to_LP": 0,
+        "to_no_call": 0
+      },
+      "criterion": "BP4",
+      "deflated": 3565,
+      "example_undecidable_variant_ids": [],
+      "example_variant_ids": [
+        "chr9:132891409:T:G",
+        "chr9:132891697:T:C",
+        "chr9:132891713:G:A",
+        "chr9:132891720:C:T",
+        "chr9:132891743:A:G",
+        "chr9:132891788:G:A",
+        "chr9:132891879:G:A",
+        "chr9:132891981:C:T",
+        "chr9:132892116:A:G",
+        "chr9:132892238:C:T"
+      ],
+      "inflated": 892,
+      "n_decidable": 5625,
+      "n_emitted_ne_corrected": 4457,
+      "n_fired": 5625,
+      "undecidable": 0
+    },
+    "PP3": {
+      "category_flips": {
+        "to_LB": 0,
+        "to_LP": 0,
+        "to_no_call": 0
+      },
+      "criterion": "PP3",
+      "deflated": 36,
+      "example_undecidable_variant_ids": [],
+      "example_variant_ids": [
+        "chr9:132896452:C:G",
+        "chr9:132897468:A:G",
+        "chr9:132900764:T:A",
+        "chr9:132900773:C:A",
+        "chr9:132901599:A:T",
+        "chr9:132903704:G:A",
+        "chr9:132903726:C:A",
+        "chr9:132903740:A:G",
+        "chr9:132903749:A:T",
+        "chr9:132904439:G:T"
+      ],
+      "inflated": 78,
+      "n_decidable": 2360,
+      "n_emitted_ne_corrected": 114,
+      "n_fired": 2360,
+      "undecidable": 0
+    }
+  },
+  "route_decision": {
+    "rationale": "Probe 3 found undecidable == 0 across all fired PP3/BP4 rows: the observable rationale output is information-complete, so the RAPTOR-side arm's-length wrapper (recompute_strength) is the primary correction route (slot 2 sec 3).",
+    "route": "raptor_side_wrapper",
+    "undecidable_total": 0,
+    "upstream_pr_proposal": "Documented, good-citizen proposal only (not adopted/merged here): fix the dead `best_score` sentinel in pathogenic_classifiers.py::get_pp3 L944-954 and benign_classifiers.py::get_bp4 L491-503 so the selection loop reassigns `best_score` on `a_score > best_score` (matching the correct idiom already used for a different criterion at get_pm1 L405-433). Adoption is gated on a separate re-pin + full re-score + re-validation, out of scope for this task."
+  }
+}

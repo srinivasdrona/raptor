@@ -1,0 +1,61 @@
+# Slot 2 sec 2.1 -- BP4/PP3 predictor-aggregation correction spec (policy
+# blocker A). Single machine-readable source of truth for the ARM'S-LENGTH
+# re-derivation of the intended per-tool aggregation ("take the maximum
+# per-tool strength, add a consensus bump when >=2 tools agree at that
+# maximum, then cap"), applied over BIAS-2015's OBSERVABLE per-tool
+# `printout_text` tokens only.
+#
+# ARM'S-LENGTH BOUNDARY (ADR-0007, non-negotiable): this file carries only
+# a RAPTOR-derived spec + citations (file . symbol . lines) about the pinned
+# BIAS-2015 (AGPL) source at the commit below. It never copies BIAS source
+# text, is never read by anything that imports `bias_2015`, and never opens
+# a label/benchmark/held-out file. Source anchors (defect + corroboration):
+#   pathogenic_classifiers.py::get_pp3 L944-954  (dead `best_score` sentinel)
+#   benign_classifiers.py::get_bp4    L491-503  (dead `best_score` sentinel;
+#     `best_score > 1` consensus guard permanently false)
+#   pathogenic_classifiers.py::get_pm1 L405-433 (different criterion's
+#     correct max-aggregation idiom -- corroboration only)
+#   constants.py :: score_to_hum_readable (weight-word vocabulary),
+#     pp3_tools/pp3_weighting L159-160, bp4_tools/bp4_weighting L63-64
+
+bias_version: "3.0.0"
+bias_commit: "ade13f206f3e2c2efe3ec92715d974645fc8da8f"
+
+# Total map, the weight->score reconstruction inverse (case-insensitive;
+# hyphen/space-insensitive at parse time -- the pinned source itself emits
+# both spellings of the top tier, e.g. get_pp3's alphamissense branch
+# literally assigns "very-strong" while get_bp4's revel branch literally
+# assigns "very strong"). An unrecognized weight word is undecidable
+# (AC-A4) -- never guessed.
+weight_to_score:
+  supporting: 1
+  moderate: 2
+  strong: 3
+  "very strong": 4
+
+# The INTENDED spec (slot 2 sec 0.1), pinned in config -- never hardcoded
+# in the wrapper. `bump_min_score` and `single_supporting_floor` are stated
+# explicitly so the corrected rule is a deliberate, reviewable, SYMMETRIC
+# choice across PP3/BP4 -- the wrapper must not silently reproduce BIAS's
+# emitted asymmetry (PP3 over-bump / BP4 no-bump).
+rule:
+  aggregation: max_plus_consensus
+  consensus_bump: 1
+  pp3:
+    cap: 3
+    bump_min_score: 1
+  bp4:
+    cap: 4
+    bump_min_score: 1
+    # Mirrors get_bp4 L501-502's single-supporting floor ("a single
+    # algorithm at supporting strength is not acceptable" -> 0): this is
+    # part of the intended spec, not a BIAS defect, so the correction
+    # preserves it explicitly rather than silently dropping it.
+    single_supporting_floor: true
+
+# Mirrors constants.py pp3_tools/bp4_tools -- used only to validate that a
+# parsed per-tool token names a known predictor (an unknown tool name is
+# undecidable, AC-A4), never to re-derive BIAS's own thresholds.
+tools:
+  pp3: [phylop, revel, absplice, alphamissense]
+  bp4: [phylop, revel, dann, gerp, absplice, alphamissense]
