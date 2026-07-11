@@ -150,6 +150,15 @@ PS1=116, PM5=13, PM1=0, PP2=0, BP1=0 and failed closed on PS1/PM5. Zero incidenc
 static lineage: masked validation resources remain required for all five comparator-dependent
 criteria. Aggregate record: `data/census/tsc_bias_lineage_audit_2026-07-10.json`.
 
+**Engineering follow-through (2026-07-12).** RAPTOR now has deterministic upstream masking +
+conservation-audit tooling for all five comparator-dependent criteria, a canonical-SPDI BIAS adapter,
+and an exact lower-confidence-bound gate. The external BIAS generators have **not** yet rebuilt the
+masked resources and no final gate has run. Separately: the BP4/PP3 aggregation defect is corrected at
+the arm's-length wrapper (7,985 real firings, zero undecidable); BS2 remains deferred after a 34-firing
+review; TSC transcript version deltas require canonical-SPDI provenance and NTHL1 remains out-of-scope.
+The production criterion-strength map is populated but explicitly **unapproved**, with null cutoffs and
+null candidate direction. These controls prepare measurement; they do not authorize a classification.
+
 ### Consequences
 
 - (+) Closes the unambiguous direct-copy leak before benchmark metrics. Removing circular evidence may

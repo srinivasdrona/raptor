@@ -18,3 +18,14 @@ policy roll-up and aggregate incidence from the 6,618-VUS and 2,577-held-out
 runs. Both runs fail closed on PS1/PM5. Dynamic firing counts never establish
 lineage; detailed reports with bounded example identities remain outside the
 repository.
+
+`tsc_calibration_batch_2026-07-11.json` records the non-identifying aggregate
+for the real provisional calibration batch: 1,571 candidate-universe packets,
+30 selected packets covering all 20 LP + 10 LB evidence patterns, both genes,
+all observed variant classes and edge flags, and zero missing populated atoms.
+Full packet/first-pass artifacts remain outside the repository.
+
+The 2026-07-12 policy reports record the arm's-length BP4/PP3 correction
+materiality, the 34-firing BS2 deferral analysis, and canonical
+transcript/NTHL1 reconciliation. They are engineering/policy evidence, not
+variant classifications.

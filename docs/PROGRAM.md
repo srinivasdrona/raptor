@@ -11,7 +11,10 @@
 > packets · evidence/assay/contradiction atlas · gated mTOR hypothesis packets). The first complete
 > **deterministic TSC1/TSC2 evidence census is done** (internal, eval-only, non-authoritative — below);
 > the raw held-out benchmark has been **scored on pinned Nirvana/BIAS** (2,577 label-free records), but
-> the **leakage-safe masked rerun and PRD-06 gate are still pending**, so no candidate direction is
+> the **leakage-safe masked rerun and PRD-06 authorization are still pending**. Masking, canonical-adapter,
+> exact confidence-bound gate, calibration-packet, and policy-control tooling are built, but the external
+> x64 masked-resource regeneration/re-score has not run and the production candidate policy remains
+> explicitly unapproved; therefore no candidate direction is
 > authoritative and no externally usable VUS worklist may be released.
 
 ## TSC VUS evidence census — COMPLETE (internal · eval-only · non-authoritative)
@@ -38,10 +41,11 @@
   static criterion lineage (ADR-0009) — PM1/PP2/BP1 depend on them too; all five need held-out masking for
   the leakage-safe validation bundle. *(The census itself used the **full** comparator resources —
   legitimate for non-authoritative VUS directions, but **not** leakage-safe for held-out validation.)*
-  BS2 fired 34× and is explicitly deferred pending a TSC penetrance/age/mosaicism decision; PS3 fired
-  46× and is deferred pending assay-validity review; 30 TSC2-region inputs annotated as **NTHL1** need manual
-  resolution; BIAS emits transcript `.4` while production pins `.5`; the production scorer currently
-  scopes to TSC2 only. **No externally usable candidate worklist may be released before leakage-safe
+  BS2 fired 34× and remains explicitly deferred with a cited penetrance/age/mosaicism rationale; PS3
+  fired 46× and remains deferred pending assay-validity review. TSC1/TSC2 `.4→.5` transcript deltas now
+  require manifest-supplied canonical SPDI proof; all 30 **NTHL1** records remain manual/out-of-scope.
+  The BP4/PP3 aggregation defect has a deterministic arm's-length correction, but the joined production
+  policy remains unapproved/null. **No externally usable candidate worklist may be released before leakage-safe
   validation + expert sign-off.**
 
 ## Operating Model — build loop
@@ -69,7 +73,9 @@ pending `OPERATING_MODEL.md` — ADR-0003.)*
 - **Evidence census:** ✅ **COMPLETE** (internal · eval-only · non-authoritative) — 6,618 VUS scored on pinned Nirvana/BIAS; candidate directions **not** classifications (see census section above)
 - Tier 3 (LLM Extraction): 🔴 NOT STARTED (Phase 2)
 - Consensus/Adjudication: 🔴 NOT STARTED
-- Validation Framework: 🟡 **BUILT + PRE-REGISTERED** (PRD-06 harness `e026422`, PRD-07 loader `499f479`, frozen benchmark `2e3477f`, thresholds `8662499`) — *raw held-out scored; masked rerun + gate not yet run*
+- Validation Framework: 🟡 **TOOLING BUILT + PRE-REGISTERED** (canonical BIAS adapter; ClinVar masker/auditor;
+  exact 95% Clopper-Pearson lower-bound, per-direction/per-stratum gate; fail-closed predictor-policy
+  prerequisite) — *raw held-out scored; external masked-resource regeneration/re-score + final gate still pending*
 
 ## Operations (Current Run)
 
@@ -90,20 +96,36 @@ the vertical worklist below replaces it. **Census candidate directions stay non-
 held-out gate PASSes.**
 
 1. **BIAS criterion lineage — COMPLETE.** The pinned source-derived **28-slot / 19-can-fire / 9-internal-stub** policy, exact-set registry gate, total audit + fail-closed enforcement, and portable source-oracle fixture are implemented. Real 6,618-VUS and 2,577-held-out audits both block on **PS1/PM5**; zero firing does not clear the statically mask-required **PM1/PP2/BP1**. See `data/census/tsc_bias_lineage_audit_2026-07-10.json`.
-2. **Held-out-masked BIAS validation bundle** — the label-free held-out VCF was already emitted and scored on the x64 worker (BIAS-2015 v3.0.0 + Nirvana; 2,577 parsed records; ADR-0008; H1 no-labels boundary) using the **full** comparator resources; what remains is **regenerating the ClinVar-derived comparator resources (PS1/PM5/PM1/PP2/BP1) with the held-out variants masked** and **re-scoring** on those masked resources.
+2. **Held-out-masked BIAS validation bundle — TOOLING COMPLETE; EXTERNAL RUN PENDING.** Canonical-SPDI
+   masking, exact removal ledger, full-resource overlap guards, zero-incidence aggregate audit, canonical
+   2,577-row adapter, and fail-closed terminal runner are built. Remaining: run BIAS's own generators on
+   the masked upstream ClinVar inputs on the x64 worker, audit rebuilt PS1/PM5/PM1/PP2/BP1 resources, and
+   re-score the held-out set. Full VUS resources remain byte-untouched.
 3. **ClinVar audit — COMPLETE; ruling/masking pending.** The mechanized audit ran on the full held-out output: **PS1 116**, **PM5 13**, **PM1/PP2/BP1 0**; the report fails closed on PS1/PM5. Static lineage still requires masking all five. Remaining: masked-resource rerun + Oracle ruling (ADR-0009).
-4. **Canonical adapter** — the arm's-length eval `EvidenceSource` adapter joining BIAS rows by canonical SPDI (not raw VCF strings).
-5. **Clopper-Pearson gate** — make the PRD-06 gate compute the 95% CI lower bound, not just the point estimate (EVAL_RUBRIC §6).
-6. **BS2 policy** — record a rationale for BS2 (fired 34× in the census, currently omitted from policy).
-7. **Transcript / NTHL1 resolution** — reconcile BIAS `.4` vs production `.5` transcripts; resolve the 30 TSC2-region inputs mis-annotated as NTHL1.
-8. **Production candidate policy** — pin the production candidate-direction policy (gene scope, combiner, criteria set) consistent with eval.
+4. **Canonical adapter — COMPLETE.** Arm's-length `BiasEvidenceSource` joins by canonical SPDI, enforces
+   exact bijection/config parity/lineage preflight, and ignores BIAS's combined call.
+5. **Clopper-Pearson gate — COMPLETE.** Exact 95% lower bounds; corrected zero-error floor 36; missense
+   both directions and truncating-pathogenic hard-gated; predictor-policy artifact required fail-closed.
+6. **BS2 policy — COMPLETE/DEFERRED.** Real probe: 34 firings (TSC1 29/TSC2 5). Population-only BIAS
+   evidence cannot satisfy a TSC-specific automated BS2 policy; BS2 remains deferred/not scored with
+   a cited decision rationale. No approval invented.
+7. **Transcript / NTHL1 resolution — COMPLETE WITH ADAPTER DEPENDENCY.** TSC1/TSC2 `.4→.5` version
+   deltas reconcile only with verified canonical SPDI provenance; direct unenriched BIAS remains blocked.
+   All 30 NTHL1 records stay `OUT_OF_SCOPE_GENE`.
+8. **Production candidate policy — POPULATED, UNAPPROVED.** Corrected BP4/PP3 strengths plus allowed
+   criteria are pinned; requires-mask/forbidden/deferred criteria are excluded. Cutoffs remain null,
+   direction remains null, and packets remain `POLICY_BLOCKED`.
 9. **PRD-04 evidence packet — BUILT.** The r3 contract and three sequenced implementations (core,
    deterministic render/queue/calibration surfaces, and state/decision/comparator workflow) are complete.
    Packets are immutable, direction-null/`POLICY_BLOCKED` while production policy is unapproved,
    first-pass double-blinded, and backed by a variant-scoped append-only decision log. Real calibration
-   batch generation is the next task; external use remains gated on validation, policy correction, and
+   batch generation is complete: a real **30-packet / 30-pattern** calibration batch covers both genes,
+   all observed classes and edge flags with no missing populated atoms. External use remains gated on validation, policy approval, and
    per-variant expert sign-off.
 10. **Expert validation + named adopter** — recruit the validating oracle (GP-3) and name a first TSC adopter (R-F1/R-F6).
+11. **ClinVar/VCEP preparation — COMPLETE (NO SUBMISSION).** PRD-09 pins the current
+    `germlineSubmission/germlineClassification` shape, `clinvarDeletion` lifecycle, deny-list, schema
+    freshness guard, institutional prerequisites, and an unreachable submission-authorization state.
 
 > **Provisional packets now vs externally usable worklist after PASS:** items 1–8 and the PRD-04 output
 > contract (item 9) proceed now, and provisional representative/all-VUS candidate packets may be built
@@ -126,10 +148,11 @@ index file until ≥3 exist).
 | PRD-01 | Tier-1/2 Deterministic ACMG Scorer | 1 | **Signed off · module built ✓** (`1d2444e`, 149 tests; arm's-length BIAS) |
 | PRD-02 | Variant Ingestion & Normalization | 0 | **Signed off · module built ✓** (`a889710`, 125 tests) |
 | PRD-03 | KB Schema & Provenance Ledger | 0 | **Signed off · module built ✓** (`b627073`) |
-| PRD-04 | **Candidate Evidence Packet / Output Contract** (immutable evidence core; nullable candidate direction; deterministic first-pass render/queue; populated-atom calibration selector; variant-scoped review log; reveal-only comparator) | 1/2 | **Built ✓ — provisional/internal only** (34 packet tests; external worklist release gated on PRD-06 PASS + policy correction + per-variant sign-off) |
+| PRD-04 | **Candidate Evidence Packet / Output Contract** (immutable evidence core; nullable candidate direction; deterministic first-pass render/queue; populated-atom calibration selector; variant-scoped review log; reveal-only comparator) | 1/2 | **Built ✓ — provisional/internal only** (42 packet tests; external worklist release gated on PRD-06 PASS + policy approval + per-variant sign-off) |
 | PRD-05 | Pipeline & Orchestration skeleton | 0 | **frozen** — generic orchestration out of scope (ADR-0010) |
 | PRD-06 | **Benchmark & Evaluation Harness** (build known-variant benchmark + train/dev/held-out split + P/R/concordance, class-stratified; **gates any VUS run**) | 1 | **Signed off · module built ✓** (`e026422`, PR #1, 222 tests; 7-round cross-family checker sign-off) |
 | PRD-07 | **ClinVar Knowns → Benchmark Labels Loader** (Track A1: label-side `variant_summary` → `LabeledVariant` for PRD-06; reuses PRD-02 contract+normalizer; keeps scorer label-blind, H1) | 1 | **Signed off · module built ✓** (`499f479`, PR #3, 274 tests; 7-round checker sign-off) |
+| PRD-09 | **ClinVar/VCEP Submission Preparation** (field/lifecycle mapping, source register, deny-list, no-submission controls; no network client/SCV) | external prep | **Prepared ✓ — no submission authorized** |
 
 > **Validation gate (binding):** no classification is run on the ~6,700 TSC VUS until PRD-06 shows
 > Tier-1/2 clears pre-registered thresholds on the **held-out known-variant** set — reported
@@ -140,16 +163,16 @@ index file until ≥3 exist).
 The three parallel tracks (A benchmark · B x64 scoring infra · C oracle thresholds) are **done**. What
 remains is the **terminal join**: the raw label-free held-out scoring run on x64 is **done** (2,577
 parsed records on full comparator resources); still pending are the held-out-masked comparator-resource
-regeneration + masked rerun, the arm's-length `EvidenceSource` canonical adapter, the Oracle ruling,
-the missense-stratified metrics, then the gated PRD-06 held-out eval. The static lineage gate and
-full-output ClinVar-derivation audit are complete (ADR-0009).
+regeneration + masked rerun and the Oracle/predictor-policy approvals, then the gated PRD-06 held-out
+eval. Canonical adapter, exact statistical gate, static lineage gate, and full-output derivation audit
+are complete (ADR-0009).
 
 | # | Track | Type | Status |
 |---|---|---|---|
 | A | **Benchmark data** — real ClinVar TSC1/TSC2 *knowns* → frozen labeled benchmark (excl. conflicting/single-submitter/low-review; label hierarchy) | data | **DONE ✓** — frozen snapshot `clinvar_2026-07-07`; **3,681** scoreable knowns → **2,577** held-out / **1,104** dev reserve at `holdout 0.7` (PR #7 `2e3477f`, Track A2; A1 loader PRD-07 `499f479`) |
 | B | **x64 live-scoring infra** — BIAS-2015 (arm's-length, ADR-0007) + Nirvana (x64-only, ADR-0008) | infra | **Smoke-tested ✓ (operator-confirmed)** — BIAS-2015 v3.0.0 + Nirvana 3.18.1 produced an 8-record TSV that passed `BiasTsvSource`'s 18-column contract with identity preserved. Large external artifacts intentionally out of repo; versions/hashes live in the operator's external reports (handoff bundle PR #8 `3556548`) |
-| C | **Oracle thresholds (GP-3)** — pre-register precision/recall targets into `configs/eval/tsc2.yaml` | governance | **DONE ✓** — `oracle_thresholds {precision: 0.90, recall: 0.85}` pre-registered *blind* to held-out results; `min_count_per_class: 35`, `split.holdout_fraction: 0.7` (PR #10 `8662499`) |
-| J | **Terminal join** — raw label-free held-out VCF **emitted + scored** (2,577 parsed records, full resources); remaining: regenerate held-out-masked comparator resources (PS1/PM5/PM1/PP2/BP1) + masked rerun, build the canonical eval adapter + derivation guard, audit PS1/PM5/PM1/PP2/BP1 → Oracle ruling, compute missense-stratified metrics, run PRD-06 held-out eval; gate must `PASS` (missense-stratified, **both directions**) → authorizes the ~6,700-VUS run | code + eval | **RAW SCORE DONE; masked rerun + gate PENDING** — see *Priorities* above; A ∧ B ∧ C are met |
+| C | **Oracle thresholds (GP-3)** — pre-register precision/recall targets into `configs/eval/tsc2.yaml` | governance | **DONE ✓** — nested 95% lower-bound thresholds: missense 0.90/0.85 both directions; truncating 0.95 pathogenic; `min_count_per_class: 36`, `split.holdout_fraction: 0.7` |
+| J | **Terminal join** — raw label-free held-out VCF **emitted + scored** (2,577 parsed records, full resources); masking/audit/adapter/gate tooling built. Remaining: external x64 masked-resource regeneration + re-score, approve predictor-policy artifact, adjudicate masked comparator criteria, run final gate | code + eval | **TOOLING DONE; external masked rerun + approvals PENDING** |
 
 > A/B/C are complete and had **no code dependency on each other**. Thresholds are now pre-registered
 > (C done), so the gate no longer reads `UNVERIFIED` for a missing target — the **raw** held-out score
@@ -164,8 +187,15 @@ full-output ClinVar-derivation audit are complete (ADR-0009).
 - (Resolved 2026-07-08) Runtime architecture depth → LiteLLM + Prefect + SQLite + Ollama; no Ray/LangGraph, see ADR-0004 / ARCHITECTURE.md.
 - (Resolved 2026-07-10) **ClinVar direct-copy circularity** → **PP5/BP6/PS4 banned** from `automatable_criteria` (eval == production; structurally rejected in `eval.config.FORBIDDEN_CRITERIA`); comparator-dependent **PS1/PM5/PM1/PP2/BP1 deferred** to the full-held-out audit (static criterion lineage — ADR-0009, PR #11 `2766e33`). Real BIAS v3.0.0 output showed PS4 falls back to counting ClinVar submitters for rare Mendelian variants.
 - (Resolved 2026-07-10) **Full-output circularity audit** — machine-enforced 28/19/9 lineage policy + exact-set registry + fail-closed audit landed. Held-out incidence: PS1 116, PM5 13, PM1/PP2/BP1 0; the unmasked report blocks on PS1/PM5, while static lineage keeps all five in the masked-resource requirement. Oracle ruling + masked rerun remain on the terminal-join path (ADR-0009).
-- (Open) **Gate fidelity — Clopper-Pearson lower bound** — the gate currently checks the **point estimate**, not the 95% CI lower bound the rubric frames; `min_count_per_class: 35` is the underpowered floor that approximates it. Making the gate compute the Clopper-Pearson lower bound is a tracked PRD-06 follow-up (EVAL_RUBRIC §6).
-- (Open) **Per-stratum truncating 0.95 gate** — truncating ≥0.95 (210 held-out, powered) is **reported, not gated**; hard-gating it needs a PRD-06 per-stratum `oracle_thresholds` extension (EVAL_RUBRIC §5). Missense (≥0.90) is the binding constraint.
+- (Resolved 2026-07-12) **Gate fidelity** — exact Clopper-Pearson lower bounds, corrected n=36 floor,
+  pinned gating/direction semantics, and truncating-pathogenic 0.95 hard gate implemented.
+- (Resolved 2026-07-12) **Policy blockers** — BP4/PP3 correction is fully decidable on both corpora;
+  BS2 remains explicitly deferred; TSC1/TSC2 scope reconciles only with canonical proof; production
+  point map is populated but unapproved/null.
+- (Resolved 2026-07-12) **30-pattern calibration** — real 1,571-candidate universe compressed to 30
+  first-pass packets covering every observed pattern/gene/class/edge flag; non-authoritative.
+- (Resolved 2026-07-12) **ClinVar/VCEP preparation** — schema/lifecycle/source package complete;
+  no contact, network submission, SCV, or authorization performed.
 - (Open) **Loader GRCh38 assembly filter** — confirm the PRD-07 knowns loader strictly filters to the GRCh38 assembly (the freeze script already filters GRCh38+TSC1/TSC2; harden the loader-side guard).
 - (Open) Cross-linkage oracle — recruit molecular geneticist before Phase 3 (STRATEGY.md GP-3; risk R-E1).
 - (Open) Confirm worker vCPU allocation at deploy (EPYC/Xeon 8-vCPU VM vs full silicon).
