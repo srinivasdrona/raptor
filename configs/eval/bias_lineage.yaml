@@ -197,6 +197,7 @@ records:
     rationale_markers: []
     notes: "Functional-assay literature evidence via AVADA extraction -- no ClinVar dependency, but assay-validity review is a separate owed decision (D1)."
     decision_dependency: "assay-validity-review"
+    decision_rationale: "Automated PS3 remains deferred because AVADA-derived literature extraction is unvalidated for criterion-level assay strength and no qualified assay-validity adjudication has approved these firings."
   PS4:
     lineage_class: same_variant_clinvar
     source_dependencies:
@@ -329,6 +330,21 @@ records:
     rationale_markers: []
     notes: "Population/control source is label-independent -- but that is NOT policy approval. A TSC-specific penetrance/age/mosaicism call is still owed (PROGRAM.md item 6) before BS2 may be scored or automated."
     decision_dependency: "bs2-policy"
+    decision_rationale: >-
+      get_bs2 (benign_classifiers.py L116-176) is a population/control-count test
+      (homozygous/hemizygous/control allele counts vs a constants.py LOEUF-tiered
+      threshold) -- it does not phenotype the "healthy adult", exclude reduced
+      penetrance, confirm age of onset past the expected TSC presentation window,
+      or exclude mosaicism (common in TSC, especially TSC2, per GeneReviews
+      Northrup et al., https://www.ncbi.nlm.nih.gov/books/NBK1220/). The ClinGen
+      Tuberous Sclerosis Complex Variant Curation Expert Panel
+      (https://www.clinicalgenome.org/affiliation/50171/) has not published an
+      approved BS2 specification for TSC1/TSC2 (Expert Panel Status: "Develop
+      Classification Rules"), and no molecular-geneticist Oracle has been
+      recruited (GP-3 open) to authorize automated BS2 for TSC. Absent that
+      authority, BS2 stays deferred; see
+      docs/reference/bs2-tsc-penetrance-mosaicism-review.md for the full,
+      cited evidence review.
   BP1:
     lineage_class: aggregate_clinvar
     source_dependencies:
