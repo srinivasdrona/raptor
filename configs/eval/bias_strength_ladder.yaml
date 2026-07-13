@@ -1,0 +1,117 @@
+# PRD-08 strength-policy reconciliation — `bias-strength-ladder` (track
+# `strength-policy-2026-07`). Machine-readable, EXHAUSTIVE, fail-closed
+# record of which strength(s) the PINNED BIAS-3.0.0 source (commit
+# `ade13f206f3e2c2efe3ec92715d974645fc8da8f`, `D:\AIProjects\raptor-data\
+# sources\BIAS-2015`) can ACTUALLY return for each of the 7 criteria this
+# track reconciles, derived by reading the `get_*` classifier bodies at the
+# cited anchors -- never by running BIAS, never from census/label incidence.
+#
+# ARM'S-LENGTH BOUNDARY (ADR-0007, non-negotiable, same as
+# configs/eval/bias_lineage.yaml): this file carries only LADDER FACTS +
+# source CITATIONS (file · symbol · lines), never BIAS source text, and is
+# never generated from a label/benchmark/held-out file.
+#
+# "criteria[C]" is the set of `score_to_hum_readable` strength names
+# (constants.py L13-19: 5=stand_alone, 4=very_strong, 3=strong, 2=moderate,
+# 1=supporting) that criterion C's classifier can structurally return a
+# non-zero score for, at THIS pinned commit. A strength name is included
+# ONLY if a concrete code path returns it; a strength named in a
+# classifier's OWN docstring/evRepo-weight comment but never actually
+# reachable from the function body (see PS1 below) is NOT included -- the
+# ladder is what the code does, not what its comments claim.
+schema: bias-strength-ladder
+bias_version: "3.0.0"
+bias_commit: "ade13f206f3e2c2efe3ec92715d974645fc8da8f"
+
+criteria:
+  # pathogenic_classifiers.get_ps1 (L146-196). Docstring/evRepo comment
+  # (L155-156) claims PS1 (3=strong)/PS1_Moderate (2)/PS1_Supporting (1),
+  # but the actual if/elif/else chain (L179-187: `score = 3` default at
+  # L179, `if review_value < ps1_strong_review(=4): score = 2` at
+  # L180-181, `elif review_value < ps1_moderate_review(=2): score = 1` at
+  # L182-183, `elif review_value < ps1_supporting_review(=0): score = 1`
+  # at L184-185, `else: return 0, ""` at L186-187) is DEAD CODE for two of
+  # those three branches: `score=3` is only kept when the FIRST `if` is
+  # FALSE, i.e. when review_value>=4 -- but at that point BOTH subsequent
+  # `elif` conditions (`< 2`, `< 0`) are also necessarily false
+  # (review_value>=4 implies not <2 and not <0), so control falls through
+  # to the trailing `else: return 0, ""` instead -- score=3 (strong) is
+  # therefore NEVER returned. Symmetrically, the two `elif` branches that
+  # would set score=1 (supporting) are only reached when the first `if` is
+  # false, which (per the above) always routes to the `else: return 0`
+  # branch instead -- score=1 (supporting) is also NEVER returned. The
+  # ONLY reachable non-zero PS1 score at this commit is score=2
+  # (moderate), returned whenever review_value < 4 (constants.py
+  # L107-109: ps1_strong_review=4, ps1_moderate_review=2,
+  # ps1_supporting_review=0). This is a materially important finding: PS1
+  # is effectively "moderate-only" in BIAS-3.0.0 regardless of ClinVar
+  # review-status tier, contrary to its own docstring.
+  PS1: [moderate]
+
+  # pathogenic_classifiers.get_pm2 (L436-499). score=1 (supporting) on the
+  # early "absent from both GnomAD and 1000 Genomes" return (L465-468:
+  # `if not variant.gnomad and not variant.oneKg: score = 1 ... return`);
+  # else score=2 (moderate) once max_af < the LOEUF-tiered
+  # `pm2_cutoff_supporting` (L474-478/L484-486/L492-494 across the
+  # both-sources/1000G-only/gnomAD-only branches), then further
+  # OVERWRITTEN to score=3 (strong) if max_af additionally < the stricter
+  # `pm2_cutoff_strong` (L478-481/L487-489/L495-497). All three tiers are
+  # reachable.
+  PM2: [supporting, moderate, strong]
+
+  # pathogenic_classifiers.get_pm4 (L541-603). Non-repeat-region in-frame
+  # indel/stop-loss length vs. `pm4_supporting_length` (=0) /
+  # `pm4_moderate_length` (=10) / `pm4_strong_length` (=30) (constants.py
+  # L138-140): score=3/2/1 (strong/moderate/supporting) by length tier
+  # (L581-586); score=0 (no call) at/under the repeat-region guard or the
+  # supporting length floor. All three non-zero tiers are reachable.
+  PM4: [supporting, moderate, strong]
+
+  # pathogenic_classifiers.get_pm5 (L622-687). score=2 (moderate) is the
+  # pre-set default (L671) once a same-residue different-AA pathogenic
+  # comparator is found; OVERWRITTEN to score=1 (supporting, L674-675)
+  # when the best comparator's ClinVar review level is 0 ("no assertion"
+  # tier, `pm5_supporting_review`=1, constants.py L141-144: level<1 means
+  # level==0), and to score=3 (strong, L676-677) when the best
+  # comparator's review level is 5 ("practice guideline"/"reviewed by
+  # expert panel", `pm5_strong_review`=4: level>4 means level==5). All
+  # three tiers (levels 0, {1,2,3}, 5 respectively) are reachable given
+  # `clinvar_review_status_to_level`'s 0-5 range (constants.py L37-48).
+  PM5: [supporting, moderate, strong]
+
+  # benign_classifiers.get_bp3 (L299-351). In-repeat-region in-frame indel:
+  # score=1 (supporting, L340-341) once var_len < `bp3_in_frame_max_length`
+  # (=60nt/19 aa, constants.py L57), OVERWRITTEN to score=3 (strong,
+  # L342-343) once additionally < `bp3_in_frame_strong_length` (=15nt/5aa,
+  # L58). There is no length band that yields score=2 (moderate) -- the
+  # code jumps directly from supporting to strong with no moderate tier at
+  # all, matching the function's own comment "5 amino acids or less" / "19
+  # or less amino acids". Both non-zero tiers are reachable; moderate is
+  # not.
+  BP3: [supporting, strong]
+
+  # benign_classifiers.get_bp4 (L353-516). Per-tool (phyloP/REVEL/DANN/
+  # GERP/ABSplice/AlphaMissense) benign-direction weights are collected
+  # into `alg_to_score` (values 1-4 depending on tool + threshold tier,
+  # e.g. REVEL alone can reach 4="very strong" at L409); the BEST per-tool
+  # score is taken (L490-497), incremented by 1 if >1 tools agree on that
+  # max (L499-500, can push 3->4), and floor-capped at 4 (`score =
+  # min(score, 4)`, L503). A lone supporting-only algorithm is rejected
+  # outright (L501-502, returns 0). If the resulting score is exactly 2
+  # ("no moderate benign in default ACMG"), it is explicitly PROMOTED to
+  # 3=strong (L512-513) -- so moderate is never the final value either.
+  # The reachable non-zero final tiers are therefore supporting (1, only
+  # when >=2 algorithms agree), strong (3, the promoted-from-2 case or a
+  # direct 3), and very_strong (4, a direct REVEL/agreement-bumped case) --
+  # moderate is structurally unreachable as a FINAL score despite being a
+  # valid intermediate per-tool weight.
+  BP4: [supporting, strong, very_strong]
+
+  # benign_classifiers.get_bs1 (L62-114). score=3 (strong, L100-101) once
+  # highest_af > the LOEUF-tiered `bs1_cutoff_strong`; ELIF score=1
+  # (supporting, L107-108) once highest_af > `bs1_cutoff` (the weaker
+  # "bs1_cutoff_supporting" tier) but not the strong tier. The `elif`
+  # structure means there is no code path that yields score=2 (moderate)
+  # -- only strong and supporting are reachable, exactly mirroring BP3's
+  # supporting/strong-only (no-moderate) shape.
+  BS1: [supporting, strong]

@@ -1,0 +1,239 @@
+# PRD-08 strength-policy reconciliation — `acmg-strength-policy` (track
+# `strength-policy-2026-07`). Reconciles `configs/eval/bias_strength_ladder.yaml`
+# (what pinned BIAS-3.0.0 can ACTUALLY emit per criterion) against THIS
+# scorer's CURRENT strength vocabulary (`configs/acmg/tsc.yaml::acmg_criteria`)
+# for the 7 criteria whose ladder includes a strength outside that vocab.
+#
+# STATUS: unapproved. `owner_approved: false`. Per
+# `raptor.scorer.strength_policy.apply_strength_policy`, an unapproved
+# policy routes EVERY call it is asked about to `manual` review for the
+# WHOLE record, regardless of what `disposition`/`emit` a given record
+# below configures -- nothing in this file is live/wired into
+# eval or production in this track (that activation, and the mechanical
+# current-vocab enforcement itself, belong to a separate parity track and
+# to an explicit owner approval, never this file flipping itself active).
+#
+# Every `records[C][S]`/`gene_overrides[G][C][S]` entry is still fully
+# schema-VALIDATED at load time regardless of `status`/`owner_approved`
+# (fail-closed is a load-time property, not merely a runtime gate) -- so
+# every entry below is a genuinely correct, activatable disposition, not a
+# placeholder. `recommended_disposition`/`recommended_emit`/
+# `decision_dependency`/`notes` are OPTIONAL, purely-informational planner
+# metadata: they document what a future, owner-approved revision of this
+# file MIGHT set `disposition`/`emit` to, and what unresolved decision
+# that would depend on -- they are never read by `apply_strength_policy`
+# and never make a decision active on their own.
+schema: acmg-strength-policy
+policy_id: tsc-strength-policy
+version: "1"
+status: unapproved
+owner_approved: false
+
+# Fail-closed: an unrecognized/unhandled (criterion, ladder-strength) pair
+# is a scorer/ladder drift bug (`UnknownStrengthPolicyPairError`), never
+# silently defaulted; this is the config-level catch-all default for any
+# record this file's own exhaustive-schema validation would otherwise have
+# already forced to exist -- never `accept`/`cap` (never an auto-accepting
+# default).
+default_disposition: manual
+
+records:
+  # get_ps1 (bias_strength_ladder.yaml::PS1) can ONLY ever emit moderate
+  # (score=2) at this pinned commit -- see the ladder file's PS1 comment
+  # for the dead-code analysis. The current scorer vocab for PS1
+  # (configs/acmg/tsc.yaml) is `[strong]` only, so moderate is
+  # unconditionally out-of-vocab: `accept` is invalid (moderate not in
+  # vocab) and `cap` is invalid (there is nothing WEAKER than moderate in
+  # the PS1 vocab to demote to -- the only vocab entry, strong, is
+  # stronger, and cap must never inflate). manual is therefore the only
+  # schema-valid disposition regardless of approval status.
+  PS1:
+    moderate:
+      disposition: manual
+      decision_dependency: "ps1-moderate-only-vocab-widening"
+      recommended_disposition: manual
+      notes: >-
+        PS1's own validation_disposition in bias_lineage.yaml is
+        `requires_heldout_mask` (cross_variant_clinvar). The planner's
+        card text ("PS1 moderate/supporting accept after mask") named
+        BOTH moderate and supporting, but this DOER's source audit
+        (bias_strength_ladder.yaml::PS1) found the supporting/strong
+        branches of get_ps1's if/elif/else chain (pathogenic_classifiers.py
+        L179-187) are dead code at commit ade13f2 -- supporting is not on
+        the ladder at all, so there is no supporting decision to make.
+        Accepting moderate would additionally require the scorer's own
+        PS1 strength_vocab (configs/acmg/tsc.yaml) to be widened to admit
+        moderate -- a decision for the current-vocab parity track, not
+        this one -- AND a completed masked held-out validation run. Until
+        both land and an owner explicitly approves this policy, manual is
+        the only correct disposition.
+
+  # get_pm2 (bias_strength_ladder.yaml::PM2). Current scorer vocab:
+  # [supporting, moderate] (configs/acmg/tsc.yaml). supporting/moderate are
+  # already in-vocab (plain accept); strong is not, and is capped to
+  # moderate -- the nearest in-vocab, strictly-weaker tier (never all the
+  # way to supporting, which would discard more signal than necessary).
+  PM2:
+    supporting:
+      disposition: accept
+      emit: supporting
+    moderate:
+      disposition: accept
+      emit: moderate
+    strong:
+      disposition: cap
+      emit: moderate
+      decision_dependency: "pm2-strong-cap-target-approval"
+      recommended_disposition: cap
+      recommended_emit: moderate
+      notes: >-
+        PM2 is `label_independent_population` (bias_lineage.yaml) --
+        production_disposition already `allowed`. Capping strong->moderate
+        (rather than ->supporting) keeps the maximum PM2 signal that is
+        still expressible in the current 2-tier vocab; this needs an
+        explicit owner sign-off before it can auto-fire (no vocab change
+        required, just approval of this file).
+
+  # get_pm4 (bias_strength_ladder.yaml::PM4). Current scorer vocab:
+  # [moderate] only (configs/acmg/tsc.yaml). moderate is already in-vocab
+  # (plain accept); strong caps DOWN to moderate (the only vocab entry,
+  # strictly weaker than strong); supporting has no valid target at all --
+  # accept is invalid (not in vocab) and cap would require PROMOTING
+  # supporting up to moderate, which inflates and is forbidden -- manual
+  # is the only schema-valid disposition for supporting.
+  PM4:
+    supporting:
+      disposition: manual
+      decision_dependency: "pm4-supporting-vocab-widening-or-forbid"
+      recommended_disposition: manual
+      notes: >-
+        Unresolved owner fork (explicitly flagged by the planner): either
+        (a) widen PM4's scorer vocab to admit `supporting` and then accept
+        it, or (b) leave PM4_Supporting calls permanently `forbid`-dropped
+        as below the current 1-tier vocab's floor. This file picks the
+        safer default (manual, never silently dropped) until an owner
+        picks (a) or (b); `recommended_disposition` is deliberately left
+        as `manual` (not `forbid`) to avoid this DOER pre-selecting the
+        fork's outcome.
+    moderate:
+      disposition: accept
+      emit: moderate
+    strong:
+      disposition: cap
+      emit: moderate
+
+  # get_pm5 (bias_strength_ladder.yaml::PM5). Current scorer vocab:
+  # [moderate, strong] (configs/acmg/tsc.yaml). moderate/strong are
+  # already in-vocab (plain accept); supporting has no valid in-vocab
+  # target weaker than itself to cap to (it IS the weakest ladder tier),
+  # so manual is the only schema-valid disposition.
+  PM5:
+    supporting:
+      disposition: manual
+      decision_dependency: "pm5-supporting-vocab-widening"
+      recommended_disposition: manual
+      notes: >-
+        Planner card: "PM5 supporting accept after mask". PM5 is
+        `cross_variant_clinvar` with `validation_disposition:
+        requires_heldout_mask` in bias_lineage.yaml. Accepting supporting
+        would require BOTH widening PM5's scorer vocab to admit supporting
+        AND a completed masked held-out validation run before an owner
+        could flip this to `accept`/emit=supporting -- neither has
+        happened, so this stays manual.
+    moderate:
+      disposition: accept
+      emit: moderate
+    strong:
+      disposition: accept
+      emit: strong
+
+  # get_bp3 (bias_strength_ladder.yaml::BP3). Current scorer vocab:
+  # [supporting] only (configs/acmg/tsc.yaml). supporting is already
+  # in-vocab (plain accept); strong caps DOWN to supporting (the only,
+  # strictly-weaker vocab entry).
+  BP3:
+    supporting:
+      disposition: accept
+      emit: supporting
+    strong:
+      disposition: cap
+      emit: supporting
+      decision_dependency: "bp3-strong-cap-approval"
+      recommended_disposition: cap
+      recommended_emit: supporting
+      notes: >-
+        BP3 is `label_independent_reference_or_predictor` --
+        production_disposition already `allowed`. No vocab widening is
+        needed for this cap (supporting is the only, and thus nearest,
+        in-vocab weaker tier); only an explicit owner approval is
+        outstanding.
+
+  # get_bp4 (bias_strength_ladder.yaml::BP4). Current scorer vocab:
+  # [supporting] only (configs/acmg/tsc.yaml). supporting is already
+  # in-vocab (plain accept); strong/very_strong (the ladder's "elevated"
+  # tiers, per the planner's shorthand) both cap DOWN to supporting -- the
+  # only in-vocab, strictly-weaker tier for either.
+  BP4:
+    supporting:
+      disposition: accept
+      emit: supporting
+    strong:
+      disposition: cap
+      emit: supporting
+      decision_dependency: "bp4-elevated-cap-vs-forbid"
+      recommended_disposition: cap
+      recommended_emit: supporting
+      notes: >-
+        Unresolved owner fork (explicitly flagged by the planner as "owner
+        fork vs forbid"): cap all BP4 "elevated" (strong/very_strong)
+        firings down to supporting (preserves a benign-direction signal,
+        just at lower confidence), OR forbid them outright (BP4's own
+        aggregation defect, `bias_bp4_pp3_aggregation_defect` in the
+        masked-holdout limitations list, may already inflate its strength
+        beyond what the underlying per-tool evidence supports -- a case
+        FOR dropping rather than trusting a demoted value). This file's
+        schema-valid record picks `cap` as the conservative
+        signal-preserving default; the alternative (`forbid`) remains
+        equally schema-valid and is the other side of the fork an owner
+        must resolve.
+    very_strong:
+      disposition: cap
+      emit: supporting
+      decision_dependency: "bp4-elevated-cap-vs-forbid"
+      recommended_disposition: cap
+      recommended_emit: supporting
+      notes: >-
+        Same unresolved owner fork as BP4 strong above (cap vs forbid) --
+        very_strong is reachable via a direct REVEL call or a >1-tool
+        agreement bump (bias_strength_ladder.yaml::BP4); it is not treated
+        differently from strong for policy purposes since both sit
+        strictly above the current 1-tier vocab ceiling.
+
+  # get_bs1 (bias_strength_ladder.yaml::BS1). Current scorer vocab:
+  # [moderate, strong] (configs/acmg/tsc.yaml). strong is already in-vocab
+  # (plain accept); supporting has no valid in-vocab target -- cap would
+  # require PROMOTING supporting up to moderate/strong (inflation,
+  # forbidden), so manual is the only schema-valid disposition.
+  BS1:
+    supporting:
+      disposition: manual
+      decision_dependency: "bs1-supporting-vocab-widening"
+      recommended_disposition: manual
+      notes: >-
+        Planner card text says "BS1 supporting accept", but that is not a
+        schema-valid disposition against the CURRENT BS1 vocab
+        (moderate/strong only) -- `accept` requires emit==strength==
+        supporting to already be in-vocab, and `cap` can never promote
+        supporting up to moderate/strong. Accepting BS1 supporting
+        therefore first requires an owner decision to WIDEN BS1's scorer
+        vocab (a parity-track/current-vocab change, out of this track's
+        scope) -- until then this stays manual, correcting the planner's
+        card to reflect what is actually schema-activatable.
+    strong:
+      disposition: accept
+      emit: strong
+
+# No TSC1/TSC2 gene-specific override has been decided in this track --
+# left empty rather than fabricated (fail-closed: an override is only ever
+# added on an explicit, cited owner decision, never speculatively).
+gene_overrides: {}
