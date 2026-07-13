@@ -1,0 +1,106 @@
+# Fail-closed, pre-registered external MAVE source register (Phase 0/1,
+# EVAL_PLAN orthogonal-validation scope). Every entry here is loaded through
+# `raptor.external.mave.register.SourceRegisterEntry` /
+# `verify_registered_source` -- an entry's `sha256` is checked byte-for-byte
+# against what was actually fetched, its `verification` state gates whether
+# it may be treated as usable, and NOTHING in this file is ACMG evidence,
+# `raptor.scorer` input, or gate/benchmark configuration (PRD-06/ADR-0007
+# boundary; see `docs/reference/mave-tsc2-source-register-2026-07.md`).
+
+sources:
+  # Primary orthogonal-validation source. Public MaveDB score-set for the
+  # TSC2 cliPE (curated loci prime editing) MAVE (PMC11185720 /
+  # doi:10.1101/2024.06.07.597916), CC0-licensed, 208 variant rows, target
+  # transcript NM_000548.5 (per MaveDB's own `methodText`: "Variants based
+  # on Refseq transcript NM_000548.5.").
+  - urn: "urn:mavedb:00001201-a-1"
+    gene: TSC2
+    transcript: NM_000548.5
+    license: CC0-1.0
+    variant_count: 208
+    verification: verified
+    # sha256 of the raw scores.csv export as fetched/pinned on 2026-07-13
+    # (scripts/fetch_mave_scoreset.py verifies this byte-for-byte; a drifted
+    # upstream export fails closed, it is never silently re-pinned).
+    sha256: "74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717"
+    api:
+      score_set: "https://api.mavedb.org/api/v1/score-sets/urn:mavedb:00001201-a-1"
+      scores_csv: "https://api.mavedb.org/api/v1/score-sets/urn:mavedb:00001201-a-1/scores"
+    license_url: "https://creativecommons.org/publicdomain/zero/1.0/"
+    doi: "10.1101/2024.06.07.597916"
+    publication_pmcid: "PMC11185720"
+    external_path: "external/mavedb/TSC2-clipe-00001201-a-1/scores.csv"
+
+  # 2026 IGVF VAMP-seq TSC2 protein-abundance functional data (referenced by
+  # PMC12871146). Registered so the source register documents its existence
+  # and pins -- NOT fetched, NOT downloaded, NOT claimed as verified.
+  # RAPTOR does not hold access to the underlying IGVF files; any attempt to
+  # verify this entry raises `ConfirmationPendingError` fail-closed.
+  - urn: "IGVF:analysis-set:IGVFDS5595BTYJ"
+    gene: TSC2
+    transcript: NM_000548.5
+    license: "unconfirmed"
+    variant_count: 0
+    verification: confirm_pending
+    sha256: ""
+    api:
+      portal: "https://www.igvf.org"
+      analysis_set: "IGVFDS5595BTYJ"
+      score_file: "IGVFFI9747KART"
+    publication_pmcid: "PMC12871146"
+    notes: >
+      access-not-held; VAMP-seq protein-abundance assay accession candidates
+      identified from public reporting only. Do not fetch/claim until IGVF
+      portal access and a licensing/terms review are completed.
+
+  # 2026 IGVF Saturation Genome Editing (SGE) TSC2 functional data
+  # (referenced by PMC12871146). Same confirm-pending, access-not-held
+  # posture as the VAMP-seq entry above.
+  - urn: "IGVF:analysis-set:IGVFDS1782FCXW"
+    gene: TSC2
+    transcript: NM_000548.5
+    license: "unconfirmed"
+    variant_count: 0
+    verification: confirm_pending
+    sha256: ""
+    api:
+      portal: "https://www.igvf.org"
+      analysis_set: "IGVFDS1782FCXW"
+      score_file: "IGVFFI3097DFGF"
+    publication_pmcid: "PMC12871146"
+    notes: >
+      access-not-held; SGE functional assay accession candidates identified
+      from public reporting only. Do not fetch/claim until IGVF portal
+      access and a licensing/terms review are completed.
+
+  # CAGI7 TSC2 protein-stability challenge (genomeinterpretation.org).
+  # Registered for provenance/citation purposes only -- confirm-pending,
+  # access-not-held (challenge data distribution terms not yet reviewed).
+  - urn: "CAGI7:TSC2-stability-challenge"
+    gene: TSC2
+    transcript: "unconfirmed"
+    license: "unconfirmed"
+    variant_count: 0
+    verification: confirm_pending
+    sha256: ""
+    api:
+      portal: "http://www.genomeinterpretation.org/cagi7-tsc2.html"
+    notes: >
+      access-not-held; CAGI7 challenge/assessment data distribution terms
+      have not been reviewed. Do not fetch/claim until a review is
+      completed and access is confirmed.
+
+# Circularity guard (PRD-01/ADR-0007 style, EVAL_PLAN orthogonal scope):
+# every entry above is external MAVE FUNCTIONAL-ASSAY evidence, never ACMG
+# criteria, never `raptor.scorer`/`BiasEvidenceSource` input, and never
+# ClinVar-derived. No entry here may be referenced by
+# `configs/acmg/*.yaml`, `configs/eval/tsc2.yaml`, `configs/eval/mask.yaml`,
+# or `configs/eval/bias_lineage.yaml`.
+circularity_guard:
+  forbidden_consumers:
+    - raptor.scorer
+    - raptor.eval.benchmark
+    - raptor.eval.gate
+    - raptor.eval.harness
+    - raptor.eval.knowns
+  forbidden_criteria: [PS3, BS3]
