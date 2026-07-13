@@ -22,6 +22,9 @@ venv/
 build/
 dist/
 *.db
+*.sqlite
+*.sqlite3
+.raptor/
 
 # Node
 node_modules/
