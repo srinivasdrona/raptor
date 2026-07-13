@@ -9,6 +9,15 @@ final path, and a local-seam `--fetcher`/injectable download function so
 tests never touch a real network. `--verify-only` never downloads; it only
 re-checks an already-fetched file against the pin.
 
+Transcript/license verification is against an INDEPENDENTLY OBSERVED source,
+never a self-comparison against the register entry under test: the MaveDB
+score-set *metadata* API response (`api.score_set`, e.g.
+`.../score-sets/urn:mavedb:00001201-a-1`) is fetched/cached separately (to
+`score_set_metadata.json` alongside `scores.csv`) and parsed
+(`raptor.external.mave.metadata`) for its own `methodText`/`license` fields
+-- so an upstream drift (wrong URN, changed license) fails loud instead of
+comparing `entry.transcript == entry.transcript`.
+
 Raw MaveDB scores never live inside the repository -- the default
 `--output` is under `RAPTOR_MAVE_EXTERNAL_ROOT`
 (default `~/raptor-data/external/mavedb`), the same external-data root used
@@ -29,6 +38,11 @@ from typing import Callable
 
 import yaml
 
+from raptor.external.mave.metadata import (
+    ScoreSetMetadataError,
+    observe_transcript_and_license,
+    parse_score_set_metadata,
+)
 from raptor.external.mave.register import (
     ConfirmationPendingError,
     SourceRegisterEntry,
@@ -89,6 +103,11 @@ def _default_fetcher(url: str, target: Path) -> None:
             handle.write(chunk)
 
 
+def _default_text_fetcher(url: str) -> str:
+    with urllib.request.urlopen(url) as response:
+        return response.read().decode("utf-8")
+
+
 def fetch_and_verify(
     *,
     config_path: Path,
@@ -96,12 +115,14 @@ def fetch_and_verify(
     output_root: Path,
     verify_only: bool,
     downloader: Callable[[str, Path], None] = _default_fetcher,
+    metadata_fetcher: Callable[[str], str] = _default_text_fetcher,
 ) -> Path:
     entry, raw = load_source_entry(config_path, urn)
     slug = re.sub(r"[^A-Za-z0-9]+", "-", urn).strip("-")
     gene = raw["gene"]
     target_dir = output_root / f"{gene}-clipe-{slug.split('mavedb-', 1)[-1]}"
     target = target_dir / "scores.csv"
+    metadata_target = target_dir / "score_set_metadata.json"
 
     if not target.is_file():
         if verify_only:
@@ -124,11 +145,48 @@ def fetch_and_verify(
     observed_sha256 = sha256_file(target)
     observed_variant_count = count_data_rows(target)
 
+    if entry.verification == "confirm_pending":
+        # `verify_registered_source` raises `ConfirmationPendingError` before
+        # ever inspecting these values for an access-not-held source -- there
+        # is no independent metadata to fetch here, and these placeholders
+        # are never treated as real observations.
+        observed_transcript = entry.transcript
+        observed_license = entry.license
+    else:
+        # Independent verification (checker finding: license/transcript
+        # "verification" was previously a self-comparison tautology --
+        # `entry.transcript == entry.transcript`). The observed transcript
+        # and license below are parsed from the MaveDB score-set *metadata*
+        # API response (`api.score_set`), a document independent of, and
+        # fetched/cached separately from, the pinned register entry.
+        if not metadata_target.is_file():
+            if verify_only:
+                raise MaveFetchError(
+                    f"missing score-set metadata at {metadata_target} (--verify-only set)"
+                )
+            metadata_url = raw.get("api", {}).get("score_set")
+            if not metadata_url:
+                raise MaveFetchError(f"no score_set metadata API URL registered for {urn!r}")
+            metadata_text = metadata_fetcher(metadata_url)
+            target_dir.mkdir(parents=True, exist_ok=True)
+            temp_metadata_path = metadata_target.with_name(f".{metadata_target.name}.download")
+            temp_metadata_path.write_text(metadata_text, encoding="utf-8")
+            os.replace(temp_metadata_path, metadata_target)
+
+        try:
+            metadata = parse_score_set_metadata(metadata_target.read_text(encoding="utf-8"))
+            observed_transcript, observed_license = observe_transcript_and_license(metadata)
+        except ScoreSetMetadataError as exc:
+            raise MaveFetchError(
+                f"could not derive an independently observed transcript/license from "
+                f"{metadata_target}: {exc}"
+            ) from exc
+
     try:
         verify_registered_source(
             entry,
-            observed_transcript=entry.transcript,
-            observed_license=entry.license,
+            observed_transcript=observed_transcript,
+            observed_license=observed_license,
             observed_sha256=observed_sha256,
             observed_variant_count=observed_variant_count,
         )

@@ -52,12 +52,16 @@ scoring against these is a blocked Phase 2 item (see §5).
 | DOI | `10.1101/2024.06.07.597916` |
 | API | `https://api.mavedb.org/api/v1/score-sets/urn:mavedb:00001201-a-1` (metadata), `.../scores` (CSV download) |
 | Local, never-committed path | `D:\AIProjects\raptor-data\external\mavedb\TSC2-clipe-00001201-a-1\scores.csv` |
+| Local, never-committed metadata cache | `D:\AIProjects\raptor-data\external\mavedb\TSC2-clipe-00001201-a-1\score_set_metadata.json` |
 | Pinned sha256 | `74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717` |
 
 The pinned sha256 above is the actual, locally-computed digest of the fetched 208-row CSV (209
 lines including the header) — not a placeholder. `register.verify_registered_source` fails
 closed (raises `SourceVerificationError`) if the observed transcript, license, sha256, or variant
-count of any locally re-fetched copy disagree with this pin.
+count of any locally re-fetched copy disagree with this pin. The observed transcript/license
+passed to that check are parsed from `score_set_metadata.json` (the MaveDB score-set metadata API
+response's `methodText`/`license` fields, `raptor.external.mave.metadata`) — an independently
+fetched/cached document, never read off the register entry itself.
 
 ### 2.1 Identity matching: exact `hgvs_c`, never a projection
 
@@ -66,10 +70,27 @@ BIAS-2015 outputs used for identity matching (`tsc_vus_input.bias_output.tsv`,
 `holdout_input.bias_output.tsv`) both carry transcript `NM_000548.4`. Rather than guess or
 compute a cDNA→genomic projection to reconcile the transcript versions (explicitly out of scope
 per this track's charter), identity matching is done by **exact bare `c.` HGVS string equality
-only** (e.g. `c.1609C>T`). This is justified empirically, not assumed: across every matched row in
-both partitions, the BIAS row's own `refAllele`/`altAllele` fields agree exactly with the
-substitution encoded in the `hgvs_c` string and with the BIAS row's own `hgvsg` field — **zero
-ref/alt disagreements** were observed. `raptor.external.mave.identity.map_cdna_to_spdi` still
+only** (e.g. `c.1609C>T`).
+
+> **UNVERIFIED ASSUMPTION — not a resolved fact.** Treating an equal bare `c.` string across
+> `NM_000548.4` and `NM_000548.5` as the same genomic position requires the two transcript
+> versions to share **identical CDS/UTR boundaries and numbering**. This has **not** been
+> independently confirmed (e.g. by diffing the two RefSeq transcript records' CDS coordinates).
+> What *is* verified is narrower: across every matched row in both partitions, each BIAS row's
+> own `refAllele`/`altAllele` fields agree exactly with the substitution encoded in that same
+> row's `hgvs_c` string and with that row's own `hgvsg` field — **zero ref/alt disagreements**
+> were observed. That check confirms internal self-consistency of the BIAS-side data; it does
+> **not** confirm that `NM_000548.4` and `.5` number their CDS identically, and it cannot detect a
+> scenario where both transcripts happen to encode the same ref/alt at a given `c.` position
+> number while that position number maps to two different genomic coordinates across versions.
+> If the two transcript versions ever diverge in CDS/UTR boundaries (e.g. an indel, alternate
+> start, or exon boundary correction between `.4` and `.5`), identical `c.` strings could denote
+> different genomic positions and this join would silently produce false matches. Confirming or
+> refuting CDS-coordinate equivalence between `NM_000548.4` and `.5` is out of scope for this fix
+> and remains an open, explicitly-flagged risk (see the `limitations` entry in
+> `data/census/tsc2_mave_clipe_orthogonal_2026-07-13.json` and the code comment at
+> `scripts/build_mave_orthogonal_report.py`'s `_match_scores_to_bias`).
+`raptor.external.mave.identity.map_cdna_to_spdi` still
 raises `ProjectionUnavailableError` when no external projector is supplied, so a full cDNA→genomic
 map is never silently fabricated; only the exact-string overlap used here is claimed.
 

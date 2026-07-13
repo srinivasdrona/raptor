@@ -66,6 +66,11 @@ from raptor.external.mave.orthogonal_metrics import (  # noqa: E402
     OrthogonalObservation,
     compute_orthogonal_metrics,
 )
+from raptor.external.mave.metadata import (  # noqa: E402
+    ScoreSetMetadataError,
+    observe_transcript_and_license,
+    parse_score_set_metadata,
+)
 from raptor.external.mave.partition import PartitionKind, build_partitions  # noqa: E402
 from raptor.external.mave.register import SourceRegisterEntry, verify_registered_source  # noqa: E402
 from raptor.external.mave.source import MaveScoreRecord, parse_mavedb_scoreset_csv  # noqa: E402
@@ -173,7 +178,14 @@ def _match_scores_to_bias(
     matches a BIAS row iff its bare `c.` HGVS change is byte-identical to a
     BIAS TSC2 row's bare `c.` change. Keyed by the bare `c.` string itself
     (the actual exact-match identity axis), not by a re-derived genomic
-    position."""
+    position.
+
+    CAVEAT (UNVERIFIED ASSUMPTION, not a resolved fact): MaveDB's rows are
+    against NM_000548.5 while the on-disk BIAS rows carry NM_000548.4; this
+    match assumes -- but has NOT independently confirmed -- that the two
+    transcript versions share identical CDS/UTR numbering, so that an equal
+    bare `c.` string denotes the same genomic position under both. See
+    `docs/reference/mave-tsc2-source-register-2026-07.md` section 2.1."""
     matched: dict[str, tuple[MaveScoreRecord, dict[str, str]]] = {}
     for raw in raw_rows:
         bias_row = bias_by_c.get(raw.hgvs_c)
@@ -238,10 +250,35 @@ def build_report(
     with scores_path.open(encoding="utf-8", newline="") as handle:
         observed_variant_count = sum(1 for _ in handle) - 1
 
+    # Independent verification (checker finding: license/transcript
+    # "verification" was previously a self-comparison tautology --
+    # `entry.transcript == entry.transcript`). `observed_transcript`/
+    # `observed_license` below are parsed from the cached MaveDB score-set
+    # *metadata* API response (`score_set_metadata.json`, fetched separately
+    # by `scripts/fetch_mave_scoreset.py` from `api.score_set` -- never the
+    # same `entry` object being verified). Missing/unparseable metadata
+    # fails loud rather than silently falling back to `entry`'s own fields.
+    metadata_path = mavedb_dir / "score_set_metadata.json"
+    if not metadata_path.is_file():
+        raise ReportBuildError(
+            f"missing independently-fetched score-set metadata at {metadata_path} -- run "
+            "`scripts/fetch_mave_scoreset.py` first (license/transcript verification must "
+            "come from the MaveDB metadata API response, never from the register entry "
+            "under test)"
+        )
+    try:
+        metadata = parse_score_set_metadata(metadata_path.read_text(encoding="utf-8"))
+        observed_transcript, observed_license = observe_transcript_and_license(metadata)
+    except ScoreSetMetadataError as exc:
+        raise ReportBuildError(
+            f"could not derive an independently observed transcript/license from "
+            f"{metadata_path}: {exc}"
+        ) from exc
+
     verify_registered_source(
         entry,
-        observed_transcript=entry.transcript,
-        observed_license=entry.license,
+        observed_transcript=observed_transcript,
+        observed_license=observed_license,
         observed_sha256=observed_sha256,
         observed_variant_count=observed_variant_count,
     )
@@ -451,9 +488,13 @@ def build_report(
         "limitations": [
             "MaveDB target transcript is NM_000548.5; the on-disk BIAS-2015 outputs used "
             "for identity matching carry NM_000548.4 -- matching is by exact hgvs_c string "
-            "only (never a projection), consistent with both transcripts sharing the same "
-            "CDS numbering for the matched substitutions (verified: 0 ref/alt disagreements "
-            "across all matched rows).",
+            "only (never a projection). UNVERIFIED ASSUMPTION (not a resolved fact): this "
+            "match assumes the two transcript versions share identical CDS/UTR numbering "
+            "for the matched substitutions. What IS verified is narrower and internal to "
+            "each side -- 0 ref/alt disagreements between each BIAS row's own hgvsg and "
+            "refAllele/altAllele fields -- which does NOT independently confirm CDS-numbering "
+            "equivalence across NM_000548.4 vs .5. See "
+            "docs/reference/mave-tsc2-source-register-2026-07.md section 2.1.",
             "The VUS-overlap and heldout-overlap orthogonal-correlation 'raptor_side_proxy' "
             "is BIAS-2015's own prior ACMG classification (an ordinal encoding), not a "
             "raptor.scorer probability and not gating evidence.",
