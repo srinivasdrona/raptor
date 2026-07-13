@@ -171,43 +171,43 @@ records:
   # get_bp4 (bias_strength_ladder.yaml::BP4). Current scorer vocab:
   # [supporting] only (configs/acmg/tsc.yaml). supporting is already
   # in-vocab (plain accept); strong/very_strong (the ladder's "elevated"
-  # tiers, per the planner's shorthand) both cap DOWN to supporting -- the
-  # only in-vocab, strictly-weaker tier for either.
+  # tiers, per the planner's shorthand) sit above the vocab ceiling and
+  # are an unresolved owner fork (cap DOWN to supporting vs. forbid
+  # outright) -- left `manual` (neutral) below until an owner decides.
   BP4:
     supporting:
       disposition: accept
       emit: supporting
     strong:
-      disposition: cap
-      emit: supporting
+      disposition: manual
       decision_dependency: "bp4-elevated-cap-vs-forbid"
-      recommended_disposition: cap
-      recommended_emit: supporting
+      recommended_disposition: manual
       notes: >-
         Unresolved owner fork (explicitly flagged by the planner as "owner
-        fork vs forbid"): cap all BP4 "elevated" (strong/very_strong)
-        firings down to supporting (preserves a benign-direction signal,
-        just at lower confidence), OR forbid them outright (BP4's own
-        aggregation defect, `bias_bp4_pp3_aggregation_defect` in the
-        masked-holdout limitations list, may already inflate its strength
-        beyond what the underlying per-tool evidence supports -- a case
-        FOR dropping rather than trusting a demoted value). This file's
-        schema-valid record picks `cap` as the conservative
-        signal-preserving default; the alternative (`forbid`) remains
-        equally schema-valid and is the other side of the fork an owner
-        must resolve.
+        fork vs forbid"): either (a) cap all BP4 "elevated"
+        (strong/very_strong) firings down to supporting (preserves a
+        benign-direction signal, just at lower confidence), OR (b) forbid
+        them outright (BP4's own aggregation defect,
+        `bias_bp4_pp3_aggregation_defect` in the masked-holdout
+        limitations list, may already inflate its strength beyond what the
+        underlying per-tool evidence supports -- a case FOR dropping
+        rather than trusting a demoted value). This file picks the safer
+        default (manual, never silently dropped/promoted) until an owner
+        picks (a) or (b); `recommended_disposition` is deliberately left
+        as `manual` (not `cap` or `forbid`) to avoid this DOER
+        pre-selecting the fork's outcome, exactly as PM4_Supporting above.
     very_strong:
-      disposition: cap
-      emit: supporting
+      disposition: manual
       decision_dependency: "bp4-elevated-cap-vs-forbid"
-      recommended_disposition: cap
-      recommended_emit: supporting
+      recommended_disposition: manual
       notes: >-
         Same unresolved owner fork as BP4 strong above (cap vs forbid) --
         very_strong is reachable via a direct REVEL call or a >1-tool
         agreement bump (bias_strength_ladder.yaml::BP4); it is not treated
         differently from strong for policy purposes since both sit
-        strictly above the current 1-tier vocab ceiling.
+        strictly above the current 1-tier vocab ceiling. Left `manual`
+        (recommended_disposition also `manual`) for the same
+        pre-selection-avoidance reason as BP4 strong.
 
   # get_bs1 (bias_strength_ladder.yaml::BS1). Current scorer vocab:
   # [moderate, strong] (configs/acmg/tsc.yaml). strong is already in-vocab

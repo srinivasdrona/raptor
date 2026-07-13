@@ -91,11 +91,12 @@ Full per-record rationale (including gene-override scope, currently empty) is in
    PM4's scorer vocab to admit `supporting` and then `accept` it, or (b) leave PM4-supporting firings
    permanently `forbid`-dropped below the current 1-tier vocab floor. `manual` (never silently dropped) is
    the safer placeholder until an owner picks (a) or (b).
-2. **BP4 elevated (strong/very_strong)** (`decision_dependency: bp4-elevated-cap-vs-forbid`): either cap
-   both down to `supporting` (preserves a benign-direction signal at lower confidence — this file's current
-   pick) or `forbid` them outright, given BP4's own aggregation defect
-   (`bias_bp4_pp3_aggregation_defect`, `configs/eval/bias_lineage.yaml`) may already inflate its strength
-   beyond what the underlying per-tool evidence supports.
+2. **BP4 elevated (strong/very_strong)** (`decision_dependency: bp4-elevated-cap-vs-forbid`): either (a) cap
+   both down to `supporting` (preserves a benign-direction signal at lower confidence), or (b) `forbid` them
+   outright, given BP4's own aggregation defect (`bias_bp4_pp3_aggregation_defect`,
+   `configs/eval/bias_lineage.yaml`) may already inflate its strength beyond what the underlying per-tool
+   evidence supports. `manual` (never silently dropped/promoted) is the safer placeholder until an owner
+   picks (a) or (b) — same treatment as PM4 supporting above; this file does not pre-select cap or forbid.
 
 ## 6. Corrections vs. the planner's summary card text
 

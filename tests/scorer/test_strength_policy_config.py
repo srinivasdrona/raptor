@@ -83,6 +83,26 @@ def test_real_strength_policy_ps1_and_bs1_supporting_have_no_accept_target():
     assert policy.records["BS1"]["supporting"].disposition == "manual"
 
 
+def test_real_strength_policy_open_owner_forks_stay_neutral_manual():
+    """Checker finding (2026-07-13, gpt-5.6-sol code-review, strength-policy
+    track): both flagged owner forks -- PM4 supporting
+    (`pm4-supporting-vocab-widening-or-forbid`) and BP4 strong/very_strong
+    (`bp4-elevated-cap-vs-forbid`) -- must resolve to the SAME neutral
+    `manual` disposition with `recommended_disposition == "manual"`. Neither
+    may pre-select one side of its fork (e.g. BP4 must not silently default
+    to `cap`), since that would let a blanket-approval of this file activate
+    an outcome the owner never explicitly chose."""
+    _, policy = _load_real_policy()
+    fork_records = [
+        policy.records["PM4"]["supporting"],
+        policy.records["BP4"]["strong"],
+        policy.records["BP4"]["very_strong"],
+    ]
+    for record in fork_records:
+        assert record.disposition == "manual"
+        assert record.recommended_disposition == "manual"
+
+
 def test_real_strength_policy_pm2_strong_caps_to_moderate_not_supporting():
     _, policy = _load_real_policy()
     record = policy.records["PM2"]["strong"]
