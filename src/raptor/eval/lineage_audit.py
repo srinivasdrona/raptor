@@ -76,10 +76,17 @@ class LineageGateError(Exception):
     this module raises on a well-formed-but-blocked audit report. Carries
     the full report so a caller can inspect/log/persist it."""
 
-    def __init__(self, report: "LineageAuditReport") -> None:
+    def __init__(
+        self,
+        report: "LineageAuditReport",
+        blocking_criteria: Iterable[str] | None = None,
+    ) -> None:
         self.report = report
+        self.blocking_criteria = tuple(
+            sorted(blocking_criteria if blocking_criteria is not None else report.blocking_criteria)
+        )
         super().__init__(
-            "BIAS lineage gate blocked: " + ", ".join(report.blocking_criteria)
+            "BIAS lineage gate blocked: " + ", ".join(self.blocking_criteria)
         )
 
 
@@ -306,8 +313,32 @@ def audit_lineage(
     )
 
 
-def enforce_lineage(report: LineageAuditReport) -> None:
-    """The ONLY gate: raises `LineageGateError(report)` iff `report.blocked`,
-    else returns `None`. `audit_lineage` never calls this."""
-    if report.blocked:
-        raise LineageGateError(report)
+def enforce_lineage(
+    report: LineageAuditReport,
+    *,
+    authorized_masked_criteria: Iterable[str] = (),
+) -> None:
+    """Raise on every blocker not covered by a verified held-out mask.
+
+    The default remains fully fail-closed. A terminal caller may authorize
+    only criteria whose static disposition is `requires_heldout_mask`, after
+    separately verifying the mask attestation.
+    """
+    authorized = {str(value).strip().upper() for value in authorized_masked_criteria}
+    disposition_by_criterion = {
+        item.criterion: item.disposition for item in report.items
+    }
+    invalid_authorizations = {
+        criterion
+        for criterion in authorized
+        if criterion in disposition_by_criterion
+        and disposition_by_criterion[criterion] != "requires_heldout_mask"
+    }
+    if invalid_authorizations:
+        raise ValueError(
+            "only requires_heldout_mask criteria may be mask-authorized; got "
+            f"{sorted(invalid_authorizations)!r}"
+        )
+    remaining = set(report.blocking_criteria) - authorized
+    if remaining:
+        raise LineageGateError(report, remaining)

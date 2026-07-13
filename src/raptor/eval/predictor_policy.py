@@ -15,10 +15,11 @@ artifact never authorizes (no default-allow).
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 #: The exact schema id an artifact must declare (AC-G9).
 SCHEMA_ID = "bp4pp3-predictor-policy"
@@ -126,3 +127,53 @@ def load_predictor_policy(path: str | Path) -> PredictorPolicy:
         decision_reference=decision_reference,
         approved=(status == "approved"),
     )
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def verify_predictor_policy_hashes(
+    policy: PredictorPolicy,
+    predictor_source_path: str | Path,
+    correction_path: str | Path | Iterable[str | Path],
+) -> None:
+    """Bind an approved decision to the exact aggregation spec and code."""
+    source = Path(predictor_source_path)
+    correction_paths = (
+        [Path(correction_path)]
+        if isinstance(correction_path, (str, Path))
+        else sorted((Path(path) for path in correction_path), key=lambda path: path.name)
+    )
+    if not source.is_file():
+        raise PredictorPolicyError(f"predictor source artifact not found: {source}")
+    if not correction_paths:
+        raise PredictorPolicyError("predictor correction artifact bundle is empty")
+    for correction in correction_paths:
+        if not correction.is_file():
+            raise PredictorPolicyError(f"predictor correction artifact not found: {correction}")
+    actual_source = _sha256_file(source)
+    if len(correction_paths) == 1:
+        actual_correction = _sha256_file(correction_paths[0])
+    else:
+        digest = hashlib.sha256()
+        for correction in correction_paths:
+            digest.update(correction.name.encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(correction.read_bytes())
+            digest.update(b"\0")
+        actual_correction = digest.hexdigest()
+    if actual_source.lower() != policy.predictor_source_hash.lower():
+        raise PredictorPolicyError(
+            "predictor_source_hash mismatch: "
+            f"policy={policy.predictor_source_hash} actual={actual_source}"
+        )
+    if actual_correction.lower() != policy.correction_hash.lower():
+        raise PredictorPolicyError(
+            "correction_hash mismatch: "
+            f"policy={policy.correction_hash} actual={actual_correction}"
+        )

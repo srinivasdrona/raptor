@@ -168,6 +168,8 @@ class BiasEvidenceSource:
         eval_config: EvalConfig,
         scorer_config: ScorerConfig,
         normalizer: CanonicalBiasNormalizer,
+        *,
+        authorized_masked_criteria: Iterable[str] = (),
     ) -> None:
         self._scorer_config = scorer_config
 
@@ -248,10 +250,14 @@ class BiasEvidenceSource:
         # --- Step 6: the completed BIAS lineage gate (fail-closed). ---------
         policy = load_lineage_policy(_LINEAGE_POLICY_PATH)
         report = audit_lineage(all_records, policy, scorer_config, eval_config)
-        enforce_lineage(report)  # raises LineageGateError iff report.blocked
+        enforce_lineage(
+            report,
+            authorized_masked_criteria=authorized_masked_criteria,
+        )
 
         self.variant_ids: Tuple[str, ...] = tuple(sorted(manifest_id_set))
         self._by_canonical: Mapping[str, BiasRecord] = dict(canonical_by_record)
+        self.lineage_report = report
 
     def get_evidence(self, variant_id: str) -> Tuple[CriterionCall, ...]:
         """Canonical SPDI id -> joined BIAS record -> every FIRED
@@ -264,3 +270,18 @@ class BiasEvidenceSource:
             raise UnknownVariantError(variant_id)
         calls = parse_rationale(record.criteria, self._scorer_config.strength_map)
         return tuple((call.criterion, call.strength, call.direction) for call in calls)
+
+    def get_predictor_correction(self, variant_id: str, criterion: str, spec):
+        """Return the auditable emitted-vs-corrected PP3/BP4 strength."""
+        from .predictor_aggregation import recompute_strength
+
+        record = self._by_canonical.get(variant_id)
+        if record is None:
+            raise UnknownVariantError(variant_id)
+        normalized = str(criterion).strip().upper()
+        entry = record.criteria.get(normalized.lower())
+        if entry is None or int(entry[0]) <= 0:
+            raise ValueError(
+                f"criterion {normalized} did not fire for variant {variant_id}"
+            )
+        return recompute_strength(normalized, str(entry[1]), spec)

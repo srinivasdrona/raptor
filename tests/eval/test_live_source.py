@@ -97,7 +97,16 @@ def _configs():
     )
 
 
-def _source(tmp_path, *, bias_rows, manifest_rows, normalizer=None, eval_config=None, scorer_config=None):
+def _source(
+    tmp_path,
+    *,
+    bias_rows,
+    manifest_rows,
+    normalizer=None,
+    eval_config=None,
+    scorer_config=None,
+    authorized_masked_criteria=(),
+):
     api = _api()
     tmp_path.mkdir(parents=True, exist_ok=True)
     manifest_path = tmp_path / "manifest.jsonl"
@@ -111,6 +120,7 @@ def _source(tmp_path, *, bias_rows, manifest_rows, normalizer=None, eval_config=
         eval_config or current_eval,
         scorer_config or current_scorer,
         normalizer or FakeCanonicalNormalizer(),
+        authorized_masked_criteria=authorized_masked_criteria,
     )
 
 
@@ -278,6 +288,32 @@ def test_ac_b8_lineage_gate_blocks_leaky_and_allows_clean(tmp_path: Path) -> Non
     assert clean.get_evidence("NC_000009.12:100:A:G") == (
         ("PM2", "supporting", "pathogenic"),
     )
+
+
+def test_mask_attested_requires_mask_criterion_is_authorized_only_explicitly(tmp_path: Path) -> None:
+    manifest = [{
+        "variant_id": "NC_000009.12:100:A:G",
+        "vcf_key": "chr9:101:A:G",
+        "accession": "NC_000009.12",
+        "contig": "chr9",
+    }]
+    source = _source(
+        tmp_path / "masked",
+        bias_rows=[{"criteria": {"pm5": (2, "masked ClinVar comparator")}}],
+        manifest_rows=manifest,
+        authorized_masked_criteria={"PM5"},
+    )
+    assert source.get_evidence("NC_000009.12:100:A:G") == (
+        ("PM5", "moderate", "pathogenic"),
+    )
+
+    with pytest.raises(LineageGateError):
+        _source(
+            tmp_path / "wrong-criterion",
+            bias_rows=[{"criteria": {"pm5": (2, "masked ClinVar comparator")}}],
+            manifest_rows=manifest,
+            authorized_masked_criteria={"PS1"},
+        )
 
 
 def test_ac_b7_reference_failure_is_fatal(tmp_path: Path) -> None:

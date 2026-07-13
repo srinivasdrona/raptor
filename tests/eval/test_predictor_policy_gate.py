@@ -6,7 +6,12 @@ from pathlib import Path
 
 # Module doesn't exist yet
 try:
-    from raptor.eval.predictor_policy import load_predictor_policy, PredictorPolicyError, PredictorPolicy
+    from raptor.eval.predictor_policy import (
+        load_predictor_policy,
+        verify_predictor_policy_hashes,
+        PredictorPolicyError,
+        PredictorPolicy,
+    )
 except ImportError:
     pass
 
@@ -72,6 +77,59 @@ def test_acg9_predictor_policy_loader_fail_closed(tmp_path):
     assert p_approved.schema == "bp4pp3-predictor-policy"
     assert p_approved.status == "approved"
     assert p_approved.predictor_source_hash == "a" * 64
+
+
+def test_predictor_policy_hashes_bind_spec_and_correction(tmp_path):
+    spec = tmp_path / "spec.yaml"
+    correction = tmp_path / "correction.py"
+    spec.write_text("spec", encoding="utf-8")
+    correction.write_text("correction", encoding="utf-8")
+    import hashlib
+
+    policy_path = tmp_path / "policy.json"
+    policy_path.write_text(json.dumps({
+        "schema": "bp4pp3-predictor-policy",
+        "status": "approved",
+        "predictor_source_hash": hashlib.sha256(b"spec").hexdigest(),
+        "correction_hash": hashlib.sha256(b"correction").hexdigest(),
+        "decision_reference": "evaluation-only-test",
+    }))
+    policy = load_predictor_policy(policy_path)
+    verify_predictor_policy_hashes(policy, spec, correction)
+
+    correction.write_text("changed", encoding="utf-8")
+    with pytest.raises(PredictorPolicyError, match="correction_hash"):
+        verify_predictor_policy_hashes(policy, spec, correction)
+
+
+def test_predictor_policy_can_bind_correction_bundle(tmp_path):
+    spec = tmp_path / "spec.yaml"
+    first = tmp_path / "a.py"
+    second = tmp_path / "b.py"
+    spec.write_text("spec", encoding="utf-8")
+    first.write_text("first", encoding="utf-8")
+    second.write_text("second", encoding="utf-8")
+    import hashlib
+
+    digest = hashlib.sha256()
+    for path in (first, second):
+        digest.update(path.name.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    policy_path = tmp_path / "policy.json"
+    policy_path.write_text(json.dumps({
+        "schema": "bp4pp3-predictor-policy",
+        "status": "approved",
+        "predictor_source_hash": hashlib.sha256(b"spec").hexdigest(),
+        "correction_hash": digest.hexdigest(),
+        "decision_reference": "evaluation-only-test",
+    }))
+    verify_predictor_policy_hashes(
+        load_predictor_policy(policy_path),
+        spec,
+        (first, second),
+    )
 
 # AC-G8
 def test_acg8_terminal_runner_blocked_policy(tmp_path):

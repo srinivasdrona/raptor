@@ -1,0 +1,7 @@
+{
+  "schema": "bp4pp3-predictor-policy",
+  "status": "approved",
+  "predictor_source_hash": "2c89bb17dea68fc9ed294eee2108bdd528e551eb4882b47cc4a400d683aca2ae",
+  "correction_hash": "19aa2ed835c05bcd3615ea1744fd654d33ca1c81d77abd852e89fcb7707e2c45",
+  "decision_reference": "docs/DECISIONS.md#evaluation-only-bp4pp3-correction-approval-2026-07-13"
+}
