@@ -1,0 +1,68 @@
+# Phase 1 orthogonal MAVE validation config for TSC2 (EVAL_PLAN orthogonal-
+# validation scope). This config is POLICY + PINS for the NON_GATING
+# orthogonal comparison between RAPTOR/BIAS's own TSC2 calls and the MaveDB
+# cliPE functional assay -- it is a SEPARATE, deliberately isolated config
+# from `configs/eval/tsc2.yaml` (the ACMG/ClinVar gate config) and must
+# never be merged into it, imported by it, or used to change
+# `oracle_thresholds`/`decide_gate` there.
+#
+# Nothing in this file can cause `raptor.eval.gate.decide_gate` to return
+# PASS, authorize a VUS, or fire PS3/BS3. `validation_mode` is always
+# "NON_GATING" wherever this config's outputs are reported (fail-closed by
+# construction in `raptor.external.mave.endpoint`/`orthogonal_metrics`).
+
+validation_mode: NON_GATING
+
+# Fixed, pre-registered functional thresholds (not derived from the data
+# being classified, not config-tunable per run -- pinned here as
+# documentation of the same constants hardcoded in
+# `raptor.external.mave.endpoint`). Changing these values does not change
+# behavior; the code owns the actual pins.
+functional_thresholds:
+  functional_blb_below: 0.242
+  functional_plp_above: 0.477
+
+# Below this per-partition per-class count, a class's concordance is
+# descriptive-only (UNDERPOWERED) and reported as such -- never treated as
+# adequately powered, and never gating regardless of status (mirrors
+# `raptor.external.mave.orthogonal_metrics.MIN_CLASS_N`).
+min_class_n: 10
+
+# Bootstrap resampling pins for the deterministic rank-correlation CIs
+# (`raptor.external.mave.orthogonal_metrics.compute_orthogonal_metrics`).
+# Fixed seed -> byte-identical aggregate on every rebuild
+# (`scripts/build_mave_orthogonal_report.py`).
+bootstrap:
+  resamples: 2000
+  random_seed: 20260713
+
+# Mutually-exclusive partitions (`raptor.external.mave.partition`).
+# `independent` records whether a partition's variants are free of any
+# ClinVar-derived clinical-label dependency on RAPTOR/BIAS's own TSC2
+# pipeline (EVAL_PLAN independence framing) -- HELDOUT_OVERLAP is NOT
+# independent (BIAS was built/QA'd against ClinVar), VUS_OVERLAP IS
+# independent (no clinical label exists for a VUS).
+partitions:
+  calibration:
+    independent: false
+  heldout_overlap:
+    independent: false
+  vus_overlap:
+    independent: true
+
+# Phase 1 scope: the single registered, verified MaveDB source
+# (`configs/external/mave_sources.yaml`). IGVF VAMP-seq/SGE and CAGI7 are
+# registered there as confirm_pending/access-not-held and are explicitly
+# OUT of Phase 1 scope (Phase 2 blocked item, see
+# `docs/reference/mave-tsc2-source-register-2026-07.md`).
+sources:
+  - "urn:mavedb:00001201-a-1"
+
+# Fail-closed: this config is NEVER read by `raptor.eval.gate`,
+# `raptor.eval.benchmark`, `raptor.eval.harness`, or `raptor.scorer`.
+forbidden_consumers:
+  - raptor.scorer
+  - raptor.eval.benchmark
+  - raptor.eval.gate
+  - raptor.eval.harness
+  - raptor.eval.knowns

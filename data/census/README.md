@@ -47,3 +47,36 @@ python scripts/build_masked_holdout_gate_aggregate.py \
   --date 2026-07-13 \
   --output data/census/tsc_masked_holdout_gate_2026-07-13.json
 ```
+
+`tsc2_mave_clipe_orthogonal_2026-07-13.json` records the first orthogonal,
+non-gating MAVE (multiplexed assay of variant effect) validation track for
+TSC2, sourced from the public MaveDB cliPE prime-editing scoreset
+`urn:mavedb:00001201-a-1` (CC0-1.0, 208 variants, transcript NM_000548.5;
+PMC11185720). It reports two mutually exclusive overlaps against the current
+BIAS-2015 TSC2 runs, both recomputed fresh from the raw scoreset by exact
+`hgvs_c` string matching (never a cDNA->genomic projection): **66 VUS
+independent functional overlap** (59 functional-BLB / 3 functional-PLP /
+4 ambiguous — functional-PLP is UNDERPOWERED, n<10) and **32 ClinVar-heldout
+non-independent overlap** (23 clinical-BLB/functional-BLB concordant, 5
+clinical-PLP/functional-PLP concordant, 4 ambiguous-direction). The VUS
+overlap is independent of RAPTOR/BIAS's own evidence (no ClinVar label
+exists for a VUS); the heldout overlap is explicitly flagged non-independent
+because BIAS/RAPTOR's TSC2 pipeline was built/QA'd against ClinVar-derived
+evidence. All figures are `NON_GATING`: no MAVE score, correlation, or
+class-power figure here is consumed by `raptor.scorer`, `BiasEvidenceSource`,
+PS3/BS3, or `decide_gate`, and the aggregate contains no per-variant
+identities or clinical labels. See
+`docs/reference/mave-tsc2-source-register-2026-07.md` for full source
+citations, licensing, and the circularity/independence rationale. IGVF
+VAMP-seq, IGVF SGE, and CAGI7 TSC2 data are registered `confirm_pending`
+(access not held) and are not reflected in this aggregate.
+
+Reproduce the aggregate (byte-identical) from the external, never-committed
+raw scoreset and BIAS outputs with:
+
+```text
+PYTHONPATH=src RAPTOR_MAVE_EXTERNAL_ROOT=<external/mavedb root> \
+  python scripts/build_mave_orthogonal_report.py \
+  --output data/census/tsc2_mave_clipe_orthogonal_2026-07-13.json
+```
+

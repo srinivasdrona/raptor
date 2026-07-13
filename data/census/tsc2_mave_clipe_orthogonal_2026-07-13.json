@@ -1,0 +1,146 @@
+{
+  "functional_thresholds": {
+    "functional_blb_below": 0.242,
+    "functional_plp_above": 0.477
+  },
+  "identity_verification": {
+    "heldout_overlap_n": 32,
+    "method": "exact hgvsc string match against two independently-computed real BIAS-2015 outputs (VUS candidate-universe run + full held-out run), cross-checked by exact bare-c.-HGVS-string join against the existing verified overlap fixture; no cDNA->genomic projection was performed or required",
+    "mutually_exclusive": true,
+    "reference_allele_mismatches": 0,
+    "vus_overlap_n": 66
+  },
+  "limitations": [
+    "MaveDB target transcript is NM_000548.5; the on-disk BIAS-2015 outputs used for identity matching carry NM_000548.4 -- matching is by exact hgvs_c string only (never a projection), consistent with both transcripts sharing the same CDS numbering for the matched substitutions (verified: 0 ref/alt disagreements across all matched rows).",
+    "The VUS-overlap and heldout-overlap orthogonal-correlation 'raptor_side_proxy' is BIAS-2015's own prior ACMG classification (an ordinal encoding), not a raptor.scorer probability and not gating evidence.",
+    "functional_PLP is UNDERPOWERED (n<10) in both partitions; all class-power figures here are descriptive only, per configs/eval/mave_tsc2.yaml:min_class_n.",
+    "The pre-existing overlap_classified.json fixture's recorded genomic positions carry a consistent +/-1 offset relative to this script's fresh BIAS-2015-derived genomic positions for the same bare c. HGVS changes (BIAS's own hgvsg/refAllele/altAllele fields agree with each other and with the fresh reconstruction; see docs/reference/mave-tsc2-source-register-2026-07.md). The cross-check therefore joins on the exact bare c. HGVS string (the axis both sources agree on), not on genomic SPDI; no genomic coordinate from either source is trusted blindly."
+  ],
+  "orthogonal_metrics": {
+    "heldout_overlap": {
+      "class_power": {
+        "ambiguous": {
+          "gating": "NON_GATING",
+          "n": 4,
+          "status": "UNDERPOWERED"
+        },
+        "functional_BLB": {
+          "gating": "NON_GATING",
+          "n": 23,
+          "status": "OK"
+        },
+        "functional_PLP": {
+          "gating": "NON_GATING",
+          "n": 5,
+          "status": "UNDERPOWERED"
+        }
+      },
+      "kendall": {
+        "bootstrap_ci": [
+          0.172957,
+          0.669092
+        ],
+        "n": 32,
+        "statistic": 0.451866
+      },
+      "raptor_side_proxy": "BIAS-2015's own prior ACMG classification (ordinal-encoded: benign=-2 .. pathogenic=2), NOT raptor.scorer output, NOT MAVE-derived, NOT used by decide_gate.",
+      "spearman": {
+        "bootstrap_ci": [
+          0.210381,
+          0.808724
+        ],
+        "n": 32,
+        "statistic": 0.579915
+      },
+      "validation_mode": "NON_GATING"
+    },
+    "vus_overlap": {
+      "class_power": {
+        "ambiguous": {
+          "gating": "NON_GATING",
+          "n": 4,
+          "status": "UNDERPOWERED"
+        },
+        "functional_BLB": {
+          "gating": "NON_GATING",
+          "n": 59,
+          "status": "OK"
+        },
+        "functional_PLP": {
+          "gating": "NON_GATING",
+          "n": 3,
+          "status": "UNDERPOWERED"
+        }
+      },
+      "kendall": {
+        "bootstrap_ci": [
+          0.245892,
+          null
+        ],
+        "n": 66,
+        "statistic": 0.168721
+      },
+      "raptor_side_proxy": "BIAS-2015's own prior ACMG classification (ordinal-encoded: benign=-2 .. pathogenic=2), NOT raptor.scorer output, NOT MAVE-derived, NOT used by decide_gate.",
+      "spearman": {
+        "bootstrap_ci": [
+          null,
+          null
+        ],
+        "n": 66,
+        "statistic": 0.205093
+      },
+      "validation_mode": "NON_GATING"
+    }
+  },
+  "partitions": {
+    "heldout_overlap": {
+      "clinvar_direction_concordance_matrix": {
+        "high_direction": {
+          "ambiguous": 3,
+          "functional_BLB": 0,
+          "functional_PLP": 5
+        },
+        "low_direction": {
+          "ambiguous": 1,
+          "functional_BLB": 23,
+          "functional_PLP": 0
+        }
+      },
+      "functional_class_counts": {
+        "ambiguous": 4,
+        "functional_BLB": 23,
+        "functional_PLP": 5
+      },
+      "independence_note": "ClinVar-labelled held-out variants; NOT independent (BIAS/RAPTOR's TSC2 pipeline was built/QA'd against ClinVar-derived evidence)",
+      "independent": false,
+      "n": 32
+    },
+    "vus_overlap": {
+      "functional_class_counts": {
+        "ambiguous": 4,
+        "functional_BLB": 59,
+        "functional_PLP": 3
+      },
+      "independence_note": "no clinical/ClinVar label exists for a VUS; this overlap is free of any label dependency on RAPTOR/BIAS's TSC2 pipeline",
+      "independent": true,
+      "n": 66
+    }
+  },
+  "phase2_blocked": [
+    "IGVF VAMP-seq TSC2 protein-abundance data (IGVFDS5595BTYJ/IGVFFI9747KART): confirm_pending, access not held.",
+    "IGVF Saturation Genome Editing TSC2 data (IGVFDS1782FCXW/IGVFFI3097DFGF): confirm_pending, access not held.",
+    "CAGI7 TSC2 protein-stability challenge data: confirm_pending, access not held, distribution terms not yet reviewed."
+  ],
+  "report": "tsc2_mave_clipe_orthogonal_2026-07-13",
+  "source": {
+    "doi": "10.1101/2024.06.07.597916",
+    "gene": "TSC2",
+    "license": "CC0-1.0",
+    "publication_pmcid": "PMC11185720",
+    "sha256": "74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717",
+    "transcript": "NM_000548.5",
+    "urn": "urn:mavedb:00001201-a-1",
+    "variant_count": 208
+  },
+  "validation_mode": "NON_GATING"
+}
