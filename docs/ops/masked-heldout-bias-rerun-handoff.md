@@ -1,8 +1,9 @@
 # Masked held-out BIAS rerun: x64 operator handoff
 
-**Status:** source provenance and source mask complete; PS1/PM5 and PM1
-baseline reproduction, masked-resource regeneration, and held-out re-score
-require `dontpanic-devbox` (x64).
+**Status:** source provenance, source mask, and PS1/PM5 baseline reproduction
+complete. PM1 is excluded from this evaluation after a zero-support audit;
+masked-resource regeneration and held-out re-score require
+`dontpanic-devbox` (x64).
 
 **Authority boundary:** this run is evaluation-only. It must not approve a
 production scoring policy, classify a patient variant, reveal held-out labels
@@ -129,7 +130,7 @@ both byte hashes; byte inequality is allowed only when the report proves the
 same complete semantic multiset and attributes the difference to ordering or
 line endings.
 
-### 5.3 Reproduce PM1 without a moving UniProt download
+### 5.3 Scope PM1 without a moving UniProt download
 
 Do not fetch today's UCSC `uniProt.bb`. Reconstruct a frozen domain BED from
 the published PM1 resource:
@@ -140,15 +141,20 @@ the published PM1 resource:
 - use only this published domain universe;
 - run BIAS's pinned `generate_domain_lists.py` against the unmasked source.
 
-The reproduced PM1 semantic row multiset, including every numeric field, must
-equal the published resource. This freezes the original domain universe.
-After masking, a formerly excluded domain is deliberately not introduced;
-that is conservative criterion withholding, not evidence learned from the
-held-out set.
+The genome-wide reproduced PM1 resource differs from the published resource,
+but the published resource has zero intervals containing any of the 2,577
+held-out positions. The frozen lineage audit also records zero PM1 firings in
+both the VUS and held-out runs
+(`data/census/tsc_bias_lineage_audit_2026-07-10.json:77`).
 
-If PP2, BP1, PS1/PM5, or PM1 fails its reproduction requirement, stop. Do not
-substitute a current ClinVar snapshot, current UniProt file, approximate
-aggregate, or hand-edited resource.
+Independently run the PM1 reachability audit against both published and
+reproduced resources. Both must report zero reachable rows. If either has a
+reachable row, stop. If both are zero, record PM1 as
+`SKIPPED_ZERO_SUPPORT_BASELINE_MISMATCH`; this is an evaluation-only
+exclusion, not production PM1 validation.
+
+Do not substitute a current ClinVar snapshot, current UniProt file,
+approximate aggregate, or hand-edited resource.
 
 ## 6. Regenerate the masked comparator resources
 
@@ -170,15 +176,17 @@ After section 5 passes:
 
 2. Regenerate from the masked source, using the exact section 5 toolchain:
    - `hg38_PS1_PM5_clinvar_pathogenic_aa_nirvana.tsv`;
-   - `hg38_PM1_chrom_to_pathogenic_domain_list.tsv`;
    - `hg38_PP2_missense_pathogenic_genes.tsv`;
    - `hg38_BP1_truncating_genes.tsv`.
-3. Keep PS4, PP5, and BP6 forbidden/unscored. Do not claim that the installed
+3. Use an isolated byte-identical copy of the published PM1 file to satisfy
+   the loader contract, and pass an evaluation skip-list containing `PM1` to
+   BIAS. Confirm all 2,577 PM1 rationale entries remain zero/empty.
+4. Keep PS4, PP5, and BP6 forbidden/unscored. Do not claim that the installed
    Nirvana supplementary ClinVar database was masked.
-4. Create a new required-paths JSON pointing to the four masked files above
+5. Create a new required-paths JSON pointing to the three masked files above
    (PS1 and PM5 share one file). Every other allowed input must point to an
    isolated copy whose hash equals the baseline resource.
-5. Run an independent survivor audit. No canonical held-out identity may
+6. Run an independent survivor audit. No canonical held-out identity may
    remain in the direct PS1/PM5 comparator. Record all aggregate before/after
    diffs for TSC1 and TSC2.
 
@@ -201,7 +209,8 @@ Set-Location D:\raptor-x64\BIAS-2015
 python bias_2015.py `
   D:\raptor-x64\masked-heldout-2026-07-12\score\holdout_input_nirvana.json.gz `
   D:\raptor-x64\masked-heldout-2026-07-12\masked-resources\hg38_nirvana_required_paths.masked.json `
-  D:\raptor-x64\masked-heldout-2026-07-12\score\holdout_input.masked.bias_output.tsv
+  D:\raptor-x64\masked-heldout-2026-07-12\score\holdout_input.masked.bias_output.tsv `
+  --skip_list D:\raptor-x64\masked-heldout-2026-07-12\masked-resources\evaluation_skip_list.txt
 ```
 
 The output must contain exactly 2,577 data rows and no duplicate
@@ -213,9 +222,10 @@ devbox.
 
 Return only the following under one `return` directory:
 
-- the four regenerated comparator resources;
+- the three regenerated comparator resources;
 - masked required-paths JSON;
 - masked BIAS TSV;
+- PM1 published/reproduced reachability audits and evaluation skip-list;
 - source-mask and independent survivor-audit ledgers;
 - baseline reproduction report and machine-readable comparisons;
 - exact commands, timings, versions, and SHA-256 manifest;
@@ -240,6 +250,7 @@ Stop immediately if:
 - the exact February source cannot be proven by baseline reproduction;
 - any full resource or prior output is modified;
 - any held-out identity survives a masked direct comparator;
+- either PM1 scope audit finds a held-out-reachable interval;
 - the BIAS TSV does not contain exactly 2,577 unique records;
 - a held-out label is opened before blind scoring completes;
 - a step would require a current/live substitute for a pinned source.
