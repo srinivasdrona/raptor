@@ -131,6 +131,23 @@ def test_predictor_policy_can_bind_correction_bundle(tmp_path):
         (first, second),
     )
 
+
+def test_approved_predictor_policy_hashes_pin_current_terminal_source_bundle():
+    """The approved policy must bind the exact correction bundle.
+
+    When `src/raptor/eval/terminal_source.py` changes for production-vocabulary
+    parity, this sentinel is expected to fail closed until the pending policy
+    artifact is re-pinned.
+    """
+    verify_predictor_policy_hashes(
+        load_predictor_policy(Path("configs/eval/bp4pp3_predictor_policy.json")),
+        Path("configs/eval/predictor_aggregation.yaml"),
+        (
+            Path("src/raptor/eval/predictor_aggregation.py"),
+            Path("src/raptor/eval/terminal_source.py"),
+        ),
+    )
+
 # AC-G8
 def test_acg8_terminal_runner_blocked_policy(tmp_path):
     # scripts/run_masked_holdout_eval.py doesn't exist yet, but we test the requirement
