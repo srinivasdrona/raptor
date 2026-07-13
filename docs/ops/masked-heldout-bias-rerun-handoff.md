@@ -1,7 +1,8 @@
 # Masked held-out BIAS rerun: x64 operator handoff
 
-**Status:** source mask complete locally; BIAS resource reproduction, regeneration,
-and held-out re-score require `dontpanic-devbox` (x64).
+**Status:** source provenance and source mask complete; PS1/PM5 and PM1
+baseline reproduction, masked-resource regeneration, and held-out re-score
+require `dontpanic-devbox` (x64).
 
 **Authority boundary:** this run is evaluation-only. It must not approve a
 production scoring policy, classify a patient variant, reveal held-out labels
@@ -24,22 +25,31 @@ Do not modify `D:\raptor-x64\bias-hg38-data`, the installed Nirvana
 supplementary bundle, or prior full/VUS outputs. Copy inputs and resources into
 the new run root before writing anything.
 
-## 2. Why the source snapshot is provisional
+## 2. Proven source snapshot
 
 BIAS `CHANGELOG.md:41-43` says the `2026.03.01` resource bundle was regenerated
-with **ClinVar February 2026**, but it does not publish the exact source VCF
-checksum. The latest official February GRCh38 archive is therefore the leading
-candidate:
+with **ClinVar February 2026**, but the current hg38 files were regenerated and
+uploaded on March 10 after the original release's preprocessing failure
+(BIAS issue 43). BIAS preprocessing uses NCBI's rolling, unversioned
+`clinvar.vcf.gz` URL.
+
+The official March 9 GRCh38 archive semantically reproduces both published
+gene-level ClinVar resources at pinned BIAS commit `ade13f2`:
 
 - NCBI archive:
-  `https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/archive_2.0/2026/clinvar_20260226.vcf.gz`
-- Official MD5: `da12f4b5fc6a5c1d77b465e5ae90bf76`
-- Downloaded SHA-256:
-  `176fcba46a149f524eef9712f4a241a5683e5cc1b344f7e91253089d6bcdcfdb`
+  `https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/archive_2.0/2026/clinvar_20260309.vcf.gz`
+- Official MD5: `308d66b5fe172104298081c2fd555d8e`
+- SHA-256:
+  `e775b80f79ac4946a3a6666201a5b0cd44d789c848e355321dfd4b001804cef8`
+- PP2: 879 reproduced rows = 879 published rows; semantic multiset exact.
+- BP1: 114 reproduced rows = 114 published rows; semantic multiset exact.
 
-This date inference is **not** sufficient provenance by itself. Section 5's
-baseline-reproduction gate must prove the snapshot against BIAS's published
-resources before any masked result is accepted.
+Byte hashes differ because the BIAS generator builds sets and sorts only by
+gene, leaving duplicate same-gene row order process-dependent. Canonically
+comparing the complete tab-separated row multiset is therefore the
+reproducibility gate; raw file hash equality is not a valid gate for these two
+generated files. Evidence is pinned in
+`evidence\grch38-20260309-pp2-bp1-comparison.json`.
 
 ## 3. Completed label-free source mask
 
@@ -49,12 +59,12 @@ records using the pinned GRCh38 FASTAs.
 
 | Check | Result |
 |---|---:|
-| Source VCF records | 4,389,319 |
+| Source VCF records | 4,397,693 |
 | Held-out manifest identities | 2,577 |
 | Source rows removed | 2,577 |
 | Distinct held-out identities removed | 2,577 |
 | Held-out identities absent from source | 0 |
-| Masked VCF records | 4,386,742 |
+| Masked VCF records | 4,395,116 |
 | Independent re-mask removals | 0 |
 
 Key bundle hashes:
@@ -63,9 +73,10 @@ Key bundle hashes:
 |---|---|
 | `inputs\holdout_input.manifest.jsonl` | `9e588cdf8ebaea2e3793e0ea74721ab5283b57c2abf045dbf3070cb6e81ec9e4` |
 | `inputs\holdout_input.vcf` | `4dcba7c882b65838cedf8ce0ad56e0f7764df34b247ab412aac144d4027c622d` |
-| `masked\clinvar_20260226.masked.vcf.gz` | `4b202474dbd2eba800dbbef5e5e1c00d8c3941449d2e79949eb52cc3a48f5cd5` |
-| `masked\clinvar_20260226.mask-ledger.json` | `d6fb73fc541dc1380d036061c751927b0de7225c425049fd79bc59e51b9172bd` |
-| `masked\clinvar_20260226.remask-audit.json` | `a88ad265ee75cd4f9b919bc74fa0d206e4cc7f041ff97d5898984b91b464519f` |
+| `source\clinvar_20260309.vcf.gz` | `e775b80f79ac4946a3a6666201a5b0cd44d789c848e355321dfd4b001804cef8` |
+| `masked\clinvar_20260309.masked.vcf.gz` | `f1e25cd2c12b6d19a7e727ae1472ab086e5578e2e51819b466fbf333e1230b28` |
+| `masked\clinvar_20260309.mask-ledger.json` | `0f55e5cff0903c94baad896c23b7675526dfcd78513580f41c88b45f5c310fd0` |
+| `masked\clinvar_20260309.remask-audit.json` | `b58ee687cb554659efe5434434e383536198c5b99b09c1f0793368b4fea03fec` |
 | `references\NC_000009.12.fasta` | `650011382f44e91b90c85271833737af2afdb6f9e92ef56f1f8f58f2389e3351` |
 | `references\NC_000016.10.fasta` | `22dc1bb93de407e0653791c36e4097fbaf64c9efa2510c83b7777f607a61e4d0` |
 
@@ -93,17 +104,20 @@ No held-out labels are in this bundle.
 Use BIAS's own preprocessing functions at pinned commit `ade13f2`; do not
 reimplement its aggregation rules in RAPTOR.
 
-### 5.1 Identify the exact February source
+### 5.1 Confirm the proven March 9 source
 
-Start with the provided 2026-02-26 source. Regenerate **unmasked** PP2 and BP1
-from that VCF and compare them with the published files in
+Use the supplied `source\clinvar_20260309.vcf.gz`. Regenerate **unmasked** PP2
+and BP1 and compare their complete row multisets with the published files in
 `D:\raptor-x64\bias-hg38-data`.
 
-If either comparison fails, test only the other official February 2026 weekly
-GRCh38 archives, newest to oldest. Select a source only if one candidate
-uniquely reproduces both resources exactly. Record URL, official MD5, SHA-256,
-commands, and comparison results. If no candidate uniquely reproduces both,
-stop with `BLOCKED_SNAPSHOT_PROVENANCE`.
+Both comparisons must be semantically exact:
+
+- PP2: 879 rows, no reproduced-only or published-only rows.
+- BP1: 114 rows, no reproduced-only or published-only rows.
+
+Do not require raw byte hashes for PP2/BP1: duplicate same-gene output order is
+nondeterministic in the pinned BIAS generator. Stop with
+`BLOCKED_SNAPSHOT_PROVENANCE` only if either canonical row multiset differs.
 
 ### 5.2 Reproduce PS1/PM5
 
@@ -140,15 +154,15 @@ aggregate, or hand-edited resource.
 
 After section 5 passes:
 
-1. If the proven source is 2026-02-26, use the supplied masked VCF and ledger.
-   Otherwise run:
+1. Use the supplied March 9 masked VCF and ledger. If they are unavailable,
+   recreate them with:
 
    ```powershell
    Set-Location D:\raptor\repo
    $env:PYTHONPATH='D:\raptor\repo\src'
    python scripts\mask_clinvar_vcf_for_holdout.py `
-     --source-vcf <proven-source.vcf.gz> `
-     --output-vcf <isolated-masked-output.vcf.gz> `
+     --source-vcf D:\raptor-x64\masked-heldout-2026-07-12\handoff-input\source\clinvar_20260309.vcf.gz `
+     --output-vcf D:\raptor-x64\masked-heldout-2026-07-12\masked-resources\clinvar_20260309.masked.vcf.gz `
      --holdout-manifest D:\raptor-x64\masked-heldout-2026-07-12\handoff-input\inputs\holdout_input.manifest.jsonl `
      --reference-root D:\raptor-x64\masked-heldout-2026-07-12\handoff-input\references `
      --ledger D:\raptor-x64\masked-heldout-2026-07-12\reports\source-mask-ledger.json
