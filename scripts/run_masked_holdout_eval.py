@@ -28,7 +28,10 @@ from raptor.eval.predictor_policy import (
     verify_predictor_policy_hashes,
 )
 from raptor.eval.split import split_benchmark
-from raptor.eval.terminal_source import PredictorCorrectedEvidenceSource
+from raptor.eval.terminal_source import (
+    PredictorCorrectedEvidenceSource,
+    ProductionVocabEvidenceSource,
+)
 from raptor.ingest.config import load_config as load_ingest_config
 from raptor.ingest.model import NormalizedVariant, RawVariant
 from raptor.ingest.normalizer import SeqRepoGenomicNormalizer
@@ -348,6 +351,16 @@ def main(argv: list[str] | None = None) -> int:
         source,
         load_aggregation_spec(args.aggregation_config),
     )
+    # Production-vocabulary parity (AFTER the predictor correction, BEFORE
+    # `run_eval`): a corrected call whose strength is outside its
+    # criterion's `scorer_config.acmg_criteria[...].strength_vocab` is never
+    # scored -- the whole variant is routed to manual review, matching
+    # `raptor.scorer.pipeline`'s STRENGTH_OUT_OF_VOCAB production behavior.
+    production_source = ProductionVocabEvidenceSource(
+        corrected_source,
+        scorer_config.acmg_criteria,
+        eval_config.automatable_criteria,
+    )
 
     labeled = _load_frozen_benchmark(Path(args.benchmark), eval_config.labels_snapshot)
     benchmark_rows = build_benchmark(labeled, eval_config)
@@ -361,7 +374,7 @@ def main(argv: list[str] | None = None) -> int:
             f"unexpected={len(actual_holdout - expected_holdout)}"
         )
 
-    report = run_eval(eval_config, labeled, corrected_source)
+    report = run_eval(eval_config, labeled, production_source)
     if report.gate.status == "PASS" and skipped:
         report.gate = GateDecision(
             status="UNVERIFIED",
@@ -389,6 +402,7 @@ def main(argv: list[str] | None = None) -> int:
             "evaluation_skipped_criteria": sorted(skipped),
             "lineage_audit_hash": source.lineage_report.content_hash(),
             "predictor_correction_counts": corrected_source.correction_counts(),
+            "production_vocab_manual_routed_counts": production_source.manual_routed_counts,
             "verified_return_artifact_count": len(verified_return),
         }
     )
