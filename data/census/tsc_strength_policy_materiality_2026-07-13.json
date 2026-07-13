@@ -1,0 +1,89 @@
+{
+  "affected": {
+    "by_effective_disposition": {
+      "manual": 1968
+    },
+    "by_eval_only_implied_pattern": {
+      "LB": 1277,
+      "LP": 51,
+      "no_call": 463
+    },
+    "by_gene": {
+      "NTHL1": 3,
+      "TSC1": 713,
+      "TSC2": 1075
+    },
+    "by_variant_class": {
+      "missense": 1457,
+      "other": 324,
+      "truncating": 10
+    }
+  },
+  "corpus": {
+    "affected_rows": 1791,
+    "total_rows": 6618
+  },
+  "out_of_vocab_emitted_by_criterion_strength": {
+    "BP3": {
+      "strong": 7
+    },
+    "BP4": {
+      "strong": 1365
+    },
+    "PM2": {
+      "strong": 338
+    },
+    "PM4": {
+      "strong": 9,
+      "supporting": 137
+    },
+    "PM5": {
+      "supporting": 2
+    },
+    "PS1": {
+      "moderate": 110
+    }
+  },
+  "policy": {
+    "is_active": false,
+    "owner_approved": false,
+    "policy_id": "tsc-strength-policy",
+    "status": "unapproved",
+    "version": "1"
+  },
+  "recommended_scenario": {
+    "by_criterion_strength": {
+      "BP3": {
+        "cap": 7
+      },
+      "BP4": {
+        "cap": 1365
+      },
+      "PM2": {
+        "cap": 338
+      },
+      "PM4": {
+        "cap": 9,
+        "manual": 137
+      },
+      "PM5": {
+        "manual": 2
+      },
+      "PS1": {
+        "manual": 110
+      }
+    },
+    "by_disposition": {
+      "cap": 1719,
+      "manual": 249
+    },
+    "description": "HYPOTHETICAL ONLY -- simulates every out-of-vocab call as if each record's recommended_disposition/recommended_emit metadata (configs/acmg/strength_policy.yaml) were promoted to disposition/emit and the policy were owner-approved. Not active, not wired into eval/production, and does not reflect the current effective (unapproved -> manual) behavior."
+  },
+  "schema": "tsc-strength-policy-materiality-probe",
+  "source": {
+    "bias_commit": "ade13f206f3e2c2efe3ec92715d974645fc8da8f",
+    "bias_tsv_path": "/mnt/d/AIProjects/raptor-data/clinvar/vus-run/tsc-vus-2026-07-07/tsc_vus_input.bias_output.tsv",
+    "bias_tsv_sha256": "0a55cab470d3de93f06cd87ba30957fd1674c0ae2098ec86350f5aaac1a1162e",
+    "bias_version": "3.0.0"
+  }
+}
