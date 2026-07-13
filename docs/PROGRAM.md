@@ -11,11 +11,12 @@
 > packets · evidence/assay/contradiction atlas · gated mTOR hypothesis packets). The first complete
 > **deterministic TSC1/TSC2 evidence census is done** (internal, eval-only, non-authoritative — below);
 > the raw held-out benchmark has been **scored on pinned Nirvana/BIAS** (2,577 label-free records), but
-> the **leakage-safe masked rerun and PRD-06 authorization are still pending**. Masking, canonical-adapter,
-> exact confidence-bound gate, calibration-packet, and policy-control tooling are built, but the external
-> x64 masked-resource regeneration/re-score has not run and the production candidate policy remains
-> explicitly unapproved; therefore no candidate direction is
-> authoritative and no externally usable VUS worklist may be released.
+> the **leakage-safe masked rerun and PRD-06 gate are complete**. The gate returned **FAIL** on the
+> binding missense stratum (`vus_authorized=false`): pathogenic precision/recall lower bounds
+> `0.6042/0.7131` and benign lower bounds `0.8378/0.7632` did not clear the pre-registered
+> `0.90/0.85` thresholds. PM1 was excluded after a zero-support audit and remains unvalidated for
+> production. No candidate direction is authoritative and no externally usable VUS worklist may be
+> released.
 
 ## TSC VUS evidence census — COMPLETE (internal · eval-only · non-authoritative)
 
@@ -66,26 +67,26 @@ pending `OPERATING_MODEL.md` — ADR-0003.)*
 ## Health Rollup
 
 > *Module built ≠ live run executed.* The Tier-1/2 code path and the validation harness are **built and
-> signed off**; the raw held-out set is **scored**, but the **leakage-safe masked rerun + gate have not
-> yet been run**, so no VUS classification is authorized.
+> signed off**; the leakage-safe held-out set is **scored and gated**, and the gate returned **FAIL**,
+> so no VUS classification is authorized.
 
-- Tier 1/2 (Deterministic): 🟡 **MODULE BUILT** (PRD-01 scorer `1d2444e`; arm's-length BIAS port) — *raw x64 held-out scoring done (2,577 records, full resources); leakage-safe masked rerun + gate pending*
+- Tier 1/2 (Deterministic): 🟡 **MODULE BUILT; VALIDATION FAILED** (PRD-01 scorer `1d2444e`; arm's-length BIAS port) — *2,577-row masked gate completed; binding missense thresholds not met*
 - **Evidence census:** ✅ **COMPLETE** (internal · eval-only · non-authoritative) — 6,618 VUS scored on pinned Nirvana/BIAS; candidate directions **not** classifications (see census section above)
 - Tier 3 (LLM Extraction): 🔴 NOT STARTED (Phase 2)
 - Consensus/Adjudication: 🔴 NOT STARTED
-- Validation Framework: 🟡 **TOOLING BUILT + PRE-REGISTERED** (canonical BIAS adapter; ClinVar masker/auditor;
+- Validation Framework: 🔴 **EXECUTED — FAIL** (canonical BIAS adapter; ClinVar masker/auditor;
   exact 95% Clopper-Pearson lower-bound, per-direction/per-stratum gate; fail-closed predictor-policy
-  prerequisite) — *raw held-out scored; external masked-resource regeneration/re-score + final gate still pending*
+  prerequisite) — *masked resources scored; missense lower bounds failed; `vus_authorized=false`*
 
 ## Operations (Current Run)
 
-> The raw 2,577-variant held-out set **has been scored** on pinned Nirvana/BIAS (2,577 parsed unique
-> records), but precision/recall stay **N/A** — they require the leakage-safe masked rerun + PRD-06 gate,
-> not merely a raw score.
+> The leakage-safe 2,577-variant held-out set has been scored and gated. Metrics below are
+> evaluation-only; the binding result is **FAIL**.
 
-- Last Batch Size: N/A
-- Precision: N/A
-- Recall: N/A
+- Last Batch Size: **2,577**
+- Missense pathogenic precision: **0.8421** (95% lower bound **0.6042**, threshold **0.90**)
+- Missense pathogenic recall: **0.9412** (95% lower bound **0.7131**, threshold **0.85**)
+- Missense benign precision/recall lower bounds: **0.8378 / 0.7632**
 - Suspended (Human Review): N/A
 
 ## Priorities (This Week) — validate the census, then build the candidate-packet contract
@@ -96,16 +97,17 @@ the vertical worklist below replaces it. **Census candidate directions stay non-
 held-out gate PASSes.**
 
 1. **BIAS criterion lineage — COMPLETE.** The pinned source-derived **28-slot / 19-can-fire / 9-internal-stub** policy, exact-set registry gate, total audit + fail-closed enforcement, and portable source-oracle fixture are implemented. Real 6,618-VUS and 2,577-held-out audits both block on **PS1/PM5**; zero firing does not clear the statically mask-required **PM1/PP2/BP1**. See `data/census/tsc_bias_lineage_audit_2026-07-10.json`.
-2. **Held-out-masked BIAS validation bundle — TOOLING COMPLETE; EXTERNAL RUN PENDING.** Canonical-SPDI
-   masking, exact removal ledger, full-resource overlap guards, zero-incidence aggregate audit, canonical
-   2,577-row adapter, and fail-closed terminal runner are built. Remaining: run BIAS's own generators on
-   the masked upstream ClinVar inputs on the x64 worker, audit rebuilt PS1/PM5/PM1/PP2/BP1 resources, and
-   re-score the held-out set. Full VUS resources remain byte-untouched.
-3. **ClinVar audit — COMPLETE; ruling/masking pending.** The mechanized audit ran on the full held-out output: **PS1 116**, **PM5 13**, **PM1/PP2/BP1 0**; the report fails closed on PS1/PM5. Static lineage still requires masking all five. Remaining: masked-resource rerun + Oracle ruling (ADR-0009).
+2. **Held-out-masked BIAS validation bundle — COMPLETE; GATE FAIL.** Exact upstream masking removed
+   2,577/2,577 identities with zero survivors; the canonical adapter joined 2,577/2,577 rows. Masked
+   PS1/PM5/PP2/BP1 resources were regenerated and scored. PM1 had zero reachable rows in both published
+   and reproduced resources, was explicitly skipped for this evaluation, and remains production-unvalidated.
+3. **ClinVar audit — COMPLETE.** Direct-copy PS4/PP5/BP6 were suppressed; effective lineage blockers
+   after the verified mask were zero. The terminal gate nevertheless failed the binding missense metrics.
 4. **Canonical adapter — COMPLETE.** Arm's-length `BiasEvidenceSource` joins by canonical SPDI, enforces
    exact bijection/config parity/lineage preflight, and ignores BIAS's combined call.
-5. **Clopper-Pearson gate — COMPLETE.** Exact 95% lower bounds; corrected zero-error floor 36; missense
-   both directions and truncating-pathogenic hard-gated; predictor-policy artifact required fail-closed.
+5. **Clopper-Pearson gate — COMPLETE/EXECUTED: FAIL.** Exact 95% lower bounds; corrected zero-error
+   floor 36; missense both directions and truncating-pathogenic hard-gated. The evaluation-only BP4/PP3
+   policy was approved with pinned hashes; production policy remains unapproved.
 6. **BS2 policy — COMPLETE/DEFERRED.** Real probe: 34 firings (TSC1 29/TSC2 5). Population-only BIAS
    evidence cannot satisfy a TSC-specific automated BS2 policy; BS2 remains deferred/not scored with
    a cited decision rationale. No approval invented.
@@ -172,13 +174,12 @@ are complete (ADR-0009).
 | A | **Benchmark data** — real ClinVar TSC1/TSC2 *knowns* → frozen labeled benchmark (excl. conflicting/single-submitter/low-review; label hierarchy) | data | **DONE ✓** — frozen snapshot `clinvar_2026-07-07`; **3,681** scoreable knowns → **2,577** held-out / **1,104** dev reserve at `holdout 0.7` (PR #7 `2e3477f`, Track A2; A1 loader PRD-07 `499f479`) |
 | B | **x64 live-scoring infra** — BIAS-2015 (arm's-length, ADR-0007) + Nirvana (x64-only, ADR-0008) | infra | **Smoke-tested ✓ (operator-confirmed)** — BIAS-2015 v3.0.0 + Nirvana 3.18.1 produced an 8-record TSV that passed `BiasTsvSource`'s 18-column contract with identity preserved. Large external artifacts intentionally out of repo; versions/hashes live in the operator's external reports (handoff bundle PR #8 `3556548`) |
 | C | **Oracle thresholds (GP-3)** — pre-register precision/recall targets into `configs/eval/tsc2.yaml` | governance | **DONE ✓** — nested 95% lower-bound thresholds: missense 0.90/0.85 both directions; truncating 0.95 pathogenic; `min_count_per_class: 36`, `split.holdout_fraction: 0.7` |
-| J | **Terminal join** — raw label-free held-out VCF **emitted + scored** (2,577 parsed records, full resources); masking/audit/adapter/gate tooling built. Remaining: external x64 masked-resource regeneration + re-score, approve predictor-policy artifact, adjudicate masked comparator criteria, run final gate | code + eval | **TOOLING DONE; external masked rerun + approvals PENDING** |
+| J | **Terminal join** — label-free held-out VCF masked, rescored, canonically joined, corrected and gated | code + eval | **DONE — FAIL** (`vus_authorized=false`; binding missense lower bounds below threshold; PM1 excluded/production-unvalidated) |
 
 > A/B/C are complete and had **no code dependency on each other**. Thresholds are now pre-registered
 > (C done), so the gate no longer reads `UNVERIFIED` for a missing target — the **raw** held-out score
-> now exists, but the gate still **cannot `PASS`** until the leakage-safe **masked rerun** produces
-> leakage-safe scores and the Oracle ruling on **PS1/PM5/PM1/PP2/BP1** lands; the derivation audit is
-> complete and confirms the current unmasked held-out output must not proceed (ADR-0009).
+> now exists. The leakage-safe masked rerun also exists and returned **FAIL**; the next step is
+> missense error/abstention analysis and expert review, not threshold relaxation or VUS release.
 
 ## Active Decisions & Bottlenecks
 - (Resolved 2026-07-10) **Strategy premise falsified → vertical TSC/mTOR reset** — generic-platform *uniqueness* premise withdrawn; horizontal/platform expansion **frozen**; RAPTOR repositioned as a vertical TSC/mTOR research-evidence product (candidate packets · atlas · gated mTOR hypotheses) — **ADR-0010**. Census (PR #12 `253c9fd`, `5a307df`) complete but **non-authoritative**; held-out gate still governs.
@@ -189,6 +190,10 @@ are complete (ADR-0009).
 - (Resolved 2026-07-10) **Full-output circularity audit** — machine-enforced 28/19/9 lineage policy + exact-set registry + fail-closed audit landed. Held-out incidence: PS1 116, PM5 13, PM1/PP2/BP1 0; the unmasked report blocks on PS1/PM5, while static lineage keeps all five in the masked-resource requirement. Oracle ruling + masked rerun remain on the terminal-join path (ADR-0009).
 - (Resolved 2026-07-12) **Gate fidelity** — exact Clopper-Pearson lower bounds, corrected n=36 floor,
   pinned gating/direction semantics, and truncating-pathogenic 0.95 hard gate implemented.
+- (Resolved 2026-07-13) **Masked terminal gate executed — FAIL** — 2,577/2,577 masked/canonical rows,
+  zero effective lineage blockers, evaluation-only BP4/PP3 correction applied, PM1 explicitly excluded;
+  binding missense lower bounds failed all four pre-registered pathogenic/benign precision/recall bars.
+  No VUS scoring or external worklist is authorized.
 - (Resolved 2026-07-12) **Policy blockers** — BP4/PP3 correction is fully decidable on both corpora;
   BS2 remains explicitly deferred; TSC1/TSC2 scope reconciles only with canonical proof; production
   point map is populated but unapproved/null.

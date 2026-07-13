@@ -29,3 +29,21 @@ The 2026-07-12 policy reports record the arm's-length BP4/PP3 correction
 materiality, the 34-firing BS2 deferral analysis, and canonical
 transcript/NTHL1 reconciliation. They are engineering/policy evidence, not
 variant classifications.
+
+`tsc_masked_holdout_gate_2026-07-13.json` records the first leakage-safe
+terminal gate. All 2,577 held-out identities were masked with zero survivors,
+the canonical BIAS join was exact, and the gate returned **FAIL** on the
+binding missense stratum. `vus_authorized` is false. PM1 was excluded from this
+fixed evaluation after a zero-support audit and remains unvalidated for
+production.
+
+Rebuild it from the external terminal envelope and returned PM1 scope audits:
+
+```text
+python scripts/build_masked_holdout_gate_aggregate.py \
+  --terminal-json <MASKED_EVAL_REPORT.json> \
+  --terminal-report <MASKED_EVAL_REPORT.txt> \
+  --return-dir <x64-return-directory> \
+  --date 2026-07-13 \
+  --output data/census/tsc_masked_holdout_gate_2026-07-13.json
+```

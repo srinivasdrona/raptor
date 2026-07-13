@@ -159,6 +159,36 @@ review; TSC transcript version deltas require canonical-SPDI provenance and NTHL
 The production criterion-strength map is populated but explicitly **unapproved**, with null cutoffs and
 null candidate direction. These controls prepare measurement; they do not authorize a classification.
 
+#### Evaluation-only BP4/PP3 correction approval (2026-07-13)
+
+The domain owner approved the arm's-length BP4/PP3 correction **only for the
+masked held-out evaluation**. The approval is bound to:
+
+- aggregation spec SHA-256:
+  `2c89bb17dea68fc9ed294eee2108bdd528e551eb4882b47cc4a400d683aca2ae`;
+- correction-bundle SHA-256:
+  `19aa2ed835c05bcd3615ea1744fd654d33ca1c81d77abd852e89fcb7707e2c45`;
+- policy artifact: `configs/eval/bp4pp3_predictor_policy.json`.
+
+The real-corpus probe found 7,985 fired BP4/PP3 rows and zero undecidable
+rationales, so the observable BIAS output is sufficient for deterministic
+reconstruction. This approval does **not** approve the production
+criterion-strength map, candidate-direction cutoffs, variant classifications,
+ClinVar submissions, or clinical use. The current masked evaluation also
+excludes PM1 after a zero-support/global-reproduction mismatch; therefore even
+a numeric gate pass must not authorize full VUS scoring.
+
+**Executed outcome (2026-07-13).** The masked 2,577-row terminal evaluation
+returned **FAIL** on the binding missense stratum; `vus_authorized=false`.
+Missense pathogenic precision/recall lower bounds were `0.6042/0.7131` and
+benign precision/recall lower bounds were `0.8378/0.7632`, below the
+pre-registered `0.90/0.85` thresholds. Overall performance cannot average away
+that result. No threshold is relaxed post hoc. The next validation work is
+missense error/abstention analysis plus expert review, followed by a newly
+pinned rerun; production policy, external worklists, and submissions remain
+blocked. Aggregate source of record:
+`data/census/tsc_masked_holdout_gate_2026-07-13.json`.
+
 ### Consequences
 
 - (+) Closes the unambiguous direct-copy leak before benchmark metrics. Removing circular evidence may

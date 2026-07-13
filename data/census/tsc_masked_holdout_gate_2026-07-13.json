@@ -1,0 +1,227 @@
+{
+  "benchmark": {
+    "benchmark_size": 3681,
+    "holdout_classes": {
+      "missense": 154,
+      "other": 2212,
+      "truncating": 211
+    },
+    "holdout_labels": {
+      "B": 1410,
+      "LB": 789,
+      "LP": 17,
+      "P": 361
+    },
+    "holdout_size": 2577,
+    "snapshot": "clinvar_2026-07-07",
+    "train_dev_size": 1104
+  },
+  "binding_stratum": "missense",
+  "content_hash": "834cf5f6a27747b524537bd405ced17a3afbdd04a3ce5b31ef8f0e68dc96d0b3",
+  "date": "2026-07-13",
+  "external_report_hashes": {
+    "MASKED_EVAL_REPORT.json": "68aeb64dd4c2c6f516bdb6a6182dc8a75aa92f25bc0c36f29e6a200836226166",
+    "MASKED_EVAL_REPORT.txt": "e53c4fa2c6d17295cb7305eeabdbeae4c689ea476e312f334e6064b03c34f913"
+  },
+  "gate": {
+    "per_stratum": {
+      "missense": {
+        "gating": true,
+        "met": false,
+        "powered": true,
+        "precision_lb": 0.6042154487333258,
+        "recall_lb": 0.7131106033327793,
+        "threshold": {
+          "directions": [
+            "pathogenic",
+            "benign"
+          ],
+          "gating": true,
+          "precision": 0.9,
+          "recall": 0.85
+        }
+      }
+    },
+    "reason": "missense metric(s) below Oracle threshold (95% CI lower bound): precision_lb=0.6042154487333258<0.9; recall_lb=0.7131106033327793<0.85; benign_precision_lb=0.8378290058184885<0.9; benign_recall_lb=0.7632247257130624<0.85",
+    "status": "FAIL",
+    "stratum": "missense",
+    "vus_authorized": false
+  },
+  "integrity": {
+    "bias_rows": 2577,
+    "bias_tsv_sha256": "7eece438a880e0c6a591df62e231bc93848eeb42277a2f4360983914298fc512",
+    "canonical_join_rows": 2577,
+    "effective_lineage_blockers": [],
+    "manifest_sha256": "9e588cdf8ebaea2e3793e0ea74721ab5283b57c2abf045dbf3070cb6e81ec9e4",
+    "mask_ledger_sha256": "0f55e5cff0903c94baad896c23b7675526dfcd78513580f41c88b45f5c310fd0",
+    "mask_removed_identities": 2577,
+    "remask_audit_sha256": "b58ee687cb554659efe5434434e383536198c5b99b09c1f0793368b4fea03fec",
+    "remask_survivors": 0,
+    "return_manifest_sha256": "5efdccdc57f7d2bdf774486dfbde106ab173bf87412c6db103aaba9958d9ac91",
+    "returned_artifacts_verified": 28
+  },
+  "limitations": [
+    "PM1 was excluded from this fixed evaluation after both published and reproduced resources had zero held-out-reachable rows; production PM1 remains unvalidated.",
+    "The evaluation-only BP4/PP3 approval does not approve production candidate policy or variant classifications.",
+    "No VUS worklist, clinical classification, or ClinVar submission is authorized."
+  ],
+  "metrics": {
+    "missense": {
+      "benign_precision": 0.96875,
+      "benign_precision_lb": 0.8378290058184885,
+      "benign_recall": 0.9117647058823529,
+      "benign_recall_lb": 0.7632247257130624,
+      "concordance": 0.9215686274509803,
+      "counts": {
+        "abstain": 103,
+        "benign_actual": 103,
+        "benign_called": 34,
+        "fn": 1,
+        "fp": 3,
+        "path_actual": 51,
+        "path_called": 17,
+        "tn": 31,
+        "total": 154,
+        "total_called": 51,
+        "tp": 16
+      },
+      "gating": false,
+      "precision": 0.8421052631578947,
+      "precision_lb": 0.6042154487333258,
+      "recall": 0.9411764705882353,
+      "recall_lb": 0.7131106033327793,
+      "stratum": "missense"
+    },
+    "other": {
+      "benign_precision": 0.9937369519832986,
+      "benign_precision_lb": 0.9881442147151834,
+      "benign_recall": 0.9993002099370188,
+      "benign_recall_lb": 0.9961072503966772,
+      "concordance": 0.9934683213585892,
+      "counts": {
+        "abstain": 681,
+        "benign_actual": 2095,
+        "benign_called": 1429,
+        "fn": 9,
+        "fp": 1,
+        "path_actual": 117,
+        "path_called": 102,
+        "tn": 1428,
+        "total": 2212,
+        "total_called": 1531,
+        "tp": 93
+      },
+      "gating": true,
+      "precision": 0.9893617021276596,
+      "precision_lb": 0.9421486602673296,
+      "recall": 0.9117647058823529,
+      "recall_lb": 0.8391018077437135,
+      "stratum": "other"
+    },
+    "overall": {
+      "benign_precision": 0.9931926480599047,
+      "benign_precision_lb": 0.9875167771584743,
+      "benign_recall": 0.9965846994535519,
+      "benign_recall_lb": 0.9920479657749747,
+      "concordance": 0.9916201117318436,
+      "counts": {
+        "abstain": 787,
+        "benign_actual": 2199,
+        "benign_called": 1464,
+        "fn": 10,
+        "fp": 5,
+        "path_actual": 378,
+        "path_called": 326,
+        "tn": 1459,
+        "total": 2577,
+        "total_called": 1790,
+        "tp": 316
+      },
+      "gating": true,
+      "precision": 0.9844236760124611,
+      "precision_lb": 0.9640263312095034,
+      "recall": 0.9693251533742331,
+      "recall_lb": 0.94431274442573,
+      "stratum": "overall"
+    },
+    "truncating": {
+      "benign_precision": 0.0,
+      "benign_precision_lb": 0.0,
+      "benign_recall": 0.0,
+      "benign_recall_lb": 0.0,
+      "concordance": 0.9951923076923077,
+      "counts": {
+        "abstain": 3,
+        "benign_actual": 1,
+        "benign_called": 1,
+        "fn": 0,
+        "fp": 1,
+        "path_actual": 210,
+        "path_called": 207,
+        "tn": 0,
+        "total": 211,
+        "total_called": 208,
+        "tp": 207
+      },
+      "gating": false,
+      "precision": 0.9951923076923077,
+      "precision_lb": 0.9735057806471772,
+      "recall": 1.0,
+      "recall_lb": 0.9823371754637865,
+      "stratum": "truncating"
+    }
+  },
+  "policy": {
+    "bp4pp3": {
+      "approved": true,
+      "correction_hash": "19aa2ed835c05bcd3615ea1744fd654d33ca1c81d77abd852e89fcb7707e2c45",
+      "decision_reference": "docs/DECISIONS.md#evaluation-only-bp4pp3-correction-approval-2026-07-13",
+      "predictor_source_hash": "2c89bb17dea68fc9ed294eee2108bdd528e551eb4882b47cc4a400d683aca2ae",
+      "schema": "bp4pp3-predictor-policy",
+      "status": "approved"
+    },
+    "evaluation_skipped": [
+      "PM1"
+    ],
+    "operationally_skipped": [
+      "BP6",
+      "PM1",
+      "PP5",
+      "PS4"
+    ],
+    "pm1_published_reachable_rows": 0,
+    "pm1_reproduced_reachable_rows": 0,
+    "pm1_status": "SKIPPED_ZERO_SUPPORT_BASELINE_MISMATCH",
+    "predictor_correction_counts": {
+      "BP4": 1395,
+      "PP3": 2
+    },
+    "production_candidate_policy_status": "unapproved"
+  },
+  "schema": "raptor.tsc.masked_holdout_gate.v1",
+  "scope": "evaluation_only_non_authoritative",
+  "status": "FAIL",
+  "thresholds": {
+    "confidence": 0.95,
+    "strata": {
+      "missense": {
+        "directions": [
+          "pathogenic",
+          "benign"
+        ],
+        "gating": true,
+        "precision": 0.9,
+        "recall": 0.85
+      },
+      "truncating": {
+        "directions": [
+          "pathogenic"
+        ],
+        "gating": true,
+        "precision": 0.95,
+        "recall": 0.95
+      }
+    }
+  },
+  "vus_authorized": false
+}
