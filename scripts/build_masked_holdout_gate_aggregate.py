@@ -25,6 +25,7 @@ from raptor.eval.config import (
     _PINNED_RESEARCH_USE_DISCLAIMER,
     _PINNED_STRATUM_SEMANTICS,
     _PINNED_STRATUM_THRESHOLDS,
+    _POOLED_OVERALL_STRATUM,
 )
 from raptor.eval.gate import _DIRECTION_COUNT_FIELDS, _DIRECTION_LB_FIELDS
 from raptor.eval.scope_gate import (
@@ -308,13 +309,17 @@ def _expected_scope_keys(report_metrics: Any) -> frozenset:
     `report['metrics']` (e.g. `other`) -- a purely descriptive stratum with
     no pinned policy still needs both scopes reported once its metrics
     exist. A stratum with neither pinned policy nor metrics evidence (a
-    "ghost" scope) is never expected.
+    "ghost" scope) is never expected. The reserved pooled `overall` stratum
+    is EXCLUDED here (AC-S5): it may legitimately be present in
+    `report['metrics']` as a descriptive cross-class aggregate, but it is
+    never expected as a scope -- an envelope publishing `overall:pathogenic`/
+    `overall:benign` is rejected as an unexpected/ghost scope below.
     """
     pinned_strata = frozenset(_PINNED_STRATUM_THRESHOLDS.keys())
     metrics_map = report_metrics if isinstance(report_metrics, dict) else {}
     descriptive_strata = frozenset(
         stratum for stratum, entry in metrics_map.items() if isinstance(entry, dict)
-    )
+    ) - {_POOLED_OVERALL_STRATUM}
     all_strata = pinned_strata | descriptive_strata
     return frozenset(
         f"{stratum}:{direction}" for stratum in all_strata for direction in ("pathogenic", "benign")
@@ -507,6 +512,13 @@ def _recompute_scope_entry(scope_key: str, entry: Any, report_metrics: Any) -> d
         raise ValueError(
             f"scope_gate integrity error: scope key {scope_key!r} is not a valid "
             "'{stratum}:{direction}' key -- inconsistent/tampered envelope"
+        )
+    if expected_stratum == _POOLED_OVERALL_STRATUM:
+        raise ValueError(
+            f"scope_gate integrity error: scopes[{scope_key!r}] names the reserved pooled "
+            "`overall` stratum -- `overall` is a descriptive, cross-class aggregate metric only "
+            "and is never a valid (stratum, direction) scope; this is an unexpected/ghost scope "
+            "key set entry with no scope policy behind it and must never be published"
         )
     if entry["stratum"] != expected_stratum:
         raise ValueError(

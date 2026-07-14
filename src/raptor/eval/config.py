@@ -52,6 +52,18 @@ _PINNED_STRATUM_THRESHOLDS: Mapping[str, Mapping[str, float]] = {
 #: block MUST define it (else it is functionally unset -- UNVERIFIED).
 _REQUIRED_GATING_STRATUM = "missense"
 
+#: The reserved pooled-metrics stratum name `raptor.eval.metrics.compute_metrics`
+#: always emits alongside each real `variant_class` stratum (missense,
+#: truncating, other, ...). `overall` is a descriptive, cross-class
+#: aggregate -- it is NEVER a `(stratum, direction)` scope, NEVER a
+#: `DirectionVerdict`, and NEVER an input to any authorization boolean/
+#: governance state (AC-S5). It stays present in `Metrics`/report/aggregate
+#: `metrics` payloads for descriptive purposes only; every scope
+#: enumeration (v2 `decide_scope_gate`, aggregate `_expected_scope_keys`)
+#: excludes this exact key while still admitting other genuine descriptive
+#: strata (e.g. `other`).
+_POOLED_OVERALL_STRATUM = "overall"
+
 #: The only directions a per-stratum `directions` list may name.
 _VALID_DIRECTIONS: frozenset[str] = frozenset({"pathogenic", "benign"})
 

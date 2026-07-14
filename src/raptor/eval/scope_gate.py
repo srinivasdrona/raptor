@@ -40,6 +40,7 @@ from .config import (
     _PINNED_RESEARCH_USE_DISCLAIMER,
     _PINNED_STRATUM_SEMANTICS,
     _PINNED_STRATUM_THRESHOLDS,
+    _POOLED_OVERALL_STRATUM,
 )
 from .gate import _DIRECTION_COUNT_FIELDS, _DIRECTION_LB_FIELDS
 from .model import DirectionVerdict, Metrics, ScopeGateDecision
@@ -551,7 +552,13 @@ def decide_scope_gate(metrics: Dict[str, Metrics], config: EvalConfig) -> ScopeG
     # sec 4 step 2: enumerate EVERY stratum x direction, no short-circuit --
     # union of oracle-registered strata and metrics-only strata (e.g.
     # `other`) so every reported class is at least descriptively present.
-    all_strata = sorted(set(strata_cfg.keys()) | set(metrics.keys()))
+    # The reserved pooled `overall` stratum is EXCLUDED here (AC-S5): it is
+    # never a scope/DirectionVerdict, only a descriptive cross-class metric
+    # that may still be present in `metrics` (and stays there untouched --
+    # only excluded from scope enumeration).
+    all_strata = sorted(
+        (set(strata_cfg.keys()) | set(metrics.keys())) - {_POOLED_OVERALL_STRATUM}
+    )
     scopes: Dict[str, DirectionVerdict] = {}
     for stratum in all_strata:
         spec = strata_cfg.get(stratum)

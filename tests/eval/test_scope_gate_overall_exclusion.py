@@ -190,8 +190,24 @@ def test_3_build_aggregate_v2_accepts_metrics_overall_but_no_scopes_overall():
             "holdout_class_counts": {"missense": 25, "truncating": 25},
             "metrics": {
                 "overall": {"precision": 0.9, "recall": 0.9, "concordance": 0.9, "counts": {}},
-                "missense": {"precision": 0.9, "recall": 0.9, "concordance": 0.9, "counts": {}},
-                "truncating": {"precision": 0.95, "recall": 0.95, "concordance": 0.95, "counts": {}}
+                "missense": {
+                    "precision": 0.9, "recall": 0.9, "concordance": 0.9,
+                    "precision_lb": 0.91, "recall_lb": 0.86,
+                    "benign_precision_lb": 0.91, "benign_recall_lb": 0.86,
+                    "counts": {
+                        "path_called": 40, "benign_called": 40,
+                        "path_actual": 40, "benign_actual": 40,
+                    },
+                },
+                "truncating": {
+                    "precision": 0.95, "recall": 0.95, "concordance": 0.95,
+                    "precision_lb": 0.96, "recall_lb": 0.96,
+                    "benign_precision_lb": 0.96, "benign_recall_lb": 0.96,
+                    "counts": {
+                        "path_called": 40, "benign_called": 40,
+                        "path_actual": 40, "benign_actual": 40,
+                    },
+                },
             },
             "gate": {
                 "status": "PASS",
@@ -217,7 +233,7 @@ def test_3_build_aggregate_v2_accepts_metrics_overall_but_no_scopes_overall():
                     "missense:pathogenic": {
                         "stratum": "missense",
                         "direction": "pathogenic",
-                        "metric_status": "VALIDATED",
+                        "metric_status": "MET",
                         "coverage_adequate": True,
                         "scope_status": "VALIDATED",
                         "precision_lb": 0.91,
@@ -232,7 +248,7 @@ def test_3_build_aggregate_v2_accepts_metrics_overall_but_no_scopes_overall():
                     "missense:benign": {
                         "stratum": "missense",
                         "direction": "benign",
-                        "metric_status": "VALIDATED",
+                        "metric_status": "MET",
                         "coverage_adequate": True,
                         "scope_status": "VALIDATED",
                         "precision_lb": 0.91,
@@ -247,7 +263,7 @@ def test_3_build_aggregate_v2_accepts_metrics_overall_but_no_scopes_overall():
                     "truncating:pathogenic": {
                         "stratum": "truncating",
                         "direction": "pathogenic",
-                        "metric_status": "VALIDATED",
+                        "metric_status": "MET",
                         "coverage_adequate": True,
                         "scope_status": "VALIDATED",
                         "precision_lb": 0.96,
@@ -275,12 +291,12 @@ def test_3_build_aggregate_v2_accepts_metrics_overall_but_no_scopes_overall():
                         "reasons": [],
                     }
                 },
-                "full_spectrum_status": "VALIDATED",
+                "full_spectrum_status": "PASS",
                 "full_spectrum_vus_authorized": True,
                 "research_scope_flags": {"truncating_pathogenic_research_scope_validated": True},
                 "governance_state": "FULL_SPECTRUM",
-                "governance_statement": "statement",
-                "research_use_disclaimer": "disclaimer",
+                "governance_statement": "All pre-registered research scopes are validated for research-evidence use only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+                "research_use_disclaimer": "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
                 "reason": "missense:benign=VALIDATED; missense:pathogenic=VALIDATED; truncating:benign=DESCRIPTIVE; truncating:pathogenic=VALIDATED",
                 "authorization_blockers": []
             }
