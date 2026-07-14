@@ -2102,4 +2102,276 @@ def test_cross_surface_red_9_legacy_gate_status_coexistence_validated():
     assert agg["research_scope_flags"]["truncating_pathogenic_research_scope_validated"] is True
 
 
+# ==============================================================================
+# RED TESTS FOR GPT-5.4 BLOCKERS (PUBLICATION INTEGRITY)
+# ==============================================================================
+
+def test_blocker_1_config_pins_oracle_thresholds_tampered_rejected():
+    """BLOCKER 1 RED TEST: Modify config_pins.oracle_thresholds missense/truncating
+    precision, recall, confidence, gating, directions; builder must reject drift
+    or canonicalize output. Prefer fail-loud rejection.
+    """
+    import pytest
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+    
+    # Case A: Tamper with confidence
+    env = _get_cross_surface_baseline()
+    env["report"]["config_pins"]["oracle_thresholds"]["confidence"] = 0.50
+    with pytest.raises(ValueError, match="confidence|threshold|drift|canonical|tamper"):
+        build_aggregate_v2(
+            env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+    # Case B: Tamper with missense precision threshold
+    env = _get_cross_surface_baseline()
+    env["report"]["config_pins"]["oracle_thresholds"]["strata"]["missense"]["precision"] = 0.10
+    with pytest.raises(ValueError, match="precision|threshold|drift|canonical|tamper"):
+        build_aggregate_v2(
+            env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+    # Case C: Tamper with truncating recall threshold
+    env = _get_cross_surface_baseline()
+    env["report"]["config_pins"]["oracle_thresholds"]["strata"]["truncating"]["recall"] = 0.10
+    with pytest.raises(ValueError, match="recall|threshold|drift|canonical|tamper"):
+        build_aggregate_v2(
+            env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+    # Case D: Missing config_pins.oracle_thresholds
+    env = _get_cross_surface_baseline()
+    del env["report"]["config_pins"]["oracle_thresholds"]
+    with pytest.raises(ValueError, match="oracle_thresholds|missing|malformed"):
+        build_aggregate_v2(
+            env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+    # Case E: Missing strata
+    env = _get_cross_surface_baseline()
+    del env["report"]["config_pins"]["oracle_thresholds"]["strata"]
+    with pytest.raises(ValueError, match="strata|missing|malformed"):
+        build_aggregate_v2(
+            env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+
+def test_blocker_1_aggregate_output_thresholds_exact_canonical():
+    """BLOCKER 1 RED TEST: Valid v2 aggregate output `thresholds` must equal exact canonical pinned payload.
+    Any additional or omitted strata or tampered metadata must be rejected or canonicalized.
+    """
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+    env = _get_cross_surface_baseline()
+    agg = build_aggregate_v2(
+        env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved"
+    )
+    
+    expected_thresholds = {
+        "confidence": 0.95,
+        "strata": {
+            "missense": {
+                "precision": 0.90,
+                "recall": 0.85,
+                "gating": True,
+                "directions": ["pathogenic", "benign"]
+            },
+            "truncating": {
+                "precision": 0.95,
+                "recall": 0.95,
+                "gating": True,
+                "directions": ["pathogenic"]
+            }
+        }
+    }
+    assert agg["thresholds"] == expected_thresholds
+
+
+def test_blocker_2_omit_truncating_benign_rejected():
+    """BLOCKER 2 RED TEST: Missing truncating:benign from scopes must reject (since truncating
+    is a pinned threshold stratum, even if it has no registered benign threshold, it must be
+    represented descriptively).
+    """
+    import pytest
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+    env = _get_cross_surface_baseline()
+    
+    # Omit truncating:benign from the scopes table
+    if "truncating:benign" in env["report"]["scope_gate"]["scopes"]:
+        del env["report"]["scope_gate"]["scopes"]["truncating:benign"]
+        
+    with pytest.raises(ValueError, match="incomplete|missing|truncating:benign|expected"):
+        build_aggregate_v2(
+            env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+
+def test_blocker_2_metrics_other_omit_one_or_both_rejected():
+    """BLOCKER 2 RED TEST: If report.metrics contains an additional descriptive stratum (e.g. 'other'),
+    both directions (other:pathogenic, other:benign) must be present in scopes. Missing one or both
+    must reject.
+    """
+    import pytest
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+    
+    # Case A: Omit both other scopes
+    env_a = _get_cross_surface_baseline()
+    env_a["report"]["metrics"]["other"] = {
+        "precision_lb": 0.50, "recall_lb": 0.50, "benign_precision_lb": 0.50, "benign_recall_lb": 0.50,
+        "counts": {"path_called": 10, "benign_called": 10, "path_actual": 10, "benign_actual": 10}
+    }
+    with pytest.raises(ValueError, match="incomplete|missing|other:pathogenic|other:benign|expected"):
+        build_aggregate_v2(
+            env_a, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+    # Case B: Omit only other:benign
+    env_b = _get_cross_surface_baseline()
+    env_b["report"]["metrics"]["other"] = {
+        "precision_lb": 0.50, "recall_lb": 0.50, "benign_precision_lb": 0.50, "benign_recall_lb": 0.50,
+        "counts": {"path_called": 10, "benign_called": 10, "path_actual": 10, "benign_actual": 10}
+    }
+    env_b["report"]["scope_gate"]["scopes"]["other:pathogenic"] = {
+        "stratum": "other", "direction": "pathogenic",
+        "precision_lb": 0.50, "recall_lb": 0.50, "precision_threshold": None, "recall_threshold": None,
+        "actual_count": 10, "called_count": 10, "min_count": 36, "coverage_adequate": False,
+        "metric_status": "NO_THRESHOLD", "scope_status": "DESCRIPTIVE", "reasons": []
+    }
+    with pytest.raises(ValueError, match="incomplete|missing|other:benign|expected"):
+        build_aggregate_v2(
+            env_b, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+
+def test_blocker_2_metrics_other_complete_scopes_accepted():
+    """BLOCKER 2 RED TEST: If report.metrics contains 'other' and both complete consistent
+    descriptive scopes are provided, build_aggregate_v2 must accept.
+    """
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+    env = _get_cross_surface_baseline()
+    
+    env["report"]["metrics"]["other"] = {
+        "precision_lb": 0.50, "recall_lb": 0.50, "benign_precision_lb": 0.50, "benign_recall_lb": 0.50,
+        "counts": {"path_called": 10, "benign_called": 10, "path_actual": 10, "benign_actual": 10}
+    }
+    env["report"]["scope_gate"]["scopes"]["other:pathogenic"] = {
+        "stratum": "other", "direction": "pathogenic",
+        "precision_lb": 0.50, "recall_lb": 0.50, "precision_threshold": None, "recall_threshold": None,
+        "actual_count": 10, "called_count": 10, "min_count": 36, "coverage_adequate": False,
+        "metric_status": "NO_THRESHOLD", "scope_status": "DESCRIPTIVE", "reasons": []
+    }
+    env["report"]["scope_gate"]["scopes"]["other:benign"] = {
+        "stratum": "other", "direction": "benign",
+        "precision_lb": 0.50, "recall_lb": 0.50, "precision_threshold": None, "recall_threshold": None,
+        "actual_count": 10, "called_count": 10, "min_count": 36, "coverage_adequate": False,
+        "metric_status": "NO_THRESHOLD", "scope_status": "DESCRIPTIVE", "reasons": []
+    }
+    
+    agg = build_aggregate_v2(
+        env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved"
+    )
+    assert agg["schema"] == "raptor.tsc.masked_holdout_gate.v2"
+    assert "other:pathogenic" in agg["scopes"]
+    assert "other:benign" in agg["scopes"]
+
+
+def test_blocker_2_ghost_scope_no_metrics_rejected():
+    """BLOCKER 2 RED TEST: If scope contains an extra/unknown 'ghost' scope but no metrics,
+    build_aggregate_v2 must reject.
+    """
+    import pytest
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+    env = _get_cross_surface_baseline()
+    
+    env["report"]["scope_gate"]["scopes"]["ghost:pathogenic"] = {
+        "stratum": "ghost", "direction": "pathogenic",
+        "precision_lb": 0.90, "recall_lb": 0.90, "precision_threshold": None, "recall_threshold": None,
+        "actual_count": 10, "called_count": 10, "min_count": 36, "coverage_adequate": True,
+        "metric_status": "NO_THRESHOLD", "scope_status": "DESCRIPTIVE", "reasons": []
+    }
+    
+    with pytest.raises(ValueError, match="ghost|metrics|unknown|extra|cross-check"):
+        build_aggregate_v2(
+            env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+
+def test_blocker_2_aggregate_output_scopes_exactly_matches_independently_expected():
+    """BLOCKER 2 RED TEST: The aggregate output scopes keys must exactly match the set
+    independently derived from report.metrics and pinned threshold strata.
+    """
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+    env = _get_cross_surface_baseline()
+    agg = build_aggregate_v2(
+        env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved"
+    )
+    
+    expected_keys = {
+        "missense:pathogenic", "missense:benign",
+        "truncating:pathogenic", "truncating:benign"
+    }
+    assert set(agg["scopes"].keys()) == expected_keys
+
+
+def test_blocker_2_aggregate_output_scopes_exactly_matches_independently_expected_with_other():
+    """BLOCKER 2 RED TEST: Aggregate output scopes must exactly match independently expected keys
+    when additional strata like other are present.
+    """
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+    env = _get_cross_surface_baseline()
+    
+    env["report"]["metrics"]["other"] = {
+        "precision_lb": 0.50, "recall_lb": 0.50, "benign_precision_lb": 0.50, "benign_recall_lb": 0.50,
+        "counts": {"path_called": 10, "benign_called": 10, "path_actual": 10, "benign_actual": 10}
+    }
+    env["report"]["scope_gate"]["scopes"]["other:pathogenic"] = {
+        "stratum": "other", "direction": "pathogenic",
+        "precision_lb": 0.50, "recall_lb": 0.50, "precision_threshold": None, "recall_threshold": None,
+        "actual_count": 10, "called_count": 10, "min_count": 36, "coverage_adequate": False,
+        "metric_status": "NO_THRESHOLD", "scope_status": "DESCRIPTIVE", "reasons": []
+    }
+    env["report"]["scope_gate"]["scopes"]["other:benign"] = {
+        "stratum": "other", "direction": "benign",
+        "precision_lb": 0.50, "recall_lb": 0.50, "precision_threshold": None, "recall_threshold": None,
+        "actual_count": 10, "called_count": 10, "min_count": 36, "coverage_adequate": False,
+        "metric_status": "NO_THRESHOLD", "scope_status": "DESCRIPTIVE", "reasons": []
+    }
+    
+    agg = build_aggregate_v2(
+        env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved"
+    )
+    
+    expected_keys = {
+        "missense:pathogenic", "missense:benign",
+        "truncating:pathogenic", "truncating:benign",
+        "other:pathogenic", "other:benign"
+    }
+    assert set(agg["scopes"].keys()) == expected_keys
+
+
+
 
