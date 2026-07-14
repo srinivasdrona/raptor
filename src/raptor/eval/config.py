@@ -95,6 +95,21 @@ _PINNED_TRUNCATING_PATHOGENIC_ONLY_STATEMENT = (
     "the validated truncating-pathogenic scope; missense remains unvalidated."
 )
 
+#: Checker finding 1 (GPT-5.4): ALL THREE governance-state strings are
+#: authorization surfaces, not just TRUNCATING_PATHOGENIC_ONLY -- pin
+#: FULL_SPECTRUM and NONE_VALIDATED verbatim too so a config author cannot
+#: quietly widen the FULL_SPECTRUM claim or weaken the most-restrictive
+#: NONE_VALIDATED fallback statement.
+_PINNED_FULL_SPECTRUM_STATEMENT = (
+    "All pre-registered research scopes are validated for research-evidence "
+    "use only; this authorizes no clinical classification, VUS worklist, or "
+    "ClinVar submission."
+)
+_PINNED_NONE_VALIDATED_STATEMENT = (
+    "Full-spectrum VUS automation is not authorized; no pre-registered "
+    "research scope is currently validated."
+)
+
 #: Mandatory, non-blank, separate disclaimer (planner correction) -- kept
 #: OUT of `governance_statement` (which stays the exact preregistered
 #: string verbatim) and pinned to the exact safe text so a config author
@@ -103,6 +118,25 @@ _PINNED_RESEARCH_USE_DISCLAIMER = (
     "Research-evidence validation only; this authorizes no clinical "
     "classification, VUS worklist, or ClinVar submission."
 )
+
+#: Checker finding 1 (GPT-5.4): the closed, exact map of all three
+#: governance states to their pinned verbatim statement -- iterated by
+#: `_validate_scope_authorization` (and cross-checked, defense-in-depth, by
+#: `scope_gate._pinned_authorization_valid` for a hand-built `EvalConfig`).
+_PINNED_GOVERNANCE_STATEMENTS: Mapping[str, str] = {
+    "FULL_SPECTRUM": _PINNED_FULL_SPECTRUM_STATEMENT,
+    "TRUNCATING_PATHOGENIC_ONLY": _PINNED_TRUNCATING_PATHOGENIC_ONLY_STATEMENT,
+    "NONE_VALIDATED": _PINNED_NONE_VALIDATED_STATEMENT,
+}
+
+#: Checker finding 2 (GPT-5.4): the preregistered v2 min-count-per-class
+#: floor is EXACTLY 36 (the 35->36 power-floor correction, see
+#: `_PINNED_STRATUM_THRESHOLDS` above) -- once a config declares a v2
+#: `scope_authorization` block, `min_count_per_class` must equal this
+#: pinned value exactly (drift below OR above 36 is rejected). Legacy
+#: (v1-only, no `scope_authorization`) configs/fixtures are unaffected --
+#: they may use any positive `min_count_per_class` as before.
+_PINNED_MIN_COUNT_PER_CLASS: int = 36
 
 #: The three governance states `decide_scope_gate` can resolve to; every
 #: `scope_authorization.governance_statements` block must carry a non-blank
@@ -452,12 +486,17 @@ def _validate_scope_authorization(scope_auth: Any, oracle_thresholds: Mapping[st
         statement = governance_statements[state]
         if not isinstance(statement, str) or not statement.strip():
             raise ConfigError(f"`scope_authorization.governance_statements[{state!r}]` must be a non-blank string")
-    truncating_only = governance_statements["TRUNCATING_PATHOGENIC_ONLY"]
-    if truncating_only != _PINNED_TRUNCATING_PATHOGENIC_ONLY_STATEMENT:
-        raise ConfigError(
-            "`scope_authorization.governance_statements['TRUNCATING_PATHOGENIC_ONLY']` must match "
-            "the user's exact governance statement verbatim, got " + repr(truncating_only)
-        )
+
+    # Checker finding 1 (GPT-5.4): pin ALL THREE governance-state strings,
+    # not just TRUNCATING_PATHOGENIC_ONLY -- every state is an authorization
+    # surface a config author could otherwise widen/weaken.
+    for state, pinned_statement in _PINNED_GOVERNANCE_STATEMENTS.items():
+        actual = governance_statements[state]
+        if actual != pinned_statement:
+            raise ConfigError(
+                f"`scope_authorization.governance_statements[{state!r}]` must match the "
+                f"mandatory pinned pre-registered statement verbatim, got {actual!r}"
+            )
 
 
 def _build_oracle_thresholds(thresholds: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -560,11 +599,28 @@ def load_config(path: str | Path) -> EvalConfig:
         raise ConfigError("`min_count_per_class` must be a positive int (>= 1) -- 0 disables the FR5 floors")
 
     # v2 scope-specific authorization gate (ADDITIVE, preregistration): the
-    # block is OPTIONAL -- absent (key missing, or explicitly `None`/`{}`)
-    # keeps a config fully v1-compatible (`scope_authorization=None`).
-    scope_authorization_raw = raw.get("scope_authorization")
-    if scope_authorization_raw:
+    # block is OPTIONAL, but checker finding 5 (GPT-5.4) requires STRICT
+    # presence semantics -- only KEY ABSENCE means "legacy v1 config"
+    # (`scope_authorization=None`). Any explicitly present value -- `null`,
+    # `{}`, `[]`, `false`, `""` -- is a malformed v2 declaration and must
+    # raise loud, never silently fall back to v1 via a truthiness check.
+    if "scope_authorization" in raw:
+        scope_authorization_raw = raw["scope_authorization"]
         _validate_scope_authorization(scope_authorization_raw, oracle_thresholds)
+        # Checker finding 2 (GPT-5.4): once a config declares a v2
+        # `scope_authorization` block, `min_count_per_class` is no longer a
+        # free-standing pin -- it must equal exactly the preregistered v2
+        # floor (36). Legacy v1-only configs (no `scope_authorization` key)
+        # are unaffected -- existing fixtures using a different positive
+        # `min_count_per_class` keep loading unchanged.
+        if min_count != _PINNED_MIN_COUNT_PER_CLASS:
+            raise ConfigError(
+                "`min_count_per_class` must equal the pinned pre-registered v2 floor "
+                f"{_PINNED_MIN_COUNT_PER_CLASS} once `scope_authorization` is present -- "
+                f"got {min_count!r}"
+            )
+    else:
+        scope_authorization_raw = None
 
     return EvalConfig(
         automatable_criteria=normalized_criteria,

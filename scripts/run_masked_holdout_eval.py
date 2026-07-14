@@ -21,6 +21,7 @@ from raptor.eval.harness import run_eval
 from raptor.eval.live_source import BiasEvidenceSource
 from raptor.eval.mask_attestation import verify_mask_attestation
 from raptor.eval.model import GateDecision, LabeledVariant, ScopeGateDecision
+from raptor.eval.report import report_to_dict
 from raptor.eval.predictor_aggregation import load_aggregation_spec
 from raptor.eval.predictor_policy import (
     PredictorPolicyError,
@@ -461,7 +462,7 @@ def main(argv: list[str] | None = None) -> int:
 
     rendered = report.render()
     envelope = {
-        "report": asdict(report),
+        "report": report_to_dict(report),
         "content_hash": report.content_hash(),
         "predictor_policy": asdict(policy),
         "mask_attestation": asdict(attestation),

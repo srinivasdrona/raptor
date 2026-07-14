@@ -33,8 +33,11 @@ from typing import Any, Dict, Mapping, Optional
 from .config import (
     EvalConfig,
     _PINNED_FULL_SPECTRUM_SCOPES,
+    _PINNED_GOVERNANCE_STATEMENTS,
+    _PINNED_MIN_COUNT_PER_CLASS,
     _PINNED_ORACLE_CONFIDENCE,
     _PINNED_RESEARCH_SCOPE_REQUIRES,
+    _PINNED_RESEARCH_USE_DISCLAIMER,
     _PINNED_STRATUM_SEMANTICS,
     _PINNED_STRATUM_THRESHOLDS,
 )
@@ -123,11 +126,15 @@ def _registered_scopes(strata_cfg: Mapping[str, Any]) -> frozenset:
 
 def _pinned_authorization_valid(scope_auth: Mapping[str, Any]) -> bool:
     """Runtime defense-in-depth (checker findings 1+2): re-validate the
-    pinned full-spectrum required set AND the pinned research-scope
-    key/`requires` mapping against a HAND-BUILT `EvalConfig` that bypasses
+    pinned full-spectrum required set, the pinned research-scope
+    key/`requires` mapping, AND the pinned governance/disclaimer text
+    against a HAND-BUILT `EvalConfig` that bypasses
     `config._validate_scope_authorization` entirely. A test/caller building
     an `EvalConfig` directly (never through `load_config`) must not be able
-    to retarget/narrow/widen either pin and still get a validated scope."""
+    to retarget/narrow/widen any pin -- including tampering with the
+    governance statements or the mandatory research-use disclaimer -- and
+    still get a validated scope (checker finding 1: never echo tampered
+    safe text)."""
     full_spectrum = scope_auth.get("full_spectrum")
     if not isinstance(full_spectrum, dict):
         return False
@@ -145,7 +152,33 @@ def _pinned_authorization_valid(scope_auth: Mapping[str, Any]) -> bool:
             return False
         if frozenset(spec.get("requires") or []) != pinned_requires:
             return False
+
+    # Checker finding 1 (GPT-5.4): the disclaimer AND all three
+    # governance-state strings are authorization surfaces -- a hand-built
+    # `EvalConfig` that tampers with any of them must fail closed exactly
+    # like `config._validate_scope_authorization` does at load time.
+    if scope_auth.get("research_use_disclaimer") != _PINNED_RESEARCH_USE_DISCLAIMER:
+        return False
+    governance_statements = scope_auth.get("governance_statements")
+    if not isinstance(governance_statements, dict):
+        return False
+    for state, pinned_statement in _PINNED_GOVERNANCE_STATEMENTS.items():
+        if governance_statements.get(state) != pinned_statement:
+            return False
     return True
+
+
+def _min_count_pinned_valid(min_count_per_class: Any) -> bool:
+    """Checker finding 2 (GPT-5.4) defense-in-depth: the preregistered v2
+    floor is EXACTLY 36 -- a hand-built `EvalConfig` drifting `min_count_per_class`
+    away from 36 (including a "more conservative" upward drift, e.g. 37, or a
+    seemingly-safe positive value like 1) must never authorize anything."""
+    return (
+        isinstance(min_count_per_class, int)
+        and not isinstance(min_count_per_class, bool)
+        and min_count_per_class == _PINNED_MIN_COUNT_PER_CLASS
+    )
+
 
 
 def _pinned_oracle_semantics_valid(oracle_thresholds: Mapping[str, Any], strata_cfg: Mapping[str, Any]) -> bool:
@@ -212,6 +245,29 @@ def _blocked_config(reason: str) -> ScopeGateDecision:
     )
 
 
+def _valid_lower_bound(value: Any) -> bool:
+    """Checker finding 3 (GPT-5.4): a lower-bound metric must be a
+    non-bool, finite numeric value clamped to the valid `[0, 1]`
+    probability domain -- `bool` (a `int` subclass), NaN/+-inf, out-of-range
+    values (e.g. `1.2`, `-0.5`), and non-numeric types (`str`, `None`) are
+    all malformed and must never be treated as a met threshold."""
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+        and 0.0 <= value <= 1.0
+    )
+
+
+def _valid_count(value: Any) -> bool:
+    """Checker finding 3 (GPT-5.4): an actual/called count must be a
+    non-bool, non-negative integer -- floats (`36.5`), negative ints,
+    `bool`, strings, and `None` are all malformed and must never be
+    compared numerically against `min_count_per_class` (which would either
+    raise or silently coerce)."""
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
 def _direction_verdict(
     stratum: str,
     direction: str,
@@ -232,19 +288,27 @@ def _direction_verdict(
     actual_count = (m.counts.get(actual_field) if m is not None else None)
     called_count = (m.counts.get(called_field) if m is not None else None)
 
-    coverage_adequate = (
-        min_count_per_class > 0
-        and actual_count is not None
-        and called_count is not None
-        and min(actual_count, called_count) >= min_count_per_class
-    )
+    actual_count_valid = _valid_count(actual_count)
+    called_count_valid = _valid_count(called_count)
 
     reasons: list = []
+    coverage_adequate = (
+        min_count_per_class > 0
+        and actual_count_valid
+        and called_count_valid
+        and min(actual_count, called_count) >= min_count_per_class
+    )
+    if not (actual_count_valid and called_count_valid):
+        if not actual_count_valid:
+            reasons.append(f"{actual_field}={actual_count!r} is not a valid non-negative integer count")
+        if not called_count_valid:
+            reasons.append(f"{called_field}={called_count!r} is not a valid non-negative integer count")
+
     if not has_threshold:
         metric_status = "NO_THRESHOLD"
     else:
-        precision_ok = isinstance(precision_lb, (int, float)) and math.isfinite(precision_lb) and precision_lb >= precision_threshold
-        recall_ok = isinstance(recall_lb, (int, float)) and math.isfinite(recall_lb) and recall_lb >= recall_threshold
+        precision_ok = _valid_lower_bound(precision_lb) and precision_lb >= precision_threshold
+        recall_ok = _valid_lower_bound(recall_lb) and recall_lb >= recall_threshold
         if precision_ok and recall_ok:
             metric_status = "MET"
         else:
@@ -253,7 +317,7 @@ def _direction_verdict(
                 reasons.append(f"{precision_field}={precision_lb!r}<{precision_threshold!r}")
             if not recall_ok:
                 reasons.append(f"{recall_field}={recall_lb!r}<{recall_threshold!r}")
-    if not coverage_adequate:
+    if not coverage_adequate and actual_count_valid and called_count_valid:
         reasons.append(
             f"coverage inadequate: min({actual_count!r}, {called_count!r}) < {min_count_per_class!r}"
         )
@@ -268,12 +332,12 @@ def _direction_verdict(
     return DirectionVerdict(
         stratum=stratum,
         direction=direction,
-        precision_lb=precision_lb if isinstance(precision_lb, (int, float)) else 0.0,
-        recall_lb=recall_lb if isinstance(recall_lb, (int, float)) else 0.0,
+        precision_lb=precision_lb if _valid_lower_bound(precision_lb) else 0.0,
+        recall_lb=recall_lb if _valid_lower_bound(recall_lb) else 0.0,
         precision_threshold=precision_threshold,
         recall_threshold=recall_threshold,
-        actual_count=actual_count if actual_count is not None else 0,
-        called_count=called_count if called_count is not None else 0,
+        actual_count=actual_count if actual_count_valid else 0,
+        called_count=called_count if called_count_valid else 0,
         min_count=min_count_per_class,
         coverage_adequate=coverage_adequate,
         metric_status=metric_status,
@@ -316,6 +380,17 @@ def decide_scope_gate(metrics: Dict[str, Metrics], config: EvalConfig) -> ScopeG
         return _blocked_config(
             f"invalid config -- min_count_per_class={config.min_count_per_class!r} must be "
             ">= 1; cannot authorize"
+        )
+
+    # Runtime defense-in-depth (checker finding 2): the preregistered v2
+    # floor is EXACTLY 36 -- a hand-built `EvalConfig` that drifts
+    # `min_count_per_class` away from 36 (in EITHER direction: 1, 35, or
+    # even a "more conservative" 37) must never authorize anything.
+    if not _min_count_pinned_valid(config.min_count_per_class):
+        return _blocked_config(
+            f"invalid config -- min_count_per_class={config.min_count_per_class!r} must equal "
+            f"the pinned pre-registered v2 floor {_PINNED_MIN_COUNT_PER_CLASS!r}; cannot "
+            "authorize on a drifted coverage floor"
         )
 
     oracle_thresholds = config.oracle_thresholds or {}

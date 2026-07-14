@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, field
+from dataclasses import InitVar, asdict, dataclass, field
 from typing import Any, Dict, List
 
 from .model import DirectionVerdict, GateDecision, Metrics, ScopeGateDecision
@@ -96,6 +96,24 @@ def _scope_gate_payload(scope_gate: ScopeGateDecision) -> dict:
     }
 
 
+def report_to_dict(report: "EvalReport") -> dict:
+    """Pure report-serialization helper (checker finding 5, GPT-5.4):
+    `EvalReport.scope_gate` is an `InitVar`-backed plain attribute (not a
+    real `dataclasses.fields()` member, see the field docstring below), so
+    raw `dataclasses.asdict(report)` never includes a `scope_gate` key
+    either way. This helper starts from `asdict(report)` and adds the
+    `scope_gate` payload back in ONLY when `report.scope_gate is not None`
+    -- a v1-shaped report (`scope_gate is None`) never serializes a
+    `scope_gate` key at all (never a `scope_gate: null`), while a v2 report
+    includes the full, JSON-safe scope-gate payload. Callers building a
+    report envelope (e.g. `scripts/run_masked_holdout_eval.py`) MUST use
+    this helper (not raw `asdict(report)`) to get the v2 key back."""
+    payload = asdict(report)
+    if report.scope_gate is not None:
+        payload["scope_gate"] = _scope_gate_payload(report.scope_gate)
+    return payload
+
+
 @dataclass
 class EvalReport:
     run_id: str
@@ -116,7 +134,20 @@ class EvalReport:
     #: entirely when `None` so a v1 report's hash is byte-identical (D2/
     #: AC-S7); `render()` only appends a scope-authorization section when
     #: present.
-    scope_gate: "ScopeGateDecision | None" = None
+    #:
+    #: Checker finding 5 (GPT-5.4): declared as an `InitVar`, NOT a real
+    #: `dataclasses.fields()` member, captured into a plain instance
+    #: attribute (same public name) by `__post_init__`. This means raw
+    #: `dataclasses.asdict(report)`/`dataclasses.fields(report)` never see
+    #: a `scope_gate` key at all -- so a v1-shaped report (`scope_gate is
+    #: None`) never serializes a `scope_gate: null` key. Reading/writing
+    #: `report.scope_gate` afterwards (`self.scope_gate`, `report.scope_gate
+    #: = ...`) behaves exactly like a normal attribute -- `content_hash()`/
+    #: `render()` are unaffected.
+    scope_gate: InitVar["ScopeGateDecision | None"] = None
+
+    def __post_init__(self, scope_gate: "ScopeGateDecision | None" = None) -> None:
+        self.scope_gate = scope_gate
 
     def content_hash(self) -> str:
         """Deterministic-content hash (FR9/AC7): excludes `run_id` and
