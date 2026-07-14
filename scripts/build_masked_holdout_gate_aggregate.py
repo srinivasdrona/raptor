@@ -141,6 +141,42 @@ def build_aggregate(
     }
 
 
+#: v2-only limitation statements (sec 5/7 of the v2 preregistration
+#: contract): the v1 `build_aggregate` limitations list is a fixed-run
+#: historical statement and stays byte-identical/untouched. v2 instead
+#: derives its `limitations` explicitly from the recomputed/verified
+#: `policy.pm1_status` for THIS run, rather than inheriting the v1 list
+#: unconditionally -- a genuine no-skip v2 run must never carry a stale
+#: PM1 exclusion/zero-support claim that this run's own state
+#: contradicts.
+_V2_PM1_SKIPPED_LIMITATION = (
+    "PM1 was excluded from this fixed evaluation after both published and "
+    "reproduced resources had zero held-out-reachable rows; production PM1 "
+    "remains unvalidated."
+)
+_V2_ALWAYS_ON_LIMITATIONS: tuple = (
+    "The evaluation-only BP4/PP3 approval does not approve production candidate "
+    "policy or variant classifications.",
+    "No VUS worklist, clinical classification, or ClinVar submission is authorized.",
+)
+
+
+def _build_v2_limitations(pm1_status: str) -> list:
+    """Builds the v2 `limitations` list canonically (never via fragile
+    substring removal from the v1 list) from the run's own recomputed
+    `policy.pm1_status`: the PM1 exclusion statement is included only
+    when this run's PM1 was actually skipped
+    (`SKIPPED_ZERO_SUPPORT_BASELINE_MISMATCH`); a scored PM1 never carries
+    it. The always-on evaluation-scope-limits statements are preserved
+    regardless of PM1 status.
+    """
+    limitations = []
+    if pm1_status == "SKIPPED_ZERO_SUPPORT_BASELINE_MISMATCH":
+        limitations.append(_V2_PM1_SKIPPED_LIMITATION)
+    limitations.extend(_V2_ALWAYS_ON_LIMITATIONS)
+    return limitations
+
+
 def _canonical_oracle_thresholds() -> dict:
     """BLOCKER 1 (GPT-5.4 publication integrity): the exact canonical v2
     oracle threshold payload, built ONLY from pinned code constants
@@ -1091,6 +1127,12 @@ def build_aggregate_v2(
             # v1 gate payload is nested under a clearly-named legacy field,
             # never presented as (or alongside) the v2 primary verdict.
             "legacy_v1_gate": legacy_v1_gate,
+            # Overrides the inherited v1 `limitations` list: v2 derives its
+            # own limitations canonically from THIS run's
+            # `policy.pm1_status` (see `_build_v2_limitations`) rather than
+            # unconditionally inheriting the v1 fixed-run historical PM1
+            # statement.
+            "limitations": _build_v2_limitations(v1_aggregate["policy"]["pm1_status"]),
     }
 
 
