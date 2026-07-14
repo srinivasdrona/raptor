@@ -2464,6 +2464,246 @@ def test_blocker_2_reject_unknown_fields_in_scope():
         )
 
 
+def test_reason_integrity_1_inject_scope_reasons_rejected_or_canonicalized():
+    """RED TEST 1: Inject arbitrary scope reasons into otherwise valid required/descriptive scope;
+    aggregate must reject mismatch OR output canonical derived reasons, never tampered text.
+    """
+    import pytest
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+
+    # Case A: Required scope (missense:pathogenic)
+    env = _get_cross_surface_baseline()
+    tampered_msg = "TAMPERED_SCOPE_REASON_XYZ_123"
+    env["report"]["scope_gate"]["scopes"]["missense:pathogenic"]["reasons"] = [tampered_msg]
+
+    try:
+        agg = build_aggregate_v2(
+            env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+        # If it doesn't reject with ValueError, it must have canonicalized the reason and replaced the tampered text!
+        assert tampered_msg not in agg["scopes"]["missense:pathogenic"]["reasons"]
+    except ValueError:
+        # Rejection via ValueError is also a valid way of handling the mismatch/tamper
+        pass
+
+    # Case B: Descriptive scope (truncating:benign)
+    env = _get_cross_surface_baseline()
+    env["report"]["scope_gate"]["scopes"]["truncating:benign"]["reasons"] = [tampered_msg]
+
+    try:
+        agg = build_aggregate_v2(
+            env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+        assert tampered_msg not in agg["scopes"]["truncating:benign"]["reasons"]
+    except ValueError:
+        pass
+
+
+def test_reason_integrity_2_inject_top_level_reason_rejected_or_canonicalized():
+    """RED TEST 2: Inject arbitrary top-level scope_gate.reason;
+    aggregate must reject or replace with canonical derived reason, never publish injected text.
+    """
+    import pytest
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+
+    env = _get_cross_surface_baseline()
+    tampered_msg = "TAMPERED_TOP_LEVEL_REASON_ABC_789"
+    env["report"]["scope_gate"]["reason"] = tampered_msg
+
+    try:
+        agg = build_aggregate_v2(
+            env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+        # If it succeeds, the top-level reason must not contain the tampered text
+        assert tampered_msg != agg["scope_gate_reason"]
+        assert tampered_msg not in agg["scope_gate_reason"]
+    except ValueError:
+        # Rejection is also acceptable
+        pass
+
+
+def test_reason_integrity_3_canonical_reasons_deterministic():
+    """RED TEST 3: Canonical reasons should be deterministic from verified numeric/policy state:
+    - UNMET: identify LB(s) below threshold without arbitrary envelope prose;
+    - UNDERPOWERED: identify actual/called coverage below min_count;
+    - NO_THRESHOLD/DESCRIPTIVE: indicate no registered threshold (or coverage inadequate if applicable);
+    - VALIDATED: empty reasons or a fixed canonical message.
+    """
+    import pytest
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+
+    # Case A: UNMET
+    # Make missense:pathogenic UNMET by reducing lower bounds
+    env = _get_cross_surface_baseline()
+    env["report"]["metrics"]["missense"]["precision_lb"] = 0.85 # threshold is 0.90
+    env["report"]["metrics"]["missense"]["recall_lb"] = 0.86 # threshold is 0.85
+    env["report"]["scope_gate"]["scopes"]["missense:pathogenic"]["precision_lb"] = 0.85
+    env["report"]["scope_gate"]["scopes"]["missense:pathogenic"]["recall_lb"] = 0.86
+    env["report"]["scope_gate"]["scopes"]["missense:pathogenic"]["metric_status"] = "UNMET"
+    env["report"]["scope_gate"]["scopes"]["missense:pathogenic"]["scope_status"] = "FAIL"
+    # Ensure they are in sync, or we test aggregate recomputation
+    env["report"]["scope_gate"]["full_spectrum_status"] = "FAIL"
+    env["report"]["scope_gate"]["full_spectrum_vus_authorized"] = False
+    env["report"]["scope_gate"]["research_scope_flags"]["truncating_pathogenic_research_scope_validated"] = True
+    env["report"]["scope_gate"]["governance_state"] = "TRUNCATING_PATHOGENIC_ONLY"
+    env["report"]["scope_gate"]["governance_statement"] = (
+        "Full-spectrum VUS automation is not authorized. Evidence supports only the validated "
+        "truncating-pathogenic scope; missense remains unvalidated."
+    )
+
+    agg = build_aggregate_v2(
+        env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved"
+    )
+    # The reasons for missense:pathogenic must identify precision_lb < threshold
+    reasons = agg["scopes"]["missense:pathogenic"]["reasons"]
+    assert any("precision_lb" in r and "0.85" in r and "0.9" in r for r in reasons)
+    # It must not contain arbitrary envelope prose
+    assert not any("arbitrary" in r or "prose" in r for r in reasons)
+
+    # Case B: UNDERPOWERED
+    # Make truncating:pathogenic UNDERPOWERED by reducing counts
+    env = _get_cross_surface_baseline()
+    env["report"]["metrics"]["truncating"]["counts"]["path_called"] = 10
+    env["report"]["scope_gate"]["scopes"]["truncating:pathogenic"]["called_count"] = 10
+    env["report"]["scope_gate"]["scopes"]["truncating:pathogenic"]["coverage_adequate"] = False
+    env["report"]["scope_gate"]["scopes"]["truncating:pathogenic"]["scope_status"] = "UNDERPOWERED"
+    env["report"]["scope_gate"]["full_spectrum_status"] = "UNDERPOWERED"
+    env["report"]["scope_gate"]["full_spectrum_vus_authorized"] = False
+    env["report"]["scope_gate"]["research_scope_flags"]["truncating_pathogenic_research_scope_validated"] = False
+    env["report"]["scope_gate"]["governance_state"] = "NONE_VALIDATED"
+    env["report"]["scope_gate"]["governance_statement"] = (
+        "Full-spectrum VUS automation is not authorized; no pre-registered research scope is currently validated."
+    )
+
+    agg = build_aggregate_v2(
+        env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved"
+    )
+    reasons = agg["scopes"]["truncating:pathogenic"]["reasons"]
+    assert any("coverage inadequate" in r or "min(" in r for r in reasons)
+
+    # Case C: NO_THRESHOLD/DESCRIPTIVE
+    # Check truncating:benign
+    env = _get_cross_surface_baseline()
+    agg = build_aggregate_v2(
+        env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved"
+    )
+    reasons = agg["scopes"]["truncating:benign"]["reasons"]
+    for r in reasons:
+        assert "coverage inadequate" in r or "threshold" in r or "min(" in r
+
+    # Case D: VALIDATED
+    assert agg["scopes"]["truncating:pathogenic"]["reasons"] == [] or agg["scopes"]["truncating:pathogenic"]["reasons"] == ["VALIDATED"]
+
+
+def test_reason_integrity_4_canonical_top_level_reason():
+    """RED TEST 4: Canonical top-level reason deterministic from canonical full status,
+    authorization blockers, and sorted scope summaries; valid genuine runner envelope builds.
+    """
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+
+    env = _get_cross_surface_baseline()
+    agg = build_aggregate_v2(
+        env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved"
+    )
+
+    # Under genuine runner behavior:
+    expected_canonical_reason = (
+        "missense:benign=VALIDATED; "
+        "missense:pathogenic=VALIDATED; "
+        "truncating:benign=DESCRIPTIVE; "
+        "truncating:pathogenic=VALIDATED"
+    )
+    assert agg["scope_gate_reason"] == expected_canonical_reason
+
+
+def test_reason_integrity_5_no_arbitrary_injected_strings():
+    """RED TEST 5: Aggregate output must not contain arbitrary injected strings anywhere
+    in scopes reasons or scope_gate_reason.
+    """
+    import uuid
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+
+    env = _get_cross_surface_baseline()
+    random_uuid_1 = str(uuid.uuid4())
+    random_uuid_2 = str(uuid.uuid4())
+    random_uuid_3 = str(uuid.uuid4())
+
+    env["report"]["scope_gate"]["reason"] = f"some prefix {random_uuid_1} some suffix"
+    env["report"]["scope_gate"]["scopes"]["missense:pathogenic"]["reasons"] = [f"malicious {random_uuid_2}"]
+    env["report"]["scope_gate"]["scopes"]["truncating:benign"]["reasons"] = [f"malicious {random_uuid_3}"]
+
+    try:
+        agg = build_aggregate_v2(
+            env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+        agg_str = str(agg)
+        assert random_uuid_1 not in agg_str
+        assert random_uuid_2 not in agg_str
+        assert random_uuid_3 not in agg_str
+    except ValueError:
+        pass
+
+
+def test_reason_integrity_6_pm1_parity_block_retains_blockers_and_canonical_reason():
+    """RED TEST 6: PM1 parity-block roundtrip retains explicit authorization_blockers;
+    top-level reason can mention canonical block but not input prose.
+    """
+    import uuid
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+
+    env = _get_cross_surface_baseline()
+    # Trigger a PM1 parity blocker
+    env["report"]["config_pins"]["evaluation_skipped_criteria"] = ["PM1"]
+    env["report"]["scope_gate"]["authorization_blockers"] = ["evaluation_skipped_criteria:PM1"]
+    env["report"]["scope_gate"]["full_spectrum_vus_authorized"] = False
+    env["report"]["scope_gate"]["full_spectrum_status"] = "BLOCKED_POLICY"
+    env["report"]["scope_gate"]["research_scope_flags"] = {
+        "truncating_pathogenic_research_scope_validated": False
+    }
+    env["report"]["scope_gate"]["governance_state"] = "NONE_VALIDATED"
+    env["report"]["scope_gate"]["governance_statement"] = (
+        "Full-spectrum VUS automation is not authorized; no pre-registered research scope is currently validated."
+    )
+
+    # Inject custom tampered prose in reason
+    random_uuid = str(uuid.uuid4())
+    env["report"]["scope_gate"]["reason"] = f"My custom bypassed reason with {random_uuid}"
+
+    try:
+        agg = build_aggregate_v2(
+            env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+        # The output must contain the correct canonical blockers
+        assert "evaluation_skipped_criteria:PM1" in agg["authorization_blockers"]
+        # The top-level reason must not contain the injected custom prose
+        assert random_uuid not in agg["scope_gate_reason"]
+        # It can mention the canonical block (e.g. BLOCKED_POLICY) or default to the canonical recomputed sorted scopes
+        assert "BLOCKED_POLICY" in agg["scope_gate_reason"] or "missense:pathogenic" in agg["scope_gate_reason"]
+    except ValueError:
+        pass
+
+
+
 
 
 
