@@ -130,6 +130,9 @@ def test_e1_v2_schema_and_scope_specific_primary() -> None:
     )
 
     assert aggregate["schema"] == "raptor.tsc.masked_holdout_gate.v2"
+    assert aggregate["full_spectrum_status"] == "PASS"
+    assert "status" not in aggregate
+    assert "binding_stratum" not in aggregate
     assert aggregate["vus_authorized"] is True  # because full_spectrum_vus_authorized is True
     assert aggregate["research_scope_flags"] == {"truncating_pathogenic_research_scope_validated": True}
     assert aggregate["governance_statement"] == "All pre-registered research scopes are validated for research-evidence use only; this authorizes no clinical classification, VUS worklist, or ClinVar submission."
@@ -212,6 +215,9 @@ def test_e2_partial_to_full_spectrum_false() -> None:
     )
 
     assert aggregate["schema"] == "raptor.tsc.masked_holdout_gate.v2"
+    assert aggregate["full_spectrum_status"] == "FAIL"
+    assert "status" not in aggregate
+    assert "binding_stratum" not in aggregate
     assert aggregate["vus_authorized"] is False  # because full_spectrum_vus_authorized is False
     assert aggregate["research_scope_flags"] == {"truncating_pathogenic_research_scope_validated": True}
     assert aggregate["governance_statement"] == "Full-spectrum VUS automation is not authorized. Evidence supports only the validated truncating-pathogenic scope; missense remains unvalidated."

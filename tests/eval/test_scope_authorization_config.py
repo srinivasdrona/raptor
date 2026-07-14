@@ -176,3 +176,83 @@ def test_c5_missing_blank_or_invalid_fields_rejected(tmp_path, changes):
 
     with pytest.raises(ConfigError):
         load_config(p)
+
+
+@pytest.mark.parametrize(
+    "invalid_requires",
+    [
+        ["missense:pathogenic"],  # wrong scope
+        [],                       # empty
+        ["truncating:pathogenic", "missense:pathogenic"],  # multiple/extras
+        ["missense:pathogenic", "truncating:pathogenic"],  # reordered/extras
+    ]
+)
+def test_c6_research_scope_flag_mapping_lock(tmp_path, invalid_requires):
+    """Finding 1: Config loader must reject any mapping where
+    truncating_pathogenic_research_scope_validated.requires is not exactly ["truncating:pathogenic"].
+    """
+    raw = make_valid_base_raw_config()
+    raw["scope_authorization"] = {
+        "schema_version": 2,
+        "research_use_disclaimer": "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+        "full_spectrum": {
+            "requires": ["missense:pathogenic", "missense:benign", "truncating:pathogenic"]
+        },
+        "research_scopes": {
+            "truncating_pathogenic_research_scope_validated": {
+                "requires": invalid_requires
+            }
+        },
+        "governance_statements": {
+            "FULL_SPECTRUM": "All pre-registered research scopes are validated for research-evidence use only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+            "TRUNCATING_PATHOGENIC_ONLY": "Full-spectrum VUS automation is not authorized. Evidence supports only the validated truncating-pathogenic scope; missense remains unvalidated.",
+            "NONE_VALIDATED": "Full-spectrum VUS automation is not authorized; no pre-registered research scope is currently validated."
+        }
+    }
+
+    p = tmp_path / "invalid_flag_requires.yaml"
+    p.write_text(yaml.safe_dump(raw), encoding="utf-8")
+
+    with pytest.raises(ConfigError):
+        load_config(p)
+
+
+def test_c7_research_scope_keys_pinned(tmp_path):
+    """Finding 1: The keys of research_scopes must be exactly pinned to
+    {"truncating_pathogenic_research_scope_validated"}.
+    Any missing or extra keys must be rejected by the config loader.
+    """
+    # Case A: Missing the required key (empty research_scopes)
+    raw = make_valid_base_raw_config()
+    raw["scope_authorization"] = {
+        "schema_version": 2,
+        "research_use_disclaimer": "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+        "full_spectrum": {
+            "requires": ["missense:pathogenic", "missense:benign", "truncating:pathogenic"]
+        },
+        "research_scopes": {},
+        "governance_statements": {
+            "FULL_SPECTRUM": "All pre-registered research scopes are validated for research-evidence use only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+            "TRUNCATING_PATHOGENIC_ONLY": "Full-spectrum VUS automation is not authorized. Evidence supports only the validated truncating-pathogenic scope; missense remains unvalidated.",
+            "NONE_VALIDATED": "Full-spectrum VUS automation is not authorized; no pre-registered research scope is currently validated."
+        }
+    }
+    p = tmp_path / "missing_key.yaml"
+    p.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    with pytest.raises(ConfigError):
+        load_config(p)
+
+    # Case B: Extra key in research_scopes
+    raw["scope_authorization"]["research_scopes"] = {
+        "truncating_pathogenic_research_scope_validated": {
+            "requires": ["truncating:pathogenic"]
+        },
+        "extra_scope_unauthorized": {
+            "requires": ["missense:pathogenic"]
+        }
+    }
+    p = tmp_path / "extra_key.yaml"
+    p.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    with pytest.raises(ConfigError):
+        load_config(p)
+

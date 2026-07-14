@@ -544,3 +544,168 @@ def test_b5_absent_required_metrics():
     # truncating:pathogenic verdict should be UNDERPOWERED or FAIL, but definitely not VALIDATED
     assert decision.scopes["truncating:pathogenic"].scope_status != "VALIDATED"
     assert decision.full_spectrum_vus_authorized is False
+
+
+def test_b6_decide_scope_gate_retargeting_defense_in_depth():
+    """Finding 1 defense-in-depth:
+    decide_scope_gate must reject/fail-closed (BLOCKED_CONFIG) if a hand-built
+    EvalConfig modifies/retargets truncating_pathogenic_research_scope_validated.requires.
+    """
+    malformed_auth = make_v2_auth_config()
+    malformed_auth["research_scopes"]["truncating_pathogenic_research_scope_validated"]["requires"] = ["missense:pathogenic"]
+
+    cfg = make_eval_config(
+        min_count_per_class=36,
+        oracle_thresholds=make_oracle_thresholds(),
+        scope_authorization=malformed_auth
+    )
+
+    m_truncating = Metrics(
+        precision=1.0, recall=1.0, concordance=1.0,
+        counts={"path_called": 40, "benign_called": 1, "path_actual": 40, "benign_actual": 1},
+        stratum="truncating", gating=True, benign_precision=1.0, benign_recall=1.0
+    )
+    m_truncating.precision_lb = 0.96
+    m_truncating.recall_lb = 0.96
+
+    decision = decide_scope_gate({"truncating": m_truncating}, cfg)
+    assert decision.full_spectrum_status == "BLOCKED_CONFIG"
+    assert decision.full_spectrum_vus_authorized is False
+    assert all(not val for val in decision.research_scope_flags.values())
+    assert decision.governance_state == "NONE_VALIDATED"
+
+
+def test_b7_decide_scope_gate_keys_pinned_defense_in_depth():
+    """Finding 1 defense-in-depth:
+    decide_scope_gate must reject/fail-closed (BLOCKED_CONFIG) if a hand-built
+    EvalConfig has missing or extra keys in research_scopes.
+    """
+    # Case A: empty research_scopes
+    malformed_auth = make_v2_auth_config()
+    malformed_auth["research_scopes"] = {}
+
+    cfg = make_eval_config(
+        min_count_per_class=36,
+        oracle_thresholds=make_oracle_thresholds(),
+        scope_authorization=malformed_auth
+    )
+    m_truncating = Metrics(
+        precision=1.0, recall=1.0, concordance=1.0,
+        counts={"path_called": 40, "benign_called": 1, "path_actual": 40, "benign_actual": 1},
+        stratum="truncating", gating=True, benign_precision=1.0, benign_recall=1.0
+    )
+    m_truncating.precision_lb = 0.96
+    m_truncating.recall_lb = 0.96
+
+    decision = decide_scope_gate({"truncating": m_truncating}, cfg)
+    assert decision.full_spectrum_status == "BLOCKED_CONFIG"
+
+    # Case B: extra keys in research_scopes
+    malformed_auth2 = make_v2_auth_config()
+    malformed_auth2["research_scopes"]["extra_scope"] = {"requires": ["missense:pathogenic"]}
+    cfg2 = make_eval_config(
+        min_count_per_class=36,
+        oracle_thresholds=make_oracle_thresholds(),
+        scope_authorization=malformed_auth2
+    )
+    decision2 = decide_scope_gate({"truncating": m_truncating}, cfg2)
+    assert decision2.full_spectrum_status == "BLOCKED_CONFIG"
+
+
+def test_b8_decide_scope_gate_rejects_deviated_full_spectrum_requires():
+    """Finding 2: Direct decide_scope_gate rejects/blocks hand-built EvalConfig with
+    narrowed or changed full_spectrum.requires.
+    """
+    malformed_auth = make_v2_auth_config()
+    malformed_auth["full_spectrum"]["requires"] = ["truncating:pathogenic"]  # narrowed
+
+    cfg = make_eval_config(
+        min_count_per_class=36,
+        oracle_thresholds=make_oracle_thresholds(),
+        scope_authorization=malformed_auth
+    )
+
+    m_truncating = Metrics(
+        precision=1.0, recall=1.0, concordance=1.0,
+        counts={"path_called": 40, "benign_called": 1, "path_actual": 40, "benign_actual": 1},
+        stratum="truncating", gating=True, benign_precision=1.0, benign_recall=1.0
+    )
+    m_truncating.precision_lb = 0.96
+    m_truncating.recall_lb = 0.96
+
+    decision = decide_scope_gate({"truncating": m_truncating}, cfg)
+    assert decision.full_spectrum_status == "BLOCKED_CONFIG"
+    assert decision.full_spectrum_vus_authorized is False
+    assert all(not val for val in decision.research_scope_flags.values())
+    assert decision.governance_state == "NONE_VALIDATED"
+
+
+@pytest.mark.parametrize(
+    "modified_thresholds",
+    [
+        # lower confidence
+        {
+            "confidence": 0.1,
+            "strata": {
+                "missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]},
+                "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]}
+            }
+        },
+        # lower precision threshold for missense
+        {
+            "confidence": 0.95,
+            "strata": {
+                "missense": {"precision": 0.10, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]},
+                "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]}
+            }
+        },
+        # lower recall threshold for truncating
+        {
+            "confidence": 0.95,
+            "strata": {
+                "missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]},
+                "truncating": {"precision": 0.95, "recall": 0.10, "gating": True, "directions": ["pathogenic"]}
+            }
+        },
+        # changed direction for truncating (adding benign)
+        {
+            "confidence": 0.95,
+            "strata": {
+                "missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]},
+                "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic", "benign"]}
+            }
+        },
+        # changed gating semantics (gating=False for missense)
+        {
+            "confidence": 0.95,
+            "strata": {
+                "missense": {"precision": 0.90, "recall": 0.85, "gating": False, "directions": ["pathogenic", "benign"]},
+                "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]}
+            }
+        },
+    ]
+)
+def test_b9_decide_scope_gate_rejects_drifted_oracle_threshold_semantics(modified_thresholds):
+    """Finding 2: Direct decide_scope_gate rejects/blocks any drift from pinned
+    oracle thresholds, directions, gating semantics, and confidence for missense/truncating.
+    """
+    cfg = make_eval_config(
+        min_count_per_class=36,
+        oracle_thresholds=modified_thresholds,
+        scope_authorization=make_v2_auth_config()
+    )
+
+    m_truncating = Metrics(
+        precision=1.0, recall=1.0, concordance=1.0,
+        counts={"path_called": 40, "benign_called": 1, "path_actual": 40, "benign_actual": 1},
+        stratum="truncating", gating=True, benign_precision=1.0, benign_recall=1.0
+    )
+    m_truncating.precision_lb = 0.96
+    m_truncating.recall_lb = 0.96
+
+    decision = decide_scope_gate({"truncating": m_truncating}, cfg)
+    assert decision.full_spectrum_status == "BLOCKED_CONFIG"
+    assert decision.full_spectrum_vus_authorized is False
+    assert all(not val for val in decision.research_scope_flags.values())
+    assert decision.governance_state == "NONE_VALIDATED"
+
