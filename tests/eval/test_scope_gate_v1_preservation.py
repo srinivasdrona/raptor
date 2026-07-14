@@ -84,7 +84,7 @@ def test_f2_immutable_artifact_invariants():
     assert payload["vus_authorized"] is False
 
     # Check absence of v2 keys at root and under report (if present)
-    v2_keys = ["scopes", "research_scope_flags", "governance_statement", "research_use_disclaimer"]
+    v2_keys = ["scopes", "research_scope_flags", "governance_statement", "research_use_disclaimer", "scope_gate"]
     for key in v2_keys:
         assert key not in payload, f"Accidental leak/write of v2 key '{key}' into v1 artifact"
 

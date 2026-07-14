@@ -256,3 +256,93 @@ def test_c7_research_scope_keys_pinned(tmp_path):
     with pytest.raises(ConfigError):
         load_config(p)
 
+
+# =========================================================================
+# RED REGRESSION TESTS FOR GPT-5.4 FINDINGS
+# =========================================================================
+
+def test_finding_1_config_load_rejects_governance_drift(tmp_path) -> None:
+    """Finding 1 [High]: Pin all three governance state strings—not only
+    TRUNCATING_PATHOGENIC_ONLY—because all are authorization surfaces. Any drift
+    from the exact pinned governance statements must be rejected by the loader.
+    """
+    raw = make_valid_base_raw_config()
+    
+    # Case A: Drift in FULL_SPECTRUM statement
+    scope_auth_a = {
+        "schema_version": 2,
+        "research_use_disclaimer": "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+        "full_spectrum": {"requires": ["missense:pathogenic", "missense:benign", "truncating:pathogenic"]},
+        "research_scopes": {"truncating_pathogenic_research_scope_validated": {"requires": ["truncating:pathogenic"]}},
+        "governance_statements": {
+            "FULL_SPECTRUM": "Tampered full-spectrum text is unauthorized.",
+            "TRUNCATING_PATHOGENIC_ONLY": "Full-spectrum VUS automation is not authorized. Evidence supports only the validated truncating-pathogenic scope; missense remains unvalidated.",
+            "NONE_VALIDATED": "Full-spectrum VUS automation is not authorized; no pre-registered research scope is currently validated."
+        }
+    }
+    raw["scope_authorization"] = scope_auth_a
+    p = tmp_path / "drift_fs.yaml"
+    p.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    with pytest.raises(ConfigError, match="governance_statements.*FULL_SPECTRUM"):
+        load_config(p)
+
+    # Case B: Drift in NONE_VALIDATED statement
+    scope_auth_b = {
+        "schema_version": 2,
+        "research_use_disclaimer": "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+        "full_spectrum": {"requires": ["missense:pathogenic", "missense:benign", "truncating:pathogenic"]},
+        "research_scopes": {"truncating_pathogenic_research_scope_validated": {"requires": ["truncating:pathogenic"]}},
+        "governance_statements": {
+            "FULL_SPECTRUM": "All pre-registered research scopes are validated for research-evidence use only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+            "TRUNCATING_PATHOGENIC_ONLY": "Full-spectrum VUS automation is not authorized. Evidence supports only the validated truncating-pathogenic scope; missense remains unvalidated.",
+            "NONE_VALIDATED": "Tampered none-validated text is unauthorized."
+        }
+    }
+    raw["scope_authorization"] = scope_auth_b
+    p = tmp_path / "drift_none.yaml"
+    p.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    with pytest.raises(ConfigError, match="governance_statements.*NONE_VALIDATED"):
+        load_config(p)
+
+
+def test_finding_2_config_load_rejects_min_count_drift(tmp_path) -> None:
+    """Finding 2 [High]: The pre-registered floor is exactly 36. Any drift
+    below or above 36 must be rejected by the loader (ConfigError).
+    """
+    for drifted_count in [1, 35, 37]:
+        raw = make_valid_base_raw_config()
+        raw["min_count_per_class"] = drifted_count
+        raw["scope_authorization"] = {
+            "schema_version": 2,
+            "research_use_disclaimer": "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+            "full_spectrum": {"requires": ["missense:pathogenic", "missense:benign", "truncating:pathogenic"]},
+            "research_scopes": {"truncating_pathogenic_research_scope_validated": {"requires": ["truncating:pathogenic"]}},
+            "governance_statements": {
+                "FULL_SPECTRUM": "All pre-registered research scopes are validated for research-evidence use only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+                "TRUNCATING_PATHOGENIC_ONLY": "Full-spectrum VUS automation is not authorized. Evidence supports only the validated truncating-pathogenic scope; missense remains unvalidated.",
+                "NONE_VALIDATED": "Full-spectrum VUS automation is not authorized; no pre-registered research scope is currently validated."
+            }
+        }
+        p = tmp_path / f"drift_min_count_{drifted_count}.yaml"
+        p.write_text(yaml.safe_dump(raw), encoding="utf-8")
+        with pytest.raises(ConfigError, match="min_count_per_class"):
+            load_config(p)
+
+
+@pytest.mark.parametrize(
+    "falsy_scope_auth",
+    [{}, [], False, "", None]
+)
+def test_finding_5_falsy_scope_authorization_fails_loud(tmp_path, falsy_scope_auth) -> None:
+    """Finding 5 [Medium]: Only key ABSENCE means legacy config. Present but falsy
+    scope_authorization blocks (such as {}, [], false, "", or null) must fail loud.
+    """
+    raw = make_valid_base_raw_config()
+    raw["scope_authorization"] = falsy_scope_auth
+    p = tmp_path / "falsy_scope_auth.yaml"
+    # To dump null for None, yaml does it naturally
+    p.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    with pytest.raises(ConfigError):
+        load_config(p)
+
+

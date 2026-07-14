@@ -709,3 +709,105 @@ def test_b9_decide_scope_gate_rejects_drifted_oracle_threshold_semantics(modifie
     assert all(not val for val in decision.research_scope_flags.values())
     assert decision.governance_state == "NONE_VALIDATED"
 
+
+# =========================================================================
+# RED REGRESSION TESTS FOR GPT-5.4 FINDINGS
+# =========================================================================
+
+def test_finding_1_tampered_governance_statements_or_disclaimer_blocked() -> None:
+    """Finding 1 [High]: Hand-built config tampering with pinned safe text or disclaimer
+    must fail-closed (BLOCKED_CONFIG, nothing validated).
+    """
+    # Case A: Tampered TRUNCATING_PATHOGENIC_ONLY statement
+    tampered_auth = make_v2_auth_config()
+    tampered_auth["governance_statements"]["TRUNCATING_PATHOGENIC_ONLY"] = "Clinical truncating-only authorization granted"
+    cfg = make_eval_config(
+        min_count_per_class=36,
+        oracle_thresholds=make_oracle_thresholds(),
+        scope_authorization=tampered_auth,
+    )
+    decision = decide_scope_gate({}, cfg)
+    assert decision.full_spectrum_status == "BLOCKED_CONFIG"
+    assert decision.full_spectrum_vus_authorized is False
+    assert decision.governance_state == "NONE_VALIDATED"
+    # Never echo tampered text:
+    assert "Clinical" not in decision.governance_statement
+
+    # Case B: Tampered research_use_disclaimer statement
+    tampered_auth_b = make_v2_auth_config()
+    tampered_auth_b["research_use_disclaimer"] = "Clinical classification authorized / No restrictions"
+    cfg_b = make_eval_config(
+        min_count_per_class=36,
+        oracle_thresholds=make_oracle_thresholds(),
+        scope_authorization=tampered_auth_b,
+    )
+    decision_b = decide_scope_gate({}, cfg_b)
+    assert decision_b.full_spectrum_status == "BLOCKED_CONFIG"
+    assert decision_b.full_spectrum_vus_authorized is False
+    assert "Clinical" not in decision_b.research_use_disclaimer
+
+
+def test_finding_2_direct_config_min_count_drift_blocked() -> None:
+    """Finding 2 [High]: Direct config with min_count_per_class drifting from exactly 36
+    must block config.
+    """
+    for drifted_min_count in [1, 35, 37]:
+        cfg = make_eval_config(
+            min_count_per_class=drifted_min_count,
+            oracle_thresholds=make_oracle_thresholds(),
+            scope_authorization=make_v2_auth_config(),
+        )
+        decision = decide_scope_gate({}, cfg)
+        assert decision.full_spectrum_status == "BLOCKED_CONFIG"
+        assert decision.full_spectrum_vus_authorized is False
+
+
+@pytest.mark.parametrize(
+    "malformed_lb",
+    [True, False, 1.2, -0.5, float("nan"), float("inf"), float("-inf"), "0.95", None]
+)
+def test_finding_3_malformed_precision_lb_fail_closed(malformed_lb) -> None:
+    """Finding 3 [High]: Malformed LBs must never lead to VALIDATED status."""
+    cfg = make_eval_config(
+        min_count_per_class=36,
+        oracle_thresholds=make_oracle_thresholds(),
+        scope_authorization=make_v2_auth_config(),
+    )
+    m_truncating = Metrics(
+        precision=1.0, recall=1.0, concordance=1.0,
+        counts={"path_called": 40, "benign_called": 1, "path_actual": 40, "benign_actual": 1},
+        stratum="truncating", gating=True, benign_precision=1.0, benign_recall=1.0
+    )
+    m_truncating.precision_lb = malformed_lb
+    m_truncating.recall_lb = 0.96
+
+    metrics = {"truncating": m_truncating}
+    decision = decide_scope_gate(metrics, cfg)
+    assert decision.scopes["truncating:pathogenic"].scope_status in ("FAIL", "UNDERPOWERED")
+    assert decision.full_spectrum_vus_authorized is False
+
+
+@pytest.mark.parametrize(
+    "malformed_count",
+    [True, False, 36.5, -5, "36", None]
+)
+def test_finding_3_malformed_counts_fail_closed(malformed_count) -> None:
+    """Finding 3 [High]: Malformed counts must never lead to VALIDATED status."""
+    cfg = make_eval_config(
+        min_count_per_class=36,
+        oracle_thresholds=make_oracle_thresholds(),
+        scope_authorization=make_v2_auth_config(),
+    )
+    m_truncating = Metrics(
+        precision=1.0, recall=1.0, concordance=1.0,
+        counts={"path_called": malformed_count, "benign_called": 40, "path_actual": 40, "benign_actual": 40},
+        stratum="truncating", gating=True, benign_precision=1.0, benign_recall=1.0
+    )
+    m_truncating.precision_lb = 0.96
+    m_truncating.recall_lb = 0.96
+
+    metrics = {"truncating": m_truncating}
+    decision = decide_scope_gate(metrics, cfg)
+    assert decision.scopes["truncating:pathogenic"].scope_status in ("FAIL", "UNDERPOWERED")
+    assert decision.full_spectrum_vus_authorized is False
+

@@ -192,3 +192,39 @@ def test_d3_hash_includes_scope_gate_when_present():
 
     # Hashes should be different
     assert report_validated.content_hash() != report_fail.content_hash()
+
+
+# =========================================================================
+# RED REGRESSION TESTS FOR GPT-5.4 FINDINGS
+# =========================================================================
+
+def test_finding_5_report_serialization_omits_none_scope_gate() -> None:
+    """Finding 5 [Medium]: Pure helper test asserting that when scope_gate is None,
+    the serialized report dictionary (e.g. from dataclass asdict() or standard helper)
+    omits the `scope_gate` key entirely, rather than outputting `scope_gate: null`.
+    """
+    from dataclasses import asdict
+    m = Metrics(1.0, 1.0, 1.0, {}, "missense", True, 1.0, 1.0)
+    gate = GateDecision(status="FAIL", stratum="missense", reason="below", vus_authorized=False)
+
+    report = EvalReport(
+        run_id="run-1",
+        generated_at="2026-07-14",
+        labels_snapshot="snap-1",
+        benchmark_size=10,
+        train_dev_size=3,
+        holdout_size=7,
+        holdout_label_counts={"P": 4, "B": 3},
+        holdout_class_counts={"missense": 5},
+        metrics={"missense": m},
+        gate=gate,
+        scope_gate=None  # Explicit None
+    )
+
+    # Let's check how the serialized dictionary handles scope_gate
+    serialized = asdict(report)
+    
+    # In order to omit None/null keys, we can have a serialization helper or post-process.
+    # Asserting that the key is completely absent:
+    assert "scope_gate" not in serialized
+
