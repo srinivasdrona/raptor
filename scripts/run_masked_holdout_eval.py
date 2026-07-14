@@ -28,7 +28,7 @@ from raptor.eval.predictor_policy import (
     load_predictor_policy,
     verify_predictor_policy_hashes,
 )
-from raptor.eval.scope_gate import decide_scope_gate
+from raptor.eval.scope_gate import canonical_scope_gate_reason, decide_scope_gate
 from raptor.eval.split import split_benchmark
 from raptor.eval.terminal_source import (
     PredictorCorrectedEvidenceSource,
@@ -98,6 +98,8 @@ def compute_report_scope_gate(
         decision.full_spectrum_vus_authorized or any(decision.research_scope_flags.values())
     ):
         blockers = sorted(f"evaluation_skipped_criteria:{criterion}" for criterion in skipped)
+        scope_statuses = {key: verdict.scope_status for key, verdict in decision.scopes.items()}
+        reason = canonical_scope_gate_reason(scope_statuses, blockers)
         decision = ScopeGateDecision(
             schema_version=decision.schema_version,
             scopes=decision.scopes,
@@ -108,11 +110,7 @@ def compute_report_scope_gate(
             governance_statement=config.scope_authorization["governance_statements"]["NONE_VALIDATED"],
             research_use_disclaimer=decision.research_use_disclaimer,
             authorization_blockers=blockers,
-            reason=(
-                "all scope metric thresholds may have passed, but evaluation-only criterion "
-                f"exclusions {sorted(skipped)!r} break full production parity; never authorize "
-                "a research scope on a parity break"
-            ),
+            reason=reason,
         )
     return decision
 

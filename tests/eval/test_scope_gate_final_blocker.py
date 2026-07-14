@@ -548,8 +548,8 @@ def test_require_canonical_parity_block_reason():
 
     # 3. Assert reason includes blocker and sorted scope status summary; no old freeform phrase
     assert "evaluation_skipped_criteria:PM1" in expected_canonical_reason
-    assert "missense:benign=UNMET" in expected_canonical_reason
-    assert "missense:pathogenic=UNMET" in expected_canonical_reason
+    assert "missense:benign=FAIL" in expected_canonical_reason
+    assert "missense:pathogenic=FAIL" in expected_canonical_reason
     assert "truncating:pathogenic=VALIDATED" in expected_canonical_reason
     assert "all scope metric thresholds may have passed" not in decision.reason
     assert "exclusions" not in decision.reason
