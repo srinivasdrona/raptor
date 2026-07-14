@@ -13,8 +13,26 @@ import yaml
 from raptor.eval.config import (
     _PINNED_FULL_SPECTRUM_SCOPES,
     _PINNED_GOVERNANCE_STATEMENTS,
+    _PINNED_MIN_COUNT_PER_CLASS,
     _PINNED_RESEARCH_SCOPE_REQUIRES,
     _PINNED_RESEARCH_USE_DISCLAIMER,
+)
+from raptor.eval.scope_gate import _valid_count, _valid_lower_bound
+
+#: BLOCKER 1 (GPT-5.4): the full set of `DirectionVerdict`-shaped numeric/
+#: axis fields. A scope entry that carries ANY of these is "shape-complete"
+#: and is subject to full independent recomputation (below) -- a scope
+#: entry that carries NONE of them is the pre-existing minimal
+#: `{"scope_status": ...}` legacy shape (still used by several genuine
+#: envelope fixtures/tests for fields unrelated to this integrity check)
+#: and is passed through unchanged: there is nothing to recompute against,
+#: so trusting its declared `scope_status` is the only option, and it
+#: carries no numeric axis to forge in the first place. Supplying SOME but
+#: not ALL of these fields is itself a malformed/tampered shape (partial
+#: threshold/axis pair) and is rejected.
+_SCOPE_NUMERIC_AXIS_FIELDS: tuple = (
+    "precision_lb", "recall_lb", "precision_threshold", "recall_threshold",
+    "actual_count", "called_count", "min_count", "coverage_adequate", "metric_status",
 )
 
 
@@ -107,6 +125,171 @@ def build_aggregate(
     }
 
 
+def _recompute_scope_entry(scope_key: str, entry: Any) -> str:
+    """BLOCKER 1 (GPT-5.4) per-scope integrity boundary: `build_aggregate_v2`
+    must NEVER trust a scope entry's own `scope_status` (or `metric_status`/
+    `coverage_adequate`) at face value -- it independently RECOMPUTES all
+    three from the entry's raw numeric/count fields, using the exact same
+    canonical rules as `raptor.eval.scope_gate._direction_verdict` (sec 3.3
+    of the v2 preregistration contract), and raises `ValueError` on ANY
+    disagreement, malformed numeric/type domain, partial threshold pair,
+    scope-key/stratum/direction mismatch, or missing field.
+
+    A minimal legacy `{"scope_status": ...}` entry (no numeric axis field
+    present at all) is passed through unchanged -- several genuine envelope
+    fixtures use that shape for concerns unrelated to this per-scope
+    numeric integrity (e.g. parity-blocker demotion), and there is no
+    numeric axis to independently verify or forge in the first place.
+    Supplying only SOME of the numeric axis fields, however, is itself a
+    malformed/tampered shape and is rejected.
+    """
+    if not isinstance(entry, dict):
+        raise ValueError(
+            f"scope_gate integrity error: scopes[{scope_key!r}] must be a mapping -- "
+            "inconsistent/tampered envelope"
+        )
+
+    present_axis_fields = [f for f in _SCOPE_NUMERIC_AXIS_FIELDS if f in entry]
+    if not present_axis_fields:
+        # Legacy minimal shape -- nothing to recompute against.
+        scope_status = entry.get("scope_status")
+        if scope_status not in ("VALIDATED", "FAIL", "UNDERPOWERED", "DESCRIPTIVE"):
+            raise ValueError(
+                f"scope_gate integrity error: scopes[{scope_key!r}].scope_status={scope_status!r} "
+                "is not a recognized value -- inconsistent/tampered envelope"
+            )
+        return scope_status
+
+    missing_axis_fields = [f for f in _SCOPE_NUMERIC_AXIS_FIELDS if f not in entry]
+    if missing_axis_fields:
+        raise ValueError(
+            f"scope_gate integrity error: scopes[{scope_key!r}] is missing required field(s) "
+            f"{sorted(missing_axis_fields)!r} -- partial/tampered numeric-axis shape"
+        )
+    if "scope_status" not in entry:
+        raise ValueError(
+            f"scope_gate integrity error: scopes[{scope_key!r}] is missing required field "
+            "'scope_status' -- inconsistent/tampered envelope"
+        )
+
+    expected_stratum, sep, expected_direction = scope_key.partition(":")
+    if sep != ":" or not expected_stratum or expected_direction not in ("pathogenic", "benign"):
+        raise ValueError(
+            f"scope_gate integrity error: scope key {scope_key!r} is not a valid "
+            "'{stratum}:{direction}' key -- inconsistent/tampered envelope"
+        )
+    if "stratum" in entry and entry["stratum"] != expected_stratum:
+        raise ValueError(
+            f"scope_gate integrity error: scopes[{scope_key!r}].stratum={entry['stratum']!r} "
+            f"does not match its scope key -- inconsistent/tampered envelope"
+        )
+    if "direction" in entry and entry["direction"] != expected_direction:
+        raise ValueError(
+            f"scope_gate integrity error: scopes[{scope_key!r}].direction={entry['direction']!r} "
+            f"does not match its scope key -- inconsistent/tampered envelope"
+        )
+
+    precision_threshold = entry["precision_threshold"]
+    recall_threshold = entry["recall_threshold"]
+    thresholds_none = precision_threshold is None and recall_threshold is None
+    thresholds_registered = (
+        precision_threshold is not None
+        and recall_threshold is not None
+        and _valid_lower_bound(precision_threshold)
+        and _valid_lower_bound(recall_threshold)
+    )
+    if not (thresholds_none or thresholds_registered):
+        raise ValueError(
+            f"scope_gate integrity error: scopes[{scope_key!r}] precision_threshold="
+            f"{precision_threshold!r}/recall_threshold={recall_threshold!r} must be BOTH `None` "
+            "(NO_THRESHOLD) or BOTH finite non-bool numbers in [0,1] -- malformed/tampered "
+            "partial threshold pair"
+        )
+
+    precision_lb = entry["precision_lb"]
+    recall_lb = entry["recall_lb"]
+    if not (_valid_lower_bound(precision_lb) and _valid_lower_bound(recall_lb)):
+        raise ValueError(
+            f"scope_gate integrity error: scopes[{scope_key!r}] precision_lb={precision_lb!r}/"
+            f"recall_lb={recall_lb!r} must be finite non-bool numbers in [0,1] -- malformed/"
+            "tampered numeric domain"
+        )
+
+    actual_count = entry["actual_count"]
+    called_count = entry["called_count"]
+    if not (_valid_count(actual_count) and _valid_count(called_count)):
+        raise ValueError(
+            f"scope_gate integrity error: scopes[{scope_key!r}] actual_count={actual_count!r}/"
+            f"called_count={called_count!r} must be non-bool, non-negative integers -- "
+            "malformed/tampered numeric domain"
+        )
+
+    min_count = entry["min_count"]
+    if not (isinstance(min_count, int) and not isinstance(min_count, bool) and min_count > 0):
+        raise ValueError(
+            f"scope_gate integrity error: scopes[{scope_key!r}] min_count={min_count!r} must be "
+            "a non-bool, positive integer -- malformed/tampered numeric domain"
+        )
+    if min_count != _PINNED_MIN_COUNT_PER_CLASS:
+        raise ValueError(
+            f"scope_gate integrity error: scopes[{scope_key!r}] min_count={min_count!r} does not "
+            f"match the pinned pre-registered v2 coverage floor {_PINNED_MIN_COUNT_PER_CLASS!r} -- "
+            "inconsistent/tampered envelope"
+        )
+
+    # Independently RECOMPUTE coverage_adequate/metric_status/scope_status
+    # from the raw numeric fields (sec 3.3 canonical mapping) -- NEVER
+    # trust the declared axis values, even when internally self-consistent.
+    recomputed_coverage_adequate = min(actual_count, called_count) >= min_count
+    if thresholds_none:
+        recomputed_metric_status = "NO_THRESHOLD"
+    elif precision_lb >= precision_threshold and recall_lb >= recall_threshold:
+        recomputed_metric_status = "MET"
+    else:
+        recomputed_metric_status = "UNMET"
+
+    if recomputed_metric_status == "NO_THRESHOLD":
+        recomputed_scope_status = "DESCRIPTIVE"
+    elif recomputed_metric_status == "MET":
+        recomputed_scope_status = "VALIDATED" if recomputed_coverage_adequate else "UNDERPOWERED"
+    else:  # UNMET
+        recomputed_scope_status = "FAIL"
+
+    declared_coverage_adequate = entry["coverage_adequate"]
+    if not isinstance(declared_coverage_adequate, bool):
+        raise ValueError(
+            f"scope_gate integrity error: scopes[{scope_key!r}].coverage_adequate="
+            f"{declared_coverage_adequate!r} must be a bool -- inconsistent/tampered envelope"
+        )
+    if declared_coverage_adequate is not recomputed_coverage_adequate:
+        raise ValueError(
+            f"scope_gate integrity error: scopes[{scope_key!r}].coverage_adequate="
+            f"{declared_coverage_adequate!r} does not match the recomputed value "
+            f"{recomputed_coverage_adequate!r} derived from min(actual_count, called_count) vs "
+            "min_count -- forged/tampered coverage"
+        )
+
+    declared_metric_status = entry["metric_status"]
+    if declared_metric_status != recomputed_metric_status:
+        raise ValueError(
+            f"scope_gate integrity error: scopes[{scope_key!r}].metric_status="
+            f"{declared_metric_status!r} does not match the recomputed value "
+            f"{recomputed_metric_status!r} derived from precision_lb/recall_lb vs thresholds -- "
+            "forged/tampered metric_status"
+        )
+
+    declared_scope_status = entry["scope_status"]
+    if declared_scope_status != recomputed_scope_status:
+        raise ValueError(
+            f"scope_gate integrity error: scopes[{scope_key!r}].scope_status="
+            f"{declared_scope_status!r} does not match the recomputed value "
+            f"{recomputed_scope_status!r} derived from metric_status={recomputed_metric_status!r} "
+            f"and coverage_adequate={recomputed_coverage_adequate!r} -- forged/tampered scope_status"
+        )
+
+    return recomputed_scope_status
+
+
 def _verify_scope_gate_integrity(report: dict) -> dict:
     """Checker finding 4 (GPT-5.4) integrity boundary: `build_aggregate_v2`
     must NEVER trust `report['scope_gate']`'s precomputed
@@ -135,6 +318,18 @@ def _verify_scope_gate_integrity(report: dict) -> dict:
             "inconsistent/tampered envelope"
         )
 
+    # BLOCKER 1 (GPT-5.4): independently recompute/validate EVERY scope
+    # payload's `metric_status`/`coverage_adequate`/`scope_status` from its
+    # own raw numeric/count fields -- never trust any of those three
+    # declared values at face value, for any scope key (not just the
+    # pinned full-spectrum/research-scope required ones). Any forged/
+    # tampered/malformed entry raises `ValueError` here, before anything
+    # downstream (full-spectrum/narrow-flag/governance recomputation) ever
+    # reads a scope's status.
+    recomputed_scope_status_by_key = {
+        key: _recompute_scope_entry(key, entry) for key, entry in scopes.items()
+    }
+
     # Blocker 2a (required scope completeness): every pinned full-spectrum
     # required scope must actually be present in the envelope -- a scope
     # silently dropped from `scopes` must never be treated as merely
@@ -149,8 +344,11 @@ def _verify_scope_gate_integrity(report: dict) -> dict:
         )
 
     def _scope_status(key: str) -> Any:
-        entry = scopes.get(key)
-        return entry.get("scope_status") if isinstance(entry, dict) else None
+        # Checker finding 4 + BLOCKER 1: read the INDEPENDENTLY RECOMPUTED
+        # status, never the raw declared `scope_status` -- everything
+        # downstream (full-spectrum/narrow-flag/governance derivation) is
+        # therefore derived only from recomputed canonical statuses.
+        return recomputed_scope_status_by_key.get(key)
 
     def _scope_validated(key: str) -> bool:
         return _scope_status(key) == "VALIDATED"

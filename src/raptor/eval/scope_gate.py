@@ -46,6 +46,12 @@ from .model import DirectionVerdict, Metrics, ScopeGateDecision
 
 _DIRECTIONS: tuple = ("pathogenic", "benign")
 
+#: v2 registered stratum names -- `oracle_thresholds.strata` may declare
+#: ONLY these two pinned strata (BLOCKER 2, GPT-5.4). Descriptive-only
+#: strata that show up purely in `metrics` (e.g. `other`) never need -- and
+#: must never require -- a config entry; see `decide_scope_gate` sec 4.
+_ALLOWED_STRATUM_NAMES: frozenset = frozenset(_PINNED_STRATUM_THRESHOLDS.keys())
+
 #: The narrow, independently-authorizing research scope flag (exact name,
 #: user-specified) -- distinct from (and never implying) full-spectrum or
 #: clinical authorization.
@@ -275,10 +281,29 @@ def _direction_verdict(
     m: Optional[Metrics],
     min_count_per_class: int,
 ) -> DirectionVerdict:
-    registered_directions = (spec or {}).get("directions", []) if spec else []
+    # Defense-in-depth (BLOCKER 2, GPT-5.4): `decide_scope_gate` already
+    # rejects any malformed/extra stratum spec as BLOCKED_CONFIG before this
+    # is ever reached, so in the normal flow `spec` is always `None` or a
+    # well-formed pinned dict. This function must still never raw-index or
+    # `float()` an unchecked value -- a malformed hand-built spec (wrong
+    # type, missing keys, non-numeric/NaN/out-of-range thresholds) must
+    # degrade to "no registered threshold" (NO_THRESHOLD/DESCRIPTIVE), never
+    # crash and never fabricate a threshold/verdict.
+    spec = spec if isinstance(spec, dict) else None
+    registered_directions = spec.get("directions") if spec is not None else None
+    registered_directions = registered_directions if isinstance(registered_directions, list) else []
     has_threshold = spec is not None and direction in registered_directions
-    precision_threshold = float(spec["precision"]) if has_threshold else None
-    recall_threshold = float(spec["recall"]) if has_threshold else None
+
+    precision_threshold: Optional[float] = None
+    recall_threshold: Optional[float] = None
+    if has_threshold:
+        raw_precision = spec.get("precision")
+        raw_recall = spec.get("recall")
+        if _valid_lower_bound(raw_precision) and _valid_lower_bound(raw_recall):
+            precision_threshold = float(raw_precision)
+            recall_threshold = float(raw_recall)
+        else:
+            has_threshold = False  # malformed threshold spec -- never fabricate a verdict
 
     precision_field, recall_field = _DIRECTION_LB_FIELDS[direction]
     actual_field, called_field = _DIRECTION_COUNT_FIELDS[direction]
@@ -394,11 +419,47 @@ def decide_scope_gate(metrics: Dict[str, Metrics], config: EvalConfig) -> ScopeG
         )
 
     oracle_thresholds = config.oracle_thresholds or {}
-    strata_cfg = oracle_thresholds.get("strata") or {}
 
-    # sec 4 step 1: empty/missing oracle_thresholds -> UNVERIFIED, but still
-    # compute descriptive-only scopes from whatever metrics exist.
-    thresholds_unset = not oracle_thresholds or not strata_cfg
+    # sec 4 step 1: an entirely empty/missing oracle_thresholds block is the
+    # honest pre-Oracle state (AC5/H13) -> UNVERIFIED, computed descriptively
+    # from whatever metrics exist. This is DISTINCT from the case handled
+    # right below (BLOCKER 2, GPT-5.4): once oracle_thresholds carries ANY
+    # content at all (e.g. a `confidence`), `strata` is no longer optional.
+    thresholds_unset = not oracle_thresholds
+    if thresholds_unset:
+        strata_cfg: Mapping[str, Any] = {}
+    else:
+        # BLOCKER 2 (GPT-5.4): a present-but-malformed top-level `strata`
+        # (missing key, `None`, `[]`, a bare string, an int, ...) must fail
+        # closed as BLOCKED_CONFIG -- never silently degrade to the
+        # `thresholds_unset`/UNVERIFIED branch above (that branch is ONLY
+        # the legitimate "not yet configured" state) and never let a
+        # non-mapping reach `.get`/`.keys()` below and raise.
+        raw_strata = oracle_thresholds.get("strata")
+        if not isinstance(raw_strata, dict) or not raw_strata:
+            return _blocked_config(
+                "oracle_thresholds.strata must be a non-empty mapping once oracle_thresholds "
+                f"is otherwise configured -- got {raw_strata!r}"
+            )
+        strata_cfg = raw_strata
+
+        # BLOCKER 2 (GPT-5.4): `strata` may declare ONLY the pinned
+        # registered stratum names (missense/truncating) -- an extra
+        # stratum entry, WELL-FORMED OR NOT, is BLOCKED_CONFIG. Metrics-only
+        # descriptive strata (e.g. `other`) never need -- and must never
+        # require -- a config entry at all; they are already handled below
+        # via the metrics/strata key union with `spec=None`. Accepting an
+        # extra configured stratum would let a forged/extra entry smuggle a
+        # new authorizing threshold past the pinned-semantics check, which
+        # only re-validates the two pinned names.
+        extra_strata = set(strata_cfg.keys()) - _ALLOWED_STRATUM_NAMES
+        if extra_strata:
+            return _blocked_config(
+                f"oracle_thresholds.strata names stratum/strata {sorted(extra_strata)!r} "
+                f"outside the pinned registered set {sorted(_ALLOWED_STRATUM_NAMES)!r} -- extra "
+                "configured strata are not permitted (descriptive-only strata are handled from "
+                "metrics alone, without any config entry)"
+            )
 
     # Runtime defense-in-depth (checker finding 2): re-check the locked
     # Oracle threshold/direction/gating/confidence semantics against a
