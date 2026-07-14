@@ -30,7 +30,14 @@ from __future__ import annotations
 import math
 from typing import Any, Dict, Mapping, Optional
 
-from .config import EvalConfig
+from .config import (
+    EvalConfig,
+    _PINNED_FULL_SPECTRUM_SCOPES,
+    _PINNED_ORACLE_CONFIDENCE,
+    _PINNED_RESEARCH_SCOPE_REQUIRES,
+    _PINNED_STRATUM_SEMANTICS,
+    _PINNED_STRATUM_THRESHOLDS,
+)
 from .gate import _DIRECTION_COUNT_FIELDS, _DIRECTION_LB_FIELDS
 from .model import DirectionVerdict, Metrics, ScopeGateDecision
 
@@ -112,6 +119,71 @@ def _registered_scopes(strata_cfg: Mapping[str, Any]) -> frozenset:
             if direction in _DIRECTIONS:
                 scopes.add(_scope_key(name, direction))
     return frozenset(scopes)
+
+
+def _pinned_authorization_valid(scope_auth: Mapping[str, Any]) -> bool:
+    """Runtime defense-in-depth (checker findings 1+2): re-validate the
+    pinned full-spectrum required set AND the pinned research-scope
+    key/`requires` mapping against a HAND-BUILT `EvalConfig` that bypasses
+    `config._validate_scope_authorization` entirely. A test/caller building
+    an `EvalConfig` directly (never through `load_config`) must not be able
+    to retarget/narrow/widen either pin and still get a validated scope."""
+    full_spectrum = scope_auth.get("full_spectrum")
+    if not isinstance(full_spectrum, dict):
+        return False
+    if frozenset(full_spectrum.get("requires") or []) != _PINNED_FULL_SPECTRUM_SCOPES:
+        return False
+
+    research_scopes = scope_auth.get("research_scopes", {})
+    if not isinstance(research_scopes, dict):
+        return False
+    if frozenset(research_scopes.keys()) != frozenset(_PINNED_RESEARCH_SCOPE_REQUIRES.keys()):
+        return False
+    for name, pinned_requires in _PINNED_RESEARCH_SCOPE_REQUIRES.items():
+        spec = research_scopes.get(name)
+        if not isinstance(spec, dict):
+            return False
+        if frozenset(spec.get("requires") or []) != pinned_requires:
+            return False
+    return True
+
+
+def _pinned_oracle_semantics_valid(oracle_thresholds: Mapping[str, Any], strata_cfg: Mapping[str, Any]) -> bool:
+    """Runtime defense-in-depth (checker finding 2): re-validate the locked
+    Oracle semantics (confidence + missense/truncating precision, recall,
+    gating, directions) against a hand-built `EvalConfig.oracle_thresholds`
+    that bypasses `config._validate_oracle_thresholds`. Any drift in a
+    threshold/direction/gating/confidence value is rejected -- fail closed,
+    never authorize on a silently-relaxed rubric."""
+    confidence = oracle_thresholds.get("confidence")
+    try:
+        if isinstance(confidence, bool) or not math.isclose(
+            float(confidence), _PINNED_ORACLE_CONFIDENCE, rel_tol=0.0, abs_tol=1e-9
+        ):
+            return False
+    except (TypeError, ValueError):
+        return False
+
+    for name, pinned_metrics in _PINNED_STRATUM_THRESHOLDS.items():
+        spec = strata_cfg.get(name)
+        if not isinstance(spec, dict):
+            continue  # unregistered pinned stratum is caught separately (requires-registered check)
+        for metric_key, pinned_value in pinned_metrics.items():
+            value = spec.get(metric_key)
+            try:
+                if isinstance(value, bool) or not math.isclose(
+                    float(value), pinned_value, rel_tol=0.0, abs_tol=1e-9
+                ):
+                    return False
+            except (TypeError, ValueError):
+                return False
+
+        pinned_gating, pinned_directions = _PINNED_STRATUM_SEMANTICS[name]
+        if spec.get("gating") is not pinned_gating:
+            return False
+        if tuple(spec.get("directions", []) or []) != pinned_directions:
+            return False
+    return True
 
 
 def _requires_registered(scope_auth: Mapping[str, Any], registered: frozenset) -> bool:
@@ -226,6 +298,18 @@ def decide_scope_gate(metrics: Dict[str, Metrics], config: EvalConfig) -> ScopeG
             "no pre-registered research scope can be evaluated"
         )
 
+    # Runtime defense-in-depth (checker findings 1+2): a hand-built
+    # `EvalConfig` never passes through `config._validate_scope_authorization`,
+    # so re-check the pinned full-spectrum/research-scope requires mapping
+    # here too -- a retargeted/narrowed/renamed pin must fail closed exactly
+    # like the config-load path does.
+    if not _pinned_authorization_valid(scope_auth):
+        return _blocked_config(
+            "scope_authorization deviates from the pinned pre-registered full_spectrum/"
+            "research_scopes requires mapping -- defense-in-depth rejection on a hand-built "
+            "EvalConfig"
+        )
+
     # sec 4 step 1 (BLOCKER-2 parity with decide_gate): min_count_per_class
     # <= 0 disables every coverage floor -- must never authorize.
     if config.min_count_per_class <= 0:
@@ -240,6 +324,17 @@ def decide_scope_gate(metrics: Dict[str, Metrics], config: EvalConfig) -> ScopeG
     # sec 4 step 1: empty/missing oracle_thresholds -> UNVERIFIED, but still
     # compute descriptive-only scopes from whatever metrics exist.
     thresholds_unset = not oracle_thresholds or not strata_cfg
+
+    # Runtime defense-in-depth (checker finding 2): re-check the locked
+    # Oracle threshold/direction/gating/confidence semantics against a
+    # hand-built `EvalConfig.oracle_thresholds` -- any drift fails closed.
+    # Skipped when thresholds are legitimately unset (AC5/H13 -> UNVERIFIED).
+    if not thresholds_unset and not _pinned_oracle_semantics_valid(oracle_thresholds, strata_cfg):
+        return _blocked_config(
+            "oracle_thresholds deviates from the locked pre-registered confidence/precision/"
+            "recall/gating/directions semantics -- defense-in-depth rejection on a hand-built "
+            "EvalConfig"
+        )
 
     registered = _registered_scopes(strata_cfg)
     if not thresholds_unset and not _requires_registered(scope_auth, registered):

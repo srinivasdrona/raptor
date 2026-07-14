@@ -65,6 +65,26 @@ _PINNED_FULL_SPECTRUM_SCOPES: frozenset[str] = frozenset(
     {"missense:pathogenic", "missense:benign", "truncating:pathogenic"}
 )
 
+#: Checker finding 1 (research-scope mapping pin): the exact, closed set of
+#: `research_scopes` keys a config may define, mapped to the EXACT
+#: `requires` set each key must equal -- not merely a subset of registered
+#: scopes. A renamed/additional/replacement research-scope key or a
+#: widened/narrowed `requires` list would silently change what a research
+#: scope authorizes, so both the key set AND each key's `requires` are
+#: locked here (anti-cherry-pick / anti-retarget control, checked at
+#: `load_config` time AND, defense-in-depth, again inside
+#: `decide_scope_gate` for a hand-built `EvalConfig` that bypasses the
+#: loader -- see `scope_gate._pinned_authorization_valid`).
+_PINNED_RESEARCH_SCOPE_REQUIRES: Mapping[str, frozenset[str]] = {
+    "truncating_pathogenic_research_scope_validated": frozenset({"truncating:pathogenic"}),
+}
+
+#: The 95% Clopper-Pearson confidence pinned in `tsc2.yaml` (R-A2
+#: pre-registration) -- checked, defense-in-depth, against a hand-built
+#: `EvalConfig.oracle_thresholds` inside `decide_scope_gate` (checker
+#: finding 2) since such a config bypasses `_validate_oracle_thresholds`.
+_PINNED_ORACLE_CONFIDENCE: float = 0.95
+
 #: The user's exact governance statement, verbatim (never paraphrased/
 #: reworded by a config author) -- the TRUNCATING_PATHOGENIC_ONLY state is
 #: pinned because it is the one that could most easily be used to
@@ -402,6 +422,26 @@ def _validate_scope_authorization(scope_auth: Any, oracle_thresholds: Mapping[st
         _validate_requires_list(
             spec.get("requires"), registered, ctx=f"scope_authorization.research_scopes[{name!r}]"
         )
+
+    # Checker finding 1: pin BOTH the key set and each key's `requires` to
+    # the exact pre-registered research-scope mapping -- a missing key, an
+    # extra/renamed key, or a `requires` list that is merely a *subset* of
+    # registered scopes (rather than exactly the pinned set) must never
+    # silently gain authorization semantics.
+    if frozenset(research_scopes.keys()) != frozenset(_PINNED_RESEARCH_SCOPE_REQUIRES.keys()):
+        raise ConfigError(
+            "`scope_authorization.research_scopes` keys must equal exactly the pinned "
+            f"pre-registered research-scope set {sorted(_PINNED_RESEARCH_SCOPE_REQUIRES)!r} "
+            f"(anti-cherry-pick lock) -- got {sorted(research_scopes)!r}"
+        )
+    for name, pinned_requires in _PINNED_RESEARCH_SCOPE_REQUIRES.items():
+        actual_requires = frozenset(research_scopes[name]["requires"])
+        if actual_requires != pinned_requires:
+            raise ConfigError(
+                f"`scope_authorization.research_scopes[{name!r}].requires` must equal exactly "
+                f"{sorted(pinned_requires)!r} (pre-registration lock) -- got "
+                f"{sorted(actual_requires)!r}"
+            )
 
     governance_statements = scope_auth.get("governance_statements")
     if not isinstance(governance_statements, dict):

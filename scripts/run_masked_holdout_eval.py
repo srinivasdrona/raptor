@@ -58,6 +58,49 @@ def _blocked(reason: str) -> GateDecision:
     )
 
 
+def compute_report_scope_gate(
+    metrics: dict,
+    config,
+    skipped: set[str] | None = None,
+) -> ScopeGateDecision | None:
+    """Legacy-runner-compatible pure helper (checker finding 3): compute the
+    v2 `report.scope_gate` value WITHOUT executing a real gate run.
+
+    Returns `None` when `config.scope_authorization` is absent -- the
+    runner must then attach NO `scope_gate` at all, preserving v1 report
+    hash/render/envelope byte-for-byte. When present, computes
+    `decide_scope_gate` and applies the same fail-closed parity-skip
+    demotion as the v1 gate: any evaluation-only criterion exclusion
+    (`skipped`) that would otherwise let a scope/full-spectrum authorization
+    stand is withheld (forced to the most restrictive, `NONE_VALIDATED`
+    state) -- a skipped criterion can never authorize a research scope.
+    """
+    if not config.scope_authorization:
+        return None
+
+    decision = decide_scope_gate(metrics, config)
+    skipped = skipped or set()
+    if skipped and (
+        decision.full_spectrum_vus_authorized or any(decision.research_scope_flags.values())
+    ):
+        decision = ScopeGateDecision(
+            schema_version=decision.schema_version,
+            scopes=decision.scopes,
+            full_spectrum_status="UNVERIFIED",
+            full_spectrum_vus_authorized=False,
+            research_scope_flags={name: False for name in decision.research_scope_flags},
+            governance_state="NONE_VALIDATED",
+            governance_statement=config.scope_authorization["governance_statements"]["NONE_VALIDATED"],
+            research_use_disclaimer=decision.research_use_disclaimer,
+            reason=(
+                "all scope metric thresholds may have passed, but evaluation-only criterion "
+                f"exclusions {sorted(skipped)!r} break full production parity; never authorize "
+                "a research scope on a parity break"
+            ),
+        )
+    return decision
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -389,38 +432,12 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     # v2 scope-specific research-authorization gate (ADDITIVE, wired for the
-    # NEXT run only -- this script is not executed by this track). Computed
-    # from `report.metrics` + `eval_config.scope_authorization`; `None` when
-    # the config carries no `scope_authorization` block (v1-compatible).
-    # Preserves the same fail-closed parity-skip principle as the v1 gate
-    # immediately above: any evaluation-only criterion exclusion that would
-    # otherwise let a scope validate must withhold that authorization.
-    report.scope_gate = decide_scope_gate(report.metrics, eval_config)
-    if skipped and (
-        report.scope_gate.full_spectrum_vus_authorized
-        or any(report.scope_gate.research_scope_flags.values())
-    ):
-        report.scope_gate = ScopeGateDecision(
-            schema_version=report.scope_gate.schema_version,
-            scopes=report.scope_gate.scopes,
-            full_spectrum_status="UNVERIFIED",
-            full_spectrum_vus_authorized=False,
-            research_scope_flags={
-                name: False for name in report.scope_gate.research_scope_flags
-            },
-            governance_state="NONE_VALIDATED",
-            governance_statement=(
-                eval_config.scope_authorization["governance_statements"]["NONE_VALIDATED"]
-                if eval_config.scope_authorization
-                else report.scope_gate.governance_statement
-            ),
-            research_use_disclaimer=report.scope_gate.research_use_disclaimer,
-            reason=(
-                "all scope metric thresholds may have passed, but evaluation-only criterion "
-                f"exclusions {sorted(skipped)!r} break full production parity; never authorize "
-                "a research scope on a parity break"
-            ),
-        )
+    # NEXT run only -- this script is not executed by this track). Delegates
+    # to the pure `compute_report_scope_gate` helper (checker finding 3):
+    # `None` when `eval_config.scope_authorization` is absent (v1-compatible,
+    # no `scope_gate` attached), else the v2 decision with the same
+    # fail-closed parity-skip demotion as the v1 gate immediately above.
+    report.scope_gate = compute_report_scope_gate(report.metrics, eval_config, skipped=skipped)
 
     report.config_pins.update(
         {

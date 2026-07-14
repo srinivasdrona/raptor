@@ -138,11 +138,20 @@ def build_aggregate_v2(
             reproduced_pm1_scope=reproduced_pm1_scope,
             production_policy_status=production_policy_status,
     )
+    v1_aggregate = dict(v1_aggregate)
+    # Checker finding 4: the v1 `status`/`binding_stratum` fields are the v1
+    # POOLED gate's primary verdict -- they must never be presented as (or
+    # alongside) the v2 primary verdict, which is scope-specific. The v1
+    # `gate` payload is retained ONLY as a clearly-named nested legacy field
+    # (never top-level, never read as authoritative by any v2 consumer).
+    v1_aggregate.pop("status", None)
+    v1_aggregate.pop("binding_stratum", None)
+    legacy_v1_gate = v1_aggregate.pop("gate", None)
 
     return {
             **v1_aggregate,
             "schema": "raptor.tsc.masked_holdout_gate.v2",
-            "status": scope_gate["full_spectrum_status"],
+            "full_spectrum_status": scope_gate["full_spectrum_status"],
             "vus_authorized": scope_gate["full_spectrum_vus_authorized"],
             "scopes": scope_gate["scopes"],
             "research_scope_flags": scope_gate["research_scope_flags"],
@@ -150,8 +159,11 @@ def build_aggregate_v2(
             "governance_statement": scope_gate["governance_statement"],
             "research_use_disclaimer": scope_gate["research_use_disclaimer"],
             "scope_gate_reason": scope_gate.get("reason", ""),
-            # `metrics`/`gate` are retained descriptive-only (v1 pooled values,
-            # AC-S5/E1) -- never the verdict source for this v2 schema.
+            # `metrics` is retained descriptive-only (v1 pooled values,
+            # AC-S5/E1) -- never the verdict source for this v2 schema. The
+            # v1 gate payload is nested under a clearly-named legacy field,
+            # never presented as (or alongside) the v2 primary verdict.
+            "legacy_v1_gate": legacy_v1_gate,
     }
 
 

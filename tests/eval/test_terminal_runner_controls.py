@@ -4,10 +4,14 @@ from pathlib import Path
 
 import pytest
 
+from conftest import make_eval_config, Metrics
+from raptor.eval.model import ScopeGateDecision
 from scripts.run_masked_holdout_eval import (
     _require_verified_return_artifact,
     _verify_return_control_files,
+    compute_report_scope_gate,
 )
+from test_scope_gate import make_v2_auth_config, make_oracle_thresholds
 
 
 def test_return_controls_require_scored_status_and_manifest_bound_skip_list(
@@ -92,9 +96,6 @@ def test_compute_report_scope_gate_returns_none_when_scope_authorization_absent(
     compute_report_scope_gate must return None to leave report.scope_gate as None,
     preserving v1-compatibility (preventing any change to content hash/render/envelope).
     """
-    from scripts.run_masked_holdout_eval import compute_report_scope_gate
-    from tests.eval.conftest import make_eval_config, Metrics
-
     config = make_eval_config(scope_authorization=None)
     metrics = {
         "missense": Metrics(
@@ -112,11 +113,6 @@ def test_compute_report_scope_gate_returns_decision_when_scope_authorization_pre
     """Finding 3: If scope_authorization is present in the config,
     compute_report_scope_gate must return a v2 ScopeGateDecision.
     """
-    from scripts.run_masked_holdout_eval import compute_report_scope_gate
-    from tests.eval.test_scope_gate import make_v2_auth_config, make_oracle_thresholds
-    from tests.eval.conftest import make_eval_config, Metrics
-    from raptor.eval.model import ScopeGateDecision
-
     config = make_eval_config(
         min_count_per_class=36,
         oracle_thresholds=make_oracle_thresholds(),
@@ -141,11 +137,6 @@ def test_compute_report_scope_gate_applies_skipped_criteria_fail_closed() -> Non
     compute_report_scope_gate must fail-closed and return an UNVERIFIED,
     most-restrictive decision if any research scope would otherwise have validated.
     """
-    from scripts.run_masked_holdout_eval import compute_report_scope_gate
-    from tests.eval.test_scope_gate import make_v2_auth_config, make_oracle_thresholds
-    from tests.eval.conftest import make_eval_config, Metrics
-    from raptor.eval.model import ScopeGateDecision
-
     config = make_eval_config(
         min_count_per_class=36,
         oracle_thresholds=make_oracle_thresholds(),
