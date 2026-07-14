@@ -2703,6 +2703,46 @@ def test_reason_integrity_6_pm1_parity_block_retains_blockers_and_canonical_reas
         pass
 
 
+def test_aggregate_cli_bootstrap() -> None:
+    """Test that running build_masked_holdout_gate_aggregate.py --help directly
+    as a script from repository root with an entirely cleared PYTHONPATH succeeds,
+    proving that it correctly bootstraps its source paths prior to importing
+    any raptor submodules.
+    """
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    # Find the repository root (going up from tests/eval)
+    test_dir = Path(__file__).resolve().parent
+    repo_root = test_dir.parents[1]
+
+    script_path = repo_root / "scripts" / "build_masked_holdout_gate_aggregate.py"
+    assert script_path.exists(), f"Script not found at: {script_path}"
+
+    # Clean/controlled environment: copy os.environ and clear PYTHONPATH
+    clean_env = dict(os.environ)
+    clean_env.pop("PYTHONPATH", None)
+
+    # Run the current Python interpreter on the script with --help
+    result = subprocess.run(
+        [sys.executable, str(script_path), "--help"],
+        cwd=str(repo_root),
+        env=clean_env,
+        capture_output=True,
+        text=True,
+    )
+
+    # Assert that it succeeds
+    assert result.returncode == 0, (
+        f"Script failed with returncode {result.returncode}.\n"
+        f"Stdout:\n{result.stdout}\n"
+        f"Stderr:\n{result.stderr}\n"
+    )
+    assert "usage:" in result.stdout.lower() or "options:" in result.stdout.lower()
+
+
 
 
 
