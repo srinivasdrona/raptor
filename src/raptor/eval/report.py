@@ -93,6 +93,7 @@ def _scope_gate_payload(scope_gate: ScopeGateDecision) -> dict:
         "governance_statement": scope_gate.governance_statement,
         "research_use_disclaimer": scope_gate.research_use_disclaimer,
         "reason": scope_gate.reason,
+        "authorization_blockers": sorted(scope_gate.authorization_blockers),
     }
 
 
@@ -292,5 +293,11 @@ class EvalReport:
         lines.append(f"governance_state: {sg.governance_state}")
         lines.append(f"governance_statement: {sg.governance_statement}")
         lines.append(f"research_use_disclaimer: {sg.research_use_disclaimer}")
+        if sg.authorization_blockers:
+            lines.append("authorization_blockers:")
+            for blocker in sorted(sg.authorization_blockers):
+                lines.append(f"  - {blocker}")
+        else:
+            lines.append("authorization_blockers: none")
         lines.append(f"scope_gate reason: {sg.reason}")
         return lines

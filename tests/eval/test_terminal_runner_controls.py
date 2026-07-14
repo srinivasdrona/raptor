@@ -133,9 +133,14 @@ def test_compute_report_scope_gate_returns_decision_when_scope_authorization_pre
 
 
 def test_compute_report_scope_gate_applies_skipped_criteria_fail_closed() -> None:
-    """Finding 3: If there are skipped (evaluation exclusion) criteria,
-    compute_report_scope_gate must fail-closed and return an UNVERIFIED,
-    most-restrictive decision if any research scope would otherwise have validated.
+    """Finding 3 (+ final scope-gate blocker): If there are skipped
+    (evaluation exclusion) criteria, compute_report_scope_gate must
+    fail-closed and return a BLOCKED_POLICY, most-restrictive decision if
+    any research scope would otherwise have validated. `BLOCKED_POLICY`
+    (not `UNVERIFIED`) explicitly reflects a non-statistical policy block
+    (a production-parity break), mirroring the v1 gate's own
+    `BLOCKED_POLICY` status -- `UNVERIFIED` stays reserved for a genuinely
+    unset/empty `oracle_thresholds` config.
     """
     config = make_eval_config(
         min_count_per_class=36,
@@ -154,10 +159,11 @@ def test_compute_report_scope_gate_applies_skipped_criteria_fail_closed() -> Non
     # If skipped is non-empty, we should fail closed
     result = compute_report_scope_gate(metrics, config, skipped={"PM1"})
     assert isinstance(result, ScopeGateDecision)
-    assert result.full_spectrum_status == "UNVERIFIED"
+    assert result.full_spectrum_status == "BLOCKED_POLICY"
     assert result.full_spectrum_vus_authorized is False
     assert result.research_scope_flags["truncating_pathogenic_research_scope_validated"] is False
     assert result.governance_state == "NONE_VALIDATED"
+    assert "evaluation_skipped_criteria:PM1" in result.authorization_blockers
 
 
 @pytest.mark.parametrize("hand_built_auth", [{}, [], False, ""])

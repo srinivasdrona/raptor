@@ -75,6 +75,19 @@ def compute_report_scope_gate(
     (`skipped`) that would otherwise let a scope/full-spectrum authorization
     stand is withheld (forced to the most restrictive, `NONE_VALIDATED`
     state) -- a skipped criterion can never authorize a research scope.
+
+    Final scope-gate blocker (explicit parity-authorization blocker): the
+    demotion NEVER alters/hides a per-scope statistical verdict --
+    `decision.scopes` (and therefore, e.g., a `truncating:pathogenic`
+    scope that is genuinely `VALIDATED`) is carried through UNCHANGED. Only
+    the non-statistical authorization surface is withheld: every
+    authorization boolean/flag is forced `False`, `governance_state` is
+    demoted to the most restrictive `NONE_VALIDATED`, and
+    `full_spectrum_status` is set to `BLOCKED_POLICY` (a policy block, never
+    a statistical PASS/FAIL/UNDERPOWERED verdict). The withholding is made
+    explicit and machine-readable via `authorization_blockers`, one
+    deterministic, sorted `"evaluation_skipped_criteria:{criterion}"` entry
+    per skipped criterion -- never silent.
     """
     if config.scope_authorization is None:
         return None
@@ -84,15 +97,17 @@ def compute_report_scope_gate(
     if skipped and (
         decision.full_spectrum_vus_authorized or any(decision.research_scope_flags.values())
     ):
+        blockers = sorted(f"evaluation_skipped_criteria:{criterion}" for criterion in skipped)
         decision = ScopeGateDecision(
             schema_version=decision.schema_version,
             scopes=decision.scopes,
-            full_spectrum_status="UNVERIFIED",
+            full_spectrum_status="BLOCKED_POLICY",
             full_spectrum_vus_authorized=False,
             research_scope_flags={name: False for name in decision.research_scope_flags},
             governance_state="NONE_VALIDATED",
             governance_statement=config.scope_authorization["governance_statements"]["NONE_VALIDATED"],
             research_use_disclaimer=decision.research_use_disclaimer,
+            authorization_blockers=blockers,
             reason=(
                 "all scope metric thresholds may have passed, but evaluation-only criterion "
                 f"exclusions {sorted(skipped)!r} break full production parity; never authorize "

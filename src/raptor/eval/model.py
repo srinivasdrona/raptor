@@ -176,3 +176,14 @@ class ScopeGateDecision:
     governance_statement: str = ""  # non-statistical; exact preregistered string for the state
     research_use_disclaimer: str = ""  # mandatory, non-blank, never merged into governance_statement
     reason: str = ""
+    #: Explicit, machine-readable, deterministic authorization blockers
+    #: (ADDITIVE) -- e.g. `"evaluation_skipped_criteria:PM1"`. Empty by
+    #: default (the normal, non-blocked path). Populated by
+    #: `scripts/run_masked_holdout_eval.py::compute_report_scope_gate` when
+    #: an evaluation-only criterion exclusion (parity break) forces every
+    #: authorization surface closed -- the per-scope statistical `scopes`
+    #: verdicts are NEVER altered/hidden by a blocker (a scope may still
+    #: legitimately read VALIDATED); only the authorization booleans/state
+    #: are withheld, and the reason is surfaced explicitly here instead of
+    #: silently.
+    authorization_blockers: list = field(default_factory=list)

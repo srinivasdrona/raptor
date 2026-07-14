@@ -165,24 +165,6 @@ def _verify_scope_gate_integrity(report: dict) -> dict:
         for name, requires in _PINNED_RESEARCH_SCOPE_REQUIRES.items()
     }
 
-    # Blocker 1 (parity-skip enforcement): inspect the actual runner
-    # envelope path `report['config_pins']['evaluation_skipped_criteria']`.
-    # If any evaluation-only criterion was skipped (a production-parity
-    # break) and the recomputed facts would otherwise authorize either the
-    # full-spectrum scope or ANY narrow research scope, fail loud -- a
-    # parity-broken run must never publish a validated scope. An
-    # already-non-authorizing envelope (nothing recomputed True) with
-    # skips recorded may still be published (test_blocker_1c).
-    config_pins = report.get("config_pins") or {}
-    evaluation_skipped = config_pins.get("evaluation_skipped_criteria") or []
-    if evaluation_skipped and (recomputed_full_spectrum or any(recomputed_flags.values())):
-        raise ValueError(
-            "scope_gate integrity error: evaluation_skipped_criteria "
-            f"{sorted(evaluation_skipped)!r} indicates a production-parity break in this run -- "
-            "a skipped-criterion run must never authorize a full-spectrum or narrow research "
-            "scope; refusing to publish a validated scope from a parity-broken run"
-        )
-
     declared_authorized = scope_gate.get("full_spectrum_vus_authorized")
     declared_status = scope_gate.get("full_spectrum_status")
     declared_flags = scope_gate.get("research_scope_flags")
@@ -191,6 +173,95 @@ def _verify_scope_gate_integrity(report: dict) -> dict:
             "scope_gate integrity error: research_scope_flags must be a mapping -- "
             "inconsistent/tampered envelope"
         )
+
+    # Blocker 1 (explicit parity-authorization blocker): inspect the actual
+    # runner envelope path `report['config_pins']['evaluation_skipped_criteria']`.
+    # When any evaluation-only criterion was skipped (a production-parity
+    # break) AND the recomputed per-scope facts would otherwise authorize
+    # either the full-spectrum scope or ANY narrow research scope, the run
+    # is genuinely "parity-blocked": the underlying statistical scope
+    # verdicts (`scopes`) may legitimately still say VALIDATED (preserved,
+    # never hidden/relabeled -- AC-S2), but the ENVELOPE must explicitly and
+    # correctly declare `authorization_blockers` naming every skipped
+    # criterion, and must show every authorization boolean/state withheld.
+    # A parity-broken run that fails to declare (or mis-declares) its
+    # blockers, or that still claims any authorization, is an
+    # inconsistent/tampered envelope and must never be published. An
+    # already-non-authorizing envelope (nothing recomputed True) with skips
+    # recorded needs no blocker and may still be published (test_blocker_1c).
+    config_pins = report.get("config_pins") or {}
+    evaluation_skipped = sorted(str(c) for c in (config_pins.get("evaluation_skipped_criteria") or []))
+    is_parity_blocked = bool(
+        evaluation_skipped and (recomputed_full_spectrum or any(recomputed_flags.values()))
+    )
+
+    if is_parity_blocked:
+        expected_blockers = sorted(f"evaluation_skipped_criteria:{c}" for c in evaluation_skipped)
+        declared_blockers = scope_gate.get("authorization_blockers")
+        if not isinstance(declared_blockers, list) or sorted(declared_blockers) != expected_blockers:
+            raise ValueError(
+                "scope_gate integrity error: evaluation_skipped_criteria "
+                f"{evaluation_skipped!r} indicates a production-parity break, and the "
+                "underlying scope verdicts would otherwise authorize a scope, but "
+                f"authorization_blockers={declared_blockers!r} does not match the required "
+                f"deterministic blocker set {expected_blockers!r} -- a parity-broken run must "
+                "explicitly and correctly declare its blockers; a missing, empty, or wrong "
+                "blocker is an inconsistent/tampered envelope and must never be published"
+            )
+        if declared_authorized is not False:
+            raise ValueError(
+                "scope_gate integrity error: inconsistent/tampered envelope -- "
+                f"full_spectrum_vus_authorized={declared_authorized!r} but evaluation_skipped_criteria "
+                f"{evaluation_skipped!r} (authorization_blockers={expected_blockers!r}) requires it be "
+                "forced False; a skipped-criterion run must never authorize a scope"
+            )
+        if any(value is not False for value in declared_flags.values()):
+            raise ValueError(
+                "scope_gate integrity error: inconsistent/tampered envelope -- "
+                f"research_scope_flags={declared_flags!r} must be entirely False under an active "
+                f"parity blocker (authorization_blockers={expected_blockers!r}); a skipped-criterion "
+                "run must never authorize a narrow research scope"
+            )
+        declared_state = scope_gate.get("governance_state")
+        if declared_state != "NONE_VALIDATED":
+            raise ValueError(
+                "scope_gate integrity error: inconsistent/tampered envelope -- "
+                f"governance_state={declared_state!r} must be NONE_VALIDATED under an active "
+                f"parity blocker (authorization_blockers={expected_blockers!r})"
+            )
+        declared_statement = scope_gate.get("governance_statement")
+        if declared_statement != _PINNED_GOVERNANCE_STATEMENTS["NONE_VALIDATED"]:
+            raise ValueError(
+                "scope_gate integrity error: inconsistent/tampered envelope -- "
+                "governance_statement does not match the exact pinned NONE_VALIDATED statement "
+                f"required under an active parity blocker, got {declared_statement!r}"
+            )
+        declared_disclaimer = scope_gate.get("research_use_disclaimer")
+        if declared_disclaimer != _PINNED_RESEARCH_USE_DISCLAIMER:
+            raise ValueError(
+                "scope_gate integrity error: inconsistent/tampered envelope -- "
+                "research_use_disclaimer does not match the exact pinned mandatory disclaimer, "
+                f"got {declared_disclaimer!r}"
+            )
+        if declared_status != "BLOCKED_POLICY":
+            raise ValueError(
+                "scope_gate integrity error: inconsistent/tampered envelope -- "
+                f"full_spectrum_status={declared_status!r} must be BLOCKED_POLICY under an active "
+                f"parity blocker (authorization_blockers={expected_blockers!r}) -- the top-level "
+                "status must explicitly reflect policy blocking, never a statistical "
+                "PASS/FAIL/UNDERPOWERED verdict"
+            )
+
+        # Genuinely parity-blocked: preserve every per-scope statistical
+        # verdict untouched (returned separately via `scope_gate['scopes']`
+        # by the caller) while forcing every authorization surface closed.
+        return {
+            "full_spectrum_status": "BLOCKED_POLICY",
+            "full_spectrum_vus_authorized": False,
+            "research_scope_flags": {name: False for name in recomputed_flags},
+            "governance_state": "NONE_VALIDATED",
+            "authorization_blockers": expected_blockers,
+        }
 
     if declared_authorized is not recomputed_full_spectrum:
         raise ValueError(
@@ -265,9 +336,11 @@ def _verify_scope_gate_integrity(report: dict) -> dict:
         )
 
     return {
+        "full_spectrum_status": expected_full_spectrum_status,
         "full_spectrum_vus_authorized": recomputed_full_spectrum,
         "research_scope_flags": recomputed_flags,
         "governance_state": expected_state,
+        "authorization_blockers": [],
     }
 
 
@@ -327,16 +400,24 @@ def build_aggregate_v2(
     return {
             **v1_aggregate,
             "schema": "raptor.tsc.masked_holdout_gate.v2",
-            "full_spectrum_status": scope_gate["full_spectrum_status"],
-            # Checker finding 4: `vus_authorized` is emitted ONLY from the
-            # independently recomputed full-spectrum result, never the raw
-            # (already-validated-equal, but never directly trusted) declared value.
+            # Checker finding 4 (+ final blocker): `full_spectrum_status`/
+            # `vus_authorized`/`research_scope_flags`/`governance_state` are
+            # emitted ONLY from the independently recomputed/verified
+            # result, never the raw declared envelope values -- under an
+            # active parity blocker this is forced to `BLOCKED_POLICY`/
+            # `False`/`NONE_VALIDATED` even though the underlying
+            # `scopes` may still say VALIDATED (preserved, never hidden).
+            "full_spectrum_status": recomputed["full_spectrum_status"],
             "vus_authorized": recomputed["full_spectrum_vus_authorized"],
             "scopes": scope_gate["scopes"],
             "research_scope_flags": recomputed["research_scope_flags"],
             "governance_state": recomputed["governance_state"],
-            "governance_statement": scope_gate["governance_statement"],
-            "research_use_disclaimer": scope_gate["research_use_disclaimer"],
+            "governance_statement": _PINNED_GOVERNANCE_STATEMENTS[recomputed["governance_state"]],
+            "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
+            # Explicit, machine-readable, deterministic authorization
+            # blockers (e.g. `"evaluation_skipped_criteria:PM1"`) -- empty
+            # when no parity break withholds an otherwise-authorized scope.
+            "authorization_blockers": recomputed["authorization_blockers"],
             "scope_gate_reason": scope_gate.get("reason", ""),
             # `metrics` is retained descriptive-only (v1 pooled values,
             # AC-S5/E1) -- never the verdict source for this v2 schema. The
