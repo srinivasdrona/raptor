@@ -54,6 +54,44 @@ _REQUIRED_GATING_STRATUM = "missense"
 
 #: The only directions a per-stratum `directions` list may name.
 _VALID_DIRECTIONS: frozenset[str] = frozenset({"pathogenic", "benign"})
+
+#: v2 scope-specific authorization gate (preregistration, additive):
+#: `full_spectrum.requires` is semantics-locked to EXACTLY this pinned set
+#: (anti-cherry-pick control, §3.6) -- a drift (dropping/adding/narrowing a
+#: required scope after the fact) raises `ConfigError`. This is what a
+#: "full-spectrum" VUS authorization means and it can never be quietly
+#: narrowed post-hoc.
+_PINNED_FULL_SPECTRUM_SCOPES: frozenset[str] = frozenset(
+    {"missense:pathogenic", "missense:benign", "truncating:pathogenic"}
+)
+
+#: The user's exact governance statement, verbatim (never paraphrased/
+#: reworded by a config author) -- the TRUNCATING_PATHOGENIC_ONLY state is
+#: pinned because it is the one that could most easily be used to
+#: over-claim (or under-claim) what the truncating-pathogenic-only research
+#: scope authorizes.
+_PINNED_TRUNCATING_PATHOGENIC_ONLY_STATEMENT = (
+    "Full-spectrum VUS automation is not authorized. Evidence supports only "
+    "the validated truncating-pathogenic scope; missense remains unvalidated."
+)
+
+#: Mandatory, non-blank, separate disclaimer (planner correction) -- kept
+#: OUT of `governance_statement` (which stays the exact preregistered
+#: string verbatim) and pinned to the exact safe text so a config author
+#: cannot silently weaken it.
+_PINNED_RESEARCH_USE_DISCLAIMER = (
+    "Research-evidence validation only; this authorizes no clinical "
+    "classification, VUS worklist, or ClinVar submission."
+)
+
+#: The three governance states `decide_scope_gate` can resolve to; every
+#: `scope_authorization.governance_statements` block must carry a non-blank
+#: string for each.
+_REQUIRED_GOVERNANCE_STATES: tuple[str, ...] = (
+    "FULL_SPECTRUM",
+    "TRUNCATING_PATHOGENIC_ONLY",
+    "NONE_VALIDATED",
+)
 _PINNED_STRATUM_SEMANTICS: Mapping[str, tuple[bool, tuple[str, ...]]] = {
     "missense": (True, ("pathogenic", "benign")),
     "truncating": (True, ("pathogenic",)),
@@ -138,6 +176,14 @@ class EvalConfig:
     #: unpinned (no checksum guard); a non-hex-64 placeholder is likewise
     #: treated as unpinned (see `knowns.LabeledVariantReader`).
     clinvar_snapshot_file_checksum: str = ""
+    #: v2 scope-specific authorization gate (ADDITIVE, preregistration,
+    #: `raptor.eval.scope_gate.decide_scope_gate`) -- `None` is the fully
+    #: v1-compatible default (absent block); schema-validated typed mapping
+    #: `{schema_version, research_use_disclaimer, full_spectrum:
+    #: {requires}, research_scopes: {name: {requires}}, governance_statements:
+    #: {FULL_SPECTRUM, TRUNCATING_PATHOGENIC_ONLY, NONE_VALIDATED}}` when
+    #: present. Never read by v1 `decide_gate`.
+    scope_authorization: Mapping[str, Any] | None = None
 
 
 def _validate_points(points: Any) -> None:
@@ -270,6 +316,110 @@ def _validate_oracle_thresholds(thresholds: Any) -> None:
                 )
 
 
+def _split_scope_key(scope_key: Any, *, ctx: str) -> tuple[str, str]:
+    """Split a `"{stratum}:{direction}"` scope key; fail loud (ConfigError)
+    on any non-string, malformed, or unknown-direction key."""
+    if not isinstance(scope_key, str) or scope_key.count(":") != 1:
+        raise ConfigError(f"{ctx} scope key must be a '{{stratum}}:{{direction}}' string, got {scope_key!r}")
+    stratum, _, direction = scope_key.partition(":")
+    if not stratum or direction not in _VALID_DIRECTIONS:
+        raise ConfigError(
+            f"{ctx} scope key {scope_key!r} names an unknown direction -- must be one of "
+            f"{sorted(_VALID_DIRECTIONS)}"
+        )
+    return stratum, direction
+
+
+def _registered_scopes(oracle_thresholds: Mapping[str, Any]) -> frozenset[str]:
+    """Every `"{stratum}:{direction}"` scope a (schema-validated, but not
+    yet type-coerced) `oracle_thresholds` block actually registers a
+    threshold-eligible direction for (i.e. `direction in strata[name].directions`)."""
+    strata = (oracle_thresholds or {}).get("strata") or {}
+    scopes: set[str] = set()
+    for name, spec in strata.items():
+        for direction in spec.get("directions", []) or []:
+            if direction in _VALID_DIRECTIONS:
+                scopes.add(f"{name}:{direction}")
+    return frozenset(scopes)
+
+
+def _validate_requires_list(requires: Any, registered: frozenset[str], *, ctx: str) -> None:
+    if not isinstance(requires, list) or not requires:
+        raise ConfigError(f"{ctx}.requires must be a non-empty list of '{{stratum}}:{{direction}}' scope keys")
+    for scope_key in requires:
+        _split_scope_key(scope_key, ctx=ctx)
+        if scope_key not in registered:
+            raise ConfigError(
+                f"{ctx}.requires names scope {scope_key!r} which is not a stratum/direction "
+                "registered in `oracle_thresholds` (cannot authorize on an unregistered scope)"
+            )
+
+
+#: v2 scope-specific authorization gate (preregistration, additive):
+#: `scope_authorization` is OPTIONAL -- absent/`None` keeps a config fully
+#: v1-compatible (`EvalConfig.scope_authorization = None`). When present it
+#: is schema-validated and fail-loud (`ConfigError`) on load, mirroring
+#: `_validate_oracle_thresholds`'s style: never silently accept a malformed
+#: or post-hoc-narrowed authorization policy.
+def _validate_scope_authorization(scope_auth: Any, oracle_thresholds: Mapping[str, Any]) -> None:
+    if not isinstance(scope_auth, dict):
+        raise ConfigError("`scope_authorization` must be a mapping")
+
+    schema_version = scope_auth.get("schema_version")
+    if schema_version not in (2, "2"):
+        raise ConfigError(
+            f"`scope_authorization.schema_version` must be 2, got {schema_version!r}"
+        )
+
+    disclaimer = scope_auth.get("research_use_disclaimer")
+    if not isinstance(disclaimer, str) or not disclaimer.strip():
+        raise ConfigError("`scope_authorization.research_use_disclaimer` must be a non-blank string")
+    if disclaimer != _PINNED_RESEARCH_USE_DISCLAIMER:
+        raise ConfigError(
+            "`scope_authorization.research_use_disclaimer` must match the mandatory pinned "
+            f"safe text exactly, got {disclaimer!r}"
+        )
+
+    registered = _registered_scopes(oracle_thresholds)
+
+    full_spectrum = scope_auth.get("full_spectrum")
+    if not isinstance(full_spectrum, dict):
+        raise ConfigError("`scope_authorization.full_spectrum` must be a mapping")
+    _validate_requires_list(full_spectrum.get("requires"), registered, ctx="scope_authorization.full_spectrum")
+    if frozenset(full_spectrum["requires"]) != _PINNED_FULL_SPECTRUM_SCOPES:
+        raise ConfigError(
+            "`scope_authorization.full_spectrum.requires` must equal exactly the pinned "
+            f"pre-registered full-spectrum scope set {sorted(_PINNED_FULL_SPECTRUM_SCOPES)!r} "
+            f"(anti-cherry-pick lock) -- got {sorted(full_spectrum['requires'])!r}"
+        )
+
+    research_scopes = scope_auth.get("research_scopes", {})
+    if not isinstance(research_scopes, dict):
+        raise ConfigError("`scope_authorization.research_scopes` must be a mapping")
+    for name, spec in research_scopes.items():
+        if not isinstance(spec, dict):
+            raise ConfigError(f"`scope_authorization.research_scopes[{name!r}]` must be a mapping")
+        _validate_requires_list(
+            spec.get("requires"), registered, ctx=f"scope_authorization.research_scopes[{name!r}]"
+        )
+
+    governance_statements = scope_auth.get("governance_statements")
+    if not isinstance(governance_statements, dict):
+        raise ConfigError("`scope_authorization.governance_statements` must be a mapping")
+    for state in _REQUIRED_GOVERNANCE_STATES:
+        if state not in governance_statements:
+            raise ConfigError(f"`scope_authorization.governance_statements` missing required state {state!r}")
+        statement = governance_statements[state]
+        if not isinstance(statement, str) or not statement.strip():
+            raise ConfigError(f"`scope_authorization.governance_statements[{state!r}]` must be a non-blank string")
+    truncating_only = governance_statements["TRUNCATING_PATHOGENIC_ONLY"]
+    if truncating_only != _PINNED_TRUNCATING_PATHOGENIC_ONLY_STATEMENT:
+        raise ConfigError(
+            "`scope_authorization.governance_statements['TRUNCATING_PATHOGENIC_ONLY']` must match "
+            "the user's exact governance statement verbatim, got " + repr(truncating_only)
+        )
+
+
 def _build_oracle_thresholds(thresholds: Mapping[str, Any]) -> Mapping[str, Any]:
     """Coerce a schema-validated nested `oracle_thresholds` block to its
     typed form -- `confidence`/`precision`/`recall` -> `float`, `gating` ->
@@ -290,6 +440,26 @@ def _build_oracle_thresholds(thresholds: Mapping[str, Any]) -> Mapping[str, Any]
         for name, spec in thresholds["strata"].items()
     }
     return {"confidence": float(thresholds["confidence"]), "strata": strata}
+
+
+def _build_scope_authorization(scope_auth: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
+    """Coerce a schema-validated `scope_authorization` block to its typed
+    form (str-keyed, list/str-coerced); `None` stays `None` (v1-compatible
+    default -- absent block, `decide_scope_gate` fails closed)."""
+    if not scope_auth:
+        return None
+    return {
+        "schema_version": 2,
+        "research_use_disclaimer": str(scope_auth["research_use_disclaimer"]),
+        "full_spectrum": {"requires": [str(s) for s in scope_auth["full_spectrum"]["requires"]]},
+        "research_scopes": {
+            str(name): {"requires": [str(s) for s in spec["requires"]]}
+            for name, spec in scope_auth.get("research_scopes", {}).items()
+        },
+        "governance_statements": {
+            str(state): str(text) for state, text in scope_auth["governance_statements"].items()
+        },
+    }
 
 
 def load_config(path: str | Path) -> EvalConfig:
@@ -349,6 +519,13 @@ def load_config(path: str | Path) -> EvalConfig:
     if not isinstance(min_count, int) or isinstance(min_count, bool) or min_count < 1:
         raise ConfigError("`min_count_per_class` must be a positive int (>= 1) -- 0 disables the FR5 floors")
 
+    # v2 scope-specific authorization gate (ADDITIVE, preregistration): the
+    # block is OPTIONAL -- absent (key missing, or explicitly `None`/`{}`)
+    # keeps a config fully v1-compatible (`scope_authorization=None`).
+    scope_authorization_raw = raw.get("scope_authorization")
+    if scope_authorization_raw:
+        _validate_scope_authorization(scope_authorization_raw, oracle_thresholds)
+
     return EvalConfig(
         automatable_criteria=normalized_criteria,
         tavtigian_points={str(k): int(v) for k, v in raw["tavtigian_points"].items()},
@@ -358,4 +535,5 @@ def load_config(path: str | Path) -> EvalConfig:
         oracle_thresholds=_build_oracle_thresholds(oracle_thresholds),
         labels_snapshot=str(raw["labels_snapshot"]),
         clinvar_snapshot_file_checksum=str(raw.get("clinvar_snapshot_file_checksum", "") or ""),
+        scope_authorization=_build_scope_authorization(scope_authorization_raw),
     )

@@ -99,6 +99,62 @@ def build_aggregate(
     }
 
 
+def build_aggregate_v2(
+    envelope: dict,
+    *,
+    date: str,
+    terminal_json_hash: str,
+    terminal_report_hash: str,
+    published_pm1_scope: dict,
+    reproduced_pm1_scope: dict,
+    production_policy_status: str,
+) -> dict:
+    """v2 scope-specific aggregate (ADDITIVE) -- schema
+    `raptor.tsc.masked_holdout_gate.v2`. `build_aggregate` (v1) stays
+    completely untouched; this is a NEW sibling function, never a dispatch
+    inside it (sec 5/7 of the v2 preregistration contract). The primary
+    verdict fields (`vus_authorized`/`status`) derive ONLY from
+    `report["scope_gate"]` (the per-scope authorization decision), NEVER
+    from the pooled/`overall` `report["metrics"]` or the v1 `report["gate"]`
+    -- those are retained here strictly descriptive-only (AC-S5/E1).
+    """
+    report = envelope["report"]
+    scope_gate = report.get("scope_gate")
+    if not isinstance(scope_gate, dict):
+            raise ValueError(
+                "build_aggregate_v2 requires report['scope_gate'] (the v2 scope-specific gate "
+                "decision) -- it is never derived from the pooled v1 gate/metrics"
+            )
+
+    # Reuse the v1 builder for every field that is NOT scope-authorization
+    # specific (benchmark/integrity/policy/thresholds/limitations/hashes)
+    # -- descriptive-only continuity, never the verdict source here.
+    v1_aggregate = build_aggregate(
+            envelope,
+            date=date,
+            terminal_json_hash=terminal_json_hash,
+            terminal_report_hash=terminal_report_hash,
+            published_pm1_scope=published_pm1_scope,
+            reproduced_pm1_scope=reproduced_pm1_scope,
+            production_policy_status=production_policy_status,
+    )
+
+    return {
+            **v1_aggregate,
+            "schema": "raptor.tsc.masked_holdout_gate.v2",
+            "status": scope_gate["full_spectrum_status"],
+            "vus_authorized": scope_gate["full_spectrum_vus_authorized"],
+            "scopes": scope_gate["scopes"],
+            "research_scope_flags": scope_gate["research_scope_flags"],
+            "governance_state": scope_gate["governance_state"],
+            "governance_statement": scope_gate["governance_statement"],
+            "research_use_disclaimer": scope_gate["research_use_disclaimer"],
+            "scope_gate_reason": scope_gate.get("reason", ""),
+            # `metrics`/`gate` are retained descriptive-only (v1 pooled values,
+            # AC-S5/E1) -- never the verdict source for this v2 schema.
+    }
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--terminal-json", type=Path, required=True)

@@ -20,13 +20,14 @@ from raptor.eval.config import load_config as load_eval_config
 from raptor.eval.harness import run_eval
 from raptor.eval.live_source import BiasEvidenceSource
 from raptor.eval.mask_attestation import verify_mask_attestation
-from raptor.eval.model import GateDecision, LabeledVariant
+from raptor.eval.model import GateDecision, LabeledVariant, ScopeGateDecision
 from raptor.eval.predictor_aggregation import load_aggregation_spec
 from raptor.eval.predictor_policy import (
     PredictorPolicyError,
     load_predictor_policy,
     verify_predictor_policy_hashes,
 )
+from raptor.eval.scope_gate import decide_scope_gate
 from raptor.eval.split import split_benchmark
 from raptor.eval.terminal_source import (
     PredictorCorrectedEvidenceSource,
@@ -385,6 +386,40 @@ def main(argv: list[str] | None = None) -> int:
             ),
             vus_authorized=False,
             per_stratum=report.gate.per_stratum,
+        )
+
+    # v2 scope-specific research-authorization gate (ADDITIVE, wired for the
+    # NEXT run only -- this script is not executed by this track). Computed
+    # from `report.metrics` + `eval_config.scope_authorization`; `None` when
+    # the config carries no `scope_authorization` block (v1-compatible).
+    # Preserves the same fail-closed parity-skip principle as the v1 gate
+    # immediately above: any evaluation-only criterion exclusion that would
+    # otherwise let a scope validate must withhold that authorization.
+    report.scope_gate = decide_scope_gate(report.metrics, eval_config)
+    if skipped and (
+        report.scope_gate.full_spectrum_vus_authorized
+        or any(report.scope_gate.research_scope_flags.values())
+    ):
+        report.scope_gate = ScopeGateDecision(
+            schema_version=report.scope_gate.schema_version,
+            scopes=report.scope_gate.scopes,
+            full_spectrum_status="UNVERIFIED",
+            full_spectrum_vus_authorized=False,
+            research_scope_flags={
+                name: False for name in report.scope_gate.research_scope_flags
+            },
+            governance_state="NONE_VALIDATED",
+            governance_statement=(
+                eval_config.scope_authorization["governance_statements"]["NONE_VALIDATED"]
+                if eval_config.scope_authorization
+                else report.scope_gate.governance_statement
+            ),
+            research_use_disclaimer=report.scope_gate.research_use_disclaimer,
+            reason=(
+                "all scope metric thresholds may have passed, but evaluation-only criterion "
+                f"exclusions {sorted(skipped)!r} break full production parity; never authorize "
+                "a research scope on a parity break"
+            ),
         )
 
     report.config_pins.update(

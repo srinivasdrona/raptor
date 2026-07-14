@@ -137,6 +137,37 @@ truncating B = 1, other P/LP = 171, other B/LB = 2,963.)
   pinned thresholds, blind to held-out results. This doc + the cited evidence base are the
   justification of record.
 
+### 5b. v2 scope-specific authorization (preregistered 2026-07-14, before the corrected rerun)
+
+- **What this is NOT:** a threshold change. Every value in §1/§5 above (missense 0.90/0.85,
+  truncating 0.95/0.95, both at 95% confidence, `min_count_per_class: 36`) is unchanged and remains
+  locked (`config._PINNED_STRATUM_THRESHOLDS`). §5 above already preregistered *separate reporting*
+  (stratify, don't pool) — this subsection preregisters a *separate authorization rule*, which v1 never
+  had (`gate.py` hardcodes `missense` as the sole binding/authorizing stratum).
+- **The new rule (`configs/eval/tsc2.yaml` → `scope_authorization`, schema_version 2,
+  `raptor.eval.scope_gate.decide_scope_gate`):** every `(stratum, direction)` scope is evaluated
+  independently (no short-circuit); a scope is `VALIDATED` only when its registered threshold is `MET`
+  on the 95% CI lower bound **and** held-out coverage is adequate. Full-spectrum VUS authorization still
+  requires `missense:pathogenic`, `missense:benign`, **and** `truncating:pathogenic` all `VALIDATED`
+  (semantics-locked, anti-cherry-pick — this cannot be narrowed to drop missense). Independently, a
+  narrow `truncating_pathogenic_research_scope_validated` flag can be `True` on `truncating:pathogenic`
+  alone — a research-only claim, never full-spectrum, never clinical.
+- **Governance text is exact and separate from the disclaimer:** the truncating-only state emits the
+  verbatim statement *"Full-spectrum VUS automation is not authorized. Evidence supports only the
+  validated truncating-pathogenic scope; missense remains unvalidated."* A separate, mandatory,
+  non-blank `research_use_disclaimer` — *"Research-evidence validation only; this authorizes no
+  clinical classification, VUS worklist, or ClinVar submission."* — is never merged into that statement.
+- **Known-outcome risk, acknowledged, not hidden:** the 2026-07-13 v1 run already showed
+  truncating-pathogenic clearing 0.95/0.95 at adequate coverage before this rule was written, so this
+  preregistration is **not** blind to that outcome (see ADR-0011 for the full risk discussion and its
+  mitigations — no threshold changed, the rule only narrows scope, full-spectrum still requires
+  missense, and validation must be re-established on a corrected rerun). This subsection records the
+  rule, not a result: no PASS/VALIDATED claim is made here, and the 2026-07-13 v1 artifact is never
+  relabeled (`schema=v1` stays `v1`; no v2 keys are added to it).
+- **Versioned, not in-place:** a new `raptor.tsc.masked_holdout_gate.v2` schema/aggregate coexists with
+  the frozen `...v1` one; `EvalReport.scope_gate` is optional/additive and excluded from `content_hash()`
+  when absent, so v1 report hashes are unaffected.
+
 ## 6. Open items
 - ✅ **Post-split held-out N per stratum** appended (§3 — from the holdout-0.7 freeze).
 - ✅ **Thresholds pre-registered** into `configs/eval/tsc2.yaml` (§5).
@@ -146,3 +177,5 @@ truncating B = 1, other P/LP = 171, other B/LB = 2,963.)
 - Confirm against the **TSC1/TSC2 VCEP specification** (Symonds 2022, *Genet Med* 24:1907) — the
   disease-specific gold standard; our high-confidence tier already privileges its 3-star calls.
 - ✅ **Truncating-pathogenic hard gate implemented** at 0.95; truncating-benign remains report-only.
+- ✅ **Scope-specific v2 authorization preregistered** (§5b, ADR-0011) — before the corrected rerun,
+  not after. Requires a corrected rerun before any real VALIDATED/authorization claim.

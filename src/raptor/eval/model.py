@@ -120,3 +120,59 @@ class GateDecision:
     reason: str
     vus_authorized: bool
     per_stratum: dict = field(default_factory=dict)
+
+
+@dataclass
+class DirectionVerdict:
+    """One `(stratum, direction)` scope verdict -- v2 additive, ADDITIVE
+    ONLY (does not replace `StratumVerdict`). Preserves TWO orthogonal axes
+    a v1 `StratumVerdict` collapses: `metric_status` (did the 95%
+    Clopper-Pearson lower bound clear its registered threshold?) and
+    `coverage_adequate` (did held-out coverage clear `min_count_per_class`?)
+    -- so a scope that is both metric-UNMET and coverage-inadequate (e.g.
+    missense) reports BOTH facts instead of losing one to the other.
+    `precision_threshold`/`recall_threshold` are `None` when this
+    `(stratum, direction)` has no Oracle-registered threshold (e.g.
+    truncating-benign) -- never fabricated.
+    """
+
+    stratum: str
+    direction: str  # "pathogenic" | "benign"
+    precision_lb: float
+    recall_lb: float
+    precision_threshold: float | None
+    recall_threshold: float | None
+    actual_count: int
+    called_count: int
+    min_count: int
+    coverage_adequate: bool
+    metric_status: str  # "MET" | "UNMET" | "NO_THRESHOLD"
+    scope_status: str  # "VALIDATED" | "FAIL" | "UNDERPOWERED" | "DESCRIPTIVE"
+    reasons: list = field(default_factory=list)
+
+
+@dataclass
+class ScopeGateDecision:
+    """v2 scope-specific gate decision (schema `raptor.tsc.masked_holdout_gate.v2`).
+
+    Additive alongside the frozen v1 `GateDecision` -- `decide_gate` never
+    dispatches into this shape. `scopes` maps the `"{stratum}:{direction}"`
+    scope key to its `DirectionVerdict`; EVERY configured stratum x
+    direction (plus any stratum present only in `metrics`, e.g. `other`) is
+    present -- no short-circuit (AC-S1). `full_spectrum_vus_authorized` and
+    `research_scope_flags` are computed ONLY from per-scope `scope_status`
+    values, never from a pooled/`overall` metric (AC-S5).
+    `research_use_disclaimer` is a separate, mandatory, non-blank field --
+    it is never appended to `governance_statement`, which stays the exact
+    preregistered string verbatim.
+    """
+
+    schema_version: str = "2"
+    scopes: dict = field(default_factory=dict)  # scope-key -> DirectionVerdict
+    full_spectrum_status: str = "UNVERIFIED"  # PASS|FAIL|UNVERIFIED|UNDERPOWERED|BLOCKED_POLICY|BLOCKED_CONFIG
+    full_spectrum_vus_authorized: bool = False
+    research_scope_flags: dict = field(default_factory=dict)  # narrow flag name -> bool
+    governance_state: str = "NONE_VALIDATED"  # FULL_SPECTRUM|TRUNCATING_PATHOGENIC_ONLY|NONE_VALIDATED
+    governance_statement: str = ""  # non-statistical; exact preregistered string for the state
+    research_use_disclaimer: str = ""  # mandatory, non-blank, never merged into governance_statement
+    reason: str = ""

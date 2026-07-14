@@ -14,7 +14,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
-from .model import GateDecision, Metrics
+from .model import DirectionVerdict, GateDecision, Metrics, ScopeGateDecision
 
 
 def _metrics_payload(metrics: Dict[str, Metrics]) -> dict:
@@ -59,6 +59,43 @@ def _per_stratum_payload(per_stratum: dict) -> dict:
     }
 
 
+def _direction_verdict_payload(v: DirectionVerdict) -> dict:
+    return {
+        "stratum": v.stratum,
+        "direction": v.direction,
+        "precision_lb": v.precision_lb,
+        "recall_lb": v.recall_lb,
+        "precision_threshold": v.precision_threshold,
+        "recall_threshold": v.recall_threshold,
+        "actual_count": v.actual_count,
+        "called_count": v.called_count,
+        "min_count": v.min_count,
+        "coverage_adequate": v.coverage_adequate,
+        "metric_status": v.metric_status,
+        "scope_status": v.scope_status,
+        "reasons": list(v.reasons),
+    }
+
+
+def _scope_gate_payload(scope_gate: ScopeGateDecision) -> dict:
+    """v2 scope-gate payload (additive): only ever called when
+    `EvalReport.scope_gate is not None` -- `content_hash()` MUST NOT call
+    this for a `None` scope_gate (v1 hash back-compat, AC-S7/D2)."""
+    return {
+        "schema_version": scope_gate.schema_version,
+        "scopes": {
+            key: _direction_verdict_payload(v) for key, v in sorted(scope_gate.scopes.items())
+        },
+        "full_spectrum_status": scope_gate.full_spectrum_status,
+        "full_spectrum_vus_authorized": scope_gate.full_spectrum_vus_authorized,
+        "research_scope_flags": dict(sorted(scope_gate.research_scope_flags.items())),
+        "governance_state": scope_gate.governance_state,
+        "governance_statement": scope_gate.governance_statement,
+        "research_use_disclaimer": scope_gate.research_use_disclaimer,
+        "reason": scope_gate.reason,
+    }
+
+
 @dataclass
 class EvalReport:
     run_id: str
@@ -74,6 +111,12 @@ class EvalReport:
     oracle_blind_findings: List[str] = field(default_factory=list)
     code_version: str = ""
     config_pins: Dict[str, Any] = field(default_factory=dict)
+    #: v2 scope-specific authorization gate (ADDITIVE, optional). `None` is
+    #: the fully v1-compatible default -- `content_hash()` excludes this key
+    #: entirely when `None` so a v1 report's hash is byte-identical (D2/
+    #: AC-S7); `render()` only appends a scope-authorization section when
+    #: present.
+    scope_gate: "ScopeGateDecision | None" = None
 
     def content_hash(self) -> str:
         """Deterministic-content hash (FR9/AC7): excludes `run_id` and
@@ -101,6 +144,11 @@ class EvalReport:
             "code_version": self.code_version,
             "config_pins": json.loads(json.dumps(self.config_pins, sort_keys=True, default=str)),
         }
+        # v2 scope-gate (ADDITIVE): only folded into the hash when present --
+        # a v1-shaped report (`scope_gate=None`, the default) must hash
+        # byte-identically to before this field existed (D2/AC-S7).
+        if self.scope_gate is not None:
+            payload["scope_gate"] = _scope_gate_payload(self.scope_gate)
         blob = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
@@ -178,4 +226,40 @@ class EvalReport:
                 lines.append(f"  - {finding}")
         else:
             lines.append("oracle-blind findings: none")
+        if self.scope_gate is not None:
+            lines.extend(self._render_scope_gate())
         return "\n".join(lines)
+
+    def _render_scope_gate(self) -> List[str]:
+        """v2 scope-specific research-authorization section (ADDITIVE) --
+        only appended when `scope_gate is not None` (v1 reports render
+        unchanged). Never states a bare global "PASS" -- the authoritative
+        human-facing output is the narrow research-scope flags plus the
+        exact preregistered governance statement and the separate,
+        mandatory `research_use_disclaimer` (never merged into the
+        statement text)."""
+        sg = self.scope_gate
+        lines: List[str] = []
+        lines.append("--- v2 scope-specific research authorization (preregistered, non-clinical) ---")
+        lines.append(f"scope_gate schema_version: {sg.schema_version}")
+        lines.append("scopes:")
+        for key, v in sorted(sg.scopes.items()):
+            precision_t_str = f"{v.precision_threshold:.4f}" if isinstance(v.precision_threshold, (int, float)) else "none"
+            recall_t_str = f"{v.recall_threshold:.4f}" if isinstance(v.recall_threshold, (int, float)) else "none"
+            lines.append(
+                f"  - {key}: metric_status={v.metric_status} coverage_adequate={v.coverage_adequate} "
+                f"scope_status={v.scope_status} precision_lb={v.precision_lb:.4f} "
+                f"recall_lb={v.recall_lb:.4f} precision_threshold>={precision_t_str} "
+                f"recall_threshold>={recall_t_str} actual_count={v.actual_count} "
+                f"called_count={v.called_count} min_count={v.min_count}"
+            )
+        lines.append(f"full_spectrum_status: {sg.full_spectrum_status}")
+        lines.append(f"full_spectrum_vus_authorized: {sg.full_spectrum_vus_authorized}")
+        lines.append("research_scope_flags:")
+        for name, flag in sorted(sg.research_scope_flags.items()):
+            lines.append(f"  - {name}={flag}")
+        lines.append(f"governance_state: {sg.governance_state}")
+        lines.append(f"governance_statement: {sg.governance_statement}")
+        lines.append(f"research_use_disclaimer: {sg.research_use_disclaimer}")
+        lines.append(f"scope_gate reason: {sg.reason}")
+        return lines
