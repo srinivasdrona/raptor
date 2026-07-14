@@ -2405,5 +2405,65 @@ def test_blocker_2_aggregate_output_scopes_exactly_matches_independently_expecte
     assert set(agg["scopes"].keys()) == expected_keys
 
 
+def test_blocker_2_reject_unknown_fields_in_scope():
+    """BLOCKER 2 RED TEST:
+    - Inject `clinical_authorized: true` into one complete scope => build_aggregate_v2 rejects ValueError.
+    - Inject arbitrary nested/unknown fields into required, descriptive, and other scope entries => reject.
+    - Exact canonical scope succeeds.
+    - Aggregate output scope entries have exactly canonical key set and are built/canonicalized rather than preserving input object extras.
+    """
+    import pytest
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+    
+    # 1. Exact canonical scope succeeds
+    env_canonical = _get_cross_surface_baseline()
+    agg = build_aggregate_v2(
+        env_canonical, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved"
+    )
+    assert agg is not None
+    
+    # Check that aggregate output scope entries have EXACTLY the canonical key set
+    canonical_keys = {
+        "stratum", "direction", "precision_lb", "recall_lb", "precision_threshold", "recall_threshold",
+        "actual_count", "called_count", "min_count", "coverage_adequate", "metric_status", "scope_status",
+        "reasons"
+    }
+    for scope_key, entry in agg["scopes"].items():
+        assert set(entry.keys()) == canonical_keys
+
+    # 2. Inject clinical_authorized: true into one complete scope => build_aggregate_v2 rejects with ValueError
+    env_injected_clinical = _get_cross_surface_baseline()
+    env_injected_clinical["report"]["scope_gate"]["scopes"]["missense:pathogenic"]["clinical_authorized"] = True
+    with pytest.raises((ValueError, TypeError)):
+        build_aggregate_v2(
+            env_injected_clinical, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+    # 3. Inject arbitrary nested/unknown fields into required scope entries => reject
+    env_injected_unknown_req = _get_cross_surface_baseline()
+    env_injected_unknown_req["report"]["scope_gate"]["scopes"]["missense:pathogenic"]["unknown_nested_field"] = {"nested": "value"}
+    with pytest.raises((ValueError, TypeError)):
+        build_aggregate_v2(
+            env_injected_unknown_req, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+    # 4. Inject arbitrary nested/unknown fields into descriptive scope entries => reject
+    env_injected_unknown_desc = _get_cross_surface_baseline()
+    env_injected_unknown_desc["report"]["scope_gate"]["scopes"]["truncating:benign"]["arbitrary_field"] = 123
+    with pytest.raises((ValueError, TypeError)):
+        build_aggregate_v2(
+            env_injected_unknown_desc, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+
+
 
 
