@@ -228,3 +228,208 @@ def test_finding_5_report_serialization_omits_none_scope_gate() -> None:
     # Asserting that the key is completely absent:
     assert "scope_gate" not in serialized
 
+
+# =========================================================================
+# RED REGRESSION TESTS FOR GPT-5.4 BLOCKERS (PUBLICATION INTEGRITY)
+# =========================================================================
+
+def test_blocker_1_eval_report_gate_mandatory_constructor():
+    """Assert that EvalReport constructor requires `gate` as a mandatory,
+    non-optional argument, and doesn't default to None, and run_id and
+    generated_at are the first two mandatory arguments of the constructor."""
+    import inspect
+    from raptor.eval.report import EvalReport
+    from raptor.eval.model import GateDecision
+
+    sig = inspect.signature(EvalReport)
+    params = list(sig.parameters.values())
+
+    # Check first parameter is run_id (no default)
+    assert params[0].name == "run_id"
+    assert params[0].default is inspect.Parameter.empty
+
+    # Check second parameter is generated_at (no default)
+    assert params[1].name == "generated_at"
+    assert params[1].default is inspect.Parameter.empty
+
+    # Check gate is mandatory (non-optional, no default None)
+    gate_param = sig.parameters.get("gate")
+    assert gate_param is not None
+    assert gate_param.default is inspect.Parameter.empty
+
+
+def test_blocker_1_report_to_dict_gate_none_raises_loudly():
+    """EvalReport/report_to_dict with gate=None and scope_gate present must fail loud
+    (TypeError or ValueError) before producing an envelope; it must not advertise/serialize
+    a v2-only shape the builder cannot consume."""
+    from raptor.eval.report import EvalReport, report_to_dict
+    from raptor.eval.model import Metrics, ScopeGateDecision
+
+    # If gate is None (or if we bypass/mock it) and scope_gate is present, report_to_dict must fail loud.
+    m = Metrics(1.0, 1.0, 1.0, {}, "missense", True, 1.0, 1.0)
+    
+    # We try to build a report with gate=None
+    with pytest.raises((TypeError, ValueError)):
+        # Constructing it or calling report_to_dict with gate=None must fail loud.
+        report = EvalReport(
+            run_id="run-1",
+            generated_at="2026-07-15",
+            labels_snapshot="snap",
+            benchmark_size=10,
+            train_dev_size=3,
+            holdout_size=7,
+            holdout_label_counts={"P": 4, "B": 3},
+            holdout_class_counts={"missense": 5},
+            metrics={"missense": m},
+            gate=None,  # Passed None
+            scope_gate=ScopeGateDecision(
+                schema_version="2",
+                scopes={},
+                full_spectrum_status="FAIL",
+                full_spectrum_vus_authorized=False,
+                research_scope_flags={},
+                governance_state="NONE_VALIDATED",
+                governance_statement="statement",
+                research_use_disclaimer="disclaimer",
+                reason="reason"
+            )
+        )
+        # Or if the constructor somehow accepts it, report_to_dict must fail loud
+        report_to_dict(report)
+
+
+def test_blocker_1_normal_v2_report_serializes_and_aggregates():
+    """Normal v2 report with real GateDecision + ScopeGateDecision serializes and aggregates."""
+    from raptor.eval.report import EvalReport, report_to_dict
+    from raptor.eval.model import Metrics, GateDecision, ScopeGateDecision
+
+    m = Metrics(1.0, 1.0, 1.0, {}, "missense", True, 1.0, 1.0)
+    gate = GateDecision(status="FAIL", stratum="missense", reason="below", vus_authorized=False)
+    v2_decision = ScopeGateDecision(
+        schema_version="2",
+        scopes={},
+        full_spectrum_status="FAIL",
+        full_spectrum_vus_authorized=False,
+        research_scope_flags={},
+        governance_state="NONE_VALIDATED",
+        governance_statement="statement",
+        research_use_disclaimer="disclaimer",
+        reason="reason"
+    )
+
+    report = EvalReport(
+        run_id="run-1",
+        generated_at="2026-07-15",
+        labels_snapshot="snap",
+        benchmark_size=10,
+        train_dev_size=3,
+        holdout_size=7,
+        holdout_label_counts={"P": 4, "B": 3},
+        holdout_class_counts={"missense": 5},
+        metrics={"missense": m},
+        gate=gate,
+        scope_gate=v2_decision
+    )
+
+    serialized = report_to_dict(report)
+    assert serialized is not None
+    assert "gate" in serialized
+    assert "scope_gate" in serialized
+
+
+def test_blocker_2_direct_hand_built_config_missense_or_truncating_spec_not_dict_returns_blocked_config():
+    """Direct hand-built EvalConfig exact top-level structure but missense or truncating
+    spec values: string, list, None, int => decide_scope_gate returns BLOCKED_CONFIG/no auth and does not throw."""
+    from raptor.eval.config import EvalConfig
+    from raptor.eval.scope_gate import decide_scope_gate
+    from raptor.eval.model import Metrics
+
+    m = Metrics(1.0, 1.0, 1.0, {}, "missense", True, 1.0, 1.0)
+
+    # Base valid top level structures
+    automatable_criteria = ["PVS1", "PS3", "PM1", "PM2", "PP3", "BA1", "BS1", "BS2", "BP4", "BP7"]
+    tavtigian_points = {"supporting": 1, "moderate": 2, "strong": 4, "very_strong": 8, "stand_alone": 8}
+    tavtigian_cutoffs = {"pathogenic_min": 10, "likely_pathogenic_min": 6, "vus_min": 0, "vus_max": 5, "likely_benign_max": -1, "benign_max": -7}
+    split = {"seed": 42, "holdout_fraction": 0.3}
+    scope_auth = {
+        "schema_version": 2,
+        "research_use_disclaimer": "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+        "full_spectrum": {
+            "requires": ["missense:pathogenic", "missense:benign", "truncating:pathogenic"]
+        },
+        "research_scopes": {
+            "truncating_pathogenic_research_scope_validated": {
+                "requires": ["truncating:pathogenic"]
+            }
+        },
+        "governance_statements": {
+            "FULL_SPECTRUM": "All pre-registered research scopes are validated for research-evidence use only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+            "TRUNCATING_PATHOGENIC_ONLY": "Full-spectrum VUS automation is not authorized. Evidence supports only the validated truncating-pathogenic scope; missense remains unvalidated.",
+            "NONE_VALIDATED": "Full-spectrum VUS automation is not authorized; no pre-registered research scope is currently validated."
+        }
+    }
+
+    bad_specs = [
+        "not-a-dict",                      # string
+        ["pathogenic", "benign"],          # list
+        None,                              # None
+        42                                 # int
+    ]
+
+    for bad_spec in bad_specs:
+        # missense spec is bad_spec
+        cfg_missense_bad = EvalConfig(
+            automatable_criteria=automatable_criteria,
+            tavtigian_points=tavtigian_points,
+            tavtigian_cutoffs=tavtigian_cutoffs,
+            min_count_per_class=36,
+            split=split,
+            oracle_thresholds={
+                "confidence": 0.95,
+                "strata": {
+                    "missense": bad_spec,
+                    "truncating": {
+                        "precision": 0.95,
+                        "recall": 0.95,
+                        "gating": True,
+                        "directions": ["pathogenic"]
+                    }
+                }
+            },
+            labels_snapshot="snap",
+            scope_authorization=scope_auth
+        )
+
+        # Calling decide_scope_gate must return BLOCKED_CONFIG, not raise/throw an exception!
+        decision = decide_scope_gate({"missense": m}, cfg_missense_bad)
+        assert decision.full_spectrum_status == "BLOCKED_CONFIG"
+        assert decision.full_spectrum_vus_authorized is False
+
+        # truncating spec is bad_spec
+        cfg_truncating_bad = EvalConfig(
+            automatable_criteria=automatable_criteria,
+            tavtigian_points=tavtigian_points,
+            tavtigian_cutoffs=tavtigian_cutoffs,
+            min_count_per_class=36,
+            split=split,
+            oracle_thresholds={
+                "confidence": 0.95,
+                "strata": {
+                    "missense": {
+                        "precision": 0.90,
+                        "recall": 0.85,
+                        "gating": True,
+                        "directions": ["pathogenic", "benign"]
+                    },
+                    "truncating": bad_spec
+                }
+            },
+            labels_snapshot="snap",
+            scope_authorization=scope_auth
+        )
+
+        decision2 = decide_scope_gate({"missense": m}, cfg_truncating_bad)
+        assert decision2.full_spectrum_status == "BLOCKED_CONFIG"
+        assert decision2.full_spectrum_vus_authorized is False
+
+

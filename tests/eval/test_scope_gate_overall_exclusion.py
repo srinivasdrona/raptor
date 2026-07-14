@@ -135,8 +135,13 @@ def test_2_serialized_and_rendered_outputs_no_overall_mention():
     assert "overall:" not in reason_text
     assert "overall:" not in decision.reason
 
+    from raptor.eval.model import GateDecision
+    gate = GateDecision(status="FAIL", stratum="missense", reason="below", vus_authorized=False)
+
     # Report render and serialized scope_gate must not contain overall:
     report = EvalReport(
+        run_id="run-1",
+        generated_at="2026-07-15",
         labels_snapshot="snap",
         benchmark_size=100,
         train_dev_size=50,
@@ -144,7 +149,7 @@ def test_2_serialized_and_rendered_outputs_no_overall_mention():
         holdout_label_counts={"P": 25, "B": 25},
         holdout_class_counts={"missense": 25, "truncating": 25},
         metrics=metrics,
-        gate=None,
+        gate=gate,
         config_pins={
             "bias_tsv_sha256": "bias",
             "manifest_sha256": "manifest",
