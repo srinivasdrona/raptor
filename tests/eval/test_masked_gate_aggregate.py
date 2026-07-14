@@ -1005,3 +1005,257 @@ def test_blocker_3_dispatch_helper_build_aggregate_for_envelope() -> None:
     assert res_v1["schema"] == "raptor.tsc.masked_holdout_gate.v1"
 
 
+def test_blocker_1_aggregate_trusts_forged_scope_status() -> None:
+    """Blocker 1 [RED TEST]: build_aggregate_v2 must independently validate
+    every scope's metric_status, coverage_adequate, and scope_status consistency
+    against the underlying numeric/axis fields, rather than trusting the
+    envelope-supplied scope_status at face value.
+    """
+    import pytest
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+
+    def make_envelope(scopes_payload: dict, evaluation_skipped: list = None) -> dict:
+        return {
+            "content_hash": "content",
+            "predictor_policy": {"status": "approved"},
+            "mask_attestation": {"removed_count": 2, "zero_survivors": True},
+            "lineage_audit": {"effective_blocking_criteria": []},
+            "verified_return_artifacts": {"a": "hash", "b": "hash"},
+            "report": {
+                "labels_snapshot": "snapshot",
+                "benchmark_size": 3,
+                "train_dev_size": 1,
+                "holdout_size": 2,
+                "holdout_label_counts": {"P": 1, "B": 1},
+                "holdout_class_counts": {"missense": 2},
+                "metrics": {"missense": {"precision": 0.5}},
+                "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
+                "scope_gate": {
+                    "schema_version": "2",
+                    "full_spectrum_status": "PASS" if all(s.get("scope_status") == "VALIDATED" for s in scopes_payload.values()) else "FAIL",
+                    "full_spectrum_vus_authorized": all(s.get("scope_status") == "VALIDATED" for s in scopes_payload.values()),
+                    "research_scope_flags": {"truncating_pathogenic_research_scope_validated": scopes_payload.get("truncating:pathogenic", {}).get("scope_status") == "VALIDATED"},
+                    "governance_state": "FULL_SPECTRUM" if all(s.get("scope_status") == "VALIDATED" for s in scopes_payload.values()) else "NONE_VALIDATED",
+                    "governance_statement": "All pre-registered research scopes are validated for research-evidence use only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+                    "research_use_disclaimer": "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+                    "reason": "reason",
+                    "scopes": scopes_payload
+                },
+                "config_pins": {
+                    "bias_tsv_sha256": "bias",
+                    "manifest_sha256": "manifest",
+                    "mask_ledger_sha256": "ledger",
+                    "remask_audit_sha256": "remask",
+                    "return_manifest_sha256": "return",
+                    "predictor_correction_counts": {"PP3": 1, "BP4": 2},
+                    "operational_skipped_criteria": ["PM1", "PS4"],
+                    "evaluation_skipped_criteria": evaluation_skipped or [],
+                    "oracle_thresholds": {
+                        "confidence": 0.95,
+                        "strata": {
+                            "missense": {
+                                "precision": 0.90,
+                                "recall": 0.85,
+                                "gating": True,
+                                "directions": ["pathogenic", "benign"]
+                            },
+                            "truncating": {
+                                "precision": 0.95,
+                                "recall": 0.95,
+                                "gating": True,
+                                "directions": ["pathogenic"]
+                            }
+                        }
+                    },
+                },
+            },
+        }
+
+    # Helper to generate a baseline valid passing scope dictionary
+    def get_valid_scopes():
+        return {
+            "missense:pathogenic": {
+                "stratum": "missense",
+                "direction": "pathogenic",
+                "precision_lb": 0.92,
+                "recall_lb": 0.87,
+                "precision_threshold": 0.90,
+                "recall_threshold": 0.85,
+                "actual_count": 40,
+                "called_count": 40,
+                "min_count": 36,
+                "coverage_adequate": True,
+                "metric_status": "MET",
+                "scope_status": "VALIDATED",
+                "reasons": []
+            },
+            "missense:benign": {
+                "stratum": "missense",
+                "direction": "benign",
+                "precision_lb": 0.92,
+                "recall_lb": 0.87,
+                "precision_threshold": 0.90,
+                "recall_threshold": 0.85,
+                "actual_count": 40,
+                "called_count": 40,
+                "min_count": 36,
+                "coverage_adequate": True,
+                "metric_status": "MET",
+                "scope_status": "VALIDATED",
+                "reasons": []
+            },
+            "truncating:pathogenic": {
+                "stratum": "truncating",
+                "direction": "pathogenic",
+                "precision_lb": 0.96,
+                "recall_lb": 0.96,
+                "precision_threshold": 0.95,
+                "recall_threshold": 0.95,
+                "actual_count": 40,
+                "called_count": 40,
+                "min_count": 36,
+                "coverage_adequate": True,
+                "metric_status": "MET",
+                "scope_status": "VALIDATED",
+                "reasons": []
+            }
+        }
+
+    # 1. Genuine / valid envelope still builds successfully.
+    genuine_scopes = get_valid_scopes()
+    genuine_env = make_envelope(genuine_scopes)
+    agg = build_aggregate_v2(
+        genuine_env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved"
+    )
+    assert agg["full_spectrum_status"] == "PASS"
+
+    # 2. Forge 1: Forge only scope_status to VALIDATED for required missense scope,
+    # but keep its metric_status UNMET / low lower bounds.
+    forged_scopes_1 = get_valid_scopes()
+    forged_scopes_1["missense:pathogenic"].update({
+        "precision_lb": 0.75,
+        "recall_lb": 0.75,
+        "metric_status": "UNMET",
+        "scope_status": "VALIDATED"  # FORGED!
+    })
+    forged_env_1 = make_envelope(forged_scopes_1)
+    with pytest.raises(ValueError, match="integrity|forged|tampered|inconsistent"):
+        build_aggregate_v2(
+            forged_env_1, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+    # 3. Forge 2: Forge scope_status=VALIDATED with metric_status MET but coverage_adequate False.
+    forged_scopes_2 = get_valid_scopes()
+    forged_scopes_2["missense:pathogenic"].update({
+        "actual_count": 10,
+        "called_count": 10,
+        "coverage_adequate": False,
+        "scope_status": "VALIDATED"  # FORGED!
+    })
+    forged_env_2 = make_envelope(forged_scopes_2)
+    with pytest.raises(ValueError, match="integrity|forged|tampered|inconsistent"):
+        build_aggregate_v2(
+            forged_env_2, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+    # 4. Forge 3: Forge inconsistent combinations.
+    # Case A: NO_THRESHOLD must map to DESCRIPTIVE. Forge to VALIDATED.
+    forged_scopes_3a = get_valid_scopes()
+    # Add a mock "truncating:benign" with NO_THRESHOLD but forged scope_status "VALIDATED"
+    forged_scopes_3a["truncating:benign"] = {
+        "stratum": "truncating",
+        "direction": "benign",
+        "precision_lb": 0.0,
+        "recall_lb": 0.0,
+        "precision_threshold": None,
+        "recall_threshold": None,
+        "actual_count": 1,
+        "called_count": 1,
+        "min_count": 36,
+        "coverage_adequate": False,
+        "metric_status": "NO_THRESHOLD",
+        "scope_status": "VALIDATED",  # FORGED!
+        "reasons": []
+    }
+    forged_env_3a = make_envelope(forged_scopes_3a)
+    with pytest.raises(ValueError, match="integrity|forged|tampered|inconsistent"):
+        build_aggregate_v2(
+            forged_env_3a, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+    # Case B: MET + adequate => VALIDATED. Forge to UNDERPOWERED.
+    forged_scopes_3b = get_valid_scopes()
+    forged_scopes_3b["missense:pathogenic"].update({
+        "scope_status": "UNDERPOWERED"  # Inconsistent: MET + adequate must be VALIDATED
+    })
+    forged_env_3b = make_envelope(forged_scopes_3b)
+    with pytest.raises(ValueError, match="integrity|forged|tampered|inconsistent"):
+        build_aggregate_v2(
+            forged_env_3b, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+    # Case C: MET + inadequate => UNDERPOWERED. Forge to VALIDATED.
+    forged_scopes_3c = get_valid_scopes()
+    forged_scopes_3c["missense:pathogenic"].update({
+        "actual_count": 10,
+        "called_count": 10,
+        "coverage_adequate": False,
+        "metric_status": "MET",
+        "scope_status": "VALIDATED"  # FORGED! MET + inadequate must be UNDERPOWERED
+    })
+    forged_env_3c = make_envelope(forged_scopes_3c)
+    with pytest.raises(ValueError, match="integrity|forged|tampered|inconsistent"):
+        build_aggregate_v2(
+            forged_env_3c, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+    # Case D: UNMET => FAIL regardless of coverage. Forge to UNDERPOWERED.
+    forged_scopes_3d = get_valid_scopes()
+    forged_scopes_3d["missense:pathogenic"].update({
+        "precision_lb": 0.75,
+        "recall_lb": 0.75,
+        "actual_count": 10,
+        "called_count": 10,
+        "coverage_adequate": False,
+        "metric_status": "UNMET",
+        "scope_status": "UNDERPOWERED"  # FORGED! UNMET must map to FAIL
+    })
+    forged_env_3d = make_envelope(forged_scopes_3d)
+    with pytest.raises(ValueError, match="integrity|forged|tampered|inconsistent"):
+        build_aggregate_v2(
+            forged_env_3d, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+    # 5. Axis verification (bounds vs metric_status/scope_status):
+    # Attacker forges metric_status=MET and scope_status=VALIDATED while numeric LB remains below threshold.
+    forged_scopes_4 = get_valid_scopes()
+    forged_scopes_4["missense:pathogenic"].update({
+        "precision_lb": 0.75,       # BELOW THRESHOLD (0.90)!
+        "recall_lb": 0.87,
+        "metric_status": "MET",     # FORGED metric_status!
+        "scope_status": "VALIDATED" # FORGED scope_status!
+    })
+    forged_env_4 = make_envelope(forged_scopes_4)
+    with pytest.raises(ValueError, match="integrity|forged|tampered|inconsistent"):
+        build_aggregate_v2(
+            forged_env_4, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+
+

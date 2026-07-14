@@ -811,3 +811,149 @@ def test_finding_3_malformed_counts_fail_closed(malformed_count) -> None:
     assert decision.scopes["truncating:pathogenic"].scope_status in ("FAIL", "UNDERPOWERED")
     assert decision.full_spectrum_vus_authorized is False
 
+
+# =========================================================================
+# RED REGRESSION TESTS FOR FINAL GATE BLOCKERS (BLOCKER 2)
+# =========================================================================
+
+@pytest.mark.parametrize(
+    "malformed_strata",
+    [
+        # Case 2.1: missing precision/recall
+        {
+            "missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]},
+            "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]},
+            "ghost": {"gating": False, "directions": ["pathogenic"]} # missing precision/recall!
+        },
+        # Case 2.2a: non-mapping for extra stratum value
+        {
+            "missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]},
+            "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]},
+            "ghost": "not-a-dict" # non-mapping!
+        },
+        # Case 2.2b: missing precision only
+        {
+            "missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]},
+            "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]},
+            "ghost": {"recall": 0.90, "gating": False, "directions": ["pathogenic"]} # missing precision!
+        },
+        # Case 2.2c: missing recall only
+        {
+            "missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]},
+            "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]},
+            "ghost": {"precision": 0.90, "gating": False, "directions": ["pathogenic"]} # missing recall!
+        },
+        # Case 2.2d: bad direction (not in ["pathogenic", "benign"])
+        {
+            "missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]},
+            "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]},
+            "ghost": {"precision": 0.90, "recall": 0.90, "gating": False, "directions": ["orange"]} # bad direction!
+        },
+        # Case 2.2e: nonbool gating
+        {
+            "missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]},
+            "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]},
+            "ghost": {"precision": 0.90, "recall": 0.90, "gating": "not-a-bool", "directions": ["pathogenic"]} # nonbool gating!
+        },
+        # Case 2.2f: NaN/out-of-range thresholds
+        {
+            "missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]},
+            "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]},
+            "ghost": {"precision": float("nan"), "recall": 0.90, "gating": False, "directions": ["pathogenic"]} # NaN precision!
+        },
+        {
+            "missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]},
+            "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]},
+            "ghost": {"precision": 1.2, "recall": 0.90, "gating": False, "directions": ["pathogenic"]} # out-of-range precision!
+        },
+    ]
+)
+def test_blocker_2_malformed_extra_strata_fail_closed(malformed_strata):
+    """Blocker 2 [RED TEST]: decide_scope_gate must not crash on malformed extra strata or
+    invalid top-level strata config, but fail closed safely and return BLOCKED_CONFIG.
+    """
+    cfg = make_eval_config(
+        min_count_per_class=36,
+        oracle_thresholds={
+            "confidence": 0.95,
+            "strata": malformed_strata
+        },
+        scope_authorization=make_v2_auth_config()
+    )
+
+    m_truncating = Metrics(
+        precision=1.0, recall=1.0, concordance=1.0,
+        counts={"path_called": 40, "benign_called": 1, "path_actual": 40, "benign_actual": 1},
+        stratum="truncating", gating=True, benign_precision=1.0, benign_recall=1.0
+    )
+    m_truncating.precision_lb = 0.96
+    m_truncating.recall_lb = 0.96
+
+    decision = decide_scope_gate({"truncating": m_truncating}, cfg)
+    assert decision.full_spectrum_status == "BLOCKED_CONFIG"
+    assert decision.full_spectrum_vus_authorized is False
+    assert decision.governance_state == "NONE_VALIDATED"
+
+
+@pytest.mark.parametrize(
+    "invalid_top_level_strata",
+    [None, [], "not-a-dict", 123]
+)
+def test_blocker_2_invalid_top_level_strata_fail_closed(invalid_top_level_strata):
+    """Blocker 2 [RED TEST]: decide_scope_gate must fail closed with BLOCKED_CONFIG
+    when direct top-level oracle_thresholds strata is invalid or missing.
+    """
+    cfg = make_eval_config(
+        min_count_per_class=36,
+        oracle_thresholds={
+            "confidence": 0.95,
+            "strata": invalid_top_level_strata
+        },
+        scope_authorization=make_v2_auth_config()
+    )
+
+    m_truncating = Metrics(
+        precision=1.0, recall=1.0, concordance=1.0,
+        counts={"path_called": 40, "benign_called": 1, "path_actual": 40, "benign_actual": 1},
+        stratum="truncating", gating=True, benign_precision=1.0, benign_recall=1.0
+    )
+    m_truncating.precision_lb = 0.96
+    m_truncating.recall_lb = 0.96
+
+    decision = decide_scope_gate({"truncating": m_truncating}, cfg)
+    assert decision.full_spectrum_status == "BLOCKED_CONFIG"
+    assert decision.full_spectrum_vus_authorized is False
+
+
+def test_blocker_2_extra_well_formed_descriptive_stratum():
+    """Blocker 2 [RED TEST]: Well-formed extra threshold config that defines explicit
+    numeric thresholds but gating: false and directions: [] (or empty) should be safely
+    treated as descriptive and not authorize, OR return BLOCKED_CONFIG if the v2 contract
+    forbids extra threshold config altogether (existing planner requirement is BLOCKED_CONFIG
+    since extra threshold config can be a vector for tampering, so we expect BLOCKED_CONFIG).
+    """
+    cfg = make_eval_config(
+        min_count_per_class=36,
+        oracle_thresholds={
+            "confidence": 0.95,
+            "strata": {
+                "missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]},
+                "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]},
+                "ghost": {"precision": 0.95, "recall": 0.95, "gating": False, "directions": []}
+            }
+        },
+        scope_authorization=make_v2_auth_config()
+    )
+
+    m_truncating = Metrics(
+        precision=1.0, recall=1.0, concordance=1.0,
+        counts={"path_called": 40, "benign_called": 1, "path_actual": 40, "benign_actual": 1},
+        stratum="truncating", gating=True, benign_precision=1.0, benign_recall=1.0
+    )
+    m_truncating.precision_lb = 0.96
+    m_truncating.recall_lb = 0.96
+
+    decision = decide_scope_gate({"truncating": m_truncating}, cfg)
+    assert decision.full_spectrum_status == "BLOCKED_CONFIG"
+    assert decision.full_spectrum_vus_authorized is False
+
