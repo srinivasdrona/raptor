@@ -3,6 +3,60 @@ from __future__ import annotations
 from scripts.build_masked_holdout_gate_aggregate import build_aggregate, build_aggregate_v2
 
 
+def _get_consistent_scope(scope_key: str, scope_status: str) -> dict:
+    stratum, _, direction = scope_key.partition(":")
+    
+    # default thresholds based on real config
+    if stratum == "missense":
+        p_thresh, r_thresh = 0.90, 0.85
+    elif stratum == "truncating" and direction == "pathogenic":
+        p_thresh, r_thresh = 0.95, 0.95
+    else:
+        p_thresh, r_thresh = None, None
+        
+    if scope_status == "VALIDATED":
+        precision_lb = p_thresh if p_thresh is not None else 0.96
+        recall_lb = r_thresh if r_thresh is not None else 0.96
+        actual_count, called_count = 40, 40
+        coverage_adequate = True
+        metric_status = "MET"
+    elif scope_status == "UNDERPOWERED":
+        precision_lb = p_thresh if p_thresh is not None else 0.96
+        recall_lb = r_thresh if r_thresh is not None else 0.96
+        actual_count, called_count = 10, 10
+        coverage_adequate = False
+        metric_status = "MET"
+    elif scope_status == "FAIL":
+        precision_lb = 0.5
+        recall_lb = 0.5
+        actual_count, called_count = 40, 40
+        coverage_adequate = True
+        metric_status = "UNMET"
+    else:  # DESCRIPTIVE / NO_THRESHOLD
+        precision_lb = 0.0
+        recall_lb = 0.0
+        actual_count, called_count = 1, 1
+        coverage_adequate = False
+        metric_status = "NO_THRESHOLD"
+        p_thresh, r_thresh = None, None
+        
+    return {
+        "stratum": stratum,
+        "direction": direction,
+        "precision_lb": precision_lb,
+        "recall_lb": recall_lb,
+        "precision_threshold": p_thresh,
+        "recall_threshold": r_thresh,
+        "actual_count": actual_count,
+        "called_count": called_count,
+        "min_count": 36,
+        "coverage_adequate": coverage_adequate,
+        "metric_status": metric_status,
+        "scope_status": scope_status,
+        "reasons": []
+    }
+
+
 def test_gate_aggregate_is_derived_from_terminal_envelope() -> None:
     envelope = {
         "content_hash": "content",
@@ -100,9 +154,9 @@ def test_e1_v2_schema_and_scope_specific_primary() -> None:
                 "research_use_disclaimer": "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
                 "reason": "all validated",
                 "scopes": {
-                    "missense:pathogenic": {"scope_status": "VALIDATED"},
-                    "missense:benign": {"scope_status": "VALIDATED"},
-                    "truncating:pathogenic": {"scope_status": "VALIDATED"},
+                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "VALIDATED"),
+                    "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
+                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
                 }
             },
             "config_pins": {
@@ -142,7 +196,7 @@ def test_e1_v2_schema_and_scope_specific_primary() -> None:
     assert aggregate["governance_statement"] == "All pre-registered research scopes are validated for research-evidence use only; this authorizes no clinical classification, VUS worklist, or ClinVar submission."
     assert aggregate["research_use_disclaimer"] == "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission."
     assert "scopes" in aggregate
-    assert aggregate["scopes"]["missense:pathogenic"] == {"scope_status": "VALIDATED"}
+    assert aggregate["scopes"]["missense:pathogenic"] == _get_consistent_scope("missense:pathogenic", "VALIDATED")
     assert "metrics" in aggregate  # descriptive-only
 
 
@@ -189,9 +243,9 @@ def test_e2_partial_to_full_spectrum_false() -> None:
                 "research_use_disclaimer": "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
                 "reason": "truncating validated but missense failed",
                 "scopes": {
-                    "missense:pathogenic": {"scope_status": "FAIL"},
-                    "missense:benign": {"scope_status": "FAIL"},
-                    "truncating:pathogenic": {"scope_status": "VALIDATED"},
+                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
+                    "missense:benign": _get_consistent_scope("missense:benign", "FAIL"),
+                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
                 }
             },
             "config_pins": {
@@ -251,9 +305,9 @@ def test_finding_4_build_aggregate_v2_rejects_inconsistent_envelope() -> None:
             "research_use_disclaimer": "disclaimer",
             "reason": "reason",
             "scopes": {
-                "missense:pathogenic": {"scope_status": "VALIDATED"},
-                "missense:benign": {"scope_status": "VALIDATED"},
-                "truncating:pathogenic": {"scope_status": "VALIDATED"},
+                "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "VALIDATED"),
+                "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
+                "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
             }
         }
         scope_gate.update(scope_gate_overrides)
@@ -291,9 +345,9 @@ def test_finding_4_build_aggregate_v2_rejects_inconsistent_envelope() -> None:
     env_a = make_base_envelope({
         "full_spectrum_vus_authorized": True,
         "scopes": {
-            "missense:pathogenic": {"scope_status": "FAIL"},
-            "missense:benign": {"scope_status": "VALIDATED"},
-            "truncating:pathogenic": {"scope_status": "VALIDATED"},
+            "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
+            "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
+            "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
         }
     })
     import pytest
@@ -308,9 +362,9 @@ def test_finding_4_build_aggregate_v2_rejects_inconsistent_envelope() -> None:
     env_b = make_base_envelope({
         "research_scope_flags": {"truncating_pathogenic_research_scope_validated": True},
         "scopes": {
-            "missense:pathogenic": {"scope_status": "FAIL"},
-            "missense:benign": {"scope_status": "FAIL"},
-            "truncating:pathogenic": {"scope_status": "FAIL"},
+            "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
+            "missense:benign": _get_consistent_scope("missense:benign", "FAIL"),
+            "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "FAIL"),
         }
     })
     with pytest.raises((ValueError, AssertionError), match="inconsistent|tampered|integrity"):
@@ -364,9 +418,9 @@ def test_finding_4_build_aggregate_v2_rejects_skipped_criteria_with_authorizatio
                 "research_use_disclaimer": "disclaimer",
                 "reason": "reason",
                 "scopes": {
-                    "missense:pathogenic": {"scope_status": "FAIL"},
-                    "missense:benign": {"scope_status": "FAIL"},
-                    "truncating:pathogenic": {"scope_status": "VALIDATED"},
+                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
+                    "missense:benign": _get_consistent_scope("missense:benign", "FAIL"),
+                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
                 }
             },
             "config_pins": {
@@ -434,9 +488,9 @@ def test_blocker_1a_skips_nonempty_narrow_true_fails() -> None:
                 "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
                 "reason": "truncating validated",
                 "scopes": {
-                    "missense:pathogenic": {"scope_status": "FAIL"},
-                    "missense:benign": {"scope_status": "FAIL"},
-                    "truncating:pathogenic": {"scope_status": "VALIDATED"},
+                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
+                    "missense:benign": _get_consistent_scope("missense:benign", "FAIL"),
+                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
                 }
             },
             "config_pins": {
@@ -497,9 +551,9 @@ def test_blocker_1b_skips_nonempty_full_spectrum_true_fails() -> None:
                 "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
                 "reason": "all validated",
                 "scopes": {
-                    "missense:pathogenic": {"scope_status": "VALIDATED"},
-                    "missense:benign": {"scope_status": "VALIDATED"},
-                    "truncating:pathogenic": {"scope_status": "VALIDATED"},
+                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "VALIDATED"),
+                    "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
+                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
                 }
             },
             "config_pins": {
@@ -560,9 +614,9 @@ def test_blocker_1c_skips_nonempty_no_authorization_succeeds() -> None:
                 "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
                 "reason": "none validated",
                 "scopes": {
-                    "missense:pathogenic": {"scope_status": "FAIL"},
-                    "missense:benign": {"scope_status": "FAIL"},
-                    "truncating:pathogenic": {"scope_status": "FAIL"},
+                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
+                    "missense:benign": _get_consistent_scope("missense:benign", "FAIL"),
+                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "FAIL"),
                 }
             },
             "config_pins": {
@@ -626,7 +680,7 @@ def test_blocker_2a_missing_scope_raises_error() -> None:
                 "reason": "missing scopes",
                 "scopes": {
                     # Missing missense:pathogenic and missense:benign entirely!
-                    "truncating:pathogenic": {"scope_status": "VALIDATED"},
+                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
                 }
             },
             "config_pins": {
@@ -686,9 +740,9 @@ def test_blocker_2b_status_mismatch_fail_vs_underpowered() -> None:
                 "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
                 "reason": "one is fail",
                 "scopes": {
-                    "missense:pathogenic": {"scope_status": "FAIL"},
-                    "missense:benign": {"scope_status": "VALIDATED"},
-                    "truncating:pathogenic": {"scope_status": "VALIDATED"},
+                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
+                    "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
+                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
                 }
             },
             "config_pins": {
@@ -748,9 +802,9 @@ def test_blocker_2b_status_mismatch_underpowered_vs_fail() -> None:
                 "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
                 "reason": "mixed underpowered",
                 "scopes": {
-                    "missense:pathogenic": {"scope_status": "UNDERPOWERED"},
-                    "missense:benign": {"scope_status": "VALIDATED"},
-                    "truncating:pathogenic": {"scope_status": "VALIDATED"},
+                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "UNDERPOWERED"),
+                    "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
+                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
                 }
             },
             "config_pins": {
@@ -810,9 +864,9 @@ def test_blocker_2c_status_mismatch_validated_vs_fail() -> None:
                 "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
                 "reason": "all validated",
                 "scopes": {
-                    "missense:pathogenic": {"scope_status": "VALIDATED"},
-                    "missense:benign": {"scope_status": "VALIDATED"},
-                    "truncating:pathogenic": {"scope_status": "VALIDATED"},
+                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "VALIDATED"),
+                    "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
+                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
                 }
             },
             "config_pins": {
@@ -872,9 +926,9 @@ def test_blocker_2d_valid_mixed_status_underpowered_builds() -> None:
                 "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
                 "reason": "underpowered scope present",
                 "scopes": {
-                    "missense:pathogenic": {"scope_status": "UNDERPOWERED"},
-                    "missense:benign": {"scope_status": "VALIDATED"},
-                    "truncating:pathogenic": {"scope_status": "VALIDATED"},
+                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "UNDERPOWERED"),
+                    "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
+                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
                 }
             },
             "config_pins": {
@@ -933,9 +987,9 @@ def test_blocker_3_dispatch_helper_build_aggregate_for_envelope() -> None:
                 "research_use_disclaimer": "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
                 "reason": "reason",
                 "scopes": {
-                    "missense:pathogenic": {"scope_status": "VALIDATED"},
-                    "missense:benign": {"scope_status": "VALIDATED"},
-                    "truncating:pathogenic": {"scope_status": "VALIDATED"},
+                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "VALIDATED"),
+                    "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
+                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
                 }
             },
             "config_pins": {
@@ -1256,6 +1310,159 @@ def test_blocker_1_aggregate_trusts_forged_scope_status() -> None:
             published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
             production_policy_status="unapproved"
         )
+
+
+def test_regression_require_complete_v2_scope_evidence() -> None:
+    """GPT-5.4 Blocker RED regression test: every required v2 scope entry
+    must contain the complete serialized DirectionVerdict payload.
+    Minimal entries or entries with missing fields must raise ValueError.
+    """
+    import pytest
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+    from raptor.eval.config import (
+        _PINNED_GOVERNANCE_STATEMENTS,
+        _PINNED_RESEARCH_USE_DISCLAIMER,
+    )
+
+    def make_envelope(scopes_payload: dict) -> dict:
+        return {
+            "content_hash": "content",
+            "predictor_policy": {"status": "approved"},
+            "mask_attestation": {"removed_count": 2, "zero_survivors": True},
+            "lineage_audit": {"effective_blocking_criteria": []},
+            "verified_return_artifacts": {"a": "hash", "b": "hash"},
+            "report": {
+                "labels_snapshot": "snapshot",
+                "benchmark_size": 3,
+                "train_dev_size": 1,
+                "holdout_size": 2,
+                "holdout_label_counts": {"P": 1, "B": 1},
+                "holdout_class_counts": {"missense": 2},
+                "metrics": {"missense": {"precision": 0.5}},
+                "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
+                "scope_gate": {
+                    "schema_version": "2",
+                    "full_spectrum_status": "PASS",
+                    "full_spectrum_vus_authorized": True,
+                    "research_scope_flags": {"truncating_pathogenic_research_scope_validated": True},
+                    "governance_state": "FULL_SPECTRUM",
+                    "governance_statement": _PINNED_GOVERNANCE_STATEMENTS["FULL_SPECTRUM"],
+                    "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
+                    "reason": "all validated",
+                    "scopes": scopes_payload
+                },
+                "config_pins": {
+                    "bias_tsv_sha256": "bias",
+                    "manifest_sha256": "manifest",
+                    "mask_ledger_sha256": "ledger",
+                    "remask_audit_sha256": "remask",
+                    "return_manifest_sha256": "return",
+                    "predictor_correction_counts": {"PP3": 1, "BP4": 2},
+                    "operational_skipped_criteria": ["PM1", "PS4"],
+                    "evaluation_skipped_criteria": [],
+                    "oracle_thresholds": {
+                        "confidence": 0.95,
+                        "strata": {
+                            "missense": {
+                                "precision": 0.90,
+                                "recall": 0.85,
+                                "gating": True,
+                                "directions": ["pathogenic", "benign"]
+                            },
+                            "truncating": {
+                                "precision": 0.95,
+                                "recall": 0.95,
+                                "gating": True,
+                                "directions": ["pathogenic"]
+                            }
+                        }
+                    },
+                },
+            }
+        }
+
+    def get_valid_scopes():
+        return {
+            "missense:pathogenic": {
+                "stratum": "missense",
+                "direction": "pathogenic",
+                "precision_lb": 0.92,
+                "recall_lb": 0.87,
+                "precision_threshold": 0.90,
+                "recall_threshold": 0.85,
+                "actual_count": 40,
+                "called_count": 40,
+                "min_count": 36,
+                "coverage_adequate": True,
+                "metric_status": "MET",
+                "scope_status": "VALIDATED",
+                "reasons": []
+            },
+            "missense:benign": {
+                "stratum": "missense",
+                "direction": "benign",
+                "precision_lb": 0.92,
+                "recall_lb": 0.87,
+                "precision_threshold": 0.90,
+                "recall_threshold": 0.85,
+                "actual_count": 40,
+                "called_count": 40,
+                "min_count": 36,
+                "coverage_adequate": True,
+                "metric_status": "MET",
+                "scope_status": "VALIDATED",
+                "reasons": []
+            },
+            "truncating:pathogenic": {
+                "stratum": "truncating",
+                "direction": "pathogenic",
+                "precision_lb": 0.96,
+                "recall_lb": 0.96,
+                "precision_threshold": 0.95,
+                "recall_threshold": 0.95,
+                "actual_count": 40,
+                "called_count": 40,
+                "min_count": 36,
+                "coverage_adequate": True,
+                "metric_status": "MET",
+                "scope_status": "VALIDATED",
+                "reasons": []
+            }
+        }
+
+    # 1. Minimal entry: only {"scope_status": "VALIDATED"}
+    # This must raise ValueError, but currently doesn't (bypasses).
+    minimal_scopes = {
+        "missense:pathogenic": {"scope_status": "VALIDATED"},
+        "missense:benign": {"scope_status": "VALIDATED"},
+        "truncating:pathogenic": {"scope_status": "VALIDATED"}
+    }
+    with pytest.raises(ValueError, match="integrity|complete|missing|invalid"):
+        build_aggregate_v2(
+            make_envelope(minimal_scopes),
+            date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+    # 2. Cover missing subsets of required fields
+    required_fields = [
+        "precision_lb", "recall_lb", "precision_threshold", "recall_threshold",
+        "actual_count", "called_count", "min_count", "coverage_adequate", "metric_status",
+        "stratum", "direction", "reasons"
+    ]
+    
+    for field in required_fields:
+        scopes = get_valid_scopes()
+        # Delete required field from one scope
+        del scopes["missense:pathogenic"][field]
+        with pytest.raises(ValueError, match="integrity|complete|missing|invalid"):
+            build_aggregate_v2(
+                make_envelope(scopes),
+                date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+                published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+                production_policy_status="unapproved"
+            )
 
 
 
