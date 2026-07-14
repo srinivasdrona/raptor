@@ -1465,4 +1465,579 @@ def test_regression_require_complete_v2_scope_evidence() -> None:
             )
 
 
+# =========================================================================
+# CROSS-SURFACE INTEGRITY RED TESTS FOR GPT-5.4
+# =========================================================================
+
+def _get_cross_surface_baseline():
+    metrics = {
+        "missense": {
+            "precision": 0.95,
+            "recall": 0.90,
+            "concordance": 0.92,
+            "benign_precision": 0.95,
+            "benign_recall": 0.90,
+            "precision_lb": 0.91,
+            "recall_lb": 0.86,
+            "benign_precision_lb": 0.91,
+            "benign_recall_lb": 0.86,
+            "counts": {
+                "path_called": 40,
+                "benign_called": 40,
+                "path_actual": 40,
+                "benign_actual": 40,
+            },
+            "gating": True,
+        },
+        "truncating": {
+            "precision": 0.98,
+            "recall": 0.97,
+            "concordance": 0.98,
+            "benign_precision": 0.0,
+            "benign_recall": 0.0,
+            "precision_lb": 0.96,
+            "recall_lb": 0.96,
+            "benign_precision_lb": 0.0,
+            "benign_recall_lb": 0.0,
+            "counts": {
+                "path_called": 40,
+                "benign_called": 1,
+                "path_actual": 40,
+                "benign_actual": 1,
+            },
+            "gating": True,
+        }
+    }
+    
+    scopes = {
+        "missense:pathogenic": {
+            "stratum": "missense",
+            "direction": "pathogenic",
+            "precision_lb": 0.91,
+            "recall_lb": 0.86,
+            "precision_threshold": 0.90,
+            "recall_threshold": 0.85,
+            "actual_count": 40,
+            "called_count": 40,
+            "min_count": 36,
+            "coverage_adequate": True,
+            "metric_status": "MET",
+            "scope_status": "VALIDATED",
+            "reasons": []
+        },
+        "missense:benign": {
+            "stratum": "missense",
+            "direction": "benign",
+            "precision_lb": 0.91,
+            "recall_lb": 0.86,
+            "precision_threshold": 0.90,
+            "recall_threshold": 0.85,
+            "actual_count": 40,
+            "called_count": 40,
+            "min_count": 36,
+            "coverage_adequate": True,
+            "metric_status": "MET",
+            "scope_status": "VALIDATED",
+            "reasons": []
+        },
+        "truncating:pathogenic": {
+            "stratum": "truncating",
+            "direction": "pathogenic",
+            "precision_lb": 0.96,
+            "recall_lb": 0.96,
+            "precision_threshold": 0.95,
+            "recall_threshold": 0.95,
+            "actual_count": 40,
+            "called_count": 40,
+            "min_count": 36,
+            "coverage_adequate": True,
+            "metric_status": "MET",
+            "scope_status": "VALIDATED",
+            "reasons": []
+        },
+        "truncating:benign": {
+            "stratum": "truncating",
+            "direction": "benign",
+            "precision_lb": 0.0,
+            "recall_lb": 0.0,
+            "precision_threshold": None,
+            "recall_threshold": None,
+            "actual_count": 1,
+            "called_count": 1,
+            "min_count": 36,
+            "coverage_adequate": False,
+            "metric_status": "NO_THRESHOLD",
+            "scope_status": "DESCRIPTIVE",
+            "reasons": []
+        }
+    }
+    
+    envelope = {
+        "content_hash": "content",
+        "predictor_policy": {"status": "approved"},
+        "mask_attestation": {"removed_count": 2, "zero_survivors": True},
+        "lineage_audit": {"effective_blocking_criteria": []},
+        "verified_return_artifacts": {"a": "hash", "b": "hash"},
+        "report": {
+            "labels_snapshot": "snapshot",
+            "benchmark_size": 100,
+            "train_dev_size": 20,
+            "holdout_size": 80,
+            "holdout_label_counts": {"P": 40, "B": 40},
+            "holdout_class_counts": {"missense": 80},
+            "metrics": metrics,
+            "gate": {"status": "PASS", "stratum": "missense", "reason": "passed", "vus_authorized": True},
+            "scope_gate": {
+                "schema_version": "2",
+                "full_spectrum_status": "PASS",
+                "full_spectrum_vus_authorized": True,
+                "research_scope_flags": {"truncating_pathogenic_research_scope_validated": True},
+                "governance_state": "FULL_SPECTRUM",
+                "governance_statement": "All pre-registered research scopes are validated for research-evidence use only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+                "research_use_disclaimer": "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+                "reason": "all validated",
+                "scopes": scopes
+            },
+            "config_pins": {
+                "bias_tsv_sha256": "bias",
+                "manifest_sha256": "manifest",
+                "mask_ledger_sha256": "ledger",
+                "remask_audit_sha256": "remask",
+                "return_manifest_sha256": "return",
+                "predictor_correction_counts": {"PP3": 1, "BP4": 2},
+                "operational_skipped_criteria": ["PM1", "PS4"],
+                "evaluation_skipped_criteria": [],
+                "oracle_thresholds": {
+                    "confidence": 0.95,
+                    "strata": {
+                        "missense": {
+                            "precision": 0.90,
+                            "recall": 0.85,
+                            "gating": True,
+                            "directions": ["pathogenic", "benign"]
+                        },
+                        "truncating": {
+                            "precision": 0.95,
+                            "recall": 0.95,
+                            "gating": True,
+                            "directions": ["pathogenic"]
+                        }
+                    }
+                },
+            },
+        },
+    }
+    return envelope
+
+
+def test_cross_surface_red_1_failing_metrics_with_forged_scopes_rejected():
+    """REQUIRED RED TEST 1: Start from realistic v2 envelope with report.metrics
+    containing failing missense LBs/counts and/or legacy gate FAIL. Replace
+    scope_gate.scopes with complete internally self-consistent VALIDATED entries
+    and matching top-level auth/governance. build_aggregate_v2 must reject.
+    """
+    import pytest
+    env = _get_cross_surface_baseline()
+    
+    # Failing missense metrics
+    env["report"]["metrics"]["missense"].update({
+        "precision_lb": 0.50, # Failing
+        "recall_lb": 0.50, # Failing
+    })
+    env["report"]["gate"].update({
+        "status": "FAIL",
+        "vus_authorized": False
+    })
+    
+    # But scopes is forged to show VALIDATED, which is internally self-consistent!
+    env["report"]["scope_gate"]["scopes"]["missense:pathogenic"].update({
+        "precision_lb": 0.91,
+        "recall_lb": 0.86,
+        "scope_status": "VALIDATED",
+        "metric_status": "MET"
+    })
+    
+    # build_aggregate_v2 must cross-check and reject the forged scopes vs metrics
+    with pytest.raises(ValueError, match="cross-check|mismatch|independent|metrics"):
+        build_aggregate_v2(
+            env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+
+def test_cross_surface_red_2_thresholds_drift_from_pins_rejected():
+    """REQUIRED RED TEST 2: Scope entry thresholds drift from pins must reject.
+    - missense not exactly .90/.85;
+    - truncating:pathogenic not .95/.95;
+    - truncating:benign and metrics-only other not both None
+    must reject even if internally MET/VALIDATED.
+    """
+    import pytest
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+
+    # Case A: missense drifts to 0.80/0.80
+    env_a = _get_cross_surface_baseline()
+    env_a["report"]["scope_gate"]["scopes"]["missense:pathogenic"].update({
+        "precision_threshold": 0.80, # Drifted from 0.90
+        "precision_lb": 0.85,
+        "metric_status": "MET",
+        "scope_status": "VALIDATED"
+    })
+    with pytest.raises(ValueError, match="cross-check|mismatch|threshold|drift"):
+        build_aggregate_v2(
+            env_a, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+    # Case B: truncating:pathogenic drifts to 0.90/0.90
+    env_b = _get_cross_surface_baseline()
+    env_b["report"]["scope_gate"]["scopes"]["truncating:pathogenic"].update({
+        "precision_threshold": 0.90, # Drifted from 0.95
+        "precision_lb": 0.91,
+        "metric_status": "MET",
+        "scope_status": "VALIDATED"
+    })
+    with pytest.raises(ValueError, match="cross-check|mismatch|threshold|drift"):
+        build_aggregate_v2(
+            env_b, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+    # Case C: truncating:benign is not None threshold
+    env_c = _get_cross_surface_baseline()
+    env_c["report"]["scope_gate"]["scopes"]["truncating:benign"].update({
+        "precision_threshold": 0.50, # Drifted from None
+        "recall_threshold": 0.50,
+        "precision_lb": 0.60,
+        "recall_lb": 0.60,
+        "metric_status": "MET",
+        "scope_status": "VALIDATED"
+    })
+    with pytest.raises(ValueError, match="cross-check|mismatch|threshold|drift"):
+        build_aggregate_v2(
+            env_c, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+
+def test_cross_surface_red_3_lower_bounds_mismatch_metrics_rejected():
+    """REQUIRED RED TEST 3: Scope lower bounds differ from corresponding report.metrics
+    fields must reject:
+    - pathogenic direction uses precision_lb/recall_lb;
+    - benign uses benign_precision_lb/benign_recall_lb.
+    """
+    import pytest
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+
+    # Case A: pathogenic precision_lb mismatch
+    env_a = _get_cross_surface_baseline()
+    env_a["report"]["scope_gate"]["scopes"]["missense:pathogenic"].update({
+        "precision_lb": 0.99, # Differ from report.metrics.missense.precision_lb (0.91)
+    })
+    with pytest.raises(ValueError, match="cross-check|mismatch|lower bound|precision_lb"):
+        build_aggregate_v2(
+            env_a, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+    # Case B: benign recall_lb mismatch
+    env_b = _get_cross_surface_baseline()
+    env_b["report"]["scope_gate"]["scopes"]["missense:benign"].update({
+        "recall_lb": 0.99, # Differ from report.metrics.missense.benign_recall_lb (0.86)
+    })
+    with pytest.raises(ValueError, match="cross-check|mismatch|lower bound|benign_recall_lb"):
+        build_aggregate_v2(
+            env_b, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+
+def test_cross_surface_red_4_counts_mismatch_metrics_rejected():
+    """REQUIRED RED TEST 4: Scope actual/called counts differ from report.metrics.counts
+    path_actual/path_called or benign_actual/benign_called must reject.
+    """
+    import pytest
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+
+    # Case A: pathogenic actual_count mismatch
+    env_a = _get_cross_surface_baseline()
+    env_a["report"]["scope_gate"]["scopes"]["missense:pathogenic"].update({
+        "actual_count": 50, # Differ from report.metrics.missense.counts.path_actual (40)
+    })
+    with pytest.raises(ValueError, match="cross-check|mismatch|count|actual_count"):
+        build_aggregate_v2(
+            env_a, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+    # Case B: benign called_count mismatch
+    env_b = _get_cross_surface_baseline()
+    env_b["report"]["scope_gate"]["scopes"]["missense:benign"].update({
+        "called_count": 50, # Differ from report.metrics.missense.counts.benign_called (40)
+    })
+    with pytest.raises(ValueError, match="cross-check|mismatch|count|called_count"):
+        build_aggregate_v2(
+            env_b, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+
+def test_cross_surface_red_5_min_count_drift_rejected():
+    """REQUIRED RED TEST 5: Scope min_count must exactly 36. Drift must reject."""
+    import pytest
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+
+    env = _get_cross_surface_baseline()
+    env["report"]["scope_gate"]["scopes"]["missense:pathogenic"].update({
+        "min_count": 10, # Drifted from 36
+    })
+    with pytest.raises(ValueError, match="cross-check|mismatch|min_count|drift"):
+        build_aggregate_v2(
+            env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+
+def test_cross_surface_red_6_other_metrics_mapped_correctly():
+    """REQUIRED RED TEST 6: Required scope set matches pinned config;
+    metrics-only other scope if present must map to report's other metrics
+    and remain NO_THRESHOLD/DESCRIPTIVE. If they differ, or if other is forged
+    as validated, build_aggregate_v2 must reject.
+    """
+    import pytest
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+
+    # Case A: other stratum is present in metrics and scopes, but other:pathogenic is forged as VALIDATED!
+    env_a = _get_cross_surface_baseline()
+    env_a["report"]["metrics"]["other"] = {
+        "precision": 0.5, "recall": 0.5, "concordance": 0.5,
+        "benign_precision": 0.5, "benign_recall": 0.5,
+        "precision_lb": 0.4, "recall_lb": 0.4,
+        "benign_precision_lb": 0.4, "benign_recall_lb": 0.4,
+        "counts": {
+            "path_called": 20, "benign_called": 20,
+            "path_actual": 20, "benign_actual": 20,
+        },
+        "gating": False
+    }
+    env_a["report"]["scope_gate"]["scopes"]["other:pathogenic"] = {
+        "stratum": "other",
+        "direction": "pathogenic",
+        "precision_lb": 0.4,
+        "recall_lb": 0.4,
+        "precision_threshold": 0.3, # Forged threshold!
+        "recall_threshold": 0.3,
+        "actual_count": 20,
+        "called_count": 20,
+        "min_count": 36,
+        "coverage_adequate": False,
+        "metric_status": "MET",
+        "scope_status": "VALIDATED", # Forged status!
+        "reasons": []
+    }
+    
+    with pytest.raises(ValueError, match="cross-check|mismatch|other|threshold"):
+        build_aggregate_v2(
+            env_a, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+
+def test_cross_surface_red_7_genuine_envelope_builds_successfully():
+    """REQUIRED RED TEST 7: A genuine runner/report_to_dict envelope generated
+    by compute_report_scope_gate(metrics, config) must build successfully both
+    no-skip and PM1 parity-blocked paths.
+    """
+    from conftest import make_eval_config
+    from scripts.run_masked_holdout_eval import compute_report_scope_gate
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+    from raptor.eval.model import Metrics, GateDecision
+    from raptor.eval.report import EvalReport, report_to_dict
+    from test_scope_gate_final_blocker import make_v2_auth_config, make_oracle_thresholds
+
+    cfg = make_eval_config(
+        min_count_per_class=36,
+        oracle_thresholds=make_oracle_thresholds(),
+        scope_authorization=make_v2_auth_config()
+    )
+
+    m_missense = Metrics(
+        precision=0.95, recall=0.90, concordance=0.92,
+        counts={"path_called": 40, "benign_called": 40, "path_actual": 40, "benign_actual": 40},
+        stratum="missense", gating=True, benign_precision=0.95, benign_recall=0.90
+    )
+    m_missense.precision_lb = 0.91
+    m_missense.recall_lb = 0.86
+    m_missense.benign_precision_lb = 0.91
+    m_missense.benign_recall_lb = 0.86
+
+    m_truncating = Metrics(
+        precision=0.98, recall=0.97, concordance=0.98,
+        counts={"path_called": 40, "benign_called": 1, "path_actual": 40, "benign_actual": 1},
+        stratum="truncating", gating=True, benign_precision=0.0, benign_recall=0.0
+    )
+    m_truncating.precision_lb = 0.96
+    m_truncating.recall_lb = 0.96
+    m_truncating.benign_precision_lb = 0.0
+    m_truncating.benign_recall_lb = 0.0
+
+    metrics = {"missense": m_missense, "truncating": m_truncating}
+
+    # Case A: No skip
+    decision_a = compute_report_scope_gate(metrics, cfg, skipped=set())
+    report_a = EvalReport(
+        run_id="run-test-a", generated_at="2026-07-15", labels_snapshot="snap",
+        benchmark_size=100, train_dev_size=20, holdout_size=80,
+        holdout_label_counts={"P": 40, "B": 40}, holdout_class_counts={"missense": 80},
+        metrics=metrics,
+        gate=GateDecision(status="PASS", stratum="missense", reason="ok", vus_authorized=True),
+        scope_gate=decision_a
+    )
+    report_a.config_pins = {
+        "bias_tsv_sha256": "bias", "manifest_sha256": "manifest",
+        "mask_ledger_sha256": "ledger", "remask_audit_sha256": "remask",
+        "return_manifest_sha256": "return", "predictor_correction_counts": {"PP3": 1, "BP4": 2},
+        "operational_skipped_criteria": ["PM1", "PS4"], "evaluation_skipped_criteria": [],
+        "oracle_thresholds": make_oracle_thresholds(),
+    }
+    env_a = {
+        "content_hash": report_a.content_hash(), "predictor_policy": {"status": "approved"},
+        "mask_attestation": {"removed_count": 2, "zero_survivors": True},
+        "lineage_audit": {"effective_blocking_criteria": []}, "verified_return_artifacts": {"a": "hash", "b": "hash"},
+        "report": report_to_dict(report_a)
+    }
+    agg_a = build_aggregate_v2(
+        env_a, date="2026-07-15", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved"
+    )
+    assert agg_a["schema"] == "raptor.tsc.masked_holdout_gate.v2"
+    assert agg_a["vus_authorized"] is True
+
+    # Case B: PM1 skipped parity-blocked path
+    decision_b = compute_report_scope_gate(metrics, cfg, skipped={"PM1"})
+    report_b = EvalReport(
+        run_id="run-test-b", generated_at="2026-07-15", labels_snapshot="snap",
+        benchmark_size=100, train_dev_size=20, holdout_size=80,
+        holdout_label_counts={"P": 40, "B": 40}, holdout_class_counts={"missense": 80},
+        metrics=metrics,
+        gate=GateDecision(status="FAIL", stratum="missense", reason="below", vus_authorized=False),
+        scope_gate=decision_b
+    )
+    report_b.config_pins = {
+        "bias_tsv_sha256": "bias", "manifest_sha256": "manifest",
+        "mask_ledger_sha256": "ledger", "remask_audit_sha256": "remask",
+        "return_manifest_sha256": "return", "predictor_correction_counts": {"PP3": 1, "BP4": 2},
+        "operational_skipped_criteria": ["PM1", "PS4"], "evaluation_skipped_criteria": ["PM1"],
+        "oracle_thresholds": make_oracle_thresholds(),
+    }
+    env_b = {
+        "content_hash": report_b.content_hash(), "predictor_policy": {"status": "approved"},
+        "mask_attestation": {"removed_count": 2, "zero_survivors": True},
+        "lineage_audit": {"effective_blocking_criteria": []}, "verified_return_artifacts": {"a": "hash", "b": "hash"},
+        "report": report_to_dict(report_b)
+    }
+    agg_b = build_aggregate_v2(
+        env_b, date="2026-07-15", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved"
+    )
+    assert agg_b["schema"] == "raptor.tsc.masked_holdout_gate.v2"
+    assert agg_b["vus_authorized"] is False
+
+
+def test_cross_surface_red_8_missing_required_metrics_rejected():
+    """REQUIRED RED TEST 8: If report.metrics is missing a required stratum/field/count,
+    aggregate must reject rather than fall back to scope payload.
+    """
+    import pytest
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
+
+    # Case A: report.metrics is missing "missense" stratum entirely!
+    env_a = _get_cross_surface_baseline()
+    del env_a["report"]["metrics"]["missense"]
+    with pytest.raises(ValueError, match="cross-check|mismatch|missing|metrics"):
+        build_aggregate_v2(
+            env_a, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+    # Case B: report.metrics has "missense" but is missing counts!
+    env_b = _get_cross_surface_baseline()
+    del env_b["report"]["metrics"]["missense"]["counts"]
+    with pytest.raises(ValueError, match="cross-check|mismatch|missing|counts"):
+        build_aggregate_v2(
+            env_b, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+
+def test_cross_surface_red_9_legacy_gate_status_coexistence_validated():
+    """REQUIRED RED TEST 9: A legacy gate FAIL can coexist with scope-specific
+    truncating validation, but full-spectrum scope recomputation must match
+    report.metrics + pinned constants, and do not rely on legacy gate status.
+    """
+    env = _get_cross_surface_baseline()
+    
+    # Legacy gate status is FAIL (missense failed)
+    env["report"]["gate"].update({
+        "status": "FAIL",
+        "vus_authorized": False,
+        "stratum": "missense"
+    })
+    
+    # We modify metrics so that missense is indeed failing
+    env["report"]["metrics"]["missense"].update({
+        "precision_lb": 0.50, # FAIL
+    })
+    # And scopes show missense:pathogenic is FAIL, which is consistent with metrics!
+    env["report"]["scope_gate"]["scopes"]["missense:pathogenic"].update({
+        "precision_lb": 0.50,
+        "scope_status": "FAIL",
+        "metric_status": "UNMET"
+    })
+    # But truncating:pathogenic is VALIDATED (both in metrics and scopes)
+    env["report"]["metrics"]["truncating"].update({
+        "precision_lb": 0.96, # PASS
+    })
+    env["report"]["scope_gate"]["scopes"]["truncating:pathogenic"].update({
+        "precision_lb": 0.96,
+        "scope_status": "VALIDATED",
+        "metric_status": "MET"
+    })
+    
+    # Update other scope-gate statuses to reflect that missense failed but truncating passed
+    from raptor.eval.config import _PINNED_GOVERNANCE_STATEMENTS
+    env["report"]["scope_gate"].update({
+        "full_spectrum_status": "FAIL",
+        "full_spectrum_vus_authorized": False,
+        "research_scope_flags": {"truncating_pathogenic_research_scope_validated": True},
+        "governance_state": "TRUNCATING_PATHOGENIC_ONLY",
+        "governance_statement": _PINNED_GOVERNANCE_STATEMENTS["TRUNCATING_PATHOGENIC_ONLY"]
+    })
+    
+    # Since everything is consistent with report.metrics (including missense FAIL),
+    # this coexistence of legacy gate FAIL and v2 TRUNCATING_PATHOGENIC_ONLY must succeed.
+    agg = build_aggregate_v2(
+        env, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved"
+    )
+    assert agg["schema"] == "raptor.tsc.masked_holdout_gate.v2"
+    assert agg["vus_authorized"] is False
+    assert agg["research_scope_flags"]["truncating_pathogenic_research_scope_validated"] is True
+
+
 
