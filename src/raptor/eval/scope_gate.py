@@ -274,6 +274,74 @@ def _valid_count(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
 
 
+def canonical_direction_reasons(
+    *,
+    metric_status: str,
+    coverage_adequate: bool,
+    precision_field: str,
+    recall_field: str,
+    precision_lb: Any,
+    recall_lb: Any,
+    precision_threshold: Optional[float],
+    recall_threshold: Optional[float],
+    actual_field: str,
+    called_field: str,
+    actual_count: Any,
+    called_count: Any,
+    min_count_per_class: int,
+    actual_count_valid: bool = True,
+    called_count_valid: bool = True,
+) -> list:
+    """CANONICAL per-scope reason derivation -- the single shared source
+    used by BOTH `_direction_verdict` (the genuine runner path, via
+    `decide_scope_gate`) and `scripts.build_masked_holdout_gate_aggregate`
+    (the independent aggregate-integrity path). Deterministic given only
+    verified numeric/policy state (`metric_status`/`coverage_adequate`/
+    thresholds/lower-bounds/counts) -- NEVER given, and NEVER echoes, any
+    arbitrary envelope-supplied prose. Centralizing this here means a
+    genuine `decide_scope_gate` run and the aggregate builder's
+    independent recomputation always produce byte-identical reason text
+    for the same underlying verdict, so the aggregate's cross-check never
+    spuriously disagrees with a real run.
+    """
+    reasons: list = []
+    if not (actual_count_valid and called_count_valid):
+        if not actual_count_valid:
+            reasons.append(f"{actual_field}={actual_count!r} is not a valid non-negative integer count")
+        if not called_count_valid:
+            reasons.append(f"{called_field}={called_count!r} is not a valid non-negative integer count")
+
+    if metric_status == "UNMET":
+        precision_ok = _valid_lower_bound(precision_lb) and precision_threshold is not None and precision_lb >= precision_threshold
+        recall_ok = _valid_lower_bound(recall_lb) and recall_threshold is not None and recall_lb >= recall_threshold
+        if not precision_ok:
+            reasons.append(f"{precision_field}={precision_lb!r}<{precision_threshold!r}")
+        if not recall_ok:
+            reasons.append(f"{recall_field}={recall_lb!r}<{recall_threshold!r}")
+
+    if not coverage_adequate and actual_count_valid and called_count_valid:
+        reasons.append(
+            f"coverage inadequate: min({actual_count!r}, {called_count!r}) < {min_count_per_class!r}"
+        )
+    return reasons
+
+
+def canonical_scope_gate_reason(scope_statuses: Mapping[str, str], authorization_blockers: Optional[list] = None) -> str:
+    """CANONICAL top-level `scope_gate.reason` derivation -- the single
+    shared source used by BOTH `decide_scope_gate` (genuine runner path)
+    and the aggregate builder's independent recomputation. Deterministic
+    from the canonical, sorted per-scope `scope_status` values plus any
+    (sorted) `authorization_blockers` -- NEVER from arbitrary
+    envelope-supplied prose, so a tampered/injected `reason` string can
+    never survive into a published aggregate.
+    """
+    summary = "; ".join(f"{key}={status}" for key, status in sorted(scope_statuses.items()))
+    blockers = sorted(set(authorization_blockers)) if authorization_blockers else []
+    if blockers:
+        return "BLOCKED_POLICY: " + "; ".join(blockers) + " | " + summary
+    return summary
+
+
 def _direction_verdict(
     stratum: str,
     direction: str,
@@ -316,36 +384,37 @@ def _direction_verdict(
     actual_count_valid = _valid_count(actual_count)
     called_count_valid = _valid_count(called_count)
 
-    reasons: list = []
     coverage_adequate = (
         min_count_per_class > 0
         and actual_count_valid
         and called_count_valid
         and min(actual_count, called_count) >= min_count_per_class
     )
-    if not (actual_count_valid and called_count_valid):
-        if not actual_count_valid:
-            reasons.append(f"{actual_field}={actual_count!r} is not a valid non-negative integer count")
-        if not called_count_valid:
-            reasons.append(f"{called_field}={called_count!r} is not a valid non-negative integer count")
 
     if not has_threshold:
         metric_status = "NO_THRESHOLD"
     else:
         precision_ok = _valid_lower_bound(precision_lb) and precision_lb >= precision_threshold
         recall_ok = _valid_lower_bound(recall_lb) and recall_lb >= recall_threshold
-        if precision_ok and recall_ok:
-            metric_status = "MET"
-        else:
-            metric_status = "UNMET"
-            if not precision_ok:
-                reasons.append(f"{precision_field}={precision_lb!r}<{precision_threshold!r}")
-            if not recall_ok:
-                reasons.append(f"{recall_field}={recall_lb!r}<{recall_threshold!r}")
-    if not coverage_adequate and actual_count_valid and called_count_valid:
-        reasons.append(
-            f"coverage inadequate: min({actual_count!r}, {called_count!r}) < {min_count_per_class!r}"
-        )
+        metric_status = "MET" if (precision_ok and recall_ok) else "UNMET"
+
+    reasons = canonical_direction_reasons(
+        metric_status=metric_status,
+        coverage_adequate=coverage_adequate,
+        precision_field=precision_field,
+        recall_field=recall_field,
+        precision_lb=precision_lb,
+        recall_lb=recall_lb,
+        precision_threshold=precision_threshold,
+        recall_threshold=recall_threshold,
+        actual_field=actual_field,
+        called_field=called_field,
+        actual_count=actual_count,
+        called_count=called_count,
+        min_count_per_class=min_count_per_class,
+        actual_count_valid=actual_count_valid,
+        called_count_valid=called_count_valid,
+    )
 
     if metric_status == "NO_THRESHOLD":
         scope_status = "DESCRIPTIVE"
@@ -545,7 +614,7 @@ def decide_scope_gate(metrics: Dict[str, Metrics], config: EvalConfig) -> ScopeG
         governance_state, _FALLBACK_NONE_VALIDATED_STATEMENT
     )
 
-    reason = "; ".join(f"{key}={verdict.scope_status}" for key, verdict in sorted(scopes.items()))
+    reason = canonical_scope_gate_reason({key: verdict.scope_status for key, verdict in scopes.items()})
 
     return ScopeGateDecision(
         schema_version="2",

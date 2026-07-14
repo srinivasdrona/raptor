@@ -21,7 +21,12 @@ from raptor.eval.config import (
     _PINNED_STRATUM_THRESHOLDS,
 )
 from raptor.eval.gate import _DIRECTION_COUNT_FIELDS, _DIRECTION_LB_FIELDS
-from raptor.eval.scope_gate import _valid_count, _valid_lower_bound
+from raptor.eval.scope_gate import (
+    _valid_count,
+    _valid_lower_bound,
+    canonical_direction_reasons,
+    canonical_scope_gate_reason,
+)
 
 #: GPT-5.4 BLOCKER (minimal-scope bypass closure): the complete set of
 #: fields a v2 `scopes[...]` entry must carry -- the full serialized
@@ -478,6 +483,13 @@ def _recompute_scope_entry(scope_key: str, entry: Any, report_metrics: Any) -> d
             f"scope_gate integrity error: scopes[{scope_key!r}].reasons={reasons!r} must be a "
             "list of strings -- malformed/tampered reasons"
         )
+    # NOTE: `reasons` above is validated for SHAPE only (a list of
+    # strings) -- its CONTENT is never trusted or republished. The
+    # published `reasons` are independently derived below, after
+    # recomputation, via the shared `canonical_direction_reasons` helper
+    # (sec "canonical reasons" of the reason-integrity fix) -- an
+    # arbitrary/tampered/injected declared reason can never survive into
+    # the published aggregate.
 
     precision_threshold = entry["precision_threshold"]
     recall_threshold = entry["recall_threshold"]
@@ -632,6 +644,30 @@ def _recompute_scope_entry(scope_key: str, entry: Any, report_metrics: Any) -> d
             f"and coverage_adequate={recomputed_coverage_adequate!r} -- forged/tampered scope_status"
         )
 
+    # Reason-integrity fix: the published `reasons` are NEVER the entry's
+    # own declared `reasons` (that content was validated for SHAPE only,
+    # above) -- they are independently derived from the recomputed
+    # canonical state via the SAME shared helper `decide_scope_gate` uses
+    # (`canonical_direction_reasons`), so a genuine runner and this
+    # independent recomputation always agree, and an arbitrary/injected
+    # declared reason string can never survive into the published
+    # aggregate.
+    canonical_reasons = canonical_direction_reasons(
+        metric_status=recomputed_metric_status,
+        coverage_adequate=recomputed_coverage_adequate,
+        precision_field=canonical["lb_precision_field"],
+        recall_field=canonical["lb_recall_field"],
+        precision_lb=precision_lb,
+        recall_lb=recall_lb,
+        precision_threshold=precision_threshold,
+        recall_threshold=recall_threshold,
+        actual_field=canonical["actual_field"],
+        called_field=canonical["called_field"],
+        actual_count=actual_count,
+        called_count=called_count,
+        min_count_per_class=min_count,
+    )
+
     # BLOCKER 2 (GPT-5.4 exact-schema closure): return a FRESH canonical
     # dict built exclusively from the independently derived/validated
     # values above (never the raw `entry` object, nor a reference into it)
@@ -653,7 +689,7 @@ def _recompute_scope_entry(scope_key: str, entry: Any, report_metrics: Any) -> d
         "coverage_adequate": recomputed_coverage_adequate,
         "metric_status": recomputed_metric_status,
         "scope_status": recomputed_scope_status,
-        "reasons": list(reasons),
+        "reasons": canonical_reasons,
     }
 
 
@@ -979,9 +1015,20 @@ def build_aggregate_v2(
     before anything else is emitted -- never trusted or republished as-is.
     """
     report = envelope["report"]
-    scope_gate = report.get("scope_gate")
     canonical_thresholds = _validate_config_pins_oracle_thresholds(report.get("config_pins"))
     recomputed = _verify_scope_gate_integrity(report)
+
+    # Reason-integrity fix: the top-level `scope_gate_reason` is NEVER
+    # `scope_gate['reason']` (an arbitrary/tampered string could ride
+    # along on the envelope) -- it is independently derived, via the SAME
+    # shared helper `decide_scope_gate` uses (`canonical_scope_gate_reason`),
+    # from the recomputed/verified per-scope `scope_status` values plus the
+    # recomputed `authorization_blockers`. A genuine runner envelope
+    # therefore always round-trips to a byte-identical top-level reason.
+    canonical_scope_gate_reason_text = canonical_scope_gate_reason(
+        {key: entry["scope_status"] for key, entry in recomputed["scopes"].items()},
+        recomputed["authorization_blockers"],
+    )
 
     # Reuse the v1 builder for every field that is NOT scope-authorization
     # specific (benchmark/integrity/policy/thresholds/limitations/hashes)
@@ -1032,7 +1079,7 @@ def build_aggregate_v2(
             # blockers (e.g. `"evaluation_skipped_criteria:PM1"`) -- empty
             # when no parity break withholds an otherwise-authorized scope.
             "authorization_blockers": recomputed["authorization_blockers"],
-            "scope_gate_reason": scope_gate.get("reason", ""),
+            "scope_gate_reason": canonical_scope_gate_reason_text,
             # `metrics` is retained descriptive-only (v1 pooled values,
             # AC-S5/E1) -- never the verdict source for this v2 schema. The
             # v1 gate payload is nested under a clearly-named legacy field,
