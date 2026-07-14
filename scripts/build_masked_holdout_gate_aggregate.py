@@ -19,20 +19,21 @@ from raptor.eval.config import (
 )
 from raptor.eval.scope_gate import _valid_count, _valid_lower_bound
 
-#: BLOCKER 1 (GPT-5.4): the full set of `DirectionVerdict`-shaped numeric/
-#: axis fields. A scope entry that carries ANY of these is "shape-complete"
-#: and is subject to full independent recomputation (below) -- a scope
-#: entry that carries NONE of them is the pre-existing minimal
-#: `{"scope_status": ...}` legacy shape (still used by several genuine
-#: envelope fixtures/tests for fields unrelated to this integrity check)
-#: and is passed through unchanged: there is nothing to recompute against,
-#: so trusting its declared `scope_status` is the only option, and it
-#: carries no numeric axis to forge in the first place. Supplying SOME but
-#: not ALL of these fields is itself a malformed/tampered shape (partial
-#: threshold/axis pair) and is rejected.
-_SCOPE_NUMERIC_AXIS_FIELDS: tuple = (
+#: GPT-5.4 BLOCKER (minimal-scope bypass closure): the complete set of
+#: fields a v2 `scopes[...]` entry must carry -- the full serialized
+#: `DirectionVerdict` shape (sec 3.2 of the v2 preregistration contract),
+#: including `stratum`/`direction` (must match the scope key) and
+#: `reasons`. There is no longer a "minimal legacy" shape that skips
+#: recomputation: EVERY scope entry -- required, optional, or
+#: descriptive -- must carry every one of these fields before
+#: `_recompute_scope_entry` will independently recompute and verify it.
+#: A scope entry missing ANY of these fields raises `ValueError` before
+#: authorization is ever derived.
+_SCOPE_REQUIRED_FIELDS: tuple = (
+    "stratum", "direction",
     "precision_lb", "recall_lb", "precision_threshold", "recall_threshold",
     "actual_count", "called_count", "min_count", "coverage_adequate", "metric_status",
+    "scope_status", "reasons",
 )
 
 
@@ -126,22 +127,21 @@ def build_aggregate(
 
 
 def _recompute_scope_entry(scope_key: str, entry: Any) -> str:
-    """BLOCKER 1 (GPT-5.4) per-scope integrity boundary: `build_aggregate_v2`
-    must NEVER trust a scope entry's own `scope_status` (or `metric_status`/
-    `coverage_adequate`) at face value -- it independently RECOMPUTES all
-    three from the entry's raw numeric/count fields, using the exact same
-    canonical rules as `raptor.eval.scope_gate._direction_verdict` (sec 3.3
-    of the v2 preregistration contract), and raises `ValueError` on ANY
-    disagreement, malformed numeric/type domain, partial threshold pair,
-    scope-key/stratum/direction mismatch, or missing field.
+    """GPT-5.4 BLOCKER (minimal-scope bypass closure) per-scope integrity
+    boundary: `build_aggregate_v2` must NEVER trust a scope entry's own
+    `scope_status` (or `metric_status`/`coverage_adequate`) at face value --
+    it independently RECOMPUTES all three from the entry's raw numeric/count
+    fields, using the exact same canonical rules as
+    `raptor.eval.scope_gate._direction_verdict` (sec 3.3 of the v2
+    preregistration contract), and raises `ValueError` on ANY disagreement,
+    malformed numeric/type domain, partial threshold pair, scope-key/
+    stratum/direction mismatch, or missing field.
 
-    A minimal legacy `{"scope_status": ...}` entry (no numeric axis field
-    present at all) is passed through unchanged -- several genuine envelope
-    fixtures use that shape for concerns unrelated to this per-scope
-    numeric integrity (e.g. parity-blocker demotion), and there is no
-    numeric axis to independently verify or forge in the first place.
-    Supplying only SOME of the numeric axis fields, however, is itself a
-    malformed/tampered shape and is rejected.
+    EVERY scope entry -- required, optional, or descriptive -- must carry
+    the complete serialized `DirectionVerdict` shape (`_SCOPE_REQUIRED_FIELDS`):
+    there is no minimal/legacy `{"scope_status": ...}` shape that bypasses
+    recomputation. Any entry missing so much as one required field raises
+    `ValueError` before authorization is ever derived from it.
     """
     if not isinstance(entry, dict):
         raise ValueError(
@@ -149,27 +149,12 @@ def _recompute_scope_entry(scope_key: str, entry: Any) -> str:
             "inconsistent/tampered envelope"
         )
 
-    present_axis_fields = [f for f in _SCOPE_NUMERIC_AXIS_FIELDS if f in entry]
-    if not present_axis_fields:
-        # Legacy minimal shape -- nothing to recompute against.
-        scope_status = entry.get("scope_status")
-        if scope_status not in ("VALIDATED", "FAIL", "UNDERPOWERED", "DESCRIPTIVE"):
-            raise ValueError(
-                f"scope_gate integrity error: scopes[{scope_key!r}].scope_status={scope_status!r} "
-                "is not a recognized value -- inconsistent/tampered envelope"
-            )
-        return scope_status
-
-    missing_axis_fields = [f for f in _SCOPE_NUMERIC_AXIS_FIELDS if f not in entry]
-    if missing_axis_fields:
+    missing_fields = [f for f in _SCOPE_REQUIRED_FIELDS if f not in entry]
+    if missing_fields:
         raise ValueError(
             f"scope_gate integrity error: scopes[{scope_key!r}] is missing required field(s) "
-            f"{sorted(missing_axis_fields)!r} -- partial/tampered numeric-axis shape"
-        )
-    if "scope_status" not in entry:
-        raise ValueError(
-            f"scope_gate integrity error: scopes[{scope_key!r}] is missing required field "
-            "'scope_status' -- inconsistent/tampered envelope"
+            f"{sorted(missing_fields)!r} -- incomplete/tampered scope entry; every v2 scope must "
+            "carry the complete serialized DirectionVerdict payload"
         )
 
     expected_stratum, sep, expected_direction = scope_key.partition(":")
@@ -178,15 +163,22 @@ def _recompute_scope_entry(scope_key: str, entry: Any) -> str:
             f"scope_gate integrity error: scope key {scope_key!r} is not a valid "
             "'{stratum}:{direction}' key -- inconsistent/tampered envelope"
         )
-    if "stratum" in entry and entry["stratum"] != expected_stratum:
+    if entry["stratum"] != expected_stratum:
         raise ValueError(
             f"scope_gate integrity error: scopes[{scope_key!r}].stratum={entry['stratum']!r} "
             f"does not match its scope key -- inconsistent/tampered envelope"
         )
-    if "direction" in entry and entry["direction"] != expected_direction:
+    if entry["direction"] != expected_direction:
         raise ValueError(
             f"scope_gate integrity error: scopes[{scope_key!r}].direction={entry['direction']!r} "
             f"does not match its scope key -- inconsistent/tampered envelope"
+        )
+
+    reasons = entry["reasons"]
+    if not isinstance(reasons, list) or not all(isinstance(r, str) for r in reasons):
+        raise ValueError(
+            f"scope_gate integrity error: scopes[{scope_key!r}].reasons={reasons!r} must be a "
+            "list of strings -- malformed/tampered reasons"
         )
 
     precision_threshold = entry["precision_threshold"]
