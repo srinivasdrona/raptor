@@ -12,7 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import InitVar, asdict, dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from .config import _POOLED_OVERALL_STRATUM
 from .model import DirectionVerdict, GateDecision, Metrics, ScopeGateDecision
@@ -109,7 +109,21 @@ def report_to_dict(report: "EvalReport") -> dict:
     `scope_gate` key at all (never a `scope_gate: null`), while a v2 report
     includes the full, JSON-safe scope-gate payload. Callers building a
     report envelope (e.g. `scripts/run_masked_holdout_eval.py`) MUST use
-    this helper (not raw `asdict(report)`) to get the v2 key back."""
+    this helper (not raw `asdict(report)`) to get the v2 key back.
+
+    Restored legacy gate contract (Gemini RED, 6491b00): `gate` is a
+    mandatory, non-optional `GateDecision` on every real `EvalReport` (base
+    v1 contract, commit 329a799) -- there is no gate-less v2 report shape.
+    A hand-built report that nonetheless carries `gate is None` (typing
+    says non-optional, but nothing stops a caller from constructing one
+    with a mocked/bypassed type checker) must fail loud HERE, before any
+    serialization is attempted -- defense-in-depth, never silently emit a
+    v2-only envelope the legacy builder cannot consume."""
+    if report.gate is None:
+        raise TypeError(
+            "EvalReport.gate is None -- gate is a mandatory legacy (v1) field; "
+            "report_to_dict() refuses to serialize a report with no gate decision"
+        )
     payload = asdict(report)
     if report.scope_gate is not None:
         payload["scope_gate"] = _scope_gate_payload(report.scope_gate)
@@ -118,6 +132,8 @@ def report_to_dict(report: "EvalReport") -> dict:
 
 @dataclass
 class EvalReport:
+    run_id: str
+    generated_at: str
     labels_snapshot: str
     benchmark_size: int
     train_dev_size: int
@@ -125,14 +141,12 @@ class EvalReport:
     holdout_label_counts: Dict[str, int]
     holdout_class_counts: Dict[str, int]
     metrics: Dict[str, Metrics]
-    #: v1 VUS-authorization gate decision. `None` is accepted (in addition
-    #: to a real `GateDecision`) for a v2-only report that carries no v1
-    #: gate result at all -- `render()`/`content_hash()` simply omit every
-    #: v1-gate-specific line/key in that case (the v2 `scope_gate` section
-    #: is unaffected either way, sec ADR-0011).
-    gate: Optional[GateDecision]
-    run_id: str = ""
-    generated_at: str = ""
+    #: v1 VUS-authorization gate decision (base contract, commit 329a799):
+    #: mandatory, non-optional -- there is no gate-less v2 report shape.
+    #: `render()`/`content_hash()` may assume a real `GateDecision` here,
+    #: exactly as the base did (the v2 `scope_gate` section is additive and
+    #: unaffected either way, sec ADR-0011).
+    gate: GateDecision
     oracle_blind_findings: List[str] = field(default_factory=list)
     code_version: str = ""
     config_pins: Dict[str, Any] = field(default_factory=dict)
@@ -171,21 +185,17 @@ class EvalReport:
             "holdout_label_counts": dict(sorted(self.holdout_label_counts.items())),
             "holdout_class_counts": dict(sorted(self.holdout_class_counts.items())),
             "metrics": _metrics_payload(self.metrics),
-            "oracle_blind_findings": sorted(self.oracle_blind_findings),
-            "code_version": self.code_version,
-            "config_pins": json.loads(json.dumps(self.config_pins, sort_keys=True, default=str)),
-        }
-        # v1 gate (now optional, additive): only folded into the hash when
-        # present -- a v2-only report (`gate=None`) never carries a v1
-        # `gate` key at all, same additive pattern as `scope_gate` below.
-        if self.gate is not None:
-            payload["gate"] = {
+            "gate": {
                 "status": self.gate.status,
                 "stratum": self.gate.stratum,
                 "reason": self.gate.reason,
                 "vus_authorized": self.gate.vus_authorized,
                 "per_stratum": _per_stratum_payload(self.gate.per_stratum),
-            }
+            },
+            "oracle_blind_findings": sorted(self.oracle_blind_findings),
+            "code_version": self.code_version,
+            "config_pins": json.loads(json.dumps(self.config_pins, sort_keys=True, default=str)),
+        }
         # v2 scope-gate (ADDITIVE): only folded into the hash when present --
         # a v1-shaped report (`scope_gate=None`, the default) must hash
         # byte-identically to before this field existed (D2/AC-S7).
@@ -204,9 +214,10 @@ class EvalReport:
         the exact pinned value). When `gate.status == "BLOCKED_POLICY"` (the
         terminal masked-rerun harness only) no metrics table is printed at
         all -- there is no authorized predictor-policy artifact, so there is
-        nothing legitimate to report a number for. When `gate is None` (a
-        v2-only report), every v1-gate-specific line is simply omitted --
-        the v2 `scope_gate` section (if present) is unaffected either way.
+        nothing legitimate to report a number for. `gate` is mandatory (base
+        v1 contract, commit 329a799, restored in 6491b00) -- there is no
+        gate-less v2 report shape; the v2 `scope_gate` section (if present)
+        is unaffected either way.
 
         The reserved pooled `overall` stratum is never printed in the
         per-class metrics table (AC-S5 parity with `decide_scope_gate`) --
@@ -227,7 +238,7 @@ class EvalReport:
             f"(by label: {dict(sorted(self.holdout_label_counts.items()))}, "
             f"by class: {dict(sorted(self.holdout_class_counts.items()))})"
         )
-        if self.gate is not None and self.gate.status == "BLOCKED_POLICY":
+        if self.gate.status == "BLOCKED_POLICY":
             lines.append(
                 "metrics by stratum: WITHHELD -- gate status is BLOCKED_POLICY "
                 "(no approved bp4pp3-predictor-policy artifact; no metric is authorized "
@@ -247,7 +258,7 @@ class EvalReport:
                     f"benign_recall_lb={m.benign_recall_lb:.4f} "
                     f"counts={dict(sorted(m.counts.items()))} gating={m.gating}"
                 )
-                verdict = self.gate.per_stratum.get(stratum) if self.gate is not None else None
+                verdict = self.gate.per_stratum.get(stratum)
                 if verdict is not None:
                     threshold = verdict.threshold or {}
                     precision_t = threshold.get("precision")
@@ -259,22 +270,19 @@ class EvalReport:
                         f"(95% CI lower bound) met={verdict.met} powered={verdict.powered} "
                         f"gating={verdict.gating}"
                     )
-        if self.gate is None:
-            lines.append("gate: none (v2-only report -- no v1 gate decision present)")
+        if self.gate.status == "UNVERIFIED":
+            threshold_status = "not-yet-set (UNVERIFIED)"
+        elif self.gate.status == "PASS":
+            threshold_status = "met"
+        elif self.gate.status == "UNDERPOWERED":
+            threshold_status = "not-evaluated (UNDERPOWERED -- stratum non-gating)"
         else:
-            if self.gate.status == "UNVERIFIED":
-                threshold_status = "not-yet-set (UNVERIFIED)"
-            elif self.gate.status == "PASS":
-                threshold_status = "met"
-            elif self.gate.status == "UNDERPOWERED":
-                threshold_status = "not-evaluated (UNDERPOWERED -- stratum non-gating)"
-            else:
-                threshold_status = "not-met"
-            lines.append(
-                f"gate: status={self.gate.status} stratum={self.gate.stratum} "
-                f"threshold status={threshold_status} vus_authorized={self.gate.vus_authorized}"
-            )
-            lines.append(f"gate reason: {self.gate.reason}")
+            threshold_status = "not-met"
+        lines.append(
+            f"gate: status={self.gate.status} stratum={self.gate.stratum} "
+            f"threshold status={threshold_status} vus_authorized={self.gate.vus_authorized}"
+        )
+        lines.append(f"gate reason: {self.gate.reason}")
         if self.oracle_blind_findings:
             lines.append("oracle-blind findings:")
             for finding in self.oracle_blind_findings:

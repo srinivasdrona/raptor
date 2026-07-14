@@ -123,8 +123,14 @@ def _structurally_valid(scope_auth: Any) -> bool:
 
 
 def _registered_scopes(strata_cfg: Mapping[str, Any]) -> frozenset:
+    """Defense-in-depth (Gemini RED, 6491b00): `decide_scope_gate` already
+    rejects any non-Mapping per-stratum spec as BLOCKED_CONFIG before ever
+    calling this helper, but a non-Mapping `spec` here must still never
+    raise -- it is silently skipped (never registered), fail-closed."""
     scopes = set()
     for name, spec in strata_cfg.items():
+        if not isinstance(spec, Mapping):
+            continue
         for direction in spec.get("directions", []) or []:
             if direction in _DIRECTIONS:
                 scopes.add(_scope_key(name, direction))
@@ -530,6 +536,22 @@ def decide_scope_gate(metrics: Dict[str, Metrics], config: EvalConfig) -> ScopeG
                 "configured strata are not permitted (descriptive-only strata are handled from "
                 "metrics alone, without any config entry)"
             )
+
+        # BLOCKER 2 defense-in-depth (Gemini RED, 6491b00): each PINNED
+        # per-stratum spec (`missense`/`truncating`) must itself be a
+        # Mapping -- a hand-built `EvalConfig` may set a spec to a bare
+        # string/list/None/int, which would otherwise reach `.get(...)`
+        # calls below (`_pinned_oracle_semantics_valid`'s `isinstance`
+        # guard only `continue`s past it, silently skipping validation) and
+        # then crash `_registered_scopes`' `spec.get("directions", [])` with
+        # an `AttributeError`. Fail closed with BLOCKED_CONFIG instead --
+        # never authorize, never raise.
+        for _name, _spec in strata_cfg.items():
+            if not isinstance(_spec, Mapping):
+                return _blocked_config(
+                    f"oracle_thresholds.strata[{_name!r}] must be a mapping -- got "
+                    f"{_spec!r} ({type(_spec).__name__})"
+                )
 
     # Runtime defense-in-depth (checker finding 2): re-check the locked
     # Oracle threshold/direction/gating/confidence semantics against a
