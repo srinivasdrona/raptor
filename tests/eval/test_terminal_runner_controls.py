@@ -159,3 +159,24 @@ def test_compute_report_scope_gate_applies_skipped_criteria_fail_closed() -> Non
     assert result.research_scope_flags["truncating_pathogenic_research_scope_validated"] is False
     assert result.governance_state == "NONE_VALIDATED"
 
+
+@pytest.mark.parametrize("hand_built_auth", [{}, [], False, ""])
+def test_compute_report_scope_gate_hand_built_truthiness_does_not_return_none(
+    hand_built_auth,
+) -> None:
+    """Finding 4: Hand-built config values like {}, [], False, "" must not downgrade to None
+    but should instead go through decide_scope_gate and fail closed or return a blocked decision.
+    """
+    class MockConfig:
+        scope_authorization = hand_built_auth
+        min_count_per_class = 36
+        oracle_thresholds = {}
+
+    metrics = {}
+    result = compute_report_scope_gate(metrics, MockConfig())
+
+    assert result is not None
+    assert isinstance(result, ScopeGateDecision)
+    assert result.governance_state == "NONE_VALIDATED"
+
+

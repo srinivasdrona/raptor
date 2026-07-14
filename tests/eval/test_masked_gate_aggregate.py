@@ -387,3 +387,613 @@ def test_finding_4_build_aggregate_v2_rejects_skipped_criteria_with_authorizatio
         )
 
 
+# =========================================================================
+# ADDITIONAL GEMINI 3.5 FLASH RED REGRESSION TESTS FOR FINAL GATE BLOCKERS
+# =========================================================================
+
+def test_blocker_1a_skips_nonempty_narrow_true_fails() -> None:
+    """Blocker 1a: report.config_pins.evaluation_skipped_criteria is nonempty,
+    and a narrow research flag would otherwise be true (TRUNCATING_PATHOGENIC_ONLY).
+    This must fail loud by raising ValueError/explicit integrity error.
+    """
+    from raptor.eval.config import (
+        _PINNED_GOVERNANCE_STATEMENTS,
+        _PINNED_RESEARCH_USE_DISCLAIMER,
+    )
+    
+    envelope = {
+        "content_hash": "content",
+        "predictor_policy": {"status": "approved"},
+        "mask_attestation": {"removed_count": 2, "zero_survivors": True},
+        "lineage_audit": {"effective_blocking_criteria": []},
+        "verified_return_artifacts": {"a": "hash", "b": "hash"},
+        "report": {
+            "labels_snapshot": "snapshot",
+            "benchmark_size": 3,
+            "train_dev_size": 1,
+            "holdout_size": 2,
+            "holdout_label_counts": {"P": 1, "B": 1},
+            "holdout_class_counts": {"missense": 2},
+            "metrics": {"missense": {"precision": 0.5}},
+            "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
+            "scope_gate": {
+                "schema_version": "2",
+                "full_spectrum_status": "FAIL",
+                "full_spectrum_vus_authorized": False,
+                "research_scope_flags": {"truncating_pathogenic_research_scope_validated": True},
+                "governance_state": "TRUNCATING_PATHOGENIC_ONLY",
+                "governance_statement": _PINNED_GOVERNANCE_STATEMENTS["TRUNCATING_PATHOGENIC_ONLY"],
+                "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
+                "reason": "truncating validated",
+                "scopes": {
+                    "missense:pathogenic": {"scope_status": "FAIL"},
+                    "missense:benign": {"scope_status": "FAIL"},
+                    "truncating:pathogenic": {"scope_status": "VALIDATED"},
+                }
+            },
+            "config_pins": {
+                "bias_tsv_sha256": "bias",
+                "manifest_sha256": "manifest",
+                "mask_ledger_sha256": "ledger",
+                "remask_audit_sha256": "remask",
+                "return_manifest_sha256": "return",
+                "predictor_correction_counts": {"PP3": 1, "BP4": 2},
+                "operational_skipped_criteria": ["PM1", "PS4"],
+                "evaluation_skipped_criteria": ["PM1"],  # NON-EMPTY SKIP!
+                "oracle_thresholds": {"confidence": 0.95},
+            },
+        },
+    }
+
+    import pytest
+    with pytest.raises((ValueError, AssertionError), match="skipped|parity|authorization"):
+        build_aggregate_v2(
+            envelope, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+
+def test_blocker_1b_skips_nonempty_full_spectrum_true_fails() -> None:
+    """Blocker 1b: report.config_pins.evaluation_skipped_criteria is nonempty,
+    and full-spectrum authorization would otherwise be true.
+    This must fail loud by raising ValueError/explicit integrity error.
+    """
+    from raptor.eval.config import (
+        _PINNED_GOVERNANCE_STATEMENTS,
+        _PINNED_RESEARCH_USE_DISCLAIMER,
+    )
+    
+    envelope = {
+        "content_hash": "content",
+        "predictor_policy": {"status": "approved"},
+        "mask_attestation": {"removed_count": 2, "zero_survivors": True},
+        "lineage_audit": {"effective_blocking_criteria": []},
+        "verified_return_artifacts": {"a": "hash", "b": "hash"},
+        "report": {
+            "labels_snapshot": "snapshot",
+            "benchmark_size": 3,
+            "train_dev_size": 1,
+            "holdout_size": 2,
+            "holdout_label_counts": {"P": 1, "B": 1},
+            "holdout_class_counts": {"missense": 2},
+            "metrics": {"missense": {"precision": 0.5}},
+            "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
+            "scope_gate": {
+                "schema_version": "2",
+                "full_spectrum_status": "PASS",
+                "full_spectrum_vus_authorized": True,
+                "research_scope_flags": {"truncating_pathogenic_research_scope_validated": True},
+                "governance_state": "FULL_SPECTRUM",
+                "governance_statement": _PINNED_GOVERNANCE_STATEMENTS["FULL_SPECTRUM"],
+                "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
+                "reason": "all validated",
+                "scopes": {
+                    "missense:pathogenic": {"scope_status": "VALIDATED"},
+                    "missense:benign": {"scope_status": "VALIDATED"},
+                    "truncating:pathogenic": {"scope_status": "VALIDATED"},
+                }
+            },
+            "config_pins": {
+                "bias_tsv_sha256": "bias",
+                "manifest_sha256": "manifest",
+                "mask_ledger_sha256": "ledger",
+                "remask_audit_sha256": "remask",
+                "return_manifest_sha256": "return",
+                "predictor_correction_counts": {"PP3": 1, "BP4": 2},
+                "operational_skipped_criteria": ["PM1", "PS4"],
+                "evaluation_skipped_criteria": ["PM1"],  # NON-EMPTY SKIP!
+                "oracle_thresholds": {"confidence": 0.95},
+            },
+        },
+    }
+
+    import pytest
+    with pytest.raises((ValueError, AssertionError), match="skipped|parity|authorization"):
+        build_aggregate_v2(
+            envelope, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+
+def test_blocker_1c_skips_nonempty_no_authorization_succeeds() -> None:
+    """Blocker 1c: report.config_pins.evaluation_skipped_criteria is nonempty,
+    but no authorization is true (NONE_VALIDATED state). This must succeed
+    and publish.
+    """
+    from raptor.eval.config import (
+        _PINNED_GOVERNANCE_STATEMENTS,
+        _PINNED_RESEARCH_USE_DISCLAIMER,
+    )
+    
+    envelope = {
+        "content_hash": "content",
+        "predictor_policy": {"status": "approved"},
+        "mask_attestation": {"removed_count": 2, "zero_survivors": True},
+        "lineage_audit": {"effective_blocking_criteria": []},
+        "verified_return_artifacts": {"a": "hash", "b": "hash"},
+        "report": {
+            "labels_snapshot": "snapshot",
+            "benchmark_size": 3,
+            "train_dev_size": 1,
+            "holdout_size": 2,
+            "holdout_label_counts": {"P": 1, "B": 1},
+            "holdout_class_counts": {"missense": 2},
+            "metrics": {"missense": {"precision": 0.5}},
+            "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
+            "scope_gate": {
+                "schema_version": "2",
+                "full_spectrum_status": "FAIL",
+                "full_spectrum_vus_authorized": False,
+                "research_scope_flags": {"truncating_pathogenic_research_scope_validated": False},
+                "governance_state": "NONE_VALIDATED",
+                "governance_statement": _PINNED_GOVERNANCE_STATEMENTS["NONE_VALIDATED"],
+                "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
+                "reason": "none validated",
+                "scopes": {
+                    "missense:pathogenic": {"scope_status": "FAIL"},
+                    "missense:benign": {"scope_status": "FAIL"},
+                    "truncating:pathogenic": {"scope_status": "FAIL"},
+                }
+            },
+            "config_pins": {
+                "bias_tsv_sha256": "bias",
+                "manifest_sha256": "manifest",
+                "mask_ledger_sha256": "ledger",
+                "remask_audit_sha256": "remask",
+                "return_manifest_sha256": "return",
+                "predictor_correction_counts": {"PP3": 1, "BP4": 2},
+                "operational_skipped_criteria": ["PM1", "PS4"],
+                "evaluation_skipped_criteria": ["PM1"],  # NON-EMPTY SKIP!
+                "oracle_thresholds": {"confidence": 0.95},
+            },
+        },
+    }
+
+    # This should succeed since there is no active authorization
+    agg = build_aggregate_v2(
+        envelope, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved"
+    )
+    assert agg["schema"] == "raptor.tsc.masked_holdout_gate.v2"
+    assert agg["vus_authorized"] is False
+    assert agg["research_scope_flags"]["truncating_pathogenic_research_scope_validated"] is False
+
+
+def test_blocker_2a_missing_scope_raises_error() -> None:
+    """Blocker 2a: All pinned full-spectrum scopes must be present.
+    Missing any of them (e.g. missense:pathogenic or missense:benign or truncating:pathogenic)
+    must raise ValueError or explicit integrity error.
+    """
+    from raptor.eval.config import (
+        _PINNED_GOVERNANCE_STATEMENTS,
+        _PINNED_RESEARCH_USE_DISCLAIMER,
+    )
+    
+    envelope = {
+        "content_hash": "content",
+        "predictor_policy": {"status": "approved"},
+        "mask_attestation": {"removed_count": 2, "zero_survivors": True},
+        "lineage_audit": {"effective_blocking_criteria": []},
+        "verified_return_artifacts": {"a": "hash", "b": "hash"},
+        "report": {
+            "labels_snapshot": "snapshot",
+            "benchmark_size": 3,
+            "train_dev_size": 1,
+            "holdout_size": 2,
+            "holdout_label_counts": {"P": 1, "B": 1},
+            "holdout_class_counts": {"missense": 2},
+            "metrics": {"missense": {"precision": 0.5}},
+            "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
+            "scope_gate": {
+                "schema_version": "2",
+                "full_spectrum_status": "FAIL",
+                "full_spectrum_vus_authorized": False,
+                "research_scope_flags": {"truncating_pathogenic_research_scope_validated": True},
+                "governance_state": "TRUNCATING_PATHOGENIC_ONLY",
+                "governance_statement": _PINNED_GOVERNANCE_STATEMENTS["TRUNCATING_PATHOGENIC_ONLY"],
+                "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
+                "reason": "missing scopes",
+                "scopes": {
+                    # Missing missense:pathogenic and missense:benign entirely!
+                    "truncating:pathogenic": {"scope_status": "VALIDATED"},
+                }
+            },
+            "config_pins": {
+                "bias_tsv_sha256": "bias",
+                "manifest_sha256": "manifest",
+                "mask_ledger_sha256": "ledger",
+                "remask_audit_sha256": "remask",
+                "return_manifest_sha256": "return",
+                "predictor_correction_counts": {"PP3": 1, "BP4": 2},
+                "operational_skipped_criteria": ["PM1", "PS4"],
+                "evaluation_skipped_criteria": [],
+                "oracle_thresholds": {"confidence": 0.95},
+            },
+        },
+    }
+
+    import pytest
+    with pytest.raises((ValueError, AssertionError), match="scopes|missing|integrity"):
+        build_aggregate_v2(
+            envelope, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+
+def test_blocker_2b_status_mismatch_fail_vs_underpowered() -> None:
+    """Blocker 2b: missense:pathogenic is FAIL, but envelope says UNDERPOWERED.
+    Must raise ValueError / reject.
+    """
+    from raptor.eval.config import (
+        _PINNED_GOVERNANCE_STATEMENTS,
+        _PINNED_RESEARCH_USE_DISCLAIMER,
+    )
+    
+    envelope = {
+        "content_hash": "content",
+        "predictor_policy": {"status": "approved"},
+        "mask_attestation": {"removed_count": 2, "zero_survivors": True},
+        "lineage_audit": {"effective_blocking_criteria": []},
+        "verified_return_artifacts": {"a": "hash", "b": "hash"},
+        "report": {
+            "labels_snapshot": "snapshot",
+            "benchmark_size": 3,
+            "train_dev_size": 1,
+            "holdout_size": 2,
+            "holdout_label_counts": {"P": 1, "B": 1},
+            "holdout_class_counts": {"missense": 2},
+            "metrics": {"missense": {"precision": 0.5}},
+            "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
+            "scope_gate": {
+                "schema_version": "2",
+                "full_spectrum_status": "UNDERPOWERED",  # MISMATCH! Recomputation must say FAIL because missense:pathogenic is FAIL.
+                "full_spectrum_vus_authorized": False,
+                "research_scope_flags": {"truncating_pathogenic_research_scope_validated": True},
+                "governance_state": "TRUNCATING_PATHOGENIC_ONLY",
+                "governance_statement": _PINNED_GOVERNANCE_STATEMENTS["TRUNCATING_PATHOGENIC_ONLY"],
+                "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
+                "reason": "one is fail",
+                "scopes": {
+                    "missense:pathogenic": {"scope_status": "FAIL"},
+                    "missense:benign": {"scope_status": "VALIDATED"},
+                    "truncating:pathogenic": {"scope_status": "VALIDATED"},
+                }
+            },
+            "config_pins": {
+                "bias_tsv_sha256": "bias",
+                "manifest_sha256": "manifest",
+                "mask_ledger_sha256": "ledger",
+                "remask_audit_sha256": "remask",
+                "return_manifest_sha256": "return",
+                "predictor_correction_counts": {"PP3": 1, "BP4": 2},
+                "operational_skipped_criteria": ["PM1", "PS4"],
+                "evaluation_skipped_criteria": [],
+                "oracle_thresholds": {"confidence": 0.95},
+            },
+        },
+    }
+
+    import pytest
+    with pytest.raises((ValueError, AssertionError), match="status|mismatch|integrity"):
+        build_aggregate_v2(
+            envelope, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+
+def test_blocker_2b_status_mismatch_underpowered_vs_fail() -> None:
+    """Blocker 2b: missense:pathogenic is UNDERPOWERED, but envelope says FAIL.
+    Must raise ValueError / reject.
+    """
+    from raptor.eval.config import (
+        _PINNED_GOVERNANCE_STATEMENTS,
+        _PINNED_RESEARCH_USE_DISCLAIMER,
+    )
+    
+    envelope = {
+        "content_hash": "content",
+        "predictor_policy": {"status": "approved"},
+        "mask_attestation": {"removed_count": 2, "zero_survivors": True},
+        "lineage_audit": {"effective_blocking_criteria": []},
+        "verified_return_artifacts": {"a": "hash", "b": "hash"},
+        "report": {
+            "labels_snapshot": "snapshot",
+            "benchmark_size": 3,
+            "train_dev_size": 1,
+            "holdout_size": 2,
+            "holdout_label_counts": {"P": 1, "B": 1},
+            "holdout_class_counts": {"missense": 2},
+            "metrics": {"missense": {"precision": 0.5}},
+            "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
+            "scope_gate": {
+                "schema_version": "2",
+                "full_spectrum_status": "FAIL",  # MISMATCH! Recomputed must be UNDERPOWERED (no FAIL is present).
+                "full_spectrum_vus_authorized": False,
+                "research_scope_flags": {"truncating_pathogenic_research_scope_validated": True},
+                "governance_state": "TRUNCATING_PATHOGENIC_ONLY",
+                "governance_statement": _PINNED_GOVERNANCE_STATEMENTS["TRUNCATING_PATHOGENIC_ONLY"],
+                "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
+                "reason": "mixed underpowered",
+                "scopes": {
+                    "missense:pathogenic": {"scope_status": "UNDERPOWERED"},
+                    "missense:benign": {"scope_status": "VALIDATED"},
+                    "truncating:pathogenic": {"scope_status": "VALIDATED"},
+                }
+            },
+            "config_pins": {
+                "bias_tsv_sha256": "bias",
+                "manifest_sha256": "manifest",
+                "mask_ledger_sha256": "ledger",
+                "remask_audit_sha256": "remask",
+                "return_manifest_sha256": "return",
+                "predictor_correction_counts": {"PP3": 1, "BP4": 2},
+                "operational_skipped_criteria": ["PM1", "PS4"],
+                "evaluation_skipped_criteria": [],
+                "oracle_thresholds": {"confidence": 0.95},
+            },
+        },
+    }
+
+    import pytest
+    with pytest.raises((ValueError, AssertionError), match="status|mismatch|integrity"):
+        build_aggregate_v2(
+            envelope, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+
+def test_blocker_2c_status_mismatch_validated_vs_fail() -> None:
+    """Blocker 2c: All required scopes validated (PASS), but envelope says FAIL/UNDERPOWERED.
+    Must raise ValueError / reject.
+    """
+    from raptor.eval.config import (
+        _PINNED_GOVERNANCE_STATEMENTS,
+        _PINNED_RESEARCH_USE_DISCLAIMER,
+    )
+    
+    envelope = {
+        "content_hash": "content",
+        "predictor_policy": {"status": "approved"},
+        "mask_attestation": {"removed_count": 2, "zero_survivors": True},
+        "lineage_audit": {"effective_blocking_criteria": []},
+        "verified_return_artifacts": {"a": "hash", "b": "hash"},
+        "report": {
+            "labels_snapshot": "snapshot",
+            "benchmark_size": 3,
+            "train_dev_size": 1,
+            "holdout_size": 2,
+            "holdout_label_counts": {"P": 1, "B": 1},
+            "holdout_class_counts": {"missense": 2},
+            "metrics": {"missense": {"precision": 0.5}},
+            "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
+            "scope_gate": {
+                "schema_version": "2",
+                "full_spectrum_status": "FAIL",  # MISMATCH! All required VALIDATED => recomputed status should be PASS.
+                "full_spectrum_vus_authorized": True,
+                "research_scope_flags": {"truncating_pathogenic_research_scope_validated": True},
+                "governance_state": "FULL_SPECTRUM",
+                "governance_statement": _PINNED_GOVERNANCE_STATEMENTS["FULL_SPECTRUM"],
+                "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
+                "reason": "all validated",
+                "scopes": {
+                    "missense:pathogenic": {"scope_status": "VALIDATED"},
+                    "missense:benign": {"scope_status": "VALIDATED"},
+                    "truncating:pathogenic": {"scope_status": "VALIDATED"},
+                }
+            },
+            "config_pins": {
+                "bias_tsv_sha256": "bias",
+                "manifest_sha256": "manifest",
+                "mask_ledger_sha256": "ledger",
+                "remask_audit_sha256": "remask",
+                "return_manifest_sha256": "return",
+                "predictor_correction_counts": {"PP3": 1, "BP4": 2},
+                "operational_skipped_criteria": ["PM1", "PS4"],
+                "evaluation_skipped_criteria": [],
+                "oracle_thresholds": {"confidence": 0.95},
+            },
+        },
+    }
+
+    import pytest
+    with pytest.raises((ValueError, AssertionError), match="status|mismatch|integrity"):
+        build_aggregate_v2(
+            envelope, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+            published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="unapproved"
+        )
+
+
+def test_blocker_2d_valid_mixed_status_underpowered_builds() -> None:
+    """Blocker 2d: Mixed scopes with one UNDERPOWERED and no FAIL should recompute
+    to UNDERPOWERED and build successfully if matched.
+    """
+    from raptor.eval.config import (
+        _PINNED_GOVERNANCE_STATEMENTS,
+        _PINNED_RESEARCH_USE_DISCLAIMER,
+    )
+    
+    envelope = {
+        "content_hash": "content",
+        "predictor_policy": {"status": "approved"},
+        "mask_attestation": {"removed_count": 2, "zero_survivors": True},
+        "lineage_audit": {"effective_blocking_criteria": []},
+        "verified_return_artifacts": {"a": "hash", "b": "hash"},
+        "report": {
+            "labels_snapshot": "snapshot",
+            "benchmark_size": 3,
+            "train_dev_size": 1,
+            "holdout_size": 2,
+            "holdout_label_counts": {"P": 1, "B": 1},
+            "holdout_class_counts": {"missense": 2},
+            "metrics": {"missense": {"precision": 0.5}},
+            "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
+            "scope_gate": {
+                "schema_version": "2",
+                "full_spectrum_status": "UNDERPOWERED",  # MATCHES expected recomputed status (no FAIL, but not all VALIDATED)
+                "full_spectrum_vus_authorized": False,
+                "research_scope_flags": {"truncating_pathogenic_research_scope_validated": True},
+                "governance_state": "TRUNCATING_PATHOGENIC_ONLY",
+                "governance_statement": _PINNED_GOVERNANCE_STATEMENTS["TRUNCATING_PATHOGENIC_ONLY"],
+                "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
+                "reason": "underpowered scope present",
+                "scopes": {
+                    "missense:pathogenic": {"scope_status": "UNDERPOWERED"},
+                    "missense:benign": {"scope_status": "VALIDATED"},
+                    "truncating:pathogenic": {"scope_status": "VALIDATED"},
+                }
+            },
+            "config_pins": {
+                "bias_tsv_sha256": "bias",
+                "manifest_sha256": "manifest",
+                "mask_ledger_sha256": "ledger",
+                "remask_audit_sha256": "remask",
+                "return_manifest_sha256": "return",
+                "predictor_correction_counts": {"PP3": 1, "BP4": 2},
+                "operational_skipped_criteria": ["PM1", "PS4"],
+                "evaluation_skipped_criteria": [],
+                "oracle_thresholds": {"confidence": 0.95},
+            },
+        },
+    }
+
+    # Since mixed UNDERPOWERED matched correctly, this must build successfully.
+    agg = build_aggregate_v2(
+        envelope, date="2026-07-14", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved"
+    )
+    assert agg["schema"] == "raptor.tsc.masked_holdout_gate.v2"
+    assert agg["full_spectrum_status"] == "UNDERPOWERED"
+
+
+def test_blocker_3_dispatch_helper_build_aggregate_for_envelope() -> None:
+    """Blocker 3: Test that build_aggregate_for_envelope dispatches to build_aggregate_v2
+    or build_aggregate depending on the presence of scope_gate.
+    """
+    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_for_envelope
+
+    # 1. Envelope with non-null scope_gate should yield v2 schema
+    envelope_v2 = {
+        "content_hash": "content",
+        "predictor_policy": {"status": "approved"},
+        "mask_attestation": {"removed_count": 2, "zero_survivors": True},
+        "lineage_audit": {"effective_blocking_criteria": []},
+        "verified_return_artifacts": {"a": "hash", "b": "hash"},
+        "report": {
+            "labels_snapshot": "snapshot",
+            "benchmark_size": 3,
+            "train_dev_size": 1,
+            "holdout_size": 2,
+            "holdout_label_counts": {"P": 1, "B": 1},
+            "holdout_class_counts": {"missense": 2},
+            "metrics": {"missense": {"precision": 0.5}},
+            "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
+            "scope_gate": {
+                "schema_version": "2",
+                "full_spectrum_status": "PASS",
+                "full_spectrum_vus_authorized": True,
+                "research_scope_flags": {"truncating_pathogenic_research_scope_validated": True},
+                "governance_state": "FULL_SPECTRUM",
+                "governance_statement": "All pre-registered research scopes are validated for research-evidence use only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+                "research_use_disclaimer": "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+                "reason": "reason",
+                "scopes": {
+                    "missense:pathogenic": {"scope_status": "VALIDATED"},
+                    "missense:benign": {"scope_status": "VALIDATED"},
+                    "truncating:pathogenic": {"scope_status": "VALIDATED"},
+                }
+            },
+            "config_pins": {
+                "bias_tsv_sha256": "bias",
+                "manifest_sha256": "manifest",
+                "mask_ledger_sha256": "ledger",
+                "remask_audit_sha256": "remask",
+                "return_manifest_sha256": "return",
+                "predictor_correction_counts": {"PP3": 1, "BP4": 2},
+                "operational_skipped_criteria": ["PM1", "PS4"],
+                "evaluation_skipped_criteria": [],
+                "oracle_thresholds": {"confidence": 0.95},
+            },
+        },
+    }
+
+    res_v2 = build_aggregate_for_envelope(
+        envelope_v2,
+        date="2026-07-14",
+        terminal_json_hash="j",
+        terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 0},
+        reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved",
+    )
+    assert res_v2["schema"] == "raptor.tsc.masked_holdout_gate.v2"
+
+    # 2. Envelope with no scope_gate should yield v1 schema
+    envelope_v1 = {
+        "content_hash": "content",
+        "predictor_policy": {"status": "approved"},
+        "mask_attestation": {"removed_count": 2, "zero_survivors": True},
+        "lineage_audit": {"effective_blocking_criteria": []},
+        "verified_return_artifacts": {"a": "hash", "b": "hash"},
+        "report": {
+            "labels_snapshot": "snapshot",
+            "benchmark_size": 3,
+            "train_dev_size": 1,
+            "holdout_size": 2,
+            "holdout_label_counts": {"P": 1, "B": 1},
+            "holdout_class_counts": {"missense": 2},
+            "metrics": {"missense": {"precision": 0.5}},
+            "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
+            "config_pins": {
+                "bias_tsv_sha256": "bias",
+                "manifest_sha256": "manifest",
+                "mask_ledger_sha256": "ledger",
+                "remask_audit_sha256": "remask",
+                "return_manifest_sha256": "return",
+                "predictor_correction_counts": {"PP3": 1, "BP4": 2},
+                "operational_skipped_criteria": ["PM1", "PS4"],
+                "evaluation_skipped_criteria": ["PM1"],
+                "oracle_thresholds": {"confidence": 0.95},
+            },
+        },
+    }
+
+    res_v1 = build_aggregate_for_envelope(
+        envelope_v1,
+        date="2026-07-14",
+        terminal_json_hash="j",
+        terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 0},
+        reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved",
+    )
+    assert res_v1["schema"] == "raptor.tsc.masked_holdout_gate.v1"
+
+
