@@ -2743,6 +2743,223 @@ def test_aggregate_cli_bootstrap() -> None:
     assert "usage:" in result.stdout.lower() or "options:" in result.stdout.lower()
 
 
+# =========================================================================
+# GEMINI 3.5 FLASH RED TESTS FOR AGGREGATE LIMITATIONS (GPT-5.4 BLOCKER)
+# =========================================================================
+
+def test_v2_limitations_genuine_no_skip():
+    """RED TEST 1: Genuine no-skip v2 envelope/roundtrip where policy.pm1_status == scored.
+    The limitations list must NOT contain any claim that PM1 was excluded, skipped,
+    or has zero support.
+    """
+    env = _get_cross_surface_baseline()
+    # No PM1 in evaluation_skipped_criteria, so pm1_status is "scored"
+    env["report"]["config_pins"]["evaluation_skipped_criteria"] = []
+    
+    agg = build_aggregate_v2(
+        env, date="2026-07-15", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 5}, reproduced_pm1_scope={"reachable_pm1_rows": 5},
+        production_policy_status="unapproved"
+    )
+    
+    assert agg["policy"]["pm1_status"] == "scored"
+    
+    # Verify that the limitations list does NOT contain any PM1 exclusion/skip claims
+    limitations = agg["limitations"]
+    for lim in limitations:
+        assert "PM1 was excluded" not in lim
+        assert "PM1 remains unvalidated" not in lim
+        assert "zero support" not in lim
+        assert "skipped" not in lim.lower()
+
+
+def test_v2_limitations_pm1_skipped_parity_block():
+    """RED TEST 2: Genuine PM1-skipped parity-block v2 envelope.
+    The policy.pm1_status must reflect the skip, and limitations MUST include
+    the accurate PM1 exclusion statement.
+    """
+    env = _get_cross_surface_baseline()
+    # Trigger a PM1 parity blocker
+    env["report"]["config_pins"]["evaluation_skipped_criteria"] = ["PM1"]
+    env["report"]["scope_gate"]["authorization_blockers"] = ["evaluation_skipped_criteria:PM1"]
+    env["report"]["scope_gate"]["full_spectrum_vus_authorized"] = False
+    env["report"]["scope_gate"]["full_spectrum_status"] = "BLOCKED_POLICY"
+    env["report"]["scope_gate"]["research_scope_flags"] = {
+        "truncating_pathogenic_research_scope_validated": False
+    }
+    env["report"]["scope_gate"]["governance_state"] = "NONE_VALIDATED"
+    env["report"]["scope_gate"]["governance_statement"] = (
+        "Full-spectrum VUS automation is not authorized; no pre-registered research scope is currently validated."
+    )
+    env["report"]["scope_gate"]["reason"] = "PM1 skipped"
+    
+    agg = build_aggregate_v2(
+        env, date="2026-07-15", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved"
+    )
+    
+    assert agg["policy"]["pm1_status"] == "SKIPPED_ZERO_SUPPORT_BASELINE_MISMATCH"
+    
+    # Limitations must include the PM1 exclusion statement
+    expected_statement = "PM1 was excluded from this fixed evaluation after both published and reproduced resources had zero held-out-reachable rows; production PM1 remains unvalidated."
+    assert expected_statement in agg["limitations"]
+
+
+def test_v2_other_limitations_remain_accurate():
+    """RED TEST 3: Other limitations (evaluation-only BP4/PP3 and nonclinical no authorization)
+    remain accurate and present as appropriate, regardless of PM1 skip status.
+    """
+    # Case A: no-skip
+    env_noskip = _get_cross_surface_baseline()
+    agg_noskip = build_aggregate_v2(
+        env_noskip, date="2026-07-15", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 5}, reproduced_pm1_scope={"reachable_pm1_rows": 5},
+        production_policy_status="unapproved"
+    )
+    
+    # Case B: skipped
+    env_skip = _get_cross_surface_baseline()
+    env_skip["report"]["config_pins"]["evaluation_skipped_criteria"] = ["PM1"]
+    env_skip["report"]["scope_gate"]["authorization_blockers"] = ["evaluation_skipped_criteria:PM1"]
+    env_skip["report"]["scope_gate"]["full_spectrum_vus_authorized"] = False
+    env_skip["report"]["scope_gate"]["full_spectrum_status"] = "BLOCKED_POLICY"
+    env_skip["report"]["scope_gate"]["research_scope_flags"] = {
+        "truncating_pathogenic_research_scope_validated": False
+    }
+    env_skip["report"]["scope_gate"]["governance_state"] = "NONE_VALIDATED"
+    env_skip["report"]["scope_gate"]["governance_statement"] = (
+        "Full-spectrum VUS automation is not authorized; no pre-registered research scope is currently validated."
+    )
+    agg_skip = build_aggregate_v2(
+        env_skip, date="2026-07-15", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved"
+    )
+    
+    other_expected = [
+        "The evaluation-only BP4/PP3 approval does not approve production candidate policy or variant classifications.",
+        "No VUS worklist, clinical classification, or ClinVar submission is authorized."
+    ]
+    
+    for agg in (agg_noskip, agg_skip):
+        for expected in other_expected:
+            assert expected in agg["limitations"]
+
+
+def test_v2_limitation_derivation_is_dynamic():
+    """RED TEST 4: Limitation derivation uses evaluation_skipped_criteria/pm1_status,
+    not stale fixed-run text.
+    """
+    env = _get_cross_surface_baseline()
+    # Test that the PM1 limitation inclusion is dynamic. If we dynamically toggle
+    # the skip status, the presence of the PM1 limitation matches it.
+    
+    # No skip -> No PM1 limitation
+    env["report"]["config_pins"]["evaluation_skipped_criteria"] = []
+    agg_noskip = build_aggregate_v2(
+        env, date="2026-07-15", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 5}, reproduced_pm1_scope={"reachable_pm1_rows": 5},
+        production_policy_status="unapproved"
+    )
+    assert not any("PM1" in lim for lim in agg_noskip["limitations"])
+    
+    # Skipped -> Has PM1 limitation
+    env["report"]["config_pins"]["evaluation_skipped_criteria"] = ["PM1"]
+    env["report"]["scope_gate"]["authorization_blockers"] = ["evaluation_skipped_criteria:PM1"]
+    env["report"]["scope_gate"]["full_spectrum_vus_authorized"] = False
+    env["report"]["scope_gate"]["full_spectrum_status"] = "BLOCKED_POLICY"
+    env["report"]["scope_gate"]["research_scope_flags"] = {
+        "truncating_pathogenic_research_scope_validated": False
+    }
+    env["report"]["scope_gate"]["governance_state"] = "NONE_VALIDATED"
+    env["report"]["scope_gate"]["governance_statement"] = (
+        "Full-spectrum VUS automation is not authorized; no pre-registered research scope is currently validated."
+    )
+    agg_skip = build_aggregate_v2(
+        env, date="2026-07-15", terminal_json_hash="j", terminal_report_hash="t",
+        published_pm1_scope={"reachable_pm1_rows": 0}, reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved"
+    )
+    assert any("PM1 was excluded" in lim for lim in agg_skip["limitations"])
+
+
+def test_v1_historical_limitations_remain_unchanged():
+    """RED TEST 5: v1 builder historical output remains unchanged and still contains
+    historical limitations regardless of config.
+    """
+    envelope = {
+        "content_hash": "content",
+        "predictor_policy": {"status": "approved"},
+        "mask_attestation": {
+            "removed_count": 2,
+            "zero_survivors": True,
+        },
+        "lineage_audit": {"effective_blocking_criteria": []},
+        "verified_return_artifacts": {"a": "hash", "b": "hash"},
+        "report": {
+            "labels_snapshot": "snapshot",
+            "benchmark_size": 3,
+            "train_dev_size": 1,
+            "holdout_size": 2,
+            "holdout_label_counts": {"P": 1, "B": 1},
+            "holdout_class_counts": {"missense": 2},
+            "metrics": {"missense": {"precision": 0.5}},
+            "gate": {
+                "status": "FAIL",
+                "stratum": "missense",
+                "reason": "below threshold",
+                "vus_authorized": False,
+                "per_stratum": {},
+            },
+            "config_pins": {
+                "bias_tsv_sha256": "bias",
+                "manifest_sha256": "manifest",
+                "mask_ledger_sha256": "ledger",
+                "remask_audit_sha256": "remask",
+                "return_manifest_sha256": "return",
+                "predictor_correction_counts": {"PP3": 1, "BP4": 2},
+                "operational_skipped_criteria": ["PM1", "PS4"],
+                "evaluation_skipped_criteria": [],  # No skip, so pm1_status == "scored"
+                "oracle_thresholds": {"confidence": 0.95},
+            },
+        },
+    }
+
+    # Case A: Build v1 aggregate with evaluation_skipped_criteria = []
+    # Even though PM1 is scored, v1 historical output MUST contain the hardcoded limitation!
+    agg_noskip = build_aggregate(
+        envelope,
+        date="2026-07-15",
+        terminal_json_hash="json",
+        terminal_report_hash="text",
+        published_pm1_scope={"reachable_pm1_rows": 5},
+        reproduced_pm1_scope={"reachable_pm1_rows": 5},
+        production_policy_status="unapproved",
+    )
+    assert agg_noskip["policy"]["pm1_status"] == "scored"
+    assert "PM1 was excluded from this fixed evaluation after both published and reproduced resources had zero held-out-reachable rows; production PM1 remains unvalidated." in agg_noskip["limitations"]
+
+    # Case B: Build v1 aggregate with evaluation_skipped_criteria = ["PM1"]
+    envelope_skip = dict(envelope)
+    envelope_skip["report"] = dict(envelope["report"])
+    envelope_skip["report"]["config_pins"] = dict(envelope["report"]["config_pins"])
+    envelope_skip["report"]["config_pins"]["evaluation_skipped_criteria"] = ["PM1"]
+    
+    agg_skip = build_aggregate(
+        envelope_skip,
+        date="2026-07-15",
+        terminal_json_hash="json",
+        terminal_report_hash="text",
+        published_pm1_scope={"reachable_pm1_rows": 0},
+        reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="unapproved",
+    )
+    assert agg_skip["policy"]["pm1_status"] == "SKIPPED_ZERO_SUPPORT_BASELINE_MISMATCH"
+    assert "PM1 was excluded from this fixed evaluation after both published and reproduced resources had zero held-out-reachable rows; production PM1 remains unvalidated." in agg_skip["limitations"]
+
+
+
 
 
 
