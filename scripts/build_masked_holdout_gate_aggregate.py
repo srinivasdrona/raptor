@@ -400,7 +400,7 @@ def _derive_canonical_scope_from_metrics(
     }
 
 
-def _recompute_scope_entry(scope_key: str, entry: Any, report_metrics: Any) -> str:
+def _recompute_scope_entry(scope_key: str, entry: Any, report_metrics: Any) -> dict:
     """GPT-5.4 BLOCKER (minimal-scope bypass closure) per-scope integrity
     boundary: `build_aggregate_v2` must NEVER trust a scope entry's own
     `scope_status` (or `metric_status`/`coverage_adequate`) at face value --
@@ -409,13 +409,21 @@ def _recompute_scope_entry(scope_key: str, entry: Any, report_metrics: Any) -> s
     `raptor.eval.scope_gate._direction_verdict` (sec 3.3 of the v2
     preregistration contract), and raises `ValueError` on ANY disagreement,
     malformed numeric/type domain, partial threshold pair, scope-key/
-    stratum/direction mismatch, or missing field.
+    stratum/direction mismatch, missing field, or unknown/extra field.
 
     EVERY scope entry -- required, optional, or descriptive -- must carry
-    the complete serialized `DirectionVerdict` shape (`_SCOPE_REQUIRED_FIELDS`):
-    there is no minimal/legacy `{"scope_status": ...}` shape that bypasses
-    recomputation. Any entry missing so much as one required field raises
-    `ValueError` before authorization is ever derived from it.
+    EXACTLY the complete serialized `DirectionVerdict` shape
+    (`_SCOPE_REQUIRED_FIELDS`, no more, no fewer): there is no minimal/
+    legacy `{"scope_status": ...}` shape that bypasses recomputation, and no
+    injected/unauthorized extra field (e.g. `clinical_authorized`) may ride
+    along. Any entry missing so much as one required field, or carrying any
+    field outside the schema, raises `ValueError` before authorization is
+    ever derived from it.
+
+    Returns a FRESH canonical dict (exactly `_SCOPE_REQUIRED_FIELDS`) built
+    from the independently derived/validated values -- never the raw input
+    `entry` object (or a reference into it) -- so a caller can never observe
+    an unvalidated/extra field by holding onto the returned mapping.
     """
     if not isinstance(entry, dict):
         raise ValueError(
@@ -429,6 +437,22 @@ def _recompute_scope_entry(scope_key: str, entry: Any, report_metrics: Any) -> s
             f"scope_gate integrity error: scopes[{scope_key!r}] is missing required field(s) "
             f"{sorted(missing_fields)!r} -- incomplete/tampered scope entry; every v2 scope must "
             "carry the complete serialized DirectionVerdict payload"
+        )
+
+    # BLOCKER 2 (GPT-5.4 exact-schema closure): the entry's key set must be
+    # EXACTLY `_SCOPE_REQUIRED_FIELDS` -- no unknown/extra field (e.g. an
+    # injected `clinical_authorized: true`, or any arbitrary/nested field)
+    # may ride along on a scope entry. An extra field is never surfaced by
+    # the missing-field check above (it only checks required fields are
+    # present), so it is checked independently here, for every scope --
+    # required, descriptive, or "other" alike.
+    extra_fields = [f for f in entry if f not in _SCOPE_REQUIRED_FIELDS]
+    if extra_fields:
+        raise ValueError(
+            f"scope_gate integrity error: scopes[{scope_key!r}] carries unknown/extra field(s) "
+            f"{sorted(extra_fields)!r} -- a scope entry's key set must EXACTLY match the "
+            "serialized DirectionVerdict schema; an injected/unauthorized field (e.g. "
+            "`clinical_authorized`) must never silently ride along into a published aggregate"
         )
 
     expected_stratum, sep, expected_direction = scope_key.partition(":")
@@ -608,7 +632,29 @@ def _recompute_scope_entry(scope_key: str, entry: Any, report_metrics: Any) -> s
             f"and coverage_adequate={recomputed_coverage_adequate!r} -- forged/tampered scope_status"
         )
 
-    return recomputed_scope_status
+    # BLOCKER 2 (GPT-5.4 exact-schema closure): return a FRESH canonical
+    # dict built exclusively from the independently derived/validated
+    # values above (never the raw `entry` object, nor a reference into it)
+    # -- the caller (`_verify_scope_gate_integrity`/`build_aggregate_v2`)
+    # publishes THIS mapping, so an injected/unauthorized extra field on
+    # the original envelope entry can never survive into the published
+    # aggregate even if some future change relaxed the extra-field check
+    # above.
+    return {
+        "stratum": expected_stratum,
+        "direction": expected_direction,
+        "precision_lb": canonical["precision_lb"],
+        "recall_lb": canonical["recall_lb"],
+        "precision_threshold": canonical["precision_threshold"],
+        "recall_threshold": canonical["recall_threshold"],
+        "actual_count": canonical["actual_count"],
+        "called_count": canonical["called_count"],
+        "min_count": _PINNED_MIN_COUNT_PER_CLASS,
+        "coverage_adequate": recomputed_coverage_adequate,
+        "metric_status": recomputed_metric_status,
+        "scope_status": recomputed_scope_status,
+        "reasons": list(reasons),
+    }
 
 
 def _verify_scope_gate_integrity(report: dict) -> dict:
@@ -624,7 +670,9 @@ def _verify_scope_gate_integrity(report: dict) -> dict:
     that disagrees with the recomputation raises `ValueError` (an
     inconsistent/tampered envelope must never reach a published aggregate).
     Returns the recomputed, trustworthy values for the caller to emit
-    (never the raw declared ones) for `vus_authorized`/`research_scope_flags`.
+    (never the raw declared ones) for `vus_authorized`/`research_scope_flags`,
+    PLUS the canonical `scopes` map (freshly built by `_recompute_scope_entry`,
+    never `scope_gate['scopes']` itself) under the `"scopes"` key.
     """
     scope_gate = report.get("scope_gate")
     if not isinstance(scope_gate, dict):
@@ -664,7 +712,7 @@ def _verify_scope_gate_integrity(report: dict) -> dict:
     # drifted entry raises `ValueError` here, before anything downstream
     # (full-spectrum/narrow-flag/governance recomputation) ever reads a
     # scope's status.
-    recomputed_scope_status_by_key = {
+    canonical_scopes_by_key = {
         key: _recompute_scope_entry(key, entry, report_metrics) for key, entry in scopes.items()
     }
 
@@ -700,7 +748,8 @@ def _verify_scope_gate_integrity(report: dict) -> dict:
         # status, never the raw declared `scope_status` -- everything
         # downstream (full-spectrum/narrow-flag/governance derivation) is
         # therefore derived only from recomputed canonical statuses.
-        return recomputed_scope_status_by_key.get(key)
+        canonical_entry = canonical_scopes_by_key.get(key)
+        return canonical_entry["scope_status"] if canonical_entry is not None else None
 
     def _scope_validated(key: str) -> bool:
         return _scope_status(key) == "VALIDATED"
@@ -803,14 +852,16 @@ def _verify_scope_gate_integrity(report: dict) -> dict:
             )
 
         # Genuinely parity-blocked: preserve every per-scope statistical
-        # verdict untouched (returned separately via `scope_gate['scopes']`
-        # by the caller) while forcing every authorization surface closed.
+        # verdict untouched (returned separately via the canonical
+        # `"scopes"` map below, never `scope_gate['scopes']` itself) while
+        # forcing every authorization surface closed.
         return {
             "full_spectrum_status": "BLOCKED_POLICY",
             "full_spectrum_vus_authorized": False,
             "research_scope_flags": {name: False for name in recomputed_flags},
             "governance_state": "NONE_VALIDATED",
             "authorization_blockers": expected_blockers,
+            "scopes": canonical_scopes_by_key,
         }
 
     if declared_authorized is not recomputed_full_spectrum:
@@ -891,6 +942,7 @@ def _verify_scope_gate_integrity(report: dict) -> dict:
         "research_scope_flags": recomputed_flags,
         "governance_state": expected_state,
         "authorization_blockers": [],
+        "scopes": canonical_scopes_by_key,
     }
 
 
@@ -971,7 +1023,7 @@ def build_aggregate_v2(
             # `scopes` may still say VALIDATED (preserved, never hidden).
             "full_spectrum_status": recomputed["full_spectrum_status"],
             "vus_authorized": recomputed["full_spectrum_vus_authorized"],
-            "scopes": scope_gate["scopes"],
+            "scopes": recomputed["scopes"],
             "research_scope_flags": recomputed["research_scope_flags"],
             "governance_state": recomputed["governance_state"],
             "governance_statement": _PINNED_GOVERNANCE_STATEMENTS[recomputed["governance_state"]],

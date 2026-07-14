@@ -298,13 +298,30 @@ def _validate_oracle_thresholds(thresholds: Any) -> None:
         raise ConfigError(
             f"`oracle_thresholds.confidence` must be strictly between 0.0 and 1.0, got {confidence!r}"
         )
+    # R-A2 pre-registration lock (checker BLOCKER 1): the 95% Clopper-Pearson
+    # confidence is pinned EXACTLY -- 0.5/0.9/1.0 are all in-range but are not
+    # the pre-registered value, so a config author could otherwise loosen or
+    # tighten the CI post-hoc without tripping the (0.0, 1.0) range check above.
+    if not math.isclose(confidence, _PINNED_ORACLE_CONFIDENCE, rel_tol=0.0, abs_tol=1e-9):
+        raise ConfigError(
+            f"`oracle_thresholds.confidence`={confidence!r} does not match the pinned "
+            f"pre-registered Clopper-Pearson confidence {_PINNED_ORACLE_CONFIDENCE!r} (R-A2 "
+            "pre-registration lock) -- changing the CI confidence post-hoc breaks pre-registration"
+        )
 
     strata = thresholds.get("strata")
     if not isinstance(strata, dict) or not strata:
         raise ConfigError("`oracle_thresholds.strata` must be a non-empty mapping when oracle_thresholds is set")
-    if _REQUIRED_GATING_STRATUM not in strata:
+    _pinned_stratum_names = frozenset(_PINNED_STRATUM_THRESHOLDS)
+    if frozenset(strata.keys()) != _pinned_stratum_names:
+        missing = _pinned_stratum_names - frozenset(strata.keys())
+        extra = frozenset(strata.keys()) - _pinned_stratum_names
         raise ConfigError(
-            f"`oracle_thresholds.strata` must include the gating {_REQUIRED_GATING_STRATUM!r} stratum"
+            f"`oracle_thresholds.strata` must define EXACTLY the pinned stratum set "
+            f"{sorted(_pinned_stratum_names)!r} once populated -- missing {sorted(missing)!r} "
+            f"or extra/ghost {sorted(extra)!r} stratum key(s) found; a ghost stratum can never "
+            "reach v1 `decide_gate` (which only binds on the fixed 'missense' key), but the "
+            "loader itself must reject the drift at config-load time (R-A2 pre-registration lock)"
         )
 
     for name, spec in strata.items():

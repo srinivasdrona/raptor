@@ -137,8 +137,12 @@ def test_config_rejects_nonpositive_threshold(tmp_path):
     ):
         with pytest.raises(ConfigError):
             load_config(_write_config(tmp_path, oracle_thresholds=bad))
-    # a genuine strictly-positive, pinned target still loads
-    load_config(_write_config(tmp_path, oracle_thresholds=oracle_thresholds_for(0.90, 0.85)))
+    # a genuine strictly-positive, pinned target (both pinned strata) still loads
+    valid = oracle_thresholds_for(0.90, 0.85)
+    valid["strata"]["truncating"] = {
+        "precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"],
+    }
+    load_config(_write_config(tmp_path, oracle_thresholds=valid))
 
 
 def test_gate_rejects_nonpositive_threshold_defense_in_depth():

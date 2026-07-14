@@ -70,8 +70,12 @@ def test_config_requires_precision_and_recall_when_thresholds_set(tmp_path):
     ):
         with pytest.raises(ConfigError):
             load_config(_write_config(tmp_path, oracle_thresholds=bad))
-    # both present, pinned exactly -> loads
-    load_config(_write_config(tmp_path, oracle_thresholds=oracle_thresholds_for(0.90, 0.85)))
+    # both present, pinned exactly, BOTH pinned strata present -> loads
+    valid = oracle_thresholds_for(0.90, 0.85)
+    valid["strata"]["truncating"] = {
+        "precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"],
+    }
+    load_config(_write_config(tmp_path, oracle_thresholds=valid))
 
 
 def test_gate_still_passes_with_precision_and_recall_met():

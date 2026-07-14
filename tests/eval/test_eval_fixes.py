@@ -85,8 +85,13 @@ def test_config_rejects_invalid_oracle_thresholds(tmp_path):
     ):
         with pytest.raises(ConfigError):
             load_config(_write_config(tmp_path, oracle_thresholds=bad))
-    # a valid, pinned threshold block still loads
-    load_config(_write_config(tmp_path, oracle_thresholds=oracle_thresholds_for(0.90, 0.85)))
+    # a valid, pinned threshold block (BOTH pinned strata -- BLOCKER-1 exact
+    # stratum-set lock requires missense+truncating together) still loads
+    valid = oracle_thresholds_for(0.90, 0.85)
+    valid["strata"]["truncating"] = {
+        "precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"],
+    }
+    load_config(_write_config(tmp_path, oracle_thresholds=valid))
 
 
 # --------------------------------------------------------------------------
