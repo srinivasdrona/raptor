@@ -6,7 +6,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping, Optional
 
 import yaml
 
@@ -16,7 +16,10 @@ from raptor.eval.config import (
     _PINNED_MIN_COUNT_PER_CLASS,
     _PINNED_RESEARCH_SCOPE_REQUIRES,
     _PINNED_RESEARCH_USE_DISCLAIMER,
+    _PINNED_STRATUM_SEMANTICS,
+    _PINNED_STRATUM_THRESHOLDS,
 )
+from raptor.eval.gate import _DIRECTION_COUNT_FIELDS, _DIRECTION_LB_FIELDS
 from raptor.eval.scope_gate import _valid_count, _valid_lower_bound
 
 #: GPT-5.4 BLOCKER (minimal-scope bypass closure): the complete set of
@@ -126,7 +129,133 @@ def build_aggregate(
     }
 
 
-def _recompute_scope_entry(scope_key: str, entry: Any) -> str:
+def _pinned_scope_threshold(stratum: str, direction: str) -> tuple:
+    """CRITICAL FIX (cross-surface aggregate integrity): the pinned v2 scope
+    policy, resolved INDEPENDENTLY of anything in the envelope --
+    `scope_gate.scopes` is a claim to verify, never evidence authority.
+    Numeric evidence always comes from `report['metrics']`; policy
+    thresholds always come from these pinned code constants, never from
+    `scope_gate` values or mutable envelope config.
+
+    Returns `(precision_threshold, recall_threshold)`, both `None` when the
+    `(stratum, direction)` scope has no registered threshold: this is exactly
+    truncating:benign, any metrics-only stratum (e.g. `other`), and any
+    stratum outside the pinned missense/truncating policy.
+    """
+    semantics = _PINNED_STRATUM_SEMANTICS.get(stratum)
+    if semantics is None:
+        return None, None
+    _gating, registered_directions = semantics
+    if direction not in registered_directions:
+        return None, None
+    thresholds = _PINNED_STRATUM_THRESHOLDS.get(stratum)
+    if thresholds is None:
+        return None, None
+    return thresholds["precision"], thresholds["recall"]
+
+
+def _derive_canonical_scope_from_metrics(
+    scope_key: str, stratum: str, direction: str, report_metrics: Any
+) -> dict:
+    """CRITICAL FIX (cross-surface aggregate integrity): independently
+    RE-DERIVE the canonical `(stratum, direction)` scope evidence from
+    `report['metrics']` (the report serializer output) and the pinned v2
+    scope policy -- `report['metrics']` is the only trusted numeric
+    evidence surface; `scope_gate.scopes` is never read as evidence here,
+    only compared against this derivation afterward. Raises `ValueError`
+    naming the offending scope/field on any missing, malformed, or unknown
+    stratum/field/count -- this function NEVER falls back to the scope
+    payload it is verifying.
+    """
+    precision_threshold, recall_threshold = _pinned_scope_threshold(stratum, direction)
+
+    known_policy_stratum = stratum in _PINNED_STRATUM_SEMANTICS
+    metrics_map = report_metrics if isinstance(report_metrics, dict) else {}
+    stratum_metrics = metrics_map.get(stratum)
+
+    if not isinstance(stratum_metrics, dict):
+        if not known_policy_stratum:
+            raise ValueError(
+                f"scope_gate cross-check integrity error: scopes[{scope_key!r}] names stratum "
+                f"{stratum!r}, which has no pinned v2 policy AND no report['metrics'] entry -- "
+                "unknown scope with no corresponding metrics/policy; cannot independently verify; "
+                "mismatch/inconsistent, tampered envelope"
+            )
+        raise ValueError(
+            f"scope_gate cross-check integrity error: report['metrics'] is missing the required "
+            f"stratum {stratum!r} needed to independently verify scopes[{scope_key!r}] against "
+            "metrics -- missing metrics; mismatch/inconsistent, tampered envelope (never falls "
+            "back to the scope payload itself)"
+        )
+
+    counts = stratum_metrics.get("counts")
+    if not isinstance(counts, dict):
+        raise ValueError(
+            f"scope_gate cross-check integrity error: report['metrics'][{stratum!r}] is missing "
+            f"the required 'counts' mapping needed to independently verify scopes[{scope_key!r}] "
+            "against metrics -- missing counts; mismatch/inconsistent, tampered envelope"
+        )
+
+    lb_precision_field, lb_recall_field = _DIRECTION_LB_FIELDS[direction]
+    actual_field, called_field = _DIRECTION_COUNT_FIELDS[direction]
+
+    precision_lb = stratum_metrics.get(lb_precision_field)
+    recall_lb = stratum_metrics.get(lb_recall_field)
+    if not (_valid_lower_bound(precision_lb) and _valid_lower_bound(recall_lb)):
+        raise ValueError(
+            f"scope_gate cross-check integrity error: report['metrics'][{stratum!r}] is missing "
+            f"or has a malformed required field {lb_precision_field!r}/{lb_recall_field!r} (got "
+            f"{precision_lb!r}/{recall_lb!r}) needed to independently verify scopes[{scope_key!r}] "
+            "-- missing/malformed metrics; lower bound mismatch/inconsistent, tampered envelope"
+        )
+
+    actual_count = counts.get(actual_field)
+    called_count = counts.get(called_field)
+    if not (_valid_count(actual_count) and _valid_count(called_count)):
+        raise ValueError(
+            f"scope_gate cross-check integrity error: report['metrics'][{stratum!r}]['counts'] is "
+            f"missing or has a malformed required field {actual_field!r}/{called_field!r} (got "
+            f"{actual_count!r}/{called_count!r}) needed to independently verify "
+            f"scopes[{scope_key!r}] -- missing/malformed counts; count mismatch/inconsistent, "
+            "tampered envelope"
+        )
+
+    min_count = _PINNED_MIN_COUNT_PER_CLASS
+    coverage_adequate = min(actual_count, called_count) >= min_count
+
+    if precision_threshold is None and recall_threshold is None:
+        metric_status = "NO_THRESHOLD"
+    elif precision_lb >= precision_threshold and recall_lb >= recall_threshold:
+        metric_status = "MET"
+    else:
+        metric_status = "UNMET"
+
+    if metric_status == "NO_THRESHOLD":
+        scope_status = "DESCRIPTIVE"
+    elif metric_status == "MET":
+        scope_status = "VALIDATED" if coverage_adequate else "UNDERPOWERED"
+    else:  # UNMET
+        scope_status = "FAIL"
+
+    return {
+        "precision_lb": float(precision_lb),
+        "recall_lb": float(recall_lb),
+        "precision_threshold": precision_threshold,
+        "recall_threshold": recall_threshold,
+        "actual_count": actual_count,
+        "called_count": called_count,
+        "min_count": min_count,
+        "coverage_adequate": coverage_adequate,
+        "metric_status": metric_status,
+        "scope_status": scope_status,
+        "lb_precision_field": lb_precision_field,
+        "lb_recall_field": lb_recall_field,
+        "actual_field": actual_field,
+        "called_field": called_field,
+    }
+
+
+def _recompute_scope_entry(scope_key: str, entry: Any, report_metrics: Any) -> str:
     """GPT-5.4 BLOCKER (minimal-scope bypass closure) per-scope integrity
     boundary: `build_aggregate_v2` must NEVER trust a scope entry's own
     `scope_status` (or `metric_status`/`coverage_adequate`) at face value --
@@ -229,6 +358,61 @@ def _recompute_scope_entry(scope_key: str, entry: Any) -> str:
             "inconsistent/tampered envelope"
         )
 
+    # CRITICAL FIX (cross-surface aggregate integrity): `scopes[scope_key]`
+    # is a CLAIM to verify, not evidence authority. Independently RE-DERIVE
+    # the canonical threshold/LB/count evidence for this exact scope from
+    # `report['metrics']` (trusted numeric surface) + the pinned v2 policy
+    # constants (trusted threshold surface) -- NEVER from this entry itself
+    # -- and reject any declared field that drifts from that independent
+    # derivation. A scope entry can be perfectly self-consistent internally
+    # (below) and still be a forgery disconnected from the real metrics;
+    # this cross-check closes exactly that gap.
+    canonical = _derive_canonical_scope_from_metrics(
+        scope_key, expected_stratum, expected_direction, report_metrics
+    )
+
+    if (
+        precision_threshold != canonical["precision_threshold"]
+        or recall_threshold != canonical["recall_threshold"]
+    ):
+        raise ValueError(
+            f"scope_gate cross-check integrity error: scopes[{scope_key!r}] precision_threshold="
+            f"{precision_threshold!r}/recall_threshold={recall_threshold!r} does not match the "
+            f"pinned canonical policy threshold {canonical['precision_threshold']!r}/"
+            f"{canonical['recall_threshold']!r} for stratum {expected_stratum!r} direction "
+            f"{expected_direction!r} -- threshold drift/mismatch; inconsistent/tampered envelope"
+        )
+
+    if precision_lb != canonical["precision_lb"]:
+        raise ValueError(
+            f"scope_gate cross-check integrity error: scopes[{scope_key!r}].precision_lb="
+            f"{precision_lb!r} does not match report['metrics'][{expected_stratum!r}]"
+            f"[{canonical['lb_precision_field']!r}]={canonical['precision_lb']!r} -- lower bound "
+            "mismatch; inconsistent/tampered envelope"
+        )
+    if recall_lb != canonical["recall_lb"]:
+        raise ValueError(
+            f"scope_gate cross-check integrity error: scopes[{scope_key!r}].recall_lb="
+            f"{recall_lb!r} does not match report['metrics'][{expected_stratum!r}]"
+            f"[{canonical['lb_recall_field']!r}]={canonical['recall_lb']!r} -- lower bound "
+            "mismatch; inconsistent/tampered envelope"
+        )
+
+    if actual_count != canonical["actual_count"]:
+        raise ValueError(
+            f"scope_gate cross-check integrity error: scopes[{scope_key!r}].actual_count="
+            f"{actual_count!r} does not match report['metrics'][{expected_stratum!r}]['counts']"
+            f"[{canonical['actual_field']!r}]={canonical['actual_count']!r} -- count mismatch; "
+            "inconsistent/tampered envelope"
+        )
+    if called_count != canonical["called_count"]:
+        raise ValueError(
+            f"scope_gate cross-check integrity error: scopes[{scope_key!r}].called_count="
+            f"{called_count!r} does not match report['metrics'][{expected_stratum!r}]['counts']"
+            f"[{canonical['called_field']!r}]={canonical['called_count']!r} -- count mismatch; "
+            "inconsistent/tampered envelope"
+        )
+
     # Independently RECOMPUTE coverage_adequate/metric_status/scope_status
     # from the raw numeric fields (sec 3.3 canonical mapping) -- NEVER
     # trust the declared axis values, even when internally self-consistent.
@@ -310,16 +494,33 @@ def _verify_scope_gate_integrity(report: dict) -> dict:
             "inconsistent/tampered envelope"
         )
 
-    # BLOCKER 1 (GPT-5.4): independently recompute/validate EVERY scope
-    # payload's `metric_status`/`coverage_adequate`/`scope_status` from its
-    # own raw numeric/count fields -- never trust any of those three
-    # declared values at face value, for any scope key (not just the
-    # pinned full-spectrum/research-scope required ones). Any forged/
-    # tampered/malformed entry raises `ValueError` here, before anything
-    # downstream (full-spectrum/narrow-flag/governance recomputation) ever
-    # reads a scope's status.
+    # CRITICAL FIX (cross-surface aggregate integrity): the only trusted
+    # numeric evidence surface is `report['metrics']` (the report
+    # serializer output) -- `scope_gate.scopes` is a claim to be verified
+    # against it, never evidence authority in its own right.
+    report_metrics = report.get("metrics")
+    if not isinstance(report_metrics, dict):
+        raise ValueError(
+            "scope_gate cross-check integrity error: report['metrics'] must be a mapping -- "
+            "required to independently verify every scope_gate scope; missing metrics; "
+            "inconsistent/tampered envelope"
+        )
+
+    # BLOCKER 1 (GPT-5.4) + CRITICAL FIX (cross-surface aggregate
+    # integrity): independently recompute/validate EVERY scope payload's
+    # threshold/lower-bound/count/`metric_status`/`coverage_adequate`/
+    # `scope_status` fields -- never trust ANY of those declared values at
+    # face value, for any scope key (not just the pinned full-spectrum/
+    # research-scope required ones). Numeric evidence (`precision_lb`/
+    # `recall_lb`/counts) is independently re-derived from
+    # `report['metrics']`; policy (`precision_threshold`/`recall_threshold`/
+    # `min_count`) is independently re-derived from pinned v2 constants --
+    # never from `scope_gate` itself. Any forged/tampered/malformed/
+    # drifted entry raises `ValueError` here, before anything downstream
+    # (full-spectrum/narrow-flag/governance recomputation) ever reads a
+    # scope's status.
     recomputed_scope_status_by_key = {
-        key: _recompute_scope_entry(key, entry) for key, entry in scopes.items()
+        key: _recompute_scope_entry(key, entry, report_metrics) for key, entry in scopes.items()
     }
 
     # Blocker 2a (required scope completeness): every pinned full-spectrum

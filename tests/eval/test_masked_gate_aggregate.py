@@ -2,6 +2,20 @@ from __future__ import annotations
 
 from scripts.build_masked_holdout_gate_aggregate import build_aggregate, build_aggregate_v2
 
+# NOTE: these two imports must stay at module level (not deferred inside a
+# test function body). `conftest` and `test_scope_gate_final_blocker` are
+# bare, non-package module names resolved via pytest's rootdir sys.path
+# insertion; when the FULL repo test suite runs, other test directories
+# (e.g. tests/scorer/conftest.py) also register a same-named `conftest`
+# module in `sys.modules`, and whichever was imported *last* during
+# collection wins for any *later*, function-body-deferred bare import.
+# Importing at module level here resolves them during this module's own
+# collection (before other test directories' conftest.py files are
+# collected), matching every other tests/eval/*.py file's proven-working
+# top-level `from conftest import ...` pattern.
+from conftest import make_eval_config
+from test_scope_gate_final_blocker import make_v2_auth_config, make_oracle_thresholds
+
 
 def _get_consistent_scope(scope_key: str, scope_status: str) -> dict:
     stratum, _, direction = scope_key.partition(":")
@@ -55,6 +69,37 @@ def _get_consistent_scope(scope_key: str, scope_status: str) -> dict:
         "scope_status": scope_status,
         "reasons": []
     }
+
+
+def _metrics_from_scopes(scopes: dict) -> dict:
+    """CRITICAL FIX cross-surface integrity test helper: `build_aggregate_v2`
+    now independently re-derives every scope's evidence from
+    `report['metrics']` (never from `scope_gate.scopes` itself), so any
+    fixture whose `scope_gate.scopes` entries are meant to be genuinely
+    accepted must be backed by a `report['metrics']` payload carrying the
+    SAME precision_lb/recall_lb/counts values. This derives that matching
+    `metrics` payload directly from a test's own `scopes` mapping so both
+    surfaces stay in lockstep by construction.
+    """
+    default = {"precision_lb": 0.99, "recall_lb": 0.99, "actual_count": 40, "called_count": 40}
+    strata = sorted({key.partition(":")[0] for key in scopes})
+    metrics = {}
+    for stratum in strata:
+        patho = scopes.get(f"{stratum}:pathogenic", default)
+        benign = scopes.get(f"{stratum}:benign", default)
+        metrics[stratum] = {
+            "precision_lb": patho["precision_lb"],
+            "recall_lb": patho["recall_lb"],
+            "benign_precision_lb": benign["precision_lb"],
+            "benign_recall_lb": benign["recall_lb"],
+            "counts": {
+                "path_actual": patho["actual_count"],
+                "path_called": patho["called_count"],
+                "benign_actual": benign["actual_count"],
+                "benign_called": benign["called_count"],
+            },
+        }
+    return metrics
 
 
 def test_gate_aggregate_is_derived_from_terminal_envelope() -> None:
@@ -119,6 +164,11 @@ def test_e1_v2_schema_and_scope_specific_primary() -> None:
     - metrics are retained (descriptive-only)
     - vus_authorized == full_spectrum_vus_authorized
     """
+    _scopes = {
+        "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "VALIDATED"),
+        "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
+        "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
+    }
     envelope = {
         "content_hash": "content",
         "predictor_policy": {"status": "approved"},
@@ -135,7 +185,7 @@ def test_e1_v2_schema_and_scope_specific_primary() -> None:
             "holdout_size": 2,
             "holdout_label_counts": {"P": 1, "B": 1},
             "holdout_class_counts": {"missense": 2},
-            "metrics": {"missense": {"precision": 0.5}},
+            "metrics": _metrics_from_scopes(_scopes),
             "gate": {
                 "status": "FAIL",
                 "stratum": "missense",
@@ -153,11 +203,7 @@ def test_e1_v2_schema_and_scope_specific_primary() -> None:
                 "governance_statement": "All pre-registered research scopes are validated for research-evidence use only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
                 "research_use_disclaimer": "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
                 "reason": "all validated",
-                "scopes": {
-                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "VALIDATED"),
-                    "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
-                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
-                }
+                "scopes": _scopes,
             },
             "config_pins": {
                 "bias_tsv_sha256": "bias",
@@ -208,6 +254,11 @@ def test_e2_partial_to_full_spectrum_false() -> None:
     - governance statement matches TRUNCATING_PATHOGENIC_ONLY verbatim
     - research_use_disclaimer is correct
     """
+    _scopes = {
+        "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
+        "missense:benign": _get_consistent_scope("missense:benign", "FAIL"),
+        "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
+    }
     envelope = {
         "content_hash": "content",
         "predictor_policy": {"status": "approved"},
@@ -224,7 +275,7 @@ def test_e2_partial_to_full_spectrum_false() -> None:
             "holdout_size": 2,
             "holdout_label_counts": {"P": 1, "B": 1},
             "holdout_class_counts": {"missense": 2},
-            "metrics": {"missense": {"precision": 0.5}},
+            "metrics": _metrics_from_scopes(_scopes),
             "gate": {
                 "status": "FAIL",
                 "stratum": "missense",
@@ -242,11 +293,7 @@ def test_e2_partial_to_full_spectrum_false() -> None:
                 "governance_statement": "Full-spectrum VUS automation is not authorized. Evidence supports only the validated truncating-pathogenic scope; missense remains unvalidated.",
                 "research_use_disclaimer": "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
                 "reason": "truncating validated but missense failed",
-                "scopes": {
-                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
-                    "missense:benign": _get_consistent_scope("missense:benign", "FAIL"),
-                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
-                }
+                "scopes": _scopes,
             },
             "config_pins": {
                 "bias_tsv_sha256": "bias",
@@ -324,7 +371,7 @@ def test_finding_4_build_aggregate_v2_rejects_inconsistent_envelope() -> None:
                 "holdout_size": 2,
                 "holdout_label_counts": {"P": 1, "B": 1},
                 "holdout_class_counts": {"missense": 2},
-                "metrics": {"missense": {"precision": 0.5}},
+                "metrics": _metrics_from_scopes(scope_gate["scopes"]),
                 "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
                 "scope_gate": scope_gate,
                 "config_pins": {
@@ -392,6 +439,11 @@ def test_finding_4_build_aggregate_v2_rejects_skipped_criteria_with_authorizatio
     and any scope/full-spectrum authorization true must raise ValueError or demote,
     never publish authorization (parity break).
     """
+    _scopes = {
+        "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
+        "missense:benign": _get_consistent_scope("missense:benign", "FAIL"),
+        "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
+    }
     env = {
         "content_hash": "content",
         "predictor_policy": {"status": "approved"},
@@ -405,7 +457,7 @@ def test_finding_4_build_aggregate_v2_rejects_skipped_criteria_with_authorizatio
             "holdout_size": 2,
             "holdout_label_counts": {"P": 1, "B": 1},
             "holdout_class_counts": {"missense": 2},
-            "metrics": {"missense": {"precision": 0.5}},
+            "metrics": _metrics_from_scopes(_scopes),
             "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
             "scope_gate": {
                 "schema_version": "2",
@@ -417,11 +469,7 @@ def test_finding_4_build_aggregate_v2_rejects_skipped_criteria_with_authorizatio
                 "governance_statement": "statement",
                 "research_use_disclaimer": "disclaimer",
                 "reason": "reason",
-                "scopes": {
-                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
-                    "missense:benign": _get_consistent_scope("missense:benign", "FAIL"),
-                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
-                }
+                "scopes": _scopes,
             },
             "config_pins": {
                 "bias_tsv_sha256": "bias",
@@ -463,6 +511,11 @@ def test_blocker_1a_skips_nonempty_narrow_true_fails() -> None:
         _PINNED_RESEARCH_USE_DISCLAIMER,
     )
     
+    _scopes = {
+        "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
+        "missense:benign": _get_consistent_scope("missense:benign", "FAIL"),
+        "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
+    }
     envelope = {
         "content_hash": "content",
         "predictor_policy": {"status": "approved"},
@@ -476,7 +529,7 @@ def test_blocker_1a_skips_nonempty_narrow_true_fails() -> None:
             "holdout_size": 2,
             "holdout_label_counts": {"P": 1, "B": 1},
             "holdout_class_counts": {"missense": 2},
-            "metrics": {"missense": {"precision": 0.5}},
+            "metrics": _metrics_from_scopes(_scopes),
             "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
             "scope_gate": {
                 "schema_version": "2",
@@ -487,11 +540,7 @@ def test_blocker_1a_skips_nonempty_narrow_true_fails() -> None:
                 "governance_statement": _PINNED_GOVERNANCE_STATEMENTS["TRUNCATING_PATHOGENIC_ONLY"],
                 "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
                 "reason": "truncating validated",
-                "scopes": {
-                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
-                    "missense:benign": _get_consistent_scope("missense:benign", "FAIL"),
-                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
-                }
+                "scopes": _scopes,
             },
             "config_pins": {
                 "bias_tsv_sha256": "bias",
@@ -526,6 +575,11 @@ def test_blocker_1b_skips_nonempty_full_spectrum_true_fails() -> None:
         _PINNED_RESEARCH_USE_DISCLAIMER,
     )
     
+    _scopes = {
+        "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "VALIDATED"),
+        "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
+        "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
+    }
     envelope = {
         "content_hash": "content",
         "predictor_policy": {"status": "approved"},
@@ -539,7 +593,7 @@ def test_blocker_1b_skips_nonempty_full_spectrum_true_fails() -> None:
             "holdout_size": 2,
             "holdout_label_counts": {"P": 1, "B": 1},
             "holdout_class_counts": {"missense": 2},
-            "metrics": {"missense": {"precision": 0.5}},
+            "metrics": _metrics_from_scopes(_scopes),
             "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
             "scope_gate": {
                 "schema_version": "2",
@@ -550,11 +604,7 @@ def test_blocker_1b_skips_nonempty_full_spectrum_true_fails() -> None:
                 "governance_statement": _PINNED_GOVERNANCE_STATEMENTS["FULL_SPECTRUM"],
                 "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
                 "reason": "all validated",
-                "scopes": {
-                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "VALIDATED"),
-                    "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
-                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
-                }
+                "scopes": _scopes,
             },
             "config_pins": {
                 "bias_tsv_sha256": "bias",
@@ -589,6 +639,11 @@ def test_blocker_1c_skips_nonempty_no_authorization_succeeds() -> None:
         _PINNED_RESEARCH_USE_DISCLAIMER,
     )
     
+    _scopes = {
+        "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
+        "missense:benign": _get_consistent_scope("missense:benign", "FAIL"),
+        "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "FAIL"),
+    }
     envelope = {
         "content_hash": "content",
         "predictor_policy": {"status": "approved"},
@@ -602,7 +657,7 @@ def test_blocker_1c_skips_nonempty_no_authorization_succeeds() -> None:
             "holdout_size": 2,
             "holdout_label_counts": {"P": 1, "B": 1},
             "holdout_class_counts": {"missense": 2},
-            "metrics": {"missense": {"precision": 0.5}},
+            "metrics": _metrics_from_scopes(_scopes),
             "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
             "scope_gate": {
                 "schema_version": "2",
@@ -613,11 +668,7 @@ def test_blocker_1c_skips_nonempty_no_authorization_succeeds() -> None:
                 "governance_statement": _PINNED_GOVERNANCE_STATEMENTS["NONE_VALIDATED"],
                 "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
                 "reason": "none validated",
-                "scopes": {
-                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
-                    "missense:benign": _get_consistent_scope("missense:benign", "FAIL"),
-                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "FAIL"),
-                }
+                "scopes": _scopes,
             },
             "config_pins": {
                 "bias_tsv_sha256": "bias",
@@ -667,7 +718,9 @@ def test_blocker_2a_missing_scope_raises_error() -> None:
             "holdout_size": 2,
             "holdout_label_counts": {"P": 1, "B": 1},
             "holdout_class_counts": {"missense": 2},
-            "metrics": {"missense": {"precision": 0.5}},
+            "metrics": _metrics_from_scopes({
+                "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
+            }),
             "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
             "scope_gate": {
                 "schema_version": "2",
@@ -715,6 +768,11 @@ def test_blocker_2b_status_mismatch_fail_vs_underpowered() -> None:
         _PINNED_RESEARCH_USE_DISCLAIMER,
     )
     
+    _scopes = {
+        "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
+        "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
+        "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
+    }
     envelope = {
         "content_hash": "content",
         "predictor_policy": {"status": "approved"},
@@ -728,7 +786,7 @@ def test_blocker_2b_status_mismatch_fail_vs_underpowered() -> None:
             "holdout_size": 2,
             "holdout_label_counts": {"P": 1, "B": 1},
             "holdout_class_counts": {"missense": 2},
-            "metrics": {"missense": {"precision": 0.5}},
+            "metrics": _metrics_from_scopes(_scopes),
             "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
             "scope_gate": {
                 "schema_version": "2",
@@ -739,11 +797,7 @@ def test_blocker_2b_status_mismatch_fail_vs_underpowered() -> None:
                 "governance_statement": _PINNED_GOVERNANCE_STATEMENTS["TRUNCATING_PATHOGENIC_ONLY"],
                 "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
                 "reason": "one is fail",
-                "scopes": {
-                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
-                    "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
-                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
-                }
+                "scopes": _scopes,
             },
             "config_pins": {
                 "bias_tsv_sha256": "bias",
@@ -777,6 +831,11 @@ def test_blocker_2b_status_mismatch_underpowered_vs_fail() -> None:
         _PINNED_RESEARCH_USE_DISCLAIMER,
     )
     
+    _scopes = {
+        "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "UNDERPOWERED"),
+        "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
+        "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
+    }
     envelope = {
         "content_hash": "content",
         "predictor_policy": {"status": "approved"},
@@ -790,7 +849,7 @@ def test_blocker_2b_status_mismatch_underpowered_vs_fail() -> None:
             "holdout_size": 2,
             "holdout_label_counts": {"P": 1, "B": 1},
             "holdout_class_counts": {"missense": 2},
-            "metrics": {"missense": {"precision": 0.5}},
+            "metrics": _metrics_from_scopes(_scopes),
             "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
             "scope_gate": {
                 "schema_version": "2",
@@ -801,11 +860,7 @@ def test_blocker_2b_status_mismatch_underpowered_vs_fail() -> None:
                 "governance_statement": _PINNED_GOVERNANCE_STATEMENTS["TRUNCATING_PATHOGENIC_ONLY"],
                 "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
                 "reason": "mixed underpowered",
-                "scopes": {
-                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "UNDERPOWERED"),
-                    "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
-                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
-                }
+                "scopes": _scopes,
             },
             "config_pins": {
                 "bias_tsv_sha256": "bias",
@@ -839,6 +894,11 @@ def test_blocker_2c_status_mismatch_validated_vs_fail() -> None:
         _PINNED_RESEARCH_USE_DISCLAIMER,
     )
     
+    _scopes = {
+        "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "VALIDATED"),
+        "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
+        "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
+    }
     envelope = {
         "content_hash": "content",
         "predictor_policy": {"status": "approved"},
@@ -852,7 +912,7 @@ def test_blocker_2c_status_mismatch_validated_vs_fail() -> None:
             "holdout_size": 2,
             "holdout_label_counts": {"P": 1, "B": 1},
             "holdout_class_counts": {"missense": 2},
-            "metrics": {"missense": {"precision": 0.5}},
+            "metrics": _metrics_from_scopes(_scopes),
             "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
             "scope_gate": {
                 "schema_version": "2",
@@ -863,11 +923,7 @@ def test_blocker_2c_status_mismatch_validated_vs_fail() -> None:
                 "governance_statement": _PINNED_GOVERNANCE_STATEMENTS["FULL_SPECTRUM"],
                 "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
                 "reason": "all validated",
-                "scopes": {
-                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "VALIDATED"),
-                    "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
-                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
-                }
+                "scopes": _scopes,
             },
             "config_pins": {
                 "bias_tsv_sha256": "bias",
@@ -901,6 +957,11 @@ def test_blocker_2d_valid_mixed_status_underpowered_builds() -> None:
         _PINNED_RESEARCH_USE_DISCLAIMER,
     )
     
+    _scopes = {
+        "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "UNDERPOWERED"),
+        "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
+        "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
+    }
     envelope = {
         "content_hash": "content",
         "predictor_policy": {"status": "approved"},
@@ -914,7 +975,7 @@ def test_blocker_2d_valid_mixed_status_underpowered_builds() -> None:
             "holdout_size": 2,
             "holdout_label_counts": {"P": 1, "B": 1},
             "holdout_class_counts": {"missense": 2},
-            "metrics": {"missense": {"precision": 0.5}},
+            "metrics": _metrics_from_scopes(_scopes),
             "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
             "scope_gate": {
                 "schema_version": "2",
@@ -925,11 +986,7 @@ def test_blocker_2d_valid_mixed_status_underpowered_builds() -> None:
                 "governance_statement": _PINNED_GOVERNANCE_STATEMENTS["TRUNCATING_PATHOGENIC_ONLY"],
                 "research_use_disclaimer": _PINNED_RESEARCH_USE_DISCLAIMER,
                 "reason": "underpowered scope present",
-                "scopes": {
-                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "UNDERPOWERED"),
-                    "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
-                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
-                }
+                "scopes": _scopes,
             },
             "config_pins": {
                 "bias_tsv_sha256": "bias",
@@ -962,6 +1019,11 @@ def test_blocker_3_dispatch_helper_build_aggregate_for_envelope() -> None:
     from scripts.build_masked_holdout_gate_aggregate import build_aggregate_for_envelope
 
     # 1. Envelope with non-null scope_gate should yield v2 schema
+    _scopes_v2 = {
+        "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "VALIDATED"),
+        "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
+        "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
+    }
     envelope_v2 = {
         "content_hash": "content",
         "predictor_policy": {"status": "approved"},
@@ -975,7 +1037,7 @@ def test_blocker_3_dispatch_helper_build_aggregate_for_envelope() -> None:
             "holdout_size": 2,
             "holdout_label_counts": {"P": 1, "B": 1},
             "holdout_class_counts": {"missense": 2},
-            "metrics": {"missense": {"precision": 0.5}},
+            "metrics": _metrics_from_scopes(_scopes_v2),
             "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
             "scope_gate": {
                 "schema_version": "2",
@@ -986,11 +1048,7 @@ def test_blocker_3_dispatch_helper_build_aggregate_for_envelope() -> None:
                 "governance_statement": "All pre-registered research scopes are validated for research-evidence use only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
                 "research_use_disclaimer": "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
                 "reason": "reason",
-                "scopes": {
-                    "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "VALIDATED"),
-                    "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
-                    "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
-                }
+                "scopes": _scopes_v2,
             },
             "config_pins": {
                 "bias_tsv_sha256": "bias",
@@ -1082,7 +1140,7 @@ def test_blocker_1_aggregate_trusts_forged_scope_status() -> None:
                 "holdout_size": 2,
                 "holdout_label_counts": {"P": 1, "B": 1},
                 "holdout_class_counts": {"missense": 2},
-                "metrics": {"missense": {"precision": 0.5}},
+                "metrics": _metrics_from_scopes(scopes_payload),
                 "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
                 "scope_gate": {
                     "schema_version": "2",
@@ -1858,12 +1916,16 @@ def test_cross_surface_red_7_genuine_envelope_builds_successfully():
     by compute_report_scope_gate(metrics, config) must build successfully both
     no-skip and PM1 parity-blocked paths.
     """
-    from conftest import make_eval_config
+    # `make_eval_config`/`make_v2_auth_config`/`make_oracle_thresholds` are
+    # imported at module level (see top of file) -- NOT re-imported here --
+    # to avoid the bare-`conftest`-module sys.modules collision that occurs
+    # when this deferred (function-body) import runs during full-repo test
+    # execution (after other test directories' same-named conftest.py files
+    # have already been collected and cached under the same bare name).
     from scripts.run_masked_holdout_eval import compute_report_scope_gate
     from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
     from raptor.eval.model import Metrics, GateDecision
     from raptor.eval.report import EvalReport, report_to_dict
-    from test_scope_gate_final_blocker import make_v2_auth_config, make_oracle_thresholds
 
     cfg = make_eval_config(
         min_count_per_class=36,
