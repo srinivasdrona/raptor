@@ -76,7 +76,7 @@ def compute_report_scope_gate(
     stand is withheld (forced to the most restrictive, `NONE_VALIDATED`
     state) -- a skipped criterion can never authorize a research scope.
     """
-    if not config.scope_authorization:
+    if config.scope_authorization is None:
         return None
 
     decision = decide_scope_gate(metrics, config)

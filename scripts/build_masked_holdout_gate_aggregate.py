@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -134,9 +135,25 @@ def _verify_scope_gate_integrity(report: dict) -> dict:
             "inconsistent/tampered envelope"
         )
 
-    def _scope_validated(key: str) -> bool:
+    # Blocker 2a (required scope completeness): every pinned full-spectrum
+    # required scope must actually be present in the envelope -- a scope
+    # silently dropped from `scopes` must never be treated as merely
+    # "not validated" (which would be indistinguishable from a real FAIL);
+    # it is an incomplete/tampered envelope and must raise loud.
+    missing_scopes = sorted(key for key in _PINNED_FULL_SPECTRUM_SCOPES if key not in scopes)
+    if missing_scopes:
+        raise ValueError(
+            "scope_gate integrity error: report['scope_gate']['scopes'] is missing required "
+            f"pinned full-spectrum scope(s) {missing_scopes!r} -- an incomplete envelope must "
+            "never be published"
+        )
+
+    def _scope_status(key: str) -> Any:
         entry = scopes.get(key)
-        return isinstance(entry, dict) and entry.get("scope_status") == "VALIDATED"
+        return entry.get("scope_status") if isinstance(entry, dict) else None
+
+    def _scope_validated(key: str) -> bool:
+        return _scope_status(key) == "VALIDATED"
 
     # Independently recompute full-spectrum validity and every narrow
     # research-scope flag from the PINNED, hardcoded required-scope sets --
@@ -147,6 +164,24 @@ def _verify_scope_gate_integrity(report: dict) -> dict:
         name: all(_scope_validated(key) for key in requires)
         for name, requires in _PINNED_RESEARCH_SCOPE_REQUIRES.items()
     }
+
+    # Blocker 1 (parity-skip enforcement): inspect the actual runner
+    # envelope path `report['config_pins']['evaluation_skipped_criteria']`.
+    # If any evaluation-only criterion was skipped (a production-parity
+    # break) and the recomputed facts would otherwise authorize either the
+    # full-spectrum scope or ANY narrow research scope, fail loud -- a
+    # parity-broken run must never publish a validated scope. An
+    # already-non-authorizing envelope (nothing recomputed True) with
+    # skips recorded may still be published (test_blocker_1c).
+    config_pins = report.get("config_pins") or {}
+    evaluation_skipped = config_pins.get("evaluation_skipped_criteria") or []
+    if evaluation_skipped and (recomputed_full_spectrum or any(recomputed_flags.values())):
+        raise ValueError(
+            "scope_gate integrity error: evaluation_skipped_criteria "
+            f"{sorted(evaluation_skipped)!r} indicates a production-parity break in this run -- "
+            "a skipped-criterion run must never authorize a full-spectrum or narrow research "
+            "scope; refusing to publish a validated scope from a parity-broken run"
+        )
 
     declared_authorized = scope_gate.get("full_spectrum_vus_authorized")
     declared_status = scope_gate.get("full_spectrum_status")
@@ -163,16 +198,28 @@ def _verify_scope_gate_integrity(report: dict) -> dict:
             f"full_spectrum_vus_authorized={declared_authorized!r} does not match the "
             f"recomputed value {recomputed_full_spectrum!r} derived from report['scope_gate']['scopes']"
         )
-    if recomputed_full_spectrum and declared_status != "PASS":
+
+    # Blocker 2b/2c (status recomputation, not just the authorized bool):
+    # `full_spectrum_status` is recomputed SOLELY from the required scope
+    # statuses -- PASS iff every required scope is VALIDATED; FAIL if any
+    # required scope is FAIL (a FAIL must never be softened to
+    # UNDERPOWERED); UNDERPOWERED otherwise (UNDERPOWERED/DESCRIPTIVE among
+    # required). The declared value must equal this exactly.
+    required_statuses = {key: _scope_status(key) for key in _PINNED_FULL_SPECTRUM_SCOPES}
+    if all(status == "VALIDATED" for status in required_statuses.values()):
+        expected_full_spectrum_status = "PASS"
+    elif any(status == "FAIL" for status in required_statuses.values()):
+        expected_full_spectrum_status = "FAIL"
+    else:
+        expected_full_spectrum_status = "UNDERPOWERED"
+
+    if declared_status != expected_full_spectrum_status:
         raise ValueError(
             "scope_gate integrity error: inconsistent/tampered envelope -- "
-            f"full_spectrum_status={declared_status!r} but every required full-spectrum scope "
-            "is VALIDATED (expected 'PASS')"
-        )
-    if not recomputed_full_spectrum and declared_status == "PASS":
-        raise ValueError(
-            "scope_gate integrity error: inconsistent/tampered envelope -- "
-            "full_spectrum_status='PASS' but not every required full-spectrum scope is VALIDATED"
+            f"full_spectrum_status={declared_status!r} does not match the recomputed value "
+            f"{expected_full_spectrum_status!r} derived from required scope statuses "
+            f"{required_statuses!r} -- a FAIL must never be represented/softened as "
+            "UNDERPOWERED (or any other inconsistent status)"
         )
 
     for name, recomputed_value in recomputed_flags.items():
@@ -299,6 +346,36 @@ def build_aggregate_v2(
     }
 
 
+def build_aggregate_for_envelope(
+    envelope: dict,
+    *,
+    date: str,
+    terminal_json_hash: str,
+    terminal_report_hash: str,
+    published_pm1_scope: dict,
+    reproduced_pm1_scope: dict,
+    production_policy_status: str,
+) -> dict:
+    """Pure v1/v2 dispatch helper (checker finding 3): route to
+    `build_aggregate_v2` when the envelope's `report['scope_gate']` is
+    present/non-null (a real v2 runner envelope), else fall back to the v1
+    `build_aggregate`. This is the single dispatch point the shipped CLI
+    (`main`) must use, so a real future v2 runner envelope can produce
+    `raptor.tsc.masked_holdout_gate.v2` through the shipped CLI without any
+    behavior change to either builder.
+    """
+    report = envelope.get("report", {})
+    builder = build_aggregate_v2 if report.get("scope_gate") is not None else build_aggregate
+    return builder(
+        envelope,
+        date=date,
+        terminal_json_hash=terminal_json_hash,
+        terminal_report_hash=terminal_report_hash,
+        published_pm1_scope=published_pm1_scope,
+        reproduced_pm1_scope=reproduced_pm1_scope,
+        production_policy_status=production_policy_status,
+    )
+
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -320,7 +397,7 @@ def main() -> int:
     production_policy = yaml.safe_load(args.production_policy.read_text(encoding="utf-8"))
     if not isinstance(production_policy, dict):
         raise ValueError("production candidate policy root must be a mapping")
-    aggregate = build_aggregate(
+    aggregate = build_aggregate_for_envelope(
         _read_json(args.terminal_json),
         date=args.date,
         terminal_json_hash=_sha256(args.terminal_json),

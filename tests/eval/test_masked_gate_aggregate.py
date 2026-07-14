@@ -113,7 +113,11 @@ def test_e1_v2_schema_and_scope_specific_primary() -> None:
                 "return_manifest_sha256": "return",
                 "predictor_correction_counts": {"PP3": 1, "BP4": 2},
                 "operational_skipped_criteria": ["PM1", "PS4"],
-                "evaluation_skipped_criteria": ["PM1"],
+                # No evaluation-only criteria skipped in this fixture -- this test
+                # exercises v2 schema shape/authorization derivation, not the
+                # separate parity-skip enforcement rule (see the dedicated
+                # blocker_1a/1b/1c and finding_4 tests below for that).
+                "evaluation_skipped_criteria": [],
                 "oracle_thresholds": {"confidence": 0.95},
             },
         },
@@ -198,7 +202,11 @@ def test_e2_partial_to_full_spectrum_false() -> None:
                 "return_manifest_sha256": "return",
                 "predictor_correction_counts": {"PP3": 1, "BP4": 2},
                 "operational_skipped_criteria": ["PM1", "PS4"],
-                "evaluation_skipped_criteria": ["PM1"],
+                # No evaluation-only criteria skipped in this fixture -- this test
+                # exercises v2 partial-authorization derivation, not the separate
+                # parity-skip enforcement rule (see the dedicated blocker_1a/1b/1c
+                # and finding_4 tests below for that).
+                "evaluation_skipped_criteria": [],
                 "oracle_thresholds": {"confidence": 0.95},
             },
         },
