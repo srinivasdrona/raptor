@@ -168,6 +168,7 @@ def test_e1_v2_schema_and_scope_specific_primary() -> None:
         "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "VALIDATED"),
         "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
         "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
+        "truncating:benign": _get_consistent_scope("truncating:benign", "DESCRIPTIVE"),
     }
     envelope = {
         "content_hash": "content",
@@ -218,7 +219,7 @@ def test_e1_v2_schema_and_scope_specific_primary() -> None:
                 # separate parity-skip enforcement rule (see the dedicated
                 # blocker_1a/1b/1c and finding_4 tests below for that).
                 "evaluation_skipped_criteria": [],
-                "oracle_thresholds": {"confidence": 0.95},
+                "oracle_thresholds": make_oracle_thresholds(),
             },
         },
     }
@@ -258,6 +259,7 @@ def test_e2_partial_to_full_spectrum_false() -> None:
         "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
         "missense:benign": _get_consistent_scope("missense:benign", "FAIL"),
         "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
+        "truncating:benign": _get_consistent_scope("truncating:benign", "DESCRIPTIVE"),
     }
     envelope = {
         "content_hash": "content",
@@ -308,7 +310,7 @@ def test_e2_partial_to_full_spectrum_false() -> None:
                 # parity-skip enforcement rule (see the dedicated blocker_1a/1b/1c
                 # and finding_4 tests below for that).
                 "evaluation_skipped_criteria": [],
-                "oracle_thresholds": {"confidence": 0.95},
+                "oracle_thresholds": make_oracle_thresholds(),
             },
         },
     }
@@ -443,6 +445,7 @@ def test_finding_4_build_aggregate_v2_rejects_skipped_criteria_with_authorizatio
         "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
         "missense:benign": _get_consistent_scope("missense:benign", "FAIL"),
         "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
+        "truncating:benign": _get_consistent_scope("truncating:benign", "DESCRIPTIVE"),
     }
     env = {
         "content_hash": "content",
@@ -481,7 +484,7 @@ def test_finding_4_build_aggregate_v2_rejects_skipped_criteria_with_authorizatio
                 "operational_skipped_criteria": ["PM1", "PS4"],
                 # NON-EMPTY evaluation skipped criteria (parity break!)
                 "evaluation_skipped_criteria": ["PM1"],
-                "oracle_thresholds": {"confidence": 0.95},
+                "oracle_thresholds": make_oracle_thresholds(),
             },
         },
     }
@@ -515,6 +518,7 @@ def test_blocker_1a_skips_nonempty_narrow_true_fails() -> None:
         "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
         "missense:benign": _get_consistent_scope("missense:benign", "FAIL"),
         "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
+        "truncating:benign": _get_consistent_scope("truncating:benign", "DESCRIPTIVE"),
     }
     envelope = {
         "content_hash": "content",
@@ -551,7 +555,7 @@ def test_blocker_1a_skips_nonempty_narrow_true_fails() -> None:
                 "predictor_correction_counts": {"PP3": 1, "BP4": 2},
                 "operational_skipped_criteria": ["PM1", "PS4"],
                 "evaluation_skipped_criteria": ["PM1"],  # NON-EMPTY SKIP!
-                "oracle_thresholds": {"confidence": 0.95},
+                "oracle_thresholds": make_oracle_thresholds(),
             },
         },
     }
@@ -579,6 +583,7 @@ def test_blocker_1b_skips_nonempty_full_spectrum_true_fails() -> None:
         "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "VALIDATED"),
         "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
         "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
+        "truncating:benign": _get_consistent_scope("truncating:benign", "DESCRIPTIVE"),
     }
     envelope = {
         "content_hash": "content",
@@ -615,7 +620,7 @@ def test_blocker_1b_skips_nonempty_full_spectrum_true_fails() -> None:
                 "predictor_correction_counts": {"PP3": 1, "BP4": 2},
                 "operational_skipped_criteria": ["PM1", "PS4"],
                 "evaluation_skipped_criteria": ["PM1"],  # NON-EMPTY SKIP!
-                "oracle_thresholds": {"confidence": 0.95},
+                "oracle_thresholds": make_oracle_thresholds(),
             },
         },
     }
@@ -643,6 +648,7 @@ def test_blocker_1c_skips_nonempty_no_authorization_succeeds() -> None:
         "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "FAIL"),
         "missense:benign": _get_consistent_scope("missense:benign", "FAIL"),
         "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "FAIL"),
+        "truncating:benign": _get_consistent_scope("truncating:benign", "DESCRIPTIVE"),
     }
     envelope = {
         "content_hash": "content",
@@ -679,7 +685,7 @@ def test_blocker_1c_skips_nonempty_no_authorization_succeeds() -> None:
                 "predictor_correction_counts": {"PP3": 1, "BP4": 2},
                 "operational_skipped_criteria": ["PM1", "PS4"],
                 "evaluation_skipped_criteria": ["PM1"],  # NON-EMPTY SKIP!
-                "oracle_thresholds": {"confidence": 0.95},
+                "oracle_thresholds": make_oracle_thresholds(),
             },
         },
     }
@@ -961,6 +967,7 @@ def test_blocker_2d_valid_mixed_status_underpowered_builds() -> None:
         "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "UNDERPOWERED"),
         "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
         "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
+        "truncating:benign": _get_consistent_scope("truncating:benign", "DESCRIPTIVE"),
     }
     envelope = {
         "content_hash": "content",
@@ -997,7 +1004,7 @@ def test_blocker_2d_valid_mixed_status_underpowered_builds() -> None:
                 "predictor_correction_counts": {"PP3": 1, "BP4": 2},
                 "operational_skipped_criteria": ["PM1", "PS4"],
                 "evaluation_skipped_criteria": [],
-                "oracle_thresholds": {"confidence": 0.95},
+                "oracle_thresholds": make_oracle_thresholds(),
             },
         },
     }
@@ -1023,6 +1030,7 @@ def test_blocker_3_dispatch_helper_build_aggregate_for_envelope() -> None:
         "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "VALIDATED"),
         "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
         "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
+        "truncating:benign": _get_consistent_scope("truncating:benign", "DESCRIPTIVE"),
     }
     envelope_v2 = {
         "content_hash": "content",
@@ -1059,7 +1067,7 @@ def test_blocker_3_dispatch_helper_build_aggregate_for_envelope() -> None:
                 "predictor_correction_counts": {"PP3": 1, "BP4": 2},
                 "operational_skipped_criteria": ["PM1", "PS4"],
                 "evaluation_skipped_criteria": [],
-                "oracle_thresholds": {"confidence": 0.95},
+                "oracle_thresholds": make_oracle_thresholds(),
             },
         },
     }
@@ -1126,6 +1134,10 @@ def test_blocker_1_aggregate_trusts_forged_scope_status() -> None:
     import pytest
     from scripts.build_masked_holdout_gate_aggregate import build_aggregate_v2
 
+    _FULL_SPECTRUM_REQUIRED_SCOPES = (
+        "missense:pathogenic", "missense:benign", "truncating:pathogenic",
+    )
+
     def make_envelope(scopes_payload: dict, evaluation_skipped: list = None) -> dict:
         return {
             "content_hash": "content",
@@ -1144,10 +1156,15 @@ def test_blocker_1_aggregate_trusts_forged_scope_status() -> None:
                 "gate": {"status": "FAIL", "stratum": "missense", "reason": "below", "vus_authorized": False},
                 "scope_gate": {
                     "schema_version": "2",
-                    "full_spectrum_status": "PASS" if all(s.get("scope_status") == "VALIDATED" for s in scopes_payload.values()) else "FAIL",
-                    "full_spectrum_vus_authorized": all(s.get("scope_status") == "VALIDATED" for s in scopes_payload.values()),
+                    # Full-spectrum authorization is derived ONLY from the pinned
+                    # full-spectrum required scopes (missense:pathogenic,
+                    # missense:benign, truncating:pathogenic) -- never from every
+                    # key in `scopes_payload` (which now also always carries the
+                    # purely-descriptive, never-VALIDATED `truncating:benign`).
+                    "full_spectrum_status": "PASS" if all(scopes_payload.get(k, {}).get("scope_status") == "VALIDATED" for k in _FULL_SPECTRUM_REQUIRED_SCOPES) else "FAIL",
+                    "full_spectrum_vus_authorized": all(scopes_payload.get(k, {}).get("scope_status") == "VALIDATED" for k in _FULL_SPECTRUM_REQUIRED_SCOPES),
                     "research_scope_flags": {"truncating_pathogenic_research_scope_validated": scopes_payload.get("truncating:pathogenic", {}).get("scope_status") == "VALIDATED"},
-                    "governance_state": "FULL_SPECTRUM" if all(s.get("scope_status") == "VALIDATED" for s in scopes_payload.values()) else "NONE_VALIDATED",
+                    "governance_state": "FULL_SPECTRUM" if all(scopes_payload.get(k, {}).get("scope_status") == "VALIDATED" for k in _FULL_SPECTRUM_REQUIRED_SCOPES) else "NONE_VALIDATED",
                     "governance_statement": "All pre-registered research scopes are validated for research-evidence use only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
                     "research_use_disclaimer": "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
                     "reason": "reason",
@@ -1229,6 +1246,21 @@ def test_blocker_1_aggregate_trusts_forged_scope_status() -> None:
                 "coverage_adequate": True,
                 "metric_status": "MET",
                 "scope_status": "VALIDATED",
+                "reasons": []
+            },
+            "truncating:benign": {
+                "stratum": "truncating",
+                "direction": "benign",
+                "precision_lb": 0.0,
+                "recall_lb": 0.0,
+                "precision_threshold": None,
+                "recall_threshold": None,
+                "actual_count": 1,
+                "called_count": 1,
+                "min_count": 36,
+                "coverage_adequate": False,
+                "metric_status": "NO_THRESHOLD",
+                "scope_status": "DESCRIPTIVE",
                 "reasons": []
             }
         }

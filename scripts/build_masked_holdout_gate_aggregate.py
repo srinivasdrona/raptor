@@ -14,6 +14,7 @@ from raptor.eval.config import (
     _PINNED_FULL_SPECTRUM_SCOPES,
     _PINNED_GOVERNANCE_STATEMENTS,
     _PINNED_MIN_COUNT_PER_CLASS,
+    _PINNED_ORACLE_CONFIDENCE,
     _PINNED_RESEARCH_SCOPE_REQUIRES,
     _PINNED_RESEARCH_USE_DISCLAIMER,
     _PINNED_STRATUM_SEMANTICS,
@@ -127,6 +128,150 @@ def build_aggregate(
             "MASKED_EVAL_REPORT.json": terminal_json_hash,
         },
     }
+
+
+def _canonical_oracle_thresholds() -> dict:
+    """BLOCKER 1 (GPT-5.4 publication integrity): the exact canonical v2
+    oracle threshold payload, built ONLY from pinned code constants
+    (`_PINNED_ORACLE_CONFIDENCE`/`_PINNED_STRATUM_THRESHOLDS`/
+    `_PINNED_STRATUM_SEMANTICS`) -- never from `scope_gate` or any mutable
+    envelope/config_pins value. This is exactly what a published v2
+    aggregate's `thresholds` field must equal.
+    """
+    return {
+        "confidence": _PINNED_ORACLE_CONFIDENCE,
+        "strata": {
+            stratum: {
+                "precision": spec["precision"],
+                "recall": spec["recall"],
+                "gating": _PINNED_STRATUM_SEMANTICS[stratum][0],
+                "directions": list(_PINNED_STRATUM_SEMANTICS[stratum][1]),
+            }
+            for stratum, spec in _PINNED_STRATUM_THRESHOLDS.items()
+        },
+    }
+
+
+def _validate_config_pins_oracle_thresholds(config_pins: Any) -> dict:
+    """BLOCKER 1 (GPT-5.4 publication integrity): `report['config_pins']
+    ['oracle_thresholds']` is a CLAIM to verify, never a trusted policy
+    source -- independently compare it, field-by-field, against the
+    canonical pinned payload (`_canonical_oracle_thresholds`). Any
+    confidence/precision/recall/gating/direction drift, any missing/extra
+    stratum, missing block, or malformed shape raises `ValueError`. Only
+    harmless ordering of `directions` is normalized (compared as sets);
+    everything else must match exactly. Returns the canonical pinned
+    payload -- callers must publish THIS, never the raw envelope object.
+    """
+    canonical = _canonical_oracle_thresholds()
+
+    if not isinstance(config_pins, dict) or "oracle_thresholds" not in config_pins:
+        raise ValueError(
+            "config_pins integrity error: report['config_pins']['oracle_thresholds'] is missing "
+            "-- a v2 aggregate can never be published without the canonical pinned threshold "
+            "policy block"
+        )
+    oracle_thresholds = config_pins["oracle_thresholds"]
+    if not isinstance(oracle_thresholds, dict):
+        raise ValueError(
+            "config_pins integrity error: report['config_pins']['oracle_thresholds'] must be a "
+            "mapping -- malformed threshold policy block"
+        )
+
+    confidence = oracle_thresholds.get("confidence")
+    if (
+        isinstance(confidence, bool)
+        or not isinstance(confidence, (int, float))
+        or float(confidence) != canonical["confidence"]
+    ):
+        raise ValueError(
+            "config_pins integrity error: report['config_pins']['oracle_thresholds']"
+            f"['confidence']={confidence!r} does not match the canonical pinned confidence "
+            f"{canonical['confidence']!r} -- threshold policy drift/tamper detected"
+        )
+
+    strata = oracle_thresholds.get("strata")
+    if not isinstance(strata, dict):
+        raise ValueError(
+            "config_pins integrity error: report['config_pins']['oracle_thresholds']['strata'] "
+            "is missing or malformed -- a v2 aggregate can never be published without the exact "
+            "canonical pinned stratum set"
+        )
+    if set(strata.keys()) != set(canonical["strata"].keys()):
+        raise ValueError(
+            "config_pins integrity error: report['config_pins']['oracle_thresholds']['strata'] "
+            f"keys {sorted(strata.keys())!r} do not exactly match the canonical pinned stratum "
+            f"set {sorted(canonical['strata'].keys())!r} -- strata addition/omission drift "
+            "detected"
+        )
+
+    for stratum_name, canonical_spec in canonical["strata"].items():
+        actual_spec = strata.get(stratum_name)
+        if not isinstance(actual_spec, dict):
+            raise ValueError(
+                f"config_pins integrity error: oracle_thresholds.strata[{stratum_name!r}] must "
+                "be a mapping -- malformed threshold policy block"
+            )
+        for field in ("precision", "recall"):
+            actual_value = actual_spec.get(field)
+            if (
+                isinstance(actual_value, bool)
+                or not isinstance(actual_value, (int, float))
+                or float(actual_value) != canonical_spec[field]
+            ):
+                raise ValueError(
+                    "config_pins integrity error: oracle_thresholds.strata"
+                    f"[{stratum_name!r}][{field!r}]={actual_value!r} does not match the "
+                    f"canonical pinned {field} {canonical_spec[field]!r} -- threshold "
+                    "drift/tamper detected"
+                )
+        actual_gating = actual_spec.get("gating")
+        if actual_gating is not canonical_spec["gating"]:
+            raise ValueError(
+                f"config_pins integrity error: oracle_thresholds.strata[{stratum_name!r}]"
+                f"['gating']={actual_gating!r} does not match the canonical pinned gating "
+                f"{canonical_spec['gating']!r} -- gating drift/tamper detected"
+            )
+        actual_directions = actual_spec.get("directions")
+        if (
+            not isinstance(actual_directions, list)
+            or len(actual_directions) != len(canonical_spec["directions"])
+            or set(actual_directions) != set(canonical_spec["directions"])
+        ):
+            raise ValueError(
+                f"config_pins integrity error: oracle_thresholds.strata[{stratum_name!r}]"
+                f"['directions']={actual_directions!r} does not exactly match the canonical "
+                f"pinned direction set {canonical_spec['directions']!r} -- direction "
+                "drift/tamper detected"
+            )
+
+    return canonical
+
+
+def _expected_scope_keys(report_metrics: Any) -> frozenset:
+    """BLOCKER 2 (GPT-5.4 publication integrity): the exact, independently
+    derived set of scope keys a v2 aggregate's `scopes` must carry --
+    computed WITHOUT ever reading `scope_gate.scopes` (that mapping is the
+    claim being checked, never the source of what is expected).
+
+    Always includes BOTH directions for every pinned threshold stratum
+    (missense, truncating) -- including `truncating:benign`, which has no
+    registered threshold but must still be represented descriptively. Also
+    includes both directions for any additional stratum actually present in
+    `report['metrics']` (e.g. `other`) -- a purely descriptive stratum with
+    no pinned policy still needs both scopes reported once its metrics
+    exist. A stratum with neither pinned policy nor metrics evidence (a
+    "ghost" scope) is never expected.
+    """
+    pinned_strata = frozenset(_PINNED_STRATUM_THRESHOLDS.keys())
+    metrics_map = report_metrics if isinstance(report_metrics, dict) else {}
+    descriptive_strata = frozenset(
+        stratum for stratum, entry in metrics_map.items() if isinstance(entry, dict)
+    )
+    all_strata = pinned_strata | descriptive_strata
+    return frozenset(
+        f"{stratum}:{direction}" for stratum in all_strata for direction in ("pathogenic", "benign")
+    )
 
 
 def _pinned_scope_threshold(stratum: str, direction: str) -> tuple:
@@ -523,17 +668,31 @@ def _verify_scope_gate_integrity(report: dict) -> dict:
         key: _recompute_scope_entry(key, entry, report_metrics) for key, entry in scopes.items()
     }
 
-    # Blocker 2a (required scope completeness): every pinned full-spectrum
-    # required scope must actually be present in the envelope -- a scope
-    # silently dropped from `scopes` must never be treated as merely
-    # "not validated" (which would be indistinguishable from a real FAIL);
-    # it is an incomplete/tampered envelope and must raise loud.
-    missing_scopes = sorted(key for key in _PINNED_FULL_SPECTRUM_SCOPES if key not in scopes)
-    if missing_scopes:
+    # BLOCKER 2 (GPT-5.4 publication integrity, scope-set completeness):
+    # `scope_gate['scopes']`'s key set must EXACTLY equal the set
+    # independently derived from the pinned threshold strata (both
+    # directions, including `truncating:benign` even though it has no
+    # registered threshold) plus both directions for any additional
+    # descriptive stratum actually present in `report['metrics']` (e.g.
+    # `other`). A scope silently dropped from `scopes` (e.g.
+    # `truncating:benign`, `other:benign`) must never be treated as merely
+    # "not validated" -- that would be indistinguishable from a real FAIL
+    # and hides an incomplete envelope. An unknown/extra "ghost" scope with
+    # no corresponding metrics/policy is equally rejected (also caught
+    # above by `_recompute_scope_entry`, which raises first for that case;
+    # this is the defense-in-depth completeness backstop for every case).
+    expected_scope_keys = _expected_scope_keys(report_metrics)
+    actual_scope_keys = frozenset(scopes.keys())
+    if actual_scope_keys != expected_scope_keys:
+        missing_keys = sorted(expected_scope_keys - actual_scope_keys)
+        extra_keys = sorted(actual_scope_keys - expected_scope_keys)
         raise ValueError(
-            "scope_gate integrity error: report['scope_gate']['scopes'] is missing required "
-            f"pinned full-spectrum scope(s) {missing_scopes!r} -- an incomplete envelope must "
-            "never be published"
+            "scope_gate integrity error: report['scope_gate']['scopes'] key set "
+            f"{sorted(actual_scope_keys)!r} does not exactly match the independently expected "
+            f"scope set {sorted(expected_scope_keys)!r} derived from the pinned threshold strata "
+            f"and report['metrics'] -- missing={missing_keys!r} extra={extra_keys!r}; an "
+            "incomplete envelope (missing scope) or an unknown/extra ghost scope with no "
+            "metrics must never be published"
         )
 
     def _scope_status(key: str) -> Any:
@@ -761,9 +920,15 @@ def build_aggregate_v2(
     rather than ever reaching a published aggregate. The emitted
     `vus_authorized`/`research_scope_flags`/`governance_state` come ONLY
     from that recomputation, never the raw declared envelope values.
+
+    BLOCKER 1 (GPT-5.4 publication integrity): `report['config_pins']
+    ['oracle_thresholds']` is independently validated against the exact
+    canonical pinned payload (`_validate_config_pins_oracle_thresholds`)
+    before anything else is emitted -- never trusted or republished as-is.
     """
     report = envelope["report"]
     scope_gate = report.get("scope_gate")
+    canonical_thresholds = _validate_config_pins_oracle_thresholds(report.get("config_pins"))
     recomputed = _verify_scope_gate_integrity(report)
 
     # Reuse the v1 builder for every field that is NOT scope-authorization
@@ -791,6 +956,12 @@ def build_aggregate_v2(
     return {
             **v1_aggregate,
             "schema": "raptor.tsc.masked_holdout_gate.v2",
+            # BLOCKER 1 (GPT-5.4 publication integrity): publish the
+            # independently validated CANONICAL pinned threshold payload,
+            # never the raw `config_pins.oracle_thresholds` envelope object
+            # (which `v1_aggregate["thresholds"]` above still holds) --
+            # this override replaces it after validation.
+            "thresholds": canonical_thresholds,
             # Checker finding 4 (+ final blocker): `full_spectrum_status`/
             # `vus_authorized`/`research_scope_flags`/`governance_state` are
             # emitted ONLY from the independently recomputed/verified
