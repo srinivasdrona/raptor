@@ -433,3 +433,212 @@ def test_blocker_2_direct_hand_built_config_missense_or_truncating_spec_not_dict
         assert decision2.full_spectrum_vus_authorized is False
 
 
+def test_overall_descriptive_rendering_v1_and_v2() -> None:
+    """RED regression tests for preserving `overall` in descriptive rendering:
+    1. Construct a legacy v1 `EvalReport` (`scope_gate=None`) whose metrics include
+       `overall`, `missense`, `truncating`, and `other`.
+       `render()` must include all four descriptive metric rows, including `overall`.
+    2. Compare v1 render behavior against the base contract expected text/order
+       sufficiently to catch the current omission; do not overfit timestamps/hash.
+    3. Construct a v2 `EvalReport` with the same metrics plus scope_gate; its
+       general descriptive metrics section must still include `overall`.
+    4. Its scope authorization/verdict section must NOT contain `overall:pathogenic`
+       or `overall:benign`; canonical scope-gate reason must not contain `overall:`.
+    5. `report_to_dict` continues to retain `metrics.overall` while
+       `scope_gate.scopes` excludes overall.
+    """
+    from raptor.eval.report import report_to_dict
+    from raptor.eval.scope_gate import canonical_scope_gate_reason
+
+    # Step 1: Construct metrics for overall, missense, truncating, and other
+    m_overall = Metrics(
+        precision=0.9100, recall=0.8600, concordance=0.9000,
+        counts={"path_called": 40, "benign_called": 40, "path_actual": 40, "benign_actual": 40},
+        stratum="overall", gating=False, benign_precision=0.9100, benign_recall=0.8600
+    )
+    m_overall.precision_lb = 0.8500
+    m_overall.recall_lb = 0.8000
+    m_overall.benign_precision_lb = 0.8500
+    m_overall.benign_recall_lb = 0.8000
+
+    m_missense = Metrics(
+        precision=0.9200, recall=0.8700, concordance=0.9100,
+        counts={"path_called": 40, "benign_called": 40, "path_actual": 40, "benign_actual": 40},
+        stratum="missense", gating=True, benign_precision=0.9200, benign_recall=0.8700
+    )
+    m_missense.precision_lb = 0.8600
+    m_missense.recall_lb = 0.8100
+    m_missense.benign_precision_lb = 0.8600
+    m_missense.benign_recall_lb = 0.8100
+
+    m_truncating = Metrics(
+        precision=0.9600, recall=0.9600, concordance=0.9500,
+        counts={"path_called": 40, "benign_called": 40, "path_actual": 40, "benign_actual": 40},
+        stratum="truncating", gating=True, benign_precision=0.9600, benign_recall=0.9600
+    )
+    m_truncating.precision_lb = 0.9000
+    m_truncating.recall_lb = 0.9000
+    m_truncating.benign_precision_lb = 0.9000
+    m_truncating.benign_recall_lb = 0.9000
+
+    m_other = Metrics(
+        precision=0.8100, recall=0.8100, concordance=0.8100,
+        counts={"path_called": 40, "benign_called": 40, "path_actual": 40, "benign_actual": 40},
+        stratum="other", gating=False, benign_precision=0.8100, benign_recall=0.8100
+    )
+    m_other.precision_lb = 0.7500
+    m_other.recall_lb = 0.7500
+    m_other.benign_precision_lb = 0.7500
+    m_other.benign_recall_lb = 0.7500
+
+    metrics = {
+        "overall": m_overall,
+        "missense": m_missense,
+        "truncating": m_truncating,
+        "other": m_other
+    }
+
+    # Construct a real synthetic GateDecision (gate is mandatory)
+    gate = GateDecision(
+        status="PASS",
+        stratum="missense",
+        reason="all strata pass",
+        vus_authorized=True,
+        per_stratum={}
+    )
+
+    # 1 & 2: Construct legacy v1 EvalReport and render it
+    report_v1 = EvalReport(
+        run_id="run-v1",
+        generated_at="2026-07-15",
+        labels_snapshot="snap-1",
+        benchmark_size=160,
+        train_dev_size=60,
+        holdout_size=100,
+        holdout_label_counts={"P": 80, "B": 80},
+        holdout_class_counts={"missense": 80, "truncating": 80},
+        metrics=metrics,
+        gate=gate,
+        scope_gate=None
+    )
+
+    rendered_v1 = report_v1.render()
+
+    # Compare v1 render behavior against the expected text/order
+    # sorted(self.metrics.items()) order:
+    # 1. missense, 2. other, 3. overall, 4. truncating
+    assert "  - missense: precision=0.9200" in rendered_v1
+    assert "  - other: precision=0.8100" in rendered_v1
+    assert "  - overall: precision=0.9100" in rendered_v1
+    assert "  - truncating: precision=0.9600" in rendered_v1
+
+    idx_missense_v1 = rendered_v1.index("  - missense: precision=0.9200")
+    idx_other_v1 = rendered_v1.index("  - other: precision=0.8100")
+    idx_overall_v1 = rendered_v1.index("  - overall: precision=0.9100")
+    idx_truncating_v1 = rendered_v1.index("  - truncating: precision=0.9600")
+
+    assert idx_missense_v1 < idx_other_v1 < idx_overall_v1 < idx_truncating_v1
+
+    # 3: Construct a v2 EvalReport with the same metrics plus scope_gate
+    scopes = {
+        "missense:pathogenic": DirectionVerdict(
+            stratum="missense", direction="pathogenic", precision_lb=0.86, recall_lb=0.81,
+            precision_threshold=0.90, recall_threshold=0.85, actual_count=40, called_count=40,
+            min_count=36, coverage_adequate=True, metric_status="MET", scope_status="VALIDATED", reasons=[]
+        ),
+        "missense:benign": DirectionVerdict(
+            stratum="missense", direction="benign", precision_lb=0.86, recall_lb=0.81,
+            precision_threshold=0.90, recall_threshold=0.85, actual_count=40, called_count=40,
+            min_count=36, coverage_adequate=True, metric_status="MET", scope_status="VALIDATED", reasons=[]
+        ),
+        "truncating:pathogenic": DirectionVerdict(
+            stratum="truncating", direction="pathogenic", precision_lb=0.90, recall_lb=0.90,
+            precision_threshold=0.95, recall_threshold=0.95, actual_count=40, called_count=40,
+            min_count=36, coverage_adequate=True, metric_status="MET", scope_status="VALIDATED", reasons=[]
+        ),
+        "truncating:benign": DirectionVerdict(
+            stratum="truncating", direction="benign", precision_lb=0.90, recall_lb=0.90,
+            precision_threshold=None, recall_threshold=None, actual_count=40, called_count=40,
+            min_count=36, coverage_adequate=True, metric_status="NO_THRESHOLD", scope_status="DESCRIPTIVE", reasons=[]
+        ),
+        "other:pathogenic": DirectionVerdict(
+            stratum="other", direction="pathogenic", precision_lb=0.75, recall_lb=0.75,
+            precision_threshold=None, recall_threshold=None, actual_count=40, called_count=40,
+            min_count=36, coverage_adequate=True, metric_status="NO_THRESHOLD", scope_status="DESCRIPTIVE", reasons=[]
+        ),
+        "other:benign": DirectionVerdict(
+            stratum="other", direction="benign", precision_lb=0.75, recall_lb=0.75,
+            precision_threshold=None, recall_threshold=None, actual_count=40, called_count=40,
+            min_count=36, coverage_adequate=True, metric_status="NO_THRESHOLD", scope_status="DESCRIPTIVE", reasons=[]
+        )
+    }
+
+    v2_decision = ScopeGateDecision(
+        schema_version="2",
+        scopes=scopes,
+        full_spectrum_status="PASS",
+        full_spectrum_vus_authorized=True,
+        research_scope_flags={"truncating_pathogenic_research_scope_validated": True},
+        governance_state="FULL_SPECTRUM",
+        governance_statement="All pre-registered research scopes are validated.",
+        research_use_disclaimer="Disclaimer statement.",
+        reason="missense:benign=VALIDATED; missense:pathogenic=VALIDATED; truncating:benign=DESCRIPTIVE; truncating:pathogenic=VALIDATED; other:benign=DESCRIPTIVE; other:pathogenic=DESCRIPTIVE",
+        authorization_blockers=[]
+    )
+
+    report_v2 = EvalReport(
+        run_id="run-v2",
+        generated_at="2026-07-15",
+        labels_snapshot="snap-1",
+        benchmark_size=160,
+        train_dev_size=60,
+        holdout_size=100,
+        holdout_label_counts={"P": 80, "B": 80},
+        holdout_class_counts={"missense": 80, "truncating": 80},
+        metrics=metrics,
+        gate=gate,
+        scope_gate=v2_decision
+    )
+
+    rendered_v2 = report_v2.render()
+
+    # The general descriptive metrics section in v2 must still include overall and maintain order
+    assert "  - overall: precision=0.9100" in rendered_v2
+    idx_missense_v2 = rendered_v2.index("  - missense: precision=0.9200")
+    idx_other_v2 = rendered_v2.index("  - other: precision=0.8100")
+    idx_overall_v2 = rendered_v2.index("  - overall: precision=0.9100")
+    idx_truncating_v2 = rendered_v2.index("  - truncating: precision=0.9600")
+
+    assert idx_missense_v2 < idx_other_v2 < idx_overall_v2 < idx_truncating_v2
+
+    # 4: Its scope authorization/verdict section must NOT contain overall:pathogenic or overall:benign,
+    # and canonical scope-gate reason must not contain overall:
+    scope_section_header = "--- v2 scope-specific research authorization (preregistered, non-clinical) ---"
+    assert scope_section_header in rendered_v2
+    _, scope_section = rendered_v2.split(scope_section_header, 1)
+
+    assert "overall:pathogenic" not in scope_section
+    assert "overall:benign" not in scope_section
+    assert "overall:" not in scope_section
+
+    reason_text = canonical_scope_gate_reason(
+        {k: v.scope_status for k, v in v2_decision.scopes.items()},
+        v2_decision.authorization_blockers
+    )
+    assert "overall:" not in reason_text
+    assert "overall:" not in v2_decision.reason
+
+    # 5: report_to_dict continues to retain metrics.overall while scope_gate.scopes excludes overall
+    serialized_v2 = report_to_dict(report_v2)
+    assert "overall" in serialized_v2["metrics"]
+    assert serialized_v2["metrics"]["overall"]["precision"] == 0.9100
+
+    assert "scope_gate" in serialized_v2
+    scopes_dict = serialized_v2["scope_gate"]["scopes"]
+    assert "overall:pathogenic" not in scopes_dict
+    assert "overall:benign" not in scopes_dict
+    for scope_key in scopes_dict:
+        assert not scope_key.startswith("overall:")
+
+
+
