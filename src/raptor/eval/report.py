@@ -14,7 +14,6 @@ import json
 from dataclasses import InitVar, asdict, dataclass, field
 from typing import Any, Dict, List
 
-from .config import _POOLED_OVERALL_STRATUM
 from .model import DirectionVerdict, GateDecision, Metrics, ScopeGateDecision
 
 
@@ -219,11 +218,14 @@ class EvalReport:
         gate-less v2 report shape; the v2 `scope_gate` section (if present)
         is unaffected either way.
 
-        The reserved pooled `overall` stratum is never printed in the
-        per-class metrics table (AC-S5 parity with `decide_scope_gate`) --
-        it remains a purely descriptive, cross-class aggregate accessible
-        via `self.metrics["overall"]`/`report_to_dict()`, never a per-class
-        row here."""
+        The reserved pooled `overall` stratum IS printed in this general
+        descriptive metrics table alongside the per-class strata (base
+        v1 contract, commit 329a799) -- it is a purely descriptive,
+        cross-class aggregate row here. `overall` is excluded only from the
+        v2 scope-specific section below: `_render_scope_gate()`, scope
+        authorization, governance reasons, and scope-verdict rendering
+        (AC-S5 parity with `decide_scope_gate`), never from this general
+        table."""
         lines: List[str] = []
         lines.append("RAPTOR Eval Report (PRD-06)")
         lines.append(f"run_id: {self.run_id}")
@@ -247,8 +249,6 @@ class EvalReport:
         else:
             lines.append("metrics by stratum:")
             for stratum, m in sorted(self.metrics.items()):
-                if stratum == _POOLED_OVERALL_STRATUM:
-                    continue
                 lines.append(
                     f"  - {stratum}: precision={m.precision:.4f} recall={m.recall:.4f} "
                     f"concordance={m.concordance:.4f} benign_precision={m.benign_precision:.4f} "

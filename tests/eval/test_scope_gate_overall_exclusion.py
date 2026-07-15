@@ -2,7 +2,7 @@
 
 Ensures that:
 1. decide_scope_gate scopes include real class scopes only and never overall:*.
-2. canonical_scope_gate_reason / report render / serialized scope_gate does not contain `overall:`.
+2. canonical_scope_gate_reason / report render (v2 scope-specific section only) / serialized scope_gate does not contain `overall:`. The general descriptive metrics section legitimately retains `overall` (base v1 contract, commit 329a799).
 3. build_aggregate_v2 accepts genuine envelope where report.metrics contains overall but scope table omits overall, and aggregate scopes/reason omit overall.
 4. If tampered scope table adds overall:* despite pooled metrics, aggregate rejects as unexpected scope.
 5. Overall metrics remain in report.metrics/aggregate metrics as descriptive aggregate but never become scopes or auth inputs.
@@ -100,7 +100,7 @@ def test_1_runner_metrics_overall_exclusion_from_scopes():
 
 
 def test_2_serialized_and_rendered_outputs_no_overall_mention():
-    """2. canonical_scope_gate_reason/report render/serialized scope_gate must not contain `overall:`."""
+    """2. canonical_scope_gate_reason/report render (v2 scope-specific section)/serialized scope_gate must not contain `overall:`."""
     cfg = make_eval_config(
         min_count_per_class=36,
         oracle_thresholds=make_oracle_thresholds(),
@@ -165,7 +165,13 @@ def test_2_serialized_and_rendered_outputs_no_overall_mention():
     )
 
     rendered = report.render()
-    assert "overall:" not in rendered
+    # `overall` legitimately appears in the general descriptive metrics
+    # section (base v1 contract, commit 329a799) -- it is excluded only
+    # from the v2 scope-specific research-authorization section below.
+    scope_section_header = "--- v2 scope-specific research authorization (preregistered, non-clinical) ---"
+    assert scope_section_header in rendered
+    _, scope_section = rendered.split(scope_section_header, 1)
+    assert "overall:" not in scope_section
 
     serialized = report_to_dict(report)
     assert "overall:" not in serialized["scope_gate"]["reason"]
