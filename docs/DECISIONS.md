@@ -9,6 +9,7 @@
 
 | ID | Title | Status | Date |
 |----|-------|--------|------|
+| [ADR-0011](#adr-0011--scope-specific-research-authorization-gate-v2-truncating-pathogenic-research-scope-preregistered-separately-from-full-spectrum-vus) | Scope-specific research authorization gate (v2): truncating-pathogenic research scope preregistered separately from full-spectrum VUS | Accepted | 2026-07-14 |
 | [ADR-0010](#adr-0010--generic-platform-uniqueness-premise-falsified-vertical-tscmtor-research-evidence-strategy) | Generic-platform uniqueness premise falsified; vertical TSC/mTOR research-evidence strategy | Accepted | 2026-07-10 |
 | [ADR-0009](#adr-0009--clinvar-derived-acmg-criteria-direct-copy-banned-pp5bp6ps4-transitive-deferred-to-audit) | ClinVar-derived ACMG criteria: direct-copy banned (PP5/BP6/PS4), transitive deferred to audit | Accepted | 2026-07-10 |
 | [ADR-0008](#adr-0008--tier-12-annotation-pipeline-bias-2015--nirvana-runs-on-an-x64-worker-not-the-arm-queen) | Tier-1/2 annotation pipeline (BIAS-2015 + Nirvana) runs on an x64 worker, not the ARM Queen | Accepted | 2026-07-08 |
@@ -19,6 +20,111 @@
 | [ADR-0003](#adr-0003--loop-operating-model-planner--doer--checker-across-three-model-families) | Loop operating model: planner / doer / checker across three model families | Accepted | 2026-07-08 |
 | [ADR-0002](#adr-0002--vision--strategy-doc-format-pichler-vision-board--rumelt-kernel) | Vision & strategy doc format: Pichler Vision Board + Rumelt Kernel | Accepted | 2026-07-08 |
 | [ADR-0001](#adr-0001--strategic-framing-narrow-buildable-claim-with-broad-north-star) | Strategic framing: narrow-buildable claim with broad north-star | Accepted | 2026-07-08 |
+
+---
+
+## ADR-0011 — Scope-specific research authorization gate (v2): truncating-pathogenic research scope preregistered separately from full-spectrum VUS
+
+- **Status:** Accepted
+- **Date:** 2026-07-14
+- **Deciders:** @dronasrinivas (operator, acting domain owner)
+- **Track:** `track/scope-specific-gate-2026-07`
+- **Supersedes:** none. Purely additive alongside ADR-0009/PRD-06's v1 held-out gate, which stays unchanged.
+
+### Context
+
+The v1 masked held-out gate (`raptor.eval.gate.decide_gate`, PRD-06) binds a single VUS-authorization
+decision on the `missense` stratum and short-circuits: if missense fails, no other stratum's verdict
+(including `truncating`) is even reported. The 2026-07-13 v1 run is `status=FAIL,
+binding_stratum=missense, vus_authorized=false` — full-spectrum VUS automation is correctly withheld.
+But that pooled, single-stratum design cannot express a real and useful fact already visible in that
+run's numbers: truncating-pathogenic cleared its own preregistered 0.95/0.95 threshold at adequate
+coverage, while missense did not. Today's gate has no way to report — let alone separately authorize —
+a narrower, non-clinical, research-only claim scoped to truncating-pathogenic alone.
+
+### Considered options
+
+1. **Additive v2 gate + models + config + schema marker** (`decide_scope_gate`, `DirectionVerdict`,
+   `ScopeGateDecision`, `EvalConfig.scope_authorization`, schema `raptor.tsc.masked_holdout_gate.v2`).
+2. **Make `decide_gate` schema-version-dispatch internally.** Rejected: fixing the metric-before-coverage
+   evaluation order to preserve both axes would flip v1's missense verdict semantics (`FAIL` could
+   read differently), silently relabeling the immutable v1 decision path and its already-published
+   2026-07-13 artifact.
+3. **Do nothing until the corrected rerun.** Rejected: the authorization *rule* itself (which scopes may
+   independently authorize what) is a policy decision that must be preregistered **before** that rerun,
+   not invented after seeing its numbers — exactly the discipline this program has followed for every
+   other threshold (EVAL_RUBRIC.md §5).
+
+### Decision
+
+Adopt **option 1**. `decide_gate`/`GateDecision`/`StratumVerdict` and the 2026-07-13 v1 artifact are
+frozen and byte-unchanged. A new, additive `decide_scope_gate` (`src/raptor/eval/scope_gate.py`)
+evaluates **every** configured `(stratum, direction)` scope independently, with no short-circuit,
+and reports two orthogonal axes per scope: `metric_status` (did the 95% Clopper-Pearson lower bound
+clear its Oracle-registered threshold?) and `coverage_adequate` (did held-out coverage clear
+`min_count_per_class`?). A scope is `VALIDATED` only when a threshold is registered, `metric_status ==
+"MET"`, and `coverage_adequate` — never on a pooled/`overall` metric.
+
+A new, additive, versioned config block (`configs/eval/tsc2.yaml` → `scope_authorization`,
+`schema_version: 2`) preregisters:
+
+- **`full_spectrum.requires`**, semantics-locked (anti-cherry-pick) to exactly
+  `{missense:pathogenic, missense:benign, truncating:pathogenic}` — full-spectrum VUS automation still
+  requires the hard missense scope; this rule cannot be narrowed away post-hoc.
+- **`truncating_pathogenic_research_scope_validated`** — a narrow, independently-computable research
+  scope flag requiring only `truncating:pathogenic` to be `VALIDATED`.
+- **Exact governance statements** for each resolvable state, most notably (verbatim, never
+  paraphrased): *"Full-spectrum VUS automation is not authorized. Evidence supports only the validated
+  truncating-pathogenic scope; missense remains unvalidated."*
+- A **separate, mandatory, non-blank `research_use_disclaimer`** — *"Research-evidence validation only;
+  this authorizes no clinical classification, VUS worklist, or ClinVar submission."* — kept out of the
+  governance statement text (never merged into it) so it cannot be truncated away.
+
+`EvalReport.scope_gate` is optional/additive; `content_hash()` excludes it entirely when `None`, so
+every existing v1 report hash (and `external_report_hashes` continuity) is unaffected. A new
+`build_aggregate_v2` (schema `raptor.tsc.masked_holdout_gate.v2`) derives its primary verdict fields
+from `scope_gate`, never from pooled `metrics`; `build_aggregate` (v1, schema `...v1`) is untouched.
+
+### Non-blind / post-hoc-risk acknowledgment (must not be hidden)
+
+**This preregistration is not blind to the truncating-pathogenic outcome.** The 2026-07-13 v1 run
+already showed truncating-pathogenic clearing 0.95/0.95 at adequate coverage before this rule was
+written — an auditor can fairly call adopting "truncating-pathogenic may independently authorize a
+truncating-only research scope" **after** seeing that number a form of post-hoc/cherry-picked
+rule-making, not a genuinely blind preregistration. This is accepted as a real, named limitation, not
+argued away, for four reasons that jointly bound the risk:
+
+1. **No threshold changed.** The truncating 0.95/0.95 precision/recall pair, `gating: true`, and
+   pathogenic-only direction were preregistered in `tsc2.yaml` **before** the v1 run and remain
+   pinned/locked (`config._PINNED_STRATUM_THRESHOLDS`) — nothing was lowered or invented to manufacture
+   this result.
+2. **The rule only narrows what a pass can mean.** It grants no new capability: it is explicitly
+   research-only, explicitly non-clinical, and explicitly not full-spectrum (the disclaimer and the
+   `TRUNCATING_PATHOGENIC_ONLY` statement say so verbatim). It cannot be used to authorize VUS scoring,
+   clinical classification, or a ClinVar submission.
+3. **The hard full-spectrum requirement cannot be quietly dropped.** `full_spectrum.requires` is
+   semantics-locked to still include `missense:pathogenic`/`missense:benign` — this preregistration
+   cannot be exploited to narrow full-spectrum authorization down to truncating alone.
+4. **Validation must still be re-established on a corrected rerun.** No `data/census/*.json` is written
+   by this track; no real gate is executed; v1's actual truncating numbers are never hardcoded into any
+   test or into this rule (Group A/B tests use only synthetic `Metrics`). The 2026-07-13 v1 artifact is
+   never relabeled — it remains `schema=v1, status=FAIL, binding_stratum=missense, vus_authorized=false`
+   and carries no v2 keys (enforced by `tests/eval/test_scope_gate_v1_preservation.py`).
+
+This ADR is deliberately explicit about the non-blindness above **as the primary control**: an honest,
+recorded acknowledgment of the risk is preferred over silently asserting the preregistration is blind
+when it is not. No PASS/VALIDATED claim about the corrected rerun is made here or anywhere in this
+track — this ADR records the rule, not a result.
+
+### Consequences
+
+- A future corrected masked-holdout rerun can report — and, if it clears the same locked thresholds at
+  adequate coverage, independently authorize — a `truncating_pathogenic_research_scope_validated`
+  research-only claim, separate from (and never implying) full-spectrum VUS authorization.
+- `README.md`/`docs/PROGRAM.md` "current status" are **not** updated by this ADR — that only happens
+  after the corrected rerun actually executes and produces a genuine, non-cherry-picked result.
+- No evidence-policy or predictor-policy approval status changes; the BP4/PP3 predictor-policy block on
+  the rerun (`configs/eval/bp4pp3_predictor_policy.json`, status pending) is untouched.
 
 ---
 

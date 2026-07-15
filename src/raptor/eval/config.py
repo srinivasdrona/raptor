@@ -52,8 +52,112 @@ _PINNED_STRATUM_THRESHOLDS: Mapping[str, Mapping[str, float]] = {
 #: block MUST define it (else it is functionally unset -- UNVERIFIED).
 _REQUIRED_GATING_STRATUM = "missense"
 
+#: The reserved pooled-metrics stratum name `raptor.eval.metrics.compute_metrics`
+#: always emits alongside each real `variant_class` stratum (missense,
+#: truncating, other, ...). `overall` is a descriptive, cross-class
+#: aggregate -- it is NEVER a `(stratum, direction)` scope, NEVER a
+#: `DirectionVerdict`, and NEVER an input to any authorization boolean/
+#: governance state (AC-S5). It stays present in `Metrics`/report/aggregate
+#: `metrics` payloads for descriptive purposes only; every scope
+#: enumeration (v2 `decide_scope_gate`, aggregate `_expected_scope_keys`)
+#: excludes this exact key while still admitting other genuine descriptive
+#: strata (e.g. `other`).
+_POOLED_OVERALL_STRATUM = "overall"
+
 #: The only directions a per-stratum `directions` list may name.
 _VALID_DIRECTIONS: frozenset[str] = frozenset({"pathogenic", "benign"})
+
+#: v2 scope-specific authorization gate (preregistration, additive):
+#: `full_spectrum.requires` is semantics-locked to EXACTLY this pinned set
+#: (anti-cherry-pick control, §3.6) -- a drift (dropping/adding/narrowing a
+#: required scope after the fact) raises `ConfigError`. This is what a
+#: "full-spectrum" VUS authorization means and it can never be quietly
+#: narrowed post-hoc.
+_PINNED_FULL_SPECTRUM_SCOPES: frozenset[str] = frozenset(
+    {"missense:pathogenic", "missense:benign", "truncating:pathogenic"}
+)
+
+#: Checker finding 1 (research-scope mapping pin): the exact, closed set of
+#: `research_scopes` keys a config may define, mapped to the EXACT
+#: `requires` set each key must equal -- not merely a subset of registered
+#: scopes. A renamed/additional/replacement research-scope key or a
+#: widened/narrowed `requires` list would silently change what a research
+#: scope authorizes, so both the key set AND each key's `requires` are
+#: locked here (anti-cherry-pick / anti-retarget control, checked at
+#: `load_config` time AND, defense-in-depth, again inside
+#: `decide_scope_gate` for a hand-built `EvalConfig` that bypasses the
+#: loader -- see `scope_gate._pinned_authorization_valid`).
+_PINNED_RESEARCH_SCOPE_REQUIRES: Mapping[str, frozenset[str]] = {
+    "truncating_pathogenic_research_scope_validated": frozenset({"truncating:pathogenic"}),
+}
+
+#: The 95% Clopper-Pearson confidence pinned in `tsc2.yaml` (R-A2
+#: pre-registration) -- checked, defense-in-depth, against a hand-built
+#: `EvalConfig.oracle_thresholds` inside `decide_scope_gate` (checker
+#: finding 2) since such a config bypasses `_validate_oracle_thresholds`.
+_PINNED_ORACLE_CONFIDENCE: float = 0.95
+
+#: The user's exact governance statement, verbatim (never paraphrased/
+#: reworded by a config author) -- the TRUNCATING_PATHOGENIC_ONLY state is
+#: pinned because it is the one that could most easily be used to
+#: over-claim (or under-claim) what the truncating-pathogenic-only research
+#: scope authorizes.
+_PINNED_TRUNCATING_PATHOGENIC_ONLY_STATEMENT = (
+    "Full-spectrum VUS automation is not authorized. Evidence supports only "
+    "the validated truncating-pathogenic scope; missense remains unvalidated."
+)
+
+#: Checker finding 1 (GPT-5.4): ALL THREE governance-state strings are
+#: authorization surfaces, not just TRUNCATING_PATHOGENIC_ONLY -- pin
+#: FULL_SPECTRUM and NONE_VALIDATED verbatim too so a config author cannot
+#: quietly widen the FULL_SPECTRUM claim or weaken the most-restrictive
+#: NONE_VALIDATED fallback statement.
+_PINNED_FULL_SPECTRUM_STATEMENT = (
+    "All pre-registered research scopes are validated for research-evidence "
+    "use only; this authorizes no clinical classification, VUS worklist, or "
+    "ClinVar submission."
+)
+_PINNED_NONE_VALIDATED_STATEMENT = (
+    "Full-spectrum VUS automation is not authorized; no pre-registered "
+    "research scope is currently validated."
+)
+
+#: Mandatory, non-blank, separate disclaimer (planner correction) -- kept
+#: OUT of `governance_statement` (which stays the exact preregistered
+#: string verbatim) and pinned to the exact safe text so a config author
+#: cannot silently weaken it.
+_PINNED_RESEARCH_USE_DISCLAIMER = (
+    "Research-evidence validation only; this authorizes no clinical "
+    "classification, VUS worklist, or ClinVar submission."
+)
+
+#: Checker finding 1 (GPT-5.4): the closed, exact map of all three
+#: governance states to their pinned verbatim statement -- iterated by
+#: `_validate_scope_authorization` (and cross-checked, defense-in-depth, by
+#: `scope_gate._pinned_authorization_valid` for a hand-built `EvalConfig`).
+_PINNED_GOVERNANCE_STATEMENTS: Mapping[str, str] = {
+    "FULL_SPECTRUM": _PINNED_FULL_SPECTRUM_STATEMENT,
+    "TRUNCATING_PATHOGENIC_ONLY": _PINNED_TRUNCATING_PATHOGENIC_ONLY_STATEMENT,
+    "NONE_VALIDATED": _PINNED_NONE_VALIDATED_STATEMENT,
+}
+
+#: Checker finding 2 (GPT-5.4): the preregistered v2 min-count-per-class
+#: floor is EXACTLY 36 (the 35->36 power-floor correction, see
+#: `_PINNED_STRATUM_THRESHOLDS` above) -- once a config declares a v2
+#: `scope_authorization` block, `min_count_per_class` must equal this
+#: pinned value exactly (drift below OR above 36 is rejected). Legacy
+#: (v1-only, no `scope_authorization`) configs/fixtures are unaffected --
+#: they may use any positive `min_count_per_class` as before.
+_PINNED_MIN_COUNT_PER_CLASS: int = 36
+
+#: The three governance states `decide_scope_gate` can resolve to; every
+#: `scope_authorization.governance_statements` block must carry a non-blank
+#: string for each.
+_REQUIRED_GOVERNANCE_STATES: tuple[str, ...] = (
+    "FULL_SPECTRUM",
+    "TRUNCATING_PATHOGENIC_ONLY",
+    "NONE_VALIDATED",
+)
 _PINNED_STRATUM_SEMANTICS: Mapping[str, tuple[bool, tuple[str, ...]]] = {
     "missense": (True, ("pathogenic", "benign")),
     "truncating": (True, ("pathogenic",)),
@@ -138,6 +242,14 @@ class EvalConfig:
     #: unpinned (no checksum guard); a non-hex-64 placeholder is likewise
     #: treated as unpinned (see `knowns.LabeledVariantReader`).
     clinvar_snapshot_file_checksum: str = ""
+    #: v2 scope-specific authorization gate (ADDITIVE, preregistration,
+    #: `raptor.eval.scope_gate.decide_scope_gate`) -- `None` is the fully
+    #: v1-compatible default (absent block); schema-validated typed mapping
+    #: `{schema_version, research_use_disclaimer, full_spectrum:
+    #: {requires}, research_scopes: {name: {requires}}, governance_statements:
+    #: {FULL_SPECTRUM, TRUNCATING_PATHOGENIC_ONLY, NONE_VALIDATED}}` when
+    #: present. Never read by v1 `decide_gate`.
+    scope_authorization: Mapping[str, Any] | None = None
 
 
 def _validate_points(points: Any) -> None:
@@ -198,13 +310,30 @@ def _validate_oracle_thresholds(thresholds: Any) -> None:
         raise ConfigError(
             f"`oracle_thresholds.confidence` must be strictly between 0.0 and 1.0, got {confidence!r}"
         )
+    # R-A2 pre-registration lock (checker BLOCKER 1): the 95% Clopper-Pearson
+    # confidence is pinned EXACTLY -- 0.5/0.9/1.0 are all in-range but are not
+    # the pre-registered value, so a config author could otherwise loosen or
+    # tighten the CI post-hoc without tripping the (0.0, 1.0) range check above.
+    if not math.isclose(confidence, _PINNED_ORACLE_CONFIDENCE, rel_tol=0.0, abs_tol=1e-9):
+        raise ConfigError(
+            f"`oracle_thresholds.confidence`={confidence!r} does not match the pinned "
+            f"pre-registered Clopper-Pearson confidence {_PINNED_ORACLE_CONFIDENCE!r} (R-A2 "
+            "pre-registration lock) -- changing the CI confidence post-hoc breaks pre-registration"
+        )
 
     strata = thresholds.get("strata")
     if not isinstance(strata, dict) or not strata:
         raise ConfigError("`oracle_thresholds.strata` must be a non-empty mapping when oracle_thresholds is set")
-    if _REQUIRED_GATING_STRATUM not in strata:
+    _pinned_stratum_names = frozenset(_PINNED_STRATUM_THRESHOLDS)
+    if frozenset(strata.keys()) != _pinned_stratum_names:
+        missing = _pinned_stratum_names - frozenset(strata.keys())
+        extra = frozenset(strata.keys()) - _pinned_stratum_names
         raise ConfigError(
-            f"`oracle_thresholds.strata` must include the gating {_REQUIRED_GATING_STRATUM!r} stratum"
+            f"`oracle_thresholds.strata` must define EXACTLY the pinned stratum set "
+            f"{sorted(_pinned_stratum_names)!r} once populated -- missing {sorted(missing)!r} "
+            f"or extra/ghost {sorted(extra)!r} stratum key(s) found; a ghost stratum can never "
+            "reach v1 `decide_gate` (which only binds on the fixed 'missense' key), but the "
+            "loader itself must reject the drift at config-load time (R-A2 pre-registration lock)"
         )
 
     for name, spec in strata.items():
@@ -270,6 +399,135 @@ def _validate_oracle_thresholds(thresholds: Any) -> None:
                 )
 
 
+def _split_scope_key(scope_key: Any, *, ctx: str) -> tuple[str, str]:
+    """Split a `"{stratum}:{direction}"` scope key; fail loud (ConfigError)
+    on any non-string, malformed, or unknown-direction key."""
+    if not isinstance(scope_key, str) or scope_key.count(":") != 1:
+        raise ConfigError(f"{ctx} scope key must be a '{{stratum}}:{{direction}}' string, got {scope_key!r}")
+    stratum, _, direction = scope_key.partition(":")
+    if not stratum or direction not in _VALID_DIRECTIONS:
+        raise ConfigError(
+            f"{ctx} scope key {scope_key!r} names an unknown direction -- must be one of "
+            f"{sorted(_VALID_DIRECTIONS)}"
+        )
+    return stratum, direction
+
+
+def _registered_scopes(oracle_thresholds: Mapping[str, Any]) -> frozenset[str]:
+    """Every `"{stratum}:{direction}"` scope a (schema-validated, but not
+    yet type-coerced) `oracle_thresholds` block actually registers a
+    threshold-eligible direction for (i.e. `direction in strata[name].directions`)."""
+    strata = (oracle_thresholds or {}).get("strata") or {}
+    scopes: set[str] = set()
+    for name, spec in strata.items():
+        for direction in spec.get("directions", []) or []:
+            if direction in _VALID_DIRECTIONS:
+                scopes.add(f"{name}:{direction}")
+    return frozenset(scopes)
+
+
+def _validate_requires_list(requires: Any, registered: frozenset[str], *, ctx: str) -> None:
+    if not isinstance(requires, list) or not requires:
+        raise ConfigError(f"{ctx}.requires must be a non-empty list of '{{stratum}}:{{direction}}' scope keys")
+    for scope_key in requires:
+        _split_scope_key(scope_key, ctx=ctx)
+        if scope_key not in registered:
+            raise ConfigError(
+                f"{ctx}.requires names scope {scope_key!r} which is not a stratum/direction "
+                "registered in `oracle_thresholds` (cannot authorize on an unregistered scope)"
+            )
+
+
+#: v2 scope-specific authorization gate (preregistration, additive):
+#: `scope_authorization` is OPTIONAL -- absent/`None` keeps a config fully
+#: v1-compatible (`EvalConfig.scope_authorization = None`). When present it
+#: is schema-validated and fail-loud (`ConfigError`) on load, mirroring
+#: `_validate_oracle_thresholds`'s style: never silently accept a malformed
+#: or post-hoc-narrowed authorization policy.
+def _validate_scope_authorization(scope_auth: Any, oracle_thresholds: Mapping[str, Any]) -> None:
+    if not isinstance(scope_auth, dict):
+        raise ConfigError("`scope_authorization` must be a mapping")
+
+    schema_version = scope_auth.get("schema_version")
+    if schema_version not in (2, "2"):
+        raise ConfigError(
+            f"`scope_authorization.schema_version` must be 2, got {schema_version!r}"
+        )
+
+    disclaimer = scope_auth.get("research_use_disclaimer")
+    if not isinstance(disclaimer, str) or not disclaimer.strip():
+        raise ConfigError("`scope_authorization.research_use_disclaimer` must be a non-blank string")
+    if disclaimer != _PINNED_RESEARCH_USE_DISCLAIMER:
+        raise ConfigError(
+            "`scope_authorization.research_use_disclaimer` must match the mandatory pinned "
+            f"safe text exactly, got {disclaimer!r}"
+        )
+
+    registered = _registered_scopes(oracle_thresholds)
+
+    full_spectrum = scope_auth.get("full_spectrum")
+    if not isinstance(full_spectrum, dict):
+        raise ConfigError("`scope_authorization.full_spectrum` must be a mapping")
+    _validate_requires_list(full_spectrum.get("requires"), registered, ctx="scope_authorization.full_spectrum")
+    if frozenset(full_spectrum["requires"]) != _PINNED_FULL_SPECTRUM_SCOPES:
+        raise ConfigError(
+            "`scope_authorization.full_spectrum.requires` must equal exactly the pinned "
+            f"pre-registered full-spectrum scope set {sorted(_PINNED_FULL_SPECTRUM_SCOPES)!r} "
+            f"(anti-cherry-pick lock) -- got {sorted(full_spectrum['requires'])!r}"
+        )
+
+    research_scopes = scope_auth.get("research_scopes", {})
+    if not isinstance(research_scopes, dict):
+        raise ConfigError("`scope_authorization.research_scopes` must be a mapping")
+    for name, spec in research_scopes.items():
+        if not isinstance(spec, dict):
+            raise ConfigError(f"`scope_authorization.research_scopes[{name!r}]` must be a mapping")
+        _validate_requires_list(
+            spec.get("requires"), registered, ctx=f"scope_authorization.research_scopes[{name!r}]"
+        )
+
+    # Checker finding 1: pin BOTH the key set and each key's `requires` to
+    # the exact pre-registered research-scope mapping -- a missing key, an
+    # extra/renamed key, or a `requires` list that is merely a *subset* of
+    # registered scopes (rather than exactly the pinned set) must never
+    # silently gain authorization semantics.
+    if frozenset(research_scopes.keys()) != frozenset(_PINNED_RESEARCH_SCOPE_REQUIRES.keys()):
+        raise ConfigError(
+            "`scope_authorization.research_scopes` keys must equal exactly the pinned "
+            f"pre-registered research-scope set {sorted(_PINNED_RESEARCH_SCOPE_REQUIRES)!r} "
+            f"(anti-cherry-pick lock) -- got {sorted(research_scopes)!r}"
+        )
+    for name, pinned_requires in _PINNED_RESEARCH_SCOPE_REQUIRES.items():
+        actual_requires = frozenset(research_scopes[name]["requires"])
+        if actual_requires != pinned_requires:
+            raise ConfigError(
+                f"`scope_authorization.research_scopes[{name!r}].requires` must equal exactly "
+                f"{sorted(pinned_requires)!r} (pre-registration lock) -- got "
+                f"{sorted(actual_requires)!r}"
+            )
+
+    governance_statements = scope_auth.get("governance_statements")
+    if not isinstance(governance_statements, dict):
+        raise ConfigError("`scope_authorization.governance_statements` must be a mapping")
+    for state in _REQUIRED_GOVERNANCE_STATES:
+        if state not in governance_statements:
+            raise ConfigError(f"`scope_authorization.governance_statements` missing required state {state!r}")
+        statement = governance_statements[state]
+        if not isinstance(statement, str) or not statement.strip():
+            raise ConfigError(f"`scope_authorization.governance_statements[{state!r}]` must be a non-blank string")
+
+    # Checker finding 1 (GPT-5.4): pin ALL THREE governance-state strings,
+    # not just TRUNCATING_PATHOGENIC_ONLY -- every state is an authorization
+    # surface a config author could otherwise widen/weaken.
+    for state, pinned_statement in _PINNED_GOVERNANCE_STATEMENTS.items():
+        actual = governance_statements[state]
+        if actual != pinned_statement:
+            raise ConfigError(
+                f"`scope_authorization.governance_statements[{state!r}]` must match the "
+                f"mandatory pinned pre-registered statement verbatim, got {actual!r}"
+            )
+
+
 def _build_oracle_thresholds(thresholds: Mapping[str, Any]) -> Mapping[str, Any]:
     """Coerce a schema-validated nested `oracle_thresholds` block to its
     typed form -- `confidence`/`precision`/`recall` -> `float`, `gating` ->
@@ -290,6 +548,26 @@ def _build_oracle_thresholds(thresholds: Mapping[str, Any]) -> Mapping[str, Any]
         for name, spec in thresholds["strata"].items()
     }
     return {"confidence": float(thresholds["confidence"]), "strata": strata}
+
+
+def _build_scope_authorization(scope_auth: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
+    """Coerce a schema-validated `scope_authorization` block to its typed
+    form (str-keyed, list/str-coerced); `None` stays `None` (v1-compatible
+    default -- absent block, `decide_scope_gate` fails closed)."""
+    if not scope_auth:
+        return None
+    return {
+        "schema_version": 2,
+        "research_use_disclaimer": str(scope_auth["research_use_disclaimer"]),
+        "full_spectrum": {"requires": [str(s) for s in scope_auth["full_spectrum"]["requires"]]},
+        "research_scopes": {
+            str(name): {"requires": [str(s) for s in spec["requires"]]}
+            for name, spec in scope_auth.get("research_scopes", {}).items()
+        },
+        "governance_statements": {
+            str(state): str(text) for state, text in scope_auth["governance_statements"].items()
+        },
+    }
 
 
 def load_config(path: str | Path) -> EvalConfig:
@@ -349,6 +627,30 @@ def load_config(path: str | Path) -> EvalConfig:
     if not isinstance(min_count, int) or isinstance(min_count, bool) or min_count < 1:
         raise ConfigError("`min_count_per_class` must be a positive int (>= 1) -- 0 disables the FR5 floors")
 
+    # v2 scope-specific authorization gate (ADDITIVE, preregistration): the
+    # block is OPTIONAL, but checker finding 5 (GPT-5.4) requires STRICT
+    # presence semantics -- only KEY ABSENCE means "legacy v1 config"
+    # (`scope_authorization=None`). Any explicitly present value -- `null`,
+    # `{}`, `[]`, `false`, `""` -- is a malformed v2 declaration and must
+    # raise loud, never silently fall back to v1 via a truthiness check.
+    if "scope_authorization" in raw:
+        scope_authorization_raw = raw["scope_authorization"]
+        _validate_scope_authorization(scope_authorization_raw, oracle_thresholds)
+        # Checker finding 2 (GPT-5.4): once a config declares a v2
+        # `scope_authorization` block, `min_count_per_class` is no longer a
+        # free-standing pin -- it must equal exactly the preregistered v2
+        # floor (36). Legacy v1-only configs (no `scope_authorization` key)
+        # are unaffected -- existing fixtures using a different positive
+        # `min_count_per_class` keep loading unchanged.
+        if min_count != _PINNED_MIN_COUNT_PER_CLASS:
+            raise ConfigError(
+                "`min_count_per_class` must equal the pinned pre-registered v2 floor "
+                f"{_PINNED_MIN_COUNT_PER_CLASS} once `scope_authorization` is present -- "
+                f"got {min_count!r}"
+            )
+    else:
+        scope_authorization_raw = None
+
     return EvalConfig(
         automatable_criteria=normalized_criteria,
         tavtigian_points={str(k): int(v) for k, v in raw["tavtigian_points"].items()},
@@ -358,4 +660,5 @@ def load_config(path: str | Path) -> EvalConfig:
         oracle_thresholds=_build_oracle_thresholds(oracle_thresholds),
         labels_snapshot=str(raw["labels_snapshot"]),
         clinvar_snapshot_file_checksum=str(raw.get("clinvar_snapshot_file_checksum", "") or ""),
+        scope_authorization=_build_scope_authorization(scope_authorization_raw),
     )

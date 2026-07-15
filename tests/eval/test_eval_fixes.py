@@ -85,8 +85,13 @@ def test_config_rejects_invalid_oracle_thresholds(tmp_path):
     ):
         with pytest.raises(ConfigError):
             load_config(_write_config(tmp_path, oracle_thresholds=bad))
-    # a valid, pinned threshold block still loads
-    load_config(_write_config(tmp_path, oracle_thresholds=oracle_thresholds_for(0.90, 0.85)))
+    # a valid, pinned threshold block (BOTH pinned strata -- BLOCKER-1 exact
+    # stratum-set lock requires missense+truncating together) still loads
+    valid = oracle_thresholds_for(0.90, 0.85)
+    valid["strata"]["truncating"] = {
+        "precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"],
+    }
+    load_config(_write_config(tmp_path, oracle_thresholds=valid))
 
 
 # --------------------------------------------------------------------------
@@ -174,3 +179,119 @@ def test_report_states_code_version_and_config_pins():
     low = report.render().lower()
     assert "code version" in low or "code_version" in low, "report omits code version (FR9)"
     assert "config pins" in low or "pins" in low or "seed" in low, "report omits config pins (FR9)"
+
+
+# --------------------------------------------------------------------------
+# [BLOCKER 1] load_config accepts oracle drift (confidence and exact strata)
+# --------------------------------------------------------------------------
+def test_config_rejects_oracle_drift(tmp_path):
+    """BLOCKER 1: _validate_oracle_thresholds must pin confidence exactly 0.95 and 
+    exact stratum keys missense+truncating; no missing/extra ghost.
+    
+    RED tests:
+      * load_config temp clone with confidence .5, 0.9, 1.0, bool, NaN => ConfigError.
+      * add extra ghost stratum (even well-formed/gating false or true) => ConfigError.
+      * omit missense or truncating => ConfigError.
+      * exact config loads.
+      * show extra gated stratum cannot reach v1 decide_gate because loader rejects it.
+    """
+    # 1. confidence validation
+    for bad_conf in (0.5, 0.9, 1.0, True, False, float("nan")):
+        bad_thresholds = {
+            "confidence": bad_conf,
+            "strata": {
+                "missense": {
+                    "precision": 0.90,
+                    "recall": 0.85,
+                    "gating": True,
+                    "directions": ["pathogenic", "benign"]
+                },
+                "truncating": {
+                    "precision": 0.95,
+                    "recall": 0.95,
+                    "gating": True,
+                    "directions": ["pathogenic"]
+                }
+            }
+        }
+        with pytest.raises(ConfigError):
+            load_config(_write_config(tmp_path, oracle_thresholds=bad_thresholds))
+
+    # 2. Extra ghost stratum (even well-formed/gating false or true)
+    ghost_thresholds = {
+        "confidence": 0.95,
+        "strata": {
+            "missense": {
+                "precision": 0.90,
+                "recall": 0.85,
+                "gating": True,
+                "directions": ["pathogenic", "benign"]
+            },
+            "truncating": {
+                "precision": 0.95,
+                "recall": 0.95,
+                "gating": True,
+                "directions": ["pathogenic"]
+            },
+            "ghost": {
+                "precision": 0.90,
+                "recall": 0.80,
+                "gating": False,
+                "directions": ["pathogenic"]
+            }
+        }
+    }
+    with pytest.raises(ConfigError):
+        load_config(_write_config(tmp_path, oracle_thresholds=ghost_thresholds))
+
+    # 3. Omit missense
+    missing_missense = {
+        "confidence": 0.95,
+        "strata": {
+            "truncating": {
+                "precision": 0.95,
+                "recall": 0.95,
+                "gating": True,
+                "directions": ["pathogenic"]
+            }
+        }
+    }
+    with pytest.raises(ConfigError):
+        load_config(_write_config(tmp_path, oracle_thresholds=missing_missense))
+
+    # 4. Omit truncating
+    missing_truncating = {
+        "confidence": 0.95,
+        "strata": {
+            "missense": {
+                "precision": 0.90,
+                "recall": 0.85,
+                "gating": True,
+                "directions": ["pathogenic", "benign"]
+            }
+        }
+    }
+    with pytest.raises(ConfigError):
+        load_config(_write_config(tmp_path, oracle_thresholds=missing_truncating))
+
+    # 5. Exact valid config loads
+    valid_thresholds = {
+        "confidence": 0.95,
+        "strata": {
+            "missense": {
+                "precision": 0.90,
+                "recall": 0.85,
+                "gating": True,
+                "directions": ["pathogenic", "benign"]
+            },
+            "truncating": {
+                "precision": 0.95,
+                "recall": 0.95,
+                "gating": True,
+                "directions": ["pathogenic"]
+            }
+        }
+    }
+    loaded = load_config(_write_config(tmp_path, oracle_thresholds=valid_thresholds))
+    assert loaded is not None
+

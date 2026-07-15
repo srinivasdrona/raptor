@@ -20,13 +20,15 @@ from raptor.eval.config import load_config as load_eval_config
 from raptor.eval.harness import run_eval
 from raptor.eval.live_source import BiasEvidenceSource
 from raptor.eval.mask_attestation import verify_mask_attestation
-from raptor.eval.model import GateDecision, LabeledVariant
+from raptor.eval.model import GateDecision, LabeledVariant, ScopeGateDecision
+from raptor.eval.report import report_to_dict
 from raptor.eval.predictor_aggregation import load_aggregation_spec
 from raptor.eval.predictor_policy import (
     PredictorPolicyError,
     load_predictor_policy,
     verify_predictor_policy_hashes,
 )
+from raptor.eval.scope_gate import canonical_scope_gate_reason, decide_scope_gate
 from raptor.eval.split import split_benchmark
 from raptor.eval.terminal_source import (
     PredictorCorrectedEvidenceSource,
@@ -55,6 +57,62 @@ def _blocked(reason: str) -> GateDecision:
         vus_authorized=False,
         per_stratum={},
     )
+
+
+def compute_report_scope_gate(
+    metrics: dict,
+    config,
+    skipped: set[str] | None = None,
+) -> ScopeGateDecision | None:
+    """Legacy-runner-compatible pure helper (checker finding 3): compute the
+    v2 `report.scope_gate` value WITHOUT executing a real gate run.
+
+    Returns `None` when `config.scope_authorization` is absent -- the
+    runner must then attach NO `scope_gate` at all, preserving v1 report
+    hash/render/envelope byte-for-byte. When present, computes
+    `decide_scope_gate` and applies the same fail-closed parity-skip
+    demotion as the v1 gate: any evaluation-only criterion exclusion
+    (`skipped`) that would otherwise let a scope/full-spectrum authorization
+    stand is withheld (forced to the most restrictive, `NONE_VALIDATED`
+    state) -- a skipped criterion can never authorize a research scope.
+
+    Final scope-gate blocker (explicit parity-authorization blocker): the
+    demotion NEVER alters/hides a per-scope statistical verdict --
+    `decision.scopes` (and therefore, e.g., a `truncating:pathogenic`
+    scope that is genuinely `VALIDATED`) is carried through UNCHANGED. Only
+    the non-statistical authorization surface is withheld: every
+    authorization boolean/flag is forced `False`, `governance_state` is
+    demoted to the most restrictive `NONE_VALIDATED`, and
+    `full_spectrum_status` is set to `BLOCKED_POLICY` (a policy block, never
+    a statistical PASS/FAIL/UNDERPOWERED verdict). The withholding is made
+    explicit and machine-readable via `authorization_blockers`, one
+    deterministic, sorted `"evaluation_skipped_criteria:{criterion}"` entry
+    per skipped criterion -- never silent.
+    """
+    if config.scope_authorization is None:
+        return None
+
+    decision = decide_scope_gate(metrics, config)
+    skipped = skipped or set()
+    if skipped and (
+        decision.full_spectrum_vus_authorized or any(decision.research_scope_flags.values())
+    ):
+        blockers = sorted(f"evaluation_skipped_criteria:{criterion}" for criterion in skipped)
+        scope_statuses = {key: verdict.scope_status for key, verdict in decision.scopes.items()}
+        reason = canonical_scope_gate_reason(scope_statuses, blockers)
+        decision = ScopeGateDecision(
+            schema_version=decision.schema_version,
+            scopes=decision.scopes,
+            full_spectrum_status="BLOCKED_POLICY",
+            full_spectrum_vus_authorized=False,
+            research_scope_flags={name: False for name in decision.research_scope_flags},
+            governance_state="NONE_VALIDATED",
+            governance_statement=config.scope_authorization["governance_statements"]["NONE_VALIDATED"],
+            research_use_disclaimer=decision.research_use_disclaimer,
+            authorization_blockers=blockers,
+            reason=reason,
+        )
+    return decision
 
 
 def _sha256(path: Path) -> str:
@@ -387,6 +445,14 @@ def main(argv: list[str] | None = None) -> int:
             per_stratum=report.gate.per_stratum,
         )
 
+    # v2 scope-specific research-authorization gate (ADDITIVE, wired for the
+    # NEXT run only -- this script is not executed by this track). Delegates
+    # to the pure `compute_report_scope_gate` helper (checker finding 3):
+    # `None` when `eval_config.scope_authorization` is absent (v1-compatible,
+    # no `scope_gate` attached), else the v2 decision with the same
+    # fail-closed parity-skip demotion as the v1 gate immediately above.
+    report.scope_gate = compute_report_scope_gate(report.metrics, eval_config, skipped=skipped)
+
     report.config_pins.update(
         {
             "bias_tsv_sha256": _sha256(Path(args.bias_tsv)),
@@ -409,7 +475,7 @@ def main(argv: list[str] | None = None) -> int:
 
     rendered = report.render()
     envelope = {
-        "report": asdict(report),
+        "report": report_to_dict(report),
         "content_hash": report.content_hash(),
         "predictor_policy": asdict(policy),
         "mask_attestation": asdict(attestation),

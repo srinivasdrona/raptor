@@ -11,10 +11,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, field
+from dataclasses import InitVar, asdict, dataclass, field
 from typing import Any, Dict, List
 
-from .model import GateDecision, Metrics
+from .model import DirectionVerdict, GateDecision, Metrics, ScopeGateDecision
 
 
 def _metrics_payload(metrics: Dict[str, Metrics]) -> dict:
@@ -59,6 +59,76 @@ def _per_stratum_payload(per_stratum: dict) -> dict:
     }
 
 
+def _direction_verdict_payload(v: DirectionVerdict) -> dict:
+    return {
+        "stratum": v.stratum,
+        "direction": v.direction,
+        "precision_lb": v.precision_lb,
+        "recall_lb": v.recall_lb,
+        "precision_threshold": v.precision_threshold,
+        "recall_threshold": v.recall_threshold,
+        "actual_count": v.actual_count,
+        "called_count": v.called_count,
+        "min_count": v.min_count,
+        "coverage_adequate": v.coverage_adequate,
+        "metric_status": v.metric_status,
+        "scope_status": v.scope_status,
+        "reasons": list(v.reasons),
+    }
+
+
+def _scope_gate_payload(scope_gate: ScopeGateDecision) -> dict:
+    """v2 scope-gate payload (additive): only ever called when
+    `EvalReport.scope_gate is not None` -- `content_hash()` MUST NOT call
+    this for a `None` scope_gate (v1 hash back-compat, AC-S7/D2)."""
+    return {
+        "schema_version": scope_gate.schema_version,
+        "scopes": {
+            key: _direction_verdict_payload(v) for key, v in sorted(scope_gate.scopes.items())
+        },
+        "full_spectrum_status": scope_gate.full_spectrum_status,
+        "full_spectrum_vus_authorized": scope_gate.full_spectrum_vus_authorized,
+        "research_scope_flags": dict(sorted(scope_gate.research_scope_flags.items())),
+        "governance_state": scope_gate.governance_state,
+        "governance_statement": scope_gate.governance_statement,
+        "research_use_disclaimer": scope_gate.research_use_disclaimer,
+        "reason": scope_gate.reason,
+        "authorization_blockers": sorted(scope_gate.authorization_blockers),
+    }
+
+
+def report_to_dict(report: "EvalReport") -> dict:
+    """Pure report-serialization helper (checker finding 5, GPT-5.4):
+    `EvalReport.scope_gate` is an `InitVar`-backed plain attribute (not a
+    real `dataclasses.fields()` member, see the field docstring below), so
+    raw `dataclasses.asdict(report)` never includes a `scope_gate` key
+    either way. This helper starts from `asdict(report)` and adds the
+    `scope_gate` payload back in ONLY when `report.scope_gate is not None`
+    -- a v1-shaped report (`scope_gate is None`) never serializes a
+    `scope_gate` key at all (never a `scope_gate: null`), while a v2 report
+    includes the full, JSON-safe scope-gate payload. Callers building a
+    report envelope (e.g. `scripts/run_masked_holdout_eval.py`) MUST use
+    this helper (not raw `asdict(report)`) to get the v2 key back.
+
+    Restored legacy gate contract (Gemini RED, 6491b00): `gate` is a
+    mandatory, non-optional `GateDecision` on every real `EvalReport` (base
+    v1 contract, commit 329a799) -- there is no gate-less v2 report shape.
+    A hand-built report that nonetheless carries `gate is None` (typing
+    says non-optional, but nothing stops a caller from constructing one
+    with a mocked/bypassed type checker) must fail loud HERE, before any
+    serialization is attempted -- defense-in-depth, never silently emit a
+    v2-only envelope the legacy builder cannot consume."""
+    if report.gate is None:
+        raise TypeError(
+            "EvalReport.gate is None -- gate is a mandatory legacy (v1) field; "
+            "report_to_dict() refuses to serialize a report with no gate decision"
+        )
+    payload = asdict(report)
+    if report.scope_gate is not None:
+        payload["scope_gate"] = _scope_gate_payload(report.scope_gate)
+    return payload
+
+
 @dataclass
 class EvalReport:
     run_id: str
@@ -70,10 +140,34 @@ class EvalReport:
     holdout_label_counts: Dict[str, int]
     holdout_class_counts: Dict[str, int]
     metrics: Dict[str, Metrics]
+    #: v1 VUS-authorization gate decision (base contract, commit 329a799):
+    #: mandatory, non-optional -- there is no gate-less v2 report shape.
+    #: `render()`/`content_hash()` may assume a real `GateDecision` here,
+    #: exactly as the base did (the v2 `scope_gate` section is additive and
+    #: unaffected either way, sec ADR-0011).
     gate: GateDecision
     oracle_blind_findings: List[str] = field(default_factory=list)
     code_version: str = ""
     config_pins: Dict[str, Any] = field(default_factory=dict)
+    #: v2 scope-specific authorization gate (ADDITIVE, optional). `None` is
+    #: the fully v1-compatible default -- `content_hash()` excludes this key
+    #: entirely when `None` so a v1 report's hash is byte-identical (D2/
+    #: AC-S7); `render()` only appends a scope-authorization section when
+    #: present.
+    #:
+    #: Checker finding 5 (GPT-5.4): declared as an `InitVar`, NOT a real
+    #: `dataclasses.fields()` member, captured into a plain instance
+    #: attribute (same public name) by `__post_init__`. This means raw
+    #: `dataclasses.asdict(report)`/`dataclasses.fields(report)` never see
+    #: a `scope_gate` key at all -- so a v1-shaped report (`scope_gate is
+    #: None`) never serializes a `scope_gate: null` key. Reading/writing
+    #: `report.scope_gate` afterwards (`self.scope_gate`, `report.scope_gate
+    #: = ...`) behaves exactly like a normal attribute -- `content_hash()`/
+    #: `render()` are unaffected.
+    scope_gate: InitVar["ScopeGateDecision | None"] = None
+
+    def __post_init__(self, scope_gate: "ScopeGateDecision | None" = None) -> None:
+        self.scope_gate = scope_gate
 
     def content_hash(self) -> str:
         """Deterministic-content hash (FR9/AC7): excludes `run_id` and
@@ -101,6 +195,11 @@ class EvalReport:
             "code_version": self.code_version,
             "config_pins": json.loads(json.dumps(self.config_pins, sort_keys=True, default=str)),
         }
+        # v2 scope-gate (ADDITIVE): only folded into the hash when present --
+        # a v1-shaped report (`scope_gate=None`, the default) must hash
+        # byte-identically to before this field existed (D2/AC-S7).
+        if self.scope_gate is not None:
+            payload["scope_gate"] = _scope_gate_payload(self.scope_gate)
         blob = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
@@ -114,7 +213,19 @@ class EvalReport:
         the exact pinned value). When `gate.status == "BLOCKED_POLICY"` (the
         terminal masked-rerun harness only) no metrics table is printed at
         all -- there is no authorized predictor-policy artifact, so there is
-        nothing legitimate to report a number for."""
+        nothing legitimate to report a number for. `gate` is mandatory (base
+        v1 contract, commit 329a799, restored in 6491b00) -- there is no
+        gate-less v2 report shape; the v2 `scope_gate` section (if present)
+        is unaffected either way.
+
+        The reserved pooled `overall` stratum IS printed in this general
+        descriptive metrics table alongside the per-class strata (base
+        v1 contract, commit 329a799) -- it is a purely descriptive,
+        cross-class aggregate row here. `overall` is excluded only from the
+        v2 scope-specific section below: `_render_scope_gate()`, scope
+        authorization, governance reasons, and scope-verdict rendering
+        (AC-S5 parity with `decide_scope_gate`), never from this general
+        table."""
         lines: List[str] = []
         lines.append("RAPTOR Eval Report (PRD-06)")
         lines.append(f"run_id: {self.run_id}")
@@ -178,4 +289,46 @@ class EvalReport:
                 lines.append(f"  - {finding}")
         else:
             lines.append("oracle-blind findings: none")
+        if self.scope_gate is not None:
+            lines.extend(self._render_scope_gate())
         return "\n".join(lines)
+
+    def _render_scope_gate(self) -> List[str]:
+        """v2 scope-specific research-authorization section (ADDITIVE) --
+        only appended when `scope_gate is not None` (v1 reports render
+        unchanged). Never states a bare global "PASS" -- the authoritative
+        human-facing output is the narrow research-scope flags plus the
+        exact preregistered governance statement and the separate,
+        mandatory `research_use_disclaimer` (never merged into the
+        statement text)."""
+        sg = self.scope_gate
+        lines: List[str] = []
+        lines.append("--- v2 scope-specific research authorization (preregistered, non-clinical) ---")
+        lines.append(f"scope_gate schema_version: {sg.schema_version}")
+        lines.append("scopes:")
+        for key, v in sorted(sg.scopes.items()):
+            precision_t_str = f"{v.precision_threshold:.4f}" if isinstance(v.precision_threshold, (int, float)) else "none"
+            recall_t_str = f"{v.recall_threshold:.4f}" if isinstance(v.recall_threshold, (int, float)) else "none"
+            lines.append(
+                f"  - {key}: metric_status={v.metric_status} coverage_adequate={v.coverage_adequate} "
+                f"scope_status={v.scope_status} precision_lb={v.precision_lb:.4f} "
+                f"recall_lb={v.recall_lb:.4f} precision_threshold>={precision_t_str} "
+                f"recall_threshold>={recall_t_str} actual_count={v.actual_count} "
+                f"called_count={v.called_count} min_count={v.min_count}"
+            )
+        lines.append(f"full_spectrum_status: {sg.full_spectrum_status}")
+        lines.append(f"full_spectrum_vus_authorized: {sg.full_spectrum_vus_authorized}")
+        lines.append("research_scope_flags:")
+        for name, flag in sorted(sg.research_scope_flags.items()):
+            lines.append(f"  - {name}={flag}")
+        lines.append(f"governance_state: {sg.governance_state}")
+        lines.append(f"governance_statement: {sg.governance_statement}")
+        lines.append(f"research_use_disclaimer: {sg.research_use_disclaimer}")
+        if sg.authorization_blockers:
+            lines.append("authorization_blockers:")
+            for blocker in sorted(sg.authorization_blockers):
+                lines.append(f"  - {blocker}")
+        else:
+            lines.append("authorization_blockers: none")
+        lines.append(f"scope_gate reason: {sg.reason}")
+        return lines

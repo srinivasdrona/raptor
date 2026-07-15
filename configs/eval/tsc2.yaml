@@ -111,6 +111,34 @@ oracle_thresholds:
       gating: true
       directions: [pathogenic]
 
+# v2 scope-specific authorization gate (NEW, additive, preregistered BEFORE
+# the corrected rerun, blind to it -- R-A2; docs/DECISIONS.md ADR-0011,
+# docs/reference/scope-authorization-preregistration-2026-07.md). Separate
+# REPORTING was already preregistered above (strata + directions +
+# thresholds); this block adds the separate AUTHORIZATION rule the v1 gate
+# lacked (v1 `decide_gate` hardcodes `_GATING_STRATUM="missense"` as the
+# sole binding stratum for `vus_authorized`). It changes NO threshold value
+# and authorizes NO clinical action, VUS worklist, or ClinVar submission.
+# `full_spectrum.requires` is semantics-locked (anti-cherry-pick, R-A2) --
+# `load_config` rejects any deviation from this exact pinned set. This
+# block is NEVER applied to relabel the 2026-07-13 v1 run
+# (data/census/tsc_masked_holdout_gate_2026-07-13.json stays schema v1).
+scope_authorization:
+  schema_version: 2
+  # Mandatory, separate, non-blank disclaimer (kept OUT of the exact
+  # governance statements below, which stay verbatim -- never merged).
+  research_use_disclaimer: "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission."
+  full_spectrum:
+    # Full-spectrum VUS authorization requires EVERY scope below to be VALIDATED.
+    requires: ["missense:pathogenic", "missense:benign", "truncating:pathogenic"]
+  research_scopes:
+    truncating_pathogenic_research_scope_validated:
+      requires: ["truncating:pathogenic"]
+  governance_statements:
+    FULL_SPECTRUM: "All pre-registered research scopes are validated for research-evidence use only; this authorizes no clinical classification, VUS worklist, or ClinVar submission."
+    TRUNCATING_PATHOGENIC_ONLY: "Full-spectrum VUS automation is not authorized. Evidence supports only the validated truncating-pathogenic scope; missense remains unvalidated."
+    NONE_VALIDATED: "Full-spectrum VUS automation is not authorized; no pre-registered research scope is currently validated."
+
 # FR1/GP-9: the labels snapshot this benchmark is frozen against (R-A11).
 # Pinned ClinVar variant_summary.txt.gz snapshot:
 #   date   : 2026-07-07 (NCBI weekly release)
