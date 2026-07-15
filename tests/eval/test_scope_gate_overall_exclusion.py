@@ -170,10 +170,27 @@ def test_2_serialized_and_rendered_outputs_no_overall_mention():
     # from the v2 scope-specific research-authorization section below.
     scope_section_header = "--- v2 scope-specific research authorization (preregistered, non-clinical) ---"
     assert scope_section_header in rendered
-    _, scope_section = rendered.split(scope_section_header, 1)
+    
+    # Precise separation validation:
+    # 1. General descriptive metrics section MUST contain overall
+    descriptive_section, scope_section = rendered.split(scope_section_header, 1)
+    assert "  - overall: precision=" in descriptive_section
+    assert "  - missense: precision=" in descriptive_section
+    assert "  - truncating: precision=" in descriptive_section
+
+    # 2. Scope-specific section MUST NOT contain overall scope keys or references
+    assert "overall:pathogenic" not in scope_section
+    assert "overall:benign" not in scope_section
     assert "overall:" not in scope_section
 
     serialized = report_to_dict(report)
+    
+    # 3. Serialized metrics includes overall
+    assert "overall" in serialized["metrics"]
+    assert "precision" in serialized["metrics"]["overall"]
+    
+    # 4. Serialized scope_gate.scopes and reason exclude overall
+    assert "scope_gate" in serialized
     assert "overall:" not in serialized["scope_gate"]["reason"]
     for key in serialized["scope_gate"]["scopes"]:
         assert not key.startswith("overall:")
