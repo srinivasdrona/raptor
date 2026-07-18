@@ -138,6 +138,7 @@ todos:
   depends_on:
   - enforce-production-vocab
   - reconcile-strength-policy
+  - resolve-pp3-bp4-activation
   - select-validate-pp3-bp4-policy
   created: '2026-07-13'
 - id: reconcile-strength-policy
@@ -172,6 +173,7 @@ todos:
   depends_on:
   - enforce-production-vocab
   - reconcile-strength-policy
+  - resolve-pp3-bp4-activation
   - select-validate-pp3-bp4-policy
   - version-scope-specific-gate
   created: '2026-07-13'
@@ -185,9 +187,26 @@ todos:
     implement shadow-only fail-closed infrastructure via Opus planner, Gemini tests, Sonnet
     5 doer, and GPT-5.4 checker. Do not owner-approve, run the terminal held-out gate, or recompute
     the VUS census.
-  status: in_progress
+    Completed via Opus planner (plan reviewed/revised by the orchestrator), Gemini 3.5 Flash
+    protected tests, Sonnet 5 production implementation, and GPT-5.4 approval. Added proposed
+    shadow REVEL policy, candidate/source registers, fail-closed leakage and score-table audits,
+    dev-only transportability/MAVE reporting, and deterministic UNKNOWN/BLOCKED_DATA artifacts.
+    Merged to main in 22d26c4; combined suite 828 passed and 5 skipped.
+  status: done
   depends_on: []
   created: '2026-07-18'
+- id: resolve-pp3-bp4-activation
+  title: Resolving PP3/BP4 activation blockers
+  description: Step 8 after the completed shadow-policy work. Pin the exact REVEL/dbNSFP
+    version and verified license; obtain and audit direct/component training manifests;
+    acquire a structured dev score table; resolve leakage UNKNOWN and transportability
+    BLOCKED_DATA/UNDERPOWERED; decide whether evidence supports activation; obtain GPT-5.4
+    review; and record explicit owner approval bound to hashes. Do not activate by default
+    or run held-out/VUS workflows before completion.
+  status: pending
+  depends_on:
+  - select-validate-pp3-bp4-policy
+  created: '2026-07-19'
 - id: version-scope-specific-gate
   title: Versioning scope-specific validation verdicts
   description: Preregister and implement the additive v2 validation contract with independent
