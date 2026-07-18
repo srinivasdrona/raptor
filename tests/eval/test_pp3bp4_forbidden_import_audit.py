@@ -134,9 +134,14 @@ def test_tc1_stage_b_imports() -> None:
 
 
 def test_tc1_production_modules_do_not_import_shadow() -> None:
-    """No production module imports the new shadow modules."""
+    """No production module or runner imports the new shadow modules.
+
+    Scan ALL existing src/raptor/**/*.py and relevant existing runner scripts,
+    excluding only the new shadow modules/scripts themselves. Do not omit src/raptor/eval. (Correction 9)
+    """
     repo_root = Path(__file__).parent.parent.parent
     src_dir = repo_root / "src" / "raptor"
+    scripts_dir = repo_root / "scripts"
     
     forbidden_imports = {
         "raptor.eval.pp3bp4_candidate_policy",
@@ -145,16 +150,46 @@ def test_tc1_production_modules_do_not_import_shadow() -> None:
         "raptor.eval.predictor_leakage_audit",
     }
 
-    # Scan production dirs: scorer, ingest, etc. (excluding eval)
-    for prod_dir_name in ["scorer", "ingest", "packet", "kb"]:
-        prod_dir = src_dir / prod_dir_name
-        if not prod_dir.exists():
-            continue
-        for root, _, files in os.walk(prod_dir):
+    # Shadow modules to exclude
+    shadow_module_paths = {
+        src_dir / "eval" / "pp3bp4_candidate_policy.py",
+        src_dir / "eval" / "pp3bp4_score_table.py",
+        src_dir / "eval" / "pp3bp4_transportability.py",
+        src_dir / "eval" / "predictor_leakage_audit.py",
+    }
+
+    # Shadow scripts to exclude
+    shadow_script_paths = {
+        scripts_dir / "export_dev_vcf.py",
+        scripts_dir / "build_pp3bp4_transportability_report.py",
+        scripts_dir / "audit_predictor_leakage.py",
+        scripts_dir / "build_pp3bp4_revel_mave_concordance.py",
+    }
+
+    # 1. Scan ALL src/raptor/**/*.py (do not omit raptor/eval)
+    for root, _, files in os.walk(src_dir):
+        for file in files:
+            if file.endswith(".py"):
+                path = Path(root) / file
+                # Skip the shadow modules themselves
+                if any(path.resolve() == shadow.resolve() for shadow in shadow_module_paths):
+                    continue
+                tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+                imported_modules = _import_names(tree)
+                for imp in imported_modules:
+                    assert imp not in forbidden_imports, f"Production module {path} imports forbidden shadow module {imp}"
+
+    # 2. Scan scripts/**/*.py (relevant runner scripts)
+    if scripts_dir.exists():
+        for root, _, files in os.walk(scripts_dir):
             for file in files:
                 if file.endswith(".py"):
                     path = Path(root) / file
+                    # Skip the shadow scripts themselves
+                    if any(path.resolve() == shadow.resolve() for shadow in shadow_script_paths):
+                        continue
                     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
                     imported_modules = _import_names(tree)
                     for imp in imported_modules:
-                        assert imp not in forbidden_imports, f"Production module {path} imports forbidden shadow module {imp}"
+                        assert imp not in forbidden_imports, f"Runner script {path} imports forbidden shadow module {imp}"
+

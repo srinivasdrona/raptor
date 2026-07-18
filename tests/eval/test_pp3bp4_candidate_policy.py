@@ -1,17 +1,34 @@
 import pytest
 import json
 import hashlib
+import os
+import sys
+import subprocess
 from pathlib import Path
 
-# We wrap top-level imports in try-except or use function-local imports
-# so that the tests collect cleanly in a RED state.
+# Policy schema alignment:
+# - schema: "pp3bp4-candidate-policy/1"
+# - version: "1"
+# - policy_id: "tsc-pp3bp4-revel-shadow"
 
-def _get_valid_policy_json():
-    # Helper to generate a valid policy JSON structure matching B.3/B.7/v1
+VALID_SOURCE_REGISTER_CONTENT = """schema: "pp3bp4-source-register/1"
+version: "1"
+citations:
+  pejaver_2022: "PMC9748256"
+  stenton_2024: "PMC11560577"
+candidate:
+  predictor: "REVEL"
+  version: "1"
+license: "non-commercial"
+availability: "repo"
+verified: true
+"""
+
+def _get_valid_policy_json(source_register_sha256="abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"):
     return {
-        "schema": "pp3bp4-candidate-policy",
-        "version": "1.0.0",
-        "policy_id": "pp3bp4-candidate-policy/1",
+        "schema": "pp3bp4-candidate-policy/1",
+        "version": "1",
+        "policy_id": "tsc-pp3bp4-revel-shadow",
         "status": "proposed",
         "shadow_only": True,
         "owner_approved": False,
@@ -55,7 +72,7 @@ def _get_valid_policy_json():
         "training_overlap_status": "UNKNOWN",
         "transportability_status": "BLOCKED_DATA",
         "license_status": "non_commercial_in_repo_tag;primary_confirm_pending",
-        "source_register_sha256": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+        "source_register_sha256": source_register_sha256,
         "activation_checklist": ["recommendation memo §8 items"],
         "activation_dependencies": [
             "revel-dbnsfp-release-pin",
@@ -77,40 +94,45 @@ def test_tb1_schema_and_hash(tmp_path):
     """
     from raptor.eval.pp3bp4_candidate_policy import load_candidate_policy, CandidatePolicyError
 
+    # Create a real source register file to test the preferred real register verification
+    register_file = tmp_path / "pp3bp4_source_register.yaml"
+    register_file.write_text(VALID_SOURCE_REGISTER_CONTENT, encoding="utf-8")
+    real_register_sha = hashlib.sha256(register_file.read_bytes()).hexdigest()
+
     p_file = tmp_path / "policy.json"
-    p_data = _get_valid_policy_json()
+    p_data = _get_valid_policy_json(source_register_sha256=real_register_sha)
 
     # Base valid check
     p_file.write_text(json.dumps(p_data), encoding="utf-8")
-    policy, provenance = load_candidate_policy(str(p_file))
+    policy, provenance = load_candidate_policy(str(p_file), source_register_path=str(register_file))
     assert policy.status == "proposed"
     assert not policy.owner_approved
-    assert provenance.source_register_sha256 == p_data["source_register_sha256"]
+    assert provenance.source_register_sha256 == real_register_sha
     
     # Check policy_source_sha256 calculation over canonical bytes
     expected_hash = hashlib.sha256(p_file.read_bytes()).hexdigest()
     assert provenance.policy_source_sha256 == expected_hash
 
-    # Reject extra fields (closed field set)
+    # Reject extra fields in policy (closed field set)
     p_extra = p_data.copy()
     p_extra["extra_unapproved_field"] = "value"
     p_file.write_text(json.dumps(p_extra), encoding="utf-8")
     with pytest.raises(CandidatePolicyError):
-        load_candidate_policy(str(p_file))
+        load_candidate_policy(str(p_file), source_register_path=str(register_file))
 
     # Rejects 'policy_sha256' field (Correction 3)
     p_self_hash = p_data.copy()
     p_self_hash["policy_sha256"] = "somehash"
     p_file.write_text(json.dumps(p_self_hash), encoding="utf-8")
     with pytest.raises(CandidatePolicyError, match="policy_sha256"):
-        load_candidate_policy(str(p_file))
+        load_candidate_policy(str(p_file), source_register_path=str(register_file))
 
     # Reject owner_approved=True when status != 'approved' (status is 'proposed')
     p_unauth = p_data.copy()
     p_unauth["owner_approved"] = True
     p_file.write_text(json.dumps(p_unauth), encoding="utf-8")
     with pytest.raises(CandidatePolicyError):
-        load_candidate_policy(str(p_file))
+        load_candidate_policy(str(p_file), source_register_path=str(register_file))
 
     # Non-monotonic PP3 intervals (e.g. moderate overlapping with supporting or out of order)
     p_non_monotonic = p_data.copy()
@@ -121,7 +143,7 @@ def test_tb1_schema_and_hash(tmp_path):
     ]
     p_file.write_text(json.dumps(p_non_monotonic), encoding="utf-8")
     with pytest.raises(CandidatePolicyError):
-        load_candidate_policy(str(p_file))
+        load_candidate_policy(str(p_file), source_register_path=str(register_file))
 
     # Overlapping intervals (lo/hi overlaps)
     p_overlap = p_data.copy()
@@ -132,28 +154,63 @@ def test_tb1_schema_and_hash(tmp_path):
     ]
     p_file.write_text(json.dumps(p_overlap), encoding="utf-8")
     with pytest.raises(CandidatePolicyError):
-        load_candidate_policy(str(p_file))
+        load_candidate_policy(str(p_file), source_register_path=str(register_file))
+
+
+def test_tb1_source_register_failures(tmp_path):
+    """Verify missing, mismatched, or unverified registers fail loud."""
+    from raptor.eval.pp3bp4_candidate_policy import load_candidate_policy, CandidatePolicyError
+
+    p_file = tmp_path / "policy.json"
+    register_file = tmp_path / "pp3bp4_source_register.yaml"
+
+    # Write some register file
+    register_file.write_text(VALID_SOURCE_REGISTER_CONTENT, encoding="utf-8")
+    real_register_sha = hashlib.sha256(register_file.read_bytes()).hexdigest()
+
+    # 1. Register file does not exist
+    p_data = _get_valid_policy_json(source_register_sha256=real_register_sha)
+    p_file.write_text(json.dumps(p_data), encoding="utf-8")
+    with pytest.raises(CandidatePolicyError, match="register"):
+        load_candidate_policy(str(p_file), source_register_path="nonexistent_register.yaml")
+
+    # 2. SHA-256 mismatch
+    p_mismatch = _get_valid_policy_json(source_register_sha256="wronghash" + "a" * 55)
+    p_file.write_text(json.dumps(p_mismatch), encoding="utf-8")
+    with pytest.raises(CandidatePolicyError, match="hash|mismatch"):
+        load_candidate_policy(str(p_file), source_register_path=str(register_file))
+
+    # 3. Unverified or missing citation in register
+    bad_register_content = """schema: "pp3bp4-source-register/1"
+version: "1"
+citations:
+  pejaver_2022: "PMC_WRONG"
+candidate:
+  predictor: "REVEL"
+"""
+    register_file.write_text(bad_register_content, encoding="utf-8")
+    bad_register_sha = hashlib.sha256(register_file.read_bytes()).hexdigest()
+    p_bad = _get_valid_policy_json(source_register_sha256=bad_register_sha)
+    p_file.write_text(json.dumps(p_bad), encoding="utf-8")
+    with pytest.raises(CandidatePolicyError, match="citation|invalid|schema"):
+        load_candidate_policy(str(p_file), source_register_path=str(register_file))
 
 
 def test_tb2_boundaries(tmp_path):
     """T-B2 boundaries.
 
     Test classify_revel at 0.003/0.016/0.183/0.290/0.644/0.773/0.932 and adjacent values.
-    Uses exact Pejaver Table 2 inclusive/exclusive edges:
-    - very_strong BP4: <= 0.003 -> BP4_DISABLED_STRENGTH
-    - strong BP4: 0.003 < s <= 0.016 -> BP4_DISABLED_STRENGTH
-    - moderate BP4: 0.016 < s <= 0.183 -> BP4_MODERATE
-    - supporting BP4: 0.183 < s <= 0.290 -> BP4_SUPPORTING
-    - indeterminate: 0.290 < s < 0.644 -> INDETERMINATE
-    - supporting PP3: 0.644 <= s < 0.773 -> PP3_SUPPORTING
-    - moderate PP3: 0.773 <= s < 0.932 -> PP3_MODERATE
-    - strong PP3: 0.932 <= s -> PP3_STRONG
+    Uses exact Pejaver Table 2 inclusive/exclusive edges.
     """
     from raptor.eval.pp3bp4_candidate_policy import load_candidate_policy, classify_revel, PolicyCall
 
+    register_file = tmp_path / "pp3bp4_source_register.yaml"
+    register_file.write_text(VALID_SOURCE_REGISTER_CONTENT, encoding="utf-8")
+    real_register_sha = hashlib.sha256(register_file.read_bytes()).hexdigest()
+
     p_file = tmp_path / "policy.json"
-    p_file.write_text(json.dumps(_get_valid_policy_json()), encoding="utf-8")
-    policy, _ = load_candidate_policy(str(p_file))
+    p_file.write_text(json.dumps(_get_valid_policy_json(source_register_sha256=real_register_sha)), encoding="utf-8")
+    policy, _ = load_candidate_policy(str(p_file), source_register_path=str(register_file))
 
     # Test values at boundaries
     assert classify_revel(0.003, policy) == PolicyCall.BP4_DISABLED_STRENGTH
@@ -203,12 +260,14 @@ def test_tb4_no_fallback_path(tmp_path):
     """
     from raptor.eval.pp3bp4_candidate_policy import load_candidate_policy, classify_revel, PolicyCall
 
-    p_file = tmp_path / "policy.json"
-    p_file.write_text(json.dumps(_get_valid_policy_json()), encoding="utf-8")
-    policy, _ = load_candidate_policy(str(p_file))
+    register_file = tmp_path / "pp3bp4_source_register.yaml"
+    register_file.write_text(VALID_SOURCE_REGISTER_CONTENT, encoding="utf-8")
+    real_register_sha = hashlib.sha256(register_file.read_bytes()).hexdigest()
 
-    # Even though Table 2 has "strong" / "very_strong" intervals, the enabled_max_bp4_strength
-    # is "moderate". Thus we must never return any hypothetical BP4_STRONG/BP4_VERY_STRONG.
+    p_file = tmp_path / "policy.json"
+    p_file.write_text(json.dumps(_get_valid_policy_json(source_register_sha256=real_register_sha)), encoding="utf-8")
+    policy, _ = load_candidate_policy(str(p_file), source_register_path=str(register_file))
+
     res_vstrong = classify_revel(0.002, policy)
     assert res_vstrong == PolicyCall.BP4_DISABLED_STRENGTH
     assert res_vstrong != "BP4_STRONG"
@@ -227,27 +286,25 @@ def test_tb5_no_authorization(tmp_path):
     """
     from raptor.eval.pp3bp4_candidate_policy import load_candidate_policy, build_shadow_report, PolicyCall
 
-    p_file_proposed = tmp_path / "proposed_policy.json"
-    p_data_proposed = _get_valid_policy_json()
-    p_file_proposed.write_text(json.dumps(p_data_proposed), encoding="utf-8")
-    policy_proposed, prov_proposed = load_candidate_policy(str(p_file_proposed))
+    register_file = tmp_path / "pp3bp4_source_register.yaml"
+    register_file.write_text(VALID_SOURCE_REGISTER_CONTENT, encoding="utf-8")
+    real_register_sha = hashlib.sha256(register_file.read_bytes()).hexdigest()
 
-    # A mock record list to pass to build_shadow_report
+    p_file_proposed = tmp_path / "proposed_policy.json"
+    p_data_proposed = _get_valid_policy_json(source_register_sha256=real_register_sha)
+    p_file_proposed.write_text(json.dumps(p_data_proposed), encoding="utf-8")
+    policy_proposed, prov_proposed = load_candidate_policy(str(p_file_proposed), source_register_path=str(register_file))
+
+    # Using canonical SPDI IDs instead of HGVS (:g.)
     mock_records = [
-        {"variant_id": "NC_000009.12:g.12345A>G", "score": 0.85, "provenance": {"source": "structured"}},
-        {"variant_id": "NC_000016.10:g.54321C>T", "score": 0.10, "provenance": {"source": "structured"}},
+        {"variant_id": "NC_000009.12:12345:A:G", "score": 0.85, "provenance": {"source": "structured"}},
+        {"variant_id": "NC_000016.10:54321:C:T", "score": 0.10, "provenance": {"source": "structured"}},
     ]
 
     report_proposed = build_shadow_report(mock_records, policy_proposed, prov_proposed, scope_genes=["TSC1", "TSC2"])
 
-    # Now a hypothetical policy with status="approved" and owner_approved=True (if allowed to load, or bypass loader validation)
-    # The requirement says "build_shadow_report has no status branch, no authorization return/implication.
-    # No behavior toggles on approved."
-    # Let's create a policy object directly or via mock, or check that the report has no "authorized" fields.
     assert hasattr(report_proposed, "provenance")
     assert report_proposed.provenance.status == "proposed"
-    # The output should not contain any authorized=True flags or similar.
-    # It must have identical classification structure.
     assert hasattr(report_proposed, "content_hash")
 
 
@@ -258,23 +315,16 @@ def test_tb6_no_censored_path():
     and build_shadow_report or Stage B transportability rejects any score record
     where `source` == 'bias_rationale' or any censored provenance is passed.
     """
-    import sys
-    # Check that there is no rationale parsing in the candidate policy source code
-    # We inspect the code text or try to import any such helper
     try:
         from raptor.eval import pp3bp4_candidate_policy
         source_code = Path(pp3bp4_candidate_policy.__file__).read_text(encoding="utf-8")
         assert "extract_revel_scores_from_bias_rationale" not in source_code
         assert "bias_rationale" not in source_code or "reject" in source_code or "==" in source_code
-    except (ImportError, NameError):
+    except (ImportError, NameError, FileNotFoundError):
         pass
 
-    # Test rejection behavior of build_shadow_report when source is bias_rationale
-    from raptor.eval.pp3bp4_candidate_policy import build_shadow_report, load_candidate_policy
-    # If the candidate policy module exists, build_shadow_report should raise ValueError on bias_rationale
-    # Let's verify this expectation
-    p_data = _get_valid_policy_json()
-    # Mocking policy and provenance objects
+    from raptor.eval.pp3bp4_candidate_policy import build_shadow_report
+
     class DummyPolicy:
         status = "proposed"
         shadow_only = True
@@ -282,11 +332,27 @@ def test_tb6_no_censored_path():
     class DummyProvenance:
         policy_source_sha256 = "1" * 64
         source_register_sha256 = "2" * 64
-        schema = "pp3bp4-candidate-policy"
+        schema = "pp3bp4-candidate-policy/1"
         status = "proposed"
 
     bad_records = [
-        {"variant_id": "NC_000009.12:g.12345A>G", "score": 0.85, "provenance": {"source": "bias_rationale"}},
+        {"variant_id": "NC_000009.12:12345:A:G", "score": 0.85, "provenance": {"source": "bias_rationale"}},
     ]
     with pytest.raises(ValueError, match="bias_rationale"):
         build_shadow_report(bad_records, DummyPolicy(), DummyProvenance(), scope_genes=["TSC1", "TSC2"])
+
+
+def test_cli_help_bootstrap():
+    """T-A4/T-B8 check script can run with a clean PYTHONPATH and shows help."""
+    script_path = Path("scripts/build_pp3bp4_transportability_report.py")
+    if not script_path.exists():
+        pytest.skip("build_pp3bp4_transportability_report.py not implemented yet")
+
+    env = os.environ.copy()
+    # Clean PYTHONPATH: only use 'src' directory
+    env["PYTHONPATH"] = "src"
+
+    cmd = [sys.executable, str(script_path), "--help"]
+    res = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    assert res.returncode == 0, f"CLI help failed under clean PYTHONPATH: {res.stderr}"
+    assert "usage" in res.stdout.lower() or "help" in res.stdout.lower()

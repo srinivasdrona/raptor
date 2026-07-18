@@ -4,9 +4,9 @@ import hashlib
 from pathlib import Path
 
 
-# Helper to generate mock dev IDs
+# Helper to generate mock dev IDs as canonical SPDI strings (Correction 3)
 def _get_mock_dev_ids(n=1104):
-    return [f"NC_000009.12:g.{10000 + i}A>G" for i in range(n)]
+    return [f"NC_000009.12:{10000 + i}:T:C" for i in range(n)]
 
 
 # Helper to compute SHA256 of sorted IDs
@@ -19,6 +19,11 @@ def _compute_ids_hash(ids):
     return hasher.hexdigest()
 
 
+# Helper to serialize JSON compactly and canonically (Correction 5)
+def _compact_canonical_json(data):
+    return json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
 def test_ts1_score_table_success(tmp_path):
     """T-S1 score-table success & coverage conservation.
 
@@ -27,7 +32,6 @@ def test_ts1_score_table_success(tmp_path):
     invariant n_scored + n_missing == 1104.
     """
     from raptor.eval.pp3bp4_score_table import load_and_validate_score_table
-    from raptor.eval.pp3bp4_candidate_policy import CandidatePolicy
 
     dev_ids = _get_mock_dev_ids(1104)
     dev_hash = _compute_ids_hash(dev_ids)
@@ -41,6 +45,7 @@ def test_ts1_score_table_success(tmp_path):
     policy = DummyPolicy()
 
     # Create score table data: 1000 scored, 104 missing
+    # Closed row schema: NO ad hoc 'gene' field allowed! (Correction 5)
     rows_data = []
     for i in range(1000):
         rows_data.append({
@@ -66,10 +71,8 @@ def test_ts1_score_table_success(tmp_path):
             "consequence": "missense_variant"
         })
 
-    # Table content hash
-    content_hasher = hashlib.sha256()
-    content_hasher.update(json.dumps(rows_data, sort_keys=True).encode("utf-8"))
-    table_hash = content_hasher.hexdigest()
+    # Table content hash using compact canonical JSON algorithm (Correction 5)
+    table_hash = hashlib.sha256(_compact_canonical_json(rows_data)).hexdigest()
 
     sidecar_data = {
         "schema": "pp3bp4-revel-score-table/1",
@@ -118,7 +121,7 @@ def test_ts1_score_table_failures(tmp_path):
 
     policy = DummyPolicy()
 
-    # Helper to generate basic valid rows
+    # Helper to generate basic valid rows (no ad hoc gene field)
     def get_valid_rows():
         return [{
             "variant_id": vid,
@@ -154,17 +157,13 @@ def test_ts1_score_table_failures(tmp_path):
 
     # 2. Extra ID not in dev set
     bad_rows = get_valid_rows()
-    bad_rows[0]["variant_id"] = "NC_000009.12:g.99999A>G" # extra
+    bad_rows[0]["variant_id"] = "NC_000009.12:99999:T:C" # extra SPDI, not in dev set
     with pytest.raises(ScoreTableValidationError, match="extra|dev set"):
         load_and_validate_score_table(bad_rows, sidecar, dev_ids=dev_ids, policy=policy)
 
     # 3. Held-out ID present
     bad_rows = get_valid_rows()
-    # Let's say NC_000009.12:g.20000A>G is a held-out ID
-    bad_rows[0]["variant_id"] = "NC_000009.12:g.20000A>G"
-    # Ensure it's treated as heldout by adding to dev_ids or checking against holdout set
-    # In any case, a heldout ID should be rejected if it's explicitly labeled or identified
-    # The loader must reject if an ID is outside dev (which NC_000009.12:g.20000A>G is)
+    bad_rows[0]["variant_id"] = "NC_000009.12:20000:T:C" # a heldout ID
     with pytest.raises(ScoreTableValidationError, match="extra|heldout|dev set"):
         load_and_validate_score_table(bad_rows, sidecar, dev_ids=dev_ids, policy=policy)
 
@@ -172,6 +171,12 @@ def test_ts1_score_table_failures(tmp_path):
     bad_rows = get_valid_rows()
     bad_rows[0]["score"] = 1.5 # out of [0, 1]
     with pytest.raises(ScoreTableValidationError, match="range|finite"):
+        load_and_validate_score_table(bad_rows, sidecar, dev_ids=dev_ids, policy=policy)
+
+    # Infinity/NaN (Correction 5)
+    bad_rows = get_valid_rows()
+    bad_rows[0]["score"] = float("inf")
+    with pytest.raises(ScoreTableValidationError, match="finite|range"):
         load_and_validate_score_table(bad_rows, sidecar, dev_ids=dev_ids, policy=policy)
 
     bad_rows = get_valid_rows()
@@ -190,9 +195,14 @@ def test_ts1_score_table_failures(tmp_path):
     with pytest.raises(ScoreTableValidationError, match="version"):
         load_and_validate_score_table(get_valid_rows(), bad_sidecar, dev_ids=dev_ids, policy=policy)
 
-    # 6. Raw coordinates (not canonical SPDI)
+    # 6. Reject HGVS :g. and raw chr:pos:ref:alt coordinates (Correction 3)
     bad_rows = get_valid_rows()
-    bad_rows[0]["variant_id"] = "chr9:12345:A:G" # raw coords, not NC_000009.12:g.12345A>G
+    bad_rows[0]["variant_id"] = "NC_000009.12:g.12345A>G" # HGVS rejected as score-table ID
+    with pytest.raises(ScoreTableValidationError, match="SPDI|format|canonical"):
+        load_and_validate_score_table(bad_rows, sidecar, dev_ids=dev_ids, policy=policy)
+
+    bad_rows = get_valid_rows()
+    bad_rows[0]["variant_id"] = "chr9:12345:A:G" # raw coords rejected as score-table ID
     with pytest.raises(ScoreTableValidationError, match="SPDI|format|canonical"):
         load_and_validate_score_table(bad_rows, sidecar, dev_ids=dev_ids, policy=policy)
 
@@ -202,6 +212,71 @@ def test_ts1_score_table_failures(tmp_path):
     with pytest.raises(ScoreTableValidationError, match="bias_rationale"):
         load_and_validate_score_table(bad_rows, sidecar, dev_ids=dev_ids, policy=policy)
 
+    # 8. Row contains bool-as-number (Correction 5)
+    bad_rows = get_valid_rows()
+    bad_rows[0]["score"] = True # bool-as-number
+    with pytest.raises(ScoreTableValidationError, match="type|bool|number"):
+        load_and_validate_score_table(bad_rows, sidecar, dev_ids=dev_ids, policy=policy)
+
+    # 9. Closed schema: row contains ad hoc 'gene' field (Correction 5)
+    bad_rows = get_valid_rows()
+    bad_rows[0]["gene"] = "TSC2" # forbidden ad hoc row field
+    with pytest.raises(ScoreTableValidationError, match="closed schema|extra field|gene"):
+        load_and_validate_score_table(bad_rows, sidecar, dev_ids=dev_ids, policy=policy)
+
+
+def test_ts1_missing_or_extra_sidecar_fields():
+    """Verify any missing or extra sidecar fields are loudly rejected."""
+    from raptor.eval.pp3bp4_score_table import load_and_validate_score_table, ScoreTableValidationError
+
+    dev_ids = _get_mock_dev_ids(1104)
+    dev_hash = _compute_ids_hash(dev_ids)
+
+    class DummyPolicy:
+        predictor = "REVEL"
+        predictor_version = "v1"
+        data_version = "v1"
+
+    policy = DummyPolicy()
+
+    valid_rows = [{
+        "variant_id": vid,
+        "score": 0.5,
+        "predictor": "REVEL",
+        "predictor_version": "v1",
+        "data_version": "v1",
+        "source": "structured"
+    } for vid in dev_ids]
+
+    sidecar = {
+        "schema": "pp3bp4-revel-score-table/1",
+        "predictor": "REVEL",
+        "predictor_version": "v1",
+        "data_version": "v1",
+        "license": "non-commercial",
+        "dev_id_set_sha256": dev_hash,
+        "table_content_sha256": "placeholder",
+        "n_dev": 1104,
+        "n_scored": 1104,
+        "n_missing": 0,
+        "coverage": 1.0,
+        "reference_pins": ["NC_000009.12"],
+        "generated_at": "2026-07-19T00:00:00Z",
+        "snapshot": "clinvar_2026-07-07"
+    }
+
+    # Missing field
+    missing_sidecar = sidecar.copy()
+    del missing_sidecar["dev_id_set_sha256"]
+    with pytest.raises(ScoreTableValidationError, match="missing|field"):
+        load_and_validate_score_table(valid_rows, missing_sidecar, dev_ids=dev_ids, policy=policy)
+
+    # Extra field
+    extra_sidecar = sidecar.copy()
+    extra_sidecar["unexpected_field"] = "value"
+    with pytest.raises(ScoreTableValidationError, match="extra|unexpected|field"):
+        load_and_validate_score_table(valid_rows, extra_sidecar, dev_ids=dev_ids, policy=policy)
+
 
 def test_ts2_attestation_fields():
     """T-S2 attestation structure.
@@ -210,7 +285,6 @@ def test_ts2_attestation_fields():
     """
     from raptor.eval.pp3bp4_score_table import ScoreTableAttestation
 
-    # Let's inspect the fields in ScoreTableAttestation class
     fields = ScoreTableAttestation.__dataclass_fields__ if hasattr(ScoreTableAttestation, "__dataclass_fields__") else {}
     expected_fields = {
         "schema", "predictor", "predictor_version", "data_version", "license",
@@ -219,3 +293,4 @@ def test_ts2_attestation_fields():
     }
     for f in expected_fields:
         assert f in fields, f"ScoreTableAttestation missing field: {f}"
+
