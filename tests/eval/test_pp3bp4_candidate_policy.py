@@ -444,11 +444,48 @@ def test_tb5_no_authorization(tmp_path):
     assert report_proposed.provenance.status == "proposed"
     assert hasattr(report_proposed, "content_hash")
 
-    # Assert no authorization, approval, or clinical use fields anywhere in the report payload
+    # Assert the shadow report contains the expected two classified records
+    # (Checking attribute 'records' or 'classified_records' on report_proposed)
+    records_list = getattr(report_proposed, "records", None) or getattr(report_proposed, "classified_records", None)
+    assert records_list is not None, "Shadow report has no records attribute"
+    assert len(records_list) == 2, "Expected exactly 2 records in shadow report"
+    
+    variant_ids = {r.get("variant_id") if isinstance(r, dict) else getattr(r, "variant_id", None) for r in records_list}
+    assert variant_ids == {"NC_000009.12:12345:A:G", "NC_000016.10:54321:C:T"}
+
+    # Assert no keys/attributes matching authorization, approval, clinical use, candidate direction, or VUS worklist
+    def check_forbidden(obj, path=""):
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                k_str = str(k).lower()
+                for term in ["authoriz", "approv", "clinical", "direction", "worklist"]:
+                    assert term not in k_str, f"Forbidden term '{term}' found in dict key '{path}.{k}'"
+                check_forbidden(v, f"{path}.{k}")
+        elif isinstance(obj, (list, tuple, set)):
+            for idx, item in enumerate(obj):
+                check_forbidden(item, f"{path}[{idx}]")
+        elif hasattr(obj, "__dict__") or hasattr(obj, "__slots__") or (hasattr(obj, "__class__") and obj.__class__.__name__ != "type"):
+            # Check attributes of custom objects (excluding standard python attributes/dunders)
+            for attr in dir(obj):
+                if attr.startswith("_"):
+                    continue
+                attr_str = attr.lower()
+                for term in ["authoriz", "approv", "clinical", "direction", "worklist"]:
+                    assert term not in attr_str, f"Forbidden term '{term}' found in attribute '{path}.{attr}'"
+                try:
+                    val = getattr(obj, attr)
+                    if not callable(val):
+                        check_forbidden(val, f"{path}.{attr}")
+                except Exception:
+                    pass
+
+    check_forbidden(report_proposed, "shadow_report")
+
+    # Assert no authorization, approval, or clinical use fields anywhere in the report payload dictionary
     report_dict = report_proposed.to_dict() if hasattr(report_proposed, "to_dict") else vars(report_proposed)
     forbidden_keys = {"authorization", "authorized", "approved", "clinical_use", "clinical_use_authorized"}
     for k in report_dict.keys():
-        assert k not in forbidden_keys, f"Forbidden authorization-related field found in report: {k}"
+        assert k not in forbidden_keys, f"Forbidden authorization-related field found in report keys: {k}"
 
     # Assert no behavior toggle (no mechanism to switch between approved and shadow behavior)
     assert not hasattr(report_proposed, "behavior_toggle")

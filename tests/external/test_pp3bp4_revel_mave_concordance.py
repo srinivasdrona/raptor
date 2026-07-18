@@ -33,7 +33,7 @@ def test_tf1_mave_concordance_non_gating_path(tmp_path):
     This test exercises the 'fully validated score-table integration' contract of Rule 7.
     """
     from scripts.build_pp3bp4_revel_mave_concordance import build_mave_concordance_report, MaveStatus
-    from raptor.eval.pp3bp4_score_table import ScoreTableAttestation
+    from raptor.eval.pp3bp4_score_table import load_and_validate_score_table, ScoreTableValidationError
 
     # Proposed policy/classifier
     class DummyPolicy:
@@ -47,25 +47,7 @@ def test_tf1_mave_concordance_non_gating_path(tmp_path):
 
     policy = DummyPolicy()
 
-    # Score table attestation
-    attestation = ScoreTableAttestation(
-        schema="pp3bp4-revel-score-table/1",
-        predictor="REVEL",
-        predictor_version="v1",
-        data_version="v1",
-        license="non-commercial",
-        dev_id_set_sha256="dummy-dev-hash",
-        table_content_sha256="dummy-content-hash",
-        n_dev=1104,
-        n_scored=1104,
-        n_missing=0,
-        coverage=1.0,
-        reference_pins=["NC_000009.12"],
-        as_of="2026-07-18",
-        snapshot="clinvar_2026-07-07"
-    )
-
-    # Valid complete synthetic structured score rows
+    # Valid complete synthetic structured score rows with exact closed row schema
     score_table_data = [
         {
             "variant_id": "NC_000009.12:10001:A:G",
@@ -89,42 +71,80 @@ def test_tf1_mave_concordance_non_gating_path(tmp_path):
         },
     ]
 
-    # Write scores and attestation sidecar
-    score_table_file = tmp_path / "scores.json"
-    score_table_file.write_text(json.dumps(score_table_data), encoding="utf-8")
+    # Compute compact canonical table hash and exact expected-ID-set hash programmatically
+    sorted_rows = sorted(score_table_data, key=lambda x: x["variant_id"])
+    canonical_bytes = json.dumps(sorted_rows, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    expected_table_hash = hashlib.sha256(canonical_bytes).hexdigest()
+    assert expected_table_hash == "39c70af704b4ec6eae2f1cb2a05408722adf4468427882229fad4d3fc3b59713"
 
-    sidecar_file = tmp_path / "scores.json.sidecar"
+    dev_ids = ["NC_000009.12:10001:A:G", "NC_000016.10:54321:C:T"]
+    hasher = hashlib.sha256()
+    for vid in sorted(dev_ids):
+        hasher.update(vid.encode("utf-8"))
+        hasher.update(b"\n")
+    expected_id_set_hash = hasher.hexdigest()
+    assert expected_id_set_hash == "4280345f755ff33f84ff1d2a9dc99691f972fda1daf0e94fc8ae36f081f6bd88"
+
+    # Build sidecar/attestation data matching these exact expected IDs without lying with 1104
     sidecar_data = {
-        "schema": attestation.schema,
-        "predictor": attestation.predictor,
-        "predictor_version": attestation.predictor_version,
-        "data_version": attestation.data_version,
-        "license": attestation.license,
-        "dev_id_set_sha256": attestation.dev_id_set_sha256,
-        "table_content_sha256": attestation.table_content_sha256,
-        "n_dev": attestation.n_dev,
-        "n_scored": attestation.n_scored,
-        "n_missing": attestation.n_missing,
-        "coverage": attestation.coverage,
-        "reference_pins": attestation.reference_pins,
-        "as_of": attestation.as_of,
-        "snapshot": attestation.snapshot
+        "schema": "pp3bp4-revel-score-table/1",
+        "predictor": "REVEL",
+        "predictor_version": "v1",
+        "data_version": "v1",
+        "license": "non-commercial",
+        "dev_id_set_sha256": expected_id_set_hash,
+        "table_content_sha256": expected_table_hash,
+        "n_dev": 2,
+        "n_scored": 2,
+        "n_missing": 0,
+        "coverage": 1.0,
+        "reference_pins": ["NC_000009.12"],
+        "as_of": "2026-07-18",
+        "snapshot": "clinvar_2026-07-07"
     }
-    sidecar_file.write_text(json.dumps(sidecar_data), encoding="utf-8")
+
+    # Add negative assertions that tampered attestation hash/count is rejected before concordance
+    tampered_sidecar_hash = sidecar_data.copy()
+    tampered_sidecar_hash["table_content_sha256"] = "wrong-hash-value"
+    with pytest.raises(ScoreTableValidationError):
+        load_and_validate_score_table(
+            sorted_rows,
+            tampered_sidecar_hash,
+            dev_ids=dev_ids,
+            policy=policy
+        )
+
+    tampered_sidecar_count = sidecar_data.copy()
+    tampered_sidecar_count["n_dev"] = 999
+    with pytest.raises(ScoreTableValidationError):
+        load_and_validate_score_table(
+            sorted_rows,
+            tampered_sidecar_count,
+            dev_ids=dev_ids,
+            policy=policy
+        )
+
+    # Call load_and_validate_score_table first
+    validated_rows, validated_attestation = load_and_validate_score_table(
+        sorted_rows,
+        sidecar_data,
+        dev_ids=dev_ids,
+        policy=policy
+    )
 
     # MAVE records separately
-    mave_file = tmp_path / "mave.jsonl"
     mave_data = [
         {"variant_id": "NC_000009.12:10001:A:G", "functional_class": "enriched", "functional_value": 1.2},
         {"variant_id": "NC_000016.10:54321:C:T", "functional_class": "depleted", "functional_value": -2.3},
     ]
-    mave_file.write_text("\n".join(json.dumps(row) for row in mave_data) + "\n", encoding="utf-8")
 
-    # Non-gating concordance path with valid files, attestation and policy
+    # Non-gating concordance path with pure helper API
+    # receives MAVE records separately, validated score rows/attestation, and proposed policy/classifier;
+    # MAVE values/classes never enter classifier arguments.
     report = build_mave_concordance_report(
-        score_table_path=str(score_table_file),
-        sidecar_path=str(sidecar_file),
-        mave_data_path=str(mave_file),
+        mave_records=mave_data,
+        validated_rows=validated_rows,
+        attestation=validated_attestation,
         policy=policy
     )
 
@@ -166,12 +186,24 @@ def test_tf1_mave_scorer_access_only_variant_id():
         {"variant_id": "NC_000016.10:54321:C:T", "functional_class": "depleted", "functional_value": -2.3},
     ]
 
+    # Proposed policy/classifier
+    class DummyPolicy:
+        predictor = "REVEL"
+        predictor_version = "v1"
+        data_version = "v1"
+        schema = "pp3bp4-candidate-policy/1"
+        status = "proposed"
+        shadow_only = True
+        owner_approved = False
+
+    policy = DummyPolicy()
+
     # We evaluate and check that the scorer only queried variant_ids, not functional classes/values
+    # Remove nonexistent/dummy score-table paths; use pure helper contract directly
     report = build_mave_concordance_report(
-        score_table_path="dummy_score_table.json",
-        mave_data_list=mock_mave_data,
+        mave_records=mock_mave_data,
         scorer=dummy_scorer,
-        status="proposed"
+        policy=policy
     )
 
     # Scorer should only have been queried with the variant_id strings
