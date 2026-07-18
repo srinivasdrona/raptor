@@ -28,7 +28,10 @@ def test_tf1_mave_concordance_blocked(tmp_path):
 
 
 def test_tf1_mave_concordance_non_gating_path(tmp_path):
-    """Verify complete synthetic NON_GATING concordance path with valid score table file and attestation."""
+    """Verify complete synthetic NON_GATING concordance path with valid score table file and attestation.
+
+    This test exercises the 'fully validated score-table integration' contract of Rule 7.
+    """
     from scripts.build_pp3bp4_revel_mave_concordance import build_mave_concordance_report, MaveStatus
     from raptor.eval.pp3bp4_score_table import ScoreTableAttestation
 
@@ -140,6 +143,8 @@ def test_tf1_mave_scorer_access_only_variant_id():
     Verify that when evaluating MAVE concordance, the injected scorer receives
     ONLY the variant_id, and the MAVE functional class or value NEVER enters
     the policy thresholds or scorer calls.
+
+    This test exercises the 'pure injected-scorer isolation' contract of Rule 7.
     """
     from scripts.build_pp3bp4_revel_mave_concordance import build_mave_concordance_report
 

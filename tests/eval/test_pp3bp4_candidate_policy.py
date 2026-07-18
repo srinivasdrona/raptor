@@ -25,8 +25,62 @@ required_primary_sources:
     pmc: "PMC11560577"
     locus: "Box 1"
     verification: "verified"
-candidate_version_status: "confirm_pending"
-candidate_license_status: "confirm_pending"
+  richards_2015:
+    doi: "10.1038/gim.2015.30"
+    pmid: "25741868"
+    pmc: "PMC4544753"
+    locus: "PP3 and BP4 criteria"
+    verification: "verified"
+  tavtigian_2018:
+    doi: "10.1038/gim.2017.210"
+    locus: "Bayesian evidence-strength model"
+    verification: "verified"
+candidates:
+  revel:
+    kind: "meta_predictor"
+    calibration_source: "pejaver_2022"
+    version_status: "confirm_pending"
+    license_status: "confirm_pending"
+    structured_score_availability: "blocked_data"
+    training_manifest_status: "unavailable"
+    tsc_specific_evidence: "none_identified"
+    decision: "advance_shadow"
+  bayesdel_noaf:
+    kind: "meta_predictor"
+    calibration_source: "pejaver_2022"
+    version_status: "confirm_pending"
+    license_status: "confirm_pending"
+    structured_score_availability: "unavailable"
+    training_manifest_status: "unavailable"
+    tsc_specific_evidence: "none_identified"
+    decision: "blocked_shadow_comparator"
+  mutpred2:
+    kind: "predictor"
+    calibration_source: "pejaver_2022"
+    version_status: "confirm_pending"
+    license_status: "confirm_pending"
+    structured_score_availability: "unavailable"
+    training_manifest_status: "unavailable"
+    tsc_specific_evidence: "none_identified"
+    decision: "blocked_shadow_comparator"
+  vest4:
+    kind: "predictor"
+    calibration_source: "pejaver_2022"
+    version_status: "confirm_pending"
+    license_status: "confirm_pending"
+    structured_score_availability: "unavailable"
+    training_manifest_status: "unavailable"
+    tsc_specific_evidence: "none_identified"
+    decision: "blocked_shadow_comparator"
+  bias_composite:
+    kind: "composite"
+    calibration_source: "none"
+    version_status: "pinned_bias_3_0_0_commit_ade13f2"
+    license_status: "arm_length_agpl"
+    structured_score_availability: "reconstructed_only"
+    training_manifest_status: "inherited_unknown"
+    tsc_specific_evidence: "none_identified"
+    decision: "audit_only_reject_authoritative"
 """
 
 def _get_valid_policy_json(source_register_sha256="abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"):
@@ -40,6 +94,16 @@ def _get_valid_policy_json(source_register_sha256="abcdef0123456789abcdef0123456
         "predictor": "REVEL",
         "predictor_version": "confirm-pending-revel-dbnsfp-release",
         "data_version": "confirm-pending-dbnsfp-release",
+        "score_direction": "higher_more_pathogenic",
+        "variant_scope": ["missense_variant"],
+        "consequence_routing": {
+            "missense_variant": "revel_policy",
+            "splice_relevant": "out_of_scope",
+            "other": "out_of_scope"
+        },
+        "no_fallback": True,
+        "criterion_once": True,
+        "max_pp3_strength": "strong",
         "enabled_max_bp4_strength": "moderate",
         "pp3": {
             "supporting": {"lo": 0.644, "lo_inclusive": True, "hi": 0.773, "hi_inclusive": False},
@@ -64,10 +128,40 @@ def _get_valid_policy_json(source_register_sha256="abcdef0123456789abcdef0123456
             "PP3_MODERATE",
             "PP3_STRONG"
         ],
-        "combination_cap": {
+        "forbidden_fields": [
+            "policy_sha256",
+            "authorized",
+            "clinical_use_authorized"
+        ],
+        "combination_caps": {
             "pp3_pm1": "strong"
         },
-        "source_register_sha256": source_register_sha256
+        "citation_ids": [
+            "pejaver_2022",
+            "stenton_2024",
+            "richards_2015",
+            "tavtigian_2018"
+        ],
+        "training_overlap_status": "UNKNOWN",
+        "transportability_status": "BLOCKED_DATA",
+        "license_status": "confirm_pending",
+        "source_register_sha256": source_register_sha256,
+        "activation_checklist": [
+            "exact predictor and data versions",
+            "verified license",
+            "leakage audit resolved",
+            "independent transportability evidence",
+            "deterministic tests and checker approval",
+            "owner approval bound to hashes"
+        ],
+        "activation_dependencies": [
+            "revel_dbnsfp_release_pin",
+            "verified_license",
+            "leakage_resolution",
+            "dev_score_acquisition",
+            "transportability_assessment"
+        ],
+        "research_use_disclaimer": "Research-evidence shadow analysis only; this authorizes no clinical\nclassification, VUS worklist, ClinVar submission, or terminal-gate use.\n"
     }
 
 
