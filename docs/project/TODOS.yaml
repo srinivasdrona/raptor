@@ -138,6 +138,7 @@ todos:
   depends_on:
   - enforce-production-vocab
   - reconcile-strength-policy
+  - select-validate-pp3-bp4-policy
   created: '2026-07-13'
 - id: reconcile-strength-policy
   title: Reconciling criterion strength policy
@@ -171,8 +172,22 @@ todos:
   depends_on:
   - enforce-production-vocab
   - reconcile-strength-policy
+  - select-validate-pp3-bp4-policy
   - version-scope-specific-gate
   created: '2026-07-13'
+- id: select-validate-pp3-bp4-policy
+  title: Selecting and validating PP3/BP4 predictor policy
+  description: Complete steps 1-7 of the approved sequence without activation. Build a cited
+    candidate matrix for REVEL, BayesDel, MutPred2, VEST4, and the frozen BIAS composite;
+    preregister REVEL as the initial single-predictor candidate with exact version, score intervals,
+    indeterminate zone, and consequence routing; audit training and benchmark overlap; assess
+    TSC1/TSC2 transportability on non-heldout development data plus orthogonal MAVE reporting;
+    implement shadow-only fail-closed infrastructure via Opus planner, Gemini tests, Sonnet
+    5 doer, and GPT-5.4 checker. Do not owner-approve, run the terminal held-out gate, or recompute
+    the VUS census.
+  status: in_progress
+  depends_on: []
+  created: '2026-07-18'
 - id: version-scope-specific-gate
   title: Versioning scope-specific validation verdicts
   description: Preregister and implement the additive v2 validation contract with independent
