@@ -264,6 +264,20 @@ def test_ts1_score_table_failures(tmp_path):
     with pytest.raises(ScoreTableValidationError, match="hash|mismatch"):
         load_and_validate_score_table(sorted_rows, sidecar, dev_ids=dev_ids, policy=policy)
 
+    # 11. Predictor mismatch on row level
+    bad_rows = get_valid_rows()
+    bad_rows[0]["predictor"] = "SIFT"
+    sorted_rows, sidecar = _canonicalize_rows_and_rebuild_sidecar(bad_rows, sidecar_template)
+    with pytest.raises(ScoreTableValidationError, match="predictor"):
+        load_and_validate_score_table(sorted_rows, sidecar, dev_ids=dev_ids, policy=policy)
+
+    # 12. Omit a dev row entirely (omission must fail exact-set conservation)
+    bad_rows = get_valid_rows()
+    bad_rows.pop(0) # Omit first row
+    sorted_rows, sidecar = _canonicalize_rows_and_rebuild_sidecar(bad_rows, sidecar_template)
+    with pytest.raises(ScoreTableValidationError, match="exact-set|missing row|conservation"):
+        load_and_validate_score_table(sorted_rows, sidecar, dev_ids=dev_ids, policy=policy)
+
 
 def test_ts1_missing_or_extra_sidecar_fields():
     """Verify any missing or extra sidecar fields are loudly rejected."""

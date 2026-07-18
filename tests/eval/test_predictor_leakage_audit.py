@@ -156,6 +156,46 @@ def test_td1_leakage_audit_precedence(tmp_path):
             registry_path=str(mismatch_registry_file)
         )
 
+    # 6. Available required entry in registry but caller doesn't provide path -> BLOCKED_DATA
+    registry_data_unsupplied = {
+        "schema": "pp3bp4-manifest-registry/1",
+        "direct": {"available": True, "verified": True, "sha256": clean_sha},
+        "components": {
+            "comp1": {"available": True, "verified": True, "sha256": clean_sha},
+            "comp_missing_path": {"available": True, "verified": True, "sha256": clean_sha}
+        }
+    }
+    registry_file_unsupplied = tmp_path / "registry_unsupplied.json"
+    registry_file_unsupplied.write_text(json.dumps(registry_data_unsupplied), encoding="utf-8")
+
+    status_unsupplied = evaluate_leakage_audit(
+        benchmark_path=str(benchmark_file),
+        direct_manifest_path=str(clean_manifest),
+        component_manifest_paths={"comp1": str(clean_manifest)},
+        registry_path=str(registry_file_unsupplied)
+    )
+    assert status_unsupplied.status == LeakageStatus.BLOCKED_DATA
+
+    # 7. Unavailable required entry in registry with no path -> UNKNOWN
+    registry_data_unavail_no_path = {
+        "schema": "pp3bp4-manifest-registry/1",
+        "direct": {"available": True, "verified": True, "sha256": clean_sha},
+        "components": {
+            "comp1": {"available": True, "verified": True, "sha256": clean_sha},
+            "comp_unavail": {"available": False, "verified": False, "sha256": clean_sha}
+        }
+    }
+    registry_file_unavail_no_path = tmp_path / "registry_unavail_no_path.json"
+    registry_file_unavail_no_path.write_text(json.dumps(registry_data_unavail_no_path), encoding="utf-8")
+
+    status_unavail_no_path = evaluate_leakage_audit(
+        benchmark_path=str(benchmark_file),
+        direct_manifest_path=str(clean_manifest),
+        component_manifest_paths={"comp1": str(clean_manifest)},
+        registry_path=str(registry_file_unavail_no_path)
+    )
+    assert status_unavail_no_path.status == LeakageStatus.UNKNOWN
+
 
 def test_td1_leakage_audit_label_invariance(tmp_path):
     """Verify benchmark labels are ignored and changing them does not change status/hash."""

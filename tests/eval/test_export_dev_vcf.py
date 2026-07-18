@@ -24,7 +24,11 @@ def test_ta1_dev_export_blocked_and_deterministic(tmp_path):
     if not script_path.exists():
         pytest.fail(f"implementation missing: {script_path}")
 
-    real_benchmark = Path("D:/AIProjects/raptor-data/clinvar/benchmark/benchmark.jsonl")
+    env_root = os.environ.get("RAPTOR_DATA_ROOT")
+    if env_root:
+        real_benchmark = Path(env_root) / "clinvar" / "benchmark" / "benchmark.jsonl"
+    else:
+        real_benchmark = Path(__file__).resolve().parents[4] / "raptor-data" / "clinvar" / "benchmark" / "benchmark.jsonl"
     if not real_benchmark.exists():
         pytest.fail(f"Missing real frozen benchmark: {real_benchmark}")
 
