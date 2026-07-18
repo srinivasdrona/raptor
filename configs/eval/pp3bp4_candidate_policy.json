@@ -1,0 +1,79 @@
+{
+  "schema": "pp3bp4-candidate-policy/1",
+  "version": "1",
+  "policy_id": "tsc-pp3bp4-revel-shadow",
+  "status": "proposed",
+  "shadow_only": true,
+  "owner_approved": false,
+  "predictor": "REVEL",
+  "predictor_version": "confirm-pending-revel-dbnsfp-release",
+  "data_version": "confirm-pending-dbnsfp-release",
+  "score_direction": "higher_more_pathogenic",
+  "variant_scope": ["missense_variant"],
+  "consequence_routing": {
+    "missense_variant": "revel_policy",
+    "splice_relevant": "out_of_scope",
+    "other": "out_of_scope"
+  },
+  "no_fallback": true,
+  "criterion_once": true,
+  "max_pp3_strength": "strong",
+  "enabled_max_bp4_strength": "moderate",
+  "pp3": {
+    "supporting": {"lo": 0.644, "lo_inclusive": true, "hi": 0.773, "hi_inclusive": false},
+    "moderate": {"lo": 0.773, "lo_inclusive": true, "hi": 0.932, "hi_inclusive": false},
+    "strong": {"lo": 0.932, "lo_inclusive": true, "hi": null, "hi_inclusive": false}
+  },
+  "bp4": {
+    "very_strong": {"lo": null, "lo_inclusive": false, "hi": 0.003, "hi_inclusive": true, "enabled": false},
+    "strong": {"lo": 0.003, "lo_inclusive": false, "hi": 0.016, "hi_inclusive": true, "enabled": false},
+    "moderate": {"lo": 0.016, "lo_inclusive": false, "hi": 0.183, "hi_inclusive": true, "enabled": true},
+    "supporting": {"lo": 0.183, "lo_inclusive": false, "hi": 0.290, "hi_inclusive": true, "enabled": true}
+  },
+  "indeterminate": {"lo": 0.290, "lo_inclusive": false, "hi": 0.644, "hi_inclusive": false},
+  "distinct_results": [
+    "BP4_DISABLED_STRENGTH",
+    "BP4_MODERATE",
+    "BP4_SUPPORTING",
+    "INDETERMINATE",
+    "MISSING_SCORE",
+    "OUT_OF_SCOPE",
+    "PP3_SUPPORTING",
+    "PP3_MODERATE",
+    "PP3_STRONG"
+  ],
+  "forbidden_fields": [
+    "policy_sha256",
+    "authorized",
+    "clinical_use_authorized"
+  ],
+  "combination_caps": {
+    "pp3_pm1": "strong"
+  },
+  "citation_ids": [
+    "pejaver_2022",
+    "stenton_2024",
+    "richards_2015",
+    "tavtigian_2018"
+  ],
+  "training_overlap_status": "UNKNOWN",
+  "transportability_status": "BLOCKED_DATA",
+  "license_status": "confirm_pending",
+  "source_register_sha256": "2e9c1f215f24bf6ea6fffa697737f84092e6c5fce02db5e74c91e479f0b36932",
+  "activation_checklist": [
+    "exact predictor and data versions",
+    "verified license",
+    "leakage audit resolved",
+    "independent transportability evidence",
+    "deterministic tests and checker approval",
+    "owner approval bound to hashes"
+  ],
+  "activation_dependencies": [
+    "revel_dbnsfp_release_pin",
+    "verified_license",
+    "leakage_resolution",
+    "dev_score_acquisition",
+    "transportability_assessment"
+  ],
+  "research_use_disclaimer": "Research-evidence shadow analysis only; this authorizes no clinical\nclassification, VUS worklist, ClinVar submission, or terminal-gate use.\n"
+}

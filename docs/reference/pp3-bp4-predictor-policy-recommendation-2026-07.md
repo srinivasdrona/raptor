@@ -286,3 +286,30 @@ If any item is missing, PP3/BP4 remains shadow evidence or routes the variant to
 | `configs/acmg/strength_policy.yaml` | Unapproved handling of BIAS/RAPTOR vocabulary mismatches | Predictor-selection or calibration policy |
 | This memo | RAPTOR's proposed target policy and activation requirements | An active decision or completed validation |
 
+## 11. Concrete shadow-only implementation (2026-07-18)
+
+A first concrete, shadow-only implementation of this memo's "preferred" single-predictor model
+(section 1) now exists, advancing REVEL per the candidate matrix below. It remains **shadow-only,
+proposed, and unapproved** -- none of section 8's activation requirements are met, and this
+implementation adds no path into RAPTOR scoring, terminal evaluation, VUS census, or clinical
+authorization.
+
+| Artifact | Role |
+|---|---|
+| `configs/eval/pp3bp4_source_register.yaml` | Verified primary-source citations + candidate predictor disposition |
+| `configs/eval/pp3bp4_candidate_policy.json` | Proposed, unapproved REVEL PP3/BP4 shadow policy (`status: proposed`, `owner_approved: false`) |
+| `configs/eval/predictor_training_manifests.yaml` | Training-manifest leakage-audit registry (no manifest currently verified) |
+| `src/raptor/eval/pp3bp4_candidate_policy.py` | Pure REVEL PP3/BP4 shadow classifier (`load_candidate_policy`, `classify_revel`, `build_shadow_report`) |
+| `src/raptor/eval/pp3bp4_score_table.py` | Stage A structured-score validation (`load_and_validate_score_table`) |
+| `src/raptor/eval/pp3bp4_transportability.py` | Stage B dev-only transportability computation kernel |
+| `src/raptor/eval/predictor_leakage_audit.py` | Direct/component training-manifest leakage audit |
+| `docs/reference/pp3bp4-candidate-matrix-2026-07.md` | Verified-vs-confirm-pending candidate matrix |
+| `docs/reference/pp3bp4-revel-preregistration-2026-07.md` | Preregistered dev-only transportability scope/metrics/power status |
+
+Current generated artifacts (`data/census/tsc_predictor_leakage_audit_2026-07.json` = `UNKNOWN`;
+`data/census/tsc_pp3bp4_dev_score_acquisition_2026-07.json` = `BLOCKED_DATA`;
+`data/census/tsc_pp3bp4_transportability_2026-07.json` = `BLOCKED_DATA`/`UNDERPOWERED`;
+`data/census/tsc2_pp3bp4_revel_mave_concordance_2026-07.json` = `BLOCKED_DATA`/`NON_GATING`) reflect
+today's real, honest blockers -- not a validated result.
+
+
