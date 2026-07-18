@@ -24,11 +24,10 @@ def test_ta1_dev_export_blocked_and_deterministic(tmp_path):
     if not script_path.exists():
         pytest.fail(f"implementation missing: {script_path}")
 
-    env_root = os.environ.get("RAPTOR_DATA_ROOT")
-    if env_root:
-        real_benchmark = Path(env_root) / "clinvar" / "benchmark" / "benchmark.jsonl"
-    else:
-        real_benchmark = Path(__file__).resolve().parents[4] / "raptor-data" / "clinvar" / "benchmark" / "benchmark.jsonl"
+    from tests.eval.test_path_resolver import resolve_raptor_data_root
+    repo_root = Path(__file__).resolve().parents[2]
+    data_root = resolve_raptor_data_root(repo_root)
+    real_benchmark = data_root / "clinvar" / "benchmark" / "benchmark.jsonl"
     if not real_benchmark.exists():
         pytest.fail(f"Missing real frozen benchmark: {real_benchmark}")
 
@@ -115,3 +114,67 @@ def test_cli_help_bootstrap_clean_pythonpath():
         res = subprocess.run(cmd, capture_output=True, text=True, env=env)
         assert res.returncode == 0, f"CLI help failed under clean PYTHONPATH for {script_name}: {res.stderr}"
         assert "usage" in res.stdout.lower() or "help" in res.stdout.lower()
+
+
+def test_ta2_stage_a_field_access_regression(tmp_path):
+    """Verify that Stage A script uses a pure production seam load_benchmark_variant_ids
+
+    which ignores/does not access label or other non-variant_id fields.
+    """
+    # 1. Require load_benchmark_variant_ids to exist in scripts/export_dev_vcf
+    try:
+        from scripts.export_dev_vcf import load_benchmark_variant_ids
+    except ImportError as e:
+        pytest.fail(f"RED failure: missing production seam load_benchmark_variant_ids in scripts/export_dev_vcf.py: {e}")
+
+    # 2. Write a JSONL with only variant_id (no label/variant_class/source/snapshot)
+    only_ids_file = tmp_path / "only_ids.jsonl"
+    only_ids_file.write_text(
+        json.dumps({"variant_id": "NC_000009.12:10001:A:G"}) + "\n" +
+        json.dumps({"variant_id": "NC_000016.10:54321:C:T"}) + "\n"
+    )
+
+    # 3. Write a JSONL with same IDs but changed/poison-shaped label and variant_class fields
+    poison_file = tmp_path / "poison.jsonl"
+    poison_file.write_text(
+        json.dumps({"variant_id": "NC_000009.12:10001:A:G", "label": "POISON_LABEL", "variant_class": "POISON_CLASS"}) + "\n" +
+        json.dumps({"variant_id": "NC_000016.10:54321:C:T", "label": "POISON_LABEL", "variant_class": "POISON_CLASS"}) + "\n"
+    )
+
+    # 4. Both must return identical list of IDs when parsed by load_benchmark_variant_ids
+    ids_from_only = load_benchmark_variant_ids(only_ids_file)
+    ids_from_poison = load_benchmark_variant_ids(poison_file)
+
+    assert ids_from_only == ["NC_000009.12:10001:A:G", "NC_000016.10:54321:C:T"]
+    assert ids_from_only == ids_from_poison
+
+    # 5. Prove label fields are not accessed.
+    # We can do this by patching json.loads in scripts.export_dev_vcf to return a proxy dictionary
+    # that raises an AssertionError if any key other than "variant_id" is accessed.
+    import scripts.export_dev_vcf
+    original_loads = scripts.export_dev_vcf.json.loads
+
+    class StrictAccessDict(dict):
+        def __getitem__(self, key):
+            if key != "variant_id":
+                raise AssertionError(f"Security/Privacy violation: Stage-A code accessed non-variant_id key: {key!r}")
+            return super().__getitem__(key)
+        def get(self, key, default=None):
+            if key != "variant_id":
+                raise AssertionError(f"Security/Privacy violation: Stage-A code accessed non-variant_id key: {key!r}")
+            return super().get(key, default)
+
+    def strict_loads(*args, **kwargs):
+        res = original_loads(*args, **kwargs)
+        if isinstance(res, dict):
+            return StrictAccessDict(res)
+        return res
+
+    scripts.export_dev_vcf.json.loads = strict_loads
+    try:
+        # This call must NOT raise any AssertionError because load_benchmark_variant_ids
+        # must not access anything other than "variant_id".
+        ids = load_benchmark_variant_ids(poison_file)
+        assert ids == ["NC_000009.12:10001:A:G", "NC_000016.10:54321:C:T"]
+    finally:
+        scripts.export_dev_vcf.json.loads = original_loads

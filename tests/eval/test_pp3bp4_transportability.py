@@ -10,11 +10,10 @@ from pathlib import Path
 # Helper to load the real benchmark rows
 def _load_real_benchmark_rows():
     from raptor.eval.model import BenchmarkRow
-    env_root = os.environ.get("RAPTOR_DATA_ROOT")
-    if env_root:
-        real_benchmark_path = Path(env_root) / "clinvar" / "benchmark" / "benchmark.jsonl"
-    else:
-        real_benchmark_path = Path(__file__).resolve().parents[4] / "raptor-data" / "clinvar" / "benchmark" / "benchmark.jsonl"
+    from tests.eval.test_path_resolver import resolve_raptor_data_root
+    repo_root = Path(__file__).resolve().parents[2]
+    data_root = resolve_raptor_data_root(repo_root)
+    real_benchmark_path = data_root / "clinvar" / "benchmark" / "benchmark.jsonl"
     if not real_benchmark_path.exists():
         pytest.fail(f"Missing real frozen benchmark: {real_benchmark_path}")
     
