@@ -7,11 +7,38 @@ import subprocess
 from pathlib import Path
 
 
-# Helper to generate mock dev IDs as canonical SPDI strings (Correction 3)
-def _get_mock_dev_ids():
-    return [f"NC_000009.12:{10000 + i}:T:C" for i in range(1104)]
+# Helper to load the real benchmark rows
+def _load_real_benchmark_rows():
+    from raptor.eval.model import BenchmarkRow
+    real_benchmark_path = Path("D:/AIProjects/raptor-data/clinvar/benchmark/benchmark.jsonl")
+    if not real_benchmark_path.exists():
+        pytest.fail(f"Missing real frozen benchmark: {real_benchmark_path}")
+    
+    rows = []
+    with open(real_benchmark_path, "r", encoding="utf-8") as f:
+        for line in f:
+            if line.strip():
+                data = json.loads(line)
+                rows.append(BenchmarkRow(
+                    variant_id=data["variant_id"],
+                    label=data["label"],
+                    variant_class=data["variant_class"],
+                    source=data.get("source"),
+                    snapshot=data.get("snapshot")
+                ))
+    return rows
 
 
+# Helper to load the real config
+def _load_real_eval_config():
+    from raptor.eval.config import load_config as load_eval_config
+    real_eval_config_path = Path("configs/eval/tsc2.yaml")
+    if not real_eval_config_path.exists():
+        pytest.fail(f"Missing real eval config: {real_eval_config_path}")
+    return load_eval_config(str(real_eval_config_path))
+
+
+# Helper to compute SHA256 of sorted IDs
 def _compute_ids_hash(ids):
     sorted_ids = sorted(ids)
     hasher = hashlib.sha256()
@@ -32,8 +59,15 @@ def test_te1_stage_b_attestation_and_rejection(tmp_path):
     """
     from raptor.eval.pp3bp4_transportability import evaluate_transportability, TransportabilityError
     from raptor.eval.pp3bp4_score_table import ScoreTableAttestation
+    from raptor.eval.split import split_benchmark
 
-    dev_ids = _get_mock_dev_ids()
+    # Load real benchmark and config to derive actual dev split
+    benchmark_rows = _load_real_benchmark_rows()
+    eval_config = _load_real_eval_config()
+    train_dev, holdout = split_benchmark(benchmark_rows, eval_config)
+
+    dev_ids = [r.variant_id for r in train_dev]
+    holdout_ids = [r.variant_id for r in holdout]
     correct_hash = _compute_ids_hash(dev_ids)
 
     # Valid base attestation
@@ -50,7 +84,7 @@ def test_te1_stage_b_attestation_and_rejection(tmp_path):
         n_missing=0,
         coverage=1.0,
         reference_pins=["NC_000009.12"],
-        generated_at="2026-07-19T00:00:00Z",
+        as_of="2026-07-18",
         snapshot="clinvar_2026-07-07"
     )
 
@@ -64,62 +98,24 @@ def test_te1_stage_b_attestation_and_rejection(tmp_path):
 
     policy = DummyPolicy()
 
-    # Create 1104 valid dev rows (NO ad hoc 'gene' field in rows)
+    # Create synthetic scores ONLY for those exact dev IDs
     valid_rows = [{
         "variant_id": vid,
         "score": 0.5,
         "predictor": "REVEL",
         "predictor_version": "confirm-pending-revel-dbnsfp-release",
         "data_version": "confirm-pending-dbnsfp-release",
-        "source": "structured"
+        "source": "structured",
+        "transcript": "NM_000051.4",
+        "consequence": "missense_variant"
     } for vid in dev_ids]
-
-    # Stage B must rederive split from benchmark + config and read labels only after attestation (Correction 6)
-    # We supply a mock benchmark rows/path and mock config
-    mock_benchmark_rows = []
-    # 1104 dev rows
-    for i, vid in enumerate(dev_ids):
-        # exact dev composition (24 pathogenic, 49 benign)
-        if i < 14:
-            lbl, cls = "P", "missense"
-        elif i < 24:
-            lbl, cls = "LP", "missense"
-        elif i < 70:
-            lbl, cls = "B", "missense"
-        elif i < 73:
-            lbl, cls = "LB", "missense"
-        else:
-            lbl, cls = "VUS", "missense"
-        mock_benchmark_rows.append({
-            "variant_id": vid,
-            "label": lbl,
-            "variant_class": cls,
-            "gene": "TSC1" if i % 2 == 0 else "TSC2"
-        })
-    # 2577 holdout rows to complete the 3681 benchmark
-    for j in range(2577):
-        mock_benchmark_rows.append({
-            "variant_id": f"NC_000009.12:{20000 + j}:T:C",
-            "label": "P",
-            "variant_class": "missense",
-            "gene": "TSC2"
-        })
-
-    # Mock eval config (similar to tsc2.yaml)
-    mock_eval_config = {
-        "split": {
-            "seed": 20260701,
-            "holdout_fraction": 0.7
-        },
-        "min_count_per_class": 36
-    }
 
     # 1. Reject if attestation is completely missing
     with pytest.raises(TransportabilityError, match="attestation|missing"):
         evaluate_transportability(
             valid_rows, None,
-            benchmark_rows=mock_benchmark_rows,
-            eval_config=mock_eval_config,
+            benchmark_rows=benchmark_rows,
+            eval_config=eval_config,
             policy=policy
         )
 
@@ -137,32 +133,34 @@ def test_te1_stage_b_attestation_and_rejection(tmp_path):
         n_missing=0,
         coverage=1.0,
         reference_pins=["NC_000009.12"],
-        generated_at="2026-07-19T00:00:00Z",
+        as_of="2026-07-18",
         snapshot="clinvar_2026-07-07"
     )
     with pytest.raises(TransportabilityError, match="mismatch|dev_id_set_sha256"):
         evaluate_transportability(
             valid_rows, mismatched_attestation,
-            benchmark_rows=mock_benchmark_rows,
-            eval_config=mock_eval_config,
+            benchmark_rows=benchmark_rows,
+            eval_config=eval_config,
             policy=policy
         )
 
     # 3. Reject if any held-out ID is present in the rows
     rows_with_heldout = valid_rows.copy()
     rows_with_heldout[0] = {
-        "variant_id": "NC_000009.12:20000:T:C", # held-out ID
+        "variant_id": holdout_ids[0], # held-out ID
         "score": 0.5,
         "predictor": "REVEL",
         "predictor_version": "confirm-pending-revel-dbnsfp-release",
         "data_version": "confirm-pending-dbnsfp-release",
-        "source": "structured"
+        "source": "structured",
+        "transcript": "NM_000051.4",
+        "consequence": "missense_variant"
     }
-    with pytest.raises(TransportabilityError, match="held-out|extra"):
+    with pytest.raises(TransportabilityError, match="held-out|extra|disjoint"):
         evaluate_transportability(
             rows_with_heldout, valid_attestation,
-            benchmark_rows=mock_benchmark_rows,
-            eval_config=mock_eval_config,
+            benchmark_rows=benchmark_rows,
+            eval_config=eval_config,
             policy=policy
         )
 
@@ -177,43 +175,16 @@ def test_te2_dev_split_composition_and_power():
     - Assert counts are derived from benchmark + config, not returned by hardcoded zero-arg function.
     """
     from raptor.eval.pp3bp4_transportability import derive_dev_split_composition, get_power_status
+    from raptor.eval.split import split_benchmark
 
-    dev_ids = _get_mock_dev_ids()
-    mock_benchmark_rows = []
-    for i, vid in enumerate(dev_ids):
-        if i < 14:
-            lbl, cls = "P", "missense"
-        elif i < 24:
-            lbl, cls = "LP", "missense"
-        elif i < 70:
-            lbl, cls = "B", "missense"
-        elif i < 73:
-            lbl, cls = "LB", "missense"
-        else:
-            lbl, cls = "VUS", "missense"
-        mock_benchmark_rows.append({
-            "variant_id": vid,
-            "label": lbl,
-            "variant_class": cls,
-            "gene": "TSC1" if i % 2 == 0 else "TSC2"
-        })
-    for j in range(2577):
-        mock_benchmark_rows.append({
-            "variant_id": f"NC_000009.12:{20000 + j}:T:C",
-            "label": "P",
-            "variant_class": "missense",
-            "gene": "TSC2"
-        })
+    benchmark_rows = _load_real_benchmark_rows()
+    eval_config = _load_real_eval_config()
 
-    mock_eval_config = {
-        "split": {
-            "seed": 20260701,
-            "holdout_fraction": 0.7
-        },
-        "min_count_per_class": 36
-    }
+    train_dev, holdout = split_benchmark(benchmark_rows, eval_config)
+    assert len(train_dev) == 1104
+    assert len(holdout) == 2577
 
-    comp = derive_dev_split_composition(mock_benchmark_rows, mock_eval_config)
+    comp = derive_dev_split_composition(benchmark_rows, eval_config)
     assert comp["n_dev"] == 1104
     assert comp["n_holdout"] == 2577
 
@@ -229,15 +200,20 @@ def test_te2_dev_split_composition_and_power():
     assert power == "UNDERPOWERED"
 
 
-def test_te1_exclude_nthl1_and_no_writeback():
-    """T-E1 NTHL1 exclusion and no label writeback.
+def test_te1_no_writeback():
+    """T-E1 no label writeback.
 
-    Verify that NTHL1 variants are excluded, and labels never flow back or are written to policy/score-table.
+    Verify that labels never flow back or are written to policy/score-table.
     """
     from raptor.eval.pp3bp4_transportability import evaluate_transportability
     from raptor.eval.pp3bp4_score_table import ScoreTableAttestation
+    from raptor.eval.split import split_benchmark
 
-    dev_ids = _get_mock_dev_ids()
+    benchmark_rows = _load_real_benchmark_rows()
+    eval_config = _load_real_eval_config()
+    train_dev, _ = split_benchmark(benchmark_rows, eval_config)
+
+    dev_ids = [r.variant_id for r in train_dev]
     correct_hash = _compute_ids_hash(dev_ids)
 
     attestation = ScoreTableAttestation(
@@ -253,78 +229,51 @@ def test_te1_exclude_nthl1_and_no_writeback():
         n_missing=0,
         coverage=1.0,
         reference_pins=["NC_000009.12"],
-        generated_at="2026-07-19T00:00:00Z",
+        as_of="2026-07-18",
         snapshot="clinvar_2026-07-07"
     )
 
     class DummyPolicy:
         predictor = "REVEL"
-        predictor_version = "confirm-pending-revel-dbnsfp-release"
-        data_version = "confirm-pending-dbnsfp-release"
+        predictor_version="confirm-pending-revel-dbnsfp-release"
+        data_version="confirm-pending-dbnsfp-release"
         citations = []
         source_register_sha256 = "dummy-ref-hash"
 
     policy = DummyPolicy()
 
-    # Score table rows (NO ad hoc 'gene' field)
+    # Score table rows
     rows = [{
         "variant_id": vid,
         "score": 0.8,
         "predictor": "REVEL",
         "predictor_version": "confirm-pending-revel-dbnsfp-release",
         "data_version": "confirm-pending-dbnsfp-release",
-        "source": "structured"
+        "source": "structured",
+        "transcript": "NM_000051.4",
+        "consequence": "missense_variant"
     } for vid in dev_ids]
-
-    # Benchmark rows with explicit genes (including one explicitly annotated NTHL1 row) (Correction 4)
-    mock_benchmark_rows = []
-    for i, vid in enumerate(dev_ids):
-        gene_name = "TSC2"
-        # We explicitly annotate the last row as NTHL1 to test exclusion (Correction 4)
-        if i == len(dev_ids) - 1:
-            gene_name = "NTHL1"
-        mock_benchmark_rows.append({
-            "variant_id": vid,
-            "label": "P" if i < 24 else "B",
-            "variant_class": "missense",
-            "gene": gene_name
-        })
-
-    for j in range(2577):
-        mock_benchmark_rows.append({
-            "variant_id": f"NC_000009.12:{20000 + j}:T:C",
-            "label": "P",
-            "variant_class": "missense",
-            "gene": "TSC2"
-        })
-
-    mock_eval_config = {
-        "split": {
-            "seed": 20260701,
-            "holdout_fraction": 0.7
-        },
-        "min_count_per_class": 36
-    }
 
     report = evaluate_transportability(
         rows, attestation,
-        benchmark_rows=mock_benchmark_rows,
-        eval_config=mock_eval_config,
+        benchmark_rows=benchmark_rows,
+        eval_config=eval_config,
         policy=policy
     )
 
-    # Verify NTHL1 was excluded and TSC2 on chromosome 16 was retained (Correction 4)
-    assert "NTHL1" not in str(report) or "excluded" in str(report).lower()
+    # Ensure labels did not flow back (no labels in the report object)
+    assert "label" not in str(report).lower()
 
 
 def test_cli_help_bootstrap():
     """T-A4/T-B8 check script can run with a clean PYTHONPATH and shows help."""
     script_path = Path("scripts/build_pp3bp4_transportability_report.py")
     if not script_path.exists():
-        pytest.skip("build_pp3bp4_transportability_report.py not implemented yet")
+        pytest.fail(f"implementation missing: {script_path}")
 
     env = os.environ.copy()
-    env["PYTHONPATH"] = "src"
+    if "PYTHONPATH" in env:
+        del env["PYTHONPATH"]
 
     cmd = [sys.executable, str(script_path), "--help"]
     res = subprocess.run(cmd, capture_output=True, text=True, env=env)

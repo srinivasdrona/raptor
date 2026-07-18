@@ -148,6 +148,7 @@ def test_tc1_production_modules_do_not_import_shadow() -> None:
         "raptor.eval.pp3bp4_score_table",
         "raptor.eval.pp3bp4_transportability",
         "raptor.eval.predictor_leakage_audit",
+        "raptor.external.mave.revel_concordance",
     }
 
     # Shadow modules to exclude
@@ -177,7 +178,8 @@ def test_tc1_production_modules_do_not_import_shadow() -> None:
                 tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
                 imported_modules = _import_names(tree)
                 for imp in imported_modules:
-                    assert imp not in forbidden_imports, f"Production module {path} imports forbidden shadow module {imp}"
+                    for forbidden in forbidden_imports:
+                        assert not (imp == forbidden or imp.startswith(forbidden + ".")), f"Production module {path} imports forbidden shadow module {imp}"
 
     # 2. Scan scripts/**/*.py (relevant runner scripts)
     if scripts_dir.exists():
@@ -191,5 +193,6 @@ def test_tc1_production_modules_do_not_import_shadow() -> None:
                     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
                     imported_modules = _import_names(tree)
                     for imp in imported_modules:
-                        assert imp not in forbidden_imports, f"Runner script {path} imports forbidden shadow module {imp}"
+                        for forbidden in forbidden_imports:
+                            assert not (imp == forbidden or imp.startswith(forbidden + ".")), f"Runner script {path} imports forbidden shadow module {imp}"
 

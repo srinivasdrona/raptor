@@ -13,15 +13,22 @@ from pathlib import Path
 
 VALID_SOURCE_REGISTER_CONTENT = """schema: "pp3bp4-source-register/1"
 version: "1"
-citations:
-  pejaver_2022: "PMC9748256"
-  stenton_2024: "PMC11560577"
-candidate:
-  predictor: "REVEL"
-  version: "1"
-license: "non-commercial"
-availability: "repo"
-verified: true
+sources:
+  pejaver_2022:
+    id: "pejaver_2022"
+    pmc: "PMC9748256"
+    verification_status: "verified"
+    exact_locus: "Pejaver Table 2"
+  stenton_2024:
+    id: "stenton_2024"
+    pmc: "PMC11560577"
+    verification_status: "verified"
+    exact_locus: "Stenton Box 1"
+candidates:
+  revel:
+    id: "revel"
+    version_availability: "confirm_pending"
+    license_verification: "confirm_pending"
 """
 
 def _get_valid_policy_json(source_register_sha256="abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"):
@@ -180,19 +187,81 @@ def test_tb1_source_register_failures(tmp_path):
     with pytest.raises(CandidatePolicyError, match="hash|mismatch"):
         load_candidate_policy(str(p_file), source_register_path=str(register_file))
 
-    # 3. Unverified or missing citation in register
-    bad_register_content = """schema: "pp3bp4-source-register/1"
+    # 3. Unverified required primary citations
+    unverified_register_content = """schema: "pp3bp4-source-register/1"
 version: "1"
-citations:
-  pejaver_2022: "PMC_WRONG"
-candidate:
-  predictor: "REVEL"
+sources:
+  pejaver_2022:
+    id: "pejaver_2022"
+    pmc: "PMC9748256"
+    verification_status: "unverified"
+    exact_locus: "Pejaver Table 2"
+  stenton_2024:
+    id: "stenton_2024"
+    pmc: "PMC11560577"
+    verification_status: "verified"
+    exact_locus: "Stenton Box 1"
+candidates:
+  revel:
+    id: "revel"
+    version_availability: "confirm_pending"
+    license_verification: "confirm_pending"
 """
-    register_file.write_text(bad_register_content, encoding="utf-8")
-    bad_register_sha = hashlib.sha256(register_file.read_bytes()).hexdigest()
-    p_bad = _get_valid_policy_json(source_register_sha256=bad_register_sha)
+    register_file.write_text(unverified_register_content, encoding="utf-8")
+    unverified_register_sha = hashlib.sha256(register_file.read_bytes()).hexdigest()
+    p_bad = _get_valid_policy_json(source_register_sha256=unverified_register_sha)
     p_file.write_text(json.dumps(p_bad), encoding="utf-8")
-    with pytest.raises(CandidatePolicyError, match="citation|invalid|schema"):
+    with pytest.raises(CandidatePolicyError, match="unverified|citation|primary"):
+        load_candidate_policy(str(p_file), source_register_path=str(register_file))
+
+    # 4. Missing required field (sources or candidates or specific citation)
+    missing_field_register_content = """schema: "pp3bp4-source-register/1"
+version: "1"
+sources:
+  stenton_2024:
+    id: "stenton_2024"
+    pmc: "PMC11560577"
+    verification_status: "verified"
+    exact_locus: "Stenton Box 1"
+candidates:
+  revel:
+    id: "revel"
+    version_availability: "confirm_pending"
+    license_verification: "confirm_pending"
+"""
+    register_file.write_text(missing_field_register_content, encoding="utf-8")
+    missing_field_register_sha = hashlib.sha256(register_file.read_bytes()).hexdigest()
+    p_bad2 = _get_valid_policy_json(source_register_sha256=missing_field_register_sha)
+    p_file.write_text(json.dumps(p_bad2), encoding="utf-8")
+    with pytest.raises(CandidatePolicyError, match="missing|field|source|pejaver"):
+        load_candidate_policy(str(p_file), source_register_path=str(register_file))
+
+    # 5. Extra field in register
+    extra_field_register_content = """schema: "pp3bp4-source-register/1"
+version: "1"
+extra_unapproved_field: "value"
+sources:
+  pejaver_2022:
+    id: "pejaver_2022"
+    pmc: "PMC9748256"
+    verification_status: "verified"
+    exact_locus: "Pejaver Table 2"
+  stenton_2024:
+    id: "stenton_2024"
+    pmc: "PMC11560577"
+    verification_status: "verified"
+    exact_locus: "Stenton Box 1"
+candidates:
+  revel:
+    id: "revel"
+    version_availability: "confirm_pending"
+    license_verification: "confirm_pending"
+"""
+    register_file.write_text(extra_field_register_content, encoding="utf-8")
+    extra_field_register_sha = hashlib.sha256(register_file.read_bytes()).hexdigest()
+    p_bad3 = _get_valid_policy_json(source_register_sha256=extra_field_register_sha)
+    p_file.write_text(json.dumps(p_bad3), encoding="utf-8")
+    with pytest.raises(CandidatePolicyError, match="extra|unexpected|schema"):
         load_candidate_policy(str(p_file), source_register_path=str(register_file))
 
 
@@ -283,6 +352,7 @@ def test_tb5_no_authorization(tmp_path):
 
     Verify build_shadow_report has no status branch or authorization return,
     producing identical output regardless of a hypothetical 'approved' status.
+    Assert that the report/payload has no authorization/approved/clinical-use fields and no behavior toggle.
     """
     from raptor.eval.pp3bp4_candidate_policy import load_candidate_policy, build_shadow_report, PolicyCall
 
@@ -307,6 +377,15 @@ def test_tb5_no_authorization(tmp_path):
     assert report_proposed.provenance.status == "proposed"
     assert hasattr(report_proposed, "content_hash")
 
+    # Assert no authorization, approval, or clinical use fields anywhere in the report payload
+    report_dict = report_proposed.to_dict() if hasattr(report_proposed, "to_dict") else vars(report_proposed)
+    forbidden_keys = {"authorization", "authorized", "approved", "clinical_use", "clinical_use_authorized"}
+    for k in report_dict.keys():
+        assert k not in forbidden_keys, f"Forbidden authorization-related field found in report: {k}"
+
+    # Assert no behavior toggle (no mechanism to switch between approved and shadow behavior)
+    assert not hasattr(report_proposed, "behavior_toggle")
+
 
 def test_tb6_no_censored_path():
     """T-B6 no censored path.
@@ -318,8 +397,16 @@ def test_tb6_no_censored_path():
     try:
         from raptor.eval import pp3bp4_candidate_policy
         source_code = Path(pp3bp4_candidate_policy.__file__).read_text(encoding="utf-8")
-        assert "extract_revel_scores_from_bias_rationale" not in source_code
-        assert "bias_rationale" not in source_code or "reject" in source_code or "==" in source_code
+        # Structurally forbid any rationale parser/source path symbols/imports
+        forbidden_symbols = [
+            "extract_revel_scores_from_bias_rationale",
+            "bias_rationale",
+            "extractor",
+            "parser",
+            "parse_rationale"
+        ]
+        for symbol in forbidden_symbols:
+            assert symbol not in source_code, f"Forbidden symbol {symbol} found in pp3bp4_candidate_policy.py"
     except (ImportError, NameError, FileNotFoundError):
         pass
 
@@ -346,11 +433,11 @@ def test_cli_help_bootstrap():
     """T-A4/T-B8 check script can run with a clean PYTHONPATH and shows help."""
     script_path = Path("scripts/build_pp3bp4_transportability_report.py")
     if not script_path.exists():
-        pytest.skip("build_pp3bp4_transportability_report.py not implemented yet")
+        pytest.fail(f"implementation missing: {script_path}")
 
     env = os.environ.copy()
-    # Clean PYTHONPATH: only use 'src' directory
-    env["PYTHONPATH"] = "src"
+    if "PYTHONPATH" in env:
+        del env["PYTHONPATH"]
 
     cmd = [sys.executable, str(script_path), "--help"]
     res = subprocess.run(cmd, capture_output=True, text=True, env=env)
