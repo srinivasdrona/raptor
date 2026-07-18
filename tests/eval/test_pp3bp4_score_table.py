@@ -230,6 +230,12 @@ def test_ts1_score_table_failures(tmp_path):
     with pytest.raises(ScoreTableValidationError, match="SPDI|format|canonical"):
         load_and_validate_score_table(sorted_rows, sidecar, dev_ids=dev_ids, policy=policy)
 
+    bad_rows = get_valid_rows()
+    bad_rows[0]["variant_id"] = "9:12345:A:G" # Raw coordinate
+    sorted_rows, sidecar = _canonicalize_rows_and_rebuild_sidecar(bad_rows, sidecar_template)
+    with pytest.raises(ScoreTableValidationError, match="SPDI|format|canonical"):
+        load_and_validate_score_table(sorted_rows, sidecar, dev_ids=dev_ids, policy=policy)
+
     # 7. Source is bias_rationale
     bad_rows = get_valid_rows()
     bad_rows[0]["source"] = "bias_rationale"

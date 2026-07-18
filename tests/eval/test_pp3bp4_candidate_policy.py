@@ -13,22 +13,20 @@ from pathlib import Path
 
 VALID_SOURCE_REGISTER_CONTENT = """schema: "pp3bp4-source-register/1"
 version: "1"
-sources:
+required_primary_sources:
   pejaver_2022:
-    id: "pejaver_2022"
+    doi: "10.1016/j.ajhg.2022.10.013"
+    pmid: "36413997"
     pmc: "PMC9748256"
-    verification_status: "verified"
-    exact_locus: "Pejaver Table 2"
+    locus: "Table 2, REVEL row"
+    verification: "verified"
   stenton_2024:
-    id: "stenton_2024"
+    pmid: "39030733"
     pmc: "PMC11560577"
-    verification_status: "verified"
-    exact_locus: "Stenton Box 1"
-candidates:
-  revel:
-    id: "revel"
-    version_availability: "confirm_pending"
-    license_verification: "confirm_pending"
+    locus: "Box 1"
+    verification: "verified"
+candidate_version_status: "confirm_pending"
+candidate_license_status: "confirm_pending"
 """
 
 def _get_valid_policy_json(source_register_sha256="abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"):
@@ -42,52 +40,34 @@ def _get_valid_policy_json(source_register_sha256="abcdef0123456789abcdef0123456
         "predictor": "REVEL",
         "predictor_version": "confirm-pending-revel-dbnsfp-release",
         "data_version": "confirm-pending-dbnsfp-release",
-        "score_direction": "higher_more_pathogenic",
-        "variant_scope": ["missense_variant"],
-        "consequence_routing": {
-            "missense_variant": "revel_policy",
-            "splice_relevant": "no_call_out_of_scope",
-            "other": "no_call"
-        },
-        "pp3_intervals": [
-            {"strength": "supporting", "lo": 0.644, "lo_inclusive": True, "hi": 0.773, "hi_inclusive": False},
-            {"strength": "moderate", "lo": 0.773, "lo_inclusive": True, "hi": 0.932, "hi_inclusive": False},
-            {"strength": "strong", "lo": 0.932, "lo_inclusive": True, "hi": None, "hi_inclusive": False}
-        ],
-        "bp4_intervals": [
-            {"strength": "supporting", "lo": 0.183, "lo_inclusive": False, "hi": 0.290, "hi_inclusive": True},
-            {"strength": "moderate", "lo": 0.016, "lo_inclusive": False, "hi": 0.183, "hi_inclusive": True},
-            {"strength": "strong", "lo": 0.003, "lo_inclusive": False, "hi": 0.016, "hi_inclusive": True},
-            {"strength": "very_strong", "lo": None, "lo_inclusive": False, "hi": 0.003, "hi_inclusive": True}
-        ],
-        "indeterminate": {
-            "strength": "indeterminate",
-            "lo": 0.290,
-            "lo_inclusive": False,
-            "hi": 0.644,
-            "hi_inclusive": False
-        },
-        "max_pp3_strength": "strong",
         "enabled_max_bp4_strength": "moderate",
-        "combination_caps": {"pp3_pm1": "strong"},
-        "citations": [
-            "Pejaver 2022 PMC9748256 Table 2",
-            "Stenton 2024 PMC11560577 Box 1",
-            "Richards 2015 PMC4544753",
-            "Tavtigian 2018 10.1038/gim.2017.210"
+        "pp3": {
+            "supporting": {"lo": 0.644, "lo_inclusive": True, "hi": 0.773, "hi_inclusive": False},
+            "moderate": {"lo": 0.773, "lo_inclusive": True, "hi": 0.932, "hi_inclusive": False},
+            "strong": {"lo": 0.932, "lo_inclusive": True, "hi": None, "hi_inclusive": False}
+        },
+        "bp4": {
+            "very_strong": {"lo": None, "lo_inclusive": False, "hi": 0.003, "hi_inclusive": True, "enabled": False},
+            "strong": {"lo": 0.003, "lo_inclusive": False, "hi": 0.016, "hi_inclusive": True, "enabled": False},
+            "moderate": {"lo": 0.016, "lo_inclusive": False, "hi": 0.183, "hi_inclusive": True, "enabled": True},
+            "supporting": {"lo": 0.183, "lo_inclusive": False, "hi": 0.290, "hi_inclusive": True, "enabled": True}
+        },
+        "indeterminate": {"lo": 0.290, "lo_inclusive": False, "hi": 0.644, "hi_inclusive": False},
+        "distinct_results": [
+            "BP4_DISABLED_STRENGTH",
+            "BP4_MODERATE",
+            "BP4_SUPPORTING",
+            "INDETERMINATE",
+            "MISSING_SCORE",
+            "OUT_OF_SCOPE",
+            "PP3_SUPPORTING",
+            "PP3_MODERATE",
+            "PP3_STRONG"
         ],
-        "training_overlap_status": "UNKNOWN",
-        "transportability_status": "BLOCKED_DATA",
-        "license_status": "non_commercial_in_repo_tag;primary_confirm_pending",
-        "source_register_sha256": source_register_sha256,
-        "activation_checklist": ["recommendation memo §8 items"],
-        "activation_dependencies": [
-            "revel-dbnsfp-release-pin",
-            "bp4-vocab-widening-for-moderate",
-            "dev-transportability-unblock",
-            "leakage-audit-PASS-or-owner-accept-UNKNOWN",
-            "owner-approval-hash-bound"
-        ]
+        "combination_cap": {
+            "pp3_pm1": "strong"
+        },
+        "source_register_sha256": source_register_sha256
     }
 
 
@@ -143,22 +123,22 @@ def test_tb1_schema_and_hash(tmp_path):
 
     # Non-monotonic PP3 intervals (e.g. moderate overlapping with supporting or out of order)
     p_non_monotonic = p_data.copy()
-    p_non_monotonic["pp3_intervals"] = [
-        {"strength": "supporting", "lo": 0.773, "lo_inclusive": True, "hi": 0.932, "hi_inclusive": False},
-        {"strength": "moderate", "lo": 0.644, "lo_inclusive": True, "hi": 0.773, "hi_inclusive": False},
-        {"strength": "strong", "lo": 0.932, "lo_inclusive": True, "hi": None, "hi_inclusive": False}
-    ]
+    p_non_monotonic["pp3"] = {
+        "supporting": {"lo": 0.773, "lo_inclusive": True, "hi": 0.932, "hi_inclusive": False},
+        "moderate": {"lo": 0.644, "lo_inclusive": True, "hi": 0.773, "hi_inclusive": False},
+        "strong": {"lo": 0.932, "lo_inclusive": True, "hi": None, "hi_inclusive": False}
+    }
     p_file.write_text(json.dumps(p_non_monotonic), encoding="utf-8")
     with pytest.raises(CandidatePolicyError):
         load_candidate_policy(str(p_file), source_register_path=str(register_file))
 
     # Overlapping intervals (lo/hi overlaps)
     p_overlap = p_data.copy()
-    p_overlap["pp3_intervals"] = [
-        {"strength": "supporting", "lo": 0.644, "lo_inclusive": True, "hi": 0.800, "hi_inclusive": False},
-        {"strength": "moderate", "lo": 0.750, "lo_inclusive": True, "hi": 0.932, "hi_inclusive": False},
-        {"strength": "strong", "lo": 0.932, "lo_inclusive": True, "hi": None, "hi_inclusive": False}
-    ]
+    p_overlap["pp3"] = {
+        "supporting": {"lo": 0.644, "lo_inclusive": True, "hi": 0.800, "hi_inclusive": False},
+        "moderate": {"lo": 0.750, "lo_inclusive": True, "hi": 0.932, "hi_inclusive": False},
+        "strong": {"lo": 0.932, "lo_inclusive": True, "hi": None, "hi_inclusive": False}
+    }
     p_file.write_text(json.dumps(p_overlap), encoding="utf-8")
     with pytest.raises(CandidatePolicyError):
         load_candidate_policy(str(p_file), source_register_path=str(register_file))
@@ -190,22 +170,20 @@ def test_tb1_source_register_failures(tmp_path):
     # 3. Unverified required primary citations
     unverified_register_content = """schema: "pp3bp4-source-register/1"
 version: "1"
-sources:
+required_primary_sources:
   pejaver_2022:
-    id: "pejaver_2022"
+    doi: "10.1016/j.ajhg.2022.10.013"
+    pmid: "36413997"
     pmc: "PMC9748256"
-    verification_status: "unverified"
-    exact_locus: "Pejaver Table 2"
+    locus: "Table 2, REVEL row"
+    verification: "unverified"
   stenton_2024:
-    id: "stenton_2024"
+    pmid: "39030733"
     pmc: "PMC11560577"
-    verification_status: "verified"
-    exact_locus: "Stenton Box 1"
-candidates:
-  revel:
-    id: "revel"
-    version_availability: "confirm_pending"
-    license_verification: "confirm_pending"
+    locus: "Box 1"
+    verification: "verified"
+candidate_version_status: "confirm_pending"
+candidate_license_status: "confirm_pending"
 """
     register_file.write_text(unverified_register_content, encoding="utf-8")
     unverified_register_sha = hashlib.sha256(register_file.read_bytes()).hexdigest()
@@ -214,20 +192,17 @@ candidates:
     with pytest.raises(CandidatePolicyError, match="unverified|citation|primary"):
         load_candidate_policy(str(p_file), source_register_path=str(register_file))
 
-    # 4. Missing required field (sources or candidates or specific citation)
+    # 4. Missing required field (required_primary_sources or specific citation)
     missing_field_register_content = """schema: "pp3bp4-source-register/1"
 version: "1"
-sources:
+required_primary_sources:
   stenton_2024:
-    id: "stenton_2024"
+    pmid: "39030733"
     pmc: "PMC11560577"
-    verification_status: "verified"
-    exact_locus: "Stenton Box 1"
-candidates:
-  revel:
-    id: "revel"
-    version_availability: "confirm_pending"
-    license_verification: "confirm_pending"
+    locus: "Box 1"
+    verification: "verified"
+candidate_version_status: "confirm_pending"
+candidate_license_status: "confirm_pending"
 """
     register_file.write_text(missing_field_register_content, encoding="utf-8")
     missing_field_register_sha = hashlib.sha256(register_file.read_bytes()).hexdigest()
@@ -240,22 +215,20 @@ candidates:
     extra_field_register_content = """schema: "pp3bp4-source-register/1"
 version: "1"
 extra_unapproved_field: "value"
-sources:
+required_primary_sources:
   pejaver_2022:
-    id: "pejaver_2022"
+    doi: "10.1016/j.ajhg.2022.10.013"
+    pmid: "36413997"
     pmc: "PMC9748256"
-    verification_status: "verified"
-    exact_locus: "Pejaver Table 2"
+    locus: "Table 2, REVEL row"
+    verification: "verified"
   stenton_2024:
-    id: "stenton_2024"
+    pmid: "39030733"
     pmc: "PMC11560577"
-    verification_status: "verified"
-    exact_locus: "Stenton Box 1"
-candidates:
-  revel:
-    id: "revel"
-    version_availability: "confirm_pending"
-    license_verification: "confirm_pending"
+    locus: "Box 1"
+    verification: "verified"
+candidate_version_status: "confirm_pending"
+candidate_license_status: "confirm_pending"
 """
     register_file.write_text(extra_field_register_content, encoding="utf-8")
     extra_field_register_sha = hashlib.sha256(register_file.read_bytes()).hexdigest()

@@ -26,7 +26,7 @@ def test_artifact_predictor_leakage_audit_exists_and_valid():
     data = json.loads(path.read_text(encoding="utf-8"))
     
     # Assert exact schema/status/report_date
-    assert data["schema"] == "pp3bp4-leakage-audit/1"
+    assert data["schema"] == "tsc-predictor-leakage-audit/1"
     assert data["status"] == "UNKNOWN"
     assert "report_date" in data or "checked_at" in data
 
@@ -60,7 +60,7 @@ def test_artifact_dev_score_acquisition_exists_and_valid():
     data = json.loads(path.read_text(encoding="utf-8"))
 
     # Assert exact schema/status/report_date
-    assert data["schema"] == "pp3bp4-dev-score-acquisition/1"
+    assert data["schema"] == "tsc-pp3bp4-dev-score-acquisition/1"
     assert data["status"] == "BLOCKED_DATA"
     assert "report_date" in data
 
@@ -94,7 +94,7 @@ def test_artifact_transportability_exists_and_valid():
     data = json.loads(path.read_text(encoding="utf-8"))
 
     # Assert exact schema/status/report_date (BLOCKED_DATA+UNDERPOWERED)
-    assert data["schema"] == "pp3bp4-transportability/1"
+    assert data["schema"] == "tsc-pp3bp4-transportability/1"
     assert data["status"] == "BLOCKED_DATA"
     assert data["power_status"] == "UNDERPOWERED"
     assert "report_date" in data
@@ -129,7 +129,7 @@ def test_artifact_revel_mave_concordance_exists_and_valid():
     data = json.loads(path.read_text(encoding="utf-8"))
 
     # Assert exact schema/status/report_date (BLOCKED_DATA + NON_GATING validation_mode)
-    assert data["schema"] == "pp3bp4-revel-mave-concordance/1"
+    assert data["schema"] == "tsc2-pp3bp4-revel-mave-concordance/1"
     assert data["status"] == "BLOCKED_DATA" # MAVE status must be BLOCKED_DATA, not NON_GATING
     assert data["gating_type"] == "NON_GATING" or data["validation_mode"] == "NON_GATING"
     assert "report_date" in data

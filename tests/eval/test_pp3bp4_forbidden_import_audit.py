@@ -149,6 +149,10 @@ def test_tc1_production_modules_do_not_import_shadow() -> None:
         "raptor.eval.pp3bp4_transportability",
         "raptor.eval.predictor_leakage_audit",
         "raptor.external.mave.revel_concordance",
+        "scripts.export_dev_vcf",
+        "scripts.build_pp3bp4_transportability_report",
+        "scripts.audit_predictor_leakage",
+        "scripts.build_pp3bp4_revel_mave_concordance",
     }
 
     # Shadow modules to exclude
