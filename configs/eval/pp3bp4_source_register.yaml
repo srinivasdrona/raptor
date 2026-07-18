@@ -1,0 +1,83 @@
+# Slot 3 (PP3/BP4 shadow policy) source register — primary citations and
+# candidate predictor disposition backing `configs/eval/pp3bp4_candidate_policy.json`.
+#
+# This is a SHADOW-ONLY, PROPOSED artifact (see
+# docs/reference/pp3-bp4-predictor-policy-recommendation-2026-07.md). It
+# authorizes no clinical classification, VUS worklist, ClinVar submission,
+# or terminal-gate use.
+#
+# `required_primary_sources` must all carry `verification: "verified"` --
+# `raptor.eval.pp3bp4_candidate_policy.load_candidate_policy` fails loud if
+# any is missing or unverified. `candidates` records provisional
+# disposition per candidate predictor from the recommendation memo; it does
+# not select a production predictor.
+schema: "pp3bp4-source-register/1"
+version: "1"
+required_primary_sources:
+  pejaver_2022:
+    doi: "10.1016/j.ajhg.2022.10.013"
+    pmid: "36413997"
+    pmc: "PMC9748256"
+    locus: "Table 2, REVEL row"
+    verification: "verified"
+  stenton_2024:
+    pmid: "39030733"
+    pmc: "PMC11560577"
+    locus: "Box 1"
+    verification: "verified"
+  richards_2015:
+    doi: "10.1038/gim.2015.30"
+    pmid: "25741868"
+    pmc: "PMC4544753"
+    locus: "PP3 and BP4 criteria"
+    verification: "verified"
+  tavtigian_2018:
+    doi: "10.1038/gim.2017.210"
+    locus: "Bayesian evidence-strength model"
+    verification: "verified"
+candidates:
+  revel:
+    kind: "meta_predictor"
+    calibration_source: "pejaver_2022"
+    version_status: "confirm_pending"
+    license_status: "confirm_pending"
+    structured_score_availability: "blocked_data"
+    training_manifest_status: "unavailable"
+    tsc_specific_evidence: "none_identified"
+    decision: "advance_shadow"
+  bayesdel_noaf:
+    kind: "meta_predictor"
+    calibration_source: "pejaver_2022"
+    version_status: "confirm_pending"
+    license_status: "confirm_pending"
+    structured_score_availability: "unavailable"
+    training_manifest_status: "unavailable"
+    tsc_specific_evidence: "none_identified"
+    decision: "blocked_shadow_comparator"
+  mutpred2:
+    kind: "predictor"
+    calibration_source: "pejaver_2022"
+    version_status: "confirm_pending"
+    license_status: "confirm_pending"
+    structured_score_availability: "unavailable"
+    training_manifest_status: "unavailable"
+    tsc_specific_evidence: "none_identified"
+    decision: "blocked_shadow_comparator"
+  vest4:
+    kind: "predictor"
+    calibration_source: "pejaver_2022"
+    version_status: "confirm_pending"
+    license_status: "confirm_pending"
+    structured_score_availability: "unavailable"
+    training_manifest_status: "unavailable"
+    tsc_specific_evidence: "none_identified"
+    decision: "blocked_shadow_comparator"
+  bias_composite:
+    kind: "composite"
+    calibration_source: "none"
+    version_status: "pinned_bias_3_0_0_commit_ade13f2"
+    license_status: "arm_length_agpl"
+    structured_score_availability: "reconstructed_only"
+    training_manifest_status: "inherited_unknown"
+    tsc_specific_evidence: "none_identified"
+    decision: "audit_only_reject_authoritative"

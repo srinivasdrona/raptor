@@ -1,0 +1,41 @@
+# Slot 3 (PP3/BP4 shadow policy) predictor training-manifest registry.
+#
+# Consumed by `raptor.eval.predictor_leakage_audit.evaluate_leakage_audit`
+# as the `registry_path` argument. Records, for the REVEL candidate
+# (`direct`) and its comparator/component candidates, whether a verified
+# training manifest is currently available on disk. None currently are --
+# this keeps `data/census/tsc_predictor_leakage_audit_2026-07.json` honest
+# at UNKNOWN (never PASS) until a real manifest is obtained and hash-pinned
+# here.
+#
+# This registry never carries benchmark labels or held-out/VUS outputs --
+# only manifest availability/verification/hash bookkeeping.
+schema: "pp3bp4-manifest-registry/1"
+version: "1"
+direct:
+  candidate: "revel"
+  available: false
+  verified: false
+  sha256: null
+  note: "REVEL (dbNSFP release) training-variant manifest not obtained; predictor_version/data_version remain confirm-pending."
+components:
+  bayesdel_noaf:
+    available: false
+    verified: false
+    sha256: null
+    note: "BayesDel-noAF training manifest not obtained; comparator only, not the active shadow predictor."
+  mutpred2:
+    available: false
+    verified: false
+    sha256: null
+    note: "MutPred2 training manifest not obtained; comparator only, not the active shadow predictor."
+  vest4:
+    available: false
+    verified: false
+    sha256: null
+    note: "VEST4 training manifest not obtained; comparator only, not the active shadow predictor."
+  bias_composite:
+    available: false
+    verified: false
+    sha256: null
+    note: "BIAS-3.0.0 composite inherits unknown constituent training provenance (audit-only; not authoritative)."
