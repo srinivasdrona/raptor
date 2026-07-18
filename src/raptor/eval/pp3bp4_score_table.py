@@ -202,12 +202,12 @@ def load_and_validate_score_table(
                 )
             n_scored += 1
 
-        for field_name in ("predictor_version", "data_version"):
+        for field_name in ("predictor", "predictor_version", "data_version"):
             row_value = row[field_name]
             policy_value = getattr(policy, field_name)
             if row_value != policy_value:
                 raise ScoreTableValidationError(
-                    f"score-table row field {field_name!r} version mismatch: "
+                    f"score-table row field {field_name!r} does not match policy: "
                     f"row={row_value!r} policy={policy_value!r}"
                 )
 
@@ -220,15 +220,27 @@ def load_and_validate_score_table(
 
         validated_rows.append(dict(row))
 
-    n_total = len(validated_rows)
-    n_missing = n_total - n_scored
+    # Exact-set conservation (Slot 2 Rule 3): every expected dev id must have
+    # an explicit row (missing scores are `score:null` rows, never omitted
+    # rows) -- an omitted dev id is an exact-set breach, not silent undercount.
+    missing_dev_ids = sorted(dev_id_set - seen_ids)
+    if missing_dev_ids:
+        raise ScoreTableValidationError(
+            "score-table is missing an explicit row for expected dev variant_id(s) "
+            f"(exact-set/conservation breach): {missing_dev_ids}"
+        )
+
+    # Missingness/coverage are computed against the expected dev id count,
+    # never the submitted-row count (Slot 2 Rule 3).
+    n_dev = len(dev_id_list)
+    n_missing = n_dev - n_scored
     if sidecar["n_scored"] != n_scored or sidecar["n_missing"] != n_missing:
         raise ScoreTableValidationError(
             f"score-table sidecar n_scored/n_missing ({sidecar['n_scored']}/{sidecar['n_missing']}) "
             f"does not match actual rows ({n_scored}/{n_missing})"
         )
 
-    coverage = (n_scored / n_total) if n_total > 0 else 1.0
+    coverage = (n_scored / n_dev) if n_dev > 0 else 1.0
 
     attestation = ScoreTableAttestation(
         schema=sidecar["schema"],

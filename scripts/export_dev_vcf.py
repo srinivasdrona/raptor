@@ -10,6 +10,14 @@ missing prerequisite (reference genome access, structured REVEL/dbNSFP
 annotation runtime, predictor/data version pin, license record). This
 script never reads or writes a label -- only `variant_id`s derived from the
 dev/holdout split.
+
+Stage-A field blindness (Rule 5): `load_benchmark_variant_ids` reads only
+`variant_id` from each benchmark row; a row with a missing, malformed, or
+poison `label`/`variant_class` field never changes or blocks ID
+derivation. Those IDs are wrapped in placeholder `BenchmarkRow`s (empty
+`label`/`variant_class`) purely so `split_benchmark` -- which only ever
+reads `.variant_id` -- can be reused without this module itself indexing a
+label.
 """
 from __future__ import annotations
 
@@ -40,24 +48,31 @@ _ALWAYS_MISSING_PREREQUISITES: tuple[str, ...] = (
 )
 
 
-def _load_benchmark_rows(path: Path) -> list[BenchmarkRow]:
-    rows: list[BenchmarkRow] = []
+def load_benchmark_variant_ids(path: Path) -> list[str]:
+    """Stage-A label-blind benchmark read (Rule 5): return only
+    `variant_id` values, in file order. Never indexes/accesses `label`,
+    `source`, `snapshot`, or `variant_class` -- a benchmark row with a
+    missing, malformed, or poison label field must not change or block
+    this derivation."""
+    ids: list[str] = []
     with path.open("r", encoding="utf-8") as handle:
         for line in handle:
             line = line.strip()
             if not line:
                 continue
             data = json.loads(line)
-            rows.append(
-                BenchmarkRow(
-                    variant_id=data["variant_id"],
-                    label=data["label"],
-                    variant_class=data["variant_class"],
-                    source=data.get("source"),
-                    snapshot=data.get("snapshot"),
-                )
-            )
-    return rows
+            ids.append(data["variant_id"])
+    return ids
+
+
+def _placeholder_rows(variant_ids: list[str]) -> list[BenchmarkRow]:
+    """Wrap label-blind `variant_id`s in placeholder `BenchmarkRow`s so
+    `split_benchmark` (which only ever reads `.variant_id`) can be reused
+    here without Stage A itself reading a label/variant_class value."""
+    return [
+        BenchmarkRow(variant_id=variant_id, label="", variant_class="")
+        for variant_id in variant_ids
+    ]
 
 
 def _id_set_hash(ids: list[str]) -> str:
@@ -83,11 +98,10 @@ def build_status_payload(
 ) -> dict:
     """Build the deterministic `tsc-pp3bp4-dev-score-acquisition/1` payload
     (content_hash excluded, added by the caller)."""
-    benchmark_rows = _load_benchmark_rows(benchmark_path)
+    benchmark_ids = load_benchmark_variant_ids(benchmark_path)
     eval_config = load_eval_config(str(eval_config_path))
-    train_dev, holdout = split_benchmark(benchmark_rows, eval_config)
+    train_dev, holdout = split_benchmark(_placeholder_rows(benchmark_ids), eval_config)
 
-    benchmark_ids = [row.variant_id for row in benchmark_rows]
     dev_ids = [row.variant_id for row in train_dev]
 
     _, provenance = load_candidate_policy(policy_path, source_register_path)

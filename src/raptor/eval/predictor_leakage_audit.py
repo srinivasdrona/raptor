@@ -2,10 +2,15 @@
 manifest leakage audit (RAPTOR PP3/BP4 shadow policy, steps 2-7).
 
 Reads benchmark `variant_id`s only (never labels or held-out criterion
-outputs) and any provided direct/component training-manifest files, hash-
-verifies each against a manifest registry, and reports a fail-closed
-precedence status: `BLOCKED_DATA` > `FAIL` > `UNKNOWN` > `PASS`. `PASS` is
-reachable only when every manifest this audit was asked to check is
+outputs) plus every direct/component training-manifest the registry itself
+declares required, hash-verifies each against that manifest registry, and
+reports a fail-closed precedence status: `BLOCKED_DATA` > `FAIL` >
+`UNKNOWN` > `PASS`. The required manifest set is derived from the
+registry, never only from the paths the caller happened to supply -- a
+caller path omission cannot erase a registry requirement: a registry entry
+marked `available` with no supplied path is `BLOCKED_DATA`; an
+unavailable/unverified required entry with no supplied path is `UNKNOWN`.
+`PASS` is reachable only when every registry-required manifest is
 available, hash-verified, and shows zero overlap.
 """
 from __future__ import annotations
@@ -163,21 +168,47 @@ def evaluate_leakage_audit(
     if not isinstance(registry, dict):
         raise LeakageValidationError("manifest registry root must be a mapping")
 
-    manifests_to_check: list[tuple[str, Path, dict | None]] = []
+    registry_direct_entry = registry.get("direct")
+    registry_components = registry.get("components") or {}
+
+    # Required manifest rule (Slot 2 Rule 4): the required set comes from the
+    # registry, never only from the caller-supplied paths. A caller path
+    # omission cannot erase a registry requirement.
+    required_entries: list[tuple[str, dict]] = []
+    if registry_direct_entry is not None:
+        required_entries.append(("direct", registry_direct_entry))
+    for comp_name, comp_entry in registry_components.items():
+        required_entries.append((comp_name, comp_entry))
+
+    supplied_paths: dict[str, Path] = {}
     if direct_manifest_path is not None:
-        manifests_to_check.append(("direct", Path(direct_manifest_path), registry.get("direct")))
+        supplied_paths["direct"] = Path(direct_manifest_path)
     for name, path in (component_manifest_paths or {}).items():
-        manifests_to_check.append((name, Path(path), (registry.get("components") or {}).get(name)))
+        supplied_paths[name] = Path(path)
+
+    required_names = {name for name, _ in required_entries}
+    # Caller-supplied paths with no matching registry entry are checked but
+    # can never be proven required/clean -- preserves prior best-effort
+    # overlap accounting for non-registry paths.
+    extra_supplied_names = [name for name in supplied_paths if name not in required_names]
 
     direct_overlap = 0
     component_overlap = 0
-    # No manifest was requested at all: nothing has been proven clean --
-    # this can never read PASS (falls through to UNKNOWN below).
-    any_unverified_or_unavailable = len(manifests_to_check) == 0
+    blocked_data = False
+    # Nothing was required and nothing was supplied: nothing has been proven
+    # clean -- this can never read PASS (falls through to UNKNOWN below).
+    any_unverified_or_unavailable = not required_entries and not extra_supplied_names
 
-    for name, path, entry in manifests_to_check:
-        if entry is None or not path.is_file():
-            any_unverified_or_unavailable = True
+    for name, entry in required_entries:
+        path = supplied_paths.get(name)
+        if path is None or not path.is_file():
+            # Available-but-missing input is BLOCKED_DATA; an
+            # unavailable/unverified required input (with no path) is
+            # UNKNOWN. Caller path omission cannot erase either status.
+            if bool(entry.get("available", False)):
+                blocked_data = True
+            else:
+                any_unverified_or_unavailable = True
             continue
 
         available = bool(entry.get("available", False))
@@ -200,7 +231,15 @@ def evaluate_leakage_audit(
         else:
             component_overlap += overlap_count
 
-    if direct_overlap > 0 or component_overlap > 0:
+    for name in extra_supplied_names:
+        # Not named in the registry: cannot be verified, so it is never
+        # counted toward overlap -- only marked unverified (unchanged
+        # behavior for non-registry paths).
+        any_unverified_or_unavailable = True
+
+    if blocked_data:
+        status = LeakageStatus.BLOCKED_DATA
+    elif direct_overlap > 0 or component_overlap > 0:
         status = LeakageStatus.FAIL
     elif any_unverified_or_unavailable:
         status = LeakageStatus.UNKNOWN
