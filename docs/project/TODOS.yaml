@@ -432,3 +432,28 @@ todos:
   status: pending
   depends_on: []
   created: '2026-07-19'
+- id: modalities-mosaicism-low-vaf-track
+  title: Designing mosaicism and low-VAF evidence track
+  description: 'Track: VARIANT-MODALITY / CLINICAL-EVIDENCE. Scope TSC mosaic and
+    low-allele-fraction detection, tissue/specimen context, caller/QC requirements,
+    orthogonal confirmation, inheritance/phenotype interpretation, packet representation
+    and validation benchmark. Keep separate from germline SNV scoring until approved.'
+  status: pending
+  depends_on: []
+  created: '2026-07-19'
+- id: clinical-phenotype-penetrance-track
+  title: Designing phenotype and penetrance evidence track
+  description: 'Track: CLINICAL-EVIDENCE. Define consented phenotype, age, tissue,
+    penetrance, segregation and mosaicism inputs needed for PP4/BS2 and mechanism synthesis;
+    establish privacy boundaries and manual-review rules before patient-level automation.'
+  status: pending
+  depends_on: []
+  created: '2026-07-19'
+- id: governance-data-rights-privacy
+  title: Establishing data rights, privacy and clinical-boundary governance
+  description: 'Track: GOVERNANCE / CROSS-CUTTING. Maintain license/permitted-use,
+    patient-data privacy, retention, access control, clinical/research boundary, audit,
+    COI and external-sharing controls for every source, packet and engagement workflow.'
+  status: pending
+  depends_on: []
+  created: '2026-07-19'
