@@ -57,8 +57,8 @@ todos:
   description: Freeze and map the TSC2 cliPE/MAVE dataset and larger 2026 functional maps,
     pre-register endpoint-specific metrics, and keep raw functional labels outside the scorer
     path. Implemented on worktree raptor-worktrees/mave-validation, branch track/mave-validation-2026-07,
-    doer commit 9d15ef78. Checker findings were fixed in 23211a7; the track was merged
-    to main in e5bf3a5.
+    doer commit 9d15ef78. Checker findings were fixed in 23211a7; the track was merged to
+    main in e5bf3a5.
   status: done
   depends_on: []
   created: '2026-07-13'
@@ -110,8 +110,8 @@ todos:
     configs/acmg/tsc.yaml strength_vocab to manual/no-call exactly as the production scorer
     does; add parity tests. Implemented on worktree raptor-worktrees/production-vocab, branch
     track/production-vocab-2026-07, doer commit 16a7f916. Predictor-policy correction_hash
-    was repinned to pending (not approved). Checker approved the track; it was merged to
-    main in 4cc1aaa.
+    was repinned to pending (not approved). Checker approved the track; it was merged to main
+    in 4cc1aaa.
   status: done
   depends_on: []
   created: '2026-07-13'
@@ -139,6 +139,7 @@ todos:
   - enforce-production-vocab
   - reconcile-strength-policy
   - resolve-pp3-bp4-activation
+  - rerun-masked-gate
   - select-validate-pp3-bp4-policy
   created: '2026-07-13'
 - id: reconcile-strength-policy
@@ -177,47 +178,6 @@ todos:
   - select-validate-pp3-bp4-policy
   - version-scope-specific-gate
   created: '2026-07-13'
-- id: select-validate-pp3-bp4-policy
-  title: Selecting and validating PP3/BP4 predictor policy
-  description: Complete steps 1-7 of the approved sequence without activation. Build a cited
-    candidate matrix for REVEL, BayesDel, MutPred2, VEST4, and the frozen BIAS composite;
-    preregister REVEL as the initial single-predictor candidate with exact version, score intervals,
-    indeterminate zone, and consequence routing; audit training and benchmark overlap; assess
-    TSC1/TSC2 transportability on non-heldout development data plus orthogonal MAVE reporting;
-    implement shadow-only fail-closed infrastructure via Opus planner, Gemini tests, Sonnet
-    5 doer, and GPT-5.4 checker. Do not owner-approve, run the terminal held-out gate, or recompute
-    the VUS census.
-    Completed via Opus planner (plan reviewed/revised by the orchestrator), Gemini 3.5 Flash
-    protected tests, Sonnet 5 production implementation, and GPT-5.4 approval. Added proposed
-    shadow REVEL policy, candidate/source registers, fail-closed leakage and score-table audits,
-    dev-only transportability/MAVE reporting, and deterministic UNKNOWN/BLOCKED_DATA artifacts.
-    Merged to main in 22d26c4; combined suite 828 passed and 5 skipped.
-  status: done
-  depends_on: []
-  created: '2026-07-18'
-- id: resolve-pp3-bp4-activation
-  title: Resolving PP3/BP4 activation blockers
-  description: Step 8 after the completed shadow-policy work. Pin the exact REVEL/dbNSFP
-    version and verified license; obtain and audit direct/component training manifests;
-    acquire a structured dev score table; resolve leakage UNKNOWN and transportability
-    BLOCKED_DATA/UNDERPOWERED; decide whether evidence supports activation; obtain GPT-5.4
-    review; and record explicit owner approval bound to hashes. Do not activate by default
-    or run held-out/VUS workflows before completion.
-  status: pending
-  depends_on:
-  - select-validate-pp3-bp4-policy
-  created: '2026-07-19'
-- id: version-scope-specific-gate
-  title: Versioning scope-specific validation verdicts
-  description: Preregister and implement the additive v2 validation contract with independent
-    missense and truncating direction verdicts, descriptive-only other/pooled metrics, full-spectrum
-    authorization kept false for partial validation, and a narrow non-clinical truncating-pathogenic
-    research flag. Preserve the immutable v1 result and locked thresholds. Gemini 3.5 Flash
-    owned tests, Sonnet 5 implemented production code, and GPT-5.4 approved the final net
-    change. Merged to main in de76ba3; combined suite 791 passed and 5 skipped.
-  status: done
-  depends_on: []
-  created: '2026-07-14'
 - id: research-independent-tsc-validation
   title: Researching independent TSC validation
   description: Verified TSC2 cliPE MaveDB (208 variants, CC0; 66 RAPTOR VUS and 32 held-out
@@ -251,3 +211,224 @@ todos:
   status: done
   depends_on: []
   created: '2026-07-13'
+- id: version-scope-specific-gate
+  title: Versioning scope-specific validation verdicts
+  description: Preregister and implement the additive v2 validation contract with independent
+    missense and truncating direction verdicts, descriptive-only other/pooled metrics, full-spectrum
+    authorization kept false for partial validation, and a narrow non-clinical truncating-pathogenic
+    research flag. Preserve the immutable v1 result and locked thresholds. Gemini 3.5 Flash
+    owned tests, Sonnet 5 implemented production code, and GPT-5.4 approved the final net
+    change. Merged to main in de76ba3; combined suite 791 passed and 5 skipped.
+  status: done
+  depends_on: []
+  created: '2026-07-14'
+- id: select-validate-pp3-bp4-policy
+  title: Selecting and validating PP3/BP4 predictor policy
+  description: Complete steps 1-7 of the approved sequence without activation. Build a cited
+    candidate matrix for REVEL, BayesDel, MutPred2, VEST4, and the frozen BIAS composite;
+    preregister REVEL as the initial single-predictor candidate with exact version, score
+    intervals, indeterminate zone, and consequence routing; audit training and benchmark overlap;
+    assess TSC1/TSC2 transportability on non-heldout development data plus orthogonal MAVE
+    reporting; implement shadow-only fail-closed infrastructure via Opus planner, Gemini tests,
+    Sonnet 5 doer, and GPT-5.4 checker. Do not owner-approve, run the terminal held-out gate,
+    or recompute the VUS census. Completed via Opus planner (plan reviewed/revised by the
+    orchestrator), Gemini 3.5 Flash protected tests, Sonnet 5 production implementation, and
+    GPT-5.4 approval. Added proposed shadow REVEL policy, candidate/source registers, fail-closed
+    leakage and score-table audits, dev-only transportability/MAVE reporting, and deterministic
+    UNKNOWN/BLOCKED_DATA artifacts. Merged to main in 22d26c4; combined suite 828 passed and
+    5 skipped.
+  status: done
+  depends_on: []
+  created: '2026-07-18'
+- id: resolve-pp3-bp4-activation
+  title: Resolving PP3/BP4 activation blockers
+  description: Step 8 after the completed shadow-policy work. Pin the exact REVEL/dbNSFP version
+    and verified license; obtain and audit direct/component training manifests; acquire a
+    structured dev score table; resolve leakage UNKNOWN and transportability BLOCKED_DATA/UNDERPOWERED;
+    decide whether evidence supports activation; obtain GPT-5.4 review; and record explicit
+    owner approval bound to hashes. Do not activate by default or run held-out/VUS workflows
+    before completion.
+  status: pending
+  depends_on:
+  - select-validate-pp3-bp4-policy
+  - sources-expand-predictor-matrix
+  - sources-pin-core-annotation-bundle
+  created: '2026-07-19'
+- id: portfolio-track-governance
+  title: Defining portfolio tracks and critical-path governance
+  description: 'Track: PORTFOLIO. Define the repo-persistent track taxonomy, milestone/gate
+    vocabulary, critical-path markers, cross-track dependency rules, WIP limits, ready queues,
+    and status views. Discussion/design only until owner approval.'
+  status: pending
+  depends_on: []
+  created: '2026-07-19'
+- id: sources-expand-predictor-matrix
+  title: Expanding calibrated predictor decision matrix
+  description: 'Track: SOURCE-COVERAGE. Expand PP3/BP4 comparison to all 16 source-verified
+    calibrated tools plus comparator/watchlist, TSC-policy-combination, splice, functional,
+    and full-classifier exclusion tiers. The matrix selects one policy; it never becomes a
+    voting ensemble.'
+  status: pending
+  depends_on: []
+  created: '2026-07-19'
+- id: sources-pin-core-annotation-bundle
+  title: Pinning core small-variant annotation bundle
+  description: 'Track: SOURCE-COVERAGE / CORE-BLOCKER. Select and checksum exact dbNSFP/Nirvana,
+    gnomAD exome/genome and constraints, dbSNP, MANE, reference, RepeatMasker, predictor versions,
+    and licenses required for reproducible TSC SNV/small-indel evidence.'
+  status: pending
+  depends_on:
+  - sources-expand-predictor-matrix
+  created: '2026-07-19'
+- id: sources-add-splice-track
+  title: Building separate splice-evidence source track
+  description: 'Track: SOURCE-COVERAGE. Design a separately calibrated splice policy using
+    pinned SpliceAI and appropriate ABSplice/dbscSNV comparators, with consequence routing
+    and no double counting with PVS1 or missense PP3/BP4.'
+  status: pending
+  depends_on: []
+  created: '2026-07-19'
+- id: sources-add-literature-stack
+  title: Adding open literature source coverage
+  description: 'Track: SOURCE-COVERAGE. Add a versioned PubMed/LitVar-first literature source
+    plan for TSC evidence and Mechanism Atlas; assess OMIM/MasterMind licensing separately
+    and keep extraction claims provenance-bound.'
+  status: pending
+  depends_on: []
+  created: '2026-07-19'
+- id: sources-audit-difficult-regions
+  title: Auditing repeats and difficult genomic regions
+  description: 'Track: SOURCE-COVERAGE. Audit TSC1/TSC2 relevance of RepeatMasker, segmental
+    duplications, camouflaged/dark regions, mappability and STR resources; distinguish public
+    sources from vendor-specific CamouflagedGenes/DarkGenes/GeneyxRepeats labels.'
+  status: pending
+  depends_on: []
+  created: '2026-07-19'
+- id: sources-design-sv-cnv-track
+  title: Designing TSC structural-variant and CNV track
+  description: 'Track: VARIANT-MODALITY / SOURCE-COVERAGE. Scope a separate TSC1/TSC2
+    deletion/duplication/SV pipeline using ACMG-SV, gnomAD-SV, DGV/dbVar/DGVGold, cytobands,
+    repeat/mappability data, an independent benchmark and evidence policy. Do not insert
+    SV rules into the SNV scorer.'
+  status: pending
+  depends_on: []
+  created: '2026-07-19'
+- id: sources-evaluate-commercial-sources
+  title: Evaluating licensed and vendor-specific sources
+  description: 'Track: SOURCE-COVERAGE. Clarify LifeCell/Geneyx Converge, GeneEnhancerSV,
+    CamouflagedGenes, DarkGenes and GeneyxRepeats definitions; assess MasterMind and OMIM
+    licensing/value; reject redundant or unverifiable feeds.'
+  status: pending
+  depends_on: []
+  created: '2026-07-19'
+- id: sourceops-version-refresh-registry
+  title: Creating live source-version and refresh registry
+  description: 'Track: SOURCE-OPS. Define source owner, URL, license, pin, checksum, update
+    cadence, freshness SLA, acquisition method, provenance, downstream consumers, revalidation
+    trigger and rollback for every active source.'
+  status: pending
+  depends_on: []
+  created: '2026-07-19'
+- id: sourceops-automated-refresh-validation
+  title: Automating staged source refresh and validation
+  description: 'Track: SOURCE-OPS. Implement detect-download-verify-stage-diff-test-promote
+    workflow for approved sources, never silently replacing production data; integrate
+    source-specific sanity checks and deterministic manifests.'
+  status: pending
+  depends_on:
+  - sourceops-version-refresh-registry
+  - sources-pin-core-annotation-bundle
+  created: '2026-07-19'
+- id: sourceops-drift-revalidation-gates
+  title: Adding source-drift revalidation gates
+  description: 'Track: SOURCE-OPS / ASSURANCE. Define materiality thresholds and CI gates
+    that determine when refreshed ClinVar, gnomAD, dbNSFP, MANE or other data require benchmark
+    rebuild, policy review, packet invalidation or rollback.'
+  status: pending
+  depends_on:
+  - sourceops-automated-refresh-validation
+  created: '2026-07-19'
+- id: engagement-recruit-molecular-geneticist
+  title: Establishing molecular-geneticist review capacity
+  description: 'Track: EXPERT-ENGAGEMENT / LONG-LEAD. Recruit or contract an appropriately
+    qualified molecular geneticist, define COI/confidentiality and review SLA, and agree the
+    non-clinical evidence-packet adjudication protocol. Can proceed independently of scoring fixes.'
+  status: pending
+  depends_on: []
+  created: '2026-07-19'
+- id: engagement-tsc-alliance-vcep-path
+  title: Establishing TSC Alliance and VCEP engagement path
+  description: 'Track: EXPERT-ENGAGEMENT / LONG-LEAD. Open protocol-compliant contact with
+    TSC Alliance/ClinGen stakeholders, clarify panel status, membership and evidence-sharing
+    route, and define what RAPTOR may submit or only prepare. No fabricated endorsement/timeline.'
+  status: pending
+  depends_on: []
+  created: '2026-07-19'
+- id: core-generate-review-packets
+  title: Generating corrected expert-review packets
+  description: 'Track: CORE-CLASSIFICATION. After the production-faithful gate and VUS census,
+    generate provenance-complete candidate packets and review queue with explicit unknowns,
+    contradictions, policy version and non-clinical status.'
+  status: pending
+  depends_on:
+  - recompute-vus-census
+  - rerun-masked-gate
+  created: '2026-07-19'
+- id: core-molecular-geneticist-adjudication
+  title: Running molecular-geneticist packet adjudication
+  description: 'Track: CORE-CLASSIFICATION / EXPERT-ENGAGEMENT. Obtain independent expert
+    review of corrected packets, record decisions/disagreements/evidence gaps, and feed policy
+    issues back without treating review as automatic ClinVar/VCEP approval.'
+  status: pending
+  depends_on:
+  - core-generate-review-packets
+  - engagement-recruit-molecular-geneticist
+  created: '2026-07-19'
+- id: engagement-submission-pilot
+  title: Preparing first external evidence-engagement pilot
+  description: 'Track: EXPERT-ENGAGEMENT. Prepare a bounded, owner-approved pilot for VCEP/TSC
+    Alliance/ClinVar engagement only after molecular-geneticist adjudication and stakeholder
+    route confirmation; preserve all governance constraints.'
+  status: pending
+  depends_on:
+  - core-molecular-geneticist-adjudication
+  - engagement-tsc-alliance-vcep-path
+  created: '2026-07-19'
+- id: tier3-literature-ingestion
+  title: Building continuous Tier-3 literature ingestion
+  description: 'Track: TIER3-RESEARCH. Ingest versioned TSC literature deltas from approved
+    open/licensed sources, canonicalize variants, preserve passages/citations/assay context,
+    and route uncertain extraction to review.'
+  status: pending
+  depends_on:
+  - sourceops-version-refresh-registry
+  - sources-add-literature-stack
+  created: '2026-07-19'
+- id: tier3-evidence-extraction-scoring
+  title: Building Tier-3 evidence extraction and research scoring
+  description: 'Track: TIER3-RESEARCH. Extract mechanistic, assay, phenotype and contradiction
+    evidence into the Mechanism Atlas schema; produce research-priority scores separate from
+    ACMG classification and never convert unsupported text into criteria.'
+  status: pending
+  depends_on:
+  - define-variant-mechanism-atlas
+  - tier3-literature-ingestion
+  created: '2026-07-19'
+- id: tier3-continuous-vus-monitoring
+  title: Operating continuous VUS evidence monitoring
+  description: 'Track: TIER3-RESEARCH / SOURCE-OPS. Monitor source and literature deltas for
+    existing/new TSC VUS, generate changed-evidence packets, and trigger re-review only through
+    versioned policies and refresh gates.'
+  status: pending
+  depends_on:
+  - sourceops-automated-refresh-validation
+  - tier3-evidence-extraction-scoring
+  created: '2026-07-19'
+- id: assurance-expand-orthogonal-validation
+  title: Expanding independent multi-oracle validation
+  description: 'Track: VALIDATION-ASSURANCE. Extend non-gating validation beyond cliPE to
+    accessible TSC2 VAMP-seq/SGE maps, legacy assays, phenotype/penetrance sources and CAGI7
+    if access is obtained; audit each oracle for ClinVar circularity.'
+  status: pending
+  depends_on: []
+  created: '2026-07-19'
