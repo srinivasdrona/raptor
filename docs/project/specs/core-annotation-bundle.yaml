@@ -1,23 +1,22 @@
-# RAPTOR core annotation bundle — pinned, hash-bound planner contract.
+# RAPTOR core annotation bundle — pinned, hash-bound planner contract (rev 2).
 #
-# Purpose: an implementation-ready, hash-bound record of the EXACT existing
-# annotation bundle required for the production-faithful masked held-out rerun
-# and the PP3/BP4 owner decision — WITHOUT upgrading any data source or
-# downloading a new comprehensive bundle.
+# Purpose: an implementation-ready, hash-bound record of the EXACT deployed
+# annotation bundle for the production-faithful masked held-out rerun and the
+# PP3/BP4 decision input — pinning the deployed bundle, NOT refreshing it.
 #
-# This file is the sole planner output. It performs no annotation, no download,
-# no held-out run and no owner policy decision. It pins the deployed bundle,
-# defines the ARM/x64 boundary, and defines BOTH a no-x64 reuse path and an
-# x64 reannotation path without silently selecting either.
+# This file is the planner PLAN. It performs no annotation, download, held-out
+# run or owner policy decision. It names the downstream implementation scope,
+# corrects the ARM evidence inventory, splits historical attestation from
+# current x64 readiness, and makes reuse conditional on an implemented PP3/BP4
+# suppression contract.
 #
-# Composed from a verified three-slot planning prompt (deliberate-action
-# prefix v2 + annotation-bundle planning template + core-bundle task) over the
-# authoritative ANNOTATION_BUNDLE_TASK_SPEC.yaml.
-#
-# Schema: raptor-core-annotation-bundle-v1 — see `spec_map` for section roles.
+# Rev 2 supersedes commit c0412342 after a GPT-5.4 DO-NOT-MERGE review.
+# Schema: raptor-core-annotation-bundle-v1.
 
 schema: raptor-core-annotation-bundle-v1
 status: planner_contract_ready_for_implementation
+reuse_readiness: BLOCKED_POLICY_IMPLEMENTATION
+reannotation_readiness: X64_WORKER_UNVERIFIED_UNTIL_OPERATOR_MAKES_AVAILABLE
 task_id: sources-pin-core-annotation-bundle
 title: Minimum deployed core annotation bundle — pinned reproducibility contract
 
@@ -25,606 +24,472 @@ worktree: 'D:\AIProjects\raptor-worktrees\annotation-bundle'
 branch: track/annotation-bundle-2026-07
 base_commit: 29d5ab58c3e717325f6337cc940805743cf2507d
 
-spec_map:
-  intent: Beat 1/3/4 record and PM sanity-check.
-  decision_ledger: The seven critical decisions with rejected alternatives.
-  binding_local_evidence: Exact evidence paths and ARM presence/absence.
-  deployed_bundle: The pinned, hash-bound deployed identity.
-  manifest_schema: Canonical machine-readable manifest schema and example.
-  file_contract: Per-file present+hashed / absent+required / worker-only rows.
-  field_provenance: Verified-from-artifact vs requires-x64-worker-inspection.
-  reuse_vs_reannotate: Decision table for the two mutually exclusive routes.
-  x64_handoff: Worker bundle-presence proof and reannotation/return contract.
-  pejaver_calibration_inputs: REVEL-version decision inputs (no owner decision).
-  licensing: Internal-research vs redistribution boundary.
-  preservation_set: Sonnet must-not-change invariants.
-  test_matrix: Gemini RED tests authored before Sonnet implementation.
-  gpt54_probes: Adversarial checks against the failure modes.
-  routes: Stop/go and N/A routing.
-  downstream_policy_handoff: Handoff to PP3/BP4 and the masked rerun.
-  blockers: Named blockers with fallback.
-  beat4_self_audit: Failure mode -> mitigation -> catching test.
+revision_log:
+  - rev: 1
+    commit: c0412342ca823eef9d2c636760ddae8033170785
+    verdict: DO_NOT_MERGE (GPT-5.4)
+  - rev: 2
+    supersedes_commit: c0412342ca823eef9d2c636760ddae8033170785
+    trigger: GPT-5.4 DO-NOT-MERGE
+    attribution:
+      orchestrator_or_spec_gap:
+        - implementation scope (which files are the branch diff) was not specified.
+        - licensing permitted-use / cloud-egress review was not specified.
+        - ARM presence inventory was prompt-silent; the 28-source count was not required.
+        - reuse-vs-x64 conflation was not disambiguated by the spec.
+      planner_miss:
+        - ARM-present copies were wrongly marked recompute-only/worker-only (factual miss).
+        - only ~12 of 28 deployed data sources were pinned while T4 claimed metadata equality.
+        - disabled/manual TSV reuse was declared safe with no implemented PP3/BP4 suppression contract.
+    corrections_in: [implementation_scope, deployed_data_sources, arm_inventory,
+      holdout_input_provenance, historical_run_attestation,
+      current_x64_reannotation_readiness, pp3_bp4_suppression_prerequisite,
+      reuse_vs_reannotate, licensing, test_matrix]
 
 planner:
   model: claude-opus-4.8
   role: opus_planner
   plan_only: true
-  prohibited_in_this_task:
-    - implementation or code edits outside the single output file
-    - any data download or bundle rebuild
-    - any held-out annotation/scoring run
-    - the PP3/BP4 owner policy decision
-  may_modify_only:
+  this_planner_commit_may_modify_only:
     - docs/project/specs/core-annotation-bundle.yaml
-  commit: one_planner_commit_no_push
+  commit: one_follow_up_planner_commit_no_amend_no_push
   required_trailers:
     - 'Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>'
-    - 'Copilot-Session: 90703341-0147-4b5c-9939-42be522500b1'
+    - 'Copilot-Session: 7c146921-f3dd-4a1e-8cf0-8f574de49204'
+  prohibited_in_this_task:
+    - implementation/runner code, downloads, held-out runs, owner activation decision
   composed_prompt:
     manifest_schema: raptor-three-slot-planning-prompt-v1
-    location: planning-session-local (not committed to this repo)
-    composition_order:
-      - slot1-DELIBERATE_ACTION_PREFIX_v2.md
-      - slot2-ANNOTATION_BUNDLE_PLANNING_TEMPLATE.md
-      - slot3-CORE_ANNOTATION_BUNDLE_PLAN.md
     verified_sha256:
-      slot1_deliberate_action_prefix_v2: 'a0f94762e69b78f7db70398e20e1ccc6293708eff52de1e886174c2d4f7ea58f'
-      slot2_annotation_bundle_planning_template: '951c28b4a12d1d10401fcbfcc76a116164e493da086dfeaf1bb0d99f113d96ef'
-      slot3_core_annotation_bundle_plan: 'f7ffe991ad87f90f282777500d1b2bf3612368d78bf3fcc54528af372b8225cc'
+      slot1: 'a0f94762e69b78f7db70398e20e1ccc6293708eff52de1e886174c2d4f7ea58f'
+      slot2: '951c28b4a12d1d10401fcbfcc76a116164e493da086dfeaf1bb0d99f113d96ef'
+      slot3: 'f7ffe991ad87f90f282777500d1b2bf3612368d78bf3fcc54528af372b8225cc'
       authoritative_spec: '6874a2b6daa4347a63d76d0dea3afc4fde5c553fa486b48552ff932ee275a329'
-    authoritative_spec_name: 'ANNOTATION_BUNDLE_TASK_SPEC.yaml (raptor-annotation-bundle-task-spec-v1)'
 
 intent:
   summary: >-
-    Pin the exact deployed Nirvana 3.18.1 / BIAS 3.0.0 annotation bundle and its
-    data-source versions as a hash-bound, machine-readable contract, and define
-    the ARM/x64 verification boundary plus the reuse-vs-reannotate routes for the
-    masked held-out rerun — without refreshing any source or making the PP3/BP4
-    decision.
+    Pin the exact deployed Nirvana 3.18.1 / BIAS 3.0.0 bundle and its full
+    28-source header set as a hash-bound contract; correct the ARM evidence
+    inventory; separate the historical run attestation from current x64
+    readiness; and gate any TSV reuse behind an implemented PP3/BP4 suppression
+    contract — without refreshing a source or deciding activation.
   contract:
     required: >-
-      A single canonical manifest recording deployed artifact identity,
+      One canonical machine-readable manifest recording deployed identity,
       file/checksum provenance, runtime field extraction, policy applicability
-      and deferred refresh work for the masked rerun and the PP3/BP4 input.
-    source: 'ANNOTATION_BUNDLE_TASK_SPEC.yaml: goal, required_planning_decisions, acceptance'
+      and deferred refresh, plus fail-closed licensing.
     done_means: >-
-      The plan is self-contained through committed sources plus exact external
-      artifact paths/hashes; it pins (not refreshes) the deployed bundle; and it
-      leaves REVEL calibration and PP3/BP4 activation as explicit downstream
-      decisions.
+      Self-contained through committed sources + exact external paths/hashes;
+      pins (not refreshes) the bundle; leaves REVEL calibration and PP3/BP4
+      activation as explicit downstream decisions; reuse is not asserted GO.
   expected_observable: >-
-    docs/project/specs/core-annotation-bundle.yaml exists on branch
-    track/annotation-bundle-2026-07 as exactly one planner commit (both Copilot
-    trailers, no push, no other file changed); every ARM-present pinned hash
-    reproduces and the pinned version set equals the deployed JSON header.
+    docs/project/specs/core-annotation-bundle.yaml is exactly one follow-up
+    planner commit (both trailers incl. Copilot-Session 7c146921..., no amend,
+    no push, no other file changed); every ARM-present hash reproduces and the
+    pinned data-source set equals all 28 deployed header sources.
   inversion:
     worst_case: >-
-      The plan reads as complete while silently substituting a latest internet
-      release for a pinned source, or asserting the 58.7-GB x64 bundle is present
-      on this ARM box when only reports exist — either corrupts the comparison
-      baseline before it is measured.
-    concrete_failure_modes_guarded: see beat4_self_audit
+      The plan again reads complete while (a) marking ARM-present evidence as
+      x64-only, (b) pinning a partial source set that lets a latest release slip
+      through T4, or (c) declaring reuse GO with no implemented PP3/BP4
+      suppression — any of which corrupts or blocks the comparison baseline.
+    guarded_by: beat4_self_audit
   pm_sanity_check: >-
-    PM: I treat the deployed Nirvana JSON header (schemaVersion 6, dataVersion
-    91.27.66, REVEL 20200205) as the ground-truth identity to pin, and I do NOT
-    equate REVEL 20200205 with any REVEL v1.3/2021 Pejaver-calibrated build; if
-    the Pejaver calibration must instead drive a source refresh, this pin is
-    wrong and the task changes.
+    PM: policy-only reuse depends on the immutable ARM return evidence (return
+    manifest + byte-identical copies), NOT on the 58.7-GB x64 bundle still
+    existing today; and reuse stays BLOCKED_POLICY_IMPLEMENTATION until the
+    PP3/BP4 suppression contract is implemented and tested. If either premise is
+    wrong, the routing changes.
 
-decision_ledger:
-  - id: D1-pin-deployed-not-latest
-    decision: >-
-      Pin every artifact to the version actually deployed in D:\raptor-x64 and
-      observed in the deployed Nirvana JSON header, not to any current internet
-      release.
-    evidence:
-      - 'devbox VERSIONS.md (Nirvana 3.18.1 archive 8CEE9D79..., BIAS 3.0.0 @ ade13f2)'
-      - 'deployed Nirvana header dataSources (verified from sample_tsc_nirvana.json.gz)'
-    rejected_alternatives:
-      - >-
-        Resolve versions from upstream release pages / "latest": rejected — it
-        changes the classifier before the comparison rerun (beat4 FM1) and
-        breaks reproducibility of the frozen masked evidence.
-  - id: D2-x64-bundle-presence-proof
-    decision: >-
-      The x64 worker proves the exact bundle still exists by recomputing
-      file-by-file SHA256 over the Nirvana + supplementary-update + BIAS data
-      roots and diffing against the frozen CHECKSUMS manifests, plus anchor-file
-      and archive-hash spot checks and a footprint check.
-    evidence:
-      - 'D:\raptor-x64\CHECKSUMS\nirvana-grch38-full.sha256.txt (8024 bytes)'
-      - 'D:\raptor-x64\CHECKSUMS\nirvana-grch38-updates.sha256.txt'
-      - 'D:\raptor-x64\CHECKSUMS\bias-hg38-data.sha256.txt (2093 bytes)'
-      - 'HANDOFF_REPORT.md footprint 58,690,294,121 bytes'
-    rejected_alternatives:
-      - >-
-        Trust the ARM-visible VERSIONS.md text as proof of on-disk state:
-        rejected — VERSIONS.md records hashes but the bundle files live on x64;
-        only a recompute proves non-drift.
-  - id: D3-missing-arm-manifest-entries
-    decision: >-
-      Enumerate the manifest entries that ARM cannot fill (full per-file hashes,
-      the masked held-out Nirvana JSON, required-paths JSONs, masked-resource
-      TSVs) and mark them worker-only rather than fabricating presence.
-    evidence:
-      - 'current_arm_state: x64_bundle_present=false, masked_nirvana_json_present=false'
-    rejected_alternatives:
-      - >-
-        Copy the summarized "notable file hashes" into the manifest as if they
-        were the complete file set: rejected — partial coverage masquerading as
-        a full manifest (beat4 FM2).
-  - id: D4-reuse-immutable-bias-tsv
-    decision: >-
-      Permit reuse of the immutable masked BIAS TSV for the rerun ONLY when
-      every upstream evidence-generation input hash is unchanged AND PP3/BP4
-      resolves to disabled/manual AND that resolution introduces no new scoring
-      input into Nirvana/BIAS (it is applied as a downstream policy recompute).
-    evidence:
-      - 'masked BIAS TSV 7eece438... present on ARM, 2577 rows, 0 duplicate ids'
-      - 'skip_list {PM1,PS4,PP5,BP6} bb418c11..., masked required-paths 6c05b8c3...'
-    rejected_alternatives:
-      - >-
-        Reuse the TSV whenever PP3/BP4 is disabled/manual regardless of upstream
-        inputs: rejected — reuse despite a changed evidence input ships stale
-        scores (beat4 FM4).
-  - id: D5-mandatory-x64-reannotation
-    decision: >-
-      Require a fresh x64 annotation whenever any evidence-generation input
-      changes (input VCF/ID-set, any source version, BIAS version/data,
-      required-paths/skip-list) or PP3/BP4 activation needs a structured input
-      not already present in the immutable held-out Nirvana JSON.
-    evidence:
-      - 'environment_boundary.rule (no ARM rebuild of the 58.7-GB bundle)'
-    rejected_alternatives:
-      - >-
-        Force an x64 rerun for every PP3/BP4 outcome: rejected — a needless
-        rerun when a downstream policy-only recompute suffices (beat4 FM5).
-  - id: D6-revel-version-distinct
-    decision: >-
-      Pin REVEL as version 20200205 (releaseDate 2020-02-05) and keep it
-      explicitly distinct from any REVEL v1.3/2021 build; Pejaver-interval
-      applicability is recorded as an unresolved downstream provenance question.
-    evidence:
-      - 'deployed header dataSource: REVEL | 20200205 | 2020-02-05 (verified)'
-    rejected_alternatives:
-      - >-
-        Relabel 20200205 as v1.3/2021 to unlock Pejaver thresholds: rejected —
-        unverified equivalence (beat4 FM3) and a hidden owner decision.
-  - id: D7-defer-modernization
-    decision: >-
-      Keep source modernization and broad annotation coverage out of scope; list
-      the deferred upgrades explicitly so they cannot leak into this rerun.
-    evidence:
-      - 'spec required_planning_decisions: explicit deferred-upgrade list'
-    rejected_alternatives:
-      - >-
-        Fold "while we are here" upgrades (dbNSFP 5.x, MANE 1.5, gnomAD 4.1.1,
-        dbSNP 157, RepeatMasker) into the pin: rejected — conflates rerun
-        reproducibility with future modernization.
-
-binding_local_evidence:
+implementation_scope:
   note: >-
-    Exact paths under D:\AIProjects\raptor-data are external to this repo. Files
-    marked present were confirmed on this ARM planning box; hashes marked
-    verified were recomputed here. Everything under D:\raptor-x64 is worker-only.
-  present_on_arm:
-    - path: 'D:\AIProjects\raptor-data\devbox-artifacts\VERSIONS.md'
-      role: deployed versions and checksums (text record)
-    - path: 'D:\AIProjects\raptor-data\devbox-artifacts\HANDOFF_REPORT.md'
-      role: exact command lines, footprint, non-isolated steps
-    - path: 'D:\AIProjects\raptor-data\devbox-artifacts\sample_tsc_nirvana.json.gz'
-      role: deployed annotator smoke-test output (header + structured fields)
-      sha256: '24c8083f01d46a4dca2233abeaaf639b7f7ccde7378d90b8b087e9f5ec250bca'
-      sha256_status: verified_on_arm
-      caveat: 8-variant smoke sample; NOT the 2,577-row held-out output
-    - path: 'D:\AIProjects\raptor-data\handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\MASKED_HELDOUT_SCORING_REPORT.md'
-      role: masked-run gates, resource hashes, deterministic commands
-    - path: 'D:\AIProjects\raptor-data\handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\holdout_input.masked.bias_output.tsv'
-      role: immutable masked BIAS scoring evidence (reuse candidate)
-      sha256: '7eece438a880e0c6a591df62e231bc93848eeb42277a2f4360983914298fc512'
-      sha256_status: verified_on_arm
-      rows: 2577
-      duplicate_ids: 0
-    - path: 'D:\AIProjects\raptor-data\handoffs\masked-heldout-2026-07-12\inputs\holdout_input.vcf'
-      role: held-out input VCF (identity gate for reuse)
-      sha256_status: present_recompute_at_implementation
-  absent_on_arm_worker_only:
-    - artifact: masked held-out Nirvana JSON
-      expected_path: 'D:\raptor-x64\masked-heldout-2026-07-12\score\holdout_input_nirvana.json.gz'
-      sha256: '315e601cc9ede55c07c4a59de796c2be5cf0f2827e441101ceea236390675d13'
-      why: source of structured REVEL/AlphaMissense for the held-out set; not on ARM
-    - artifact: Nirvana GRCh38 data root (57.2 GB)
-      expected_path: 'D:\raptor-x64\nirvana-data\GRCh38'
-    - artifact: BIAS hg38 data root (0.89 GB)
-      expected_path: 'D:\raptor-x64\bias-hg38-data'
-    - artifact: full checksum manifests
-      expected_paths:
-        - 'D:\raptor-x64\CHECKSUMS\nirvana-grch38-full.sha256.txt'
-        - 'D:\raptor-x64\CHECKSUMS\nirvana-grch38-updates.sha256.txt'
-        - 'D:\raptor-x64\CHECKSUMS\bias-hg38-data.sha256.txt'
-    - artifact: required-paths JSONs (local + masked) and masked-resource TSVs
-      expected_paths:
-        - 'D:\raptor-x64\hg38_nirvana_required_paths.local.json'
-        - 'D:\raptor-x64\masked-heldout-2026-07-12\masked-resources\hg38_nirvana_required_paths.masked.json'
+    This planner file (docs/project/specs/...) is the PLAN, not part of the
+    implementation branch diff. The implementation branch diff is exactly three
+    files, authored in two commits; no runner/production code changes here.
+  branch_diff_is_exactly:
+    - configs/eval/core_annotation_bundle.yaml
+    - docs/reference/core-annotation-bundle-2026-07.md
+    - tests/eval/test_core_annotation_bundle.py
+  canonical_manifest:
+    path: configs/eval/core_annotation_bundle.yaml
+    author: Sonnet
+    is: the single machine-readable source of truth for the deployed bundle
+    must_contain:
+      - runtime identity (Nirvana 3.18.1 / data 91.27.66 / schema 6 / BIAS 3.0.0)
+      - all 28 deployed data sources (name/version/release_date)
+      - structured field JSON paths (revel.score, AlphaMissense.AM_score)
+      - arm_inventory with recomputed sha256/bytes for every present file
+      - historical_run_attestation and current_x64_reannotation_readiness (separate)
+      - reuse gate incl. PP3_BP4_SUPPRESSION_CONTRACT_REQUIRED
+      - fail-closed licensing (per-channel) and deferred_upgrades
+  human_reference:
+    path: docs/reference/core-annotation-bundle-2026-07.md
+    author: Sonnet
+    is: human-readable companion explaining the pin, boundary and routes
+  gemini_test:
+    path: tests/eval/test_core_annotation_bundle.py
+    author: Gemini
+    order: RED before Sonnet implementation
+  commit_split:
+    gemini_commit: [tests/eval/test_core_annotation_bundle.py]
+    sonnet_commit: [configs/eval/core_annotation_bundle.yaml, docs/reference/core-annotation-bundle-2026-07.md]
+  excluded:
+    - no runner or production code changes in this task
+    - no new eval harness/runner wiring
 
 deployed_bundle:
   provenance: >-
-    Versions and archive hashes from devbox VERSIONS.md / HANDOFF_REPORT.md;
-    data-source versions and structured-field schema verified from the deployed
+    Versions/archive hashes from devbox VERSIONS.md and HANDOFF_REPORT.md;
+    data-source set and structured-field schema verified from the deployed
     Nirvana JSON header in sample_tsc_nirvana.json.gz (present on ARM).
   runtime:
     dotnet:
       component: .NET Runtime 6.0.36 (win-x64 portable zip)
-      archive: 'D:\raptor-x64\downloads\dotnet-runtime-6.0.36-win-x64.zip'
       sha256: 'C077CCC342C5571CEB7A3C06D1DFBC99B989ED5A6E0F3A0B0B450531C1259615'
       install_path: 'D:\raptor-x64\dotnet-runtime-6'
     nirvana:
       annotator: Nirvana 3.18.1
       runtime_banner: 3.18.1-0-g05f88047
-      archive: 'D:\raptor-x64\downloads\Nirvana-3.18.1-net6.0.zip'
-      sha256: '8CEE9D797A7CB637D0752F17A9B6ACD6550627D43E1C062FD73D2BE2FF7A302B'
-      install_path: 'D:\raptor-x64\Nirvana-v3.18.1'
+      archive_sha256: '8CEE9D797A7CB637D0752F17A9B6ACD6550627D43E1C062FD73D2BE2FF7A302B'
       data_version: 91.27.66
       schema_version: 6
       genome_assembly: GRCh38
+    bias:
+      repo: https://github.com/bitscopic/BIAS-2015.git
+      version: 3.0.0
+      commit: ade13f206f3e2c2efe3ec92715d974645fc8da8f
   nirvana_data_bundle:
-    source_mechanism: Downloader.dll --ga GRCh38
     base_data_root: 'D:\raptor-x64\nirvana-data\GRCh38'
-    full_manifest: 'D:\raptor-x64\CHECKSUMS\nirvana-grch38-full.sha256.txt'
-    full_manifest_bytes: 8024
+    full_manifest: 'D:\raptor-x64\CHECKSUMS\nirvana-grch38-full.sha256.txt (8024 bytes)'
     anchor_hashes:
       Homo_sapiens.GRCh38.Nirvana.dat: 'FE0031B6D62A70C520B19CFD0CEE09FBCCA5E5A5D9AB0B7685666B64D1438936'
       Both.transcripts.ndb: '543CF91A308E4AAF5ACE74B62D3362FD2AC624CBF7D6245B11B6CB46159A25F9'
       gnomAD_4.0.nsa: '9E2E7E7967BE269EDFFF12C51741C41ABA0DBEEF177F25AB015DE7EAC29D86F5'
   supplementary_updates:
-    reason: BIAS 3.0.0 compatibility (replace stale bundled ClinVar; add AlphaMissense)
-    staging_path: 'D:\raptor-x64\supplementary-updates\GRCh38_updated'
     installed_into: 'D:\raptor-x64\nirvana-data\GRCh38\SupplementaryAnnotation\GRCh38'
     full_manifest: 'D:\raptor-x64\CHECKSUMS\nirvana-grch38-updates.sha256.txt'
-    replaced:
-      removed_stale: 'ClinVar_20231230.*'
-      added_clinvar_2026_02:
-        ClinVar_hg38_2026-02.nsa: 'C30BD0D18916F477E0EF3E483C2E2B362E0ACA8109BACCF3F8AD256E1A7ECCE7'
-        ClinVar_hg38_2026-02.nsa.idx: 'D44F5E599D6B5F1AD55C9F2F8D5D9E884FAEDA2EAD7BF9825E70C70F098FB9AF'
-        ClinVar_hg38_2026-02.nsa.schema: 'CA8BCAD6040C375721CA9BAFCC97F8125E8EC7FAF71190F22A544F752EFB5CFE'
-      added_alphamissense:
-        AlphaMissense_hg38.nirvana.nsa: 'DCA8AF9521C45FC1363F65F2925AD8514AC9AC82726D9369ACD4D60305B9DD09'
-        AlphaMissense_hg38.nirvana.nsa.idx: '6C44BDBF81F63FA719F1263425BE393EDF9174BC9E97EA381BB20FCD6EE5EDED'
-        AlphaMissense_hg38.nirvana.nsa.schema: '3F90FC0B94710BE46864C2C21FF6306EA02636768FA0379429ECEFE4765A5DF2'
+    added_clinvar_2026_02_nsa: 'C30BD0D18916F477E0EF3E483C2E2B362E0ACA8109BACCF3F8AD256E1A7ECCE7'
+    added_alphamissense_nsa: 'DCA8AF9521C45FC1363F65F2925AD8514AC9AC82726D9369ACD4D60305B9DD09'
     provenance_caveat: >-
       HANDOFF removed a stale bundled ClinVar_20231230.*; the deployed header
-      still exposes a legacy ClinVar 20240301 as a distinct data source. The
-      relationship between the removed 20231230 and the header-visible 20240301
-      is a worker-confirm provenance detail — do not assume they are the same.
-  bias:
-    repo: https://github.com/bitscopic/BIAS-2015.git
-    local_path: 'D:\raptor-x64\BIAS-2015'
-    version: 3.0.0
-    commit: ade13f206f3e2c2efe3ec92715d974645fc8da8f
-    describe: ade13f2
+      still exposes a distinct legacy ClinVar 20240301. Do not assume the removed
+      20231230 and the header-visible 20240301 are the same — worker confirms.
   bias_data_bundle:
     local_data_root: 'D:\raptor-x64\bias-hg38-data'
     dataset_prefix: v3.0.0_datasets/2026.03.01/
     template_required_paths_sha256: '8DDFC29E5910094166D0C527936774FA6D7F6571DABDC73CD8D424EFCD0BEFFC'
-    localized_required_paths: 'D:\raptor-x64\hg38_nirvana_required_paths.local.json'
-    full_manifest: 'D:\raptor-x64\CHECKSUMS\bias-hg38-data.sha256.txt'
-    full_manifest_bytes: 2093
-  data_sources:
-    verified_from: deployed Nirvana JSON header (sample_tsc_nirvana.json.gz)
-    pinned:
-      revel: {version: '20200205', release_date: '2020-02-05'}
-      alphamissense: {version: 'AlphaMissense_hg38.nirvana.tsv', release_date: '2026-02-25'}
-      clinvar_primary: {version: '2026-02', release_date: '2026-02-24'}
-      clinvar_legacy: {version: '20240301', release_date: '2024-03-01'}
-      dbsnp_primary: {version: '156', release_date: '2023-09-28'}
-      dbsnp_legacy: {version: '151', release_date: '2018-04-18'}
-      gnomad: {version: '4.0', release_date: '2024-02-17'}
-      gnomad_exome: {version: '4.0', release_date: '2024-02-17'}
-      gnomad_gene_scores: {version: '4.0', release_date: '2024-03-20'}
-      gerp: {version: '20110522', release_date: '2011-05-22'}
-      vep: {version: '91', release_date: '2017-12-18'}
-      phylop:
-        observed_header_version: hg38
-        observed_release_date: '2015-04-17'
-        spec_label: hg38_20way
-        reconcile: >-
-          The deployed header labels phyloP version "hg38"; the task spec labels
-          it "hg38_20way". Pin the observed value and have the worker confirm the
-          deployed phyloP .nsa filename/track before treating them as identical.
+    full_manifest: 'D:\raptor-x64\CHECKSUMS\bias-hg38-data.sha256.txt (2093 bytes)'
   structured_fields:
     verified_from: deployed Nirvana JSON header + variant objects (present sample)
-    revel:
-      json_path: 'positions[].variants[].revel.score'
-      value_type: float
-      example: {vid: 9-132896255-T-A, score: 0.164}
-    alphamissense:
-      json_path: 'positions[].variants[].AlphaMissense.AM_score'
-      value_type: float
-      sibling_keys: [refAllele, altAllele, Transcript]
-      example: {vid: 9-132896255-T-A, AM_score: 0.0876}
-    scalar_conservation:
-      phylop: 'positions[].variants[].phylopScore (scalar float, nullable)'
-      gerp: 'positions[].variants[].gerpScore (scalar float, nullable)'
-    forbidden_source:
-      revel_from_bias_rationale: >-
-        REVEL must be read from the Nirvana JSON structured path above, never
-        parsed out of the BIAS free-form rationale text (preservation rule).
+    revel: {json_path: 'positions[].variants[].revel.score', value_type: float, example: 0.164}
+    alphamissense: {json_path: 'positions[].variants[].AlphaMissense.AM_score', value_type: float, example: 0.0876}
+    scalars: {phylop: 'positions[].variants[].phylopScore', gerp: 'positions[].variants[].gerpScore'}
+    forbidden_source: >-
+      REVEL is read only from the structured JSON path, never parsed from BIAS
+      free-form rationale text.
 
-manifest_schema:
-  intent: >-
-    One canonical, machine-readable manifest is the single source of truth. Every
-    file is either present+hashed, absent+required, or external-worker-only.
-    Runtime metadata and source-download claims stay separate.
-  proposed_name: raptor-core-annotation-bundle-manifest-v1
-  top_level_keys:
-    - schema
-    - generated_by
-    - environment: {machine_arch, x64_bundle_present}
-    - runtime: {dotnet, nirvana}
-    - data_bundle: {nirvana_data, supplementary_updates, bias, bias_data}
-    - data_sources: 'map of source -> {version, release_date, presence}'
-    - structured_fields: 'map of field -> {json_path, value_type}'
-    - files: 'list of file entries (see file_entry_schema)'
-    - masked_run: {input_vcf, nirvana_json, bias_tsv, required_paths, skip_list, rows, duplicate_ids}
-    - licensing: {source -> permitted_use}
-    - deferred_upgrades: list
-  file_entry_schema:
-    path: absolute or repo-relative path
-    role: short description
-    sha256: lowercase hex or null
-    presence: {enum: [present_hashed, absent_required, worker_only]}
-    verified_on: {enum: [arm, x64_worker, unverified]}
-    bytes: integer or null
-  example_entries:
-    - path: 'D:\...\holdout_input.masked.bias_output.tsv'
-      role: immutable masked BIAS scoring output
-      sha256: '7eece438a880e0c6a591df62e231bc93848eeb42277a2f4360983914298fc512'
-      presence: present_hashed
-      verified_on: arm
-      bytes: 2590498
-    - path: 'D:\raptor-x64\masked-heldout-2026-07-12\score\holdout_input_nirvana.json.gz'
-      role: held-out Nirvana JSON (structured REVEL/AlphaMissense source)
-      sha256: '315e601cc9ede55c07c4a59de796c2be5cf0f2827e441101ceea236390675d13'
-      presence: worker_only
-      verified_on: unverified
-      bytes: null
-    - path: 'D:\raptor-x64\nirvana-data\GRCh38\...\gnomAD_4.0.nsa'
-      role: gnomAD 4.0 supplementary annotation (anchor file)
-      sha256: '9E2E7E7967BE269EDFFF12C51741C41ABA0DBEEF177F25AB015DE7EAC29D86F5'
-      presence: worker_only
-      verified_on: unverified
-      bytes: null
+deployed_data_sources:
+  count: 28
+  verified_from: sample_tsc_nirvana.json.gz header.dataSources (present on ARM)
+  equality_rule: >-
+    The manifest must pin ALL 28 sources exactly; T4 fails on any missing, extra
+    or version-mismatched source. This is a full deployed-metadata equality check
+    (not a "core-only" subset), so a latest-release substitution cannot slip past.
+  sources:
+    - {name: 'VEP', version: '91', release_date: '2017-12-18'}
+    - {name: 'MultiZ100Way', version: '20171006', release_date: '2017-10-06'}
+    - {name: 'AlphaMissense', version: 'AlphaMissense_hg38.nirvana.tsv', release_date: '2026-02-25'}
+    - {name: 'ClinVar', version: '2026-02', release_date: '2026-02-24'}
+    - {name: 'ClinVar', version: '20240301', release_date: '2024-03-01'}
+    - {name: 'dbSNP', version: '156', release_date: '2023-09-28'}
+    - {name: 'dbSNP', version: '151', release_date: '2018-04-18'}
+    - {name: 'GME', version: '20160618', release_date: '2016-06-18'}
+    - {name: 'gnomAD', version: '4.0', release_date: '2024-02-17'}
+    - {name: 'gnomAD_exome', version: '4.0', release_date: '2024-02-17'}
+    - {name: 'MITOMAP', version: '20200819', release_date: '2020-08-19'}
+    - {name: '1000 Genomes Project', version: 'Phase 3 v3plus', release_date: '2013-05-27'}
+    - {name: 'REVEL', version: '20200205', release_date: '2020-02-05'}
+    - {name: 'TOPMed', version: 'freeze_5', release_date: '2017-08-28'}
+    - {name: 'ClinGen', version: '20160414', release_date: '2016-04-14'}
+    - {name: 'ClinGen Dosage Sensitivity Map', version: '20240110', release_date: '2024-01-10'}
+    - {name: 'DECIPHER', version: '201509', release_date: '2015-09-01'}
+    - {name: 'gnomAD_SV', version: '4.0', release_date: '2024-02-26'}
+    - {name: 'MITOMAP_SV', version: '20200819', release_date: '2020-08-19'}
+    - {name: '1000 Genomes Project (SV)', version: 'Phase 3 v5a', release_date: '2013-05-27'}
+    - {name: 'FusionCatcher', version: '1.33', release_date: '2020-12-22'}
+    - {name: 'DANN', version: '20200205', release_date: '2020-02-05'}
+    - {name: 'Gerp', version: '20110522', release_date: '2011-05-22'}
+    - {name: 'ClinGen disease validity curations', version: '20240110', release_date: '2024-01-10'}
+    - {name: 'gnomAD_gene_scores', version: '4.0', release_date: '2024-03-20'}
+    - {name: 'phyloP', version: 'hg38', release_date: '2015-04-17'}
+    - {name: 'gnomAD_LCR', version: '2.1', release_date: '2019-04-10'}
+    - {name: 'MitochondrialHeteroplasmy', version: '20180410', release_date: '2020-05-21'}
+  reconcile_notes:
+    - 'REVEL 20200205 stays distinct from any REVEL v1.3/2021 build (see pejaver_calibration_inputs).'
+    - 'phyloP header version "hg38"; the task spec labeled it "hg38_20way" — worker confirms the deployed track/filename before equating.'
 
-file_contract:
-  present_hashed_on_arm:
-    - {file: holdout_input.masked.bias_output.tsv, sha256: '7eece438a880e0c6a591df62e231bc93848eeb42277a2f4360983914298fc512'}
-    - {file: sample_tsc_nirvana.json.gz, sha256: '24c8083f01d46a4dca2233abeaaf639b7f7ccde7378d90b8b087e9f5ec250bca'}
-    - {file: holdout_input.vcf, sha256: recompute_at_implementation}
-  absent_required_worker_only:
-    - {file: holdout_input_nirvana.json.gz, sha256: '315e601cc9ede55c07c4a59de796c2be5cf0f2827e441101ceea236390675d13'}
-    - {file: nirvana-grch38-full.sha256.txt, note: 'full per-file manifest, 8024 bytes'}
-    - {file: nirvana-grch38-updates.sha256.txt, note: supplementary-update manifest}
-    - {file: bias-hg38-data.sha256.txt, note: 'BIAS data manifest, 2093 bytes'}
-    - {file: hg38_nirvana_required_paths.local.json, note: 'BIAS required-paths (local)'}
-    - {file: hg38_nirvana_required_paths.masked.json, sha256: '6c05b8c30efa4f6032a3a40446823a0e08c888295889d3876cf7871d5b4f569c'}
-  masked_resource_hashes_recorded_not_on_arm:
-    hg38_PS1_PM5_clinvar_pathogenic_aa_nirvana.tsv: 'f17b19e6322ac00ad1bae5125efc6381874266771fa71fdb9832b3a54401be1f'
-    hg38_PP2_missense_pathogenic_genes.tsv: '43f6002d8c88cbc200df4da79aeffb52d1f854589aeb50c97e190b80c376d2cf'
-    hg38_BP1_truncating_genes.tsv: '274ab0ce632ef6d14b5fefe4a87c04a4955e1685569ad45a73d06f5a78fd5840'
-    hg38_PM1_chrom_to_pathogenic_domain_list.tsv: 'ce9ee18d89f208f409dff66532590d7e7294a690cb631ffe2b1399acfe2409ee'
-    evaluation_skip_list.txt: 'bb418c11773080d8cf6b3facadf71236d25ce35fa2ca173d63d33089c57a1d8a'
+arm_inventory:
+  note: >-
+    CORRECTED (rev 2): ARM-present copies are present_hashed with recomputed
+    sha256/bytes. Original x64 paths are retained as provenance metadata only,
+    not as the sole presence claim.
+  data_root: 'D:\AIProjects\raptor-data'
+  present_hashed:
+    - {id: sample_nirvana_json, arm_path: 'devbox-artifacts\sample_tsc_nirvana.json.gz', sha256: '24c8083f01d46a4dca2233abeaaf639b7f7ccde7378d90b8b087e9f5ec250bca', bytes: 14360, role: deployed annotator header + structured-field schema (8-variant smoke sample)}
+    - {id: required_paths_local, arm_path: 'devbox-artifacts\hg38_nirvana_required_paths.local.json', sha256: '5d57c068d44a00ce0d95215046b215f9a4fa6eae35b4629e39cfbcce8010af32', bytes: 1301, x64_provenance: 'D:\raptor-x64\hg38_nirvana_required_paths.local.json'}
+    - {id: required_paths_masked, arm_path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\hg38_nirvana_required_paths.masked.json', sha256: '6c05b8c30efa4f6032a3a40446823a0e08c888295889d3876cf7871d5b4f569c', bytes: 1649, x64_provenance: 'D:\raptor-x64\masked-heldout-2026-07-12\return\hg38_nirvana_required_paths.masked.json'}
+    - {id: evaluation_skip_list, arm_path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\evaluation_skip_list.txt', sha256: 'bb418c11773080d8cf6b3facadf71236d25ce35fa2ca173d63d33089c57a1d8a', bytes: 20, contents: [PM1, PS4, PP5, BP6]}
+    - {id: masked_ps1_pm5, arm_path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\hg38_PS1_PM5_clinvar_pathogenic_aa_nirvana.tsv', sha256: 'f17b19e6322ac00ad1bae5125efc6381874266771fa71fdb9832b3a54401be1f', bytes: 28395992}
+    - {id: masked_pp2, arm_path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\hg38_PP2_missense_pathogenic_genes.tsv', sha256: '43f6002d8c88cbc200df4da79aeffb52d1f854589aeb50c97e190b80c376d2cf', bytes: 34786}
+    - {id: masked_bp1, arm_path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\hg38_BP1_truncating_genes.tsv', sha256: '274ab0ce632ef6d14b5fefe4a87c04a4955e1685569ad45a73d06f5a78fd5840', bytes: 1855}
+    - {id: masked_pm1, arm_path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\hg38_PM1_chrom_to_pathogenic_domain_list.tsv', sha256: 'ce9ee18d89f208f409dff66532590d7e7294a690cb631ffe2b1399acfe2409ee', bytes: 1587498}
+    - {id: return_manifest, arm_path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\RETURN_MANIFEST.sha256.txt', sha256: '5efdccdc57f7d2bdf774486dfbde106ab173bf87412c6db103aaba9958d9ac91', bytes: 4005, role: original x64 return manifest listing all return-file hashes}
+    - {id: masked_bias_tsv, arm_path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\holdout_input.masked.bias_output.tsv', sha256: '7eece438a880e0c6a591df62e231bc93848eeb42277a2f4360983914298fc512', bytes: 2590498, rows: 2577, duplicate_ids: 0}
+    - {id: scoring_report, arm_path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\MASKED_HELDOUT_SCORING_REPORT.md', sha256: 'e5351a42e3120083d21d6b82775a38aee2a5d9bcf8586da08b3b239f24c35b3c', bytes: 5039, note: byte-identical to the hash listed in RETURN_MANIFEST}
+    - {id: holdout_input_vcf, arm_path: 'handoffs\masked-heldout-2026-07-12\inputs\holdout_input.vcf', sha256: '4dcba7c882b65838cedf8ce0ad56e0f7764df34b247ab412aac144d4027c622d', bytes: 69470}
+    - {id: holdout_input_provenance, arm_path: 'handoffs\masked-heldout-2026-07-12\inputs\holdout_input.provenance.json', sha256: '63f1881287f1e3aa0b36ca14e1a7329ef2bcacc7b9674c2489f5e1d4352a6ac8', bytes: 573}
+    - {id: holdout_input_manifest, arm_path: 'handoffs\masked-heldout-2026-07-12\inputs\holdout_input.manifest.jsonl', sha256: '9e588cdf8ebaea2e3793e0ea74721ab5283b57c2abf045dbf3070cb6e81ec9e4', bytes: 321687, note: equals provenance.manifest_hash}
+  worker_only_absent_on_arm:
+    note: these are NOT required to be present on ARM; they belong to the x64 worker.
+    items:
+      - {id: heldout_nirvana_json, x64_path: 'D:\raptor-x64\masked-heldout-2026-07-12\score\holdout_input_nirvana.json.gz', sha256: '315e601cc9ede55c07c4a59de796c2be5cf0f2827e441101ceea236390675d13', needed_for: structured REVEL/AM recompute on reannotate/activation only}
+      - {id: nirvana_data_root, x64_path: 'D:\raptor-x64\nirvana-data\GRCh38', note: 57.2 GB}
+      - {id: bias_data_root, x64_path: 'D:\raptor-x64\bias-hg38-data', note: 0.89 GB}
+      - {id: full_checksum_manifests, x64_paths: ['D:\raptor-x64\CHECKSUMS\nirvana-grch38-full.sha256.txt', 'D:\raptor-x64\CHECKSUMS\nirvana-grch38-updates.sha256.txt', 'D:\raptor-x64\CHECKSUMS\bias-hg38-data.sha256.txt']}
 
-field_provenance:
-  verified_from_arm_artifact:
-    - Nirvana annotator/runtime_banner/schemaVersion/dataVersion/genomeAssembly
-    - full data_sources version+release_date set (deployed header)
-    - structured field JSON paths (revel.score, AlphaMissense.AM_score) + scalars
-    - masked BIAS TSV identity (7eece438..., 2577 rows, 0 duplicate ids)
-    - masked-run gates, resource hashes and deterministic commands (report text)
-    - deployed archive/commit hashes and footprint (VERSIONS/HANDOFF text)
-  requires_x64_worker_inspection:
-    - on-disk file-by-file SHA256 of the full Nirvana + supplementary + BIAS data
-    - presence + hash of the masked held-out Nirvana JSON (315e601c...)
-    - required-paths JSONs (local + masked) on-disk hashes and byte sizes
-    - REVEL/AlphaMissense scores for the 2,577 held-out variants (from held-out JSON)
-    - phyloP version-label reconciliation (observed "hg38" vs spec "hg38_20way")
-    - masked-resource TSV on-disk presence (hashes recorded, files not on ARM)
+holdout_input_provenance:
+  file: 'handoffs\masked-heldout-2026-07-12\inputs\holdout_input.provenance.json'
+  vcf_hash_pinned: '4dcba7c882b65838cedf8ce0ad56e0f7764df34b247ab412aac144d4027c622d'
+  vcf_hash_source: recomputed on ARM AND equals provenance.json vcf_hash (no recompute-only ambiguity)
+  benchmark_snapshot: clinvar_2026-07-07
+  code_version: raptor.eval.export/1
+  conservation_count: 2577
+  manifest_hash: '9e588cdf8ebaea2e3793e0ea74721ab5283b57c2abf045dbf3070cb6e81ec9e4'
+  reference_checksums:
+    NC_000009.12: '650011382f44e91b90c85271833737af2afdb6f9e92ef56f1f8f58f2389e3351'
+    NC_000016.10: '22dc1bb93de407e0653791c36e4097fbaf64c9efa2510c83b7777f607a61e4d0'
+    NM_000368.5: confirm-pending
+    NM_000548.5: confirm-pending
+
+historical_run_attestation:
+  claim: >-
+    The masked BIAS held-out run occurred and its outputs are immutable evidence
+    that is CURRENTLY PRESENT on ARM. Policy-only reuse relies on this evidence,
+    NOT on the 58.7-GB x64 bundle still existing today.
+  proven_by:
+    - RETURN_MANIFEST.sha256.txt (5efdccdc...) lists every return-file hash
+    - ARM copies match those listed hashes byte-for-byte (skip_list bb418c11, BP1 274ab0ce, PM1 ce9ee18d, PP2 43f6002d, PS1/PM5 f17b19e6, masked-paths 6c05b8c3, bias TSV 7eece438, report e5351a42)
+    - provenance.json vcf_hash 4dcba7c8 and manifest_hash 9e588cdf are internally consistent
+  independent_of: current existence/verification of the deployed x64 data bundle
+  masked_run_metadata:
+    input_vcf_sha256: '4dcba7c882b65838cedf8ce0ad56e0f7764df34b247ab412aac144d4027c622d'
+    bias_tsv_sha256: '7eece438a880e0c6a591df62e231bc93848eeb42277a2f4360983914298fc512'
+    heldout_nirvana_json_sha256: '315e601cc9ede55c07c4a59de796c2be5cf0f2827e441101ceea236390675d13'
+    rows: 2577
+    duplicate_ids: 0
+    skip_list: [PM1, PS4, PP5, BP6]
+
+current_x64_reannotation_readiness:
+  required_only_for: X64_REANNOTATE
+  status_today: UNVERIFIED
+  reason: the deployed bundle is not on ARM by design; the operator makes x64 available on demand.
+  presence_proof_when_needed:
+    - recompute file-by-file SHA256 over nirvana-data\GRCh38, SupplementaryAnnotation\GRCh38 and bias-hg38-data; diff vs the three frozen CHECKSUMS manifests
+    - spot-verify anchors (Nirvana.dat, Both.transcripts.ndb, gnomAD_4.0.nsa, ClinVar_hg38_2026-02.nsa, AlphaMissense_hg38.nirvana.nsa)
+    - verify archives (Nirvana 8CEE9D79..., .NET C077CCC3...) and BIAS commit ade13f2
+    - confirm footprint approx 58,690,294,121 bytes and free disk
+    - confirm annotator header re-emits dataVersion 91.27.66 / schema 6 / all 28 sources
+  boundary_rule: do not download or rebuild the 58.7-GB bundle on ARM64.
+
+pp3_bp4_suppression_prerequisite:
+  id: PP3_BP4_SUPPRESSION_CONTRACT_REQUIRED
+  finding: >-
+    The existing runner has NO implemented PP3/BP4 disabled/manual suppression
+    path. It hard-forbids {PP5, BP6, PS4} at config-load and combine time and the
+    masked run only added a PM1 batch-scope skip; non-approved policy is
+    hard-blocked. Reuse of the disabled/manual TSV therefore cannot be declared
+    safe today.
+  evidence:
+    - 'src/raptor/eval/config.py:187 FORBIDDEN_CRITERIA = {PP5, BP6, PS4}'
+    - 'src/raptor/eval/config.py:197 VALID_CRITERIA = 28 canonical ACMG codes; config-load + combine validation'
+    - 'masked run evaluation_skip_list = {PM1, PS4, PP5, BP6} = forbidden set + PM1 batch waiver'
+  requirement: >-
+    The downstream resolve-pp3-bp4-activation / rerun task must IMPLEMENT AND
+    TEST an explicit PP3/BP4 suppression contract (disabled/manual applied as a
+    downstream policy recompute) before ANY reuse of the immutable TSV.
+  until_then: route = BLOCKED_POLICY_IMPLEMENTATION (NOT GO_REUSE)
 
 reuse_vs_reannotate:
   principle: >-
-    Comparison reruns preserve the historical data bundle. A downstream
-    policy-only rerun may reuse immutable evidence ONLY when the plan proves no
-    upstream evidence-generation input changed. Neither route is selected here.
-  reuse_path_no_x64:
-    name: REUSE_IMMUTABLE_BIAS_TSV
-    reuses: 'holdout_input.masked.bias_output.tsv (7eece438..., 2577 rows)'
-    preconditions_all_required:
-      - input VCF identity == frozen holdout_input.vcf hash
-      - Nirvana 3.18.1 / data 91.27.66 / schema 6 unchanged
-      - supplementary set (ClinVar 2026-02, AlphaMissense, gnomAD 4.0) unchanged
-      - BIAS 3.0.0 @ ade13f2 and bias hg38 data bundle unchanged
-      - masked required-paths JSON 6c05b8c3... and skip_list bb418c11... unchanged
-      - PP3/BP4 outcome in {disabled, manual}
-      - PP3/BP4 resolution adds NO new scoring input to Nirvana/BIAS
-    applied_as: downstream policy-only recompute over already-emitted fields
-  reannotate_path_x64:
+    Comparison reruns preserve the historical bundle. Policy-only reuse is
+    permitted only when no upstream evidence-generation input changed AND a
+    tested PP3/BP4 suppression contract exists. Neither route is selected here.
+  reuse_path:
+    name: POLICY_ONLY_REUSE
+    relies_on: historical_run_attestation (immutable ARM evidence)
+    input_preconditions_all_required:
+      - input VCF == 4dcba7c8... (frozen)
+      - masked required-paths == 6c05b8c3... ; skip_list == bb418c11...
+      - masked resources unchanged (PS1/PM5 f17b19e6, PP2 43f6002d, BP1 274ab0ce, PM1 ce9ee18d)
+      - Nirvana 3.18.1 / data 91.27.66 / schema 6 and BIAS 3.0.0 @ ade13f2 unchanged
+      - PP3/BP4 outcome in {disabled, manual} and adds no new scoring input
+    policy_precondition: PP3_BP4_SUPPRESSION_CONTRACT_REQUIRED is implemented+tested
+    current_route: BLOCKED_POLICY_IMPLEMENTATION
+  reannotate_path:
     name: X64_REANNOTATE
+    relies_on: current_x64_reannotation_readiness
     trigger_any:
-      - input VCF / ID-set differs from the frozen 2,577-row set
-      - any data-source version changes (any forbidden upgrade actually applied)
+      - input VCF/ID-set differs from the frozen 2,577-row set
+      - any of the 28 data-source versions changes (any forbidden upgrade applied)
       - BIAS version/commit or bias data bundle changes
       - masked required-paths JSON or skip-list changes
-      - PP3/BP4 activation needs a structured input not present in the held-out JSON
-      - REVEL/structured recompute needed but held-out Nirvana JSON cannot be verified
+      - PP3/BP4 activation needs a structured input absent from the held-out JSON
+      - a structured recompute is needed but the held-out Nirvana JSON is unverifiable
   decision_table:
-    - {upstream_inputs: unchanged, pp3_bp4: disabled_or_manual, new_scoring_input: false, route: REUSE_IMMUTABLE_BIAS_TSV}
+    - {upstream_inputs: unchanged, pp3_bp4: disabled_or_manual, suppression_contract: absent, route: BLOCKED_POLICY_IMPLEMENTATION}
+    - {upstream_inputs: unchanged, pp3_bp4: disabled_or_manual, suppression_contract: implemented_tested, route: POLICY_ONLY_REUSE}
     - {upstream_inputs: unchanged, pp3_bp4: activate, new_scoring_input: true, route: X64_REANNOTATE}
-    - {upstream_inputs: unchanged, pp3_bp4: activate, new_scoring_input: false, route: 'REUSE + downstream policy recompute (structured fields from held-out JSON)'}
-    - {upstream_inputs: changed, pp3_bp4: any, new_scoring_input: any, route: X64_REANNOTATE}
-    - {upstream_inputs: unknown_or_unverifiable, pp3_bp4: any, new_scoring_input: any, route: BLOCKED_DATA_until_x64_verifies}
+    - {upstream_inputs: changed, pp3_bp4: any, route: X64_REANNOTATE}
+    - {upstream_inputs: unknown_or_unverifiable, pp3_bp4: any, route: BLOCKED_DATA_until_x64_verifies}
 
 x64_handoff:
-  boundary_rule: >-
-    Do not download or rebuild the 58.7-GB x64 bundle on ARM64. The planner
-    defines the worker-side verification/handoff contract; the operator makes the
-    x64 machine available only when execution is needed.
-  bundle_presence_proof:
-    - recompute file-by-file SHA256 over nirvana-data\GRCh38 and diff vs nirvana-grch38-full.sha256.txt
-    - recompute over SupplementaryAnnotation\GRCh38 and diff vs nirvana-grch38-updates.sha256.txt
-    - recompute over bias-hg38-data and diff vs bias-hg38-data.sha256.txt
-    - spot-verify anchors (Homo_sapiens.GRCh38.Nirvana.dat, Both.transcripts.ndb, gnomAD_4.0.nsa, ClinVar_hg38_2026-02.nsa, AlphaMissense_hg38.nirvana.nsa)
-    - verify archive hashes (Nirvana 8CEE9D79..., .NET C077CCC3...) and BIAS commit ade13f2
-    - confirm footprint approx 58,690,294,121 bytes and free disk before any run
-    - confirm annotator header emits dataVersion 91.27.66 / schemaVersion 6 / same dataSources
+  bundle_presence_proof: see current_x64_reannotation_readiness.presence_proof_when_needed
   reannotation_commands_reference:
-    note: exact deterministic commands are recorded in MASKED_HELDOUT_SCORING_REPORT.md
+    note: exact deterministic commands recorded in MASKED_HELDOUT_SCORING_REPORT.md
     nirvana: 'dotnet Nirvana.dll -c ...\Cache\GRCh38\Both --sd ...\SupplementaryAnnotation\GRCh38 -r ...\Homo_sapiens.GRCh38.Nirvana.dat -i holdout_input.vcf -o holdout_input_nirvana'
     bias: 'python bias_2015.py holdout_input_nirvana.json.gz hg38_nirvana_required_paths.masked.json holdout_input.masked.bias_output.tsv --skip_list evaluation_skip_list.txt'
   return_handoff_manifest:
     - recomputed full-bundle diff result (match/drift list)
-    - held-out Nirvana JSON path + SHA256 (expected 315e601c... on reuse; new on reannotate)
-    - BIAS TSV path + SHA256 (expected 7eece438... on reuse; new on reannotate)
+    - held-out Nirvana JSON path + SHA256 and BIAS TSV path + SHA256
     - row count == 2577 and duplicate-id count == 0
     - BiasTsvSource parse proof (records == rows, no BiasContractError)
-    - wall times and exit codes
+    - exit codes and wall times
 
 pejaver_calibration_inputs:
-  purpose: provide decision inputs only; the owner makes the PP3/BP4 call downstream
+  purpose: decision inputs only; the owner makes the PP3/BP4 call downstream
   pinned_revel: {version: '20200205', release_date: '2020-02-05'}
   unresolved_question: >-
-    Whether the Pejaver et al. REVEL calibration intervals apply to REVEL
-    20200205 as deployed, or were derived on a different REVEL build (e.g.
-    v1.3/2021). This requires a resolved provenance argument; it is NOT assumed.
+    Whether Pejaver REVEL intervals apply to REVEL 20200205 as deployed or were
+    derived on a different build (e.g. v1.3/2021). Requires a resolved provenance
+    argument; NOT assumed.
   constraints:
     - do not relabel 20200205 as v1.3/2021 without a resolved provenance record
     - do not read held-out labels/VUS outputs/prior outcomes to pick a version
     - REVEL values come from the Nirvana structured path, not BIAS rationale
 
 licensing:
-  internal_research_use: permitted for the masked rerun and PP3/BP4 evidence
-  redistribution_boundary: >-
-    Do not redistribute raw non-commercial predictor scores (REVEL, AlphaMissense)
-    in public or Anthropic-grant outputs. Public/grant artifacts may reference
-    provenance and derived, non-raw results only.
-  per_source_flags:
-    revel: {use: internal_research, redistribute_raw: false}
-    alphamissense: {use: internal_research, redistribute_raw: false}
+  model: fail_closed
+  channels:
+    local_execution_status: permitted_for_local_masked_rerun_and_pp3bp4_evidence
+    raw_public_redistribution: false
+    raw_cloud_egress: false
+  cloud_egress_rule: >-
+    REVEL and AlphaMissense RAW scores must NOT enter Anthropic/cloud prompts or
+    any cloud egress until a permitted-use review clears them. Default is deny.
+  per_source:
+    revel:
+      raw_public_redistribution: false
+      raw_cloud_egress: false
+      use: local_only_pending_permitted_use_review
+    alphamissense:
+      licence_version: confirm_pending
+      licence_note: conflicting official/current evidence; do not claim a licence version
+      raw_public_redistribution: false
+      raw_cloud_egress: false
+      use: local_only_pending_permitted_use_review
 
 preservation_set:
-  do_not_change_before_comparison_rerun:
-    - MANE, gnomAD, dbSNP, ClinVar, REVEL, Nirvana, BIAS versions
+  do_not_change_before_comparison_rerun: [MANE, gnomAD, dbSNP, ClinVar, REVEL, Nirvana, BIAS versions]
   do_not:
     - substitute current web releases for the deployed bundle
     - claim Pejaver intervals apply to REVEL 20200205 without resolved provenance
     - parse REVEL from BIAS free-form rationale
-    - read held-out labels, VUS outputs or prior criterion outcomes to pick a version
-    - redistribute raw non-commercial predictor scores in public/grant outputs
+    - read held-out labels/VUS outputs/prior outcomes to pick a version
+    - egress or redistribute raw non-commercial predictor scores (REVEL, AlphaMissense)
 
 test_matrix:
-  ownership: Gemini authors these RED tests before Sonnet implements the manifest.
+  ownership: Gemini authors these RED tests (tests/eval/test_core_annotation_bundle.py) before Sonnet implements the manifest.
   tests:
-    - id: T1_schema_valid
-      asserts: manifest parses against raptor-core-annotation-bundle-manifest-v1; required keys present; enums valid.
-    - id: T2_hash_binding
-      asserts: every present_hashed entry's recomputed SHA256 == pinned; worker_only entries are not asserted present.
+    - id: T1_three_file_scope
+      asserts: 'the branch diff is exactly the three named files; gemini commit = test only; sonnet commit = manifest + reference only; no runner code.'
+    - id: T2_arm_presence_and_hash
+      asserts: 'every arm_inventory.present_hashed entry exists on ARM and its recomputed SHA256 and bytes equal the pinned values.'
     - id: T3_structured_provenance
-      asserts: REVEL read only from positions[].variants[].revel.score and AlphaMissense from AlphaMissense.AM_score; a BIAS-rationale REVEL path is rejected.
-    - id: T4_forbidden_upgrade_guard
-      asserts: version set equals the pinned deployed set; fails if MANE 1.5, dbNSFP 5.x, gnomAD 4.1.1, dbSNP 157, RepeatMasker or a newer primary ClinVar appears.
+      asserts: 'REVEL read only from positions[].variants[].revel.score and AlphaMissense from AlphaMissense.AM_score; a BIAS-rationale REVEL path is rejected.'
+    - id: T4_full_28_source_equality
+      asserts: 'the manifest data sources equal ALL 28 deployed header sources (name/version/release_date); any missing/extra/mismatch fails.'
     - id: T5_revel_label_guard
-      asserts: REVEL version == "20200205"; fails if "1.3"/"2021" is asserted without a provenance record.
+      asserts: 'REVEL version == 20200205; fails if 1.3 or 2021 is asserted without a provenance record.'
     - id: T6_arm_x64_boundary
-      asserts: environment.x64_bundle_present == false on ARM; fails if any worker_only artifact is marked present on ARM.
-    - id: T7_reuse_gate
-      asserts: reuse allowed only when all upstream input hashes equal frozen values AND pp3_bp4 in {disabled, manual} AND no new scoring input; else reannotate.
-    - id: T8_handoff_completeness
-      asserts: x64_handoff includes bundle-presence proof, conditional reannotation commands and the return manifest fields.
-    - id: T9_masked_tsv_invariants
-      asserts: masked BIAS TSV has 2577 rows, 0 duplicate keys and parses via BiasTsvSource with no BiasContractError (worker-side fixture).
-    - id: T10_licensing_guard
-      asserts: raw non-commercial scores are flagged non-redistributable; fails if a public/grant output path embeds raw REVEL/AlphaMissense values.
+      asserts: 'worker_only files are NOT required present on ARM and are not marked present; x64_bundle_present == false on ARM.'
+    - id: T7_latest_upgrade_rejection
+      asserts: 'fails if MANE 1.5, dbNSFP 5.x, gnomAD 4.1.1, dbSNP 157, RepeatMasker or a newer primary ClinVar appears.'
+    - id: T8_historical_vs_current_split
+      asserts: 'historical_run_attestation is provable from immutable ARM evidence INDEPENDENT of current_x64_reannotation_readiness (no cross-dependency).'
+    - id: T9_suppression_prerequisite
+      asserts: 'with no implemented PP3/BP4 suppression contract, the reuse route resolves to BLOCKED_POLICY_IMPLEMENTATION, never GO_REUSE.'
+    - id: T10_failclosed_licensing
+      asserts: 'raw_public_redistribution and raw_cloud_egress are false for REVEL and AlphaMissense; AlphaMissense licence_version is confirm_pending; fails on any raw cloud/public egress path.'
+    - id: T11_vcf_provenance_pin
+      asserts: 'holdout_input.vcf SHA256 equals 4dcba7c8... equals provenance.json vcf_hash; manifest.jsonl SHA256 equals provenance.manifest_hash.'
+    - id: T12_masked_tsv_invariants
+      asserts: 'masked BIAS TSV has 2577 rows, 0 duplicate keys and parses via BiasTsvSource with no BiasContractError (worker-side fixture).'
 
-gpt54_probes:
-  - probe: substitute a "latest" source version -> must fail T4.
-  - probe: mark the x64 bundle present on ARM -> must fail T6.
-  - probe: relabel REVEL 20200205 as v1.3/2021 -> must fail T5.
-  - probe: reuse the TSV after an upstream input hash changed -> must fail T7.
-  - probe: source REVEL from the BIAS rationale column -> must fail T3.
-  - probe: embed raw non-commercial scores in a public/grant output -> must fail T10.
-
-routes:
-  go_reuse: all upstream hashes frozen AND pp3_bp4 in {disabled, manual} AND no new scoring input -> REUSE_IMMUTABLE_BIAS_TSV + downstream policy recompute.
-  go_reannotate: any upstream input changed OR activation needs a new scoring input -> X64_REANNOTATE.
-  stop_blocked_data: x64 machine unavailable AND reannotation (or full-bundle verification) required -> record BLOCKED_DATA with the exact missing artifact and fallback.
-  na_no_score_needed: PP3/BP4 resolves manual with no predictor score required -> neither the held-out JSON nor a rerun is needed.
+blockers:
+  - id: B1_reuse_blocked
+    detail: 'no implemented PP3/BP4 suppression contract; route BLOCKED_POLICY_IMPLEMENTATION until resolve-pp3-bp4-activation implements+tests it.'
+  - id: B2_x64_unavailable
+    detail: '58.7-GB bundle absent on ARM by design; needed only for reannotation or full-manifest verification; fallback is operator makes x64 available else BLOCKED_DATA.'
+  - id: B3_heldout_json_absent
+    detail: 'held-out Nirvana JSON 315e601c... not on ARM; needed only for a structured recompute in reannotate/activation.'
+  - id: B4_pejaver_provenance
+    detail: 'REVEL-20200205 vs Pejaver-calibrated build equivalence unproven (downstream).'
+  - id: B5_alphamissense_licence
+    detail: 'licence version confirm_pending; raw cloud egress pending permitted-use review.'
+  - id: B6_phylop_label
+    detail: 'header phyloP hg38 vs spec hg38_20way; worker confirms track/filename.'
+  - id: B7_transcript_ref_checksums
+    detail: 'provenance.json NM_000368.5 and NM_000548.5 reference checksums are confirm-pending.'
 
 downstream_policy_handoff:
   to: [resolve-pp3-bp4-activation, rerun-masked-gate]
   provides:
-    - pinned REVEL 20200205 and AlphaMissense provenance and structured extraction route
+    - pinned REVEL 20200205 / AlphaMissense provenance and the structured extraction route
     - the unresolved Pejaver/REVEL-20200205 compatibility question (inputs, not decision)
-    - the reuse-vs-reannotate decision table and preconditions
-    - the immutable masked evidence identity (7eece438..., 2577 rows)
-  does_not:
-    - make the PP3/BP4 activation or owner decision
-    - select reuse or reannotate on the owner's behalf
-
-blockers:
-  - id: B1_x64_unavailable
-    detail: 58.7-GB x64 bundle absent on ARM by design; needed for full-manifest verification or any reannotation.
-    fallback: operator makes the x64 machine available; else BLOCKED_DATA.
-  - id: B2_masked_nirvana_json_absent
-    detail: held-out Nirvana JSON 315e601c... not on ARM; blocks ARM-side REVEL structured recompute.
-    fallback: obtain/verify from x64; do not derive REVEL from the BIAS TSV.
-  - id: B3_pejaver_provenance_unresolved
-    detail: REVEL-20200205 vs Pejaver-calibrated build equivalence unproven.
-    fallback: downstream provenance decision; keep versions distinct until resolved.
-  - id: B4_phylop_label_reconcile
-    detail: deployed header "hg38" vs spec "hg38_20way".
-    fallback: worker confirms the deployed phyloP track/filename before equating.
+    - the reuse-vs-reannotate decision table and the PP3_BP4_SUPPRESSION_CONTRACT_REQUIRED prerequisite
+    - the immutable historical run attestation (return manifest + byte-identical ARM copies)
+  does_not: [make the PP3/BP4 activation or owner decision, select reuse or reannotate, clear cloud-egress for raw scores]
 
 beat4_self_audit:
-  - failure_mode: Latest-release substitution changes the classifier before comparison.
-    mitigation: pin deployed header versions (D1); deferred_upgrades explicit (D7).
-    caught_by: T4, T5
-  - failure_mode: A manifest claims the x64 bundle is present on ARM when only reports exist.
-    mitigation: presence enum + worker_only rows; boundary rule (D2, D3).
-    caught_by: T6, T2
-  - failure_mode: REVEL 20200205 relabeled v1.3/2021 without evidence.
-    mitigation: pin 20200205; Pejaver question left open (D6).
-    caught_by: T5
-  - failure_mode: Existing BIAS TSV reused despite a change requiring new evidence.
-    mitigation: reuse gate with full upstream-hash preconditions (D4).
-    caught_by: T7
-  - failure_mode: A needless x64 rerun when downstream policy recompute suffices.
-    mitigation: reuse path + decision table row for activate/no-new-input (D5).
-    caught_by: T7, decision_table
-  - failure_mode: Non-commercial score values leak into public/grant outputs.
-    mitigation: licensing boundary and per-source redistribute_raw=false.
+  - failure_mode: 'ARM-present evidence mislabeled x64-only'
+    mitigation: 'arm_inventory present_hashed with recomputed hashes; x64 paths are provenance only'
+    caught_by: T2/T6
+  - failure_mode: 'Partial source pin lets a latest release pass T4'
+    mitigation: 'full 28-source equality'
+    caught_by: T4/T7
+  - failure_mode: 'Reuse declared GO with no suppression contract'
+    mitigation: 'PP3_BP4_SUPPRESSION_CONTRACT_REQUIRED; route BLOCKED_POLICY_IMPLEMENTATION'
+    caught_by: T9
+  - failure_mode: 'Reuse conflated with current x64 bundle existence'
+    mitigation: 'historical_run_attestation split from current_x64_reannotation_readiness'
+    caught_by: T8
+  - failure_mode: 'Raw non-commercial scores egress to cloud/public'
+    mitigation: 'fail-closed per-channel licensing'
     caught_by: T10
-
-acceptance_trace:
-  self_contained: committed plan + exact external paths/hashes (binding_local_evidence, file_contract).
-  pins_not_refreshes: deployed_bundle + preservation_set + deferred handling.
-  rerun_vs_modernization: deferred_upgrades separated from the pinned bundle.
-  revel_downstream: pejaver_calibration_inputs leaves calibration/activation open.
-  both_routes_defined: reuse_vs_reannotate defines both without selecting.
-  executable_tests_required: test_matrix T1-T10.
-  no_forbidden_action: plan_only; no implementation/download/held-out run/owner decision.
+  - failure_mode: 'REVEL 20200205 relabeled v1.3/2021'
+    mitigation: 'pin plus open Pejaver question'
+    caught_by: T5
+  - failure_mode: 'Latest-release substitution changes the classifier'
+    mitigation: 'pin deployed header; deferred_upgrades explicit'
+    caught_by: T4/T7
 
 deferred_upgrades:
-  out_of_scope_until_a_separate_approved_refresh:
-    - dbNSFP 5.x
-    - MANE 1.5
-    - gnomAD 4.1.1
-    - dbSNP 157
-    - RepeatMasker
-    - broad multi-predictor (16-predictor) coverage
-  rule: these are future source modernization; they must not enter this rerun.
+  out_of_scope_until_a_separate_approved_refresh: [dbNSFP 5.x, MANE 1.5, gnomAD 4.1.1, dbSNP 157, RepeatMasker, broad 16-predictor coverage]
+  rule: future source modernization; must not enter this rerun.
 
 verification_return:
   package: >-
-    Returned to the orchestrator: INTENT, the single planner commit id, the
-    manifest schema, verified-vs-worker-check field lists, the reuse-vs-reannotate
-    decision table, the x64 handoff, the Gemini test matrix, blockers, the
-    downstream policy handoff and the Beat-4 evidence.
+    Returned to the orchestrator: commit id, corrected implementation scopes, the
+    corrected ARM manifest, the historical-vs-current split, the suppression
+    dependency, the 28-source set, the fail-closed licensing states, the revised
+    tests and the verification block.
