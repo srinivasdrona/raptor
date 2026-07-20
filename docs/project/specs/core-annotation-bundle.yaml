@@ -1,4 +1,4 @@
-# RAPTOR core annotation bundle — pinned, hash-bound planner contract (rev 4).
+# RAPTOR core annotation bundle — pinned, hash-bound planner contract (rev 5).
 #
 # Purpose: an implementation-ready, hash-bound record of the EXACT deployed
 # annotation bundle for the production-faithful masked held-out rerun and the
@@ -10,8 +10,8 @@
 # current x64 readiness, and makes reuse conditional on an implemented PP3/BP4
 # suppression contract.
 #
-# Rev 4 supersedes commit e08a17e after the Gemini RED test exposed an
-# undefined canonical-manifest schema/status (planner-spec gap).
+# Rev 5 supersedes commit 62310e2, resolving a schema contradiction: x64-only
+# directories/unknown-hash files no longer forced into the ARM file_entry shape.
 # Schema: raptor-core-annotation-bundle-v1 (planner). The Sonnet manifest uses
 # schema raptor-core-annotation-bundle-manifest-v1 / status pinned_historical_evidence.
 
@@ -73,6 +73,17 @@ revision_log:
     corrections_in: [canonical_manifest_schema, implementation_scope, test_matrix, beat4_self_audit]
     preserved:
       - 9 offline + 3 reference test partition; 3-file scope; 28 sources; suppression blocker; licensing states; no runner/CI changes
+  - rev: 5
+    supersedes_commit: 62310e2c831fb5fe1315057e68a7442295dc404a
+    trigger: schema contradiction (worker_only file_entry forced sha/bytes for directories and unknown ARM artifacts)
+    attribution:
+      planner_miss:
+        - canonical_manifest_schema.arm_inventory required worker_only entries to use the file_entry shape (64-hex sha256, positive bytes), which directories and unknown-on-ARM files cannot satisfy without fabrication.
+      correction:
+        - arm_inventory is now exactly {data_root, present_hashed} (14 files); x64-only files/directories moved to x64_handoff_requirements.items with a null-allowing x64_requirement_shape (kind file/directory/manifest, expected_sha256 and expected_bytes nullable).
+    corrections_in: [canonical_manifest_schema, arm_inventory, current_x64_reannotation_readiness, x64_handoff, test_matrix, beat4_self_audit]
+    preserved:
+      - top-level 14 manifest keys; 28 sources; licensing; suppression; 9 offline + 3 reference partition; 3-file scope
 
 planner:
   model: claude-opus-4.8
@@ -253,26 +264,26 @@ canonical_manifest_schema:
     forbidden_source_rule: REVEL must not be sourced from BIAS free-form rationale
   arm_inventory:
     closed: true
-    required_keys_exact: [data_root, present_hashed, worker_only]
+    required_keys_exact: [data_root, present_hashed]
+    no_worker_only: >-
+      arm_inventory has NO worker_only key. x64-only files and directories are
+      NOT ARM inventory; they live in x64_handoff_requirements.items. No x64 path
+      may appear anywhere in arm_inventory.
     present_hashed:
       type: list of exactly 14 file_entry
       constraint: every entry has location arm and presence present_hashed
-    worker_only:
-      type: list of file_entry
-      constraint: every entry has location x64 and presence worker_only
     file_entry_shape:
       closed: true
       required_keys_exact: [id, location, path, sha256, bytes, presence]
       allowed_optional_keys: [attributes]
       reject_keys_outside: required_keys_exact plus allowed_optional_keys
-      enums:
-        location: [arm, x64]
-        presence: [present_hashed, worker_only]
+      fixed_values:
+        location: arm
+        presence: present_hashed
       invariants:
-        - 'location == arm iff presence == present_hashed'
-        - 'location == x64 iff presence == worker_only'
-        - 'sha256 is 64 lowercase hex; bytes is a positive integer'
-        - 'entry-specific extras (rows, duplicate_ids, contents, role, needed_for, provenance_path) live only under attributes'
+        - 'sha256 is 64 lowercase hex; bytes is a positive integer (never null)'
+        - 'no x64 path appears anywhere in arm_inventory'
+        - 'entry-specific extras (rows, duplicate_ids, contents, role, provenance_path) live only under attributes'
   historical_run_attestation:
     closed: true
     required_keys_exact: [claim, proven_by, hashes, independent_of]
@@ -292,10 +303,11 @@ canonical_manifest_schema:
     no_current_x64_dependency: true
   current_x64_reannotation_readiness:
     closed: true
-    required_keys_exact: [required_only_for, status, presence_proof_when_needed, boundary_rule]
+    required_keys_exact: [required_only_for, status, x64_requirement_ids, presence_proof_when_needed, boundary_rule]
     required_only_for: X64_REANNOTATE
     status_enum: [UNVERIFIED, VERIFIED]
-    contains_only: reannotation proof requirements (no historical-evidence hashes)
+    x64_requirement_ids: references x64_handoff_requirements.items ids only (no inline file entries, no historical hashes)
+    contains_only: reannotation proof requirements and x64 requirement references (no historical-evidence hashes)
   pp3_bp4_suppression_prerequisite:
     closed: true
     required_keys_exact: [id, finding, evidence, requirement, until_then]
@@ -338,8 +350,20 @@ canonical_manifest_schema:
     must_include: [dbNSFP 5.x, MANE 1.5, gnomAD 4.1.1, dbSNP 157, RepeatMasker]
   x64_handoff_requirements:
     closed: true
-    required_keys_exact: [bundle_presence_proof, reannotation_commands_reference, return_handoff_manifest, required_artifact]
+    required_keys_exact: [items, bundle_presence_proof, reannotation_commands_reference, return_handoff_manifest, required_artifact]
     required_artifact: x64_bundle_verification.json
+    items:
+      type: list of x64_requirement (the x64-only files and directories)
+      required_ids_exact: [heldout_nirvana_json, nirvana_data_root, bias_data_root, nirvana_full_manifest, nirvana_updates_manifest, bias_data_manifest]
+      values: see x64_handoff.items (authoritative)
+    x64_requirement_shape:
+      closed: true
+      required_keys_exact: [id, kind, x64_path, expected_sha256, expected_bytes, required_for, verification_rule]
+      enums:
+        kind: [file, directory, manifest]
+      types:
+        expected_sha256: 64-lowercase-hex string OR null (null when unknown on ARM; never fabricated)
+        expected_bytes: positive integer OR null (null when unknown on ARM; never fabricated)
 
 deployed_bundle:
   provenance: >-
@@ -434,14 +458,15 @@ deployed_data_sources:
 
 arm_inventory:
   note: >-
-    CORRECTED (rev 2): ARM-present copies are present_hashed with recomputed
-    sha256/bytes. Original x64 paths are retained as provenance metadata only,
-    not as the sole presence claim.
+    ARM-present copies are present_hashed with recomputed sha256/bytes. x64-only
+    files and directories are NOT here (rev 5): they moved to x64_handoff.items
+    because directories and unknown-hash/bytes artifacts cannot fit the
+    64-hex/positive-bytes file_entry shape. No x64 path appears in arm_inventory.
   data_root: 'D:\AIProjects\raptor-data'
   present_hashed:
     - {id: sample_nirvana_json, arm_path: 'devbox-artifacts\sample_tsc_nirvana.json.gz', sha256: '24c8083f01d46a4dca2233abeaaf639b7f7ccde7378d90b8b087e9f5ec250bca', bytes: 14360, role: deployed annotator header + structured-field schema (8-variant smoke sample)}
-    - {id: required_paths_local, arm_path: 'devbox-artifacts\hg38_nirvana_required_paths.local.json', sha256: '5d57c068d44a00ce0d95215046b215f9a4fa6eae35b4629e39cfbcce8010af32', bytes: 1301, x64_provenance: 'D:\raptor-x64\hg38_nirvana_required_paths.local.json'}
-    - {id: required_paths_masked, arm_path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\hg38_nirvana_required_paths.masked.json', sha256: '6c05b8c30efa4f6032a3a40446823a0e08c888295889d3876cf7871d5b4f569c', bytes: 1649, x64_provenance: 'D:\raptor-x64\masked-heldout-2026-07-12\return\hg38_nirvana_required_paths.masked.json'}
+    - {id: required_paths_local, arm_path: 'devbox-artifacts\hg38_nirvana_required_paths.local.json', sha256: '5d57c068d44a00ce0d95215046b215f9a4fa6eae35b4629e39cfbcce8010af32', bytes: 1301}
+    - {id: required_paths_masked, arm_path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\hg38_nirvana_required_paths.masked.json', sha256: '6c05b8c30efa4f6032a3a40446823a0e08c888295889d3876cf7871d5b4f569c', bytes: 1649}
     - {id: evaluation_skip_list, arm_path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\evaluation_skip_list.txt', sha256: 'bb418c11773080d8cf6b3facadf71236d25ce35fa2ca173d63d33089c57a1d8a', bytes: 20, contents: [PM1, PS4, PP5, BP6]}
     - {id: masked_ps1_pm5, arm_path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\hg38_PS1_PM5_clinvar_pathogenic_aa_nirvana.tsv', sha256: 'f17b19e6322ac00ad1bae5125efc6381874266771fa71fdb9832b3a54401be1f', bytes: 28395992}
     - {id: masked_pp2, arm_path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\hg38_PP2_missense_pathogenic_genes.tsv', sha256: '43f6002d8c88cbc200df4da79aeffb52d1f854589aeb50c97e190b80c376d2cf', bytes: 34786}
@@ -453,13 +478,6 @@ arm_inventory:
     - {id: holdout_input_vcf, arm_path: 'handoffs\masked-heldout-2026-07-12\inputs\holdout_input.vcf', sha256: '4dcba7c882b65838cedf8ce0ad56e0f7764df34b247ab412aac144d4027c622d', bytes: 69470}
     - {id: holdout_input_provenance, arm_path: 'handoffs\masked-heldout-2026-07-12\inputs\holdout_input.provenance.json', sha256: '63f1881287f1e3aa0b36ca14e1a7329ef2bcacc7b9674c2489f5e1d4352a6ac8', bytes: 573}
     - {id: holdout_input_manifest, arm_path: 'handoffs\masked-heldout-2026-07-12\inputs\holdout_input.manifest.jsonl', sha256: '9e588cdf8ebaea2e3793e0ea74721ab5283b57c2abf045dbf3070cb6e81ec9e4', bytes: 321687, note: equals provenance.manifest_hash}
-  worker_only_absent_on_arm:
-    note: these are NOT required to be present on ARM; they belong to the x64 worker.
-    items:
-      - {id: heldout_nirvana_json, x64_path: 'D:\raptor-x64\masked-heldout-2026-07-12\score\holdout_input_nirvana.json.gz', sha256: '315e601cc9ede55c07c4a59de796c2be5cf0f2827e441101ceea236390675d13', needed_for: structured REVEL/AM recompute on reannotate/activation only}
-      - {id: nirvana_data_root, x64_path: 'D:\raptor-x64\nirvana-data\GRCh38', note: 57.2 GB}
-      - {id: bias_data_root, x64_path: 'D:\raptor-x64\bias-hg38-data', note: 0.89 GB}
-      - {id: full_checksum_manifests, x64_paths: ['D:\raptor-x64\CHECKSUMS\nirvana-grch38-full.sha256.txt', 'D:\raptor-x64\CHECKSUMS\nirvana-grch38-updates.sha256.txt', 'D:\raptor-x64\CHECKSUMS\bias-hg38-data.sha256.txt']}
 
 holdout_input_provenance:
   file: 'handoffs\masked-heldout-2026-07-12\inputs\holdout_input.provenance.json'
@@ -496,6 +514,7 @@ historical_run_attestation:
 current_x64_reannotation_readiness:
   required_only_for: X64_REANNOTATE
   status_today: UNVERIFIED
+  x64_requirement_ids: [heldout_nirvana_json, nirvana_data_root, bias_data_root, nirvana_full_manifest, nirvana_updates_manifest, bias_data_manifest]
   reason: the deployed bundle is not on ARM by design; the operator makes x64 available on demand.
   presence_proof_when_needed:
     - recompute file-by-file SHA256 over nirvana-data\GRCh38, SupplementaryAnnotation\GRCh38 and bias-hg38-data; diff vs the three frozen CHECKSUMS manifests
@@ -557,6 +576,13 @@ reuse_vs_reannotate:
     - {upstream_inputs: unknown_or_unverifiable, pp3_bp4: any, route: BLOCKED_DATA_until_x64_verifies}
 
 x64_handoff:
+  items:
+    - {id: heldout_nirvana_json, kind: file, x64_path: 'D:\raptor-x64\masked-heldout-2026-07-12\score\holdout_input_nirvana.json.gz', expected_sha256: '315e601cc9ede55c07c4a59de796c2be5cf0f2827e441101ceea236390675d13', expected_bytes: null, required_for: structured REVEL/AM recompute on reannotate or activation, verification_rule: verify presence and sha256 match on x64}
+    - {id: nirvana_data_root, kind: directory, x64_path: 'D:\raptor-x64\nirvana-data\GRCh38', expected_sha256: null, expected_bytes: null, required_for: X64_REANNOTATE, verification_rule: recompute file-by-file SHA256 and diff vs nirvana_full_manifest}
+    - {id: bias_data_root, kind: directory, x64_path: 'D:\raptor-x64\bias-hg38-data', expected_sha256: null, expected_bytes: null, required_for: X64_REANNOTATE, verification_rule: recompute file-by-file SHA256 and diff vs bias_data_manifest}
+    - {id: nirvana_full_manifest, kind: manifest, x64_path: 'D:\raptor-x64\CHECKSUMS\nirvana-grch38-full.sha256.txt', expected_sha256: null, expected_bytes: 8024, required_for: X64_REANNOTATE, verification_rule: frozen baseline for the nirvana_data_root recompute}
+    - {id: nirvana_updates_manifest, kind: manifest, x64_path: 'D:\raptor-x64\CHECKSUMS\nirvana-grch38-updates.sha256.txt', expected_sha256: null, expected_bytes: null, required_for: X64_REANNOTATE, verification_rule: frozen baseline for the supplementary-update recompute}
+    - {id: bias_data_manifest, kind: manifest, x64_path: 'D:\raptor-x64\CHECKSUMS\bias-hg38-data.sha256.txt', expected_sha256: null, expected_bytes: 2093, required_for: X64_REANNOTATE, verification_rule: frozen baseline for the bias_data_root recompute}
   bundle_presence_proof: see current_x64_reannotation_readiness.presence_proof_when_needed
   reannotation_commands_reference:
     note: exact deterministic commands recorded in MASKED_HELDOUT_SCORING_REPORT.md
@@ -637,7 +663,7 @@ test_matrix:
     tests:
       - {id: OFF1_schema, asserts: 'manifest schema equals raptor-core-annotation-bundle-manifest-v1 and status equals pinned_historical_evidence (NOT the planner spec raptor-core-annotation-bundle-v1 / planner_contract_ready_for_implementation); manifest top-level keys equal canonical_manifest_schema.top_level_keys_exact with no missing or extra key; readiness has the three keys with valid enum values.'}
       - {id: OFF2_source_values_28, asserts: 'data_sources is exactly 28 entries; every entry has exactly the source_entry keys name/version/release_date with no missing or extra key; the 28 name/version/release_date triples equal the pinned set exactly.'}
-      - {id: OFF3_presence_enums, asserts: 'every arm_inventory file entry matches file_entry_shape exactly (all required keys present; no key outside required plus allowed_optional); presence in present_hashed or worker_only; location arm iff present_hashed and location x64 iff worker_only; present_hashed count is 14.'}
+      - {id: OFF3_arm_inventory_and_x64_shape, asserts: 'arm_inventory has exactly the keys data_root and present_hashed (no worker_only), and present_hashed is exactly 14 file_entry, each matching file_entry_shape (required keys, no key outside required plus attributes) with location arm, presence present_hashed, a 64-hex sha256 and positive bytes; assert NO x64 path appears anywhere in arm_inventory. Structural offline check with no local x64 existence test: every x64_handoff_requirements.items entry matches the closed x64_requirement_shape with kind in file/directory/manifest, expected_sha256 a 64-hex string or null, and expected_bytes a positive int or null.'}
       - {id: OFF4_reuse_blocked_on_suppression, asserts: 'with the PP3/BP4 suppression contract absent, the reuse route resolves to BLOCKED_POLICY_IMPLEMENTATION and never GO_REUSE.'}
       - {id: OFF5_licensing_egress_flags, asserts: 'exact-match: channel and per-source local status equals pending_permitted_use_review; raw_public_redistribution and raw_cloud_egress equal false everywhere; AlphaMissense licence_version equals confirm_pending; AND a RECURSIVE walk of the licensing subtree fails on any boolean that is true or any status/value outside the allowed pending/false set (no vacuous substring check).'}
       - {id: OFF6_deferred_upgrade_guard, asserts: 'fails if MANE 1.5, dbNSFP 5.x, gnomAD 4.1.1, dbSNP 157, RepeatMasker or a newer primary ClinVar appears in data_sources.'}
@@ -716,6 +742,9 @@ beat4_self_audit:
   - failure_mode: 'Closed shapes not enforced so missing/extra keys or a permissive licensing substring check pass'
     mitigation: 'closed file_entry and source_entry shapes; recursive licensing permission reject'
     caught_by: OFF2/OFF3/OFF5
+  - failure_mode: 'x64-only directories or unknown-hash files forced into the ARM file_entry shape (fabricated sha/bytes)'
+    mitigation: 'arm_inventory holds only the 14 present ARM files; x64 evidence lives in x64_handoff_requirements.items with nullable expected_sha256/expected_bytes'
+    caught_by: OFF3
   - failure_mode: 'ARM-present evidence mislabeled x64-only'
     mitigation: 'arm_inventory present_hashed with recomputed hashes; x64 paths are provenance only'
     caught_by: OFF3/REF1
