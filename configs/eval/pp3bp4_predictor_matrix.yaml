@@ -1604,12 +1604,11 @@ audit_rows:
       cp_ids: []
       note: audit-only reconstruction
     implementation_cost:
-      status: not_applicable
+      status: unavailable
       value: null
       source_ids: []
       cp_ids: []
-      note: already implemented as an audit/reconstruction layer (src/raptor/eval/predictor_aggregation.py);
-        not assessed for this matrix; out of scope
+      note: not assessed; out of scope for this bounded decision matrix
 smallest_pin_handoff:
   next_task_id: sources-pin-core-annotation-bundle
   rule: The next task pins ONE annotation bundle and only the fields needed to decide/operate the primary
