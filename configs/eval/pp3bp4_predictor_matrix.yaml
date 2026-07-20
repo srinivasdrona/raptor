@@ -4,6 +4,9 @@
 # Does not change configs/eval/pp3bp4_source_register.yaml, configs/eval/predictor_training_manifests.yaml,
 # or configs/eval/pp3bp4_candidate_policy.json (all remain byte-identical / REVEL shadow-policy scoped).
 # REVEL remains the sole advance_shadow candidate; this file advances no other predictor.
+# tool_kind pinned by candidate_identity.tool_kind_map; field CPs/source_ids follow field_cp_semantics
+# (rev 4): CP-20 only for the six training-overlap tools; CP-21 only for REVEL's own release pin;
+# licences/non-REVEL pins/standalone acquisitions carry empty source_ids with a naming CP.
 
 schema: pp3bp4-predictor-matrix/1
 version: 1
@@ -20,6 +23,9 @@ source_map:
         dbNSFP score acquisition; training-overlap exclusions; REVEL/BayesDel named as meta-predictors.
       table_2: Calibrated PP3/BP4 score intervals; the REVEL row is the only fully-verified multi-level
         interval set.
+      supplement: 'Supplementary materials: exact independently-generated tool versions; the calibrated
+        PhyloP column; the evaluated PrimateAI release; and the dbNSFP release/columns used for dbNSFP-obtained
+        tools (resolves CP-9/CP-14/CP-15/CP-23).'
   bergquist_2025:
     citation: Bergquist T, Pejaver V, et al. Calibration of additional computational tools expands ClinGen
       recommendation options for variant classification with PP3/BP4 criteria. Genetics in Medicine 2025.
@@ -31,6 +37,8 @@ source_map:
     loci:
       table_1: AlphaMissense, ESM1b, VARITY_R calibration conclusions; exact numeric intervals remain
         confirm_pending until Table 1 is read directly (CP-5/CP-6/CP-7).
+      methods_data_availability: 'Methods and Data Availability: exact evaluated releases for AlphaMissense
+        (CP-10), ESM1b (CP-22), and VARITY_R (CP-11).'
   stenton_2024:
     citation: Stenton SL, Pejaver V, Harrison SM, et al. Assessment of the evidence yield for the calibrated
       PP3/BP4 computational recommendations. Genetics in Medicine 2024.
@@ -67,31 +75,51 @@ source_map:
         remains confirm_pending (CP-21).'
     role: 'Distribution/availability reference only (not a calibration source). The exact RAPTOR-pinned
       release/column/licence branch remain confirm_pending: current_release_pin (CP-21), availability
-      (CP-12/CP-13), licences (CP-16..CP-19).'
+      (CP-12/CP-13/CP-25), licences (CP-16..CP-19/CP-24).'
 confirm_pending_register:
-  CP-1: BayesDel-noAF intervals -> Pejaver Table 2
-  CP-2: MutPred2 intervals -> Pejaver Table 2
-  CP-3: VEST4 intervals -> Pejaver Table 2
+  CP-1: BayesDel-noAF intervals -> pejaver_2022 table_2
+  CP-2: MutPred2 intervals -> pejaver_2022 table_2
+  CP-3: VEST4 intervals -> pejaver_2022 table_2
   CP-4: Intervals/maxima for CADD, EA, FATHMM, GERP++, MPC, PhyloP, PolyPhen-2 HumVar, PrimateAI, SIFT
-    -> Pejaver Table 2
-  CP-5: AlphaMissense intervals -> Bergquist Table 1
-  CP-6: ESM1b intervals -> Bergquist Table 1
-  CP-7: VARITY_R intervals -> Bergquist Table 1
+    -> pejaver_2022 table_2
+  CP-5: AlphaMissense intervals -> bergquist_2025 table_1
+  CP-6: ESM1b intervals -> bergquist_2025 table_1
+  CP-7: VARITY_R intervals -> bergquist_2025 table_1
   CP-8: Bergquist 2025 PMCID -> PubMed/PMC
-  CP-9: Independently-generated tool versions used by Pejaver -> Pejaver supplement
-  CP-10: AlphaMissense release evaluated by Bergquist -> Bergquist Methods/Data Availability
-  CP-11: VARITY_R release evaluated by Bergquist -> Bergquist Methods/Data Availability
-  CP-12: ESM1b availability in the selected dbNSFP branch -> selected release README
-  CP-13: VARITY_R availability in the selected dbNSFP branch -> selected release README
-  CP-14: PhyloP column calibrated by Pejaver -> Pejaver supplement
-  CP-15: PrimateAI release evaluated by Pejaver -> Pejaver supplement
-  CP-16: Official MPC licence -> official distribution source
-  CP-17: Official GERP++ licence -> official distribution source
-  CP-18: Official PhyloP/PHAST licence -> official distribution source
-  CP-19: Official Evolutionary Action licence -> official distribution source
-  CP-20: Training overlap for CADD, EA, MPC, PhyloP, GERP++, PrimateAI vs the TSC benchmark -> verified
-    manifests + leakage audit
-  CP-21: REVEL/dbNSFP release to pin for RAPTOR -> annotation-bundle decision
+  CP-9: Exact independently-generated tool versions Pejaver evaluated (BayesDel-noAF, CADD, EA, MutPred2,
+    PolyPhen-2 HumVar) -> pejaver_2022 supplement
+  CP-10: AlphaMissense release evaluated by Bergquist -> bergquist_2025 methods_data_availability
+  CP-11: VARITY_R release evaluated by Bergquist -> bergquist_2025 methods_data_availability
+  CP-12: ESM1b availability in the selected dbNSFP branch -> selected dbNSFP release README (dbnsfp_v4
+    distribution_metadata)
+  CP-13: VARITY_R availability in the selected dbNSFP branch -> selected dbNSFP release README (dbnsfp_v4
+    distribution_metadata)
+  CP-14: Exact PhyloP column calibrated by Pejaver -> pejaver_2022 supplement
+  CP-15: Exact PrimateAI release evaluated by Pejaver -> pejaver_2022 supplement
+  CP-16: Official MPC licence -> official MPC distribution source
+  CP-17: Official GERP++ licence -> official GERP++ distribution source
+  CP-18: Official PhyloP/PHAST licence -> official PHAST distribution source
+  CP-19: Official Evolutionary Action licence -> official EA distribution source
+  CP-20: Training overlap vs the TSC benchmark -- APPLIES ONLY to CADD, EA, MPC, PhyloP, GERP++, PrimateAI
+    -> verified training manifests + leakage audit. No other candidate may carry CP-20.
+  CP-21: REVEL/dbNSFP release to pin for RAPTOR -- APPLIES ONLY to REVEL current_release_pin_status ->
+    sources-pin-core-annotation-bundle. Must NOT ground any licence, implementation cost, non-REVEL acquisition,
+    or any other candidate's release.
+  CP-22: Exact ESM1b evaluated release -> bergquist_2025 methods_data_availability (dedicated release
+    CP; NOT the ESM1b interval CP-6)
+  CP-23: Exact dbNSFP release/columns Pejaver evaluated for dbNSFP-obtained tools (REVEL, FATHMM, GERP++,
+    MPC, SIFT, VEST4) -> pejaver_2022 supplement/methods
+  CP-24: Official licence for candidates not covered by CP-16..CP-19 (REVEL, BayesDel-noAF, MutPred2,
+    VEST4, AlphaMissense, ESM1b, VARITY_R, CADD, FATHMM, PolyPhen-2 HumVar, PrimateAI, SIFT) -> each tool's
+    official distribution/terms; never upgraded to verified
+  CP-25: Availability of dbNSFP-bundled candidate scores in the selected dbNSFP release/branch (bundled
+    route) -> selected dbNSFP release README/column inventory (dbnsfp_v4 distribution_metadata)
+  CP-26: Standalone MutPred2 score acquisition (separately generated; NOT dbNSFP-bundled) -> official
+    MutPred2 distribution
+  CP-27: Standalone Evolutionary Action score acquisition (separately generated; NOT dbNSFP-bundled) ->
+    official Evolutionary Action distribution
+  CP-28: Annotation-bundle RAPTOR release pin for NON-REVEL calibrated candidates -> sources-pin-core-annotation-bundle
+    (distinct from CP-21)
 candidates:
   revel:
     candidate_id: revel
@@ -140,20 +168,18 @@ candidates:
       source_ids:
       - pejaver_2022
       cp_ids: []
-      note: Calibrated ceiling is very_strong; the current shadow policy enables only up to moderate (bp4_strong/bp4_very_strong
-        are calibrated but disabled).
+      note: calibrated maximum is very_strong; current ENABLED maximum in the REVEL policy is moderate
     calibrated_version:
       status: confirm_pending
       value: null
       source_ids:
-      - dbnsfp_v4
+      - pejaver_2022
       cp_ids:
-      - CP-21
+      - CP-23
     current_release_pin_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
       - CP-21
     structured_score_availability:
@@ -162,40 +188,35 @@ candidates:
       source_ids:
       - dbnsfp_v4
       cp_ids:
-      - CP-21
+      - CP-25
     license_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-24
     training_manifest_status:
       status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
-      cp_ids:
-      - CP-20
-      note: manifest not obtained; metadata only, not a leakage input
-    tsc_specific_evidence:
-      status: not_applicable
-      value: null
-      source_ids:
-      - pejaver_2022
+      source_ids: []
       cp_ids: []
-      note: no TSC-specific calibration at matrix stage
-    implementation_cost:
-      status: confirm_pending
+      note: manifest not obtained; NOT in the CP-20 overlap set; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
-      cp_ids:
-      - CP-21
+      source_ids: []
+      cp_ids: []
+      note: none identified for TSC1/TSC2; not assessed at matrix stage
+    implementation_cost:
+      status: unavailable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: not assessed; out of scope for this bounded decision matrix
   bayesdel_noaf:
     candidate_id: bayesdel_noaf
     display_name: BayesDel (no allele frequency)
-    tool_kind: predictor
+    tool_kind: meta_predictor
     evidence_role: calibrated_missense
     calibration_source_id: pejaver_2022
     calibration_locus: Table 2
@@ -246,50 +267,44 @@ candidates:
     current_release_pin_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-28
     structured_score_availability:
       status: confirm_pending
       value: null
       source_ids:
       - dbnsfp_v4
       cp_ids:
-      - CP-21
+      - CP-25
     license_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-24
     training_manifest_status:
       status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
-      cp_ids:
-      - CP-20
-      note: manifest not obtained; metadata only, not a leakage input
-    tsc_specific_evidence:
-      status: not_applicable
-      value: null
-      source_ids:
-      - pejaver_2022
+      source_ids: []
       cp_ids: []
-      note: no TSC-specific calibration at matrix stage
-    implementation_cost:
-      status: confirm_pending
+      note: manifest not obtained; NOT in the CP-20 overlap set; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
-      cp_ids:
-      - CP-21
+      source_ids: []
+      cp_ids: []
+      note: none identified for TSC1/TSC2; not assessed at matrix stage
+    implementation_cost:
+      status: unavailable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: not assessed; out of scope for this bounded decision matrix
   mutpred2:
     candidate_id: mutpred2
     display_name: MutPred2
-    tool_kind: predictor
+    tool_kind: supervised_predictor
     evidence_role: calibrated_missense
     calibration_source_id: pejaver_2022
     calibration_locus: Table 2
@@ -339,50 +354,43 @@ candidates:
     current_release_pin_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-28
     structured_score_availability:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-26
     license_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-24
     training_manifest_status:
       status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
-      cp_ids:
-      - CP-20
-      note: manifest not obtained; metadata only, not a leakage input
-    tsc_specific_evidence:
-      status: not_applicable
-      value: null
-      source_ids:
-      - pejaver_2022
+      source_ids: []
       cp_ids: []
-      note: no TSC-specific calibration at matrix stage
-    implementation_cost:
-      status: confirm_pending
+      note: manifest not obtained; NOT in the CP-20 overlap set; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
-      cp_ids:
-      - CP-21
+      source_ids: []
+      cp_ids: []
+      note: none identified for TSC1/TSC2; not assessed at matrix stage
+    implementation_cost:
+      status: unavailable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: not assessed; out of scope for this bounded decision matrix
   vest4:
     candidate_id: vest4
     display_name: VEST4
-    tool_kind: predictor
+    tool_kind: supervised_predictor
     evidence_role: calibrated_missense
     calibration_source_id: pejaver_2022
     calibration_locus: Table 2
@@ -428,54 +436,48 @@ candidates:
       source_ids:
       - pejaver_2022
       cp_ids:
-      - CP-9
+      - CP-23
     current_release_pin_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-28
     structured_score_availability:
       status: confirm_pending
       value: null
       source_ids:
       - dbnsfp_v4
       cp_ids:
-      - CP-21
+      - CP-25
     license_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-24
     training_manifest_status:
       status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
-      cp_ids:
-      - CP-20
-      note: manifest not obtained; metadata only, not a leakage input
-    tsc_specific_evidence:
-      status: not_applicable
-      value: null
-      source_ids:
-      - pejaver_2022
+      source_ids: []
       cp_ids: []
-      note: no TSC-specific calibration at matrix stage
-    implementation_cost:
-      status: confirm_pending
+      note: manifest not obtained; NOT in the CP-20 overlap set; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
-      cp_ids:
-      - CP-21
+      source_ids: []
+      cp_ids: []
+      note: none identified for TSC1/TSC2; not assessed at matrix stage
+    implementation_cost:
+      status: unavailable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: not assessed; out of scope for this bounded decision matrix
   cadd:
     candidate_id: cadd
     display_name: CADD
-    tool_kind: predictor
+    tool_kind: meta_annotation_score
     evidence_role: calibrated_missense
     calibration_source_id: pejaver_2022
     calibration_locus: Table 2
@@ -526,50 +528,45 @@ candidates:
     current_release_pin_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-28
     structured_score_availability:
       status: confirm_pending
       value: null
       source_ids:
       - dbnsfp_v4
       cp_ids:
-      - CP-21
+      - CP-25
     license_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-24
     training_manifest_status:
       status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
       - CP-20
-      note: manifest not obtained; metadata only, not a leakage input
+      note: manifest not obtained; overlap-vs-TSC pending (CP-20); metadata only, not a leakage input
     tsc_specific_evidence:
-      status: not_applicable
+      status: unavailable
       value: null
-      source_ids:
-      - pejaver_2022
+      source_ids: []
       cp_ids: []
-      note: no TSC-specific calibration at matrix stage
+      note: none identified for TSC1/TSC2; not assessed at matrix stage
     implementation_cost:
-      status: confirm_pending
+      status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
-      cp_ids:
-      - CP-21
+      source_ids: []
+      cp_ids: []
+      note: not assessed; out of scope for this bounded decision matrix
   evolutionary_action:
     candidate_id: evolutionary_action
     display_name: Evolutionary Action
-    tool_kind: predictor
+    tool_kind: evolutionary_predictor
     evidence_role: calibrated_missense
     calibration_source_id: pejaver_2022
     calibration_locus: Table 2
@@ -619,50 +616,44 @@ candidates:
     current_release_pin_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-28
     structured_score_availability:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-27
     license_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
       - CP-19
     training_manifest_status:
       status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
       - CP-20
-      note: manifest not obtained; metadata only, not a leakage input
+      note: manifest not obtained; overlap-vs-TSC pending (CP-20); metadata only, not a leakage input
     tsc_specific_evidence:
-      status: not_applicable
+      status: unavailable
       value: null
-      source_ids:
-      - pejaver_2022
+      source_ids: []
       cp_ids: []
-      note: no TSC-specific calibration at matrix stage
+      note: none identified for TSC1/TSC2; not assessed at matrix stage
     implementation_cost:
-      status: confirm_pending
+      status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
-      cp_ids:
-      - CP-21
+      source_ids: []
+      cp_ids: []
+      note: not assessed; out of scope for this bounded decision matrix
   fathmm:
     candidate_id: fathmm
     display_name: FATHMM
-    tool_kind: predictor
+    tool_kind: hmm_predictor
     evidence_role: calibrated_missense
     calibration_source_id: pejaver_2022
     calibration_locus: Table 2
@@ -708,54 +699,48 @@ candidates:
       source_ids:
       - pejaver_2022
       cp_ids:
-      - CP-9
+      - CP-23
     current_release_pin_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-28
     structured_score_availability:
       status: confirm_pending
       value: null
       source_ids:
       - dbnsfp_v4
       cp_ids:
-      - CP-21
+      - CP-25
     license_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-24
     training_manifest_status:
       status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
-      cp_ids:
-      - CP-20
-      note: manifest not obtained; metadata only, not a leakage input
-    tsc_specific_evidence:
-      status: not_applicable
-      value: null
-      source_ids:
-      - pejaver_2022
+      source_ids: []
       cp_ids: []
-      note: no TSC-specific calibration at matrix stage
-    implementation_cost:
-      status: confirm_pending
+      note: manifest not obtained; NOT in the CP-20 overlap set; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
-      cp_ids:
-      - CP-21
+      source_ids: []
+      cp_ids: []
+      note: none identified for TSC1/TSC2; not assessed at matrix stage
+    implementation_cost:
+      status: unavailable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: not assessed; out of scope for this bounded decision matrix
   mpc:
     candidate_id: mpc
     display_name: MPC
-    tool_kind: predictor
+    tool_kind: regional_constraint
     evidence_role: calibrated_missense
     calibration_source_id: pejaver_2022
     calibration_locus: Table 2
@@ -801,54 +786,49 @@ candidates:
       source_ids:
       - pejaver_2022
       cp_ids:
-      - CP-9
+      - CP-23
     current_release_pin_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-28
     structured_score_availability:
       status: confirm_pending
       value: null
       source_ids:
       - dbnsfp_v4
       cp_ids:
-      - CP-21
+      - CP-25
     license_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
       - CP-16
     training_manifest_status:
       status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
       - CP-20
-      note: manifest not obtained; metadata only, not a leakage input
+      note: manifest not obtained; overlap-vs-TSC pending (CP-20); metadata only, not a leakage input
     tsc_specific_evidence:
-      status: not_applicable
+      status: unavailable
       value: null
-      source_ids:
-      - pejaver_2022
+      source_ids: []
       cp_ids: []
-      note: no TSC-specific calibration at matrix stage
+      note: none identified for TSC1/TSC2; not assessed at matrix stage
     implementation_cost:
-      status: confirm_pending
+      status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
-      cp_ids:
-      - CP-21
+      source_ids: []
+      cp_ids: []
+      note: not assessed; out of scope for this bounded decision matrix
   polyphen2_humvar:
     candidate_id: polyphen2_humvar
     display_name: PolyPhen-2 HumVar
-    tool_kind: predictor
+    tool_kind: missense_predictor
     evidence_role: calibrated_missense
     calibration_source_id: pejaver_2022
     calibration_locus: Table 2
@@ -898,50 +878,44 @@ candidates:
     current_release_pin_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-28
     structured_score_availability:
       status: confirm_pending
       value: null
       source_ids:
       - dbnsfp_v4
       cp_ids:
-      - CP-21
+      - CP-25
     license_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-24
     training_manifest_status:
       status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
-      cp_ids:
-      - CP-20
-      note: manifest not obtained; metadata only, not a leakage input
-    tsc_specific_evidence:
-      status: not_applicable
-      value: null
-      source_ids:
-      - pejaver_2022
+      source_ids: []
       cp_ids: []
-      note: no TSC-specific calibration at matrix stage
-    implementation_cost:
-      status: confirm_pending
+      note: manifest not obtained; NOT in the CP-20 overlap set; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
-      cp_ids:
-      - CP-21
+      source_ids: []
+      cp_ids: []
+      note: none identified for TSC1/TSC2; not assessed at matrix stage
+    implementation_cost:
+      status: unavailable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: not assessed; out of scope for this bounded decision matrix
   primateai_original:
     candidate_id: primateai_original
     display_name: PrimateAI
-    tool_kind: predictor
+    tool_kind: deep_learning_predictor
     evidence_role: calibrated_missense
     calibration_source_id: pejaver_2022
     calibration_locus: Table 2
@@ -987,54 +961,49 @@ candidates:
       source_ids:
       - pejaver_2022
       cp_ids:
-      - CP-9
+      - CP-15
     current_release_pin_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-28
     structured_score_availability:
       status: confirm_pending
       value: null
       source_ids:
       - dbnsfp_v4
       cp_ids:
-      - CP-21
+      - CP-25
     license_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-24
     training_manifest_status:
       status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
       - CP-20
-      note: manifest not obtained; metadata only, not a leakage input
+      note: manifest not obtained; overlap-vs-TSC pending (CP-20); metadata only, not a leakage input
     tsc_specific_evidence:
-      status: not_applicable
+      status: unavailable
       value: null
-      source_ids:
-      - pejaver_2022
+      source_ids: []
       cp_ids: []
-      note: no TSC-specific calibration at matrix stage
+      note: none identified for TSC1/TSC2; not assessed at matrix stage
     implementation_cost:
-      status: confirm_pending
+      status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
-      cp_ids:
-      - CP-21
+      source_ids: []
+      cp_ids: []
+      note: not assessed; out of scope for this bounded decision matrix
   sift:
     candidate_id: sift
     display_name: SIFT
-    tool_kind: predictor
+    tool_kind: homology_predictor
     evidence_role: calibrated_missense
     calibration_source_id: pejaver_2022
     calibration_locus: Table 2
@@ -1080,50 +1049,44 @@ candidates:
       source_ids:
       - pejaver_2022
       cp_ids:
-      - CP-9
+      - CP-23
     current_release_pin_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-28
     structured_score_availability:
       status: confirm_pending
       value: null
       source_ids:
       - dbnsfp_v4
       cp_ids:
-      - CP-21
+      - CP-25
     license_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-24
     training_manifest_status:
       status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
-      cp_ids:
-      - CP-20
-      note: manifest not obtained; metadata only, not a leakage input
-    tsc_specific_evidence:
-      status: not_applicable
-      value: null
-      source_ids:
-      - pejaver_2022
+      source_ids: []
       cp_ids: []
-      note: no TSC-specific calibration at matrix stage
-    implementation_cost:
-      status: confirm_pending
+      note: manifest not obtained; NOT in the CP-20 overlap set; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
-      cp_ids:
-      - CP-21
+      source_ids: []
+      cp_ids: []
+      note: none identified for TSC1/TSC2; not assessed at matrix stage
+    implementation_cost:
+      status: unavailable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: not assessed; out of scope for this bounded decision matrix
   gerp_plus_plus:
     candidate_id: gerp_plus_plus
     display_name: GERP++
@@ -1135,7 +1098,7 @@ candidates:
     transcript_and_consequence_scope: missense_variant
     component_or_feature_overlap: embedded in CADD and other meta-predictors
     structured_score_source: dbnsfp_v4
-    license_source: dbnsfp_v4_official_distribution
+    license_source: official_gerp_distribution
     disposition: shadow_comparator
     rationale_source_ids:
     - pejaver_2022
@@ -1173,50 +1136,45 @@ candidates:
       source_ids:
       - pejaver_2022
       cp_ids:
-      - CP-9
+      - CP-23
     current_release_pin_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-28
     structured_score_availability:
       status: confirm_pending
       value: null
       source_ids:
       - dbnsfp_v4
       cp_ids:
-      - CP-21
+      - CP-25
     license_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
       - CP-17
     training_manifest_status:
       status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
       - CP-20
-      note: manifest not obtained; metadata only, not a leakage input
+      note: manifest not obtained; overlap-vs-TSC pending (CP-20); metadata only, not a leakage input
     tsc_specific_evidence:
-      status: not_applicable
+      status: unavailable
       value: null
-      source_ids:
-      - pejaver_2022
+      source_ids: []
       cp_ids: []
-      note: no TSC-specific calibration at matrix stage
+      note: none identified for TSC1/TSC2; not assessed at matrix stage
     implementation_cost:
-      status: confirm_pending
+      status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
-      cp_ids:
-      - CP-21
+      source_ids: []
+      cp_ids: []
+      note: not assessed; out of scope for this bounded decision matrix
   phylop:
     candidate_id: phylop
     display_name: PhyloP
@@ -1228,7 +1186,7 @@ candidates:
     transcript_and_consequence_scope: missense_variant
     component_or_feature_overlap: embedded in CADD and other meta-predictors
     structured_score_source: dbnsfp_v4
-    license_source: dbnsfp_v4_official_distribution
+    license_source: official_phylop_distribution
     disposition: shadow_comparator
     rationale_source_ids:
     - pejaver_2022
@@ -1266,55 +1224,49 @@ candidates:
       source_ids:
       - pejaver_2022
       cp_ids:
-      - CP-9
       - CP-14
     current_release_pin_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-28
     structured_score_availability:
       status: confirm_pending
       value: null
       source_ids:
       - dbnsfp_v4
       cp_ids:
-      - CP-21
+      - CP-25
     license_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
       - CP-18
     training_manifest_status:
       status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
+      source_ids: []
       cp_ids:
       - CP-20
-      note: manifest not obtained; metadata only, not a leakage input
+      note: manifest not obtained; overlap-vs-TSC pending (CP-20); metadata only, not a leakage input
     tsc_specific_evidence:
-      status: not_applicable
+      status: unavailable
       value: null
-      source_ids:
-      - pejaver_2022
+      source_ids: []
       cp_ids: []
-      note: no TSC-specific calibration at matrix stage
+      note: none identified for TSC1/TSC2; not assessed at matrix stage
     implementation_cost:
-      status: confirm_pending
+      status: unavailable
       value: null
-      source_ids:
-      - dbnsfp_v4
-      cp_ids:
-      - CP-21
+      source_ids: []
+      cp_ids: []
+      note: not assessed; out of scope for this bounded decision matrix
   alphamissense:
     candidate_id: alphamissense
     display_name: AlphaMissense
-    tool_kind: predictor
+    tool_kind: protein_language_ml_predictor
     evidence_role: calibrated_missense
     calibration_source_id: bergquist_2025
     calibration_locus: Table 1
@@ -1364,51 +1316,44 @@ candidates:
     current_release_pin_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - bergquist_2025
+      source_ids: []
       cp_ids:
-      - CP-10
-      - CP-21
+      - CP-28
     structured_score_availability:
       status: confirm_pending
       value: null
       source_ids:
-      - bergquist_2025
+      - dbnsfp_v4
       cp_ids:
-      - CP-21
+      - CP-25
     license_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - bergquist_2025
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-24
     training_manifest_status:
       status: unavailable
       value: null
-      source_ids:
-      - bergquist_2025
-      cp_ids:
-      - CP-20
-      note: manifest not obtained; metadata only, not a leakage input
-    tsc_specific_evidence:
-      status: not_applicable
-      value: null
-      source_ids:
-      - bergquist_2025
+      source_ids: []
       cp_ids: []
-      note: no TSC-specific calibration at matrix stage
-    implementation_cost:
-      status: confirm_pending
+      note: manifest not obtained; NOT in the CP-20 overlap set; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: unavailable
       value: null
-      source_ids:
-      - bergquist_2025
-      cp_ids:
-      - CP-21
+      source_ids: []
+      cp_ids: []
+      note: none identified for TSC1/TSC2; not assessed at matrix stage
+    implementation_cost:
+      status: unavailable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: not assessed; out of scope for this bounded decision matrix
   esm1b:
     candidate_id: esm1b
     display_name: ESM1b
-    tool_kind: predictor
+    tool_kind: protein_language_model
     evidence_role: calibrated_missense
     calibration_source_id: bergquist_2025
     calibration_locus: Table 1
@@ -1454,55 +1399,48 @@ candidates:
       source_ids:
       - bergquist_2025
       cp_ids:
-      - CP-6
+      - CP-22
     current_release_pin_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - bergquist_2025
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-28
     structured_score_availability:
       status: confirm_pending
       value: null
       source_ids:
-      - bergquist_2025
+      - dbnsfp_v4
       cp_ids:
       - CP-12
-      - CP-21
     license_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - bergquist_2025
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-24
     training_manifest_status:
       status: unavailable
       value: null
-      source_ids:
-      - bergquist_2025
-      cp_ids:
-      - CP-20
-      note: manifest not obtained; metadata only, not a leakage input
-    tsc_specific_evidence:
-      status: not_applicable
-      value: null
-      source_ids:
-      - bergquist_2025
+      source_ids: []
       cp_ids: []
-      note: no TSC-specific calibration at matrix stage
-    implementation_cost:
-      status: confirm_pending
+      note: manifest not obtained; NOT in the CP-20 overlap set; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: unavailable
       value: null
-      source_ids:
-      - bergquist_2025
-      cp_ids:
-      - CP-21
+      source_ids: []
+      cp_ids: []
+      note: none identified for TSC1/TSC2; not assessed at matrix stage
+    implementation_cost:
+      status: unavailable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: not assessed; out of scope for this bounded decision matrix
   varity_r:
     candidate_id: varity_r
     display_name: VARITY_R
-    tool_kind: predictor
+    tool_kind: supervised_rare_variant_model
     evidence_role: calibrated_missense
     calibration_source_id: bergquist_2025
     calibration_locus: Table 1
@@ -1552,53 +1490,45 @@ candidates:
     current_release_pin_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - bergquist_2025
+      source_ids: []
       cp_ids:
-      - CP-11
-      - CP-21
+      - CP-28
     structured_score_availability:
       status: confirm_pending
       value: null
       source_ids:
-      - bergquist_2025
+      - dbnsfp_v4
       cp_ids:
       - CP-13
-      - CP-21
     license_status:
       status: confirm_pending
       value: null
-      source_ids:
-      - bergquist_2025
+      source_ids: []
       cp_ids:
-      - CP-21
+      - CP-24
     training_manifest_status:
       status: unavailable
       value: null
-      source_ids:
-      - bergquist_2025
-      cp_ids:
-      - CP-20
-      note: manifest not obtained; metadata only, not a leakage input
-    tsc_specific_evidence:
-      status: not_applicable
-      value: null
-      source_ids:
-      - bergquist_2025
+      source_ids: []
       cp_ids: []
-      note: no TSC-specific calibration at matrix stage
-    implementation_cost:
-      status: confirm_pending
+      note: manifest not obtained; NOT in the CP-20 overlap set; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: unavailable
       value: null
-      source_ids:
-      - bergquist_2025
-      cp_ids:
-      - CP-21
+      source_ids: []
+      cp_ids: []
+      note: none identified for TSC1/TSC2; not assessed at matrix stage
+    implementation_cost:
+      status: unavailable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: not assessed; out of scope for this bounded decision matrix
 audit_rows:
   bias_composite:
     candidate_id: bias_composite
     display_name: BIAS composite (reconstructed max_plus_consensus)
-    tool_kind: composite
+    tool_kind: custom_composite
     evidence_role: audit_only
     calibration_source_id: null
     calibration_locus: null
@@ -1615,8 +1545,7 @@ audit_rows:
       value: null
       source_ids: []
       cp_ids: []
-      note: BIAS composite has no external end-to-end calibration; audit reconstruction only (disposition
-        audit_only_reject_authoritative); not a PP3/BP4 candidate interval.
+      note: no external calibration
     explicit_indeterminate_interval:
       status: not_applicable
       value: null
@@ -1643,7 +1572,7 @@ audit_rows:
       value: null
       source_ids: []
       cp_ids: []
-      note: no external calibration version; internal reconstruction only
+      note: internal audit reconstruction; not an externally versioned predictor
     current_release_pin_status:
       status: not_applicable
       value: null
@@ -1655,32 +1584,32 @@ audit_rows:
       value: null
       source_ids: []
       cp_ids: []
-      note: reconstructed only from BIAS rationale text, not a structured external score source
+      note: reconstructed_only
     license_status:
       status: not_applicable
       value: null
       source_ids: []
       cp_ids: []
-      note: internal repository component; no external predictor licence applicable
+      note: audit-only; not a distributed PP3/BP4 predictor
     training_manifest_status:
-      status: not_applicable
+      status: unavailable
       value: null
       source_ids: []
       cp_ids: []
-      note: no external training data; internal deterministic reconstruction
+      note: inherits unknown constituent provenance; audit-only
     tsc_specific_evidence:
       status: not_applicable
       value: null
       source_ids: []
       cp_ids: []
-      note: no TSC-specific calibration; audit-only composite
+      note: audit-only reconstruction
     implementation_cost:
       status: not_applicable
       value: null
       source_ids: []
       cp_ids: []
       note: already implemented as an audit/reconstruction layer (src/raptor/eval/predictor_aggregation.py);
-        not proposed for PP3/BP4 activation
+        not assessed for this matrix; out of scope
 smallest_pin_handoff:
   next_task_id: sources-pin-core-annotation-bundle
   rule: The next task pins ONE annotation bundle and only the fields needed to decide/operate the primary

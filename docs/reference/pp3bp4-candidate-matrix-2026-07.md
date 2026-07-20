@@ -51,21 +51,21 @@ The following are **confirm-pending** (not yet independently verified against a 
 |---|---|---|---|---|---|
 | `revel` | REVEL | meta_predictor | calibrated_missense | Pejaver 2022, Table 2 | **advance_shadow** |
 | `bayesdel_noaf` | BayesDel (no allele frequency) | meta_predictor | calibrated_missense | Pejaver 2022, Table 2 | eligible_primary_candidate |
-| `mutpred2` | MutPred2 | predictor | calibrated_missense | Pejaver 2022, Table 2 | eligible_primary_candidate |
-| `vest4` | VEST4 | predictor | calibrated_missense | Pejaver 2022, Table 2 | eligible_primary_candidate |
-| `alphamissense` | AlphaMissense | predictor | calibrated_missense | Bergquist 2025, Table 1 | eligible_primary_candidate |
-| `esm1b` | ESM1b | predictor | calibrated_missense | Bergquist 2025, Table 1 | eligible_primary_candidate |
-| `varity_r` | VARITY_R | predictor | calibrated_missense | Bergquist 2025, Table 1 | eligible_primary_candidate |
-| `cadd` | CADD | predictor | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
-| `evolutionary_action` | Evolutionary Action | predictor | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
-| `fathmm` | FATHMM | predictor | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
+| `mutpred2` | MutPred2 | supervised_predictor | calibrated_missense | Pejaver 2022, Table 2 | eligible_primary_candidate |
+| `vest4` | VEST4 | supervised_predictor | calibrated_missense | Pejaver 2022, Table 2 | eligible_primary_candidate |
+| `alphamissense` | AlphaMissense | protein_language_ml_predictor | calibrated_missense | Bergquist 2025, Table 1 | eligible_primary_candidate |
+| `esm1b` | ESM1b | protein_language_model | calibrated_missense | Bergquist 2025, Table 1 | eligible_primary_candidate |
+| `varity_r` | VARITY_R | supervised_rare_variant_model | calibrated_missense | Bergquist 2025, Table 1 | eligible_primary_candidate |
+| `cadd` | CADD | meta_annotation_score | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
+| `evolutionary_action` | Evolutionary Action | evolutionary_predictor | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
+| `fathmm` | FATHMM | hmm_predictor | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
 | `gerp_plus_plus` | GERP++ | conservation | conservation_context | Pejaver 2022, Table 2 | shadow_comparator |
-| `mpc` | MPC | predictor | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
+| `mpc` | MPC | regional_constraint | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
 | `phylop` | PhyloP | conservation | conservation_context | Pejaver 2022, Table 2 | shadow_comparator |
-| `polyphen2_humvar` | PolyPhen-2 HumVar | predictor | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
-| `primateai_original` | PrimateAI | predictor | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
-| `sift` | SIFT | predictor | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
-| `bias_composite` | BIAS composite (reconstructed max_plus_consensus) | composite | audit_only | none (audit reconstruction only) | audit_only_reject_authoritative |
+| `polyphen2_humvar` | PolyPhen-2 HumVar | missense_predictor | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
+| `primateai_original` | PrimateAI | deep_learning_predictor | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
+| `sift` | SIFT | homology_predictor | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
+| `bias_composite` | BIAS composite (reconstructed max_plus_consensus) | custom_composite | audit_only | none (audit reconstruction only) | audit_only_reject_authoritative |
 
 Notes:
 
