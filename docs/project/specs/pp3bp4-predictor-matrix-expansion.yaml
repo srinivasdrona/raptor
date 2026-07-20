@@ -136,7 +136,9 @@ source_map:
   dbnsfp_v4:
     citation: "Liu X, Li C, Mou C, Dong Y, Tu Y. dbNSFP v4. Genome Medicine 2020;12:103."
     url: "https://sites.google.com/site/jpopgen/dbNSFP"
-    role: "Distribution/availability reference only (not a calibration source). Exact RAPTOR release/column/licence branch are unpinned: current_release_pin (CP-21), availability (CP-12/CP-13), licences (CP-16..CP-19)."
+    loci:
+      distribution_metadata: "Official dbNSFP distribution page (https://sites.google.com/site/jpopgen/dbNSFP): per-release download/file listing, the release column/field inventory (README/'column description'), and the academic-vs-commercial licence-separated branches. Used only to locate candidate score fields, their availability, and licence terms; it does not pin a release. The exact RAPTOR release remains confirm_pending (CP-21)."
+    role: "Distribution/availability reference only (not a calibration source). The exact RAPTOR-pinned release/column/licence branch remain confirm_pending: current_release_pin (CP-21), availability (CP-12/CP-13), licences (CP-16..CP-19)."
   resolution_rule: >-
     Every candidate basis, component/dependence claim, calibration conclusion, and confirm_pending
     item resolves to one of these source_map IDs + locus, or to the official URL above. The matrix
