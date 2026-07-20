@@ -1,0 +1,660 @@
+schema: raptor-predictor-matrix-expansion-plan/1
+status: implementation_ready_task_spec
+task_id: sources-expand-predictor-matrix
+title: Bounded expansion of the calibrated PP3/BP4 predictor decision matrix
+
+# ---------------------------------------------------------------------------
+# 0. Planner provenance and authority
+# ---------------------------------------------------------------------------
+planner_provenance:
+  role: >-
+    Opus planner in RAPTOR's declared Opus -> Gemini -> Sonnet 5 -> GPT-5.4
+    loop. Plan only; this artifact implements no code, tests, config, or
+    matrix content.
+  composition_order:
+    - slot1-DELIBERATE_ACTION_PREFIX_v2.md
+    - slot2-PREDICTOR_MATRIX_PLANNING_TEMPLATE.md
+    - slot3-PREDICTOR_MATRIX_PLAN.md
+  authoritative_input_precedence:
+    - "1: PREDICTOR_MATRIX_TASK_SPEC.yaml (machine spec; highest)"
+    - "2: PRIMARY_SOURCE_RESEARCH_BRIEF.md (confirm-pending markers are binding)"
+    - "3: RAPTOR repository artifacts listed under context_surface"
+    - "4: existing code/tests as implementation context only"
+  manifest_hash_verification:
+    manifest: predictor-matrix-3slot/manifest.json
+    method: "Get-FileHash -Algorithm SHA256 over raw file bytes"
+    result: all_match
+    entries:
+      - { name: slot1-DELIBERATE_ACTION_PREFIX_v2.md, sha256: a0f94762e69b78f7db70398e20e1ccc6293708eff52de1e886174c2d4f7ea58f, status: match }
+      - { name: slot2-PREDICTOR_MATRIX_PLANNING_TEMPLATE.md, sha256: 469608846f2b626409024b4116b5579625074afc13df00cedcf71930d2e2a813, status: match }
+      - { name: slot3-PREDICTOR_MATRIX_PLAN.md, sha256: d5413f2494b1d8b2cd774b23bc42461e0d6ec578b9b8a3256d20109ffb0beb17, status: match }
+      - { name: PREDICTOR_MATRIX_TASK_SPEC.yaml, sha256: 21160e7bcf0745e651918dc5338b1831a418c44995a3de987c2400c3f21f1deb, status: match }
+      - { name: PRIMARY_SOURCE_RESEARCH_BRIEF.md, sha256: c155add86aef53805e874dc04cc477804c9ed6eaa2c4b35d27afdb1f9fc1ea71, status: match }
+
+worktree: D:\AIProjects\raptor-worktrees\predictor-matrix
+branch: track/predictor-matrix-2026-07
+base_commit: 2267d27d9ce18381907e8452644387f21bc0ce6c
+planner_output_path: docs/project/specs/pp3bp4-predictor-matrix-expansion.yaml
+planner_may_modify_only:
+  - docs/project/specs/pp3bp4-predictor-matrix-expansion.yaml
+planner_commit_policy: one_planner_commit_no_push
+
+# ---------------------------------------------------------------------------
+# 1. Goal and bounded-scope contract
+# ---------------------------------------------------------------------------
+goal: >-
+  Expand RAPTOR's PP3/BP4 decision matrix from four dispositioned candidates to
+  the complete, source-verified set of 16 calibrated missense tools (plus the
+  required BIAS composite audit row), as machine-readable and human-reviewable
+  DECISION SUPPORT, while keeping the existing REVEL candidate policy proposed,
+  shadow-only, unapproved, and behaviourally unchanged.
+
+bounded_scope_contract:
+  is:
+    - "A 16-tool decision matrix (16 calibrated rows + 1 bias_composite audit row = 17 table rows)."
+    - "The 16-calibrated-tool identity set is the binding completeness invariant."
+    - "Comparison/disposition metadata sourced only from published calibration and official tool pages."
+    - "The first technical unit on the Tier-1/2 VUS critical path; it unblocks sources-pin-core-annotation-bundle."
+  is_not:
+    - "Not 16 score integrations. Matrix completeness must not imply downloading or wiring any predictor."
+    - "Not predictor voting, ranking, consensus, strongest-score, fallback, or per-variant selection."
+    - "Not activation, owner approval, terminal held-out rerun, VUS census, or clinical output."
+    - "Not held-out / VUS-census / MAVE-class tuning of any selection, disposition, interval, or ranking."
+  invariants:
+    - "16-tool decision support, never 16 integrations."
+    - "No production scorer / gate / packet / census wiring is added or touched."
+    - "No fabricated interval, version, license, availability, or training-overlap fact; use confirm_pending / unavailable / not_applicable."
+    - "The existing REVEL policy is semantically unchanged; only its bound source_register_sha256 may change, and only under an explicit, approved, hash-only update proven equivalent."
+    - "REVEL remains the sole proposed shadow candidate; MAVE remains orthogonal functional evidence, never a predictor label."
+
+# ---------------------------------------------------------------------------
+# 2. Motivating references
+# ---------------------------------------------------------------------------
+motivating_references:
+  primary_sources:
+    pejaver_2022:
+      citation: "Pejaver V, Byrne AB, Feng BJ, et al. AJHG 2022;109:2163-2177."
+      ids: { doi: "10.1016/j.ajhg.2022.10.013", pmid: "36413997", pmc: "PMC9748256" }
+      relevant_locus: "Methods (13-tool set, direction transforms, score acquisition, training-overlap exclusions); Table 2 (calibrated intervals)."
+      verified_use: "REVEL Table-2 intervals are the ONLY fully-verified multi-level numeric intervals (see revel_verified_intervals)."
+    bergquist_2025:
+      citation: "Bergquist T, Pejaver V, et al. Genetics in Medicine 2025."
+      ids: { doi: "10.1016/j.gim.2025.101402", pmid: "40084623", preprint_doi: "10.1101/2024.09.17.611902", pmc: confirm_pending }
+      relevant_locus: "Table 1 (AlphaMissense, ESM1b, VARITY_R exact intervals) -- numeric use requires direct Table 1 verification (CP-5/6/7); PMCID is CP-8."
+    stenton_2024:
+      citation: "Stenton SL, Pejaver V, Harrison SM, et al. Genetics in Medicine 2024."
+      ids: { pmid: "39030733", pmc: "PMC11560577" }
+      relevant_locus: "Box 1 operational guidance -- one preselected predictor, no cherry-picking, combined PP3+PM1 capped at Strong."
+    richards_2015:
+      citation: "Richards S, Aziz N, Bale S, et al. ACMG/AMP standards. 2015."
+      ids: { doi: "10.1038/gim.2015.30", pmid: "25741868", pmc: "PMC4544753" }
+      relevant_locus: "PP3/BP4 as computational evidence applied once per variant; correlated-tool rule."
+    tavtigian_2018:
+      citation: "Tavtigian SV, et al. Bayesian evidence framework. 2018."
+      ids: { doi: "10.1038/gim.2017.210" }
+      relevant_locus: "Bayesian evidence-strength ladder (supporting/moderate/strong)."
+  distribution_reference:
+    dbnsfp_v4:
+      citation: "Liu X, Li C, Mou C, Dong Y, Tu Y. dbNSFP v4. Genome Medicine 2020;12:103."
+      note: >-
+        Distribution/availability reference only, NOT a calibration primary source and NOT a
+        pinned RAPTOR release. The exact release, column inventory, and licence branch are
+        confirm_pending (CP-12/CP-13/CP-14/CP-21) and are decided in sources-pin-core-annotation-bundle.
+        Referenced from candidate structured_score_source fields as the token `dbnsfp_v4`; it is
+        deliberately NOT added to the register required_primary_sources to avoid implying a pinned release.
+
+# ---------------------------------------------------------------------------
+# 3. Context surface (repository artifacts) + <=4 primary implementation refs
+# ---------------------------------------------------------------------------
+context_surface:
+  matrix_and_policy_artifacts:
+    - docs/reference/pp3bp4-candidate-matrix-2026-07.md
+    - docs/reference/pp3-bp4-predictor-policy-recommendation-2026-07.md
+    - configs/eval/pp3bp4_source_register.yaml
+    - configs/eval/predictor_training_manifests.yaml
+    - configs/eval/pp3bp4_candidate_policy.json
+    - src/raptor/eval/pp3bp4_candidate_policy.py
+    - tests/eval/test_pp3bp4_candidate_policy.py
+  loader_and_consumer_context:
+    - src/raptor/eval/predictor_leakage_audit.py
+    - src/raptor/eval/pp3bp4_score_table.py
+    - src/raptor/eval/pp3bp4_transportability.py
+primary_implementation_reference_files:   # at most four
+  - path: configs/eval/pp3bp4_source_register.yaml
+    why: "Machine register to expand; its raw bytes are hashed into the REVEL policy binding."
+  - path: docs/reference/pp3bp4-candidate-matrix-2026-07.md
+    why: "Human-reviewable matrix to expand to the full 16-tool + bias set."
+  - path: configs/eval/pp3bp4_candidate_policy.json
+    why: "REVEL policy; only its source_register_sha256 field may change (gated, equivalence-proven)."
+  - path: src/raptor/eval/pp3bp4_candidate_policy.py
+    why: "Read-only reference for the loader's register-hash binding and closed schemas; MUST NOT be edited."
+
+# ---------------------------------------------------------------------------
+# 4. Authoritative candidate identity set (Slot 3 decision 1)
+# ---------------------------------------------------------------------------
+candidate_identity:
+  completeness_invariant: "Exactly these 16 calibrated candidate_ids, plus the required bias_composite audit row."
+  calibrated_16:
+    pejaver_2022_thirteen:
+      - { candidate_id: bayesdel_noaf,      display_name: "BayesDel without minor-allele frequency", tool_kind: meta_predictor }
+      - { candidate_id: cadd,               display_name: "CADD",                 tool_kind: meta_annotation_score }
+      - { candidate_id: evolutionary_action, display_name: "Evolutionary Action", tool_kind: evolutionary_predictor }
+      - { candidate_id: fathmm,             display_name: "FATHMM",               tool_kind: hmm_predictor }
+      - { candidate_id: gerp_plus_plus,     display_name: "GERP++",               tool_kind: conservation }
+      - { candidate_id: mpc,                display_name: "MPC",                  tool_kind: regional_constraint }
+      - { candidate_id: mutpred2,           display_name: "MutPred2",             tool_kind: supervised_predictor }
+      - { candidate_id: phylop,             display_name: "PhyloP",               tool_kind: conservation }
+      - { candidate_id: polyphen2_humvar,   display_name: "PolyPhen-2 HumVar",    tool_kind: missense_predictor }
+      - { candidate_id: primateai_original, display_name: "PrimateAI (original)", tool_kind: deep_learning_predictor }
+      - { candidate_id: revel,              display_name: "REVEL",                tool_kind: meta_predictor }
+      - { candidate_id: sift,               display_name: "SIFT",                 tool_kind: homology_predictor }
+      - { candidate_id: vest4,              display_name: "VEST4",                tool_kind: supervised_predictor }
+    bergquist_2025_three:
+      - { candidate_id: alphamissense, display_name: "AlphaMissense",  tool_kind: protein_language_ml_predictor }
+      - { candidate_id: esm1b,         display_name: "ESM1b",          tool_kind: protein_language_model }
+      - { candidate_id: varity_r,      display_name: "VARITY_R (rare-variant-trained)", tool_kind: supervised_rare_variant_model }
+  additional_required_rows:
+    - { candidate_id: bias_composite, display_name: "BIAS composite", tool_kind: custom_composite, note: "Audit reconstruction only; no external end-to-end calibration identified." }
+  alias_rejections:
+    - "primateai_original MUST NOT be substituted by PrimateAI-3D (a distinct successor model)."
+    - "varity_r MUST NOT be substituted by other VARITY variants (e.g. base VARITY / VARITY_ER); it is the rare-variant-trained model."
+    - "bayesdel_noaf (without allele frequency) MUST remain distinct from any BayesDel-addAF variant."
+    - "A paper calibrating a tool does not authorise substituting a later release of that tool."
+  source_grounding: "Identity set from PRIMARY_SOURCE_RESEARCH_BRIEF.md sections 1-2; no substantive identity correction was found in the brief."
+
+# ---------------------------------------------------------------------------
+# 5. Tier and disposition vocabulary (Slot 3 decision 4)
+# ---------------------------------------------------------------------------
+classification:
+  required_tiers:            # from task spec required_classification_tiers
+    calibrated_missense_candidates:
+      definition: "The 16 tools calibrated for missense PP3/BP4 by Pejaver 2022 / Bergquist 2025."
+      members: [bayesdel_noaf, cadd, evolutionary_action, fathmm, gerp_plus_plus, mpc, mutpred2, phylop, polyphen2_humvar, primateai_original, revel, sift, vest4, alphamissense, esm1b, varity_r]
+    comparator_watchlist:
+      definition: "Non-calibrated / excluded / successor models recorded to prevent silent substitution; carry NO PP3/BP4 numeric rows and NO votes."
+      examples_from_brief: ["EVE (Bergquist-excluded: predictions unavailable for enough genes/benign variants -> sampling-bias concern)", "PrimateAI-3D (successor; alias-rejected)"]
+      population_rule: "Populate ONLY from sourced facts; otherwise leave explicitly empty. No fabricated entries."
+    separate_splice_policy:
+      definition: "Splice predictors (e.g. SpliceAI / ABSplice / dbscSNV) are a separate consequence policy, never additional missense PP3/BP4 votes."
+      routing: "REVEL policy already routes splice_relevant -> out_of_scope; splice work is handed off to todo sources-add-splice-track."
+      rows: "No calibrated missense rows here."
+    functional_evidence_not_pp3bp4:
+      definition: "MAVE / functional assays are orthogonal functional evidence (PS3/BS3 family), never a PP3/BP4 predictor label."
+      rows: "No missense predictor rows here."
+    full_classifier_exclusions:
+      definition: "Full variant classifiers that emit an end-to-end classification (not a calibrated missense score) are excluded from the PP3/BP4 comparison."
+      population_rule: "Populate ONLY from sourced facts; if none are enumerated, record an explicit not_applicable note. No fabrication."
+  disposition_vocabulary:    # exactly the task spec allowed_dispositions
+    - advance_shadow
+    - eligible_primary_candidate
+    - shadow_comparator
+    - research_watchlist
+    - separate_consequence_policy
+    - functional_evidence_not_pp3bp4
+    - full_classifier_exclusion
+    - audit_only_reject_authoritative
+    - blocked_pending_source
+  legacy_disposition_mapping:
+    note: >-
+      The pre-expansion register used advance_shadow / blocked_shadow_comparator /
+      audit_only_reject_authoritative. blocked_shadow_comparator is NOT in the authoritative
+      allowed_dispositions and is retired. REVEL stays advance_shadow (unchanged). The three
+      existing comparators are re-dispositioned from published calibration + acquisition status
+      ONLY (never held-out performance); this is decision-support relabelling, not selection.
+    mapping:
+      - "revel: advance_shadow (UNCHANGED; sole advanced shadow candidate)."
+      - "bayesdel_noaf: blocked_shadow_comparator -> eligible_primary_candidate (brief S5: PP3 Strong + BP4 Moderate)."
+      - "mutpred2: blocked_shadow_comparator -> eligible_primary_candidate (brief S5)."
+      - "vest4: blocked_shadow_comparator -> eligible_primary_candidate (brief S5)."
+      - "bias_composite: audit_only_reject_authoritative (UNCHANGED)."
+  provisional_disposition_assignment:
+    source: "PRIMARY_SOURCE_RESEARCH_BRIEF.md section 5 (published calibration conclusions + acquisition/overlap); NOT RAPTOR held-out data."
+    binding_rule: >-
+      Dispositions are decision-matrix labels, not runtime routes. They must not create voting,
+      fallback, ranking, or per-variant selection. Only revel carries advance_shadow.
+    assignments:
+      revel: { disposition: advance_shadow, basis: "PP3 Strong + BP4 Moderate; existing sole shadow candidate" }
+      bayesdel_noaf: { disposition: eligible_primary_candidate, basis: "PP3 Strong + BP4 Moderate; meta-predictor; component overlap" }
+      mutpred2: { disposition: eligible_primary_candidate, basis: "PP3 Strong + BP4 Moderate; separately generated" }
+      vest4: { disposition: eligible_primary_candidate, basis: "PP3 Strong + BP4 Moderate; dbNSFP academic route" }
+      alphamissense: { disposition: eligible_primary_candidate, basis: "PP3 Strong + BP4 Moderate; official precomputed scores; release pin pending (CP-10)" }
+      esm1b: { disposition: eligible_primary_candidate, basis: "PP3 Strong + BP4 Moderate (practical validation yield may cap PP3); direction lower; release/column pin pending (CP-6/CP-12)" }
+      varity_r: { disposition: eligible_primary_candidate, basis: "PP3 Strong + BP4 Strong; model/release pin pending (CP-7/CP-11/CP-13)" }
+      cadd: { disposition: shadow_comparator, basis: "Calibrated; did not meet both preferred maxima; many embedded conservation/protein features" }
+      evolutionary_action: { disposition: shadow_comparator, basis: "Calibrated; did not meet both preferred maxima; separate generation route (brief also flags watchlist-adjacent)" }
+      fathmm: { disposition: shadow_comparator, basis: "Calibrated; did not meet both preferred maxima; REVEL/BayesDel component; native lower before Pejaver transform" }
+      gerp_plus_plus: { disposition: shadow_comparator, basis: "Calibrated; conservation/context; feature overlap with meta-predictors" }
+      mpc: { disposition: shadow_comparator, basis: "Calibrated; constraint/population dependence; BayesDel component" }
+      phylop: { disposition: shadow_comparator, basis: "Calibrated; conservation; exact calibrated dbNSFP column pending (CP-14)" }
+      polyphen2_humvar: { disposition: shadow_comparator, basis: "Calibrated; REVEL/BayesDel component" }
+      primateai_original: { disposition: shadow_comparator, basis: "Calibrated; evaluated release needs confirmation (CP-15)" }
+      sift: { disposition: shadow_comparator, basis: "Calibrated; REVEL/BayesDel component; native lower before Pejaver transform" }
+      bias_composite: { disposition: audit_only_reject_authoritative, basis: "No external end-to-end calibration identified; audit reconstruction only" }
+
+# ---------------------------------------------------------------------------
+# 6. Verified facts vs confirm-pending handling (Slot 3 decision 2)
+# ---------------------------------------------------------------------------
+fact_status_model:
+  enum: [verified, confirm_pending, unavailable, not_applicable]
+  rule: >-
+    Every matrix cell carries either a verified value WITH a rationale_source_id, or an explicit
+    status token. No success-shaped defaults: a blank, a zero, an empty interval, or a bare
+    tool name must NOT be interpreted as verified/available. Missing training manifests are
+    unavailable/unknown, never zero-overlap. Bundled score availability is never licence approval.
+  verified_facts:
+    - "The 16-tool + 3-tool identity split (Pejaver 13 / Bergquist 3)."
+    - "Native score directions: all higher-is-more-pathogenic EXCEPT fathmm and sift (lower, transformed by Pejaver) and esm1b (lower, Bergquist)."
+    - "Meta-predictor component maps (see component_overlap_map)."
+    - "Score-acquisition split: Pejaver took precomputed scores from dbNSFP EXCEPT bayesdel_noaf, cadd, evolutionary_action, mutpred2, polyphen2 (generated separately)."
+    - "Pejaver training-variant removal set: bayesdel, fathmm, mpc, mutpred2, polyphen2, revel, vest4 (REVEL/BayesDel also considered constituent training sets)."
+    - "Bergquist calibrated alphamissense/esm1b/varity_r to PP3 Strong + BP4 Moderate; varity_r also BP4 Strong; EVE attempted but excluded."
+    - "REVEL Table-2 multi-level intervals (revel_verified_intervals) -- the ONLY verified numeric intervals."
+  revel_verified_intervals:
+    source_id: pejaver_2022
+    locus: "Table 2, REVEL row"
+    intervals:
+      pp3_supporting: "0.644 <= score < 0.773 (enabled)"
+      pp3_moderate: "0.773 <= score < 0.932 (enabled)"
+      pp3_strong: "score >= 0.932 (enabled)"
+      indeterminate: "0.290 < score < 0.644 (no criterion)"
+      bp4_supporting: "0.183 < score <= 0.290 (enabled)"
+      bp4_moderate: "0.016 < score <= 0.183 (enabled)"
+      bp4_strong: "0.003 < score <= 0.016 (calibrated but DISABLED in current RAPTOR policy)"
+      bp4_very_strong: "score <= 0.003 (calibrated but DISABLED in current RAPTOR policy)"
+    binding: "These exactly reproduce configs/eval/pp3bp4_candidate_policy.json and MUST NOT change."
+  confirm_pending_register:   # brief section 8 -- binding, do not upgrade
+    - { id: CP-1, fact: "Exact BayesDel-noAF PP3/BP4 intervals + indeterminate bounds", resolve_with: "Pejaver 2022 Table 2" }
+    - { id: CP-2, fact: "Exact MutPred2 intervals + indeterminate bounds", resolve_with: "Pejaver 2022 Table 2" }
+    - { id: CP-3, fact: "Exact VEST4 intervals + indeterminate bounds", resolve_with: "Pejaver 2022 Table 2" }
+    - { id: CP-4, fact: "Exact intervals/maxima for CADD, EA, FATHMM, GERP++, MPC, PhyloP, PolyPhen-2 HumVar, PrimateAI, SIFT", resolve_with: "Pejaver 2022 Table 2" }
+    - { id: CP-5, fact: "Exact AlphaMissense intervals", resolve_with: "Bergquist 2025 Table 1" }
+    - { id: CP-6, fact: "Exact ESM1b intervals", resolve_with: "Bergquist 2025 Table 1" }
+    - { id: CP-7, fact: "Exact VARITY_R intervals", resolve_with: "Bergquist 2025 Table 1" }
+    - { id: CP-8, fact: "Bergquist 2025 PMCID", resolve_with: "PubMed/PMC record" }
+    - { id: CP-9, fact: "Exact independently-generated tool versions used by Pejaver", resolve_with: "Pejaver supplement" }
+    - { id: CP-10, fact: "Exact AlphaMissense release evaluated by Bergquist", resolve_with: "Bergquist Methods/Data Availability" }
+    - { id: CP-11, fact: "Exact VARITY_R release evaluated by Bergquist", resolve_with: "Bergquist Methods/Data Availability" }
+    - { id: CP-12, fact: "ESM1b availability in the selected commercial dbNSFP branch", resolve_with: "selected release README" }
+    - { id: CP-13, fact: "VARITY_R availability in the selected commercial dbNSFP branch", resolve_with: "selected release README" }
+    - { id: CP-14, fact: "Exact PhyloP column calibrated by Pejaver", resolve_with: "Pejaver supplement" }
+    - { id: CP-15, fact: "Exact PrimateAI release evaluated by Pejaver", resolve_with: "Pejaver supplement" }
+    - { id: CP-16, fact: "Official MPC licence", resolve_with: "official distribution source" }
+    - { id: CP-17, fact: "Official GERP++ licence", resolve_with: "official distribution source" }
+    - { id: CP-18, fact: "Official PhyloP/PHAST licence", resolve_with: "official distribution source" }
+    - { id: CP-19, fact: "Official Evolutionary Action licence", resolve_with: "official distribution source" }
+    - { id: CP-20, fact: "Training overlap for CADD, EA, MPC, PhyloP, GERP++, PrimateAI vs the TSC benchmark", resolve_with: "verified training manifests + leakage audit" }
+    - { id: CP-21, fact: "Exact REVEL/dbNSFP release to pin for RAPTOR", resolve_with: "annotation-bundle decision (sources-pin-core-annotation-bundle)" }
+  component_overlap_map:     # brief section 6 -- verified; drives double-count analysis
+    revel: "includes SIFT, PolyPhen-2, FATHMM and other predictor features"
+    bayesdel_noaf: "includes SIFT, PolyPhen-2, FATHMM-coding, MPC and conservation features"
+    cadd: "includes conservation and protein-prediction features (PhyloP/GERP++/PolyPhen-derived)"
+    independence_rule: "REVEL and its components are not independent PP3/BP4 evidence; REVEL and BayesDel-noAF are not both applied as independent criteria; conservation/context tools are comparators, not additional votes; an allele-frequency-bearing predictor is not independent of population evidence without an explicit dependence policy."
+
+# ---------------------------------------------------------------------------
+# 7. Decision summary and rejected alternatives
+# ---------------------------------------------------------------------------
+decision_summary:
+  - "Represent the full 16-tool set + bias_composite as decision support across three surfaces: the Markdown matrix (human, all required_matrix_fields), the machine source register (candidate records + citation binding), and the training-manifest registry (availability + component overlap)."
+  - "Adopt the task spec allowed_dispositions vocabulary; retire blocked_shadow_comparator; keep REVEL advance_shadow."
+  - "Keep the loader-facing register schema (pp3bp4-source-register/1) and the 6 allowed top-level keys UNCHANGED; expand only required_primary_sources (add bergquist_2025) and the candidates block (informal, loader-unvalidated sub-structure)."
+  - "Treat the REVEL policy as semantically frozen; permit ONLY a gated, hash-only source_register_sha256 update proven equivalent."
+  - "Bind every unverified numeric/version/licence/availability fact to a CP-id; never fabricate."
+  - "Hand off the smallest annotation pin to sources-pin-core-annotation-bundle without narrowing the 16-row matrix."
+rejected_alternatives:
+  - id: reject_new_register_toplevel_keys
+    rejected: "Add a new top-level key (e.g. matrix / additional_sources) to the source register to hold the rich 23-field rows."
+    reason: "The loader's _validate_source_register rejects any top-level key outside the 6 allowed; this would force editing the preserved loader src/raptor/eval/pp3bp4_candidate_policy.py."
+  - id: reject_register_carries_all_23_fields_verbatim
+    rejected: "Put all 23 required_matrix_fields x 17 rows verbatim into the hash-bound register."
+    reason: "Every future matrix edit would re-hash the register and churn the REVEL policy binding. The Markdown carries the full 23-field presentation; the register carries the machine-checkable subset + citation binding."
+  - id: reject_separate_matrix_file_register_untouched
+    rejected: "Leave the register byte-identical and put the whole 16-row matrix in a NEW machine file so the policy never re-hashes."
+    reason: "Precedence-1 task spec explicitly says 'Expand the machine-readable source register' and names that exact register. Kept as the documented N/A fallback if the orchestrator withholds the hash-only policy update (see na_routes)."
+  - id: reject_disposition_from_holdout
+    rejected: "Choose or rank dispositions using RAPTOR held-out outcomes, VUS criterion outputs, MAVE classes, or strongest-score."
+    reason: "Hard boundary: no held-out/VUS/MAVE data may inform selection, disposition, interval, or ranking."
+  - id: reject_fabricate_intervals
+    rejected: "Fill numeric intervals for the 15 non-REVEL tools to make the table look complete."
+    reason: "Only REVEL Table-2 intervals are verified; all others are CP-1..CP-7 confirm_pending until the cited table is directly inspected."
+  - id: reject_silent_policy_rehash
+    rejected: "Let the register expansion re-hash and silently rewrite pp3bp4_candidate_policy.json."
+    reason: "Beat-4 failure mode 3. The transition must be an explicit, approved, one-field, equivalence-proven update."
+  - id: reject_integrate_16
+    rejected: "Download/wire all 16 predictors to 'complete' the matrix."
+    reason: "The matrix is decision support; integration is the separate sources-pin-core-annotation-bundle task and stays minimal."
+
+# ---------------------------------------------------------------------------
+# 8. Exact file-by-file change contract (for Sonnet)
+# ---------------------------------------------------------------------------
+file_change_contract:
+  - path: docs/reference/pp3bp4-candidate-matrix-2026-07.md
+    action: expand
+    change: >-
+      Expand section 2 to 17 rows (16 calibrated + bias_composite) presenting all required_matrix_fields
+      as columns, with verified values carrying a rationale_source_id and every unresolved cell showing
+      confirm_pending / unavailable / not_applicable (+ CP-id). Add the tier map (section 5 tiers) and
+      the component_overlap_map. Preserve the PROPOSED/UNAPPROVED/SHADOW-ONLY header, the reading rule,
+      and section 3's 'held-out acknowledged, not used' language verbatim.
+    protected: "REVEL row disposition stays advance_shadow; no numeric interval invented; no activation language added."
+  - path: configs/eval/pp3bp4_source_register.yaml
+    action: expand
+    change: >-
+      Add bergquist_2025 to required_primary_sources (verified citation; pmc confirm_pending; locus
+      'Table 1, intervals confirm_pending'). Expand candidates from 5 to the full 16 calibrated + bias_composite,
+      each carrying the register candidate schema (see schema_examples.register_candidate). Keep schema
+      'pp3bp4-source-register/1', version '1', and the 6 allowed top-level keys unchanged.
+    protected: "The 4 existing required citations remain verification: verified; revel candidate stays disposition advance_shadow."
+    forces_hash_update: true
+  - path: configs/eval/predictor_training_manifests.yaml
+    action: expand
+    change: >-
+      Keep direct: revel. Expand components to cover every comparator/component candidate
+      (all available: false, verified: false, sha256: null, with a note and an overlaps list drawn from
+      component_overlap_map). Keep schema 'pp3bp4-manifest-registry/1'.
+    protected: "No entry may claim available/verified or zero-overlap; the leakage audit must remain honest at UNKNOWN."
+  - path: configs/eval/pp3bp4_candidate_policy.json
+    action: hash_only_update_gated
+    change: >-
+      Update ONLY source_register_sha256 to sha256(final expanded register bytes). Change no other byte.
+    gate: orchestrator_approval_required   # see policy_hash_preservation
+    protected: "All other fields byte-identical: status proposed, shadow_only true, owner_approved false, predictor REVEL, pp3/bp4/indeterminate intervals, citation_ids, forbidden_fields, activation_* ."
+  - path: docs/reference/pp3-bp4-predictor-policy-recommendation-2026-07.md
+    action: link_only
+    change: >-
+      In section 10 or 11 only, add a link to the expanded matrix and a bounded-selection-implications note
+      (16-tool decision support; no new predictor advanced; REVEL remains the sole shadow candidate; next
+      task pins the smallest annotation bundle). No new selection, no interval, no activation.
+    protected: "Sections 1-9 unchanged; section 8 activation checklist unchanged."
+  - path: tests/eval/test_pp3bp4_candidate_policy.py
+    action: add_or_update
+    owner: gemini   # RED-first; Sonnet does not edit tests
+    change: >-
+      Add the cross-artifact / completeness / equivalence / non-activation tests in gemini_red_test_matrix.
+      May update the inline VALID_SOURCE_REGISTER_CONTENT fixture ONLY if a new test asserts the fixture
+      mirrors the expanded real register.
+  - path: tests/eval/test_pp3bp4_matrix_expansion.py
+    action: create
+    owner: gemini
+    change: "New RED test module for real-artifact binding, exact-identity, cross-artifact consistency, and REVEL semantic equivalence (may live here instead of extending the existing module)."
+
+# ---------------------------------------------------------------------------
+# 9. Schema examples
+# ---------------------------------------------------------------------------
+schema_examples:
+  register_candidate:
+    description: "Per-candidate record in configs/eval/pp3bp4_source_register.yaml candidates block. Loader does not validate sub-structure; keep field names stable for cross-artifact tests."
+    example:
+      alphamissense:
+        display_name: "AlphaMissense"
+        tool_kind: "protein_language_ml_predictor"
+        calibration_source_id: "bergquist_2025"
+        calibration_locus: "Table 1"
+        calibrated_score_intervals: "confirm_pending"        # CP-5
+        maximum_supported_pp3_strength: "strong"             # brief S5 (verified conclusion)
+        maximum_supported_bp4_strength: "moderate"           # brief S5
+        explicit_indeterminate_interval: "confirm_pending"   # CP-5
+        calibrated_version: "confirm_pending"                # CP-10
+        current_release_pin_status: "confirm_pending"        # CP-10
+        score_direction: "higher_more_pathogenic"
+        transcript_and_consequence_scope: "missense_variant"
+        training_manifest_status: "unavailable"
+        component_or_feature_overlap: "none_identified"
+        structured_score_source: "official_precomputed"      # not dbnsfp-pinned
+        structured_score_availability: "confirm_pending"     # CP-10
+        license_source: "official_alphamissense_terms"
+        license_status: "confirm_pending"
+        tsc_specific_evidence: "none_identified"
+        implementation_cost: "confirm_pending"
+        disposition: "eligible_primary_candidate"
+        rationale_source_ids: ["bergquist_2025"]
+    notes:
+      - "score_direction for fathmm/sift records native 'lower_more_pathogenic' + a pejaver_transform note; esm1b is 'lower_more_pathogenic' (Bergquist)."
+      - "Any *_status/*_interval/*_version that is not directly verified MUST be confirm_pending/unavailable/not_applicable with its CP-id, never a value."
+  training_manifest_entry:
+    description: "Component entry in configs/eval/predictor_training_manifests.yaml consumed by predictor_leakage_audit.evaluate_leakage_audit."
+    example:
+      bayesdel_noaf:
+        available: false
+        verified: false
+        sha256: null
+        overlaps: ["sift", "polyphen2_humvar", "fathmm", "mpc", "conservation_features"]
+        note: "BayesDel-noAF training manifest not obtained; comparator/component only; not the active shadow predictor."
+    invariant: "available:false + verified:false + sha256:null keeps the audit at UNKNOWN (never PASS, never zero-overlap)."
+  policy_hash_only_diff:
+    description: "The ONLY permitted change to configs/eval/pp3bp4_candidate_policy.json."
+    before: '"source_register_sha256": "2e9c1f215f24bf6ea6fffa697737f84092e6c5fce02db5e74c91e479f0b36932"'
+    after: '"source_register_sha256": "<sha256 of the final expanded register bytes; computed by Sonnet, verified by Gemini test>"'
+    forbidden: "Do NOT invent this hash in the plan. Every other line of the policy JSON is byte-identical."
+
+# ---------------------------------------------------------------------------
+# 10. Policy-hash preservation strategy (Slot 3 decision 3 / Beat-4 mode 3)
+# ---------------------------------------------------------------------------
+policy_hash_preservation:
+  mechanism_verified: >-
+    load_candidate_policy(policy, register) reads the register bytes, computes sha256, and fails loud
+    (CandidatePolicyError 'source_register_sha256 hash mismatch') unless the policy's declared
+    source_register_sha256 equals the actual hash. Current bound value = 2e9c1f21...b36932 =
+    sha256(current register bytes) (verified live).
+  consequence: "Any byte change to the register changes its sha256 and therefore requires updating the single policy field source_register_sha256."
+  semantic_policy_definition:
+    unchanged_fields: [schema, version, policy_id, status, shadow_only, owner_approved, predictor, predictor_version, data_version, score_direction, variant_scope, consequence_routing, no_fallback, criterion_once, max_pp3_strength, enabled_max_bp4_strength, pp3, bp4, indeterminate, distinct_results, forbidden_fields, combination_caps, citation_ids, training_overlap_status, transportability_status, license_status, activation_checklist, activation_dependencies, research_use_disclaimer]
+    only_mutable_field: source_register_sha256
+  transition_rule: >-
+    Byte-identity of the whole policy file cannot be preserved once the register expands, so the
+    transition is an EXPLICIT hash-only update: change exactly source_register_sha256, nothing else.
+  gate:
+    requires: "Separate orchestrator approval of the hash-only update forced by the expanded register."
+    if_withheld: "Take na_routes.register_deferred (Markdown/manifest/tests land; register + policy stay byte-identical; register expansion recorded as a blocked follow-up)."
+  equivalence_proof:
+    - "T-M4 real-binding: loading the REAL policy + REAL expanded register succeeds (declared == actual expanded hash). RED before the one-field update, GREEN after."
+    - "T-M5 hash-only diff: the policy JSON differs from its pre-expansion baseline in exactly one key, source_register_sha256; all other keys deep-equal."
+    - "T-M6 classify parity: classify_revel at 0.003/0.016/0.183/0.290/0.644/0.773/0.932 and adjacent values returns the same PolicyCall as before (Table-2 intervals unchanged)."
+
+# ---------------------------------------------------------------------------
+# 11. Gemini RED test matrix (author FIRST, must fail before Sonnet changes)
+# ---------------------------------------------------------------------------
+gemini_red_test_matrix:
+  conventions: "pytest; pythonpath=src (pyproject). Tests fail RED on the pre-change tree and pass GREEN only after the exact intended change."
+  tests:
+    - name: test_matrix_exact_16_calibrated_identity
+      asserts: "The register candidates (calibrated tier) are EXACTLY the 16 canonical candidate_ids; bias_composite present as the additional audit row; primateai_3d / non-R VARITY / bayesdel_addaf absent."
+    - name: test_markdown_register_manifest_id_parity
+      asserts: "set(Markdown calibrated rows) == set(register calibrated candidates) == set(training-manifest entries covering those tools) == the 16 IDs; bias_composite consistently present in Markdown + register."
+    - name: test_every_calibration_source_id_resolves
+      asserts: "Every candidate.calibration_source_id resolves to a register required_primary_sources entry; unknown source ids fail."
+    - name: test_no_fabricated_numeric_intervals
+      asserts: "Only revel carries verified multi-level numeric intervals; all 15 other calibrated candidates carry calibrated_score_intervals == confirm_pending (+ CP-id). No numeric interval string appears for a non-REVEL candidate."
+    - name: test_confirm_pending_truthfulness
+      asserts: "No candidate marks a training manifest available/verified or zero-overlap; no license_status is 'verified' without a resolved license_source; unpinned versions/releases are confirm_pending; no success-shaped default (blank/zero) substitutes for a status token."
+    - name: test_score_direction_facts
+      asserts: "fathmm/sift record native lower + pejaver_transform note; esm1b lower; all others higher. No REVEL-style direction logic is attached to esm1b/fathmm/sift."
+    - name: test_component_overlap_double_count
+      asserts: "revel/bayesdel_noaf/cadd overlap sets match component_overlap_map; independence_rule text present; conservation/context tools are not marked as independent votes."
+    - name: test_disposition_vocabulary_closed
+      asserts: "Every disposition is in allowed_dispositions; blocked_shadow_comparator absent; exactly one candidate (revel) has advance_shadow; bias_composite is audit_only_reject_authoritative."
+    - name: test_tiers_separate_non_missense
+      asserts: "separate_splice_policy, functional_evidence_not_pp3bp4, and full_classifier_exclusions carry no calibrated missense PP3/BP4 rows/votes; MAVE never appears as a predictor label."
+    - name: test_real_policy_register_binding      # T-M4
+      asserts: "load_candidate_policy(real policy, real register) succeeds (declared source_register_sha256 == sha256(real register bytes)). RED until the gated one-field update lands."
+    - name: test_revel_policy_hash_only_diff       # T-M5
+      asserts: "The real policy JSON equals its pre-expansion baseline except the single key source_register_sha256."
+    - name: test_revel_classify_parity             # T-M6
+      asserts: "classify_revel boundary results are unchanged (mirrors existing test_tb2_boundaries thresholds)."
+    - name: test_no_activation_or_wiring
+      asserts: "status stays proposed, shadow_only true, owner_approved false; forbidden_fields (policy_sha256/authorized/clinical_use_authorized) absent; no import/reference is added from scorer/packet/terminal/predictor_aggregation into the shadow matrix path."
+    - name: test_preserved_safety_properties
+      asserts: "build_shadow_report still rejects source == 'bias_rationale' (T-B6) and exposes no authorization/approval/clinical/direction/worklist field (T-B5); classify_revel still collapses disabled BP4 tiers to BP4_DISABLED_STRENGTH (T-B4)."
+
+# ---------------------------------------------------------------------------
+# 12. Sonnet implementation boundary
+# ---------------------------------------------------------------------------
+sonnet_boundary:
+  permitted_edits:
+    - docs/reference/pp3bp4-candidate-matrix-2026-07.md
+    - configs/eval/pp3bp4_source_register.yaml
+    - configs/eval/predictor_training_manifests.yaml
+    - "configs/eval/pp3bp4_candidate_policy.json (source_register_sha256 ONLY; gated on orchestrator approval)"
+    - "docs/reference/pp3-bp4-predictor-policy-recommendation-2026-07.md (link + bounded implications only)"
+  must_not_edit_tests: "Sonnet never edits tests; Gemini owns the RED suite."
+  preservation_set:
+    files:
+      - configs/eval/pp3bp4_candidate_policy.json   # except the single gated hash field
+      - src/raptor/eval/pp3bp4_candidate_policy.py
+      - src/raptor/eval/pp3bp4_score_table.py
+      - src/raptor/eval/pp3bp4_transportability.py
+      - src/raptor/eval/predictor_leakage_audit.py
+      - "src/raptor/scorer/  (whole package; see operator_notes re task-spec 'scorer.py')"
+    behaviour:
+      - "REVEL remains the sole proposed shadow candidate."
+      - "Production scorer, gate, packet, and census paths remain unwired."
+      - "Generated statuses remain UNKNOWN / BLOCKED_DATA / UNDERPOWERED / NON_GATING."
+  prohibited_files:
+    - configs/eval/bp4pp3_predictor_policy.json      # DISTINCT production predictor gate; not the shadow matrix
+    - configs/eval/predictor_aggregation.yaml
+    - src/raptor/eval/predictor_policy.py
+    - src/raptor/eval/predictor_aggregation.py
+    - src/raptor/eval/terminal_source.py
+    - src/raptor/packet/
+    - src/raptor/scorer/
+    - configs/acmg/strength_policy.yaml
+    - data/census/
+  prohibited_actions:
+    - "Change REVEL intervals, consequence routing, status, shadow_only, or owner_approved."
+    - "Select/rank a predictor via held-out outcomes, held-out scores, VUS criterion outputs, MAVE classes, or voting."
+    - "Add fallback, voting, consensus, score-maximization, or per-variant predictor choice."
+    - "Integrate or download any predictor; run the terminal held-out gate; recompute the VUS census; generate clinical classifications; modify scorer/packet paths."
+    - "Assert any version/license/interval/training-set/availability fact without a primary/official source (use confirm_pending/unavailable)."
+  one_commit_ownership: "A single Sonnet implementation commit lands production/config/doc changes only; Gemini's RED tests are already present; the checker adds none."
+
+# ---------------------------------------------------------------------------
+# 13. GPT-5.4 review probes
+# ---------------------------------------------------------------------------
+gpt54_review_probes:
+  - "Confirm exactly one changed file if reviewing the planner commit; confirm the Sonnet commit touches only permitted files and no preserved/prohibited file."
+  - "Diff configs/eval/pp3bp4_candidate_policy.json against base: exactly one changed key (source_register_sha256); confirm the new value equals sha256 of the final register bytes and that orchestrator approval for the hash-only update is recorded."
+  - "Grep the expanded matrix/register for any numeric interval attached to a non-REVEL candidate; there must be none (all confirm_pending)."
+  - "Confirm the 16-tool identity set is exact and alias-free (no PrimateAI-3D, no non-R VARITY, no BayesDel-addAF)."
+  - "Confirm every confirm_pending/unavailable cell carries a CP-id or resolution source and that no success-shaped default masks an unknown."
+  - "Confirm training-manifest entries are all available:false/verified:false/sha256:null and none imply zero-overlap; confirm the leakage audit still reads UNKNOWN."
+  - "Confirm no scorer/gate/packet/census/terminal wiring was added and REVEL remains the sole advance_shadow candidate."
+  - "Confirm the matrix is decision support: no voting/fallback/ranking/per-variant selection was introduced."
+  - "Confirm the next-task handoff points at sources-pin-core-annotation-bundle and does not require integrating all 16 tools."
+
+# ---------------------------------------------------------------------------
+# 14. Targeted validation commands
+# ---------------------------------------------------------------------------
+validation_commands:
+  setup: 'python -m pip install -e ".[dev]"'
+  targeted_red_then_green:
+    - "python -m pytest tests/eval/test_pp3bp4_matrix_expansion.py -q"
+    - "python -m pytest tests/eval/test_pp3bp4_candidate_policy.py -q"
+  register_hash_recompute: 'python -c "import hashlib,pathlib;print(hashlib.sha256(pathlib.Path(''configs/eval/pp3bp4_source_register.yaml'').read_bytes()).hexdigest())"'
+  policy_loads_clean: 'python -c "from raptor.eval.pp3bp4_candidate_policy import load_candidate_policy; load_candidate_policy(''configs/eval/pp3bp4_candidate_policy.json'',''configs/eval/pp3bp4_source_register.yaml''); print(''policy+register OK'')"'
+  scope_guard: "git -C D:\\AIProjects\\raptor-worktrees\\predictor-matrix show --stat HEAD   # planner commit: exactly one file"
+
+# ---------------------------------------------------------------------------
+# 15. Implementation sequence and one-commit boundaries
+# ---------------------------------------------------------------------------
+implementation_sequence:
+  - "1. Gemini authors the RED test matrix (section 11); confirm RED on the base tree, including test_real_policy_register_binding failing after a hypothetical register change."
+  - "2. Sonnet expands the Markdown matrix, source register, and training-manifest registry (no policy change yet); recompute the register hash."
+  - "3. Orchestrator decision gate: approve the hash-only source_register_sha256 update (or route to na_routes.register_deferred)."
+  - "4. If approved: Sonnet updates ONLY source_register_sha256 in pp3bp4_candidate_policy.json; add the memo link + bounded implications."
+  - "5. Run validation_commands; all RED tests turn GREEN; equivalence proofs (T-M4/5/6) pass; existing T-B1..T-B6 remain GREEN."
+  - "6. GPT-5.4 review against gpt54_review_probes."
+ownership_boundaries:
+  planner: "This YAML only; one planner commit; no push."
+  gemini: "Tests only (RED-first)."
+  sonnet: "Production/config/docs only; one implementation commit; the gated hash field."
+  gpt54: "Review only; no edits."
+
+# ---------------------------------------------------------------------------
+# 16. Blockers, N/A routes, next-task handoff
+# ---------------------------------------------------------------------------
+blockers:
+  - "Exact numeric intervals for all 15 non-REVEL candidates (CP-1..CP-7) require direct Pejaver Table 2 / Bergquist Table 1 inspection."
+  - "Exact evaluated releases/licences/availability (CP-8..CP-19) require supplements and official/selected-release sources."
+  - "Training-overlap for CADD/EA/MPC/PhyloP/GERP++/PrimateAI (CP-20) requires verified manifests + leakage audit."
+  - "The pinned REVEL/dbNSFP release (CP-21) is decided in sources-pin-core-annotation-bundle."
+na_routes:
+  register_deferred:
+    when: "Orchestrator withholds approval for the hash-only policy update."
+    action: "Land the Markdown matrix + training-manifest + RED tests describing the full 16-row set; keep configs/eval/pp3bp4_source_register.yaml and pp3bp4_candidate_policy.json byte-identical; record the register expansion + hash update as a blocked follow-up."
+    still_delivers: "The 16-tool decision-support matrix (human + tests) without any policy change."
+  unresolved_facts:
+    action: "Leave unresolved cells as confirm_pending/unavailable/not_applicable with CP-ids; never fabricate to fill the table."
+next_task_handoff:
+  next_task_id: sources-pin-core-annotation-bundle
+  smallest_pinnable_subset:
+    priority:
+      - "1. The existing REVEL field required by the current shadow policy (CP-21)."
+      - "2. BayesDel-noAF, VEST4, AlphaMissense, ESM1b, VARITY_R fields where the exact selected dbNSFP release + licence permit (CP-10..CP-13)."
+      - "3. Supporting provenance/context columns needed to route transcripts and audit dependence."
+      - "4. No requirement to integrate MutPred2 or Evolutionary Action before the annotation blocker can advance."
+    invariant: "The comprehensive matrix stays at 16 calibrated rows even when the initial pinned bundle implements a smaller score subset."
+  related_track: "Splice tier hands off to todo sources-add-splice-track (separate consequence policy)."
+
+# ---------------------------------------------------------------------------
+# 17. Acceptance criteria (typed)
+# ---------------------------------------------------------------------------
+acceptance:
+  mechanical:
+    - { id: A-M1, check: "Register calibrated candidates == the 16 canonical IDs; bias_composite present; aliases absent." }
+    - { id: A-M2, check: "Markdown / register / training-manifest candidate identities are consistent (id parity test passes)." }
+    - { id: A-M3, check: "policy JSON differs from base in exactly one key: source_register_sha256, equal to sha256(final register bytes)." }
+    - { id: A-M4, check: "load_candidate_policy(real policy, real register) succeeds; existing T-B1..T-B6 stay GREEN." }
+    - { id: A-M5, check: "No numeric interval string is attached to any non-REVEL candidate." }
+    - { id: A-M6, check: "Every disposition is in allowed_dispositions; exactly one advance_shadow (revel)." }
+    - { id: A-M7, check: "Planner commit changes exactly one file and carries both Copilot trailers; no push." }
+  evidence_form:
+    - { id: A-E1, check: "Every asserted calibrated fact resolves to Pejaver/Bergquist/brief or an official source; unresolved facts are confirm_pending with a CP-id." }
+    - { id: A-E2, check: "The plan treats the 16-row matrix as decision support, not 16 integrations." }
+    - { id: A-E3, check: "No held-out / VUS census / MAVE tuning / production activation / clinical output is planned." }
+    - { id: A-E4, check: "REVEL stays proposed, unapproved, shadow-only, and the sole advanced shadow candidate; policy semantics unchanged." }
+    - { id: A-E5, check: "The smallest realistically pinnable annotation subset is identified without narrowing the 16-row matrix." }
+
+# ---------------------------------------------------------------------------
+# 18. Beat-4 self-audit (against every failure mode in the machine spec)
+# ---------------------------------------------------------------------------
+beat4_self_audit:
+  - failure_mode: "A complete-looking 16-row table fabricates versions, licenses, intervals, or availability."
+    guard: "fact_status_model + confirm_pending_register (CP-1..CP-21); test_no_fabricated_numeric_intervals + test_confirm_pending_truthfulness; only REVEL intervals verified."
+  - failure_mode: "Expanding the matrix silently changes the selected REVEL policy through a source-register hash."
+    guard: "policy_hash_preservation: explicit, approved, one-field hash-only update; T-M4/T-M5/T-M6 equivalence proofs; na_routes.register_deferred fallback."
+  - failure_mode: "The matrix becomes an ensemble or per-variant fallback menu."
+    guard: "bounded_scope_contract.is_not + disposition binding_rule; test_disposition_vocabulary_closed (single advance_shadow) + test_no_activation_or_wiring."
+  - failure_mode: "Tests count rows but fail to enforce exact identities, cross-artifact consistency, and non-activation."
+    guard: "gemini_red_test_matrix enforces exact-identity, id-parity, source-resolution, equivalence, and non-activation -- not row counts alone."
+  - failure_mode: "Research expands into downloading/integrating 16 tools instead of unblocking the annotation pin."
+    guard: "bounded_scope_contract + next_task_handoff.smallest_pinnable_subset; reject_integrate_16; matrix stays 16 rows while the pin stays small."
+  - failure_mode: "A wrong-artifact edit hits the production predictor gate (bp4pp3_predictor_policy.json) or scorer/packet, thinking it is the shadow matrix."
+    guard: "sonnet_boundary.prohibited_files names the distinct production surfaces; operator_notes flags the scorer.py-vs-package discrepancy."
+  - failure_mode: "Adding candidates/sources breaks the preserved loader or leakage-audit consumer."
+    guard: "Register stays within the 6 loader-allowed top-level keys (candidate sub-structure is unvalidated); training-manifest growth uses only direct/components which evaluate_leakage_audit reads via .get(); both preserved files untouched (verified)."
+
+# ---------------------------------------------------------------------------
+# 19. Operator notes / unresolved operator decisions
+# ---------------------------------------------------------------------------
+operator_notes:
+  - id: OP-1
+    decision: "Approve the gated, hash-only source_register_sha256 update forced by the expanded register (else take na_routes.register_deferred)."
+  - id: OP-2
+    note: "Task-spec preservation_set lists src/raptor/scorer.py, but the repository has a src/raptor/scorer/ PACKAGE (no scorer.py file). Preservation is applied to the whole package; confirm no scorer.py is expected."
+  - id: OP-3
+    decision: "Confirm bergquist_2025 belongs in register required_primary_sources as a verified CITATION while its Table-1 intervals remain confirm_pending (CP-5/6/7), and that dbnsfp_v4 stays a candidate-field token rather than a required primary source."
+  - id: OP-4
+    note: "16-row = 16 calibrated tools; bias_composite is the required additional audit row (17 table rows). Completeness invariant is the 16-tool identity set."
+
+# ---------------------------------------------------------------------------
+# 20. Verification-return scaffold (Slot 3 requires these; doer/checker fill)
+# ---------------------------------------------------------------------------
+verification_return_required:
+  - "1. INTENT"
+  - "2. planner commit SHA"
+  - "3. source/candidate identity audit"
+  - "4. decision summary and rejected alternatives"
+  - "5. file/test ownership matrix"
+  - "6. exact policy-hash preservation strategy"
+  - "7. smallest-pinnable-subset recommendation"
+  - "8. acceptance and Beat-4 verification"
+  - "9. unresolved operator decisions"
