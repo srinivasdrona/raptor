@@ -509,3 +509,336 @@ def test_t13_markdown_backing_relabeling():
     source_desc = " ".join(source_row[0][1:]).lower()
     assert "revel" in source_desc and "provenance" in source_desc, f"Source register row does not describe REVEL policy provenance: {source_row[0]}"
 
+
+def test_t14_exact_tool_kind_map():
+    """T14: Every candidate's tool_kind equals candidate_identity.tool_kind_map exactly in the machine matrix; BayesDel-noAF is meta_predictor."""
+    matrix = _load_matrix()
+    candidates = matrix.get("candidates", {})
+    audit_rows = matrix.get("audit_rows", {})
+
+    expected_tool_kinds = {
+        "revel": "meta_predictor",
+        "bayesdel_noaf": "meta_predictor",
+        "cadd": "meta_annotation_score",
+        "evolutionary_action": "evolutionary_predictor",
+        "fathmm": "hmm_predictor",
+        "gerp_plus_plus": "conservation",
+        "phylop": "conservation",
+        "mpc": "regional_constraint",
+        "mutpred2": "supervised_predictor",
+        "vest4": "supervised_predictor",
+        "polyphen2_humvar": "missense_predictor",
+        "primateai_original": "deep_learning_predictor",
+        "sift": "homology_predictor",
+        "alphamissense": "protein_language_ml_predictor",
+        "esm1b": "protein_language_model",
+        "varity_r": "supervised_rare_variant_model",
+        "bias_composite": "custom_composite"
+    }
+
+    for cid, r in candidates.items():
+        assert cid in expected_tool_kinds, f"Unexpected candidate '{cid}'"
+        assert r.get("tool_kind") == expected_tool_kinds[cid], (
+            f"Candidate '{cid}' tool_kind mismatch. Got: {r.get('tool_kind')}, Expected: {expected_tool_kinds[cid]}"
+        )
+
+    for cid, r in audit_rows.items():
+        assert cid in expected_tool_kinds, f"Unexpected audit row '{cid}'"
+        assert r.get("tool_kind") == expected_tool_kinds[cid], (
+            f"Audit row '{cid}' tool_kind mismatch. Got: {r.get('tool_kind')}, Expected: {expected_tool_kinds[cid]}"
+        )
+
+
+def test_t15_markdown_machine_parity():
+    """T15: Markdown/machine parity for every row: candidate_id, display_name, tool_kind, evidence_role, calibration source, and disposition match the canonical machine matrix."""
+    matrix = _load_matrix()
+    candidates = matrix.get("candidates", {})
+    audit_rows = matrix.get("audit_rows", {})
+
+    yaml_records = {}
+    yaml_records.update(candidates)
+    yaml_records.update(audit_rows)
+
+    md_file = REPO_ROOT / "docs/reference/pp3bp4-candidate-matrix-2026-07.md"
+    assert md_file.exists(), f"Markdown file not found: {md_file}"
+
+    with open(md_file, "r", encoding="utf-8") as f:
+        md_content = f.read()
+
+    # Extract rows of the Candidate matrix table under Section 2
+    match = re.search(r'## 2\. Candidate matrix\s*\n\n?(.*?)(?:\n\n|\n[^|]|$)', md_content, re.DOTALL)
+    if not match:
+        table_lines = [line.strip() for line in md_content.splitlines() if line.strip().startswith('|')]
+    else:
+        table_lines = [line.strip() for line in match.group(1).splitlines() if line.strip().startswith('|')]
+
+    if not table_lines:
+        pytest.fail("No table lines found under Candidate matrix.")
+
+    # Locate column headers in the table's first row
+    headers = [h.strip().lower() for h in table_lines[0].split('|')[1:-1]]
+    cid_idx = headers.index("candidate id")
+    name_idx = headers.index("display name")
+    kind_idx = headers.index("tool kind")
+    role_idx = headers.index("evidence role")
+    source_idx = headers.index("calibration source")
+    dec_idx = headers.index("decision") if "decision" in headers else headers.index("disposition")
+
+    parsed_md = {}
+    for line in table_lines[1:]:
+        parts = [p.strip() for p in line.split('|')[1:-1]]
+        if not parts or parts[0].startswith('---'):
+            continue
+        if len(parts) <= max(cid_idx, name_idx, kind_idx, role_idx, source_idx, dec_idx):
+            continue
+
+        cid = parts[cid_idx].replace('`', '').replace('*', '').strip()
+        parsed_md[cid] = {
+            "display_name": parts[name_idx].replace('`', '').replace('*', '').strip(),
+            "tool_kind": parts[kind_idx].replace('`', '').replace('*', '').strip(),
+            "evidence_role": parts[role_idx].replace('`', '').replace('*', '').strip(),
+            "calibration_source": parts[source_idx].replace('`', '').replace('*', '').strip(),
+            "disposition": parts[dec_idx].replace('`', '').replace('*', '').strip().lower()
+        }
+
+    # Verify exact set match
+    assert set(parsed_md.keys()) == set(yaml_records.keys()), (
+        f"Markdown IDs mismatch. Markdown set: {set(parsed_md.keys())}, YAML set: {set(yaml_records.keys())}"
+    )
+
+    # Parity comparisons
+    for cid, yaml_r in yaml_records.items():
+        md_r = parsed_md[cid]
+        assert yaml_r.get("display_name") == md_r["display_name"], f"'{cid}' display_name mismatch"
+        assert yaml_r.get("tool_kind") == md_r["tool_kind"], f"'{cid}' tool_kind mismatch"
+        assert yaml_r.get("evidence_role") == md_r["evidence_role"], f"'{cid}' evidence_role mismatch"
+        assert yaml_r.get("disposition") == md_r["disposition"], f"'{cid}' disposition mismatch"
+
+        yaml_source_id = yaml_r.get("calibration_source_id")
+        md_source = md_r["calibration_source"]
+        if yaml_source_id is None or yaml_source_id == "null" or yaml_source_id == "none":
+            assert "none" in md_source.lower() or md_source == "" or md_source == "null"
+        else:
+            # Check author and year substrings match
+            author, year = yaml_source_id.split("_")
+            assert author.lower() in md_source.lower(), f"'{cid}' calibration source author mismatch"
+            assert year in md_source, f"'{cid}' calibration source year mismatch"
+
+
+def test_t16_cp20_allowed_set():
+    """T16: training_manifest_status carries CP-20 ONLY for cadd, evolutionary_action, mpc, phylop, gerp_plus_plus, primateai_original; no other candidate carries CP-20, and each such row uses an honest note with empty source_ids."""
+    matrix = _load_matrix()
+    candidates = matrix.get("candidates", {})
+    audit_rows = matrix.get("audit_rows", {})
+
+    allowed_cp20_set = {"cadd", "evolutionary_action", "mpc", "phylop", "gerp_plus_plus", "primateai_original"}
+
+    for cid, r in candidates.items():
+        tms = r.get("training_manifest_status", {})
+        cp_ids = tms.get("cp_ids", [])
+        source_ids = tms.get("source_ids", [])
+
+        if "CP-20" in cp_ids:
+            assert cid in allowed_cp20_set, f"Candidate '{cid}' must NOT carry CP-20"
+            note = tms.get("note", "")
+            assert isinstance(note, str) and "manifest not obtained" in note, f"Candidate '{cid}' training_manifest_status lacks honest note"
+            assert len(source_ids) == 0, f"Candidate '{cid}' training_manifest_status has non-empty source_ids with CP-20"
+        else:
+            assert cid not in allowed_cp20_set, f"Candidate '{cid}' must carry CP-20 in training_manifest_status"
+
+    bias_tms = audit_rows["bias_composite"].get("training_manifest_status", {})
+    assert "CP-20" not in bias_tms.get("cp_ids", []), "bias_composite must not carry CP-20"
+
+
+def test_t17_field_cp_allowlists():
+    """T17: Field-CP allowlist (field_cp_semantics): each fact-object field's cp_ids are drawn only from the allowed set for that field/candidate; CP-21 appears only on REVEL current_release_pin_status; interval CPs (CP-1..CP-7) never appear on version/release/licence/availability/pin fields."""
+    matrix = _load_matrix()
+    candidates = matrix.get("candidates", {})
+    audit_rows = matrix.get("audit_rows", {})
+
+    all_records = {}
+    all_records.update(candidates)
+    all_records.update(audit_rows)
+
+    interval_fields = {"calibrated_score_intervals", "explicit_indeterminate_interval", "maximum_supported_pp3_strength", "maximum_supported_bp4_strength"}
+    interval_cps = {"CP-1", "CP-2", "CP-3", "CP-4", "CP-5", "CP-6", "CP-7"}
+
+    for cid, r in all_records.items():
+        for field, obj in r.items():
+            if not isinstance(obj, dict) or "status" not in obj:
+                continue
+
+            cp_ids = obj.get("cp_ids", [])
+
+            # General rules check
+            if "CP-21" in cp_ids:
+                assert cid == "revel" and field == "current_release_pin_status", (
+                    f"CP-21 found on illegal candidate/field combo: {cid}.{field}"
+                )
+
+            if any(cp in interval_cps for cp in cp_ids):
+                assert field in interval_fields, (
+                    f"Interval CP found on version/release/licence/availability/pin field: {cid}.{field}"
+                )
+
+            # Field-specific check
+            if field in interval_fields:
+                if cid == "revel" or cid == "bias_composite":
+                    assert not cp_ids, f"'{cid}' interval field must not have cp_ids"
+                elif cid == "bayesdel_noaf":
+                    assert set(cp_ids).issubset({"CP-1"})
+                elif cid == "mutpred2":
+                    assert set(cp_ids).issubset({"CP-2"})
+                elif cid == "vest4":
+                    assert set(cp_ids).issubset({"CP-3"})
+                elif cid in ["cadd", "evolutionary_action", "fathmm", "gerp_plus_plus", "mpc", "phylop", "polyphen2_humvar", "primateai_original", "sift"]:
+                    assert set(cp_ids).issubset({"CP-4"})
+                elif cid == "alphamissense":
+                    assert set(cp_ids).issubset({"CP-5"})
+                elif cid == "esm1b":
+                    assert set(cp_ids).issubset({"CP-6"})
+                elif cid == "varity_r":
+                    assert set(cp_ids).issubset({"CP-7"})
+
+            elif field == "calibrated_version":
+                if cid in ["bayesdel_noaf", "cadd", "evolutionary_action", "mutpred2", "polyphen2_humvar"]:
+                    assert set(cp_ids).issubset({"CP-9"})
+                elif cid in ["revel", "fathmm", "gerp_plus_plus", "mpc", "sift", "vest4"]:
+                    assert set(cp_ids).issubset({"CP-23"})
+                elif cid == "phylop":
+                    assert set(cp_ids).issubset({"CP-14"})
+                elif cid == "primateai_original":
+                    assert set(cp_ids).issubset({"CP-15"})
+                elif cid == "alphamissense":
+                    assert set(cp_ids).issubset({"CP-10"})
+                elif cid == "esm1b":
+                    assert set(cp_ids).issubset({"CP-22"})
+                elif cid == "varity_r":
+                    assert set(cp_ids).issubset({"CP-11"})
+                else:
+                    assert not cp_ids
+
+            elif field == "current_release_pin_status":
+                if cid == "revel":
+                    assert set(cp_ids).issubset({"CP-21"})
+                elif cid == "bias_composite":
+                    assert not cp_ids
+                else:
+                    assert set(cp_ids).issubset({"CP-28"})
+
+            elif field == "structured_score_availability":
+                if cid in ["revel", "bayesdel_noaf", "cadd", "fathmm", "gerp_plus_plus", "mpc", "phylop", "polyphen2_humvar", "primateai_original", "sift", "vest4", "alphamissense"]:
+                    assert set(cp_ids).issubset({"CP-25"})
+                elif cid == "esm1b":
+                    assert set(cp_ids).issubset({"CP-12"})
+                elif cid == "varity_r":
+                    assert set(cp_ids).issubset({"CP-13"})
+                elif cid == "mutpred2":
+                    assert set(cp_ids).issubset({"CP-26"})
+                elif cid == "evolutionary_action":
+                    assert set(cp_ids).issubset({"CP-27"})
+                else:
+                    assert not cp_ids
+
+            elif field == "license_status":
+                if cid == "mpc":
+                    assert set(cp_ids).issubset({"CP-16"})
+                elif cid == "gerp_plus_plus":
+                    assert set(cp_ids).issubset({"CP-17"})
+                elif cid == "phylop":
+                    assert set(cp_ids).issubset({"CP-18"})
+                elif cid == "evolutionary_action":
+                    assert set(cp_ids).issubset({"CP-19"})
+                elif cid == "bias_composite":
+                    assert not cp_ids
+                else:
+                    assert set(cp_ids).issubset({"CP-24"})
+
+            elif field == "training_manifest_status":
+                if cid in ["cadd", "evolutionary_action", "mpc", "phylop", "gerp_plus_plus", "primateai_original"]:
+                    assert set(cp_ids).issubset({"CP-20"})
+                else:
+                    assert not cp_ids
+
+            elif field == "tsc_specific_evidence":
+                assert not cp_ids
+
+            elif field == "implementation_cost":
+                assert not cp_ids, f"implementation_cost has cp_ids on '{cid}'"
+
+
+def test_t18_bergquist_release_facts():
+    """T18: Bergquist release facts (alphamissense/esm1b/varity_r calibrated_version) use CP-10/CP-22/CP-11 with source_ids [bergquist_2025] (methods_data_availability locus); ESM1b evaluated release uses CP-22, never interval CP-6."""
+    matrix = _load_matrix()
+    candidates = matrix.get("candidates", {})
+
+    assert "alphamissense" in candidates
+    assert "esm1b" in candidates
+    assert "varity_r" in candidates
+
+    # AlphaMissense calibrated_version
+    am_cv = candidates["alphamissense"].get("calibrated_version", {})
+    assert "CP-10" in am_cv.get("cp_ids", [])
+    assert am_cv.get("source_ids") == ["bergquist_2025"]
+
+    # ESM1b calibrated_version (uses dedicated CP-22 release fact, never CP-6 interval fact)
+    esm_cv = candidates["esm1b"].get("calibrated_version", {})
+    assert "CP-22" in esm_cv.get("cp_ids", [])
+    assert "CP-6" not in esm_cv.get("cp_ids", [])
+    assert esm_cv.get("source_ids") == ["bergquist_2025"]
+
+    # VARITY_R calibrated_version
+    vr_cv = candidates["varity_r"].get("calibrated_version", {})
+    assert "CP-11" in vr_cv.get("cp_ids", [])
+    assert vr_cv.get("source_ids") == ["bergquist_2025"]
+
+
+def test_t19_evidence_and_cost_disciplines():
+    """T19: tsc_specific_evidence for every calibrated row is unavailable/none-identified (never not_applicable; not_applicable only for bias_composite); implementation_cost for every row is unavailable with no cp_ids and empty source_ids."""
+    matrix = _load_matrix()
+    candidates = matrix.get("candidates", {})
+    audit_rows = matrix.get("audit_rows", {})
+
+    for cid, r in candidates.items():
+        tse = r.get("tsc_specific_evidence", {})
+        assert tse.get("status") == "unavailable", f"'{cid}' tsc_specific_evidence must be unavailable"
+        assert tse.get("status") != "not_applicable", f"'{cid}' tsc_specific_evidence must never be not_applicable"
+        note = tse.get("note", "")
+        assert isinstance(note, str) and "none identified" in note, f"'{cid}' tse lacks 'none identified' note"
+
+        ic = r.get("implementation_cost", {})
+        assert ic.get("status") == "unavailable", f"'{cid}' implementation_cost must be unavailable"
+        assert not ic.get("cp_ids"), f"'{cid}' implementation_cost must have no cp_ids"
+        assert not ic.get("source_ids"), f"'{cid}' implementation_cost must have empty source_ids"
+
+    bias_tse = audit_rows["bias_composite"].get("tsc_specific_evidence", {})
+    assert bias_tse.get("status") == "not_applicable", "bias_composite tsc_specific_evidence must be not_applicable"
+
+    bias_ic = audit_rows["bias_composite"].get("implementation_cost", {})
+    assert bias_ic.get("status") == "not_applicable", "bias_composite implementation_cost must be not_applicable"
+
+
+def test_t20_source_id_rule():
+    """T20: source_id_rule holds: source_ids are non-empty only when a source_map locus resolves the fact; licence, non-REVEL pin, and standalone-acquisition confirm_pending facts have empty source_ids with a naming CP."""
+    matrix = _load_matrix()
+    candidates = matrix.get("candidates", {})
+
+    for cid, r in candidates.items():
+        # License status confirm_pending facts must have empty source_ids
+        lic = r.get("license_status", {})
+        if lic.get("status") == "confirm_pending":
+            assert len(lic.get("source_ids", [])) == 0, f"'{cid}' license_status has non-empty source_ids"
+
+        # Non-REVEL pin status must have empty source_ids
+        if cid != "revel":
+            pin = r.get("current_release_pin_status", {})
+            if pin.get("status") == "confirm_pending":
+                assert len(pin.get("source_ids", [])) == 0, f"'{cid}' current_release_pin_status has non-empty source_ids"
+
+        # Standalone availability (mutpred2, evolutionary_action) must have empty source_ids
+        if cid in ["mutpred2", "evolutionary_action"]:
+            avail = r.get("structured_score_availability", {})
+            if avail.get("status") == "confirm_pending":
+                assert len(avail.get("source_ids", [])) == 0, f"'{cid}' structured_score_availability has non-empty source_ids"
+
+
