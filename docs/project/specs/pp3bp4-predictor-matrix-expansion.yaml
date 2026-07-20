@@ -1,14 +1,15 @@
 schema: raptor-predictor-matrix-expansion-plan/2
 status: implementation_ready_task_spec
 task_id: sources-expand-predictor-matrix
-title: Bounded PP3/BP4 predictor decision matrix (revision 3 -- self-contained, durable traceability)
+title: Bounded PP3/BP4 predictor decision matrix (revision 4 -- exact tool_kind + CP/source field semantics)
 
 # ---------------------------------------------------------------------------
 # Revision provenance
 # ---------------------------------------------------------------------------
 revision:
-  current: 3
-  reviewed_commit: 72614a86c4e6112605c95beb505665cc9fc0fdce
+  current: 4
+  reviewed_commit: 925beb365a992ea3a8b29ec227d922204e2ac97d
+  reviewed_commit_kind: implementation_commit
   checker: { model: gpt-5.4, verdict: WITH-CHANGES }
   planner_provenance_only:
     note: >-
@@ -36,10 +37,29 @@ revision:
       self-contained source_map with DOI/PMID/PMC/URL/locus; replaced every brief-section
       reference with direct source_map IDs and loci; fenced prompt/manifest hashes as
       provenance-only and not factual evidence.
+  rev4_attribution:
+    scope: "GPT-5.4 WITH-CHANGES on implementation commit 925beb36 (Sonnet matrix). Planner fixes spec gaps only; implementation/tests are re-run by Sonnet/Gemini against this corrected contract and are NOT edited here."
+    findings:
+      - { id: bayesdel_tool_kind,        attribution: implementation_test_miss,             note: "BayesDel tool_kind mis-set against the existing spec; spec now pins an exact tool_kind_map and a Gemini machine/Markdown parity test." }
+      - { id: cp20_overapplication,      attribution: implementation_test_miss,             note: "CP-20 applied beyond its six-tool overlap set; spec now fixes the CP-20 allowed set and adds a Gemini allowlist test." }
+      - { id: tool_kind_remaining_rows,  attribution: planner_spec_gap,                     note: "Exact tool_kind per row was never pinned." }
+      - { id: field_cp_source_semantics, attribution: planner_spec_gap,                     note: "Field-specific CP/source semantics (release vs licence vs availability vs overlap vs pin) were underspecified." }
+      - { id: implementation_cost,       attribution: planner_spec_gap,                     note: "implementation_cost handling underspecified (implementation misused CP-21)." }
+      - { id: tsc_specific_evidence,     attribution: planner_spec_gap,                     note: "tsc_specific_evidence example used not_applicable instead of unavailable/none-identified for calibrated rows." }
+      - { id: bergquist_facts,           attribution: mixed_spec_gap_and_implementation_misuse, note: "Missing Bergquist Methods/Data Availability locus + dedicated ESM1b release CP; implementation reused an interval CP for a release fact." }
+  rev4_corrections:
+    - "Pinned exact tool_kind_map for all 17 rows (candidate_identity.tool_kind_map)."
+    - "Constrained CP-20 to its six-tool overlap set; other unavailable manifests carry no CP + an honest note."
+    - "Added Bergquist methods_data_availability + Pejaver supplement loci; added CP-22 (ESM1b release) and CP-23..CP-28 (dbNSFP-evaluated versions, grouped licences, bundle/standalone acquisition, non-REVEL pin)."
+    - "Constrained CP-21 to the REVEL/dbNSFP RAPTOR pin ONLY (not licences, costs, non-REVEL acquisition, or other releases)."
+    - "Added field_cp_semantics: per-field CP allowlist + source_ids rule (non-empty source_ids only when a source_map locus resolves the fact; empty source_ids allowed for confirm_pending when the CP names the missing official source)."
+    - "implementation_cost for calibrated rows = unavailable/not-assessed (no CP/source, explicit note; out of scope); tsc_specific_evidence for calibrated rows = unavailable/none-identified (never not_applicable; not_applicable reserved for bias_composite)."
+    - "REVEL maximum_supported_bp4_strength = verified very_strong with an explicit note that the current enabled maximum is moderate."
+    - "Added Gemini tests T14..T20; preserved architecture, file scopes, policy/leakage hashes, REVEL-only verified intervals, and no activation/wiring."
 
 worktree: D:\AIProjects\raptor-worktrees\predictor-matrix
 branch: track/predictor-matrix-2026-07
-parent_commit: 72614a86c4e6112605c95beb505665cc9fc0fdce
+parent_commit: 925beb365a992ea3a8b29ec227d922204e2ac97d
 planner_output_path: docs/project/specs/pp3bp4-predictor-matrix-expansion.yaml
 planner_may_modify_only: [docs/project/specs/pp3bp4-predictor-matrix-expansion.yaml]
 commit_policy: one_followup_commit_no_amend_no_push
@@ -103,6 +123,7 @@ source_map:
     loci:
       methods: "13-tool calibrated set; higher-is-pathogenic direction transforms for FATHMM and SIFT; dbNSFP score acquisition; training-overlap exclusions; REVEL/BayesDel named as meta-predictors."
       table_2: "Calibrated PP3/BP4 score intervals; the REVEL row is the only fully-verified multi-level interval set."
+      supplement: "Supplementary materials: exact independently-generated tool versions; the calibrated PhyloP column; the evaluated PrimateAI release; and the dbNSFP release/columns used for dbNSFP-obtained tools (resolves CP-9/CP-14/CP-15/CP-23)."
   bergquist_2025:
     citation: "Bergquist T, Pejaver V, et al. Calibration of additional computational tools expands ClinGen recommendation options for variant classification with PP3/BP4 criteria. Genetics in Medicine 2025."
     doi: "10.1016/j.gim.2025.101402"
@@ -112,6 +133,7 @@ source_map:
     url: "https://www.biorxiv.org/content/10.1101/2024.09.17.611902v1"
     loci:
       table_1: "AlphaMissense, ESM1b, VARITY_R calibration conclusions; exact numeric intervals remain confirm_pending until Table 1 is read directly (CP-5/CP-6/CP-7)."
+      methods_data_availability: "Methods and Data Availability: exact evaluated releases for AlphaMissense (CP-10), ESM1b (CP-22), and VARITY_R (CP-11)."
   stenton_2024:
     citation: "Stenton SL, Pejaver V, Harrison SM, et al. Assessment of the evidence yield for the calibrated PP3/BP4 computational recommendations. Genetics in Medicine 2024."
     pmid: "39030733"
@@ -178,6 +200,24 @@ candidate_identity:
   pejaver_2022_thirteen: [bayesdel_noaf, cadd, evolutionary_action, fathmm, gerp_plus_plus, mpc, mutpred2, phylop, polyphen2_humvar, primateai_original, revel, sift, vest4]
   bergquist_2025_three: [alphamissense, esm1b, varity_r]
   additional_audit_row: [bias_composite]
+  tool_kind_map:              # exact tool_kind per row (pinned; Gemini asserts machine + Markdown parity)
+    revel: meta_predictor
+    bayesdel_noaf: meta_predictor
+    cadd: meta_annotation_score
+    evolutionary_action: evolutionary_predictor
+    fathmm: hmm_predictor
+    gerp_plus_plus: conservation
+    phylop: conservation
+    mpc: regional_constraint
+    mutpred2: supervised_predictor
+    vest4: supervised_predictor
+    polyphen2_humvar: missense_predictor
+    primateai_original: deep_learning_predictor
+    sift: homology_predictor
+    alphamissense: protein_language_ml_predictor
+    esm1b: protein_language_model
+    varity_r: supervised_rare_variant_model
+    bias_composite: custom_composite
   alias_rejections:
     - "primateai_original is NOT PrimateAI-3D."
     - "varity_r is NOT generic VARITY / VARITY_ER."
@@ -253,27 +293,107 @@ fact_status:
     cadd: "conservation + protein-prediction features (PhyloP/GERP++/PolyPhen-derived)"
     rule: "REVEL and its components are not independent PP3/BP4 evidence; REVEL and BayesDel-noAF are not both applied as independent criteria; conservation/context tools are comparators, not votes."
   confirm_pending_register:    # binding; every fact-object cp_id must resolve here; also a matrix top-level field. Resolutions cite source_map IDs/loci or an official source.
-    CP-1: "BayesDel-noAF intervals -> Pejaver Table 2"
-    CP-2: "MutPred2 intervals -> Pejaver Table 2"
-    CP-3: "VEST4 intervals -> Pejaver Table 2"
-    CP-4: "Intervals/maxima for CADD, EA, FATHMM, GERP++, MPC, PhyloP, PolyPhen-2 HumVar, PrimateAI, SIFT -> Pejaver Table 2"
-    CP-5: "AlphaMissense intervals -> Bergquist Table 1"
-    CP-6: "ESM1b intervals -> Bergquist Table 1"
-    CP-7: "VARITY_R intervals -> Bergquist Table 1"
+    CP-1: "BayesDel-noAF intervals -> pejaver_2022 table_2"
+    CP-2: "MutPred2 intervals -> pejaver_2022 table_2"
+    CP-3: "VEST4 intervals -> pejaver_2022 table_2"
+    CP-4: "Intervals/maxima for CADD, EA, FATHMM, GERP++, MPC, PhyloP, PolyPhen-2 HumVar, PrimateAI, SIFT -> pejaver_2022 table_2"
+    CP-5: "AlphaMissense intervals -> bergquist_2025 table_1"
+    CP-6: "ESM1b intervals -> bergquist_2025 table_1"
+    CP-7: "VARITY_R intervals -> bergquist_2025 table_1"
     CP-8: "Bergquist 2025 PMCID -> PubMed/PMC"
-    CP-9: "Independently-generated tool versions used by Pejaver -> Pejaver supplement"
-    CP-10: "AlphaMissense release evaluated by Bergquist -> Bergquist Methods/Data Availability"
-    CP-11: "VARITY_R release evaluated by Bergquist -> Bergquist Methods/Data Availability"
-    CP-12: "ESM1b availability in the selected dbNSFP branch -> selected release README"
-    CP-13: "VARITY_R availability in the selected dbNSFP branch -> selected release README"
-    CP-14: "PhyloP column calibrated by Pejaver -> Pejaver supplement"
-    CP-15: "PrimateAI release evaluated by Pejaver -> Pejaver supplement"
-    CP-16: "Official MPC licence -> official distribution source"
-    CP-17: "Official GERP++ licence -> official distribution source"
-    CP-18: "Official PhyloP/PHAST licence -> official distribution source"
-    CP-19: "Official Evolutionary Action licence -> official distribution source"
-    CP-20: "Training overlap for CADD, EA, MPC, PhyloP, GERP++, PrimateAI vs the TSC benchmark -> verified manifests + leakage audit"
-    CP-21: "REVEL/dbNSFP release to pin for RAPTOR -> annotation-bundle decision"
+    CP-9: "Exact independently-generated tool versions Pejaver evaluated (BayesDel-noAF, CADD, EA, MutPred2, PolyPhen-2 HumVar) -> pejaver_2022 supplement"
+    CP-10: "AlphaMissense release evaluated by Bergquist -> bergquist_2025 methods_data_availability"
+    CP-11: "VARITY_R release evaluated by Bergquist -> bergquist_2025 methods_data_availability"
+    CP-12: "ESM1b availability in the selected dbNSFP branch -> selected dbNSFP release README (dbnsfp_v4 distribution_metadata)"
+    CP-13: "VARITY_R availability in the selected dbNSFP branch -> selected dbNSFP release README (dbnsfp_v4 distribution_metadata)"
+    CP-14: "Exact PhyloP column calibrated by Pejaver -> pejaver_2022 supplement"
+    CP-15: "Exact PrimateAI release evaluated by Pejaver -> pejaver_2022 supplement"
+    CP-16: "Official MPC licence -> official MPC distribution source"
+    CP-17: "Official GERP++ licence -> official GERP++ distribution source"
+    CP-18: "Official PhyloP/PHAST licence -> official PHAST distribution source"
+    CP-19: "Official Evolutionary Action licence -> official EA distribution source"
+    CP-20: "Training overlap vs the TSC benchmark -- APPLIES ONLY to CADD, EA, MPC, PhyloP, GERP++, PrimateAI -> verified training manifests + leakage audit. No other candidate may carry CP-20."
+    CP-21: "REVEL/dbNSFP release to pin for RAPTOR -- APPLIES ONLY to REVEL current_release_pin_status -> sources-pin-core-annotation-bundle. Must NOT ground any licence, implementation cost, non-REVEL acquisition, or any other candidate's release."
+    CP-22: "Exact ESM1b evaluated release -> bergquist_2025 methods_data_availability (dedicated release CP; NOT the ESM1b interval CP-6)"
+    CP-23: "Exact dbNSFP release/columns Pejaver evaluated for dbNSFP-obtained tools (REVEL, FATHMM, GERP++, MPC, SIFT, VEST4) -> pejaver_2022 supplement/methods"
+    CP-24: "Official licence for candidates not covered by CP-16..CP-19 (REVEL, BayesDel-noAF, MutPred2, VEST4, AlphaMissense, ESM1b, VARITY_R, CADD, FATHMM, PolyPhen-2 HumVar, PrimateAI, SIFT) -> each tool's official distribution/terms; never upgraded to verified"
+    CP-25: "Availability of dbNSFP-bundled candidate scores in the selected dbNSFP release/branch (bundled route) -> selected dbNSFP release README/column inventory (dbnsfp_v4 distribution_metadata)"
+    CP-26: "Standalone MutPred2 score acquisition (separately generated; NOT dbNSFP-bundled) -> official MutPred2 distribution"
+    CP-27: "Standalone Evolutionary Action score acquisition (separately generated; NOT dbNSFP-bundled) -> official Evolutionary Action distribution"
+    CP-28: "Annotation-bundle RAPTOR release pin for NON-REVEL calibrated candidates -> sources-pin-core-annotation-bundle (distinct from CP-21)"
+
+# ---------------------------------------------------------------------------
+# 6b. Field-level CP + source_id semantics (R4) -- per-field allowlists
+# ---------------------------------------------------------------------------
+field_cp_semantics:
+  source_id_rule: >-
+    A fact object carries non-empty source_ids ONLY when a source_map entry's locus actually
+    resolves the fact (intervals/maxima via pejaver_2022 table_2 or bergquist_2025 table_1;
+    evaluated versions via pejaver_2022 supplement or bergquist_2025 methods_data_availability;
+    dbNSFP-branch availability via dbnsfp_v4 distribution_metadata). For confirm_pending facts whose
+    resolution is an official source not present in source_map (selected release README, official
+    tool distribution/licence, or the annotation-bundle decision), source_ids MUST be empty and the
+    named CP identifies the missing official source. Never attach a source_id whose locus cannot
+    resolve the fact.
+  fields:
+    calibrated_score_intervals: &interval_rule
+      revel: { status: verified, source_ids: [pejaver_2022] }
+      bayesdel_noaf: { status: confirm_pending, cp: CP-1, source_ids: [pejaver_2022] }
+      mutpred2: { status: confirm_pending, cp: CP-2, source_ids: [pejaver_2022] }
+      vest4: { status: confirm_pending, cp: CP-3, source_ids: [pejaver_2022] }
+      cadd_ea_fathmm_gerp_mpc_phylop_polyphen2_primateai_sift: { status: confirm_pending, cp: CP-4, source_ids: [pejaver_2022] }
+      alphamissense: { status: confirm_pending, cp: CP-5, source_ids: [bergquist_2025] }
+      esm1b: { status: confirm_pending, cp: CP-6, source_ids: [bergquist_2025] }
+      varity_r: { status: confirm_pending, cp: CP-7, source_ids: [bergquist_2025] }
+      bias_composite: { status: not_applicable, note: "no external calibration" }
+    explicit_indeterminate_interval: *interval_rule
+    maximum_supported_pp3_strength:
+      revel: { status: verified, value: strong, source_ids: [pejaver_2022] }
+      all_other_calibrated: { status: confirm_pending, cp: "same interval CP as the row (CP-1..CP-7)", source_ids: "[pejaver_2022] or [bergquist_2025]" }
+      bias_composite: { status: not_applicable }
+    maximum_supported_bp4_strength:
+      revel: { status: verified, value: very_strong, source_ids: [pejaver_2022], note: "calibrated maximum is very_strong; current ENABLED maximum in the REVEL policy is moderate" }
+      all_other_calibrated: { status: confirm_pending, cp: "same interval CP as the row (CP-1..CP-7)", source_ids: "[pejaver_2022] or [bergquist_2025]" }
+      bias_composite: { status: not_applicable }
+    calibrated_version:
+      independently_generated__bayesdel_noaf_cadd_evolutionary_action_mutpred2_polyphen2_humvar: { status: confirm_pending, cp: CP-9, source_ids: [pejaver_2022] }
+      dbnsfp_obtained__revel_fathmm_gerp_plus_plus_mpc_sift_vest4: { status: confirm_pending, cp: CP-23, source_ids: [pejaver_2022] }
+      phylop: { status: confirm_pending, cp: CP-14, source_ids: [pejaver_2022] }
+      primateai_original: { status: confirm_pending, cp: CP-15, source_ids: [pejaver_2022] }
+      alphamissense: { status: confirm_pending, cp: CP-10, source_ids: [bergquist_2025] }
+      esm1b: { status: confirm_pending, cp: CP-22, source_ids: [bergquist_2025] }
+      varity_r: { status: confirm_pending, cp: CP-11, source_ids: [bergquist_2025] }
+      bias_composite: { status: not_applicable, note: "internal audit reconstruction; not an externally versioned predictor" }
+    current_release_pin_status:
+      revel: { status: confirm_pending, cp: CP-21, source_ids: [] }
+      all_other_calibrated: { status: confirm_pending, cp: CP-28, source_ids: [] }
+      bias_composite: { status: not_applicable }
+    structured_score_availability:
+      dbnsfp_bundled__revel_bayesdel_noaf_cadd_fathmm_gerp_plus_plus_mpc_phylop_polyphen2_humvar_primateai_original_sift_vest4_alphamissense: { status: confirm_pending, cp: CP-25, source_ids: [dbnsfp_v4] }
+      esm1b: { status: confirm_pending, cp: CP-12, source_ids: [dbnsfp_v4] }
+      varity_r: { status: confirm_pending, cp: CP-13, source_ids: [dbnsfp_v4] }
+      standalone__mutpred2: { status: confirm_pending, cp: CP-26, source_ids: [] }
+      standalone__evolutionary_action: { status: confirm_pending, cp: CP-27, source_ids: [] }
+      bias_composite: { status: not_applicable, note: "reconstructed_only" }
+    license_status:
+      mpc: { status: confirm_pending, cp: CP-16, source_ids: [] }
+      gerp_plus_plus: { status: confirm_pending, cp: CP-17, source_ids: [] }
+      phylop: { status: confirm_pending, cp: CP-18, source_ids: [] }
+      evolutionary_action: { status: confirm_pending, cp: CP-19, source_ids: [] }
+      all_other_calibrated: { status: confirm_pending, cp: CP-24, source_ids: [] }
+      bias_composite: { status: not_applicable, note: "audit-only; not a distributed PP3/BP4 predictor" }
+      rule: "No licence field is ever status: verified."
+    training_manifest_status:
+      cp20_set__cadd_evolutionary_action_mpc_phylop_gerp_plus_plus_primateai_original: { status: unavailable, cp: CP-20, source_ids: [], note: "manifest not obtained; overlap-vs-TSC pending (CP-20); metadata only, not a leakage input" }
+      all_other_calibrated: { status: unavailable, cp: none, source_ids: [], note: "manifest not obtained; NOT in the CP-20 overlap set; metadata only, not a leakage input" }
+      bias_composite: { status: unavailable, cp: none, source_ids: [], note: "inherits unknown constituent provenance; audit-only" }
+    tsc_specific_evidence:
+      all_calibrated: { status: unavailable, source_ids: [], cp_ids: [], note: "none identified for TSC1/TSC2; not assessed at matrix stage" }
+      bias_composite: { status: not_applicable, note: "audit-only reconstruction" }
+      rule: "Calibrated rows use unavailable/none-identified, NEVER not_applicable. Reserve not_applicable for bias_composite."
+    implementation_cost:
+      all_rows: { status: unavailable, source_ids: [], cp_ids: [], note: "not assessed; out of scope for this bounded decision matrix" }
+      rule: "No CP and no source; implementation_cost is out of scope for this matrix."
 
 # ---------------------------------------------------------------------------
 # 7. Canonical matrix schema + fact-object examples (pp3bp4-predictor-matrix/1)
@@ -287,6 +407,7 @@ matrix_schema:
   example_verified_revel:
     revel:
       candidate_id: revel
+      tool_kind: meta_predictor
       evidence_role: calibrated_missense
       disposition: advance_shadow
       calibration_source_id: pejaver_2022
@@ -296,6 +417,8 @@ matrix_schema:
         value: { pp3_supporting: "0.644<=s<0.773", pp3_moderate: "0.773<=s<0.932", pp3_strong: "s>=0.932", bp4_supporting: "0.183<s<=0.290", bp4_moderate: "0.016<s<=0.183" }
         source_ids: [pejaver_2022]
         cp_ids: []
+      maximum_supported_pp3_strength: { status: verified, value: strong, source_ids: [pejaver_2022], cp_ids: [] }
+      maximum_supported_bp4_strength: { status: verified, value: very_strong, source_ids: [pejaver_2022], cp_ids: [], note: "calibrated maximum is very_strong; current ENABLED maximum in the REVEL policy is moderate" }
   example_confirm_pending_gerp:
     gerp_plus_plus:
       candidate_id: gerp_plus_plus
@@ -308,22 +431,23 @@ matrix_schema:
       transcript_and_consequence_scope: missense_variant
       component_or_feature_overlap: "embedded in CADD and other meta-predictors"
       structured_score_source: dbnsfp_v4
-      license_source: official_distribution
+      license_source: official_gerp_distribution
       disposition: shadow_comparator
       rationale_source_ids: [pejaver_2022]
       calibrated_score_intervals:      { status: confirm_pending, value: null, source_ids: [pejaver_2022], cp_ids: [CP-4] }
       explicit_indeterminate_interval: { status: confirm_pending, value: null, source_ids: [pejaver_2022], cp_ids: [CP-4] }
       maximum_supported_pp3_strength:  { status: confirm_pending, value: null, source_ids: [pejaver_2022], cp_ids: [CP-4] }
       maximum_supported_bp4_strength:  { status: confirm_pending, value: null, source_ids: [pejaver_2022], cp_ids: [CP-4] }
-      calibrated_version:              { status: confirm_pending, value: null, source_ids: [pejaver_2022], cp_ids: [CP-9] }
-      current_release_pin_status:      { status: confirm_pending, value: null, source_ids: [dbnsfp_v4],    cp_ids: [CP-21] }
-      structured_score_availability:   { status: confirm_pending, value: null, source_ids: [dbnsfp_v4],    cp_ids: [CP-21] }
-      license_status:                  { status: confirm_pending, value: null, source_ids: [dbnsfp_v4],    cp_ids: [CP-17] }
-      training_manifest_status:        { status: unavailable,     value: null, source_ids: [dbnsfp_v4],    cp_ids: [CP-20], note: "manifest not obtained; metadata only, not a leakage input" }
-      tsc_specific_evidence:           { status: not_applicable,  value: null, source_ids: [pejaver_2022], cp_ids: [], note: "no TSC-specific calibration at matrix stage" }
-      implementation_cost:             { status: confirm_pending, value: null, source_ids: [dbnsfp_v4],    cp_ids: [CP-21] }
+      calibrated_version:              { status: confirm_pending, value: null, source_ids: [pejaver_2022], cp_ids: [CP-23] }
+      current_release_pin_status:      { status: confirm_pending, value: null, source_ids: [],            cp_ids: [CP-28] }
+      structured_score_availability:   { status: confirm_pending, value: null, source_ids: [dbnsfp_v4],   cp_ids: [CP-25] }
+      license_status:                  { status: confirm_pending, value: null, source_ids: [],            cp_ids: [CP-17] }
+      training_manifest_status:        { status: unavailable,     value: null, source_ids: [],            cp_ids: [CP-20], note: "manifest not obtained; overlap-vs-TSC pending (CP-20); metadata only, not a leakage input" }
+      tsc_specific_evidence:           { status: unavailable,     value: null, source_ids: [],            cp_ids: [], note: "none identified for TSC1/TSC2; not assessed at matrix stage" }
+      implementation_cost:             { status: unavailable,     value: null, source_ids: [],            cp_ids: [], note: "not assessed; out of scope for this bounded decision matrix" }
   notes:
-    - "Only REVEL carries a status: verified interval object; every other candidate's interval fields are status: confirm_pending with a resolving cp_id."
+    - "Only REVEL carries status: verified interval + maxima objects (bp4 very_strong calibrated, note enabled=moderate); every other candidate's interval/maxima fields are confirm_pending with a resolving cp_id."
+    - "tool_kind is pinned by candidate_identity.tool_kind_map; per-field CP/source use field_cp_semantics (CP-20 only for the six overlap tools; CP-21 only for REVEL's pin; licences via CP-16..19/CP-24; implementation_cost and calibrated-row tsc_specific_evidence are unavailable with a note, never CP-21 or not_applicable)."
     - "fathmm/sift record native lower + a pejaver_transform note; esm1b is lower."
 
 # ---------------------------------------------------------------------------
@@ -375,6 +499,13 @@ gemini_tests:
     - T11: "No scorer, gate, packet, terminal, census, or production-policy wiring is added."
     - T12: "Every fact object obeys fact_status.fact_object.validation (status/value/source_ids/cp_ids), and every cp_id resolves to the top-level confirm_pending_register; no CP id is comment-only."
     - T13: "Markdown Backing config names pp3bp4_predictor_matrix.yaml (not the source register); the memo relation table labels the matrix and the REVEL provenance register distinctly."
+    - T14: "Every candidate's tool_kind equals candidate_identity.tool_kind_map exactly in the machine matrix; BayesDel-noAF is meta_predictor."
+    - T15: "Markdown/machine parity for every row: candidate_id, display_name, tool_kind, evidence_role, calibration source, and disposition match the canonical machine matrix."
+    - T16: "training_manifest_status carries CP-20 ONLY for cadd, evolutionary_action, mpc, phylop, gerp_plus_plus, primateai_original; no other candidate carries CP-20, and each such row uses an honest note with empty source_ids."
+    - T17: "Field-CP allowlist (field_cp_semantics): each fact-object field's cp_ids are drawn only from the allowed set for that field/candidate; CP-21 appears only on REVEL current_release_pin_status; interval CPs (CP-1..CP-7) never appear on version/release/licence/availability/pin fields."
+    - T18: "Bergquist release facts (alphamissense/esm1b/varity_r calibrated_version) use CP-10/CP-22/CP-11 with source_ids [bergquist_2025] (methods_data_availability locus); ESM1b evaluated release uses CP-22, never interval CP-6."
+    - T19: "tsc_specific_evidence for every calibrated row is unavailable/none-identified (never not_applicable; not_applicable only for bias_composite); implementation_cost for every row is unavailable with no cp_ids and empty source_ids."
+    - T20: "source_id_rule holds: source_ids are non-empty only when a source_map locus resolves the fact; licence, non-REVEL pin, and standalone-acquisition confirm_pending facts have empty source_ids with a naming CP."
 
 # ---------------------------------------------------------------------------
 # 10. Sonnet boundary
