@@ -5,7 +5,7 @@
 | Status | **PROPOSED / UNAPPROVED / SHADOW ONLY** |
 | Date | 2026-07-18 |
 | Scope | TSC1/TSC2 missense computational evidence; research use only |
-| Backing config | `configs/eval/pp3bp4_source_register.yaml` |
+| Backing config | `configs/eval/pp3bp4_predictor_matrix.yaml` |
 | Backing policy | `configs/eval/pp3bp4_candidate_policy.json` (`policy_id: tsc-pp3bp4-revel-shadow`, `status: proposed`) |
 
 > **Reading rule.** This matrix records candidate predictor disposition for the shadow REVEL
@@ -13,6 +13,13 @@
 > predictor, activate a scorer, classify a variant, authorize a VUS worklist, or approve clinical
 > use. It supersedes no primary source in
 > `docs/reference/pp3-bp4-predictor-policy-recommendation-2026-07.md`.
+
+> **Backing-config migration.** The comprehensive 16-tool + `bias_composite` decision matrix below
+> is now backed by the new standalone canonical machine matrix
+> `configs/eval/pp3bp4_predictor_matrix.yaml` (schema `pp3bp4-predictor-matrix/1`).
+> `configs/eval/pp3bp4_source_register.yaml` remains, unchanged, the existing REVEL PP3/BP4
+> shadow-policy **provenance register only** -- it is not the backing config for this comprehensive
+> matrix and was not touched by this expansion.
 
 ## 1. Verified facts vs confirm-pending values
 
@@ -40,18 +47,42 @@ The following are **confirm-pending** (not yet independently verified against a 
 
 ## 2. Candidate matrix
 
-| Candidate | Kind | Calibration source | Version status | License status | Structured score availability | Training-manifest status | TSC-specific evidence | Decision |
-|---|---|---|---|---|---|---|---|---|
-| REVEL | meta_predictor | Pejaver 2022 | confirm_pending | confirm_pending | blocked_data | unavailable | none_identified | **advance_shadow** |
-| BayesDel-noAF | meta_predictor | Pejaver 2022 | confirm_pending | confirm_pending | unavailable | unavailable | none_identified | blocked_shadow_comparator |
-| MutPred2 | predictor | Pejaver 2022 | confirm_pending | confirm_pending | unavailable | unavailable | none_identified | blocked_shadow_comparator |
-| VEST4 | predictor | Pejaver 2022 | confirm_pending | confirm_pending | unavailable | unavailable | none_identified | blocked_shadow_comparator |
-| BIAS composite | composite | none | pinned_bias_3_0_0_commit_ade13f2 | arm_length_agpl | reconstructed_only | inherited_unknown | none_identified | audit_only_reject_authoritative |
+| Candidate ID | Display name | Tool kind | Evidence role | Calibration source | Decision |
+|---|---|---|---|---|---|
+| `revel` | REVEL | meta_predictor | calibrated_missense | Pejaver 2022, Table 2 | **advance_shadow** |
+| `bayesdel_noaf` | BayesDel (no allele frequency) | meta_predictor | calibrated_missense | Pejaver 2022, Table 2 | eligible_primary_candidate |
+| `mutpred2` | MutPred2 | predictor | calibrated_missense | Pejaver 2022, Table 2 | eligible_primary_candidate |
+| `vest4` | VEST4 | predictor | calibrated_missense | Pejaver 2022, Table 2 | eligible_primary_candidate |
+| `alphamissense` | AlphaMissense | predictor | calibrated_missense | Bergquist 2025, Table 1 | eligible_primary_candidate |
+| `esm1b` | ESM1b | predictor | calibrated_missense | Bergquist 2025, Table 1 | eligible_primary_candidate |
+| `varity_r` | VARITY_R | predictor | calibrated_missense | Bergquist 2025, Table 1 | eligible_primary_candidate |
+| `cadd` | CADD | predictor | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
+| `evolutionary_action` | Evolutionary Action | predictor | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
+| `fathmm` | FATHMM | predictor | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
+| `gerp_plus_plus` | GERP++ | conservation | conservation_context | Pejaver 2022, Table 2 | shadow_comparator |
+| `mpc` | MPC | predictor | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
+| `phylop` | PhyloP | conservation | conservation_context | Pejaver 2022, Table 2 | shadow_comparator |
+| `polyphen2_humvar` | PolyPhen-2 HumVar | predictor | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
+| `primateai_original` | PrimateAI | predictor | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
+| `sift` | SIFT | predictor | calibrated_missense | Pejaver 2022, Table 2 | shadow_comparator |
+| `bias_composite` | BIAS composite (reconstructed max_plus_consensus) | composite | audit_only | none (audit reconstruction only) | audit_only_reject_authoritative |
 
-REVEL is the sole candidate advanced into the shadow lane (`configs/eval/pp3bp4_candidate_policy.json`,
-`status: proposed`, `shadow_only: true`, `owner_approved: false`). This is **not** a production
-predictor selection -- every activation-checklist item in section 8 of
-`pp3-bp4-predictor-policy-recommendation-2026-07.md` remains unmet.
+Notes:
+
+- This table is the human rendering of the canonical machine matrix
+  `configs/eval/pp3bp4_predictor_matrix.yaml` (schema `pp3bp4-predictor-matrix/1`). Candidate IDs
+  and dispositions above must match that file exactly; see the machine matrix for the full
+  fact-object detail (status/value/source_ids/cp_ids) behind every cell.
+- `gerp_plus_plus` and `phylop` carry `evidence_role: conservation_context` -- a distinct policy
+  role within the calibrated set, not an extra independent PP3/BP4 vote and not a splice policy.
+- Only `revel` carries `status: verified` calibrated score intervals; every other candidate's
+  interval fields are `status: confirm_pending` with a resolving `cp_id` in the machine matrix's
+  `confirm_pending_register`.
+- REVEL is the sole candidate advanced into the shadow lane (`configs/eval/pp3bp4_candidate_policy.json`,
+  `status: proposed`, `shadow_only: true`, `owner_approved: false`). This is **not** a production
+  predictor selection -- every activation-checklist item in section 8 of
+  `pp3-bp4-predictor-policy-recommendation-2026-07.md` remains unmet. No other candidate above is
+  `advance_shadow`; the matrix adds 16-tool decision support, not 16 integrations.
 
 ## 3. Known historical held-out outcome (acknowledged, not used for choice/tuning)
 

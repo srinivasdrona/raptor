@@ -1,0 +1,1698 @@
+# pp3bp4-predictor-matrix/1
+# Canonical machine matrix for the bounded PP3/BP4 predictor decision support (Sonnet Slot 3).
+# Sole machine source of truth for the comprehensive 16+bias_composite decision matrix.
+# Does not change configs/eval/pp3bp4_source_register.yaml, configs/eval/predictor_training_manifests.yaml,
+# or configs/eval/pp3bp4_candidate_policy.json (all remain byte-identical / REVEL shadow-policy scoped).
+# REVEL remains the sole advance_shadow candidate; this file advances no other predictor.
+
+schema: pp3bp4-predictor-matrix/1
+version: 1
+source_map:
+  pejaver_2022:
+    citation: Pejaver V, Byrne AB, Feng BJ, et al. Calibration of computational tools for missense variant
+      pathogenicity classification and ClinGen recommendations for PP3/BP4 criteria. AJHG 2022;109:2163-2177.
+    doi: 10.1016/j.ajhg.2022.10.013
+    pmid: '36413997'
+    pmc: PMC9748256
+    url: https://pmc.ncbi.nlm.nih.gov/articles/PMC9748256/
+    loci:
+      methods: 13-tool calibrated set; higher-is-pathogenic direction transforms for FATHMM and SIFT;
+        dbNSFP score acquisition; training-overlap exclusions; REVEL/BayesDel named as meta-predictors.
+      table_2: Calibrated PP3/BP4 score intervals; the REVEL row is the only fully-verified multi-level
+        interval set.
+  bergquist_2025:
+    citation: Bergquist T, Pejaver V, et al. Calibration of additional computational tools expands ClinGen
+      recommendation options for variant classification with PP3/BP4 criteria. Genetics in Medicine 2025.
+    doi: 10.1016/j.gim.2025.101402
+    pmid: '40084623'
+    preprint_doi: 10.1101/2024.09.17.611902
+    pmc: confirm_pending (CP-8)
+    url: https://www.biorxiv.org/content/10.1101/2024.09.17.611902v1
+    loci:
+      table_1: AlphaMissense, ESM1b, VARITY_R calibration conclusions; exact numeric intervals remain
+        confirm_pending until Table 1 is read directly (CP-5/CP-6/CP-7).
+  stenton_2024:
+    citation: Stenton SL, Pejaver V, Harrison SM, et al. Assessment of the evidence yield for the calibrated
+      PP3/BP4 computational recommendations. Genetics in Medicine 2024.
+    pmid: '39030733'
+    pmc: PMC11560577
+    url: https://pmc.ncbi.nlm.nih.gov/articles/PMC11560577/
+    loci:
+      box_1: One preselected predictor, no cherry-picking, established thresholds; combined PP3+PM1 capped
+        at Strong.
+  richards_2015:
+    citation: Richards S, Aziz N, Bale S, et al. Standards and guidelines for the interpretation of sequence
+      variants (ACMG/AMP). Genetics in Medicine 2015.
+    doi: 10.1038/gim.2015.30
+    pmid: '25741868'
+    pmc: PMC4544753
+    url: https://pmc.ncbi.nlm.nih.gov/articles/PMC4544753/
+    loci:
+      pp3_bp4: PP3/BP4 computational-evidence criteria; correlated-tool (apply once per variant) rule.
+  tavtigian_2018:
+    citation: Tavtigian SV, et al. Modeling the ACMG/AMP variant classification guidelines as a Bayesian
+      classification framework. Genetics in Medicine 2018.
+    doi: 10.1038/gim.2017.210
+    url: https://doi.org/10.1038/gim.2017.210
+    loci:
+      model: Bayesian evidence-strength ladder (supporting/moderate/strong/very-strong).
+  dbnsfp_v4:
+    citation: Liu X, Li C, Mou C, Dong Y, Tu Y. dbNSFP v4. Genome Medicine 2020;12:103.
+    url: https://sites.google.com/site/jpopgen/dbNSFP
+    loci:
+      distribution_metadata: 'Official dbNSFP distribution page (https://sites.google.com/site/jpopgen/dbNSFP):
+        per-release download/file listing, the release column/field inventory (README/''column description''),
+        and the academic-vs-commercial licence-separated branches. Used only to locate candidate score
+        fields, their availability, and licence terms; it does not pin a release. The exact RAPTOR release
+        remains confirm_pending (CP-21).'
+    role: 'Distribution/availability reference only (not a calibration source). The exact RAPTOR-pinned
+      release/column/licence branch remain confirm_pending: current_release_pin (CP-21), availability
+      (CP-12/CP-13), licences (CP-16..CP-19).'
+confirm_pending_register:
+  CP-1: BayesDel-noAF intervals -> Pejaver Table 2
+  CP-2: MutPred2 intervals -> Pejaver Table 2
+  CP-3: VEST4 intervals -> Pejaver Table 2
+  CP-4: Intervals/maxima for CADD, EA, FATHMM, GERP++, MPC, PhyloP, PolyPhen-2 HumVar, PrimateAI, SIFT
+    -> Pejaver Table 2
+  CP-5: AlphaMissense intervals -> Bergquist Table 1
+  CP-6: ESM1b intervals -> Bergquist Table 1
+  CP-7: VARITY_R intervals -> Bergquist Table 1
+  CP-8: Bergquist 2025 PMCID -> PubMed/PMC
+  CP-9: Independently-generated tool versions used by Pejaver -> Pejaver supplement
+  CP-10: AlphaMissense release evaluated by Bergquist -> Bergquist Methods/Data Availability
+  CP-11: VARITY_R release evaluated by Bergquist -> Bergquist Methods/Data Availability
+  CP-12: ESM1b availability in the selected dbNSFP branch -> selected release README
+  CP-13: VARITY_R availability in the selected dbNSFP branch -> selected release README
+  CP-14: PhyloP column calibrated by Pejaver -> Pejaver supplement
+  CP-15: PrimateAI release evaluated by Pejaver -> Pejaver supplement
+  CP-16: Official MPC licence -> official distribution source
+  CP-17: Official GERP++ licence -> official distribution source
+  CP-18: Official PhyloP/PHAST licence -> official distribution source
+  CP-19: Official Evolutionary Action licence -> official distribution source
+  CP-20: Training overlap for CADD, EA, MPC, PhyloP, GERP++, PrimateAI vs the TSC benchmark -> verified
+    manifests + leakage audit
+  CP-21: REVEL/dbNSFP release to pin for RAPTOR -> annotation-bundle decision
+candidates:
+  revel:
+    candidate_id: revel
+    display_name: REVEL
+    tool_kind: meta_predictor
+    evidence_role: calibrated_missense
+    calibration_source_id: pejaver_2022
+    calibration_locus: Table 2
+    score_direction: higher_more_pathogenic
+    transcript_and_consequence_scope: missense_variant
+    component_or_feature_overlap: meta-predictor; combines SIFT, PolyPhen-2, FATHMM + others (component_dependence_map)
+    structured_score_source: dbnsfp_v4
+    license_source: dbnsfp_v4_official_distribution
+    disposition: advance_shadow
+    rationale_source_ids:
+    - pejaver_2022
+    calibrated_score_intervals:
+      status: verified
+      value:
+        pp3_supporting: 0.644<=s<0.773 (enabled)
+        pp3_moderate: 0.773<=s<0.932 (enabled)
+        pp3_strong: s>=0.932 (enabled)
+        indeterminate: 0.290<s<0.644 (no criterion)
+        bp4_supporting: 0.183<s<=0.290 (enabled)
+        bp4_moderate: 0.016<s<=0.183 (enabled)
+        bp4_strong: 0.003<s<=0.016 (calibrated, DISABLED in the current policy)
+        bp4_very_strong: s<=0.003 (calibrated, DISABLED in the current policy)
+      source_ids:
+      - pejaver_2022
+      cp_ids: []
+    explicit_indeterminate_interval:
+      status: verified
+      value: 0.290 < s < 0.644 (no criterion)
+      source_ids:
+      - pejaver_2022
+      cp_ids: []
+    maximum_supported_pp3_strength:
+      status: verified
+      value: strong
+      source_ids:
+      - pejaver_2022
+      cp_ids: []
+    maximum_supported_bp4_strength:
+      status: verified
+      value: very_strong
+      source_ids:
+      - pejaver_2022
+      cp_ids: []
+      note: Calibrated ceiling is very_strong; the current shadow policy enables only up to moderate (bp4_strong/bp4_very_strong
+        are calibrated but disabled).
+    calibrated_version:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    current_release_pin_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    structured_score_availability:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    license_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    training_manifest_status:
+      status: unavailable
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-20
+      note: manifest not obtained; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: not_applicable
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids: []
+      note: no TSC-specific calibration at matrix stage
+    implementation_cost:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+  bayesdel_noaf:
+    candidate_id: bayesdel_noaf
+    display_name: BayesDel (no allele frequency)
+    tool_kind: predictor
+    evidence_role: calibrated_missense
+    calibration_source_id: pejaver_2022
+    calibration_locus: Table 2
+    score_direction: higher_more_pathogenic
+    transcript_and_consequence_scope: missense_variant
+    component_or_feature_overlap: SIFT, PolyPhen-2, FATHMM-coding, MPC, conservation features (meta-predictor
+      component overlap)
+    structured_score_source: dbnsfp_v4
+    license_source: dbnsfp_v4_official_distribution
+    disposition: eligible_primary_candidate
+    rationale_source_ids:
+    - pejaver_2022
+    calibrated_score_intervals:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-1
+    explicit_indeterminate_interval:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-1
+    maximum_supported_pp3_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-1
+    maximum_supported_bp4_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-1
+    calibrated_version:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-9
+    current_release_pin_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    structured_score_availability:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    license_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    training_manifest_status:
+      status: unavailable
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-20
+      note: manifest not obtained; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: not_applicable
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids: []
+      note: no TSC-specific calibration at matrix stage
+    implementation_cost:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+  mutpred2:
+    candidate_id: mutpred2
+    display_name: MutPred2
+    tool_kind: predictor
+    evidence_role: calibrated_missense
+    calibration_source_id: pejaver_2022
+    calibration_locus: Table 2
+    score_direction: higher_more_pathogenic
+    transcript_and_consequence_scope: missense_variant
+    component_or_feature_overlap: none identified; separately generated
+    structured_score_source: dbnsfp_v4
+    license_source: dbnsfp_v4_official_distribution
+    disposition: eligible_primary_candidate
+    rationale_source_ids:
+    - pejaver_2022
+    calibrated_score_intervals:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-2
+    explicit_indeterminate_interval:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-2
+    maximum_supported_pp3_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-2
+    maximum_supported_bp4_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-2
+    calibrated_version:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-9
+    current_release_pin_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    structured_score_availability:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    license_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    training_manifest_status:
+      status: unavailable
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-20
+      note: manifest not obtained; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: not_applicable
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids: []
+      note: no TSC-specific calibration at matrix stage
+    implementation_cost:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+  vest4:
+    candidate_id: vest4
+    display_name: VEST4
+    tool_kind: predictor
+    evidence_role: calibrated_missense
+    calibration_source_id: pejaver_2022
+    calibration_locus: Table 2
+    score_direction: higher_more_pathogenic
+    transcript_and_consequence_scope: missense_variant
+    component_or_feature_overlap: none identified
+    structured_score_source: dbnsfp_v4
+    license_source: dbnsfp_v4_official_distribution
+    disposition: eligible_primary_candidate
+    rationale_source_ids:
+    - pejaver_2022
+    calibrated_score_intervals:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-3
+    explicit_indeterminate_interval:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-3
+    maximum_supported_pp3_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-3
+    maximum_supported_bp4_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-3
+    calibrated_version:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-9
+    current_release_pin_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    structured_score_availability:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    license_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    training_manifest_status:
+      status: unavailable
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-20
+      note: manifest not obtained; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: not_applicable
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids: []
+      note: no TSC-specific calibration at matrix stage
+    implementation_cost:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+  cadd:
+    candidate_id: cadd
+    display_name: CADD
+    tool_kind: predictor
+    evidence_role: calibrated_missense
+    calibration_source_id: pejaver_2022
+    calibration_locus: Table 2
+    score_direction: higher_more_pathogenic
+    transcript_and_consequence_scope: missense_variant
+    component_or_feature_overlap: conservation + protein-prediction features embedded (PhyloP/GERP++/PolyPhen-derived);
+      many embedded features
+    structured_score_source: dbnsfp_v4
+    license_source: dbnsfp_v4_official_distribution
+    disposition: shadow_comparator
+    rationale_source_ids:
+    - pejaver_2022
+    calibrated_score_intervals:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    explicit_indeterminate_interval:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    maximum_supported_pp3_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    maximum_supported_bp4_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    calibrated_version:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-9
+    current_release_pin_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    structured_score_availability:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    license_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    training_manifest_status:
+      status: unavailable
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-20
+      note: manifest not obtained; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: not_applicable
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids: []
+      note: no TSC-specific calibration at matrix stage
+    implementation_cost:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+  evolutionary_action:
+    candidate_id: evolutionary_action
+    display_name: Evolutionary Action
+    tool_kind: predictor
+    evidence_role: calibrated_missense
+    calibration_source_id: pejaver_2022
+    calibration_locus: Table 2
+    score_direction: higher_more_pathogenic
+    transcript_and_consequence_scope: missense_variant
+    component_or_feature_overlap: none identified; separate generation route
+    structured_score_source: dbnsfp_v4
+    license_source: dbnsfp_v4_official_distribution
+    disposition: shadow_comparator
+    rationale_source_ids:
+    - pejaver_2022
+    calibrated_score_intervals:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    explicit_indeterminate_interval:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    maximum_supported_pp3_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    maximum_supported_bp4_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    calibrated_version:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-9
+    current_release_pin_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    structured_score_availability:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    license_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-19
+    training_manifest_status:
+      status: unavailable
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-20
+      note: manifest not obtained; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: not_applicable
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids: []
+      note: no TSC-specific calibration at matrix stage
+    implementation_cost:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+  fathmm:
+    candidate_id: fathmm
+    display_name: FATHMM
+    tool_kind: predictor
+    evidence_role: calibrated_missense
+    calibration_source_id: pejaver_2022
+    calibration_locus: Table 2
+    score_direction: lower_native_pejaver_transformed
+    transcript_and_consequence_scope: missense_variant
+    component_or_feature_overlap: REVEL and BayesDel-noAF component; native lower pre-transform
+    structured_score_source: dbnsfp_v4
+    license_source: dbnsfp_v4_official_distribution
+    disposition: shadow_comparator
+    rationale_source_ids:
+    - pejaver_2022
+    calibrated_score_intervals:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    explicit_indeterminate_interval:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    maximum_supported_pp3_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    maximum_supported_bp4_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    calibrated_version:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-9
+    current_release_pin_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    structured_score_availability:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    license_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    training_manifest_status:
+      status: unavailable
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-20
+      note: manifest not obtained; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: not_applicable
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids: []
+      note: no TSC-specific calibration at matrix stage
+    implementation_cost:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+  mpc:
+    candidate_id: mpc
+    display_name: MPC
+    tool_kind: predictor
+    evidence_role: calibrated_missense
+    calibration_source_id: pejaver_2022
+    calibration_locus: Table 2
+    score_direction: higher_more_pathogenic
+    transcript_and_consequence_scope: missense_variant
+    component_or_feature_overlap: BayesDel-noAF component; constraint/population dependence
+    structured_score_source: dbnsfp_v4
+    license_source: dbnsfp_v4_official_distribution
+    disposition: shadow_comparator
+    rationale_source_ids:
+    - pejaver_2022
+    calibrated_score_intervals:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    explicit_indeterminate_interval:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    maximum_supported_pp3_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    maximum_supported_bp4_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    calibrated_version:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-9
+    current_release_pin_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    structured_score_availability:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    license_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-16
+    training_manifest_status:
+      status: unavailable
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-20
+      note: manifest not obtained; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: not_applicable
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids: []
+      note: no TSC-specific calibration at matrix stage
+    implementation_cost:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+  polyphen2_humvar:
+    candidate_id: polyphen2_humvar
+    display_name: PolyPhen-2 HumVar
+    tool_kind: predictor
+    evidence_role: calibrated_missense
+    calibration_source_id: pejaver_2022
+    calibration_locus: Table 2
+    score_direction: higher_more_pathogenic
+    transcript_and_consequence_scope: missense_variant
+    component_or_feature_overlap: REVEL and BayesDel-noAF component
+    structured_score_source: dbnsfp_v4
+    license_source: dbnsfp_v4_official_distribution
+    disposition: shadow_comparator
+    rationale_source_ids:
+    - pejaver_2022
+    calibrated_score_intervals:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    explicit_indeterminate_interval:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    maximum_supported_pp3_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    maximum_supported_bp4_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    calibrated_version:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-9
+    current_release_pin_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    structured_score_availability:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    license_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    training_manifest_status:
+      status: unavailable
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-20
+      note: manifest not obtained; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: not_applicable
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids: []
+      note: no TSC-specific calibration at matrix stage
+    implementation_cost:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+  primateai_original:
+    candidate_id: primateai_original
+    display_name: PrimateAI
+    tool_kind: predictor
+    evidence_role: calibrated_missense
+    calibration_source_id: pejaver_2022
+    calibration_locus: Table 2
+    score_direction: higher_more_pathogenic
+    transcript_and_consequence_scope: missense_variant
+    component_or_feature_overlap: none identified; evaluated release needs confirmation
+    structured_score_source: dbnsfp_v4
+    license_source: dbnsfp_v4_official_distribution
+    disposition: shadow_comparator
+    rationale_source_ids:
+    - pejaver_2022
+    calibrated_score_intervals:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    explicit_indeterminate_interval:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    maximum_supported_pp3_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    maximum_supported_bp4_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    calibrated_version:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-9
+    current_release_pin_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    structured_score_availability:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    license_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    training_manifest_status:
+      status: unavailable
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-20
+      note: manifest not obtained; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: not_applicable
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids: []
+      note: no TSC-specific calibration at matrix stage
+    implementation_cost:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+  sift:
+    candidate_id: sift
+    display_name: SIFT
+    tool_kind: predictor
+    evidence_role: calibrated_missense
+    calibration_source_id: pejaver_2022
+    calibration_locus: Table 2
+    score_direction: lower_native_pejaver_transformed
+    transcript_and_consequence_scope: missense_variant
+    component_or_feature_overlap: REVEL and BayesDel-noAF component; native lower pre-transform
+    structured_score_source: dbnsfp_v4
+    license_source: dbnsfp_v4_official_distribution
+    disposition: shadow_comparator
+    rationale_source_ids:
+    - pejaver_2022
+    calibrated_score_intervals:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    explicit_indeterminate_interval:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    maximum_supported_pp3_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    maximum_supported_bp4_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    calibrated_version:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-9
+    current_release_pin_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    structured_score_availability:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    license_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    training_manifest_status:
+      status: unavailable
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-20
+      note: manifest not obtained; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: not_applicable
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids: []
+      note: no TSC-specific calibration at matrix stage
+    implementation_cost:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+  gerp_plus_plus:
+    candidate_id: gerp_plus_plus
+    display_name: GERP++
+    tool_kind: conservation
+    evidence_role: conservation_context
+    calibration_source_id: pejaver_2022
+    calibration_locus: Table 2
+    score_direction: higher_more_pathogenic
+    transcript_and_consequence_scope: missense_variant
+    component_or_feature_overlap: embedded in CADD and other meta-predictors
+    structured_score_source: dbnsfp_v4
+    license_source: dbnsfp_v4_official_distribution
+    disposition: shadow_comparator
+    rationale_source_ids:
+    - pejaver_2022
+    calibrated_score_intervals:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    explicit_indeterminate_interval:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    maximum_supported_pp3_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    maximum_supported_bp4_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    calibrated_version:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-9
+    current_release_pin_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    structured_score_availability:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    license_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-17
+    training_manifest_status:
+      status: unavailable
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-20
+      note: manifest not obtained; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: not_applicable
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids: []
+      note: no TSC-specific calibration at matrix stage
+    implementation_cost:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+  phylop:
+    candidate_id: phylop
+    display_name: PhyloP
+    tool_kind: conservation
+    evidence_role: conservation_context
+    calibration_source_id: pejaver_2022
+    calibration_locus: Table 2
+    score_direction: higher_more_pathogenic
+    transcript_and_consequence_scope: missense_variant
+    component_or_feature_overlap: embedded in CADD and other meta-predictors
+    structured_score_source: dbnsfp_v4
+    license_source: dbnsfp_v4_official_distribution
+    disposition: shadow_comparator
+    rationale_source_ids:
+    - pejaver_2022
+    calibrated_score_intervals:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    explicit_indeterminate_interval:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    maximum_supported_pp3_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    maximum_supported_bp4_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-4
+    calibrated_version:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids:
+      - CP-9
+      - CP-14
+    current_release_pin_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    structured_score_availability:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+    license_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-18
+    training_manifest_status:
+      status: unavailable
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-20
+      note: manifest not obtained; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: not_applicable
+      value: null
+      source_ids:
+      - pejaver_2022
+      cp_ids: []
+      note: no TSC-specific calibration at matrix stage
+    implementation_cost:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - dbnsfp_v4
+      cp_ids:
+      - CP-21
+  alphamissense:
+    candidate_id: alphamissense
+    display_name: AlphaMissense
+    tool_kind: predictor
+    evidence_role: calibrated_missense
+    calibration_source_id: bergquist_2025
+    calibration_locus: Table 1
+    score_direction: higher_more_pathogenic
+    transcript_and_consequence_scope: missense_variant
+    component_or_feature_overlap: none identified
+    structured_score_source: dbnsfp_v4
+    license_source: dbnsfp_v4_official_distribution
+    disposition: eligible_primary_candidate
+    rationale_source_ids:
+    - bergquist_2025
+    calibrated_score_intervals:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-5
+    explicit_indeterminate_interval:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-5
+    maximum_supported_pp3_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-5
+    maximum_supported_bp4_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-5
+    calibrated_version:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-10
+    current_release_pin_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-10
+      - CP-21
+    structured_score_availability:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-21
+    license_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-21
+    training_manifest_status:
+      status: unavailable
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-20
+      note: manifest not obtained; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: not_applicable
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids: []
+      note: no TSC-specific calibration at matrix stage
+    implementation_cost:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-21
+  esm1b:
+    candidate_id: esm1b
+    display_name: ESM1b
+    tool_kind: predictor
+    evidence_role: calibrated_missense
+    calibration_source_id: bergquist_2025
+    calibration_locus: Table 1
+    score_direction: lower_more_pathogenic
+    transcript_and_consequence_scope: missense_variant
+    component_or_feature_overlap: none identified
+    structured_score_source: dbnsfp_v4
+    license_source: dbnsfp_v4_official_distribution
+    disposition: eligible_primary_candidate
+    rationale_source_ids:
+    - bergquist_2025
+    calibrated_score_intervals:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-6
+    explicit_indeterminate_interval:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-6
+    maximum_supported_pp3_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-6
+    maximum_supported_bp4_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-6
+    calibrated_version:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-6
+    current_release_pin_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-21
+    structured_score_availability:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-12
+      - CP-21
+    license_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-21
+    training_manifest_status:
+      status: unavailable
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-20
+      note: manifest not obtained; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: not_applicable
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids: []
+      note: no TSC-specific calibration at matrix stage
+    implementation_cost:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-21
+  varity_r:
+    candidate_id: varity_r
+    display_name: VARITY_R
+    tool_kind: predictor
+    evidence_role: calibrated_missense
+    calibration_source_id: bergquist_2025
+    calibration_locus: Table 1
+    score_direction: higher_more_pathogenic
+    transcript_and_consequence_scope: missense_variant
+    component_or_feature_overlap: none identified
+    structured_score_source: dbnsfp_v4
+    license_source: dbnsfp_v4_official_distribution
+    disposition: eligible_primary_candidate
+    rationale_source_ids:
+    - bergquist_2025
+    calibrated_score_intervals:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-7
+    explicit_indeterminate_interval:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-7
+    maximum_supported_pp3_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-7
+    maximum_supported_bp4_strength:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-7
+    calibrated_version:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-11
+    current_release_pin_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-11
+      - CP-21
+    structured_score_availability:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-13
+      - CP-21
+    license_status:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-21
+    training_manifest_status:
+      status: unavailable
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-20
+      note: manifest not obtained; metadata only, not a leakage input
+    tsc_specific_evidence:
+      status: not_applicable
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids: []
+      note: no TSC-specific calibration at matrix stage
+    implementation_cost:
+      status: confirm_pending
+      value: null
+      source_ids:
+      - bergquist_2025
+      cp_ids:
+      - CP-21
+audit_rows:
+  bias_composite:
+    candidate_id: bias_composite
+    display_name: BIAS composite (reconstructed max_plus_consensus)
+    tool_kind: composite
+    evidence_role: audit_only
+    calibration_source_id: null
+    calibration_locus: null
+    score_direction: not_applicable
+    transcript_and_consequence_scope: not_applicable
+    component_or_feature_overlap: reconstructs constituent predictor scores from BIAS free-form rationale
+      text; not independently calibrated
+    structured_score_source: null
+    license_source: not_applicable_internal_reconstruction
+    disposition: audit_only_reject_authoritative
+    rationale_source_ids: []
+    calibrated_score_intervals:
+      status: not_applicable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: BIAS composite has no external end-to-end calibration; audit reconstruction only (disposition
+        audit_only_reject_authoritative); not a PP3/BP4 candidate interval.
+    explicit_indeterminate_interval:
+      status: not_applicable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: BIAS composite has no external end-to-end calibration; audit reconstruction only (disposition
+        audit_only_reject_authoritative); not a PP3/BP4 candidate interval.
+    maximum_supported_pp3_strength:
+      status: not_applicable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: BIAS composite has no external end-to-end calibration; audit reconstruction only (disposition
+        audit_only_reject_authoritative); not a PP3/BP4 candidate interval.
+    maximum_supported_bp4_strength:
+      status: not_applicable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: BIAS composite has no external end-to-end calibration; audit reconstruction only (disposition
+        audit_only_reject_authoritative); not a PP3/BP4 candidate interval.
+    calibrated_version:
+      status: not_applicable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: no external calibration version; internal reconstruction only
+    current_release_pin_status:
+      status: not_applicable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: not an annotation-bundle predictor; internal audit reconstruction
+    structured_score_availability:
+      status: not_applicable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: reconstructed only from BIAS rationale text, not a structured external score source
+    license_status:
+      status: not_applicable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: internal repository component; no external predictor licence applicable
+    training_manifest_status:
+      status: not_applicable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: no external training data; internal deterministic reconstruction
+    tsc_specific_evidence:
+      status: not_applicable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: no TSC-specific calibration; audit-only composite
+    implementation_cost:
+      status: not_applicable
+      value: null
+      source_ids: []
+      cp_ids: []
+      note: already implemented as an audit/reconstruction layer (src/raptor/eval/predictor_aggregation.py);
+        not proposed for PP3/BP4 activation
+smallest_pin_handoff:
+  next_task_id: sources-pin-core-annotation-bundle
+  rule: The next task pins ONE annotation bundle and only the fields needed to decide/operate the primary
+    policy. No integration of all 16 tools.
+  priority:
+  - Exact REVEL field/release required by the current shadow policy (CP-21).
+  - Other eligible candidate fields already present in the same licensed bundle.
+  - Transcript/provenance/dependence columns.
+  explicit_non_requirements:
+  - mutpred2_integration
+  - evolutionary_action_integration
+  - all_16_score_acquisition
+  related_track: Splice tier hands off to sources-add-splice-track.
+  invariant: The comprehensive matrix stays at 16 calibrated rows even when the pinned bundle implements
+    a smaller score subset.

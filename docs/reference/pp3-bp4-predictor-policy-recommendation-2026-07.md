@@ -284,6 +284,8 @@ If any item is missing, PP3/BP4 remains shadow evidence or routes the variant to
 | `configs/eval/bp4pp3_predictor_policy.json` | Hash-bound approval gate; currently pending | Production or clinical approval |
 | `docs/DECISIONS.md` evaluation-only approval | Historical approval for a prior evaluation bundle | Approval of the current hash or future policy |
 | `configs/acmg/strength_policy.yaml` | Unapproved handling of BIAS/RAPTOR vocabulary mismatches | Predictor-selection or calibration policy |
+| `configs/eval/pp3bp4_predictor_matrix.yaml` | Comprehensive 16-tool + `bias_composite` PP3/BP4 decision matrix (candidate disposition, evidence role, fact-object provenance) | Predictor activation; REVEL remains the sole `advance_shadow` candidate -- the matrix advances no new predictor |
+| `configs/eval/pp3bp4_source_register.yaml` | REVEL PP3/BP4 shadow-policy provenance register only (verified primary-source citations for the REVEL candidate) | The comprehensive decision matrix -- that source-of-truth role now belongs to `pp3bp4_predictor_matrix.yaml` |
 | This memo | RAPTOR's proposed target policy and activation requirements | An active decision or completed validation |
 
 ## 11. Concrete shadow-only implementation (2026-07-18)
@@ -296,7 +298,8 @@ authorization.
 
 | Artifact | Role |
 |---|---|
-| `configs/eval/pp3bp4_source_register.yaml` | Verified primary-source citations + candidate predictor disposition |
+| `configs/eval/pp3bp4_predictor_matrix.yaml` | Comprehensive 16-tool + `bias_composite` PP3/BP4 decision matrix (schema `pp3bp4-predictor-matrix/1`); advances no new predictor -- REVEL remains the sole `advance_shadow` candidate |
+| `configs/eval/pp3bp4_source_register.yaml` | REVEL PP3/BP4 shadow-policy provenance register only: verified primary-source citations + candidate predictor disposition for REVEL |
 | `configs/eval/pp3bp4_candidate_policy.json` | Proposed, unapproved REVEL PP3/BP4 shadow policy (`status: proposed`, `owner_approved: false`) |
 | `configs/eval/predictor_training_manifests.yaml` | Training-manifest leakage-audit registry (no manifest currently verified) |
 | `src/raptor/eval/pp3bp4_candidate_policy.py` | Pure REVEL PP3/BP4 shadow classifier (`load_candidate_policy`, `classify_revel`, `build_shadow_report`) |
