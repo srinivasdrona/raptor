@@ -1,4 +1,4 @@
-# RAPTOR core annotation bundle — pinned, hash-bound planner contract (rev 2).
+# RAPTOR core annotation bundle — pinned, hash-bound planner contract (rev 3).
 #
 # Purpose: an implementation-ready, hash-bound record of the EXACT deployed
 # annotation bundle for the production-faithful masked held-out rerun and the
@@ -10,13 +10,15 @@
 # current x64 readiness, and makes reuse conditional on an implemented PP3/BP4
 # suppression contract.
 #
-# Rev 2 supersedes commit c0412342 after a GPT-5.4 DO-NOT-MERGE review.
+# Rev 3 supersedes commit 4e3ed7c after a GPT-5.4 DO-NOT-MERGE review
+# (fail-closed licensing wording and a CI-executable test partition).
 # Schema: raptor-core-annotation-bundle-v1.
 
 schema: raptor-core-annotation-bundle-v1
 status: planner_contract_ready_for_implementation
 reuse_readiness: BLOCKED_POLICY_IMPLEMENTATION
 reannotation_readiness: X64_WORKER_UNVERIFIED_UNTIL_OPERATOR_MAKES_AVAILABLE
+licensing_readiness: PENDING_PERMITTED_USE_REVIEW
 task_id: sources-pin-core-annotation-bundle
 title: Minimum deployed core annotation bundle — pinned reproducibility contract
 
@@ -45,6 +47,20 @@ revision_log:
       holdout_input_provenance, historical_run_attestation,
       current_x64_reannotation_readiness, pp3_bp4_suppression_prerequisite,
       reuse_vs_reannotate, licensing, test_matrix]
+  - rev: 3
+    supersedes_commit: 4e3ed7c8951da54f9a5c0132bdffc610fb758eea
+    trigger: GPT-5.4 DO-NOT-MERGE
+    attribution:
+      planner_miss:
+        - licensing said local execution was permitted; permission was not separated from the observed historical execution (fail-open wording).
+        - the test matrix mixed CI-unrunnable commit/diff-scope and external-data assertions into the Gemini pytest, so it could not pass in current CI and skips could masquerade as success.
+    corrections_in: [licensing, test_matrix, intent]
+    preserved:
+      - implementation_scope (exactly 3 files, no runner changes)
+      - arm_inventory (14 present_hashed hashes/bytes)
+      - deployed_data_sources (28 pinned)
+      - historical_run_attestation and current_x64_reannotation_readiness split
+      - pp3_bp4_suppression_prerequisite (reuse blocked)
 
 planner:
   model: claude-opus-4.8
@@ -91,8 +107,10 @@ intent:
     worst_case: >-
       The plan again reads complete while (a) marking ARM-present evidence as
       x64-only, (b) pinning a partial source set that lets a latest release slip
-      through T4, or (c) declaring reuse GO with no implemented PP3/BP4
-      suppression — any of which corrupts or blocks the comparison baseline.
+      through, (c) declaring reuse GO with no implemented PP3/BP4 suppression,
+      (d) asserting local raw-score use is permitted rather than pending review,
+      or (e) shipping tests that cannot run in current CI or that count skips as
+      success — any of which corrupts, blocks or falsely greenlights the rerun.
     guarded_by: beat4_self_audit
   pm_sanity_check: >-
     PM: policy-only reuse depends on the immutable ARM return evidence (return
@@ -121,7 +139,7 @@ implementation_scope:
       - arm_inventory with recomputed sha256/bytes for every present file
       - historical_run_attestation and current_x64_reannotation_readiness (separate)
       - reuse gate incl. PP3_BP4_SUPPRESSION_CONTRACT_REQUIRED
-      - fail-closed licensing (per-channel) and deferred_upgrades
+      - fail-closed licensing (per-channel, pending permitted-use review) and deferred_upgrades
   human_reference:
     path: docs/reference/core-annotation-bundle-2026-07.md
     author: Sonnet
@@ -322,7 +340,7 @@ pp3_bp4_suppression_prerequisite:
 reuse_vs_reannotate:
   principle: >-
     Comparison reruns preserve the historical bundle. Policy-only reuse is
-    permitted only when no upstream evidence-generation input changed AND a
+    allowed only when no upstream evidence-generation input changed AND a
     tested PP3/BP4 suppression contract exists. Neither route is selected here.
   reuse_path:
     name: POLICY_ONLY_REUSE
@@ -379,24 +397,34 @@ pejaver_calibration_inputs:
 
 licensing:
   model: fail_closed
+  historical_execution_observed: true
+  historical_execution_note: >-
+    A masked BIAS run already occurred and its outputs are immutable historical
+    artifacts on ARM. That execution HAPPENED is a fact; it is NOT permission to
+    use raw predictor scores going forward.
   channels:
-    local_execution_status: permitted_for_local_masked_rerun_and_pp3bp4_evidence
+    local_execution_status: pending_permitted_use_review
     raw_public_redistribution: false
     raw_cloud_egress: false
+  downstream_use_rule: >-
+    The downstream policy/runner MUST NOT use raw predictor scores (REVEL,
+    AlphaMissense) beyond the already-existing historical artifacts until the
+    grant/data-rights todo closes OR an explicit owner permitted-use record
+    exists. No field in this contract asserts that use is currently permitted.
   cloud_egress_rule: >-
     REVEL and AlphaMissense RAW scores must NOT enter Anthropic/cloud prompts or
     any cloud egress until a permitted-use review clears them. Default is deny.
   per_source:
     revel:
+      local_status: pending_permitted_use_review
       raw_public_redistribution: false
       raw_cloud_egress: false
-      use: local_only_pending_permitted_use_review
     alphamissense:
       licence_version: confirm_pending
       licence_note: conflicting official/current evidence; do not claim a licence version
+      local_status: pending_permitted_use_review
       raw_public_redistribution: false
       raw_cloud_egress: false
-      use: local_only_pending_permitted_use_review
 
 preservation_set:
   do_not_change_before_comparison_rerun: [MANE, gnomAD, dbSNP, ClinVar, REVEL, Nirvana, BIAS versions]
@@ -408,32 +436,67 @@ preservation_set:
     - egress or redistribute raw non-commercial predictor scores (REVEL, AlphaMissense)
 
 test_matrix:
-  ownership: Gemini authors these RED tests (tests/eval/test_core_annotation_bundle.py) before Sonnet implements the manifest.
-  tests:
-    - id: T1_three_file_scope
-      asserts: 'the branch diff is exactly the three named files; gemini commit = test only; sonnet commit = manifest + reference only; no runner code.'
-    - id: T2_arm_presence_and_hash
-      asserts: 'every arm_inventory.present_hashed entry exists on ARM and its recomputed SHA256 and bytes equal the pinned values.'
-    - id: T3_structured_provenance
-      asserts: 'REVEL read only from positions[].variants[].revel.score and AlphaMissense from AlphaMissense.AM_score; a BIAS-rationale REVEL path is rejected.'
-    - id: T4_full_28_source_equality
-      asserts: 'the manifest data sources equal ALL 28 deployed header sources (name/version/release_date); any missing/extra/mismatch fails.'
-    - id: T5_revel_label_guard
-      asserts: 'REVEL version == 20200205; fails if 1.3 or 2021 is asserted without a provenance record.'
-    - id: T6_arm_x64_boundary
-      asserts: 'worker_only files are NOT required present on ARM and are not marked present; x64_bundle_present == false on ARM.'
-    - id: T7_latest_upgrade_rejection
-      asserts: 'fails if MANE 1.5, dbNSFP 5.x, gnomAD 4.1.1, dbSNP 157, RepeatMasker or a newer primary ClinVar appears.'
-    - id: T8_historical_vs_current_split
-      asserts: 'historical_run_attestation is provable from immutable ARM evidence INDEPENDENT of current_x64_reannotation_readiness (no cross-dependency).'
-    - id: T9_suppression_prerequisite
-      asserts: 'with no implemented PP3/BP4 suppression contract, the reuse route resolves to BLOCKED_POLICY_IMPLEMENTATION, never GO_REUSE.'
-    - id: T10_failclosed_licensing
-      asserts: 'raw_public_redistribution and raw_cloud_egress are false for REVEL and AlphaMissense; AlphaMissense licence_version is confirm_pending; fails on any raw cloud/public egress path.'
-    - id: T11_vcf_provenance_pin
-      asserts: 'holdout_input.vcf SHA256 equals 4dcba7c8... equals provenance.json vcf_hash; manifest.jsonl SHA256 equals provenance.manifest_hash.'
-    - id: T12_masked_tsv_invariants
-      asserts: 'masked BIAS TSV has 2577 rows, 0 duplicate keys and parses via BiasTsvSource with no BiasContractError (worker-side fixture).'
+  ownership: >-
+    Gemini authors tests/eval/test_core_annotation_bundle.py (RED before Sonnet).
+    Always-on tests use only the committed manifest/reference; external-data
+    tests gate behind RAPTOR_DATA_ROOT. File-scope/commit-split is a GPT-5.4
+    review probe, NOT a Gemini pytest assertion.
+  ci_constraint: >-
+    Always-on tests must pass in current CI with no workflow or fetch-depth
+    change and no repository data fetch. requires_reference tests skip cleanly
+    when data is absent; a skip is NOT evidence of local completion.
+  always_on_offline:
+    runs_in_ci: true
+    inputs: committed configs/eval/core_annotation_bundle.yaml and docs/reference/core-annotation-bundle-2026-07.md only
+    tests:
+      - {id: OFF1_schema, asserts: 'the canonical manifest parses and has the required keys and enums (schema-valid).'}
+      - {id: OFF2_source_values_28, asserts: 'manifest data_sources equal the 28 pinned name/version/release_date values exactly; any missing, extra or mismatch fails.'}
+      - {id: OFF3_presence_enums, asserts: 'every file entry presence is present_hashed or worker_only; worker_only files are not marked present on ARM; x64_bundle_present is false.'}
+      - {id: OFF4_reuse_blocked_on_suppression, asserts: 'with the PP3/BP4 suppression contract absent, the reuse route resolves to BLOCKED_POLICY_IMPLEMENTATION and never GO_REUSE.'}
+      - {id: OFF5_licensing_egress_flags, asserts: 'channel local_execution_status is pending_permitted_use_review; raw_public_redistribution and raw_cloud_egress are false for the channel and every per-source; AlphaMissense licence_version is confirm_pending; no field asserts currently-permitted use.'}
+      - {id: OFF6_deferred_upgrade_guard, asserts: 'fails if MANE 1.5, dbNSFP 5.x, gnomAD 4.1.1, dbSNP 157, RepeatMasker or a newer primary ClinVar appears in data_sources.'}
+      - {id: OFF7_structured_path_contract, asserts: 'REVEL path is positions[].variants[].revel.score and AlphaMissense is AlphaMissense.AM_score; a BIAS-rationale REVEL path is rejected.'}
+      - {id: OFF8_revel_label_guard, asserts: 'REVEL version is 20200205; fails if 1.3 or 2021 is asserted without a provenance record.'}
+      - {id: OFF9_historical_vs_current_split, asserts: 'historical_run_attestation references only immutable ARM evidence and has no dependency on current_x64_reannotation_readiness.'}
+  data_backed_local:
+    runs_in_ci: false
+    marker: requires_reference
+    env: RAPTOR_DATA_ROOT
+    skip_rule: 'pytest.skip only when RAPTOR_DATA_ROOT or a listed file is absent; never silently pass and never treat an assertion failure as a skip.'
+    inputs: the 14 arm_inventory.present_hashed files under RAPTOR_DATA_ROOT
+    tests:
+      - {id: REF1_arm_hash_bytes, asserts: 'each of the 14 present_hashed files exists and its recomputed SHA256 and byte size equal the pinned values.'}
+      - {id: REF2_vcf_provenance_return_consistency, asserts: 'holdout_input.vcf SHA256 equals provenance.json vcf_hash equals 4dcba7c8...; manifest.jsonl SHA256 equals provenance.manifest_hash; RETURN_MANIFEST-listed hashes match the ARM copies.'}
+      - {id: REF3_bias_tsv_invariants, asserts: 'the masked BIAS TSV has 2577 rows and 0 duplicate keys and parses via BiasTsvSource with no BiasContractError.'}
+    missing_data_report: >-
+      Absent reference data must be reported by the required local presence gate
+      (validation_commands.local_reference_gate), which lists the missing files
+      and exits non-zero. A CI skip of these tests does NOT count as
+      implementation success.
+  x64_worker_checks:
+    is_pytest_on_arm_or_ci: false
+    form: handoff checklist / probes plus a required worker verification artifact
+    checks:
+      - recompute file-by-file SHA256 over the Nirvana, supplementary-update and BIAS roots and diff vs the frozen CHECKSUMS manifests
+      - anchor, archive and BIAS-commit spot checks; footprint approx 58,690,294,121 bytes
+      - annotator header re-emits dataVersion 91.27.66, schema 6 and all 28 sources
+    required_artifact: 'worker returns x64_bundle_verification.json (diff result, hashes, exit codes) attached to the reannotation handoff; required only for X64_REANNOTATE.'
+  review_probes:
+    owner: GPT-5.4
+    probes:
+      - the implementation branch diff equals exactly configs/eval/core_annotation_bundle.yaml, docs/reference/core-annotation-bundle-2026-07.md and tests/eval/test_core_annotation_bundle.py
+      - the Gemini commit changes only the test; the Sonnet commit changes only the manifest and reference
+      - no runner or production code is modified
+  validation_commands:
+    offline_ci: 'pytest tests/eval/test_core_annotation_bundle.py -m "not requires_reference"'
+    local_data_backed_pwsh: '$env:RAPTOR_DATA_ROOT="D:\AIProjects\raptor-data"; pytest tests/eval/test_core_annotation_bundle.py -m requires_reference'
+    local_reference_gate: 'required local command that verifies the 14 present_hashed files exist under RAPTOR_DATA_ROOT and exits non-zero listing any missing (distinct from a pytest skip).'
+    gpt_diff_scope: 'git diff --name-only <impl_base>..HEAD must equal the three implementation files (GPT-5.4 probe, not pytest).'
+    ci_fetch_depth: 'unchanged; do not modify actions/checkout fetch-depth and do not add a data-fetch step.'
+  implementation_status_rule: >-
+    Status is CLEAN only when offline_ci passes AND the local_reference_gate plus
+    data_backed_local tests pass on a box with RAPTOR_DATA_ROOT. CI skips of
+    requires_reference tests are NOT evidence of local completion.
 
 blockers:
   - id: B1_reuse_blocked
@@ -463,25 +526,28 @@ downstream_policy_handoff:
 beat4_self_audit:
   - failure_mode: 'ARM-present evidence mislabeled x64-only'
     mitigation: 'arm_inventory present_hashed with recomputed hashes; x64 paths are provenance only'
-    caught_by: T2/T6
-  - failure_mode: 'Partial source pin lets a latest release pass T4'
-    mitigation: 'full 28-source equality'
-    caught_by: T4/T7
+    caught_by: OFF3/REF1
+  - failure_mode: 'Partial source pin lets a latest release slip through'
+    mitigation: 'full 28-source equality plus deferred-upgrade guard'
+    caught_by: OFF2/OFF6
   - failure_mode: 'Reuse declared GO with no suppression contract'
     mitigation: 'PP3_BP4_SUPPRESSION_CONTRACT_REQUIRED; route BLOCKED_POLICY_IMPLEMENTATION'
-    caught_by: T9
+    caught_by: OFF4
   - failure_mode: 'Reuse conflated with current x64 bundle existence'
     mitigation: 'historical_run_attestation split from current_x64_reannotation_readiness'
-    caught_by: T8
-  - failure_mode: 'Raw non-commercial scores egress to cloud/public'
-    mitigation: 'fail-closed per-channel licensing'
-    caught_by: T10
+    caught_by: OFF9
+  - failure_mode: 'Raw non-commercial score use asserted as permitted or egressed'
+    mitigation: 'fail-closed per-channel licensing; local status pending_permitted_use_review; no currently-permitted text; downstream_use_rule'
+    caught_by: OFF5
   - failure_mode: 'REVEL 20200205 relabeled v1.3/2021'
     mitigation: 'pin plus open Pejaver question'
-    caught_by: T5
+    caught_by: OFF8
   - failure_mode: 'Latest-release substitution changes the classifier'
     mitigation: 'pin deployed header; deferred_upgrades explicit'
-    caught_by: T4/T7
+    caught_by: OFF2/OFF6
+  - failure_mode: 'Tests cannot run in CI or count skips as success'
+    mitigation: 'always-on offline partition; requires_reference skip; required local gate; CI skip is not completion'
+    caught_by: always_on_offline/implementation_status_rule
 
 deferred_upgrades:
   out_of_scope_until_a_separate_approved_refresh: [dbNSFP 5.x, MANE 1.5, gnomAD 4.1.1, dbSNP 157, RepeatMasker, broad 16-predictor coverage]
