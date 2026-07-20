@@ -1,0 +1,357 @@
+# RAPTOR core annotation bundle — canonical runtime manifest.
+#
+# This is the Sonnet-authored machine-readable manifest implementing the
+# planner spec docs/project/specs/core-annotation-bundle.yaml (rev 5,
+# commit f9276b4). It is distinct from the planner spec: it carries its own
+# schema id and its own artifact status, and it is closed (no keys outside
+# the set below).
+#
+# Purpose: pin the EXACT deployed Nirvana 3.18.1 / BIAS 3.0.0 annotation
+# bundle used for the masked held-out rerun as immutable historical evidence.
+# This manifest does not download, refresh, re-annotate or activate anything;
+# it records what was deployed and what is verified present on ARM today.
+
+schema: raptor-core-annotation-bundle-manifest-v1
+status: pinned_historical_evidence
+
+readiness:
+  reuse_readiness: BLOCKED_POLICY_IMPLEMENTATION
+  reannotation_readiness: X64_WORKER_UNVERIFIED_UNTIL_OPERATOR_MAKES_AVAILABLE
+  licensing_readiness: PENDING_PERMITTED_USE_REVIEW
+
+runtime:
+  annotator: Nirvana 3.18.1
+  runtime_banner: 3.18.1-0-g05f88047
+  nirvana_data_version: '91.27.66'
+  nirvana_schema_version: 6
+  genome_assembly: GRCh38
+  bias_version: '3.0.0'
+  bias_commit: ade13f206f3e2c2efe3ec92715d974645fc8da8f
+  dotnet_runtime: '6.0.36'
+
+# Exactly 28 deployed data sources, verified from the deployed Nirvana JSON
+# header (sample_tsc_nirvana.json.gz, present on ARM). Full equality check:
+# no source may be missing, added, or version-mismatched.
+data_sources:
+  - {name: 'VEP', version: '91', release_date: '2017-12-18'}
+  - {name: 'MultiZ100Way', version: '20171006', release_date: '2017-10-06'}
+  - {name: 'AlphaMissense', version: 'AlphaMissense_hg38.nirvana.tsv', release_date: '2026-02-25'}
+  - {name: 'ClinVar', version: '2026-02', release_date: '2026-02-24'}
+  - {name: 'ClinVar', version: '20240301', release_date: '2024-03-01'}
+  - {name: 'dbSNP', version: '156', release_date: '2023-09-28'}
+  - {name: 'dbSNP', version: '151', release_date: '2018-04-18'}
+  - {name: 'GME', version: '20160618', release_date: '2016-06-18'}
+  - {name: 'gnomAD', version: '4.0', release_date: '2024-02-17'}
+  - {name: 'gnomAD_exome', version: '4.0', release_date: '2024-02-17'}
+  - {name: 'MITOMAP', version: '20200819', release_date: '2020-08-19'}
+  - {name: '1000 Genomes Project', version: 'Phase 3 v3plus', release_date: '2013-05-27'}
+  - {name: 'REVEL', version: '20200205', release_date: '2020-02-05'}
+  - {name: 'TOPMed', version: 'freeze_5', release_date: '2017-08-28'}
+  - {name: 'ClinGen', version: '20160414', release_date: '2016-04-14'}
+  - {name: 'ClinGen Dosage Sensitivity Map', version: '20240110', release_date: '2024-01-10'}
+  - {name: 'DECIPHER', version: '201509', release_date: '2015-09-01'}
+  - {name: 'gnomAD_SV', version: '4.0', release_date: '2024-02-26'}
+  - {name: 'MITOMAP_SV', version: '20200819', release_date: '2020-08-19'}
+  - {name: '1000 Genomes Project (SV)', version: 'Phase 3 v5a', release_date: '2013-05-27'}
+  - {name: 'FusionCatcher', version: '1.33', release_date: '2020-12-22'}
+  - {name: 'DANN', version: '20200205', release_date: '2020-02-05'}
+  - {name: 'Gerp', version: '20110522', release_date: '2011-05-22'}
+  - {name: 'ClinGen disease validity curations', version: '20240110', release_date: '2024-01-10'}
+  - {name: 'gnomAD_gene_scores', version: '4.0', release_date: '2024-03-20'}
+  - {name: 'phyloP', version: 'hg38', release_date: '2015-04-17'}
+  - {name: 'gnomAD_LCR', version: '2.1', release_date: '2019-04-10'}
+  - {name: 'MitochondrialHeteroplasmy', version: '20180410', release_date: '2020-05-21'}
+
+structured_fields:
+  revel:
+    json_path: 'positions[].variants[].revel.score'
+    value_type: float
+  alphamissense:
+    json_path: 'positions[].variants[].AlphaMissense.AM_score'
+    value_type: float
+  scalars:
+    phylop: 'positions[].variants[].phylopScore'
+    gerp: 'positions[].variants[].gerpScore'
+  forbidden_source: >-
+    REVEL is read only from the structured Nirvana JSON path above; it must
+    never be parsed from BIAS free-form narrative text output.
+
+# ARM-present copies only (recomputed sha256/bytes). x64-only files and
+# directories are NOT here — they live in x64_handoff_requirements.items,
+# since directories and unknown-hash artifacts cannot satisfy this closed
+# file_entry shape without fabrication. No x64 path appears below.
+arm_inventory:
+  data_root: 'D:\AIProjects\raptor-data'
+  present_hashed:
+    - id: sample_nirvana_json
+      location: arm
+      path: 'devbox-artifacts\sample_tsc_nirvana.json.gz'
+      sha256: '24c8083f01d46a4dca2233abeaaf639b7f7ccde7378d90b8b087e9f5ec250bca'
+      bytes: 14360
+      presence: present_hashed
+    - id: required_paths_local
+      location: arm
+      path: 'devbox-artifacts\hg38_nirvana_required_paths.local.json'
+      sha256: '5d57c068d44a00ce0d95215046b215f9a4fa6eae35b4629e39cfbcce8010af32'
+      bytes: 1301
+      presence: present_hashed
+    - id: required_paths_masked
+      location: arm
+      path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\hg38_nirvana_required_paths.masked.json'
+      sha256: '6c05b8c30efa4f6032a3a40446823a0e08c888295889d3876cf7871d5b4f569c'
+      bytes: 1649
+      presence: present_hashed
+    - id: evaluation_skip_list
+      location: arm
+      path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\evaluation_skip_list.txt'
+      sha256: 'bb418c11773080d8cf6b3facadf71236d25ce35fa2ca173d63d33089c57a1d8a'
+      bytes: 20
+      presence: present_hashed
+    - id: masked_ps1_pm5
+      location: arm
+      path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\hg38_PS1_PM5_clinvar_pathogenic_aa_nirvana.tsv'
+      sha256: 'f17b19e6322ac00ad1bae5125efc6381874266771fa71fdb9832b3a54401be1f'
+      bytes: 28395992
+      presence: present_hashed
+    - id: masked_pp2
+      location: arm
+      path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\hg38_PP2_missense_pathogenic_genes.tsv'
+      sha256: '43f6002d8c88cbc200df4da79aeffb52d1f854589aeb50c97e190b80c376d2cf'
+      bytes: 34786
+      presence: present_hashed
+    - id: masked_bp1
+      location: arm
+      path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\hg38_BP1_truncating_genes.tsv'
+      sha256: '274ab0ce632ef6d14b5fefe4a87c04a4955e1685569ad45a73d06f5a78fd5840'
+      bytes: 1855
+      presence: present_hashed
+    - id: masked_pm1
+      location: arm
+      path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\hg38_PM1_chrom_to_pathogenic_domain_list.tsv'
+      sha256: 'ce9ee18d89f208f409dff66532590d7e7294a690cb631ffe2b1399acfe2409ee'
+      bytes: 1587498
+      presence: present_hashed
+    - id: return_manifest
+      location: arm
+      path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\RETURN_MANIFEST.sha256.txt'
+      sha256: '5efdccdc57f7d2bdf774486dfbde106ab173bf87412c6db103aaba9958d9ac91'
+      bytes: 4005
+      presence: present_hashed
+    - id: masked_bias_tsv
+      location: arm
+      path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\holdout_input.masked.bias_output.tsv'
+      sha256: '7eece438a880e0c6a591df62e231bc93848eeb42277a2f4360983914298fc512'
+      bytes: 2590498
+      presence: present_hashed
+    - id: scoring_report
+      location: arm
+      path: 'handoffs\masked-heldout-2026-07-12\return-post-pm1-resume\MASKED_HELDOUT_SCORING_REPORT.md'
+      sha256: 'e5351a42e3120083d21d6b82775a38aee2a5d9bcf8586da08b3b239f24c35b3c'
+      bytes: 5039
+      presence: present_hashed
+    - id: holdout_input_vcf
+      location: arm
+      path: 'handoffs\masked-heldout-2026-07-12\inputs\holdout_input.vcf'
+      sha256: '4dcba7c882b65838cedf8ce0ad56e0f7764df34b247ab412aac144d4027c622d'
+      bytes: 69470
+      presence: present_hashed
+    - id: holdout_input_provenance
+      location: arm
+      path: 'handoffs\masked-heldout-2026-07-12\inputs\holdout_input.provenance.json'
+      sha256: '63f1881287f1e3aa0b36ca14e1a7329ef2bcacc7b9674c2489f5e1d4352a6ac8'
+      bytes: 573
+      presence: present_hashed
+    - id: holdout_input_manifest
+      location: arm
+      path: 'handoffs\masked-heldout-2026-07-12\inputs\holdout_input.manifest.jsonl'
+      sha256: '9e588cdf8ebaea2e3793e0ea74721ab5283b57c2abf045dbf3070cb6e81ec9e4'
+      bytes: 321687
+      presence: present_hashed
+
+# Immutable evidence that the masked held-out run occurred, independent of
+# whether the 58.7-GB x64 bundle exists today.
+historical_run_attestation:
+  claim: >-
+    The masked BIAS held-out run occurred and its outputs are immutable
+    evidence currently present on ARM. Policy-only reuse relies on this
+    evidence, not on the 58.7-GB x64 bundle still existing today.
+  proven_by:
+    - 'RETURN_MANIFEST.sha256.txt (5efdccdc...) lists every return-file hash'
+    - 'ARM copies match those listed hashes byte-for-byte (skip_list bb418c11, BP1 274ab0ce, PM1 ce9ee18d, PP2 43f6002d, PS1/PM5 f17b19e6, masked-paths 6c05b8c3, bias TSV 7eece438, report e5351a42)'
+    - 'provenance.json vcf_hash 4dcba7c8 and manifest_hash 9e588cdf are internally consistent'
+  hashes:
+    input_vcf_sha256: '4dcba7c882b65838cedf8ce0ad56e0f7764df34b247ab412aac144d4027c622d'
+    provenance_sha256: '63f1881287f1e3aa0b36ca14e1a7329ef2bcacc7b9674c2489f5e1d4352a6ac8'
+    provenance_manifest_hash: '9e588cdf8ebaea2e3793e0ea74721ab5283b57c2abf045dbf3070cb6e81ec9e4'
+    provenance_vcf_hash: '4dcba7c882b65838cedf8ce0ad56e0f7764df34b247ab412aac144d4027c622d'
+    return_manifest_sha256: '5efdccdc57f7d2bdf774486dfbde106ab173bf87412c6db103aaba9958d9ac91'
+    scoring_report_sha256: 'e5351a42e3120083d21d6b82775a38aee2a5d9bcf8586da08b3b239f24c35b3c'
+    bias_tsv_sha256: '7eece438a880e0c6a591df62e231bc93848eeb42277a2f4360983914298fc512'
+    heldout_nirvana_json_sha256: '315e601cc9ede55c07c4a59de796c2be5cf0f2827e441101ceea236390675d13'
+  independent_of: current_x64_reannotation_readiness
+
+# Required only for the X64_REANNOTATE route. Contains only reannotation
+# proof requirements and requirement-id references — no historical hashes.
+current_x64_reannotation_readiness:
+  required_only_for: X64_REANNOTATE
+  status: UNVERIFIED
+  x64_requirement_ids:
+    - heldout_nirvana_json
+    - nirvana_data_root
+    - bias_data_root
+    - nirvana_full_manifest
+    - nirvana_updates_manifest
+    - bias_data_manifest
+  presence_proof_when_needed:
+    - recompute file-by-file SHA256 over nirvana-data\GRCh38, SupplementaryAnnotation\GRCh38 and bias-hg38-data; diff vs the three frozen CHECKSUMS manifests
+    - spot-verify anchors (Nirvana.dat, Both.transcripts.ndb, gnomAD_4.0.nsa, ClinVar_hg38_2026-02.nsa, AlphaMissense_hg38.nirvana.nsa)
+    - verify archives (Nirvana, .NET runtime) and the BIAS commit
+    - confirm footprint approx 58,690,294,121 bytes and free disk on the worker
+    - confirm the annotator header re-emits dataVersion 91.27.66 / schema 6 / all 28 sources
+  boundary_rule: do not download or rebuild the 58.7-GB bundle on ARM64.
+
+pp3_bp4_suppression_prerequisite:
+  id: PP3_BP4_SUPPRESSION_CONTRACT_REQUIRED
+  finding: >-
+    The existing runner has no implemented PP3/BP4 disabled/manual
+    suppression path. It hard-forbids {PP5, BP6, PS4} at config-load and
+    combine time, and the masked run only added a PM1 batch-scope skip;
+    non-approved policy is hard-blocked. Reuse of the disabled/manual TSV
+    cannot be declared safe today.
+  evidence:
+    - 'src/raptor/eval/config.py:187 FORBIDDEN_CRITERIA = {PP5, BP6, PS4}'
+    - 'src/raptor/eval/config.py:197 VALID_CRITERIA = 28 canonical ACMG codes; config-load + combine validation'
+    - 'masked run evaluation_skip_list = {PM1, PS4, PP5, BP6} = forbidden set + PM1 batch waiver'
+  requirement: >-
+    The downstream resolve-pp3-bp4-activation / rerun task must implement and
+    test an explicit PP3/BP4 suppression contract (disabled/manual applied as
+    a downstream policy recompute) before any reuse of the immutable TSV.
+  until_then: BLOCKED_POLICY_IMPLEMENTATION
+
+reuse_vs_reannotate:
+  principle: >-
+    Comparison reruns preserve the historical bundle. Policy-only reuse is
+    allowed only when no upstream evidence-generation input changed AND a
+    tested PP3/BP4 suppression contract exists. Neither route is selected
+    here.
+  reuse_path:
+    name: POLICY_ONLY_REUSE
+    relies_on: historical_run_attestation
+    input_preconditions_all_required:
+      - 'input VCF == 4dcba7c8... (frozen)'
+      - 'masked required-paths == 6c05b8c3... ; skip_list == bb418c11...'
+      - 'masked resources unchanged (PS1/PM5 f17b19e6, PP2 43f6002d, BP1 274ab0ce, PM1 ce9ee18d)'
+      - 'Nirvana 3.18.1 / data 91.27.66 / schema 6 and BIAS 3.0.0 @ ade13f2 unchanged'
+      - 'PP3/BP4 outcome in {disabled, manual} and adds no new scoring input'
+    policy_precondition: PP3_BP4_SUPPRESSION_CONTRACT_REQUIRED is implemented and tested
+    current_route: BLOCKED_POLICY_IMPLEMENTATION
+  reannotate_path:
+    name: X64_REANNOTATE
+    relies_on: current_x64_reannotation_readiness
+    trigger_any:
+      - input VCF/ID-set differs from the frozen 2,577-row set
+      - any of the 28 data-source versions changes (any forbidden upgrade applied)
+      - BIAS version/commit or bias data bundle changes
+      - masked required-paths JSON or skip-list changes
+      - PP3/BP4 activation needs a structured input absent from the held-out JSON
+      - a structured recompute is needed but the held-out Nirvana JSON is unverifiable
+  decision_table:
+    - {upstream_inputs: unchanged, pp3_bp4: disabled_or_manual, suppression_contract: absent, route: BLOCKED_POLICY_IMPLEMENTATION}
+    - {upstream_inputs: unchanged, pp3_bp4: disabled_or_manual, suppression_contract: implemented_tested, route: POLICY_ONLY_REUSE}
+    - {upstream_inputs: unchanged, pp3_bp4: activate, new_scoring_input: true, route: X64_REANNOTATE}
+    - {upstream_inputs: changed, pp3_bp4: any, route: X64_REANNOTATE}
+    - {upstream_inputs: unknown_or_unverifiable, pp3_bp4: any, route: BLOCKED_DATA_until_x64_verifies}
+
+licensing:
+  model: fail_closed
+  historical_execution_observed: true
+  channels:
+    local_execution_status: pending_permitted_use_review
+    raw_public_redistribution: false
+    raw_cloud_egress: false
+  downstream_use_rule: >-
+    Raw predictor scores (REVEL, AlphaMissense) must not be used by any
+    downstream policy or runner beyond the existing historical artifacts
+    unless an owner permitted-use record clears them; local status remains
+    pending_permitted_use_review until then.
+  cloud_egress_rule: >-
+    REVEL and AlphaMissense raw scores must not enter any cloud egress
+    (including Anthropic prompts) while local status is
+    pending_permitted_use_review; default is deny.
+  per_source:
+    revel:
+      local_status: pending_permitted_use_review
+      raw_public_redistribution: false
+      raw_cloud_egress: false
+    alphamissense:
+      local_status: pending_permitted_use_review
+      raw_public_redistribution: false
+      raw_cloud_egress: false
+      licence_version: confirm_pending
+
+deferred_upgrades:
+  out_of_scope_until_a_separate_approved_refresh:
+    - dbNSFP 5.x
+    - MANE 1.5
+    - gnomAD 4.1.1
+    - dbSNP 157
+    - RepeatMasker
+    - broad 16-predictor coverage
+  rule: future source modernization; must not enter this rerun.
+
+x64_handoff_requirements:
+  required_artifact: x64_bundle_verification.json
+  items:
+    - id: heldout_nirvana_json
+      kind: file
+      x64_path: 'D:\raptor-x64\masked-heldout-2026-07-12\score\holdout_input_nirvana.json.gz'
+      expected_sha256: '315e601cc9ede55c07c4a59de796c2be5cf0f2827e441101ceea236390675d13'
+      expected_bytes: null
+      required_for: structured REVEL/AM recompute on reannotate or activation
+      verification_rule: verify presence and sha256 match on the x64 worker
+    - id: nirvana_data_root
+      kind: directory
+      x64_path: 'D:\raptor-x64\nirvana-data\GRCh38'
+      expected_sha256: null
+      expected_bytes: null
+      required_for: X64_REANNOTATE
+      verification_rule: recompute file-by-file SHA256 and diff vs nirvana_full_manifest
+    - id: bias_data_root
+      kind: directory
+      x64_path: 'D:\raptor-x64\bias-hg38-data'
+      expected_sha256: null
+      expected_bytes: null
+      required_for: X64_REANNOTATE
+      verification_rule: recompute file-by-file SHA256 and diff vs bias_data_manifest
+    - id: nirvana_full_manifest
+      kind: manifest
+      x64_path: 'D:\raptor-x64\CHECKSUMS\nirvana-grch38-full.sha256.txt'
+      expected_sha256: null
+      expected_bytes: 8024
+      required_for: X64_REANNOTATE
+      verification_rule: frozen baseline for the nirvana_data_root recompute
+    - id: nirvana_updates_manifest
+      kind: manifest
+      x64_path: 'D:\raptor-x64\CHECKSUMS\nirvana-grch38-updates.sha256.txt'
+      expected_sha256: null
+      expected_bytes: null
+      required_for: X64_REANNOTATE
+      verification_rule: frozen baseline for the supplementary-update recompute
+    - id: bias_data_manifest
+      kind: manifest
+      x64_path: 'D:\raptor-x64\CHECKSUMS\bias-hg38-data.sha256.txt'
+      expected_sha256: null
+      expected_bytes: 2093
+      required_for: X64_REANNOTATE
+      verification_rule: frozen baseline for the bias_data_root recompute
+  bundle_presence_proof: see current_x64_reannotation_readiness.presence_proof_when_needed
+  reannotation_commands_reference:
+    note: exact deterministic commands recorded in MASKED_HELDOUT_SCORING_REPORT.md
+    nirvana: 'dotnet Nirvana.dll -c ...\Cache\GRCh38\Both --sd ...\SupplementaryAnnotation\GRCh38 -r ...\Homo_sapiens.GRCh38.Nirvana.dat -i holdout_input.vcf -o holdout_input_nirvana'
+    bias: 'python bias_2015.py holdout_input_nirvana.json.gz hg38_nirvana_required_paths.masked.json holdout_input.masked.bias_output.tsv --skip_list evaluation_skip_list.txt'
+  return_handoff_manifest:
+    - recomputed full-bundle diff result (match/drift list)
+    - held-out Nirvana JSON path + SHA256 and BIAS TSV path + SHA256
+    - row count == 2577 and duplicate-id count == 0
+    - BiasTsvSource parse proof (records == rows, no BiasContractError)
+    - exit codes and wall times
