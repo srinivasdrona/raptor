@@ -163,6 +163,7 @@ def check_file_entry_shape(entry):
     # Reject keys outside required + allowed_optional
     forbidden_keys = entry_keys - (required_keys | allowed_optional)
     assert not forbidden_keys, f"File entry contains forbidden keys: {forbidden_keys}"
+    assert "worker_only" not in entry_keys, "File entry contains forbidden worker_only key"
     
     # Check all required keys are present
     missing_keys = required_keys - entry_keys
@@ -172,21 +173,19 @@ def check_file_entry_shape(entry):
     pres = entry["presence"]
     sha = entry["sha256"]
     size = entry["bytes"]
+    path = entry["path"]
     
     # Enums
-    assert loc in ["arm", "x64"], f"Invalid location: {loc}"
-    assert pres in ["present_hashed", "worker_only"], f"Invalid presence: {pres}"
+    assert loc == "arm", f"Invalid location: {loc}. Location must be arm."
+    assert pres == "present_hashed", f"Invalid presence: {pres}. Presence must be present_hashed."
     
-    # Invariants
-    if loc == "arm":
-        assert pres == "present_hashed", f"Invalid presence {pres} for location arm"
-    else:  # loc == x64
-        assert pres == "worker_only", f"Invalid presence {pres} for location x64"
-        
     # Check sha256 is 64 lowercase hex
     assert len(sha) == 64 and all(c in "0123456789abcdef" for c in sha), f"Invalid sha256: {sha}"
     # Check bytes is a positive integer
     assert isinstance(size, int) and size > 0, f"Invalid bytes: {size}"
+    
+    # Reject any x64 path
+    assert "x64" not in path.lower(), f"Path contains x64: {path}"
     
     # Check entry-specific extras live only under attributes
     forbidden_direct_extras = {"rows", "duplicate_ids", "contents", "role", "needed_for", "provenance_path"}
@@ -194,7 +193,27 @@ def check_file_entry_shape(entry):
     assert not found_extras, f"File entry has direct extras outside attributes: {found_extras}"
     
     if "attributes" in entry:
-        assert isinstance(entry["attributes"], dict), "attributes must be a dict"
+        attrs = entry["attributes"]
+        assert isinstance(attrs, dict), "attributes must be a dict"
+        assert "worker_only" not in attrs, "attributes contains worker_only key"
+        assert "x64" not in str(attrs).lower(), "attributes contains x64 reference"
+
+
+def check_x64_requirement_shape(item):
+    required_keys = {"id", "kind", "x64_path", "expected_sha256", "expected_bytes", "required_for", "verification_rule"}
+    assert set(item.keys()) == required_keys, f"x64 requirement keys mismatch. Got {set(item.keys())}"
+    
+    kind = item["kind"]
+    assert kind in ["file", "directory", "manifest"], f"Invalid kind: {kind}"
+    
+    sha = item["expected_sha256"]
+    if sha is not None:
+        assert isinstance(sha, str)
+        assert len(sha) == 64 and all(c in "0123456789abcdef" for c in sha), f"Invalid expected_sha256: {sha}"
+        
+    bytes_val = item["expected_bytes"]
+    if bytes_val is not None:
+        assert isinstance(bytes_val, int) and bytes_val > 0, f"Invalid expected_bytes: {bytes_val}"
 
 
 # ==========================================
@@ -261,20 +280,39 @@ def test_OFF2_source_values_28():
 
 def test_OFF3_presence_enums():
     manifest = load_manifest()
-    inventory = manifest.get("arm_inventory", {})
     
-    # Check required keys for arm_inventory are exactly data_root, present_hashed, worker_only
-    assert set(inventory.keys()) == {"data_root", "present_hashed", "worker_only"}
+    # 1. arm_inventory exact keys are data_root and present_hashed
+    inventory = manifest.get("arm_inventory", {})
+    assert set(inventory.keys()) == {"data_root", "present_hashed"}
+    assert "worker_only" not in inventory, "arm_inventory contains forbidden worker_only key"
     
     present_hashed = inventory.get("present_hashed", [])
-    worker_only = inventory.get("worker_only", [])
-    
     assert len(present_hashed) == 14, f"Expected exactly 14 present_hashed files, got {len(present_hashed)}"
     
-    # Check shapes of all entries
-    for list_name, entry_list in [("present_hashed", present_hashed), ("worker_only", worker_only)]:
-        for item in entry_list:
-            check_file_entry_shape(item)
+    # 2. Check shapes of all entries
+    for item in present_hashed:
+        check_file_entry_shape(item)
+        
+    # 3. Assert NO x64 path appears anywhere in arm_inventory
+    inv_str = str(inventory)
+    assert "x64" not in inv_str.lower(), "Found x64 path inside arm_inventory!"
+    
+    # 4. Validate x64_handoff_requirements exact closed shape and its 6 items
+    handoff = manifest.get("x64_handoff_requirements", {})
+    expected_handoff_keys = {"items", "bundle_presence_proof", "reannotation_commands_reference", "return_handoff_manifest", "required_artifact"}
+    assert set(handoff.keys()) == expected_handoff_keys, f"x64_handoff_requirements keys mismatch. Got {set(handoff.keys())}"
+    assert handoff.get("required_artifact") == "x64_bundle_verification.json", f"Invalid required_artifact: {handoff.get('required_artifact')}"
+    
+    items = handoff.get("items", [])
+    assert len(items) == 6, f"Expected exactly 6 handoff requirement items, got {len(items)}"
+    
+    for item in items:
+        check_x64_requirement_shape(item)
+        
+    # The list of IDs of these 6 entries must be exactly the 6 required IDs
+    expected_ids = {"heldout_nirvana_json", "nirvana_data_root", "bias_data_root", "nirvana_full_manifest", "nirvana_updates_manifest", "bias_data_manifest"}
+    actual_ids = {item["id"] for item in items}
+    assert actual_ids == expected_ids, f"x64 handoff requirement IDs mismatch: expected {expected_ids}, got {actual_ids}"
 
 
 def test_OFF4_reuse_blocked_on_suppression():
@@ -429,12 +467,20 @@ def test_OFF9_historical_vs_current_split():
     assert hashes.get("bias_tsv_sha256") == '7eece438a880e0c6a591df62e231bc93848eeb42277a2f4360983914298fc512'
     assert hashes.get("heldout_nirvana_json_sha256") == '315e601cc9ede55c07c4a59de796c2be5cf0f2827e441101ceea236390675d13'
     
-    # Strict independence from current x64 readiness (no references in hist)
-    assert "current_x64" not in str(hist).lower() or hist.get("independent_of") == "current_x64_reannotation_readiness"
+    # Strict independence from current x64 readiness (no references in hist except independent_of)
+    hist_str = str({k: v for k, v in hist.items() if k != "independent_of"})
+    assert "current_x64" not in hist_str.lower(), "historical_run_attestation has current x64 dependency outside independent_of"
     
     curr = manifest.get("current_x64_reannotation_readiness", {})
-    assert set(curr.keys()) == {"required_only_for", "status", "presence_proof_when_needed", "boundary_rule"}
+    assert set(curr.keys()) == {"required_only_for", "status", "x64_requirement_ids", "presence_proof_when_needed", "boundary_rule"}
     assert curr.get("required_only_for") == "X64_REANNOTATE"
+    
+    # x64_requirement_ids matches exactly the 6 required IDs
+    req_ids = curr.get("x64_requirement_ids", [])
+    assert isinstance(req_ids, list), "x64_requirement_ids must be a list"
+    assert len(req_ids) == 6, f"Expected exactly 6 requirement IDs, got {len(req_ids)}"
+    expected_ids = {"heldout_nirvana_json", "nirvana_data_root", "bias_data_root", "nirvana_full_manifest", "nirvana_updates_manifest", "bias_data_manifest"}
+    assert set(req_ids) == expected_ids, f"x64_requirement_ids mismatch. Expected {expected_ids}, got {set(req_ids)}"
     
     # current_x64_reannotation_readiness must contain NO historical evidence hashes
     curr_str = str(curr)
@@ -529,26 +575,12 @@ def test_REF2_return_manifest_and_provenance():
             clean_rel_path = rel_file_path.lstrip("*").replace("./", "").replace(".\\", "")
             basename = os.path.basename(clean_rel_path)
             
-            # Explicit worker-only files that can be absent
-            worker_only_basenames = {
-                "holdout_input_nirvana.json.gz",
-                "nirvana-grch38-full.sha256.txt",
-                "nirvana-grch38-updates.sha256.txt",
-                "bias-hg38-data.sha256.txt"
-            }
-            
+            # Since keep local/reference tests ARM-present only, we assert every file exists and matches hash.
+            # No silent exists() skips, and no worker-only files exist in RETURN_MANIFEST anyway.
             file_to_check = return_manifest_path.parent / basename
-            
-            if basename in worker_only_basenames:
-                # Allowed to be absent, but if it exists, check its hash
-                if file_to_check.exists():
-                    actual_hash = compute_sha256(file_to_check)
-                    assert actual_hash == expected_hash, f"Hash mismatch for worker-only {basename}"
-            else:
-                # MUST exist and match
-                assert file_to_check.exists(), f"ARM-present file listed in RETURN_MANIFEST does not exist: {file_to_check}"
-                actual_hash = compute_sha256(file_to_check)
-                assert actual_hash == expected_hash, f"Hash mismatch in RETURN_MANIFEST for {basename}: expected {expected_hash}, got {actual_hash}"
+            assert file_to_check.exists(), f"ARM-present file listed in RETURN_MANIFEST does not exist: {file_to_check}"
+            actual_hash = compute_sha256(file_to_check)
+            assert actual_hash == expected_hash, f"Hash mismatch in RETURN_MANIFEST for {basename}: expected {expected_hash}, got {actual_hash}"
 
     # Attempt to load canonical manifest
     load_manifest()
