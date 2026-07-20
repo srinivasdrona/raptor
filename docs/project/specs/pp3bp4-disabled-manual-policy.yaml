@@ -1,0 +1,704 @@
+# RAPTOR PP3/BP4 disabled/manual policy — Opus planner contract (rev 1).
+#
+# Purpose: an implementation-ready, hash-bound plan for a FIRST-CLASS
+# disabled/manual PP3/BP4 policy mode. It permits the production-faithful
+# masked rerun to proceed WITHOUT emitting automated PP3 or BP4, keeps future
+# activation separately gated, and cannot be confused with predictor approval.
+#
+# This file is the planner PLAN. It performs NO implementation, NO tests, NO
+# runner/config/code edits, NO owner approval and NO held-out run. It names the
+# exact downstream implementation scope, the policy schema v2, the status x mode
+# state machine, the config/hash contract, the runner data flow and the
+# suppression proof, the Gemini RED matrix, the Sonnet file boundaries, the
+# GPT-5.4 probes, the owner ADR/approval sequence, the reuse-vs-x64 conclusion,
+# the migration/backout, and the Beat-4 self-audit.
+#
+# Schema: raptor-pp3bp4-disabled-manual-policy-v1 (planner). The runtime policy
+# artifact uses schema bp4pp3-predictor-policy/2 (defined in policy_schema_v2).
+
+schema: raptor-pp3bp4-disabled-manual-policy-v1
+status: planner_contract_ready_for_implementation
+task_id: resolve-pp3-bp4-activation
+title: Explicit PP3/BP4 disabled/manual policy mode — hash-bound, fail-closed
+
+worktree: 'D:\AIProjects\raptor-worktrees\pp3bp4-resolution'
+branch: track/pp3bp4-resolution-2026-07
+base_commit: 680e803af995de8cfd6deaa61a0f33867f77bf2c
+
+authoritative_spec:
+  path: PP3BP4_RESOLUTION_TASK_SPEC.yaml
+  sha256: fd7780c1928db0d3a7447b1f8de8a581915855835d123eb8e13b81f7e5142b46
+
+planner:
+  model: claude-opus-4.8
+  role: opus_planner
+  plan_only: true
+  this_planner_commit_may_modify_only:
+    - docs/project/specs/pp3bp4-disabled-manual-policy.yaml
+  commit: one_planner_commit_no_amend_no_push
+  required_trailers:
+    - 'Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>'
+    - 'Copilot-Session: 90703341-0147-4b5c-9939-42be522500b1'
+  prohibited_in_this_task:
+    - implementation/runner/loader/wrapper code
+    - config edits (configs/acmg/tsc.yaml, configs/eval/tsc2.yaml, the policy JSON)
+    - test authoring or edits
+    - owner approval / ADR acceptance / status flip
+    - any held-out run, census, activation or predictor use
+  composed_prompt:
+    manifest_schema: raptor-three-slot-planning-prompt-v1
+    composition_order:
+      - slot1-DELIBERATE_ACTION_PREFIX_v2.md
+      - slot2-PP3BP4_POLICY_PLANNING_TEMPLATE.md
+      - slot3-PP3BP4_DISABLED_PLAN.md
+    verified_sha256:
+      slot1: a0f94762e69b78f7db70398e20e1ccc6293708eff52de1e886174c2d4f7ea58f
+      slot2: 27bb725152afb9b8eeb8939b7c5a3e28aefc166e0249324728553029db2a6b3b
+      slot3: f971980fa9e6fa7316e123f0742352d9547bc6f839413e6d78a3b52e746d4d0e
+      authoritative_spec: fd7780c1928db0d3a7447b1f8de8a581915855835d123eb8e13b81f7e5142b46
+
+# ---------------------------------------------------------------------------
+# INTENT (slot 1 Beat 1/3/4) — the first-class contract this plan satisfies.
+# ---------------------------------------------------------------------------
+intent:
+  summary: >-
+    Design an explicit, hash-bound disabled/manual PP3/BP4 policy mode that lets
+    the masked rerun proceed while emitting zero automated PP3/BP4, retains
+    PP3/BP4 in the criterion vocabulary for manual review, binds the decision to
+    exact production/eval config hashes, and keeps corrected/REVEL activation a
+    separately gated future decision.
+  contract:
+    required: >-
+      A policy schema (v2) that carries an evidence `mode` ORTHOGONAL to
+      approval `status`; a terminal-runner branch that PROCEEDS only for an
+      approved disabled/manual artifact whose production/eval config hashes
+      match, that applies NO predictor correction, and that proves zero
+      consumed PP3/BP4 calls; production/eval configs with PP3/BP4 removed from
+      emission/automation but retained in vocabulary; and an owner approval
+      recorded separately from the doer.
+    done_means: >-
+      The plan is self-contained and implementation-ready: a doer can author the
+      exact files, the checker can review exact probes, and no design decision
+      is left open. Disabled/manual is explicit and cannot be read as predictor
+      approval; production and eval stay equal and hash-bound; pending/unapproved
+      and any corrected-enabled mode stay BLOCKED_POLICY.
+  expected_observable:
+    - >-
+      This planner commit adds exactly one file
+      (docs/project/specs/pp3bp4-disabled-manual-policy.yaml); `git show --stat`
+      shows 1 file changed, parent 680e803, both trailers, no push.
+    - >-
+      Post-implementation (Sonnet, separate track): with an APPROVED
+      disabled/manual artifact + matching config hashes + the masked runtime
+      inputs, `scripts/run_masked_holdout_eval.py` prints a gate status that is
+      NOT BLOCKED_POLICY, and config_pins report policy_mode=disabled_manual,
+      pp3bp4_scored_calls=0, non-empty pp3bp4_suppressed_counts, and
+      predictor_correction_applied=false.
+  inversion_beat4:
+    - >-
+      Worst silent-wrong: an `status: approved` artifact enables CORRECTED
+      PP3/BP4 via the existing PredictorCorrectedEvidenceSource path
+      (run_masked_holdout_eval.py enabled branch) even though the owner meant
+      "disabled". Controlled by making `mode` mandatory and refusing to
+      construct PredictorCorrectedEvidenceSource in the disabled branch.
+    - >-
+      Config removes PP3/BP4 from eval but not production (or vice versa):
+      controlled by editing BOTH configs in one commit + the load-time parity
+      invariant (live_source.py:243) + a Gemini parity test.
+    - >-
+      Report claims suppression without counting: controlled by a counting
+      PolicyDisabledEvidenceSource and an asserted pp3bp4_scored_calls == 0.
+    - >-
+      Planner-scope inversion: silently editing code/config/tests. This plan
+      touches ONLY the one YAML; every other change is delegated, not performed.
+  pm_sanity_check: >-
+    PM: I assume the two required commit trailers are the Copilot co-author
+    trailer AND `Copilot-Session: 90703341-0147-4b5c-9939-42be522500b1` (this
+    session, matching the prior core-annotation-bundle planner contract and the
+    2026-07 base commit's own trailers). If a different session id is required,
+    the commit trailer is wrong and only the trailer needs to change.
+
+# ---------------------------------------------------------------------------
+# Problem statement — the exact current behavior this plan changes (Beat 2).
+# ---------------------------------------------------------------------------
+current_state:
+  policy_artifact:
+    file: configs/eval/bp4pp3_predictor_policy.json
+    schema: bp4pp3-predictor-policy
+    status: pending
+    fields: [schema, status, predictor_source_hash, correction_hash, decision_reference]
+    loader: src/raptor/eval/predictor_policy.py
+    approved_semantics: >-
+      predictor_policy.py sets approved = (status == "approved"); the loader has
+      a CLOSED field set (_REQUIRED_FIELDS) and rejects unknown fields; the
+      caller (terminal runner) owns fail-closed BLOCKED_POLICY wiring
+      (predictor_policy.py:51-58).
+  terminal_runner:
+    file: scripts/run_masked_holdout_eval.py
+    load_and_gate:
+      - 'load_predictor_policy -> malformed => BLOCKED_POLICY (run_masked_holdout_eval.py ~301-310)'
+      - 'not policy.approved => BLOCKED_POLICY (~311-317)'
+      - 'verify_predictor_policy_hashes(policy, predictor_aggregation.yaml, [predictor_aggregation.py, terminal_source.py]) => BLOCKED_POLICY on mismatch (~327-332)'
+    evidence_flow_today:
+      - 'BiasEvidenceSource(...) reads the masked BIAS TSV; get_evidence returns ALL fired calls incl. raw PP3/BP4 (live_source.py get_evidence ~262-272)'
+      - 'PredictorCorrectedEvidenceSource applies the BP4/PP3 correction as ACTIVE evidence (terminal_source.py:17-56) -- THIS is the enabled/corrected path'
+      - 'ProductionVocabEvidenceSource enforces strength-vocab parity, routing whole variant to manual on out-of-vocab (terminal_source.py:59-138)'
+      - 'run_eval(...) -> gate; config_pins record predictor_correction_counts + production_vocab_manual_routed_counts (~455-470)'
+    the_trap: >-
+      The ONLY non-blocked path is status=="approved", and it unconditionally
+      wraps PredictorCorrectedEvidenceSource -- so a status-only "approval"
+      silently enables corrected PP3/BP4. This is exactly beat4_failure_mode #1.
+  criteria_configs:
+    production: 'configs/acmg/tsc.yaml -> included_criteria (line 21) currently lists PP3 (line 29) and BP4 (line 34)'
+    eval: 'configs/eval/tsc2.yaml -> automatable_criteria (line 28) currently lists PP3 (line 36) and BP4 (line 41)'
+    vocabulary: 'configs/acmg/tsc.yaml acmg_criteria keeps PP3 (line 77) and BP4 (line 84); config.py VALID_CRITERIA (line 197) is the canonical 28-code registry; FORBIDDEN_CRITERIA (line 187) = {PP5,BP6,PS4} (PP3/BP4 are NOT forbidden)'
+    parity_enforcement:
+      - 'live_source.py:113-114 _normalized_criteria_set strips FORBIDDEN then compares'
+      - 'live_source.py:240-247 Step 5 raises ConfigConsistencyError iff automatable != included'
+      - 'lineage_registry.py:67-75 assert_registry_consistency reports included/automatable drift'
+    emission_filters:
+      - 'production: scorer/pipeline.py:87 included = set(config.included_criteria); :200 keeps only c.criterion in included; :206 no_evidence otherwise'
+      - 'eval combiner: combine.py:90 `if crit not in automatable: continue` -- non-automatable criteria are never scored'
+  suppression_prerequisite_open:
+    id: PP3_BP4_SUPPRESSION_CONTRACT_REQUIRED
+    source: configs/eval/core_annotation_bundle.yaml (pp3_bp4_suppression_prerequisite)
+    finding: >-
+      There is no implemented PP3/BP4 disabled/manual suppression path today;
+      non-approved policy is hard-blocked and TSV reuse is
+      BLOCKED_POLICY_IMPLEMENTATION until a tested suppression contract exists.
+      This plan defines that contract.
+  sentinel_test_coupling:
+    test: tests/eval/test_predictor_policy_gate.py::test_approved_predictor_policy_hashes_pin_current_terminal_source_bundle
+    behavior: >-
+      Recomputes correction_hash over [predictor_aggregation.py,
+      terminal_source.py] and compares to the artifact. Its docstring states it
+      is EXPECTED to fail closed when terminal_source.py changes until the
+      artifact is re-pinned. Adding PolicyDisabledEvidenceSource to
+      terminal_source.py therefore REQUIRES re-pinning correction_hash in the
+      migrated artifact (a config change, never a test edit).
+
+# ---------------------------------------------------------------------------
+# Decision ledger (slot 2) — the load-bearing choices and why.
+# ---------------------------------------------------------------------------
+decision_ledger:
+  - id: D1
+    decision: >-
+      Introduce an explicit evidence `mode` field ORTHOGONAL to approval
+      `status`. Enablement is NEVER inferred from status alone.
+    rationale: >-
+      Directly kills beat4 #1. status answers "did the owner approve THIS
+      artifact"; mode answers "what evidence behavior is authorized"
+      (disabled_manual vs corrected_enabled). Both are required; the runner
+      dispatches on mode.
+  - id: D2
+    decision: >-
+      Bump the artifact to schema bp4pp3-predictor-policy/2 with a closed v2
+      field set; keep v1 loadable for existing fixtures but make the RUNNER
+      refuse to proceed on any artifact lacking an explicit disabled_manual mode.
+    rationale: >-
+      Backward-compatible loader keeps protected v1 tests green; the runner's
+      explicit-mode requirement means a legacy `status: approved` v1 artifact is
+      BLOCKED_POLICY (proves status-alone never enables).
+  - id: D3
+    decision: >-
+      Bind the disabled/manual approval to production_config_hash (raw bytes of
+      configs/acmg/tsc.yaml) AND eval_config_hash (raw bytes of
+      configs/eval/tsc2.yaml), verified at runtime; drift fails closed.
+    rationale: >-
+      Kills beat4 #5 (config drift re-enabling under an old approval): any later
+      edit to either config breaks the hash and BLOCKS. Two hashes (not one)
+      make an eval-only or production-only removal impossible to approve.
+  - id: D4
+    decision: >-
+      Remove PP3/BP4 from included_criteria AND automatable_criteria in ONE
+      commit; retain them in VALID_CRITERIA, scorer acmg_criteria, and the BIAS
+      lineage can_fire/allowed set. Only automation is disabled.
+    rationale: >-
+      Preserves eval==production parity (kills beat4 #2 via the load-time
+      invariant) and keeps PP3/BP4 available for future manual review and future
+      activation without relabeling data lineage.
+  - id: D5
+    decision: >-
+      Add a dedicated, counting PolicyDisabledEvidenceSource that strips PP3/BP4
+      from evidence and records exact per-criterion suppression counts; the
+      disabled runner branch wraps it INSTEAD of PredictorCorrectedEvidenceSource
+      and asserts pp3bp4_scored_calls == 0.
+    rationale: >-
+      Kills beat4 #3 (runner still consumes PP3/BP4) and #4 (claims suppression
+      without counting). Defense-in-depth over combine.py:90, which would also
+      drop non-automatable calls, but without an auditable count.
+  - id: D6
+    decision: >-
+      Keep predictor_source_hash and correction_hash in the v2 artifact as audit
+      provenance; RE-PIN correction_hash to the new terminal_source.py bundle;
+      do NOT apply correction and do NOT gate disabled-mode enablement on them.
+    rationale: >-
+      Preserves aggregation/correction provenance and satisfies the sentinel
+      test, while making disabled mode independent of the correction code path.
+  - id: D7
+    decision: >-
+      Owner approval is a SEPARATE human step: an ADR plus a distinct owner
+      commit flipping status proposed->approved after verifying the two config
+      hashes. The doer leaves status=proposed.
+    rationale: >-
+      Kills beat4 #7 (owner approval embedded by the doer). Self-approval by the
+      planner or doer is structurally impossible.
+  - id: D8
+    decision: >-
+      corrected_enabled / REVEL activation stays BLOCKED_POLICY in this track;
+      re-enabling requires a new hash-bound owner decision and the recommendation
+      section-8 activation checklist.
+    rationale: >-
+      Kills beat4 #6 (disabled mistaken for validated evidence) and matches the
+      task's future_activation scope. The only proceed path is
+      approved + disabled_manual + matching hashes.
+
+rejected_alternatives:
+  - option: 'Reuse status=="approved" on the v1 schema to mean "disabled".'
+    rejected_because: >-
+      Overloads one field; the existing runner would still wrap
+      PredictorCorrectedEvidenceSource -> silent corrected enablement (beat4 #1).
+  - option: 'Delete PP3/BP4 from VALID_CRITERIA / acmg_criteria / bias lineage.'
+    rejected_because: >-
+      Erases vocabulary and manual-review context, breaks lineage registry
+      consistency, and forbids future activation; the spec requires retaining
+      vocabulary and only disabling automation.
+  - option: 'Single combined config-hash over both files.'
+    rejected_because: >-
+      Cannot independently prove BOTH production and eval dropped PP3/BP4; a
+      one-sided change could be masked. Two explicit hashes + load-time parity
+      are stronger.
+  - option: 'Rely only on combine.py:90 (non-automatable skip) for suppression.'
+    rejected_because: >-
+      Correct but silent: no counted proof, and raw PP3/BP4 still flow out of
+      BiasEvidenceSource. A counting wrapper yields the auditable zero-consumed
+      proof (beat4 #4).
+  - option: 'Have the doer set status=approved after implementing.'
+    rejected_because: >-
+      Self-approval; violates the separated owner gate (beat4 #7).
+  - option: 'Add an online enable/disable toggle read at run time.'
+    rejected_because: >-
+      slot 2 forbids an online toggle; future activation must be a new hash-bound
+      decision, not a runtime switch.
+
+# ---------------------------------------------------------------------------
+# Policy schema v2 — closed artifact contract.
+# ---------------------------------------------------------------------------
+policy_schema_v2:
+  artifact: configs/eval/bp4pp3_predictor_policy.json
+  schema_id: bp4pp3-predictor-policy/2
+  closed_field_set:
+    schema: 'const "bp4pp3-predictor-policy/2"'
+    status: 'enum {proposed, approved} -- APPROVAL STATE ONLY; never implies enablement'
+    mode: 'enum {disabled_manual, corrected_enabled} -- EVIDENCE MODE; the first-class policy dimension'
+    production_config_hash: '64-hex sha256 of the raw bytes of configs/acmg/tsc.yaml (post-removal)'
+    eval_config_hash: '64-hex sha256 of the raw bytes of configs/eval/tsc2.yaml (post-removal)'
+    predictor_source_hash: '64-hex sha256 of configs/eval/predictor_aggregation.yaml (retained audit provenance)'
+    correction_hash: '64-hex sha256 over the [predictor_aggregation.py, terminal_source.py] bundle, RE-PINNED (retained audit provenance)'
+    decision_reference: 'non-blank string; ADR/DECISIONS anchor for the disabled/manual decision'
+  forbidden_fields:
+    - authorized
+    - clinical_use_authorized
+    - vus_authorized
+    - enabled
+    - policy_sha256
+  field_rules:
+    - 'unknown/extra field => malformed (fail closed), as in v1 loader semantics'
+    - 'each hash must match ^[0-9a-fA-F]{64}$'
+    - 'mode is REQUIRED for schema v2; a v2 artifact missing mode is malformed'
+    - 'status and mode are independent: no field derives from the other'
+  hash_canonicalization: >-
+    Raw file-bytes sha256 via predictor_policy._sha256_file (streamed 1 MiB
+    chunks) -- identical to the existing predictor_source_hash/correction_hash
+    convention. No YAML re-serialization; the exact committed bytes are bound.
+  example_proposed_artifact_illustrative_only:
+    schema: bp4pp3-predictor-policy/2
+    status: proposed
+    mode: disabled_manual
+    production_config_hash: '<sha256(configs/acmg/tsc.yaml) after PP3/BP4 removal>'
+    eval_config_hash: '<sha256(configs/eval/tsc2.yaml) after PP3/BP4 removal>'
+    predictor_source_hash: '<sha256(configs/eval/predictor_aggregation.yaml)>'
+    correction_hash: '<sha256 bundle over predictor_aggregation.py + terminal_source.py, re-pinned>'
+    decision_reference: 'docs/DECISIONS.md#adr-0012-pp3bp4-disabled-manual-policy'
+
+# ---------------------------------------------------------------------------
+# Status x mode state machine — the exact runner resolution.
+# ---------------------------------------------------------------------------
+state_machine:
+  principle: >-
+    effective_state is a pure function of (status, mode, config-hash match). Only
+    ONE combination proceeds; everything else is BLOCKED_POLICY. decide_gate
+    never emits BLOCKED_POLICY -- only the terminal runner does (model.py:104-113).
+  transitions:
+    - state: MALFORMED
+      when: 'artifact missing / invalid JSON / unknown field / bad hash / v2 without mode'
+      runner_action: BLOCKED_POLICY
+      reason_prefix: 'predictor-policy artifact missing or malformed'
+    - state: UNSUPPORTED_MODE
+      when: 'schema v1 (no mode) OR mode not in {disabled_manual, corrected_enabled}'
+      runner_action: BLOCKED_POLICY
+      reason_prefix: 'explicit disabled_manual mode required; status-only/legacy policy never enables'
+    - state: CORRECTED_ENABLED_OUT_OF_SCOPE
+      when: 'mode == corrected_enabled (any status)'
+      runner_action: BLOCKED_POLICY
+      reason_prefix: 'corrected/REVEL activation is out of scope; requires a new hash-bound decision (recommendation section 8)'
+    - state: PROPOSED_DISABLED
+      when: 'mode == disabled_manual AND status != approved'
+      runner_action: BLOCKED_POLICY
+      reason_prefix: 'disabled/manual policy is proposed, not owner-approved'
+    - state: CONFIG_DRIFT
+      when: 'mode == disabled_manual AND status == approved AND (production_config_hash or eval_config_hash mismatch)'
+      runner_action: BLOCKED_POLICY
+      reason_prefix: 'disabled/manual approval is not bound to the current production/eval configs (drift)'
+    - state: APPROVED_DISABLED
+      when: 'mode == disabled_manual AND status == approved AND both config hashes match'
+      runner_action: PROCEED_DISABLED_MANUAL
+      reason_prefix: 'approved disabled/manual policy; PP3/BP4 automation suppressed'
+  proceed_preconditions_all_required:
+    - 'status == approved'
+    - 'mode == disabled_manual'
+    - 'sha256(configs/acmg/tsc.yaml) == production_config_hash'
+    - 'sha256(configs/eval/tsc2.yaml) == eval_config_hash'
+    - 'PP3 and BP4 absent from scorer_config.included_criteria AND eval_config.automatable_criteria'
+    - 'the masked runtime inputs + verified return manifest present (unchanged from today)'
+
+# ---------------------------------------------------------------------------
+# Hash contract.
+# ---------------------------------------------------------------------------
+hash_contract:
+  bound_now:
+    - name: production_config_hash
+      target: configs/acmg/tsc.yaml
+      meaning: 'binds the disabled decision to the exact production config with PP3/BP4 removed from included_criteria'
+    - name: eval_config_hash
+      target: configs/eval/tsc2.yaml
+      meaning: 'binds the disabled decision to the exact eval config with PP3/BP4 removed from automatable_criteria'
+  audit_provenance_retained:
+    - name: predictor_source_hash
+      target: configs/eval/predictor_aggregation.yaml
+      note: 'preserved; not used to enable disabled mode'
+    - name: correction_hash
+      target: '[src/raptor/eval/predictor_aggregation.py, src/raptor/eval/terminal_source.py] bundle'
+      note: 're-pinned after the terminal_source.py edit; verified by the sentinel test; not used to enable disabled mode'
+  immutable_evidence_referenced:
+    masked_bias_tsv_sha256: 7eece438a880e0c6a591df62e231bc93848eeb42277a2f4360983914298fc512
+    return_manifest_sha256: 5efdccdc57f7d2bdf774486dfbde106ab173bf87412c6db103aaba9958d9ac91
+    note: 'from configs/eval/core_annotation_bundle.yaml; the masked TSV is reused unchanged (see reuse_vs_x64_conclusion)'
+  drift_behavior: fail_closed_block_never_default_allow
+
+# ---------------------------------------------------------------------------
+# Exact config changes and parity validation.
+# ---------------------------------------------------------------------------
+config_changes:
+  production:
+    file: configs/acmg/tsc.yaml
+    key: included_criteria (line 21)
+    remove: [PP3 (line 29), BP4 (line 34)]
+    resulting_list: [PVS1, PS1, PM1, PM2, PM4, PM5, PP2, BA1, BS1, BP1, BP3, BP7]
+    keep_untouched: 'acmg_criteria PP3 (line 77) and BP4 (line 84) -- vocabulary + strength_vocab retained'
+  eval:
+    file: configs/eval/tsc2.yaml
+    key: automatable_criteria (line 28)
+    remove: [PP3 (line 36), BP4 (line 41)]
+    resulting_list: [PVS1, PS1, PM1, PM2, PM4, PM5, PP2, BA1, BS1, BP1, BP3, BP7]
+  parity_validation:
+    - 'the two resulting lists MUST be identical (both 12 codes) so live_source.py:243 ConfigConsistencyError never fires'
+    - 'lineage_registry.py:67-75 must report no included/automatable drift'
+    - 'do NOT touch configs/eval/bias_lineage.yaml: PP3/BP4 keep their allowed/can_fire disposition (predictor_policy.py:1-16 states BP4/PP3 keep allowed data-lineage)'
+  vocabulary_retained_invariants:
+    - 'config.py VALID_CRITERIA (line 197) still contains PP3 and BP4'
+    - 'scorer acmg_criteria still defines PP3 and BP4 (registry presence != inclusion)'
+    - 'PP3/BP4 remain available for future manual review and future activation'
+
+# ---------------------------------------------------------------------------
+# Runner behavior + evidence source construction (the disabled data flow).
+# ---------------------------------------------------------------------------
+runner_behavior:
+  file: scripts/run_masked_holdout_eval.py
+  dispatch:
+    - 'load_predictor_policy(args.predictor_policy) -> MALFORMED => BLOCKED_POLICY'
+    - 'resolve effective_state via state_machine; every non-PROCEED state prints a BLOCKED_POLICY GateDecision (vus_authorized=False) and returns 0 with NO metrics'
+    - 'PROCEED only for APPROVED_DISABLED (verify both config hashes via a new predictor_policy.verify_disabled_config_hashes)'
+  disabled_manual_proceed_path:
+    evidence_wrapping:
+      - 'source = BiasEvidenceSource(...)  # unchanged; reads the immutable masked BIAS TSV'
+      - 'disabled = PolicyDisabledEvidenceSource(source, disabled_criteria={PP3, BP4})  # strips + COUNTS; REPLACES PredictorCorrectedEvidenceSource'
+      - 'production = ProductionVocabEvidenceSource(disabled, scorer_config.acmg_criteria, eval_config.automatable_criteria)  # unchanged; now a no-op on PP3/BP4 (not automatable)'
+      - 'DO NOT construct PredictorCorrectedEvidenceSource in this branch (no correction applied)'
+    guards_before_run_eval:
+      - 'verify_disabled_config_hashes(policy, configs/acmg/tsc.yaml, configs/eval/tsc2.yaml) or BLOCKED_POLICY'
+      - 'assert {PP3,BP4} disjoint from scorer_config.included_criteria and eval_config.automatable_criteria or BLOCKED_POLICY'
+    after_run_eval:
+      - 'assert emitted PP3/BP4 scored calls == 0 (invariant; derived from evidence, not hardcoded)'
+      - 'the existing PASS+skipped -> UNVERIFIED demotion stays; disabled mode adds no VUS authorization'
+  evidence_source_construction:
+    new_class: src/raptor/eval/terminal_source.py::PolicyDisabledEvidenceSource
+    contract:
+      - 'ctor(source, disabled_criteria=frozenset({"PP3","BP4"})); normalizes codes strip().upper()'
+      - 'get_evidence(variant_id): return only calls whose criterion not in disabled; drop the rest'
+      - 'bookkeeping keyed by variant_id (dict variant_id -> {criterion: count}) so repeated get_evidence calls are IDEMPOTENT and never double-count (mirrors ProductionVocabEvidenceSource idempotency)'
+      - 'properties: suppressed_counts -> {"PP3": n, "BP4": m}; suppressed_variant_ids -> sorted tuple; total_suppressed -> int'
+      - 'a disabled criterion that never fires yields count 0 (explicit, not absent)'
+      - 'passes variant_ids through from the wrapped source'
+    preserved_for_future: 'PredictorCorrectedEvidenceSource and verify_predictor_policy_hashes remain in the code for the future corrected_enabled activation; this track does not delete or wire them into a proceed path'
+
+report_provenance_fields:
+  location: 'report.config_pins (folded into report.content_hash via report.py payload) + the JSON envelope predictor_policy=asdict(policy)'
+  added_or_changed_in_disabled_mode:
+    policy_mode: disabled_manual
+    pp3bp4_automation_disabled: true
+    pp3bp4_suppressed_counts: '{"PP3": n, "BP4": m}  # from PolicyDisabledEvidenceSource'
+    pp3bp4_suppressed_variant_count: k
+    pp3bp4_scored_calls: 0
+    pp3bp4_in_included_criteria: false
+    pp3bp4_in_automatable_criteria: false
+    pp3bp4_retained_in_vocabulary: true
+    predictor_correction_applied: false
+    production_config_hash: '<policy.production_config_hash>'
+    eval_config_hash: '<policy.eval_config_hash>'
+    predictor_policy_source_hash: '<policy.predictor_source_hash>  # provenance'
+    predictor_policy_correction_hash: '<policy.correction_hash>  # provenance'
+    predictor_policy_decision_reference: '<policy.decision_reference>'
+  removed_in_disabled_mode:
+    - 'predictor_correction_counts (enabled-path only; no correction is applied)'
+  unchanged:
+    - 'production_vocab_manual_routed_counts (now reflects only still-automatable criteria)'
+    - 'lineage_audit_hash, mask_attestation, verified_return_artifacts'
+
+# ---------------------------------------------------------------------------
+# Implementation scope (Sonnet 5) — exact files, nothing else.
+# ---------------------------------------------------------------------------
+implementation_scope:
+  doer: claude-sonnet-5
+  single_commit: true
+  atomicity: >-
+    All config + code changes land in ONE commit so parity never breaks
+    mid-flight and the sentinel re-pin is co-located with the terminal_source.py
+    edit. The artifact stays status=proposed (blocked) so the doer enables nothing.
+  files:
+    - path: src/raptor/eval/predictor_policy.py
+      change: >-
+        Add schema-v2 support: dispatch on schema; v2 closed field set incl.
+        mode/production_config_hash/eval_config_hash; extend PredictorPolicy with
+        mode (default None for v1); add verify_disabled_config_hashes(policy,
+        production_config_path, eval_config_path) using _sha256_file (fail closed
+        on mismatch/missing). Keep v1 loading + verify_predictor_policy_hashes
+        intact for existing fixtures/sentinel.
+    - path: src/raptor/eval/terminal_source.py
+      change: >-
+        Add PolicyDisabledEvidenceSource (strip + idempotent counting). Do NOT
+        modify PredictorCorrectedEvidenceSource / ProductionVocabEvidenceSource.
+    - path: scripts/run_masked_holdout_eval.py
+      change: >-
+        Replace the status-only gate with the state_machine dispatch on
+        (status, mode, config-hash); implement the disabled_manual proceed path
+        (PolicyDisabledEvidenceSource instead of PredictorCorrectedEvidenceSource;
+        config-hash + absent-from-both-configs guards; suppression pins;
+        pp3bp4_scored_calls==0 assertion). corrected_enabled and legacy/unknown
+        mode => BLOCKED_POLICY.
+    - path: configs/acmg/tsc.yaml
+      change: 'Remove PP3, BP4 from included_criteria (keep them in acmg_criteria).'
+    - path: configs/eval/tsc2.yaml
+      change: 'Remove PP3, BP4 from automatable_criteria.'
+    - path: configs/eval/bp4pp3_predictor_policy.json
+      change: >-
+        Migrate to schema bp4pp3-predictor-policy/2; status=proposed;
+        mode=disabled_manual; add production_config_hash + eval_config_hash
+        (post-removal bytes); RE-PIN correction_hash to the new terminal_source.py
+        bundle; keep predictor_source_hash; update decision_reference to ADR-0012.
+        Leave status=proposed (owner flips separately).
+  explicitly_out_of_scope:
+    - 'configs/eval/bias_lineage.yaml (PP3/BP4 lineage disposition unchanged)'
+    - 'configs/eval/predictor_aggregation.yaml, pp3bp4_candidate_policy.json, pp3bp4_predictor_matrix.yaml (REVEL shadow scope untouched)'
+    - 'src/raptor/scorer/* (production emission already keys off included_criteria)'
+    - 'any protected test file (Gemini-owned)'
+    - 'setting status=approved / writing an ADR acceptance (owner-only)'
+
+# ---------------------------------------------------------------------------
+# Gemini RED test matrix (authored by Gemini; RED before Sonnet implements).
+# ---------------------------------------------------------------------------
+test_matrix:
+  author: gemini
+  new_file_suggestion: tests/eval/test_pp3bp4_disabled_policy.py
+  authorship_rule: 'Sonnet must not edit Gemini tests; Gemini must not edit the protected v1 tests below except by adding new cases in the new file.'
+  red_tests:
+    - id: G-DM1
+      target: predictor_policy.py
+      asserts: >-
+        v2 loader accepts the exact closed v2 field set and populates
+        PredictorPolicy.mode; rejects an unknown/extra field; rejects a v2
+        artifact missing mode; rejects an unknown mode value; rejects a
+        non-64-hex production_config_hash/eval_config_hash.
+    - id: G-DM2
+      target: predictor_policy.verify_disabled_config_hashes
+      asserts: 'passes when both hashes match actual bytes; PredictorPolicyError on either mismatch and on a missing file.'
+    - id: G-DM3
+      target: terminal_source.PolicyDisabledEvidenceSource
+      asserts: >-
+        strips PP3 and BP4, passes all other calls unchanged, reports exact
+        suppressed_counts, and is IDEMPOTENT: two get_evidence calls for one
+        variant do not double-count.
+    - id: G-DM4
+      target: 'run_masked_holdout_eval.py (subprocess, PROCEED path)'
+      asserts: >-
+        approved+disabled_manual with matching config hashes + masked inputs =>
+        gate status != BLOCKED_POLICY; config_pins show policy_mode=disabled_manual,
+        pp3bp4_scored_calls=0, non-empty pp3bp4_suppressed_counts,
+        predictor_correction_applied=false. Provide an offline synthetic-source
+        variant plus a reference-partition variant (gate on data availability
+        like the existing enabled tests).
+    - id: G-DM5
+      target: 'run_masked_holdout_eval.py (subprocess)'
+      asserts: 'proposed+disabled_manual => BLOCKED_POLICY, no metrics.'
+    - id: G-DM6
+      target: 'run_masked_holdout_eval.py (subprocess)'
+      asserts: 'approved+corrected_enabled => BLOCKED_POLICY (out-of-scope activation), no metrics.'
+    - id: G-DM7
+      target: 'run_masked_holdout_eval.py (subprocess)'
+      asserts: 'approved+disabled_manual but a tampered config byte (hash mismatch) => BLOCKED_POLICY (drift).'
+    - id: G-DM8
+      target: 'run_masked_holdout_eval.py (subprocess)'
+      asserts: 'legacy v1 schema status=approved (no mode) => BLOCKED_POLICY -- proves status alone never enables.'
+    - id: G-DM9
+      target: 'configs + config.py'
+      asserts: >-
+        after removal included_criteria == automatable_criteria (12 codes, no
+        ConfigConsistencyError); PP3/BP4 absent from both; PP3/BP4 STILL in
+        VALID_CRITERIA and scorer acmg_criteria (vocabulary retained).
+    - id: G-DM10
+      target: 'end-to-end suppression'
+      asserts: >-
+        a BIAS record firing PP3+BP4+PVS1 yields zero emitted PP3/BP4, a counted
+        suppression of 2, and a still-emitted PVS1.
+  protected_tests_expectations:
+    - 'tests/eval/test_predictor_policy_gate.py v1 loader/hash/BLOCKED cases stay GREEN.'
+    - 'tests/eval/test_terminal_runner_controls.py stays GREEN.'
+    - 'test_approved_predictor_policy_hashes_pin_current_terminal_source_bundle goes RED on the terminal_source.py edit and returns GREEN only after the artifact re-pins correction_hash (config change, not a test edit).'
+
+# ---------------------------------------------------------------------------
+# GPT-5.4 review probes.
+# ---------------------------------------------------------------------------
+gpt_probes:
+  reviewer: gpt-5.4
+  probes:
+    - 'P1: no proceed path exists for status=approved without mode=disabled_manual; corrected_enabled and legacy/unknown mode are BLOCKED_POLICY.'
+    - 'P2: PredictorCorrectedEvidenceSource is NOT constructed in the disabled branch (grep the branch); the wrappers remain for future activation.'
+    - 'P3: eval==production parity is enforced at load (live_source.py:243) and lineage_registry.py:67; a one-sided removal fails closed.'
+    - 'P4: pp3bp4_scored_calls==0 is an asserted invariant and pp3bp4_suppressed_counts is derived from actual dropped calls (not a literal).'
+    - 'P5: a single tampered config byte flips APPROVED_DISABLED -> BLOCKED_POLICY (drift); the owner status flip is a separate commit/artifact, absent from the doer commit.'
+    - 'P6: PP3/BP4 remain in VALID_CRITERIA, scorer acmg_criteria, and bias_lineage can_fire/allowed (vocabulary + lineage retained; only automation disabled).'
+    - 'P7: the correction_hash re-pin reflects exactly the new terminal_source.py bundle and predictor_source_hash did not drift unintentionally.'
+    - 'P8: disabled mode adds no new scoring input (POLICY_ONLY_REUSE), so no x64 reannotation is triggered.'
+
+# ---------------------------------------------------------------------------
+# Owner decision gate — no self-approval.
+# ---------------------------------------------------------------------------
+owner_decision_gate:
+  sequence:
+    - '1. Gemini authors the RED test matrix (separate authorship/commit).'
+    - '2. Sonnet implements implementation_scope in one commit; artifact stays status=proposed, mode=disabled_manual with post-removal config hashes and re-pinned correction_hash; all tests green (sentinel green after re-pin).'
+    - '3. GPT-5.4 runs gpt_probes.'
+    - '4. Owner (operator/domain owner, @dronasrinivas) records ADR-0012 in docs/DECISIONS.md (MADR, Accepted) describing the disabled/manual decision and the unmet activation evidence (exact_revel_compatibility unresolved, permitted_use pending, training_overlap UNKNOWN, transportability BLOCKED_DATA_UNDERPOWERED).'
+    - '5. Owner, in a SEPARATE commit, flips configs/eval/bp4pp3_predictor_policy.json status proposed->approved after independently verifying production_config_hash/eval_config_hash match the committed configs.'
+    - '6. Only then may the terminal runner PROCEED in disabled_manual mode.'
+  no_self_approval:
+    - 'the planner (Opus) never approves; the doer (Sonnet) never sets status=approved.'
+    - 'approval is a distinct human commit bound to the config hashes; drift after approval fails closed.'
+  adr:
+    id: ADR-0012
+    title: 'PP3/BP4 automated emission disabled; explicit disabled/manual policy mode'
+    status_when_written: Accepted (owner)
+    supersedes: 'none (additive alongside ADR-0009 ClinVar-derived criteria ruling)'
+    decision_reference_target: docs/DECISIONS.md#adr-0012-pp3bp4-disabled-manual-policy
+
+# ---------------------------------------------------------------------------
+# Reuse vs x64 conclusion for THIS mode.
+# ---------------------------------------------------------------------------
+reuse_vs_x64_conclusion:
+  route: POLICY_ONLY_REUSE
+  requires_x64: false
+  rationale: >-
+    disabled_manual SUPPRESSES PP3/BP4 downstream and introduces no new
+    structured scoring input (no REVEL/AlphaMissense recompute), so no
+    structured field absent from the held-out Nirvana JSON is needed. Per
+    configs/eval/core_annotation_bundle.yaml reuse_vs_reannotate.decision_table,
+    {upstream_inputs: unchanged, pp3_bp4: disabled_or_manual, suppression_contract:
+    implemented_tested} -> POLICY_ONLY_REUSE.
+  unblocks: >-
+    This plan implements + tests the PP3_BP4_SUPPRESSION_CONTRACT_REQUIRED
+    prerequisite, so the immutable masked BIAS TSV
+    (sha256 7eece438...) may be reused via ARM-side downstream filtering once the
+    owner approves -- no x64 worker, no 58.7 GB bundle rebuild.
+  x64_only_if: >-
+    a future corrected_enabled/REVEL activation needs a structured input absent
+    from the held-out JSON (X64_REANNOTATE trigger) -- out of scope here.
+
+# ---------------------------------------------------------------------------
+# Migration and backout.
+# ---------------------------------------------------------------------------
+migration_and_backout:
+  migration:
+    - 'one atomic Sonnet commit edits both configs + policy artifact + loader + wrapper + runner so parity never breaks mid-flight.'
+    - 'the terminal_source.py edit trips the sentinel; the co-located correction_hash re-pin restores it.'
+    - 'artifact remains status=proposed (BLOCKED) until the separate owner approval; the doer enables nothing.'
+  backout:
+    - 'revert the Sonnet commit: PP3/BP4 return to included_criteria + automatable_criteria; the artifact returns to v1/pending; the runner returns to the prior behavior.'
+    - 'a partial/one-sided revert fails closed at load (parity invariant) -- no drifted half-state can ship.'
+  future_reactivation_gate:
+    - 'corrected_enabled/REVEL requires a NEW owner ADR + new hash-bound artifact + the recommendation section-8 activation checklist + a fresh masked rerun.'
+    - 'mode=corrected_enabled stays BLOCKED_POLICY; config drift fails closed under any stale approval.'
+
+# ---------------------------------------------------------------------------
+# Beat-4 self-audit (slot 1 Beat 4) — every failure mode -> its control.
+# ---------------------------------------------------------------------------
+beat4_self_audit:
+  spec_failure_modes:
+    - failure: 'Policy status approved silently enables corrected PP3/BP4.'
+      control: 'D1/D2 mandatory mode; disabled branch never constructs PredictorCorrectedEvidenceSource; legacy/unknown mode => BLOCKED_POLICY (G-DM8, P1/P2).'
+    - failure: 'Config removes PP3/BP4 in eval but not production, or vice versa.'
+      control: 'D4 both configs edited in one commit + load-time parity (live_source.py:243) + lineage_registry.py:67 + G-DM9 (P3).'
+    - failure: 'Runner still consumes PP3/BP4 from the historical TSV.'
+      control: 'D5 PolicyDisabledEvidenceSource strips + counts; combine.py:90 defense-in-depth; asserted pp3bp4_scored_calls==0 (G-DM3/G-DM10, P4).'
+    - failure: 'Report claims suppression without counting consumed calls.'
+      control: 'D5 counted pp3bp4_suppressed_counts derived from actual dropped calls; idempotent bookkeeping (G-DM3, P4).'
+    - failure: 'Future config drift re-enables PP3/BP4 under an old approval.'
+      control: 'D3 production/eval config-hash binding verified at runtime; drift => BLOCKED_POLICY (G-DM7, P5).'
+    - failure: 'Disabled mode mistaken for validated benign/pathogenic evidence.'
+      control: 'D8 disabled_manual authorizes no VUS; corrected_enabled stays BLOCKED; report records pp3bp4_automation_disabled + predictor_correction_applied=false (P6/P8).'
+    - failure: 'Owner approval embedded by the doer rather than separately recorded.'
+      control: 'D7 doer leaves status=proposed; owner flips in a separate commit bound to the config hashes + ADR-0012 (G-DM5, P5).'
+  planner_scope_inversions:
+    - 'Editing code/config/tests instead of only the YAML: this planner commit modifies exactly one file (verified in VERIFICATION).'
+    - 'Wrong or missing commit trailers: both required trailers pinned in planner.required_trailers and verified post-commit.'
+    - 'Committing on the wrong branch/base: worktree/branch/base pinned and verified before/after commit.'
+  empty_beat4_allowed: false
+
+# ---------------------------------------------------------------------------
+# Acceptance mapping (authoritative spec `acceptance`).
+# ---------------------------------------------------------------------------
+acceptance_mapping:
+  - acceptance: 'Plan is implementation-ready and self-contained.'
+    satisfied_by: 'implementation_scope + policy_schema_v2 + state_machine + runner_behavior + test_matrix name exact files, fields and probes.'
+  - acceptance: 'Disabled/manual mode is explicit and cannot be confused with predictor approval.'
+    satisfied_by: 'D1/D2 orthogonal mode; corrected_enabled + legacy => BLOCKED_POLICY.'
+  - acceptance: 'Production and eval configs remain equal and hash-bound.'
+    satisfied_by: 'D3/D4 config-hash binding + load-time parity invariant.'
+  - acceptance: 'Existing masked TSV can be reused without x64 only after the mode is approved and tests prove suppression.'
+    satisfied_by: 'reuse_vs_x64_conclusion (POLICY_ONLY_REUSE) gated on approval + the tested suppression contract.'
+  - acceptance: 'Pending/unapproved mode remains blocked.'
+    satisfied_by: 'state_machine PROPOSED_DISABLED => BLOCKED_POLICY (G-DM5).'
+  - acceptance: 'No held-out run, census, activation or owner approval occurs in planning.'
+    satisfied_by: 'planner.prohibited_in_this_task; this commit writes only the YAML.'
+  - acceptance: 'Tests authored by Gemini, implementation by Sonnet 5, review by GPT-5.4.'
+    satisfied_by: 'test_matrix.author=gemini; implementation_scope.doer=claude-sonnet-5; gpt_probes.reviewer=gpt-5.4.'
+
+# ---------------------------------------------------------------------------
+# VERIFICATION (slot 1) — filled by the planner after the commit.
+# ---------------------------------------------------------------------------
+verification:
+  expected: 'one new commit on track/pp3bp4-resolution-2026-07 adding exactly docs/project/specs/pp3bp4-disabled-manual-policy.yaml; parent 680e803; both trailers; no push.'
+  checks:
+    - 'git show --stat HEAD => 1 file changed (this file only).'
+    - 'git log -1 shows Co-authored-by Copilot AND Copilot-Session: 90703341-0147-4b5c-9939-42be522500b1.'
+    - 'git status clean; branch unchanged; no remote update.'
+  verdict: recorded_in_final_response
