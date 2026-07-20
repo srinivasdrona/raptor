@@ -78,20 +78,18 @@ def test_t2_rejected_aliases():
 
 
 def test_t3_closed_schemas():
-    """T3: Every record uses the closed identity/routing + fact_object field set; unknown fields fail."""
+    """T3: Every record uses the closed identity/routing + fact_object field set; unknown/missing fields fail."""
     matrix = _load_matrix()
 
-    # Closed top-level schema check
-    allowed_top_level = {
+    # Closed top-level schema check (must have exactly these 7 keys)
+    expected_top_level = {
         "schema", "version", "source_map", "confirm_pending_register",
         "candidates", "audit_rows", "smallest_pin_handoff"
     }
-    top_keys = set(matrix.keys())
-    extra_top = top_keys - allowed_top_level
-    assert not extra_top, f"Unexpected top-level fields found in matrix: {extra_top}"
+    assert set(matrix.keys()) == expected_top_level, f"Top-level keys mismatch. Got: {set(matrix.keys())}, expected: {expected_top_level}"
 
-    # Closed record fields check
-    allowed_record_fields = {
+    # Closed record fields check (must have exactly these 24 keys, both candidates and audit rows)
+    expected_record_fields = {
         "candidate_id", "display_name", "tool_kind", "evidence_role",
         "calibration_source_id", "calibration_locus", "score_direction",
         "transcript_and_consequence_scope", "component_or_feature_overlap",
@@ -119,9 +117,8 @@ def test_t3_closed_schemas():
 
     for r in records:
         cid = r.get("candidate_id")
-        record_keys = set(r.keys())
-        extra_keys = record_keys - allowed_record_fields
-        assert not extra_keys, f"Record '{cid}' has unexpected fields: {extra_keys}"
+        # Ensure the record contains exactly the 24 schema fields (no extras, no omissions)
+        assert set(r.keys()) == expected_record_fields, f"Record '{cid}' keys mismatch. Got: {set(r.keys())}, expected: {expected_record_fields}"
 
 
 def test_t4_self_contained_source_map():
@@ -222,7 +219,7 @@ def test_t5_only_revel_verified_intervals():
 
 
 def test_t6_markdown_parity():
-    """T6: Markdown candidate IDs and material dispositions match the canonical machine matrix."""
+    """T6: Markdown candidate IDs and material dispositions match the canonical machine matrix via explicit column contract."""
     matrix = _load_matrix()
     md_file = REPO_ROOT / "docs/reference/pp3bp4-candidate-matrix-2026-07.md"
     assert md_file.exists(), f"Markdown candidate matrix file not found: {md_file}"
@@ -237,25 +234,36 @@ def test_t6_markdown_parity():
     else:
         table_lines = [line.strip() for line in match.group(1).splitlines() if line.strip().startswith('|')]
 
+    if not table_lines:
+        pytest.fail("No table lines found under Candidate matrix.")
+
+    # Locate column headers in the table's first row
+    header_parts = [p.strip().lower() for p in table_lines[0].split('|')[1:-1]]
+    
+    # Require an explicit "candidate_id" or "candidate id" column/marker in the Markdown table
+    if "candidate_id" not in header_parts and "candidate id" not in header_parts:
+        raise KeyError("Markdown table is missing an explicit 'candidate_id' or 'candidate id' column header.")
+    
+    cid_idx = header_parts.index("candidate_id") if "candidate_id" in header_parts else header_parts.index("candidate id")
+
+    # Find "decision" or "disposition" column index
+    decision_indices = [i for i, h in enumerate(header_parts) if h in ["decision", "disposition"]]
+    if not decision_indices:
+        raise KeyError("Markdown table is missing a 'decision' or 'disposition' column header.")
+    disp_idx = decision_indices[0]
+
     parsed_md = {}
-    for line in table_lines:
+    for line in table_lines[1:]:
         parts = [p.strip() for p in line.split('|')[1:-1]]
-        if not parts:
+        if not parts or parts[0].startswith('---'):
             continue
-        if parts[0].lower() in ['candidate', '---']:
+        if len(parts) <= max(cid_idx, disp_idx):
             continue
 
-        candidate_name = parts[0]
-        decision = parts[-1].replace('**', '').strip().lower()
+        candidate_id = parts[cid_idx].replace('`', '').replace('*', '').strip()
+        decision = parts[disp_idx].replace('`', '').replace('*', '').strip().lower()
 
-        # Normalize name to candidate ID
-        cid = candidate_name.lower().replace(' ', '_').replace('-', '_').replace('++', '_plus_plus').replace('+', '_plus')
-        if cid == 'bias_composite':
-            pass
-        elif cid == 'gerp':
-            cid = 'gerp_plus_plus'
-
-        parsed_md[cid] = decision
+        parsed_md[candidate_id] = decision
 
     # Collect YAML candidates and dispositions
     candidates = matrix.get("candidates", {})
@@ -271,9 +279,13 @@ def test_t6_markdown_parity():
     else:
         yaml_records.update({r.get("candidate_id"): r for r in audit_rows if r.get("candidate_id")})
 
-    # Assert exact match
+    # Assert exact Markdown ID set matches YAML 16 + bias
+    assert set(parsed_md.keys()) == set(yaml_records.keys()), (
+        f"Markdown IDs mismatch. Markdown set: {set(parsed_md.keys())}, YAML set: {set(yaml_records.keys())}"
+    )
+
+    # Assert exact dispositions match
     for cid, record in yaml_records.items():
-        assert cid in parsed_md, f"Candidate '{cid}' from YAML not found in Markdown table."
         yaml_disp = record.get("disposition")
         md_disp = parsed_md[cid]
         assert yaml_disp == md_disp, f"Disposition mismatch for '{cid}': YAML={yaml_disp}, MD={md_disp}"
@@ -450,6 +462,11 @@ def test_t12_fact_object_schema_validation():
                 assert (isinstance(note, str) and note.strip()) or len(source_ids) > 0, f"unavailable status in '{field}' for '{cid}' requires note or source explaining why."
             elif status == "not_applicable":
                 assert value is None, f"not_applicable status in '{field}' for '{cid}' requires null value."
+                # T12 revision: must carry a rationale note or source IDs
+                note = fact_obj.get("note")
+                assert (isinstance(note, str) and note.strip()) or len(source_ids) > 0, (
+                    f"not_applicable status in '{field}' for '{cid}' must carry a rationale note or source_ids explaining why."
+                )
 
 
 def test_t13_markdown_backing_relabeling():
@@ -458,8 +475,10 @@ def test_t13_markdown_backing_relabeling():
     assert matrix_md_file.exists(), "Candidate matrix markdown file not found."
     matrix_md = matrix_md_file.read_text(encoding="utf-8")
 
-    # Backing config must name configs/eval/pp3bp4_predictor_matrix.yaml
-    assert "configs/eval/pp3bp4_predictor_matrix.yaml" in matrix_md, "Candidate matrix markdown does not reference pp3bp4_predictor_matrix.yaml"
+    # Backing config must name configs/eval/pp3bp4_predictor_matrix.yaml in the markdown configuration table
+    backing_lines = [line for line in matrix_md.splitlines() if "backing config" in line.lower()]
+    assert backing_lines, "Could not find 'Backing config' row in Candidate matrix markdown."
+    assert "configs/eval/pp3bp4_predictor_matrix.yaml" in backing_lines[0], f"Backing config row does not reference pp3bp4_predictor_matrix.yaml: {backing_lines[0]}"
 
     recommendation_md_file = REPO_ROOT / "docs/reference/pp3-bp4-predictor-policy-recommendation-2026-07.md"
     assert recommendation_md_file.exists(), "Recommendation memo markdown file not found."
@@ -469,13 +488,24 @@ def test_t13_markdown_backing_relabeling():
     assert "configs/eval/pp3bp4_predictor_matrix.yaml" in rec_md, "Recommendation memo does not reference pp3bp4_predictor_matrix.yaml"
     assert "configs/eval/pp3bp4_source_register.yaml" in rec_md, "Recommendation memo does not reference pp3bp4_source_register.yaml"
 
-    lines_with_matrix = [line for line in rec_md.splitlines() if "pp3bp4_predictor_matrix.yaml" in line]
-    lines_with_source = [line for line in rec_md.splitlines() if "pp3bp4_source_register.yaml" in line]
+    # Parse and identify actual relation-table rows to verify distinct definitions
+    rel_rows = []
+    for line in rec_md.splitlines():
+        if line.strip().startswith("|") and ("pp3bp4_predictor_matrix.yaml" in line or "pp3bp4_source_register.yaml" in line):
+            parts = [p.strip() for p in line.split("|")[1:-1]]
+            if len(parts) >= 2:
+                rel_rows.append(parts)
 
-    assert lines_with_matrix, "Could not find relation lines for pp3bp4_predictor_matrix.yaml"
-    assert lines_with_source, "Could not find relation lines for pp3bp4_source_register.yaml"
+    matrix_row = [r for r in rel_rows if "pp3bp4_predictor_matrix.yaml" in r[0]]
+    source_row = [r for r in rel_rows if "pp3bp4_source_register.yaml" in r[0]]
 
-    # Distinct labeling rows check
-    for lm in lines_with_matrix:
-        for ls in lines_with_source:
-            assert lm != ls, f"The matrix and source register are defined on the same line in relation table: {lm}"
+    assert matrix_row, "Relation table row for pp3bp4_predictor_matrix.yaml not found."
+    assert source_row, "Relation table row for pp3bp4_source_register.yaml not found."
+
+    # Parse columns of the relation table to check description details
+    matrix_desc = " ".join(matrix_row[0][1:]).lower()
+    assert "comprehensive" in matrix_desc and "decision matrix" in matrix_desc, f"Matrix row does not describe comprehensive decision matrix: {matrix_row[0]}"
+
+    source_desc = " ".join(source_row[0][1:]).lower()
+    assert "revel" in source_desc and "provenance" in source_desc, f"Source register row does not describe REVEL policy provenance: {source_row[0]}"
+
