@@ -799,6 +799,10 @@ def test_t19_evidence_and_cost_disciplines():
     candidates = matrix.get("candidates", {})
     audit_rows = matrix.get("audit_rows", {})
 
+    all_records = {}
+    all_records.update(candidates)
+    all_records.update(audit_rows)
+
     for cid, r in candidates.items():
         tse = r.get("tsc_specific_evidence", {})
         assert tse.get("status") == "unavailable", f"'{cid}' tsc_specific_evidence must be unavailable"
@@ -806,16 +810,18 @@ def test_t19_evidence_and_cost_disciplines():
         note = tse.get("note", "")
         assert isinstance(note, str) and "none identified" in note, f"'{cid}' tse lacks 'none identified' note"
 
-        ic = r.get("implementation_cost", {})
-        assert ic.get("status") == "unavailable", f"'{cid}' implementation_cost must be unavailable"
-        assert not ic.get("cp_ids"), f"'{cid}' implementation_cost must have no cp_ids"
-        assert not ic.get("source_ids"), f"'{cid}' implementation_cost must have empty source_ids"
-
     bias_tse = audit_rows["bias_composite"].get("tsc_specific_evidence", {})
     assert bias_tse.get("status") == "not_applicable", "bias_composite tsc_specific_evidence must be not_applicable"
 
-    bias_ic = audit_rows["bias_composite"].get("implementation_cost", {})
-    assert bias_ic.get("status") == "not_applicable", "bias_composite implementation_cost must be not_applicable"
+    # implementation_cost must be unavailable for EVERY row, including bias_composite
+    for cid, r in all_records.items():
+        ic = r.get("implementation_cost", {})
+        assert ic.get("status") == "unavailable", f"'{cid}' implementation_cost must be unavailable"
+        assert ic.get("value") is None, f"'{cid}' implementation_cost value must be null"
+        assert not ic.get("cp_ids"), f"'{cid}' implementation_cost must have no cp_ids"
+        assert not ic.get("source_ids"), f"'{cid}' implementation_cost must have empty source_ids"
+        note = ic.get("note", "")
+        assert isinstance(note, str) and note.strip(), f"'{cid}' implementation_cost must have a note"
 
 
 def test_t20_source_id_rule():
