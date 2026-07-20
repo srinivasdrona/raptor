@@ -275,7 +275,7 @@ todos:
     calibrated tools plus comparator/watchlist, TSC-policy-combination, splice, functional,
     and full-classifier exclusion tiers. The matrix selects one policy; it never becomes a
     voting ensemble.'
-  status: in_progress
+  status: done
   depends_on: []
   created: '2026-07-19'
 - id: sources-pin-core-annotation-bundle
@@ -283,7 +283,7 @@ todos:
   description: 'Track: SOURCE-COVERAGE / CORE-BLOCKER. Select and checksum exact dbNSFP/Nirvana,
     gnomAD exome/genome and constraints, dbSNP, MANE, reference, RepeatMasker, predictor versions,
     and licenses required for reproducible TSC SNV/small-indel evidence.'
-  status: pending
+  status: in_progress
   depends_on:
   - sources-expand-predictor-matrix
   created: '2026-07-19'
