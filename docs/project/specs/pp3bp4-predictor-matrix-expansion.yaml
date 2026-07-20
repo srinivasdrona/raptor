@@ -1,36 +1,38 @@
 schema: raptor-predictor-matrix-expansion-plan/2
 status: implementation_ready_task_spec
 task_id: sources-expand-predictor-matrix
-title: Bounded PP3/BP4 predictor decision matrix (revision 1 -- decoupled from the REVEL policy)
+title: Bounded PP3/BP4 predictor decision matrix (revision 2 -- executable-contract correction)
 
 # ---------------------------------------------------------------------------
 # Revision provenance
 # ---------------------------------------------------------------------------
 revision:
-  reviewed_commit: 53fe604ed7ce06ce60206b315e8b67f1bca65a12
-  checker: { model: gpt-5.4, verdict: DO-NOT-MERGE }
-  authoritative_precedence:                       # revision spec is highest
+  current: 2
+  reviewed_commit: f53378591f3393322e42ae5b801ca648d584479a
+  checker: { model: gpt-5.4, verdict: WITH-CHANGES }
+  authoritative_precedence:                      # v2 revision spec is highest
+    - PREDICTOR_MATRIX_PLAN_REVISION_SPEC_v2.yaml
     - PREDICTOR_MATRIX_PLAN_REVISION_SPEC.yaml
-    - PREDICTOR_MATRIX_TASK_SPEC.yaml
-    - PRIMARY_SOURCE_RESEARCH_BRIEF.md
-  composition_order: [slot1-DELIBERATE_ACTION_PREFIX_v2.md, slot2-PREDICTOR_MATRIX_PLANNING_TEMPLATE.md, slot3-PREDICTOR_MATRIX_PLAN-REVISION-1.md]
-  manifest_hash_verification: "6/6 MATCH (slot1 a0f94762, slot2 46960884, slot3-rev1 1a69bc70, revision-spec 1db3c678, task-spec 21160e7b, brief c155add8)"
-  corrections:
-    - id: "F1-F3"
-      was: "Plan coupled the research matrix to REVEL policy-bound artifacts: expand configs/eval/pp3bp4_source_register.yaml, expand configs/eval/predictor_training_manifests.yaml, and a gated source_register_sha256 policy update."
-      fix: >-
-        The comprehensive matrix now lives in a NEW standalone file
-        configs/eval/pp3bp4_predictor_matrix.yaml as the sole canonical machine source. The REVEL
-        source register, the active leakage-manifest registry, and the candidate policy stay
-        byte-identical. Every source-register hash-update, register-deferred, and hash-equivalence
-        branch is deleted; no matrix-wide expansion of predictor_training_manifests.yaml is planned.
-    - id: F4
-      was: "GERP++ and PhyloP were collapsed into a generic shadow_comparator, losing their conservation/context role."
-      fix: "GERP++ and PhyloP carry an explicit evidence_role: conservation_context within the calibrated set; a distinct policy role, not an independent PP3/BP4 vote and not a splice policy."
+  composition_order: [slot1-DELIBERATE_ACTION_PREFIX_v2.md, slot2-PREDICTOR_MATRIX_PLANNING_TEMPLATE.md, slot3-PREDICTOR_MATRIX_PLAN-REVISION-2.md]
+  manifest_hash_verification: "5/5 MATCH (slot1 a0f94762, slot2 46960884, slot3-rev2 04d28812, rev-spec-v2 e3175792, rev-spec-v1 1db3c678)"
+  rev1_architecture_preserved:
+    - "Comprehensive matrix lives ONLY in the new standalone configs/eval/pp3bp4_predictor_matrix.yaml."
+    - "REVEL source register, active leakage registry, and candidate policy stay byte-identical (no hash-update / register-deferred / manifest-expansion)."
+    - "GERP++ and PhyloP carry evidence_role conservation_context."
+  rev2_corrections:
+    - id: R2-F1
+      was: "Scope claimed base-to-head changes only three Sonnet files, omitting Gemini's new test."
+      fix: "change_scope now defines the 4-file overall implementation diff separately from per-owner commit scopes (Gemini 1, Sonnet 3); every contradictory three-file base-to-head assertion is removed."
+    - id: R2-F2
+      was: "Confirm-pending CP IDs existed only in YAML comments, not the closed machine schema."
+      fix: "Every evidence field is a closed fact object {status, value, source_ids, cp_ids}; cp_ids are first-class machine data that must resolve to the matrix top-level confirm_pending_register."
+    - id: R2-F3
+      was: "Docs could still name pp3bp4_source_register.yaml as the matrix backing source."
+      fix: "documentation_cleanup migrates the Markdown Backing config and the memo relation table to the new canonical matrix; the source register is named REVEL policy provenance only."
 
 worktree: D:\AIProjects\raptor-worktrees\predictor-matrix
 branch: track/predictor-matrix-2026-07
-parent_commit: 53fe604ed7ce06ce60206b315e8b67f1bca65a12
+parent_commit: f53378591f3393322e42ae5b801ca648d584479a
 planner_output_path: docs/project/specs/pp3bp4-predictor-matrix-expansion.yaml
 planner_may_modify_only: [docs/project/specs/pp3bp4-predictor-matrix-expansion.yaml]
 commit_policy: one_followup_commit_no_amend_no_push
@@ -53,42 +55,62 @@ bounded_scope:
     - "Not activation, owner approval, terminal rerun, VUS census, MAVE tuning, or clinical output."
   invariants:
     - "REVEL remains the sole advance_shadow candidate; policy stays proposed/shadow-only/unapproved."
-    - "No fabricated interval/version/license/availability/training fact; use confirm_pending / unavailable / not_applicable."
+    - "No fabricated interval/version/license/availability/training fact; use the fact-object status vocabulary."
     - "Matrix training_manifest_status is metadata only and never becomes a leakage-audit input."
     - "GERP++/PhyloP keep an explicit conservation_context role and are never independent votes."
 
 # ---------------------------------------------------------------------------
-# 2. Canonical architecture (Slot-3-rev1 correction)
+# 2. Canonical architecture (rev-1 correction, preserved)
 # ---------------------------------------------------------------------------
 architecture:
   canonical_machine_matrix:
-    path: configs/eval/pp3bp4_predictor_matrix.yaml            # NEW file (created by Sonnet)
+    path: configs/eval/pp3bp4_predictor_matrix.yaml           # NEW file (created by Sonnet)
     schema: pp3bp4-predictor-matrix/1
     role: sole machine source of truth for the comprehensive 16+BIAS decision matrix
-    contents: [source_map, sixteen_calibrated_records, bias_composite_audit_record, fact_statuses_and_confirm_pending_ids, component_dependence_metadata, disposition_and_evidence_role, smallest_pin_handoff]
   human_view:
     path: docs/reference/pp3bp4-candidate-matrix-2026-07.md
     role: "human rendering; candidate IDs and material dispositions must match the canonical machine matrix"
   recommendation_memo:
     path: docs/reference/pp3-bp4-predictor-policy-recommendation-2026-07.md
     role: "link-only update recording the comprehensive matrix exists and advances no new predictor"
-  preserved_byte_identical:                                    # tested by hash; never edited
-    - { path: configs/eval/pp3bp4_source_register.yaml,       sha256: 2e9c1f215f24bf6ea6fffa697737f84092e6c5fce02db5e74c91e479f0b36932, reason: "bound to the existing REVEL shadow policy" }
-    - { path: configs/eval/predictor_training_manifests.yaml, sha256: 64208cd23081d5c99db332709b5de6b3603ac7e11d7bcc203ca7f74f952f229c, reason: "active leakage-audit registry; matrix-wide training status must not become required leakage inputs" }
+  preserved_byte_identical:                                   # tested by hash; never edited
+    - { path: configs/eval/pp3bp4_source_register.yaml,       sha256: 2e9c1f215f24bf6ea6fffa697737f84092e6c5fce02db5e74c91e479f0b36932, reason: "existing REVEL shadow-policy provenance register" }
+    - { path: configs/eval/predictor_training_manifests.yaml, sha256: 64208cd23081d5c99db332709b5de6b3603ac7e11d7bcc203ca7f74f952f229c, reason: "active leakage-audit registry; matrix training status must not become a leakage input" }
     - { path: configs/eval/pp3bp4_candidate_policy.json,      sha256: 6bba6b906c7bf1296450c8f1df4addda052f5d3ee90f45879a062d02980428b2, reason: "existing proposed REVEL policy remains semantically and byte identical" }
-  canonical_store_decision: >-
-    A NEW file (not the policy-bound register) is the sole canonical matrix because the register's
-    raw bytes are hashed into the REVEL policy; writing matrix content there would re-hash and
-    disturb the policy (the exact F1-F3 defect). The new file has no policy/leakage binding, so the
-    matrix can be comprehensive while the shadow policy stays frozen.
-  primary_implementation_reference_files:                      # <= 4
-    - configs/eval/pp3bp4_predictor_matrix.yaml            # to create
-    - docs/reference/pp3bp4-candidate-matrix-2026-07.md    # human view
-    - docs/reference/pp3-bp4-predictor-policy-recommendation-2026-07.md  # link-only
-    - PRIMARY_SOURCE_RESEARCH_BRIEF.md                    # fact source
+  primary_implementation_reference_files:                     # <= 4
+    - configs/eval/pp3bp4_predictor_matrix.yaml
+    - docs/reference/pp3bp4-candidate-matrix-2026-07.md
+    - docs/reference/pp3-bp4-predictor-policy-recommendation-2026-07.md
+    - PRIMARY_SOURCE_RESEARCH_BRIEF.md
 
 # ---------------------------------------------------------------------------
-# 3. Candidate identity (task spec + brief S1-2)
+# 3. Change scope (R2-F1) -- overall branch diff vs per-owner commit diff
+# ---------------------------------------------------------------------------
+change_scope:
+  planner_commit_diff:                # THIS commit and every planner commit
+    - docs/project/specs/pp3bp4-predictor-matrix-expansion.yaml
+  overall_implementation_diff:        # the 4 files added by the Gemini+Sonnet commits, measured from the pre-implementation base
+    - tests/eval/test_pp3bp4_matrix_expansion.py                        # Gemini
+    - configs/eval/pp3bp4_predictor_matrix.yaml                         # Sonnet
+    - docs/reference/pp3bp4-candidate-matrix-2026-07.md                 # Sonnet
+    - docs/reference/pp3-bp4-predictor-policy-recommendation-2026-07.md # Sonnet
+  gemini_commit_diff:
+    - tests/eval/test_pp3bp4_matrix_expansion.py
+  sonnet_commit_diff:
+    - configs/eval/pp3bp4_predictor_matrix.yaml
+    - docs/reference/pp3bp4-candidate-matrix-2026-07.md
+    - docs/reference/pp3-bp4-predictor-policy-recommendation-2026-07.md
+  preserved_byte_identical:
+    - configs/eval/pp3bp4_source_register.yaml
+    - configs/eval/predictor_training_manifests.yaml
+    - configs/eval/pp3bp4_candidate_policy.json
+  rule: >-
+    Review probes, commands, and acceptance MUST distinguish the 4-file overall implementation diff
+    from the per-owner commit scopes (Gemini exactly 1 file; Sonnet exactly 3 files). No assertion
+    claims the overall diff is only three files. Planner commits touch only this spec YAML.
+
+# ---------------------------------------------------------------------------
+# 4. Candidate identity
 # ---------------------------------------------------------------------------
 candidate_identity:
   completeness_invariant: "Exactly these 16 calibrated candidate_ids, plus bias_composite as the audit row."
@@ -101,44 +123,57 @@ candidate_identity:
     - "bayesdel_noaf (no allele frequency) is NOT BayesDel-addAF."
 
 # ---------------------------------------------------------------------------
-# 4. Disposition + evidence-role classification (Slot 3 decision 4; F4)
+# 5. Disposition + evidence-role classification (F4 preserved)
 # ---------------------------------------------------------------------------
 classification:
   disposition_vocabulary: [advance_shadow, eligible_primary_candidate, shadow_comparator, research_watchlist, separate_consequence_policy, functional_evidence_not_pp3bp4, full_classifier_exclusion, audit_only_reject_authoritative, blocked_pending_source]
   evidence_role_vocabulary: [calibrated_missense, conservation_context, audit_only]
-  conservation_context_members: [gerp_plus_plus, phylop]       # F4: distinct role within the calibrated set
-  conservation_context_rule: "A distinct policy role, not an extra PP3/BP4 vote and not a splice policy."
+  conservation_context_members: [gerp_plus_plus, phylop]
+  conservation_context_rule: "A distinct policy role within the calibrated set, not an extra PP3/BP4 vote and not a splice policy."
   non_missense_tiers_no_rows:
     separate_splice_policy: "Splice predictors are a separate consequence policy (handoff: sources-add-splice-track); no missense rows/votes here."
     functional_evidence_not_pp3bp4: "MAVE/functional assays are orthogonal (PS3/BS3 family), never a predictor label."
     full_classifier_exclusions: "Full end-to-end classifiers are excluded from the PP3/BP4 comparison; populate only from sourced facts, else not_applicable."
-  per_candidate:               # disposition + evidence_role; basis = brief S5 published conclusions (NOT held-out)
-    revel:                { disposition: advance_shadow,             evidence_role: calibrated_missense,   basis: "PP3 Strong + BP4 Moderate; existing sole shadow candidate" }
-    bayesdel_noaf:        { disposition: eligible_primary_candidate, evidence_role: calibrated_missense,   basis: "PP3 Strong + BP4 Moderate; meta-predictor; component overlap" }
-    mutpred2:             { disposition: eligible_primary_candidate, evidence_role: calibrated_missense,   basis: "PP3 Strong + BP4 Moderate; separately generated" }
-    vest4:                { disposition: eligible_primary_candidate, evidence_role: calibrated_missense,   basis: "PP3 Strong + BP4 Moderate" }
-    alphamissense:        { disposition: eligible_primary_candidate, evidence_role: calibrated_missense,   basis: "PP3 Strong + BP4 Moderate; release pin pending (CP-10)" }
-    esm1b:                { disposition: eligible_primary_candidate, evidence_role: calibrated_missense,   basis: "PP3 Strong + BP4 Moderate (PP3 may cap); direction lower; pins CP-6/CP-12" }
-    varity_r:             { disposition: eligible_primary_candidate, evidence_role: calibrated_missense,   basis: "PP3 Strong + BP4 Strong; pins CP-7/CP-11/CP-13" }
-    cadd:                 { disposition: shadow_comparator,          evidence_role: calibrated_missense,   basis: "Did not meet both preferred maxima; many embedded features" }
-    evolutionary_action:  { disposition: shadow_comparator,          evidence_role: calibrated_missense,   basis: "Did not meet both preferred maxima; separate generation route" }
-    fathmm:               { disposition: shadow_comparator,          evidence_role: calibrated_missense,   basis: "Did not meet both maxima; REVEL/BayesDel component; native lower pre-transform" }
-    gerp_plus_plus:       { disposition: shadow_comparator,          evidence_role: conservation_context,  basis: "Conservation; feature overlap with meta-predictors" }
-    mpc:                  { disposition: shadow_comparator,          evidence_role: calibrated_missense,   basis: "Constraint/population dependence; BayesDel component" }
-    phylop:               { disposition: shadow_comparator,          evidence_role: conservation_context,  basis: "Conservation; exact calibrated dbNSFP column pending (CP-14)" }
-    polyphen2_humvar:     { disposition: shadow_comparator,          evidence_role: calibrated_missense,   basis: "Did not meet both maxima; REVEL/BayesDel component" }
-    primateai_original:   { disposition: shadow_comparator,          evidence_role: calibrated_missense,   basis: "Did not meet both maxima; evaluated release needs confirmation (CP-15)" }
-    sift:                 { disposition: shadow_comparator,          evidence_role: calibrated_missense,   basis: "Did not meet both maxima; REVEL/BayesDel component; native lower pre-transform" }
-    bias_composite:       { disposition: audit_only_reject_authoritative, evidence_role: audit_only,       basis: "No external end-to-end calibration; audit reconstruction only" }
+  per_candidate:              # disposition + evidence_role; basis = brief S5 published conclusions (NOT held-out)
+    revel:                { disposition: advance_shadow,             evidence_role: calibrated_missense,  basis: "PP3 Strong + BP4 Moderate; existing sole shadow candidate" }
+    bayesdel_noaf:        { disposition: eligible_primary_candidate, evidence_role: calibrated_missense,  basis: "PP3 Strong + BP4 Moderate; meta-predictor; component overlap" }
+    mutpred2:             { disposition: eligible_primary_candidate, evidence_role: calibrated_missense,  basis: "PP3 Strong + BP4 Moderate; separately generated" }
+    vest4:                { disposition: eligible_primary_candidate, evidence_role: calibrated_missense,  basis: "PP3 Strong + BP4 Moderate" }
+    alphamissense:        { disposition: eligible_primary_candidate, evidence_role: calibrated_missense,  basis: "PP3 Strong + BP4 Moderate; release pin pending (CP-10)" }
+    esm1b:                { disposition: eligible_primary_candidate, evidence_role: calibrated_missense,  basis: "PP3 Strong + BP4 Moderate (PP3 may cap); direction lower; pins CP-6/CP-12" }
+    varity_r:             { disposition: eligible_primary_candidate, evidence_role: calibrated_missense,  basis: "PP3 Strong + BP4 Strong; pins CP-7/CP-11/CP-13" }
+    cadd:                 { disposition: shadow_comparator,          evidence_role: calibrated_missense,  basis: "Did not meet both preferred maxima; many embedded features" }
+    evolutionary_action:  { disposition: shadow_comparator,          evidence_role: calibrated_missense,  basis: "Did not meet both preferred maxima; separate generation route" }
+    fathmm:               { disposition: shadow_comparator,          evidence_role: calibrated_missense,  basis: "Did not meet both maxima; REVEL/BayesDel component; native lower pre-transform" }
+    gerp_plus_plus:       { disposition: shadow_comparator,          evidence_role: conservation_context, basis: "Conservation; feature overlap with meta-predictors" }
+    mpc:                  { disposition: shadow_comparator,          evidence_role: calibrated_missense,  basis: "Constraint/population dependence; BayesDel component" }
+    phylop:               { disposition: shadow_comparator,          evidence_role: conservation_context, basis: "Conservation; exact calibrated dbNSFP column pending (CP-14)" }
+    polyphen2_humvar:     { disposition: shadow_comparator,          evidence_role: calibrated_missense,  basis: "Did not meet both maxima; REVEL/BayesDel component" }
+    primateai_original:   { disposition: shadow_comparator,          evidence_role: calibrated_missense,  basis: "Did not meet both maxima; evaluated release needs confirmation (CP-15)" }
+    sift:                 { disposition: shadow_comparator,          evidence_role: calibrated_missense,  basis: "Did not meet both maxima; REVEL/BayesDel component; native lower pre-transform" }
+    bias_composite:       { disposition: audit_only_reject_authoritative, evidence_role: audit_only,      basis: "No external end-to-end calibration; audit reconstruction only" }
   binding_rule: "Dispositions/roles are decision-matrix labels, not runtime routes; only revel is advance_shadow; no voting/fallback/ranking/per-variant selection."
 
 # ---------------------------------------------------------------------------
-# 5. Fact-status discipline (Slot 3 decision 2)
+# 6. Fact-status discipline + machine fact-object schema (R2-F2)
 # ---------------------------------------------------------------------------
 fact_status:
   enum: [verified, confirm_pending, unavailable, not_applicable]
-  rule: "Every cell is a verified value WITH a rationale_source_id, or an explicit status token. No success-shaped defaults; unavailable manifests are never zero-overlap; bundled availability is never licence approval."
-  revel_verified_intervals:      # Pejaver Table 2, REVEL row -- the ONLY verified numeric intervals; MUST match the frozen policy
+  fact_object:
+    applies_to: [calibrated_score_intervals, explicit_indeterminate_interval, maximum_supported_pp3_strength, maximum_supported_bp4_strength, calibrated_version, current_release_pin_status, structured_score_availability, license_status, training_manifest_status, tsc_specific_evidence, implementation_cost]
+    required_shape:
+      status: "verified | confirm_pending | unavailable | not_applicable"
+      value: "scalar | mapping | null"
+      source_ids: ["string"]
+      cp_ids: ["string"]
+    validation:
+      - "verified: non-null value, >=1 source_id, cp_ids empty."
+      - "confirm_pending: value null or explicitly partial, >=1 cp_id, no fabricated resolved value."
+      - "unavailable: value null, plus a source/note explaining the missing input."
+      - "not_applicable: value null, plus a rationale source/note."
+      - "every cp_id resolves to the matrix top-level confirm_pending_register."
+    rule: "CP IDs are first-class machine data, never comment-only. No success-shaped default may substitute for a status."
+  revel_verified_intervals:    # Pejaver Table 2, REVEL row -- the ONLY verified numeric intervals; MUST match the frozen policy
     pp3_supporting: "0.644 <= s < 0.773 (enabled)"
     pp3_moderate:   "0.773 <= s < 0.932 (enabled)"
     pp3_strong:     "s >= 0.932 (enabled)"
@@ -151,12 +186,12 @@ fact_status:
     - "Native direction: higher-is-pathogenic for all EXCEPT fathmm & sift (lower, Pejaver-transformed) and esm1b (lower)."
     - "Score acquisition: Pejaver used dbNSFP precomputed scores EXCEPT bayesdel_noaf, cadd, evolutionary_action, mutpred2, polyphen2 (generated separately)."
     - "Bergquist calibrated alphamissense/esm1b to PP3 Strong + BP4 Moderate and varity_r to PP3 Strong + BP4 Strong; EVE attempted but excluded (sampling bias)."
-  component_dependence_map:      # brief S6 -- verified
+  component_dependence_map:    # brief S6 -- verified
     revel: "SIFT, PolyPhen-2, FATHMM + others"
     bayesdel_noaf: "SIFT, PolyPhen-2, FATHMM-coding, MPC, conservation features"
     cadd: "conservation + protein-prediction features (PhyloP/GERP++/PolyPhen-derived)"
     rule: "REVEL and its components are not independent PP3/BP4 evidence; REVEL and BayesDel-noAF are not both applied as independent criteria; conservation/context tools are comparators, not votes."
-  confirm_pending_register:      # brief S8 -- binding; do not upgrade
+  confirm_pending_register:    # brief S8 -- binding; every fact-object cp_id must resolve here; also a matrix top-level field
     CP-1: "BayesDel-noAF intervals -> Pejaver Table 2"
     CP-2: "MutPred2 intervals -> Pejaver Table 2"
     CP-3: "VEST4 intervals -> Pejaver Table 2"
@@ -180,81 +215,87 @@ fact_status:
     CP-21: "REVEL/dbNSFP release to pin for RAPTOR -> annotation-bundle decision"
 
 # ---------------------------------------------------------------------------
-# 6. Canonical matrix schema + example (pp3bp4-predictor-matrix/1)
+# 7. Canonical matrix schema + fact-object examples (pp3bp4-predictor-matrix/1)
 # ---------------------------------------------------------------------------
 matrix_schema:
-  top_level: [schema, version, source_map, candidates, audit_rows, fact_status_vocabulary, confirm_pending_register, smallest_pin_handoff]
-  source_map_rule: "Self-contained citation map (pejaver_2022, bergquist_2025, stenton_2024, richards_2015, tavtigian_2018, dbnsfp_v4 as a distribution token). Every candidate calibration_source_id and rationale_source_id must resolve here. No coupling to configs/eval/pp3bp4_source_register.yaml."
-  candidate_record_fields:      # closed set = 23 task-spec matrix fields + evidence_role
-    - candidate_id
-    - display_name
-    - tool_kind
-    - evidence_role                 # calibrated_missense | conservation_context | audit_only
-    - calibration_source_id
-    - calibration_locus
-    - calibrated_score_intervals_or_confirm_pending
-    - maximum_supported_pp3_strength
-    - maximum_supported_bp4_strength
-    - explicit_indeterminate_interval_or_confirm_pending
-    - calibrated_version_or_confirm_pending
-    - current_release_pin_status
-    - score_direction
-    - transcript_and_consequence_scope
-    - training_manifest_status      # METADATA ONLY; not a leakage input
-    - component_or_feature_overlap
-    - structured_score_source
-    - structured_score_availability
-    - license_source
-    - license_status
-    - tsc_specific_evidence
-    - implementation_cost
-    - disposition
-    - rationale_source_ids
-  example_record:
+  top_level: [schema, version, source_map, confirm_pending_register, candidates, audit_rows, smallest_pin_handoff]
+  source_map_rule: "Self-contained citation map (pejaver_2022, bergquist_2025, stenton_2024, richards_2015, tavtigian_2018, dbnsfp_v4). Every source_id used by any record or fact-object resolves here. No coupling to configs/eval/pp3bp4_source_register.yaml."
+  confirm_pending_register_rule: "Top-level mapping of CP-id -> resolution; every fact-object cp_id must be a key here."
+  identity_and_routing_fields: [candidate_id, display_name, tool_kind, evidence_role, calibration_source_id, calibration_locus, score_direction, transcript_and_consequence_scope, component_or_feature_overlap, structured_score_source, license_source, disposition, rationale_source_ids]
+  fact_object_fields: [calibrated_score_intervals, explicit_indeterminate_interval, maximum_supported_pp3_strength, maximum_supported_bp4_strength, calibrated_version, current_release_pin_status, structured_score_availability, license_status, training_manifest_status, tsc_specific_evidence, implementation_cost]
+  example_verified_revel:
+    revel:
+      candidate_id: revel
+      evidence_role: calibrated_missense
+      disposition: advance_shadow
+      calibration_source_id: pejaver_2022
+      score_direction: higher_more_pathogenic
+      calibrated_score_intervals:
+        status: verified
+        value: { pp3_supporting: "0.644<=s<0.773", pp3_moderate: "0.773<=s<0.932", pp3_strong: "s>=0.932", bp4_supporting: "0.183<s<=0.290", bp4_moderate: "0.016<s<=0.183" }
+        source_ids: [pejaver_2022]
+        cp_ids: []
+  example_confirm_pending_gerp:
     gerp_plus_plus:
+      candidate_id: gerp_plus_plus
       display_name: "GERP++"
       tool_kind: conservation
       evidence_role: conservation_context
       calibration_source_id: pejaver_2022
       calibration_locus: "Table 2"
-      calibrated_score_intervals_or_confirm_pending: confirm_pending    # CP-4
-      maximum_supported_pp3_strength: confirm_pending                    # CP-4
-      maximum_supported_bp4_strength: confirm_pending                    # CP-4
-      explicit_indeterminate_interval_or_confirm_pending: confirm_pending
-      calibrated_version_or_confirm_pending: confirm_pending
-      current_release_pin_status: confirm_pending
       score_direction: higher_more_pathogenic
       transcript_and_consequence_scope: missense_variant
-      training_manifest_status: unavailable       # metadata only
       component_or_feature_overlap: "embedded in CADD and other meta-predictors"
       structured_score_source: dbnsfp_v4
-      structured_score_availability: confirm_pending
       license_source: official_distribution
-      license_status: confirm_pending             # CP-17
-      tsc_specific_evidence: none_identified
-      implementation_cost: confirm_pending
       disposition: shadow_comparator
       rationale_source_ids: [pejaver_2022]
+      calibrated_score_intervals:      { status: confirm_pending, value: null, source_ids: [pejaver_2022], cp_ids: [CP-4] }
+      explicit_indeterminate_interval: { status: confirm_pending, value: null, source_ids: [pejaver_2022], cp_ids: [CP-4] }
+      maximum_supported_pp3_strength:  { status: confirm_pending, value: null, source_ids: [pejaver_2022], cp_ids: [CP-4] }
+      maximum_supported_bp4_strength:  { status: confirm_pending, value: null, source_ids: [pejaver_2022], cp_ids: [CP-4] }
+      calibrated_version:              { status: confirm_pending, value: null, source_ids: [pejaver_2022], cp_ids: [CP-9] }
+      current_release_pin_status:      { status: confirm_pending, value: null, source_ids: [dbnsfp_v4],    cp_ids: [CP-21] }
+      structured_score_availability:   { status: confirm_pending, value: null, source_ids: [dbnsfp_v4],    cp_ids: [CP-21] }
+      license_status:                  { status: confirm_pending, value: null, source_ids: [dbnsfp_v4],    cp_ids: [CP-17] }
+      training_manifest_status:        { status: unavailable,     value: null, source_ids: [dbnsfp_v4],    cp_ids: [CP-20], note: "manifest not obtained; metadata only, not a leakage input" }
+      tsc_specific_evidence:           { status: not_applicable,  value: null, source_ids: [pejaver_2022], cp_ids: [], note: "no TSC-specific calibration at matrix stage" }
+      implementation_cost:             { status: confirm_pending, value: null, source_ids: [dbnsfp_v4],    cp_ids: [CP-21] }
   notes:
-    - "Only revel carries verified numeric multi-level intervals; every other interval field is confirm_pending with a CP id."
+    - "Only REVEL carries a status: verified interval object; every other candidate's interval fields are status: confirm_pending with a resolving cp_id."
     - "fathmm/sift record native lower + a pejaver_transform note; esm1b is lower."
 
 # ---------------------------------------------------------------------------
-# 7. File-by-file change contract (Sonnet)
+# 8. File-by-file change contract (Sonnet) + documentation cleanup (R2-F3)
 # ---------------------------------------------------------------------------
 file_change_contract:
   - path: configs/eval/pp3bp4_predictor_matrix.yaml
     action: create
-    change: "New canonical machine matrix per matrix_schema: source_map, 16 calibrated records + bias_composite audit row, fact statuses, CP register, component/dependence, disposition + evidence_role, smallest_pin_handoff."
+    owner: sonnet
+    change: "New canonical machine matrix per matrix_schema: source_map, top-level confirm_pending_register, 16 calibrated records + bias_composite audit row (fact objects for all fact_object_fields), disposition + evidence_role, smallest_pin_handoff."
   - path: docs/reference/pp3bp4-candidate-matrix-2026-07.md
     action: expand
-    change: "Render the 16+BIAS rows for human review; candidate IDs and material dispositions must match the canonical machine matrix. Preserve the PROPOSED/UNAPPROVED/SHADOW-ONLY header and the 'held-out acknowledged, not used' language."
+    owner: sonnet
+    change: >-
+      Render the 16+BIAS rows for human review; candidate IDs and material dispositions must match the
+      canonical machine matrix. Replace the 'Backing config' row value 'configs/eval/pp3bp4_source_register.yaml'
+      with 'configs/eval/pp3bp4_predictor_matrix.yaml', and state that pp3bp4_source_register.yaml remains
+      only the existing REVEL policy provenance register (not the matrix backing). Preserve the
+      PROPOSED/UNAPPROVED/SHADOW-ONLY header and the 'held-out acknowledged, not used' language.
   - path: docs/reference/pp3-bp4-predictor-policy-recommendation-2026-07.md
     action: link_only
-    change: "In section 10/11 only, link the comprehensive matrix and note it advances no new predictor; REVEL stays the sole shadow candidate. No new selection/interval/activation."
+    owner: sonnet
+    change: >-
+      In the relation table, add/identify pp3bp4_predictor_matrix.yaml as the comprehensive decision matrix
+      and relabel pp3bp4_source_register.yaml as REVEL policy provenance. Note the matrix advances no new
+      predictor; REVEL stays the sole shadow candidate. No new selection/interval/activation.
+documentation_cleanup:
+  - "Markdown Backing config -> configs/eval/pp3bp4_predictor_matrix.yaml."
+  - "Markdown states configs/eval/pp3bp4_source_register.yaml is REVEL policy provenance only."
+  - "Memo relation table: pp3bp4_predictor_matrix.yaml = comprehensive decision matrix; pp3bp4_source_register.yaml = REVEL policy provenance."
 
 # ---------------------------------------------------------------------------
-# 8. Gemini RED test contract (isolated; author FIRST)
+# 9. Gemini RED test contract (isolated; author FIRST)
 # ---------------------------------------------------------------------------
 gemini_tests:
   may_create: [tests/eval/test_pp3bp4_matrix_expansion.py]
@@ -262,18 +303,20 @@ gemini_tests:
   required_assertions:
     - T1: "Canonical machine matrix contains exactly the 16 candidate IDs plus bias_composite."
     - T2: "Aliases PrimateAI-3D, generic VARITY/VARITY_ER, and BayesDel-addAF are rejected."
-    - T3: "Every record uses the closed schema and the fact-status vocabulary."
-    - T4: "Every source ID resolves within the matrix source_map."
-    - T5: "Only REVEL contains verified numeric multi-level intervals; all other interval fields are confirm_pending with CP IDs."
+    - T3: "Every record uses the closed identity/routing + fact_object field set; unknown fields fail."
+    - T4: "Every source ID (records + fact objects) resolves within the matrix source_map."
+    - T5: "Only REVEL has status: verified interval fact objects; all other candidates' interval fields are confirm_pending."
     - T6: "Markdown candidate IDs and material dispositions match the canonical machine matrix."
     - T7: "Exactly one candidate has disposition advance_shadow and it is REVEL."
     - T8: "GERP++ and PhyloP carry evidence_role conservation_context and cannot be treated as independent votes."
-    - T9: "Matrix training_manifest_status is metadata only; it does not alter predictor_training_manifests.yaml or leakage-audit inputs."
+    - T9: "Matrix training_manifest_status is a metadata fact object; it does not alter predictor_training_manifests.yaml or leakage-audit inputs."
     - T10: "The three preserved artifacts match their base SHA-256 values byte-for-byte (2e9c1f21..., 64208cd2..., 6bba6b90...)."
     - T11: "No scorer, gate, packet, terminal, census, or production-policy wiring is added."
+    - T12: "Every fact object obeys fact_status.fact_object.validation (status/value/source_ids/cp_ids), and every cp_id resolves to the top-level confirm_pending_register; no CP id is comment-only."
+    - T13: "Markdown Backing config names pp3bp4_predictor_matrix.yaml (not the source register); the memo relation table labels the matrix and the REVEL provenance register distinctly."
 
 # ---------------------------------------------------------------------------
-# 9. Sonnet boundary
+# 10. Sonnet boundary
 # ---------------------------------------------------------------------------
 sonnet_boundary:
   may_modify: [configs/eval/pp3bp4_predictor_matrix.yaml, docs/reference/pp3bp4-candidate-matrix-2026-07.md, docs/reference/pp3-bp4-predictor-policy-recommendation-2026-07.md]
@@ -283,41 +326,47 @@ sonnet_boundary:
     - "Select/rank a predictor via held-out/VUS/MAVE outputs or voting; add fallback/consensus/per-variant choice."
     - "Assert a version/license/interval/training/availability fact without a primary/official source."
     - "Add scorer/gate/packet/terminal/census/production-policy wiring; integrate or download any predictor."
-  one_commit_ownership: "A single Sonnet implementation commit touches only the three may_modify files."
+  commit_scope: "The single Sonnet commit changes exactly its three files (see change_scope.sonnet_commit_diff)."
 
 # ---------------------------------------------------------------------------
-# 10. GPT-5.4 review probes
+# 11. GPT-5.4 review probes
 # ---------------------------------------------------------------------------
 gpt54_review_probes:
-  - "git diff base..HEAD touches only the three may_modify files; the three preserved artifacts are byte-identical to their base SHAs."
-  - "The plan/spec contain no source_register_sha256 update, no register-deferred branch, no hash-equivalence step, and no matrix-wide predictor_training_manifests.yaml expansion."
+  - "Overall implementation diff changes exactly the four declared files (1 Gemini test + 3 Sonnet files); the Gemini commit is its test only; the Sonnet commit is its three files only; no assertion says the overall diff is only three files."
+  - "The three preserved artifacts are byte-identical to their base SHAs; the plan contains no source_register_sha256 update, register-deferred branch, hash-equivalence step, or matrix-wide predictor_training_manifests.yaml expansion."
   - "configs/eval/pp3bp4_predictor_matrix.yaml is the sole canonical matrix; Markdown IDs/dispositions mirror it."
-  - "Exactly 16 calibrated IDs + bias_composite; aliases absent; only REVEL has advance_shadow."
-  - "GERP++/PhyloP carry evidence_role conservation_context; not independent votes; not splice."
-  - "Every non-REVEL interval is confirm_pending with a CP id; no success-shaped defaults."
-  - "Matrix training_manifest_status is metadata; leakage audit inputs unchanged."
+  - "Every fact object validates (status/value/source_ids/cp_ids); every cp_id resolves to the top-level confirm_pending_register; no CP id is comment-only."
+  - "Markdown Backing config and the memo relation table name pp3bp4_predictor_matrix.yaml as the matrix and pp3bp4_source_register.yaml as REVEL provenance only."
+  - "Exactly 16 calibrated IDs + bias_composite; aliases absent; only REVEL has advance_shadow; GERP++/PhyloP are conservation_context; no non-REVEL verified intervals."
+  - "Protected tests test_pp3bp4_candidate_policy.py and test_predictor_leakage_audit.py are run and unmodified."
 
 # ---------------------------------------------------------------------------
-# 11. Validation, sequence, ownership
+# 12. Validation, sequence, ownership
 # ---------------------------------------------------------------------------
 validation_commands:
   setup: 'python -m pip install -e ".[dev]"'
-  targeted: "python -m pytest tests/eval/test_pp3bp4_matrix_expansion.py -q"
+  targeted:
+    - "python -m pytest tests/eval/test_pp3bp4_matrix_expansion.py -q"
+    - "python -m pytest tests/eval/test_pp3bp4_candidate_policy.py tests/eval/test_predictor_leakage_audit.py -q"
   preserved_hashes: 'python -c "import hashlib,pathlib;[print(p, hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest()) for p in [''configs/eval/pp3bp4_source_register.yaml'',''configs/eval/predictor_training_manifests.yaml'',''configs/eval/pp3bp4_candidate_policy.json'']]"'
-  scope_guard: "git -C D:\\AIProjects\\raptor-worktrees\\predictor-matrix show --stat HEAD"
+  scope_checks:
+    - "Gemini commit changes only tests/eval/test_pp3bp4_matrix_expansion.py."
+    - "Sonnet commit changes only its three files."
+    - "Total implementation branch diff changes exactly the four declared files."
+    - "Planner commit changes only docs/project/specs/pp3bp4-predictor-matrix-expansion.yaml."
 implementation_sequence:
-  - "1. Gemini authors tests/eval/test_pp3bp4_matrix_expansion.py (T1-T11); confirm RED on the base tree."
-  - "2. Sonnet creates configs/eval/pp3bp4_predictor_matrix.yaml, renders the Markdown view, and adds the memo link."
-  - "3. Run validation; T1-T11 GREEN; preserved hashes byte-identical; existing policy/leakage tests untouched and GREEN."
-  - "4. GPT-5.4 review against the probes."
+  - "1. Gemini authors tests/eval/test_pp3bp4_matrix_expansion.py (T1-T13); confirm RED on the base tree; this is the Gemini one-file commit."
+  - "2. Sonnet creates configs/eval/pp3bp4_predictor_matrix.yaml, renders the Markdown view (with Backing-config migration), and updates the memo relation table; this is the Sonnet three-file commit."
+  - "3. Run both validation command lines; T1-T13 GREEN; protected policy/leakage tests unmodified and GREEN; preserved hashes byte-identical."
+  - "4. GPT-5.4 review against the probes; confirm the four-file overall diff and per-owner scopes."
 ownership_boundaries:
   planner: "This YAML only; one follow-up commit; no amend; no push."
-  gemini: "tests/eval/test_pp3bp4_matrix_expansion.py only (RED-first)."
+  gemini: "tests/eval/test_pp3bp4_matrix_expansion.py only (RED-first); runs but never edits the protected tests."
   sonnet: "The three may_modify files only; one implementation commit."
   gpt54: "Review only."
 
 # ---------------------------------------------------------------------------
-# 12. Blockers + smallest-pin handoff
+# 13. Blockers + smallest-pin handoff
 # ---------------------------------------------------------------------------
 blockers:
   - "Numeric intervals for all 15 non-REVEL candidates (CP-1..CP-7) require direct Pejaver Table 2 / Bergquist Table 1 inspection."
@@ -336,45 +385,45 @@ smallest_pin_handoff:
   invariant: "The comprehensive matrix stays at 16 calibrated rows even when the pinned bundle implements a smaller score subset."
 
 # ---------------------------------------------------------------------------
-# 13. Acceptance (typed)
+# 14. Acceptance (typed)
 # ---------------------------------------------------------------------------
 acceptance:
   mechanical:
-    - "Matrix has exactly the 16 calibrated IDs + bias_composite; aliases absent."
-    - "Exactly one advance_shadow (revel); every disposition in the allowed vocabulary."
+    - "Overall implementation diff = exactly the 4 declared files; Gemini commit = 1 file; Sonnet commit = 3 files; planner commit = this spec only. No surviving three-file overall-diff claim."
+    - "The three preserved artifacts equal their base SHAs."
+    - "Matrix has exactly the 16 calibrated IDs + bias_composite; aliases absent; exactly one advance_shadow (revel)."
     - "GERP++/PhyloP evidence_role == conservation_context."
-    - "The three preserved artifacts equal their base SHAs; only the three may_modify files change."
-    - "No numeric interval string on any non-REVEL candidate."
-    - "Planner commit changes exactly one file, parent 53fe604, both required trailers, no amend/push."
+    - "Every fact object conforms to the schema and every cp_id resolves to the top-level confirm_pending_register (no comment-only CP ids); no non-REVEL candidate has verified intervals."
+    - "Planner commit changes exactly one file, parent f533785, both required trailers (Copilot-Session 7c146921-...), no amend/push."
   evidence_form:
-    - "Every asserted fact resolves to Pejaver/Bergquist/brief/official source; unresolved facts are confirm_pending with a CP id."
-    - "16-row decision support, not 16 integrations; no voting/held-out/VUS/MAVE/activation/clinical output."
-    - "REVEL stays proposed, unapproved, shadow-only, sole advanced shadow candidate; policy semantics + bytes unchanged."
+    - "Every asserted fact resolves to Pejaver/Bergquist/brief/official source; unresolved facts are confirm_pending with a resolving cp_id."
+    - "Documentation source-of-truth is migrated to the canonical matrix; the source register is named REVEL policy provenance only."
+    - "Protected policy/leakage tests are run explicitly and stay GREEN."
+    - "16-row decision support, not 16 integrations; no voting/held-out/VUS/MAVE/activation/clinical output; REVEL policy semantics + bytes unchanged."
     - "Smallest realistically pinnable subset identified without narrowing the 16-row matrix."
 
 # ---------------------------------------------------------------------------
-# 14. Beat-4 self-audit (revision inversion)
+# 15. Beat-4 self-audit
 # ---------------------------------------------------------------------------
 beat4_self_audit:
-  - mode: "New matrix file added but register-parity tests / policy re-hash steps / all-candidate leakage requirements retained."
-    guard: "Zero source_register_sha256 / register-deferred / hash-equivalence / manifest-expansion language; preserved-hash tests T10 assert byte-identity; sole canonical matrix."
-  - mode: "GERP++/PhyloP left collapsed as generic comparators."
-    guard: "evidence_role conservation_context + test T8; conservation_context_rule (not a vote, not splice)."
-  - mode: "Complete-looking rows fabricate intervals/versions/licenses/availability."
-    guard: "fact_status enum + CP register; tests T3/T5; only REVEL verified."
-  - mode: "Matrix drifts into an ensemble / per-variant menu."
-    guard: "binding_rule + single advance_shadow (T7); no wiring (T11)."
-  - mode: "Research expands into integrating 16 tools."
-    guard: "smallest_pin_handoff + explicit_non_requirements; matrix stays 16 rows."
+  - mode: "Scope claim conflates per-owner commits with the overall branch (omits Gemini's test) or keeps a three-file overall-diff assertion."
+    guard: "change_scope defines overall 4 vs Gemini 1 vs Sonnet 3; probes/commands/acceptance distinguish them; no residual three-file claim."
+  - mode: "CP ids remain comment-only, not mechanically validatable."
+    guard: "fact_object schema + validation; tests T3/T12; every cp_id resolves to the top-level confirm_pending_register."
+  - mode: "Docs still name the source register as the matrix backing."
+    guard: "documentation_cleanup + test T13; Markdown Backing config -> matrix; memo relation-table relabel."
+  - mode: "New matrix file added but policy/leakage coupling residue survives."
+    guard: "preserved_byte_identical + T10; no hash-update/register-deferred/manifest-expansion language."
+  - mode: "GERP++/PhyloP collapsed; or matrix drifts into an ensemble; or fabricated facts."
+    guard: "evidence_role conservation_context (T8); single advance_shadow (T7) + no wiring (T11); fact_object status vocabulary + only-REVEL verified (T5)."
 
 # ---------------------------------------------------------------------------
-# 15. Verification-return scaffold (Slot-3-rev1)
+# 16. Verification-return (Slot-3-rev2 requested)
 # ---------------------------------------------------------------------------
 verification_return_required:
-  - revised commit SHA
-  - changed-file proof (exactly one file)
-  - canonical-source decision
-  - preserved hashes (byte-identical)
-  - revised Gemini/Sonnet ownership
-  - GERP++/PhyloP conservation_context role
-  - acceptance evidence
+  - follow-up commit SHA
+  - fact-object example
+  - ownership/scope table (overall 4 / Gemini 1 / Sonnet 3 / planner 1 / preserved 3)
+  - documentation cleanup
+  - validation commands
+  - acceptance verification
