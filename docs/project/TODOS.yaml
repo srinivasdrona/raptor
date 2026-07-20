@@ -256,9 +256,11 @@ todos:
   created: '2026-07-19'
 - id: portfolio-track-governance
   title: Defining portfolio tracks and critical-path governance
-  description: 'Track: PORTFOLIO. Define the repo-persistent track taxonomy, milestone/gate
-    vocabulary, critical-path markers, cross-track dependency rules, WIP limits, ready queues,
-    and status views. Discussion/design only until owner approval.'
+  description: 'Track: PORTFOLIO / DEFERRED. Preserve the proposed orchestration contract
+    unmerged on track/orchestration-contract-2026-07 as a future control catalogue. Revisit
+    only after a concrete scaling trigger: sustained multi-contributor work, more than three
+    concurrent technical tracks, repeated session-death/state-recovery failures, or sustained
+    PR volume. This todo must not block the Tier-1/2 VUS critical path.'
   status: pending
   depends_on: []
   created: '2026-07-19'
@@ -268,7 +270,7 @@ todos:
     calibrated tools plus comparator/watchlist, TSC-policy-combination, splice, functional,
     and full-classifier exclusion tiers. The matrix selects one policy; it never becomes a
     voting ensemble.'
-  status: pending
+  status: in_progress
   depends_on: []
   created: '2026-07-19'
 - id: sources-pin-core-annotation-bundle
@@ -353,7 +355,7 @@ todos:
   description: 'Track: EXPERT-ENGAGEMENT / LONG-LEAD. Recruit or contract an appropriately
     qualified molecular geneticist, define COI/confidentiality and review SLA, and agree the
     non-clinical evidence-packet adjudication protocol. Can proceed independently of scoring fixes.'
-  status: pending
+  status: in_progress
   depends_on: []
   created: '2026-07-19'
 - id: engagement-tsc-alliance-vcep-path
