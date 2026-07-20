@@ -253,7 +253,7 @@ todos:
     decide whether evidence supports activation; obtain GPT-5.4 review; and record explicit
     owner approval bound to hashes. Do not activate by default or run held-out/VUS workflows
     before completion.
-  status: pending
+  status: in_progress
   depends_on:
   - select-validate-pp3-bp4-policy
   - sources-expand-predictor-matrix
@@ -283,7 +283,7 @@ todos:
   description: 'Track: SOURCE-COVERAGE / CORE-BLOCKER. Select and checksum exact dbNSFP/Nirvana,
     gnomAD exome/genome and constraints, dbSNP, MANE, reference, RepeatMasker, predictor versions,
     and licenses required for reproducible TSC SNV/small-indel evidence.'
-  status: in_progress
+  status: done
   depends_on:
   - sources-expand-predictor-matrix
   created: '2026-07-19'
