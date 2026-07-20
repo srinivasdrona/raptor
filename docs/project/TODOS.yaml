@@ -91,7 +91,7 @@ todos:
     inputs and mechanism-profile outputs, bidirectional import/leakage guards from scoring
     logic, independent validation criteria, and a documented extraction seam. Extract to a
     separate repository only after reuse is demonstrated by another gene and/or another consumer.
-    Durable starting artifact: pre-build/raptor-mechanism-atlas-handoff.md. Treat that handoff
+    Durable starting artifact: docs/project/atlas/MECHANISM_ATLAS_HANDOFF.md. Treat that handoff
     as preliminary discussion, not authority: re-verify every R611Q pathogenicity, zygosity,
     molecular-mechanism, assay and rescue statement against primary evidence; unresolved claims
     remain hypotheses/unknowns and cannot become treatment recommendations.'
@@ -513,7 +513,7 @@ todos:
     rerun and the Atlas design contract, create the internal RAPTOR Mechanism Atlas module
     skeleton with its README, schema/contracts, tests/fixtures, canonical variant inputs,
     mechanism-profile outputs, scoring/import leakage guards, extraction seam and a bounded
-    5-10-record TSC2 pilot. Use pre-build/raptor-mechanism-atlas-handoff.md as a preliminary
+    5-10-record TSC2 pilot. Use docs/project/atlas/MECHANISM_ATLAS_HANDOFF.md as a preliminary
     design input, not a factual source; independently ground the R611Q card and test the ontology
     against pathogenic, benign, conflicting and VUS examples to avoid single-case overfitting.
     Keep clinical classification separate; no cross-disease expansion, treatment recommendation
