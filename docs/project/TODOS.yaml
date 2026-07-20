@@ -157,9 +157,11 @@ todos:
   created: '2026-07-13'
 - id: refresh-program-docs
   title: Refreshing final program documentation
-  description: After corrected census and masked gate are complete, update README, PROGRAM,
-    DECISIONS, census aggregates, limitations, and next priorities in one coherent checkpoint;
-    mark the earlier diagnostic gate superseded.
+  description: After corrected census and masked gate are complete, reconcile PROGRAM,
+    STRATEGY, DECISIONS, ARCHITECTURE, RISK_REGISTER, EVAL_PLAN/EVAL_RUBRIC, census
+    aggregates, limitations and next priorities in one coherent checkpoint; mark earlier
+    diagnostic status as historical/superseded without rewriting accepted ADRs. This is
+    the factual source checkpoint for the public README, website and blog.
   status: pending
   depends_on:
   - build-mave-validation
@@ -502,4 +504,40 @@ todos:
   depends_on:
   - grant-anthropic-application-evidence-log
   - grant-anthropic-eligibility-data-terms
+  created: '2026-07-21'
+- id: build-mechanism-atlas-starter
+  title: Building the RAPTOR Mechanism Atlas starter module
+  description: 'Track: MECHANISM-ATLAS / TSC2-PILOT. After the production-faithful masked
+    rerun and the Atlas design contract, create the internal RAPTOR Mechanism Atlas module
+    skeleton with its README, schema/contracts, tests/fixtures, canonical variant inputs,
+    mechanism-profile outputs, scoring/import leakage guards, extraction seam and a bounded
+    5-10-record TSC2 pilot. Keep clinical classification separate; no cross-disease expansion,
+    treatment recommendation or DisMech dependency in the internal source of truth.'
+  status: pending
+  depends_on:
+  - define-variant-mechanism-atlas
+  - rerun-masked-gate
+  created: '2026-07-21'
+- id: refresh-repository-readme
+  title: Publishing the RAPTOR repository README
+  description: 'Track: DOCUMENTATION / PUBLIC-SURFACE. Replace the stale local README status
+    snapshot with a concise public landing page grounded in the post-rerun documentation:
+    problem, research-only scope, what is built, current verified results, architecture,
+    quick start, repository guide, Mechanism Atlas status, limitations, citation and contact.
+    Never imply clinical classification, expert approval, production authorization or grant endorsement.'
+  status: pending
+  depends_on:
+  - refresh-program-docs
+  created: '2026-07-21'
+- id: publish-post-rerun-blog
+  title: Publishing the post-rerun RAPTOR progress article
+  description: 'Track: DOCUMENTATION / PUBLIC-SURFACE. After program docs and README are
+    reconciled, publish a source-linked article explaining what the production-faithful masked
+    rerun showed, what changed from the pre-results post, where RAPTOR failed or abstained,
+    what the corrected census/packets do and do not mean, and why the bounded TSC2 Mechanism
+    Atlas comes next. Use no projected results, clinical claims or grant-driven overstatement.'
+  status: pending
+  depends_on:
+  - refresh-program-docs
+  - refresh-repository-readme
   created: '2026-07-21'
