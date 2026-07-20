@@ -6,6 +6,11 @@ from pathlib import Path
 import pytest
 import yaml
 
+# Bootstrapping src relative to this file's location
+src_path = Path(__file__).resolve().parent.parent.parent / "src"
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+
 # Import RAPTOR components
 from raptor.scorer.bias_source import BiasTsvSource
 from raptor.scorer.contract import BiasContractError
