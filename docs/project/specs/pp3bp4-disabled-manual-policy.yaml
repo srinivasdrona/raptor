@@ -1,17 +1,28 @@
-# RAPTOR PP3/BP4 disabled/manual policy — Opus planner contract (rev 1).
+# RAPTOR PP3/BP4 disabled/manual policy — Opus planner contract (rev 2).
 #
 # Purpose: an implementation-ready, hash-bound plan for a FIRST-CLASS
 # disabled/manual PP3/BP4 policy mode. It permits the production-faithful
 # masked rerun to proceed WITHOUT emitting automated PP3 or BP4, keeps future
 # activation separately gated, and cannot be confused with predictor approval.
 #
+# Rev 2 supersedes commit 878bff8 after a GPT-5.4 DO-NOT-MERGE review (see
+# revision_log). It adds a runtime_enforcement_hash over the loader/wrapper/
+# runner code, binds the ACTUAL loaded --scorer-config/--eval-config bytes
+# (verified before load), and makes the runner AUTHORIZATION-NEUTRAL: policy
+# approval authorizes only the disabled/manual evidence mode, never a VUS/scope
+# authorization boolean -- the pre-registered gate/scope_gate still decide
+# PASS/FAIL from the production-faithful classifier's metrics. It also corrects
+# the false "session 90703341 matches" trailer claim (the correct track session
+# is 7c146921-f3dd-4a1e-8cf0-8f574de49204).
+#
 # This file is the planner PLAN. It performs NO implementation, NO tests, NO
 # runner/config/code edits, NO owner approval and NO held-out run. It names the
 # exact downstream implementation scope, the policy schema v2, the status x mode
-# state machine, the config/hash contract, the runner data flow and the
-# suppression proof, the Gemini RED matrix, the Sonnet file boundaries, the
-# GPT-5.4 probes, the owner ADR/approval sequence, the reuse-vs-x64 conclusion,
-# the migration/backout, and the Beat-4 self-audit.
+# state machine, the config/hash/enforcement contract, the runner data flow and
+# the suppression proof, the neutral authorization rule, the Gemini RED matrix,
+# the Sonnet file boundaries, the GPT-5.4 probes, the owner ADR/approval
+# sequence, the reuse-vs-x64 conclusion, the migration/backout, and the Beat-4
+# self-audit.
 #
 # Schema: raptor-pp3bp4-disabled-manual-policy-v1 (planner). The runtime policy
 # artifact uses schema bp4pp3-predictor-policy/2 (defined in policy_schema_v2).
@@ -29,6 +40,42 @@ authoritative_spec:
   path: PP3BP4_RESOLUTION_TASK_SPEC.yaml
   sha256: fd7780c1928db0d3a7447b1f8de8a581915855835d123eb8e13b81f7e5142b46
 
+revision_log:
+  - rev: 1
+    commit: 878bff84b2bcb3cb71eabf13026f57e1049ee941
+    verdict: DO_NOT_MERGE (GPT-5.4)
+    trailer_defect: >-
+      used Copilot-Session 90703341-...; the correct track session is
+      7c146921-... (base commit 680e803 and the core-annotation-bundle planner
+      both use 7c146921). 90703341 is the manifest-implementation session, not
+      this planner track.
+  - rev: 2
+    supersedes_commit: 878bff84b2bcb3cb71eabf13026f57e1049ee941
+    trigger: GPT-5.4 DO-NOT-MERGE + one orchestrator correction to the review
+    attribution:
+      planner_spec_gap:
+        - 'no hash over the disabled-mode ENFORCEMENT code (loader/wrapper/runner): a code change could bypass suppression while configs still match. Fixed by runtime_enforcement_hash (D9).'
+        - 'config hashes were bound to hardcoded paths, not the ACTUAL loaded --scorer-config/--eval-config: a caller could load a different, non-byte-identical config. Fixed by verifying the actual loaded bytes before load (D10).'
+      planner_over_conservative_decision:
+        - 'the plan said disabled mode "adds no VUS authorization" and implied forcing authorization closed. That is an over-conservative planner decision, not a spec requirement. Corrected to an authorization-NEUTRAL rule (D11).'
+      orchestrator_correction_to_review:
+        - 'GPT-5.4 suggested forcing all gate/scope authorization booleans false in disabled mode. REJECTED: it contradicts the production-faithful rerun goal and could suppress ADR-0011 scope reporting. The runner must neither force-allow nor force-deny; the pre-registered gate/scope_gate decide from metrics.'
+    corrections_in:
+      - runtime_enforcement_hash (policy_schema_v2, hash_contract, state_machine)
+      - actual_loaded_config_binding (verify_disabled_config_hashes, runner_behavior)
+      - authorization_semantics (new neutral rule; removed force-false language)
+      - implementation_scope (gate.py/scope_gate.py out of scope; branch_scope + per-agent commits)
+      - test_matrix (G-DM11 stale-code, G-DM12 alternate-config, G-DM13 neutral-authorization)
+      - gpt_probes (P9/P10/P11)
+      - beat4_self_audit (enforcement-drift, alternate-config, authorization-neutrality)
+      - owner_decision_gate (ADR: evaluation not authorization; status-only flip)
+      - required_trailers + verification (Copilot-Session 7c146921)
+    preserved:
+      - 'policy schema v2 status x mode; corrected_enabled BLOCKED; v1/legacy BLOCKED'
+      - 'PP3/BP4 removed from included_criteria + automatable_criteria; retained in vocabulary'
+      - 'PolicyDisabledEvidenceSource counted suppression + pp3bp4_scored_calls==0'
+      - 'POLICY_ONLY_REUSE, no x64; no owner approval in the doer; separate owner flip'
+
 planner:
   model: claude-opus-4.8
   role: opus_planner
@@ -38,7 +85,7 @@ planner:
   commit: one_planner_commit_no_amend_no_push
   required_trailers:
     - 'Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>'
-    - 'Copilot-Session: 90703341-0147-4b5c-9939-42be522500b1'
+    - 'Copilot-Session: 7c146921-f3dd-4a1e-8cf0-8f574de49204'
   prohibited_in_this_task:
     - implementation/runner/loader/wrapper code
     - config edits (configs/acmg/tsc.yaml, configs/eval/tsc2.yaml, the policy JSON)
@@ -71,9 +118,11 @@ intent:
     required: >-
       A policy schema (v2) that carries an evidence `mode` ORTHOGONAL to
       approval `status`; a terminal-runner branch that PROCEEDS only for an
-      approved disabled/manual artifact whose production/eval config hashes
-      match, that applies NO predictor correction, and that proves zero
-      consumed PP3/BP4 calls; production/eval configs with PP3/BP4 removed from
+      approved disabled/manual artifact whose ACTUAL-loaded production/eval
+      config hashes AND runtime_enforcement_hash match, that applies NO
+      predictor correction, proves zero consumed PP3/BP4 calls, and stays
+      AUTHORIZATION-NEUTRAL (the pre-registered gate/scope_gate decide from
+      metrics); production/eval configs with PP3/BP4 removed from
       emission/automation but retained in vocabulary; and an owner approval
       recorded separately from the doer.
     done_means: >-
@@ -84,9 +133,10 @@ intent:
       and any corrected-enabled mode stay BLOCKED_POLICY.
   expected_observable:
     - >-
-      This planner commit adds exactly one file
+      This rev-2 planner commit modifies exactly one file
       (docs/project/specs/pp3bp4-disabled-manual-policy.yaml); `git show --stat`
-      shows 1 file changed, parent 680e803, both trailers, no push.
+      shows 1 file changed, parent 878bff8, both trailers
+      (Copilot-Session 7c146921), no amend, no push.
     - >-
       Post-implementation (Sonnet, separate track): with an APPROVED
       disabled/manual artifact + matching config hashes + the masked runtime
@@ -109,14 +159,25 @@ intent:
       Report claims suppression without counting: controlled by a counting
       PolicyDisabledEvidenceSource and an asserted pp3bp4_scored_calls == 0.
     - >-
+      Enforcement-code drift: the loader/wrapper/runner is changed to bypass
+      suppression while configs still hash-match. Controlled by a
+      runtime_enforcement_hash over those three files; any drift => BLOCKED_POLICY.
+    - >-
+      Authorization over-reach in EITHER direction: the runner force-DENIES (the
+      rejected GPT suggestion, which would break the production-faithful rerun /
+      ADR-0011 scope reporting) or force-ALLOWS VUS/scope authorization from
+      policy mode. Controlled by an authorization-neutral runner: only the
+      pre-registered gate/scope_gate decide from metrics.
+    - >-
       Planner-scope inversion: silently editing code/config/tests. This plan
       touches ONLY the one YAML; every other change is delegated, not performed.
   pm_sanity_check: >-
-    PM: I assume the two required commit trailers are the Copilot co-author
-    trailer AND `Copilot-Session: 90703341-0147-4b5c-9939-42be522500b1` (this
-    session, matching the prior core-annotation-bundle planner contract and the
-    2026-07 base commit's own trailers). If a different session id is required,
-    the commit trailer is wrong and only the trailer needs to change.
+    PM: the rev-2 commit uses `Copilot-Session: 7c146921-f3dd-4a1e-8cf0-8f574de49204`
+    -- the correct track session (base commit 680e803 and the
+    core-annotation-bundle planner both use it). Rev 1 (878bff8) wrongly used
+    90703341 (the manifest-implementation session); per the no-amend rule that
+    commit is left as-is and only this spec + the new commit's trailer are
+    corrected. If the required session differs, only the trailer needs to change.
 
 # ---------------------------------------------------------------------------
 # Problem statement — the exact current behavior this plan changes (Beat 2).
@@ -249,9 +310,47 @@ decision_ledger:
       re-enabling requires a new hash-bound owner decision and the recommendation
       section-8 activation checklist.
     rationale: >-
-      Kills beat4 #6 (disabled mistaken for validated evidence) and matches the
-      task's future_activation scope. The only proceed path is
-      approved + disabled_manual + matching hashes.
+      Matches the task's future_activation scope. The only proceed path is
+      approved + disabled_manual + matching config AND enforcement hashes.
+  - id: D9
+    decision: >-
+      Add a REQUIRED runtime_enforcement_hash to policy v2, computed
+      deterministically over the exact bytes+names of the three enforcement
+      files: src/raptor/eval/predictor_policy.py,
+      src/raptor/eval/terminal_source.py, scripts/run_masked_holdout_eval.py. The
+      disabled proceed path verifies it; any drift => BLOCKED_POLICY.
+    rationale: >-
+      The config hashes prove WHICH criteria are automatable but not that the
+      code enforcing suppression is unchanged. Without this, an edit to the
+      loader/wrapper/runner could bypass suppression while configs still match.
+      Binding the enforcement code closes that gap (new beat4 failure mode).
+  - id: D10
+    decision: >-
+      verify_disabled_config_hashes receives the ACTUAL --scorer-config and
+      --eval-config paths the runner will load, hashes THOSE bytes against
+      production_config_hash/eval_config_hash BEFORE loading/using them, and
+      blocks on mismatch. Alternate paths are allowed only if byte-identical.
+    rationale: >-
+      Binding hardcoded paths would let a caller load a DIFFERENT config than the
+      one hashed. Hashing the actual loaded bytes means a config that drops
+      PP3/BP4 but changes thresholds/scope/authorization is a different byte
+      string => hash mismatch => BLOCKED_POLICY.
+  - id: D11
+    decision: >-
+      The runner is AUTHORIZATION-NEUTRAL. Policy status/mode approves ONLY use
+      of the disabled/manual evidence mode; it never sets or forces any
+      VUS/full-spectrum/research authorization boolean. The pre-registered gate
+      (raptor.eval.gate.decide_gate) and scope_gate (ADR-0011) decide
+      PASS/FAIL/authorization from the production-faithful classifier's metrics.
+      The runner neither force-allows nor force-denies; it only records mode +
+      zero-consumed so the gate result is interpretable. gate.py and
+      scope_gate.py are NOT modified.
+    rationale: >-
+      Orchestrator correction to the GPT-5.4 review: forcing authorization
+      booleans false would contradict the production-faithful rerun goal and
+      could suppress ADR-0011 scope reporting. Disabled mode changes only the
+      evidence a variant carries (no automated PP3/BP4), not how the gate reads
+      the resulting metrics.
 
 rejected_alternatives:
   - option: 'Reuse status=="approved" on the v1 schema to mean "disabled".'
@@ -280,6 +379,20 @@ rejected_alternatives:
     rejected_because: >-
       slot 2 forbids an online toggle; future activation must be a new hash-bound
       decision, not a runtime switch.
+  - option: 'Force all gate/scope authorization booleans false in disabled mode (GPT-5.4 review suggestion).'
+    rejected_because: >-
+      Orchestrator correction: it contradicts the production-faithful rerun goal
+      and could suppress ADR-0011 scope-specific reporting. The runner must be
+      authorization-neutral; the pre-registered gate/scope_gate decide from
+      metrics (D11).
+  - option: 'Verify config hashes against hardcoded configs/acmg/tsc.yaml + configs/eval/tsc2.yaml paths.'
+    rejected_because: >-
+      The runner could then LOAD a different --scorer-config/--eval-config than
+      the one hashed. Hash the ACTUAL loaded bytes before load (D10).
+  - option: 'Bind only the two config hashes and not the enforcement code.'
+    rejected_because: >-
+      Suppression is enforced by the loader/wrapper/runner code; a code edit
+      could bypass it while configs match. Bind a runtime_enforcement_hash (D9).
 
 # ---------------------------------------------------------------------------
 # Policy schema v2 — closed artifact contract.
@@ -295,6 +408,7 @@ policy_schema_v2:
     eval_config_hash: '64-hex sha256 of the raw bytes of configs/eval/tsc2.yaml (post-removal)'
     predictor_source_hash: '64-hex sha256 of configs/eval/predictor_aggregation.yaml (retained audit provenance)'
     correction_hash: '64-hex sha256 over the [predictor_aggregation.py, terminal_source.py] bundle, RE-PINNED (retained audit provenance)'
+    runtime_enforcement_hash: '64-hex sha256 over the enforcement bundle [predictor_policy.py, terminal_source.py, run_masked_holdout_eval.py] (see runtime_enforcement_hash_bundle); REQUIRED; verified on the disabled proceed path'
     decision_reference: 'non-blank string; ADR/DECISIONS anchor for the disabled/manual decision'
   forbidden_fields:
     - authorized
@@ -304,13 +418,28 @@ policy_schema_v2:
     - policy_sha256
   field_rules:
     - 'unknown/extra field => malformed (fail closed), as in v1 loader semantics'
-    - 'each hash must match ^[0-9a-fA-F]{64}$'
+    - 'each hash (production_config_hash, eval_config_hash, predictor_source_hash, correction_hash, runtime_enforcement_hash) must match ^[0-9a-fA-F]{64}$'
     - 'mode is REQUIRED for schema v2; a v2 artifact missing mode is malformed'
+    - 'runtime_enforcement_hash is REQUIRED for schema v2; a v2 artifact missing it is malformed'
     - 'status and mode are independent: no field derives from the other'
+    - 'production_config_hash/eval_config_hash bind the ACTUAL loaded --scorer-config/--eval-config bytes (verified before load), not a hardcoded path'
   hash_canonicalization: >-
-    Raw file-bytes sha256 via predictor_policy._sha256_file (streamed 1 MiB
-    chunks) -- identical to the existing predictor_source_hash/correction_hash
-    convention. No YAML re-serialization; the exact committed bytes are bound.
+    Single-file hashes (production_config_hash, eval_config_hash,
+    predictor_source_hash) are raw file-bytes sha256 via
+    predictor_policy._sha256_file (streamed 1 MiB chunks). Multi-file bundle
+    hashes (correction_hash, runtime_enforcement_hash) reuse the EXISTING
+    verify_predictor_policy_hashes bundle convention: files sorted by name, and
+    for each: sha256.update(name utf-8); update(NUL); update(bytes); update(NUL).
+    No YAML/JSON re-serialization; the exact committed bytes are bound, so a
+    byte-identical alternate path passes and any real change fails.
+  runtime_enforcement_hash_bundle:
+    files:
+      - src/raptor/eval/predictor_policy.py
+      - src/raptor/eval/terminal_source.py
+      - scripts/run_masked_holdout_eval.py
+    method: 'deterministic name+NUL+bytes+NUL, files sorted by name (same as correction_hash bundle)'
+    verified_by: predictor_policy.verify_runtime_enforcement_hash (new)
+    note: 'terminal_source.py appears in BOTH correction_hash and runtime_enforcement_hash bundles; both are re-pinned in the migration commit'
   example_proposed_artifact_illustrative_only:
     schema: bp4pp3-predictor-policy/2
     status: proposed
@@ -319,6 +448,7 @@ policy_schema_v2:
     eval_config_hash: '<sha256(configs/eval/tsc2.yaml) after PP3/BP4 removal>'
     predictor_source_hash: '<sha256(configs/eval/predictor_aggregation.yaml)>'
     correction_hash: '<sha256 bundle over predictor_aggregation.py + terminal_source.py, re-pinned>'
+    runtime_enforcement_hash: '<sha256 bundle over predictor_policy.py + terminal_source.py + run_masked_holdout_eval.py>'
     decision_reference: 'docs/DECISIONS.md#adr-0012-pp3bp4-disabled-manual-policy'
 
 # ---------------------------------------------------------------------------
@@ -347,20 +477,30 @@ state_machine:
       runner_action: BLOCKED_POLICY
       reason_prefix: 'disabled/manual policy is proposed, not owner-approved'
     - state: CONFIG_DRIFT
-      when: 'mode == disabled_manual AND status == approved AND (production_config_hash or eval_config_hash mismatch)'
+      when: 'mode == disabled_manual AND status == approved AND sha256(actual --scorer-config bytes) != production_config_hash OR sha256(actual --eval-config bytes) != eval_config_hash (checked BEFORE load)'
       runner_action: BLOCKED_POLICY
-      reason_prefix: 'disabled/manual approval is not bound to the current production/eval configs (drift)'
+      reason_prefix: 'disabled/manual approval is not bound to the actually-loaded production/eval configs (drift)'
+    - state: ENFORCEMENT_DRIFT
+      when: 'mode == disabled_manual AND status == approved AND runtime_enforcement_hash != sha256 bundle over [predictor_policy.py, terminal_source.py, run_masked_holdout_eval.py]'
+      runner_action: BLOCKED_POLICY
+      reason_prefix: 'disabled/manual enforcement code changed since approval (stale-code drift)'
     - state: APPROVED_DISABLED
-      when: 'mode == disabled_manual AND status == approved AND both config hashes match'
+      when: 'mode == disabled_manual AND status == approved AND both config hashes match the actual loaded bytes AND runtime_enforcement_hash matches'
       runner_action: PROCEED_DISABLED_MANUAL
       reason_prefix: 'approved disabled/manual policy; PP3/BP4 automation suppressed'
   proceed_preconditions_all_required:
     - 'status == approved'
     - 'mode == disabled_manual'
-    - 'sha256(configs/acmg/tsc.yaml) == production_config_hash'
-    - 'sha256(configs/eval/tsc2.yaml) == eval_config_hash'
-    - 'PP3 and BP4 absent from scorer_config.included_criteria AND eval_config.automatable_criteria'
+    - 'sha256(actual --scorer-config bytes) == production_config_hash  (verified before load)'
+    - 'sha256(actual --eval-config bytes) == eval_config_hash  (verified before load)'
+    - 'runtime_enforcement_hash == sha256 bundle over [predictor_policy.py, terminal_source.py, run_masked_holdout_eval.py]'
+    - 'PP3 and BP4 absent from scorer_config.included_criteria AND eval_config.automatable_criteria (defense-in-depth, after load)'
     - 'the masked runtime inputs + verified return manifest present (unchanged from today)'
+  authorization_note: >-
+    NONE of these preconditions set a VUS/scope authorization value. On PROCEED,
+    the pre-registered gate/scope_gate compute PASS/FAIL/authorization from
+    metrics exactly as today; the runner is authorization-neutral (see
+    authorization_semantics).
 
 # ---------------------------------------------------------------------------
 # Hash contract.
@@ -368,11 +508,14 @@ state_machine:
 hash_contract:
   bound_now:
     - name: production_config_hash
-      target: configs/acmg/tsc.yaml
-      meaning: 'binds the disabled decision to the exact production config with PP3/BP4 removed from included_criteria'
+      target: 'the ACTUAL --scorer-config bytes (default configs/acmg/tsc.yaml), verified BEFORE load'
+      meaning: 'binds the disabled decision to the exact production config with PP3/BP4 removed from included_criteria; an alternate path passes only if byte-identical'
     - name: eval_config_hash
-      target: configs/eval/tsc2.yaml
-      meaning: 'binds the disabled decision to the exact eval config with PP3/BP4 removed from automatable_criteria'
+      target: 'the ACTUAL --eval-config bytes (default configs/eval/tsc2.yaml), verified BEFORE load'
+      meaning: 'binds the disabled decision to the exact eval config with PP3/BP4 removed from automatable_criteria; a config that drops PP3/BP4 but changes thresholds/scope/auth is a different byte string => BLOCKED'
+    - name: runtime_enforcement_hash
+      target: '[src/raptor/eval/predictor_policy.py, src/raptor/eval/terminal_source.py, scripts/run_masked_holdout_eval.py] bundle'
+      meaning: 'binds the disabled decision to the exact enforcement code (loader/wrapper/runner); any code drift => BLOCKED_POLICY'
   audit_provenance_retained:
     - name: predictor_source_hash
       target: configs/eval/predictor_aggregation.yaml
@@ -418,19 +561,23 @@ runner_behavior:
   dispatch:
     - 'load_predictor_policy(args.predictor_policy) -> MALFORMED => BLOCKED_POLICY'
     - 'resolve effective_state via state_machine; every non-PROCEED state prints a BLOCKED_POLICY GateDecision (vus_authorized=False) and returns 0 with NO metrics'
-    - 'PROCEED only for APPROVED_DISABLED (verify both config hashes via a new predictor_policy.verify_disabled_config_hashes)'
+    - 'PROCEED only for APPROVED_DISABLED, after: verify_runtime_enforcement_hash(policy, [predictor_policy.py, terminal_source.py, run_masked_holdout_eval.py]) AND verify_disabled_config_hashes(policy, args.scorer_config, args.eval_config) on the ACTUAL loaded paths, BEFORE load_scorer_config/load_eval_config'
+    - 'on PROCEED the runner is authorization-NEUTRAL: it never sets vus_authorized/scope booleans; the gate/scope_gate decide from metrics (see authorization_semantics)'
   disabled_manual_proceed_path:
     evidence_wrapping:
       - 'source = BiasEvidenceSource(...)  # unchanged; reads the immutable masked BIAS TSV'
       - 'disabled = PolicyDisabledEvidenceSource(source, disabled_criteria={PP3, BP4})  # strips + COUNTS; REPLACES PredictorCorrectedEvidenceSource'
       - 'production = ProductionVocabEvidenceSource(disabled, scorer_config.acmg_criteria, eval_config.automatable_criteria)  # unchanged; now a no-op on PP3/BP4 (not automatable)'
       - 'DO NOT construct PredictorCorrectedEvidenceSource in this branch (no correction applied)'
-    guards_before_run_eval:
-      - 'verify_disabled_config_hashes(policy, configs/acmg/tsc.yaml, configs/eval/tsc2.yaml) or BLOCKED_POLICY'
-      - 'assert {PP3,BP4} disjoint from scorer_config.included_criteria and eval_config.automatable_criteria or BLOCKED_POLICY'
+    guards_before_load:
+      - 'verify_runtime_enforcement_hash(policy, [predictor_policy.py, terminal_source.py, run_masked_holdout_eval.py]) or BLOCKED_POLICY'
+      - 'verify_disabled_config_hashes(policy, args.scorer_config, args.eval_config) -- hashes the ACTUAL bytes at those paths against production_config_hash/eval_config_hash, or BLOCKED_POLICY'
+    guards_after_load_defense_in_depth:
+      - 'assert {PP3,BP4} disjoint from scorer_config.included_criteria and eval_config.automatable_criteria or BLOCKED_POLICY (kept as belt-and-suspenders on top of the hash)'
+      - 'assert scorer_config.included_criteria == eval_config.automatable_criteria (parity; live_source.py:243 also enforces this)'
     after_run_eval:
       - 'assert emitted PP3/BP4 scored calls == 0 (invariant; derived from evidence, not hardcoded)'
-      - 'the existing PASS+skipped -> UNVERIFIED demotion stays; disabled mode adds no VUS authorization'
+      - 'do NOT alter gate/scope_gate output: the pre-registered gate decides PASS/FAIL/authorization from metrics. PP3/BP4 removal is NOT a "skipped criterion", so the existing PASS+skipped->UNVERIFIED demotion (about PM1-type parity skips) does not apply to PP3/BP4 and is left unchanged.'
   evidence_source_construction:
     new_class: src/raptor/eval/terminal_source.py::PolicyDisabledEvidenceSource
     contract:
@@ -454,16 +601,45 @@ report_provenance_fields:
     pp3bp4_in_automatable_criteria: false
     pp3bp4_retained_in_vocabulary: true
     predictor_correction_applied: false
-    production_config_hash: '<policy.production_config_hash>'
-    eval_config_hash: '<policy.eval_config_hash>'
+    production_config_hash: '<policy.production_config_hash>  # verified against actual --scorer-config bytes'
+    eval_config_hash: '<policy.eval_config_hash>  # verified against actual --eval-config bytes'
+    runtime_enforcement_hash: '<policy.runtime_enforcement_hash>  # enforcement-code binding'
     predictor_policy_source_hash: '<policy.predictor_source_hash>  # provenance'
     predictor_policy_correction_hash: '<policy.correction_hash>  # provenance'
     predictor_policy_decision_reference: '<policy.decision_reference>'
+  authorization_neutral:
+    - 'the runner sets NO authorization value; gate.status / gate.vus_authorized / scope_gate are computed by the pre-registered gate/scope_gate from metrics exactly as today.'
+    - 'these mode/zero-consumed pins make the gate result INTERPRETABLE (the reader knows PP3/BP4 carried no automated evidence), without changing it.'
   removed_in_disabled_mode:
     - 'predictor_correction_counts (enabled-path only; no correction is applied)'
   unchanged:
     - 'production_vocab_manual_routed_counts (now reflects only still-automatable criteria)'
+    - 'gate + scope_gate fields (decide_gate/decide_scope_gate output, unaltered)'
     - 'lineage_audit_hash, mask_attestation, verified_return_artifacts'
+
+# ---------------------------------------------------------------------------
+# Authorization semantics — NEUTRAL (orchestrator correction to GPT-5.4).
+# ---------------------------------------------------------------------------
+authorization_semantics:
+  rule: >-
+    Policy status/mode approval authorizes ONLY use of the disabled/manual
+    evidence mode. It NEVER directly sets or forces a VUS/full-spectrum/research
+    authorization value. The runner neither force-allows nor force-denies.
+  gate_of_record:
+    - 'raptor.eval.gate.decide_gate (v1) decides PASS/FAIL/UNVERIFIED/UNDERPOWERED from the production-faithful classifier metrics.'
+    - 'raptor.eval.scope_gate.decide_scope_gate (v2, ADR-0011) decides scope-specific research authorization from metrics; its behavior is preserved.'
+    - 'the gate outcome remains AUTHORITATIVE; disabled mode only guarantees PP3/BP4 carry no automated evidence (zero consumed calls).'
+  do_not:
+    - 'do NOT force gate/scope authorization booleans false in disabled mode (rejected GPT-5.4 suggestion; would break the production-faithful rerun and ADR-0011 reporting).'
+    - 'do NOT force them true; policy approval is not an authorization.'
+    - 'do NOT treat PP3/BP4 removal as a parity "skipped criterion"; that would wrongly demote the gate.'
+  do_not_modify:
+    - src/raptor/eval/gate.py
+    - src/raptor/eval/scope_gate.py
+  interpretability: >-
+    The report records policy_mode + pp3bp4_scored_calls=0 + pp3bp4_suppressed_counts
+    so a reader can interpret the (unchanged) gate result knowing PP3/BP4 were not
+    automated.
 
 # ---------------------------------------------------------------------------
 # Implementation scope (Sonnet 5) — exact files, nothing else.
@@ -479,11 +655,15 @@ implementation_scope:
     - path: src/raptor/eval/predictor_policy.py
       change: >-
         Add schema-v2 support: dispatch on schema; v2 closed field set incl.
-        mode/production_config_hash/eval_config_hash; extend PredictorPolicy with
-        mode (default None for v1); add verify_disabled_config_hashes(policy,
-        production_config_path, eval_config_path) using _sha256_file (fail closed
-        on mismatch/missing). Keep v1 loading + verify_predictor_policy_hashes
-        intact for existing fixtures/sentinel.
+        mode/production_config_hash/eval_config_hash/runtime_enforcement_hash;
+        extend PredictorPolicy with mode + runtime_enforcement_hash (default None
+        for v1). Add verify_disabled_config_hashes(policy, scorer_config_path,
+        eval_config_path) that hashes the ACTUAL given paths (single-file
+        _sha256_file) against production_config_hash/eval_config_hash. Add
+        verify_runtime_enforcement_hash(policy, code_paths) using the existing
+        multi-file bundle convention over [predictor_policy.py, terminal_source.py,
+        run_masked_holdout_eval.py]. All fail closed on mismatch/missing. Keep v1
+        loading + verify_predictor_policy_hashes intact for fixtures/sentinel.
     - path: src/raptor/eval/terminal_source.py
       change: >-
         Add PolicyDisabledEvidenceSource (strip + idempotent counting). Do NOT
@@ -491,11 +671,14 @@ implementation_scope:
     - path: scripts/run_masked_holdout_eval.py
       change: >-
         Replace the status-only gate with the state_machine dispatch on
-        (status, mode, config-hash); implement the disabled_manual proceed path
-        (PolicyDisabledEvidenceSource instead of PredictorCorrectedEvidenceSource;
-        config-hash + absent-from-both-configs guards; suppression pins;
-        pp3bp4_scored_calls==0 assertion). corrected_enabled and legacy/unknown
-        mode => BLOCKED_POLICY.
+        (status, mode, config-hash, enforcement-hash). Disabled_manual proceed
+        path: verify_runtime_enforcement_hash + verify_disabled_config_hashes on
+        args.scorer_config/args.eval_config BEFORE load; then load; then
+        defense-in-depth parity/absence asserts; wrap PolicyDisabledEvidenceSource
+        instead of PredictorCorrectedEvidenceSource; add suppression + hash pins;
+        assert pp3bp4_scored_calls==0. Stay AUTHORIZATION-NEUTRAL: do not set or
+        force any gate/scope authorization value. corrected_enabled and
+        legacy/unknown mode => BLOCKED_POLICY.
     - path: configs/acmg/tsc.yaml
       change: 'Remove PP3, BP4 from included_criteria (keep them in acmg_criteria).'
     - path: configs/eval/tsc2.yaml
@@ -504,15 +687,40 @@ implementation_scope:
       change: >-
         Migrate to schema bp4pp3-predictor-policy/2; status=proposed;
         mode=disabled_manual; add production_config_hash + eval_config_hash
-        (post-removal bytes); RE-PIN correction_hash to the new terminal_source.py
-        bundle; keep predictor_source_hash; update decision_reference to ADR-0012.
-        Leave status=proposed (owner flips separately).
+        (post-removal bytes) + runtime_enforcement_hash (bundle over
+        predictor_policy.py + terminal_source.py + run_masked_holdout_eval.py);
+        RE-PIN correction_hash to the new terminal_source.py bundle; keep
+        predictor_source_hash; update decision_reference to ADR-0012. Leave
+        status=proposed (owner flips separately).
   explicitly_out_of_scope:
+    - 'src/raptor/eval/gate.py and src/raptor/eval/scope_gate.py (ADR-0011 gate/scope authorization logic; MUST NOT change -- authorization stays metric-driven)'
     - 'configs/eval/bias_lineage.yaml (PP3/BP4 lineage disposition unchanged)'
     - 'configs/eval/predictor_aggregation.yaml, pp3bp4_candidate_policy.json, pp3bp4_predictor_matrix.yaml (REVEL shadow scope untouched)'
     - 'src/raptor/scorer/* (production emission already keys off included_criteria)'
     - 'any protected test file (Gemini-owned)'
     - 'setting status=approved / writing an ADR acceptance (owner-only)'
+  branch_scope:
+    total_files_on_branch: 8
+    per_agent_commits:
+      - agent: opus_planner
+        model: claude-opus-4.8
+        commit_scope: [docs/project/specs/pp3bp4-disabled-manual-policy.yaml]
+        note: 'this planner spec only (rev 1 = 878bff8, rev 2 = this commit)'
+      - agent: gemini
+        commit_scope: [tests/eval/test_pp3bp4_disabled_policy.py]
+        note: 'ONE new RED test file; no edits to protected tests or any src/config'
+      - agent: sonnet_5
+        commit_scope:
+          - src/raptor/eval/predictor_policy.py
+          - src/raptor/eval/terminal_source.py
+          - scripts/run_masked_holdout_eval.py
+          - configs/acmg/tsc.yaml
+          - configs/eval/tsc2.yaml
+          - configs/eval/bp4pp3_predictor_policy.json
+        note: 'exactly six files in ONE commit; NO gate.py/scope_gate.py; artifact stays status=proposed'
+    excluded_from_branch:
+      - src/raptor/eval/gate.py
+      - src/raptor/eval/scope_gate.py
 
 # ---------------------------------------------------------------------------
 # Gemini RED test matrix (authored by Gemini; RED before Sonnet implements).
@@ -531,7 +739,7 @@ test_matrix:
         non-64-hex production_config_hash/eval_config_hash.
     - id: G-DM2
       target: predictor_policy.verify_disabled_config_hashes
-      asserts: 'passes when both hashes match actual bytes; PredictorPolicyError on either mismatch and on a missing file.'
+      asserts: 'hashes the ACTUAL passed --scorer-config/--eval-config bytes; passes when both match; PredictorPolicyError on either mismatch and on a missing file.'
     - id: G-DM3
       target: terminal_source.PolicyDisabledEvidenceSource
       asserts: >-
@@ -541,12 +749,13 @@ test_matrix:
     - id: G-DM4
       target: 'run_masked_holdout_eval.py (subprocess, PROCEED path)'
       asserts: >-
-        approved+disabled_manual with matching config hashes + masked inputs =>
-        gate status != BLOCKED_POLICY; config_pins show policy_mode=disabled_manual,
-        pp3bp4_scored_calls=0, non-empty pp3bp4_suppressed_counts,
-        predictor_correction_applied=false. Provide an offline synthetic-source
-        variant plus a reference-partition variant (gate on data availability
-        like the existing enabled tests).
+        approved+disabled_manual with matching config + enforcement hashes +
+        masked inputs => gate status != BLOCKED_POLICY and is the metric-derived
+        decide_gate result (NOT forced by mode); config_pins show
+        policy_mode=disabled_manual, pp3bp4_scored_calls=0, non-empty
+        pp3bp4_suppressed_counts, predictor_correction_applied=false. Provide an
+        offline synthetic-source variant plus a reference-partition variant (gate
+        on data availability like the existing enabled tests).
     - id: G-DM5
       target: 'run_masked_holdout_eval.py (subprocess)'
       asserts: 'proposed+disabled_manual => BLOCKED_POLICY, no metrics.'
@@ -570,10 +779,34 @@ test_matrix:
       asserts: >-
         a BIAS record firing PP3+BP4+PVS1 yields zero emitted PP3/BP4, a counted
         suppression of 2, and a still-emitted PVS1.
+    - id: G-DM11
+      target: 'predictor_policy.verify_runtime_enforcement_hash + runner (stale-code)'
+      asserts: >-
+        verify_runtime_enforcement_hash passes on the pinned bundle and raises on
+        any changed/missing enforcement file; end-to-end, mutating any of
+        predictor_policy.py / terminal_source.py / run_masked_holdout_eval.py (or
+        the artifact's runtime_enforcement_hash) => runner BLOCKED_POLICY.
+    - id: G-DM12
+      target: 'run_masked_holdout_eval.py (subprocess, alternate config)'
+      asserts: >-
+        an alternate --scorer-config/--eval-config path that is BYTE-IDENTICAL to
+        the pinned config => PROCEED; a config that removes PP3/BP4 but changes a
+        threshold/scope/authorization byte => BLOCKED_POLICY (hash mismatch),
+        proving absence alone is insufficient.
+    - id: G-DM13
+      target: 'authorization neutrality'
+      asserts: >-
+        (a) policy approval/mode ALONE cannot alter a synthetic gate decision --
+        feeding fixed metrics yields the same decide_gate/decide_scope_gate
+        result regardless of policy_mode/status; (b) a passing metric set and a
+        failing metric set each produce the SAME gate semantics as the existing
+        code, while pp3bp4 scored calls == 0 is guaranteed in both. The runner
+        neither force-allows nor force-denies.
   protected_tests_expectations:
     - 'tests/eval/test_predictor_policy_gate.py v1 loader/hash/BLOCKED cases stay GREEN.'
     - 'tests/eval/test_terminal_runner_controls.py stays GREEN.'
     - 'test_approved_predictor_policy_hashes_pin_current_terminal_source_bundle goes RED on the terminal_source.py edit and returns GREEN only after the artifact re-pins correction_hash (config change, not a test edit).'
+    - 'existing gate.py / scope_gate.py (ADR-0011) tests stay GREEN and unmodified; disabled mode does not change gate semantics.'
 
 # ---------------------------------------------------------------------------
 # GPT-5.4 review probes.
@@ -589,6 +822,9 @@ gpt_probes:
     - 'P6: PP3/BP4 remain in VALID_CRITERIA, scorer acmg_criteria, and bias_lineage can_fire/allowed (vocabulary + lineage retained; only automation disabled).'
     - 'P7: the correction_hash re-pin reflects exactly the new terminal_source.py bundle and predictor_source_hash did not drift unintentionally.'
     - 'P8: disabled mode adds no new scoring input (POLICY_ONLY_REUSE), so no x64 reannotation is triggered.'
+    - 'P9: runtime_enforcement_hash binds [predictor_policy.py, terminal_source.py, run_masked_holdout_eval.py]; mutating any of them (or the pin) => BLOCKED_POLICY (stale-code drift).'
+    - 'P10: config hashes are computed over the ACTUAL --scorer-config/--eval-config bytes and verified BEFORE load; a byte-identical alternate path passes, but changed thresholds/scope/auth (despite PP3/BP4 absence) => BLOCKED_POLICY.'
+    - 'P11: the runner is authorization-NEUTRAL -- it sets no gate/scope authorization value; decide_gate/decide_scope_gate (ADR-0011) still decide from metrics; gate.py/scope_gate.py are unchanged; a synthetic gate decision is unaffected by policy mode.'
 
 # ---------------------------------------------------------------------------
 # Owner decision gate — no self-approval.
@@ -598,8 +834,8 @@ owner_decision_gate:
     - '1. Gemini authors the RED test matrix (separate authorship/commit).'
     - '2. Sonnet implements implementation_scope in one commit; artifact stays status=proposed, mode=disabled_manual with post-removal config hashes and re-pinned correction_hash; all tests green (sentinel green after re-pin).'
     - '3. GPT-5.4 runs gpt_probes.'
-    - '4. Owner (operator/domain owner, @dronasrinivas) records ADR-0012 in docs/DECISIONS.md (MADR, Accepted) describing the disabled/manual decision and the unmet activation evidence (exact_revel_compatibility unresolved, permitted_use pending, training_overlap UNKNOWN, transportability BLOCKED_DATA_UNDERPOWERED).'
-    - '5. Owner, in a SEPARATE commit, flips configs/eval/bp4pp3_predictor_policy.json status proposed->approved after independently verifying production_config_hash/eval_config_hash match the committed configs.'
+    - '4. Owner (operator/domain owner, @dronasrinivas) records ADR-0012 in docs/DECISIONS.md (MADR, Accepted). The ADR states that disabled/manual permits EVALUATION (use of the disabled/manual evidence mode) and does NOT grant automatic VUS/scope authorization -- the pre-registered gate/scope_gate outcome remains authoritative -- and records the unmet activation evidence (exact_revel_compatibility unresolved, permitted_use pending, training_overlap UNKNOWN, transportability BLOCKED_DATA_UNDERPOWERED).'
+    - '5. Owner, in a SEPARATE status-only commit, flips configs/eval/bp4pp3_predictor_policy.json status proposed->approved after independently verifying production_config_hash/eval_config_hash (vs the actual configs) and runtime_enforcement_hash (vs the enforcement bundle). No other field changes.'
     - '6. Only then may the terminal runner PROCEED in disabled_manual mode.'
   no_self_approval:
     - 'the planner (Opus) never approves; the doer (Sonnet) never sets status=approved.'
@@ -609,6 +845,8 @@ owner_decision_gate:
     title: 'PP3/BP4 automated emission disabled; explicit disabled/manual policy mode'
     status_when_written: Accepted (owner)
     supersedes: 'none (additive alongside ADR-0009 ClinVar-derived criteria ruling)'
+    preserves: 'ADR-0011 scope-specific research-authorization gate (unchanged; still metric-driven)'
+    authorization_statement: 'disabled/manual permits evaluation, NOT automatic VUS authorization; the gate outcome remains authoritative; the status flip is status-only and separate.'
     decision_reference_target: docs/DECISIONS.md#adr-0012-pp3bp4-disabled-manual-policy
 
 # ---------------------------------------------------------------------------
@@ -664,13 +902,19 @@ beat4_self_audit:
     - failure: 'Future config drift re-enables PP3/BP4 under an old approval.'
       control: 'D3 production/eval config-hash binding verified at runtime; drift => BLOCKED_POLICY (G-DM7, P5).'
     - failure: 'Disabled mode mistaken for validated benign/pathogenic evidence.'
-      control: 'D8 disabled_manual authorizes no VUS; corrected_enabled stays BLOCKED; report records pp3bp4_automation_disabled + predictor_correction_applied=false (P6/P8).'
+      control: 'D11 authorization-neutral: policy approval authorizes only the evidence mode; the pre-registered gate/scope_gate decide from metrics; report records pp3bp4_automation_disabled + predictor_correction_applied=false so the (unchanged) gate result is interpretable; corrected_enabled stays BLOCKED (P6/P8/P11).'
     - failure: 'Owner approval embedded by the doer rather than separately recorded.'
-      control: 'D7 doer leaves status=proposed; owner flips in a separate commit bound to the config hashes + ADR-0012 (G-DM5, P5).'
+      control: 'D7 doer leaves status=proposed; owner flips in a separate status-only commit bound to the config + enforcement hashes + ADR-0012 (G-DM5, P5).'
+    - failure: 'Enforcement code (loader/wrapper/runner) changed to bypass suppression while configs still match.'
+      control: 'D9 runtime_enforcement_hash over the three files; any drift => BLOCKED_POLICY (G-DM11, P9).'
+    - failure: 'Runner loads a different config than the one hashed (alternate --scorer-config/--eval-config), or a config that drops PP3/BP4 but changes thresholds/scope/auth.'
+      control: 'D10 verify the ACTUAL loaded bytes before load; alternate ok only if byte-identical; changed bytes => BLOCKED_POLICY (G-DM12, P10).'
+    - failure: 'Runner force-DENIES or force-ALLOWS VUS/scope authorization from policy mode (the rejected GPT force-false suggestion is the force-deny case).'
+      control: 'D11 authorization-neutral runner; gate.py/scope_gate.py untouched; a synthetic gate decision is unaffected by policy mode (G-DM13, P11).'
   planner_scope_inversions:
     - 'Editing code/config/tests instead of only the YAML: this planner commit modifies exactly one file (verified in VERIFICATION).'
-    - 'Wrong or missing commit trailers: both required trailers pinned in planner.required_trailers and verified post-commit.'
-    - 'Committing on the wrong branch/base: worktree/branch/base pinned and verified before/after commit.'
+    - 'Wrong or missing commit trailers: the corrected trailer Copilot-Session 7c146921-... is pinned in planner.required_trailers and verified post-commit; rev 1 (878bff8) used 90703341 and, per the no-amend rule, is left as-is with the spec corrected.'
+    - 'Committing on the wrong branch/base: worktree/branch pinned; rev-2 parent is 878bff8 and is verified before/after commit.'
   empty_beat4_allowed: false
 
 # ---------------------------------------------------------------------------
@@ -680,7 +924,9 @@ acceptance_mapping:
   - acceptance: 'Plan is implementation-ready and self-contained.'
     satisfied_by: 'implementation_scope + policy_schema_v2 + state_machine + runner_behavior + test_matrix name exact files, fields and probes.'
   - acceptance: 'Disabled/manual mode is explicit and cannot be confused with predictor approval.'
-    satisfied_by: 'D1/D2 orthogonal mode; corrected_enabled + legacy => BLOCKED_POLICY.'
+    satisfied_by: 'D1/D2 orthogonal mode; corrected_enabled + legacy => BLOCKED_POLICY; D11 approval authorizes only the evidence mode.'
+  - acceptance: 'Production-faithful rerun is preserved: policy approval never forces authorization; the gate decides from metrics (ADR-0011 preserved).'
+    satisfied_by: 'authorization_semantics + D11 + gate.py/scope_gate.py out of scope; G-DM13/P11.'
   - acceptance: 'Production and eval configs remain equal and hash-bound.'
     satisfied_by: 'D3/D4 config-hash binding + load-time parity invariant.'
   - acceptance: 'Existing masked TSV can be reused without x64 only after the mode is approved and tests prove suppression.'
@@ -696,9 +942,9 @@ acceptance_mapping:
 # VERIFICATION (slot 1) — filled by the planner after the commit.
 # ---------------------------------------------------------------------------
 verification:
-  expected: 'one new commit on track/pp3bp4-resolution-2026-07 adding exactly docs/project/specs/pp3bp4-disabled-manual-policy.yaml; parent 680e803; both trailers; no push.'
+  expected: 'one follow-up commit on track/pp3bp4-resolution-2026-07 modifying exactly docs/project/specs/pp3bp4-disabled-manual-policy.yaml; parent 878bff8; both trailers; no amend; no push.'
   checks:
     - 'git show --stat HEAD => 1 file changed (this file only).'
-    - 'git log -1 shows Co-authored-by Copilot AND Copilot-Session: 90703341-0147-4b5c-9939-42be522500b1.'
-    - 'git status clean; branch unchanged; no remote update.'
+    - 'git log -1 shows Co-authored-by Copilot AND Copilot-Session: 7c146921-f3dd-4a1e-8cf0-8f574de49204.'
+    - 'HEAD~1 == 878bff84b2bcb3cb71eabf13026f57e1049ee941 (no amend); git status clean; branch unchanged; no remote update.'
   verdict: recorded_in_final_response
