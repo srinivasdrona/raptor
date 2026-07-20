@@ -1,4 +1,4 @@
-# RAPTOR core annotation bundle — pinned, hash-bound planner contract (rev 3).
+# RAPTOR core annotation bundle — pinned, hash-bound planner contract (rev 4).
 #
 # Purpose: an implementation-ready, hash-bound record of the EXACT deployed
 # annotation bundle for the production-faithful masked held-out rerun and the
@@ -10,9 +10,10 @@
 # current x64 readiness, and makes reuse conditional on an implemented PP3/BP4
 # suppression contract.
 #
-# Rev 3 supersedes commit 4e3ed7c after a GPT-5.4 DO-NOT-MERGE review
-# (fail-closed licensing wording and a CI-executable test partition).
-# Schema: raptor-core-annotation-bundle-v1.
+# Rev 4 supersedes commit e08a17e after the Gemini RED test exposed an
+# undefined canonical-manifest schema/status (planner-spec gap).
+# Schema: raptor-core-annotation-bundle-v1 (planner). The Sonnet manifest uses
+# schema raptor-core-annotation-bundle-manifest-v1 / status pinned_historical_evidence.
 
 schema: raptor-core-annotation-bundle-v1
 status: planner_contract_ready_for_implementation
@@ -61,6 +62,17 @@ revision_log:
       - deployed_data_sources (28 pinned)
       - historical_run_attestation and current_x64_reannotation_readiness split
       - pp3_bp4_suppression_prerequisite (reuse blocked)
+  - rev: 4
+    supersedes_commit: e08a17ef6be76cbd4c7e0b8eff23cbbe0e0dde46
+    trigger: Gemini RED test exposed a planner-spec gap
+    attribution:
+      planner_spec_gap:
+        - the canonical manifest's exact schema and runtime status were never defined, so the Gemini test (OFF1) reused the planner spec's schema/status (planner_contract_ready_for_implementation) for the manifest.
+      correction:
+        - define canonical_manifest_schema with schema raptor-core-annotation-bundle-manifest-v1 and status pinned_historical_evidence, closed top-level keys, and closed file/source entry shapes.
+    corrections_in: [canonical_manifest_schema, implementation_scope, test_matrix, beat4_self_audit]
+    preserved:
+      - 9 offline + 3 reference test partition; 3-file scope; 28 sources; suppression blocker; licensing states; no runner/CI changes
 
 planner:
   model: claude-opus-4.8
@@ -132,18 +144,28 @@ implementation_scope:
     path: configs/eval/core_annotation_bundle.yaml
     author: Sonnet
     is: the single machine-readable source of truth for the deployed bundle
-    must_contain:
-      - runtime identity (Nirvana 3.18.1 / data 91.27.66 / schema 6 / BIAS 3.0.0)
-      - all 28 deployed data sources (name/version/release_date)
-      - structured field JSON paths (revel.score, AlphaMissense.AM_score)
-      - arm_inventory with recomputed sha256/bytes for every present file
-      - historical_run_attestation and current_x64_reannotation_readiness (separate)
-      - reuse gate incl. PP3_BP4_SUPPRESSION_CONTRACT_REQUIRED
-      - fail-closed licensing (per-channel, pending permitted-use review) and deferred_upgrades
+    schema: raptor-core-annotation-bundle-manifest-v1
+    status: pinned_historical_evidence
+    distinct_from_planner: >-
+      This artifact is NOT this planner spec. It has its own schema id and its
+      own artifact status. OFF1 must assert THESE values, never the planner
+      spec's raptor-core-annotation-bundle-v1 / planner_contract_ready_for_implementation.
+    exact_shape: see canonical_manifest_schema (closed top-level keys and nested shapes)
   human_reference:
     path: docs/reference/core-annotation-bundle-2026-07.md
     author: Sonnet
     is: human-readable companion explaining the pin, boundary and routes
+    must_mirror_exact_values:
+      manifest_schema: raptor-core-annotation-bundle-manifest-v1
+      manifest_status: pinned_historical_evidence
+      reuse_readiness: BLOCKED_POLICY_IMPLEMENTATION
+      reannotation_readiness: X64_WORKER_UNVERIFIED_UNTIL_OPERATOR_MAKES_AVAILABLE
+      licensing_readiness: PENDING_PERMITTED_USE_REVIEW
+    must_state_explicitly:
+      - historical evidence is pinned (immutable, present on ARM)
+      - reuse is blocked pending the PP3/BP4 suppression contract
+      - current x64 reannotation readiness is unverified
+      - raw-predictor-score permissions are pending permitted-use review
   gemini_test:
     path: tests/eval/test_core_annotation_bundle.py
     author: Gemini
@@ -154,6 +176,170 @@ implementation_scope:
   excluded:
     - no runner or production code changes in this task
     - no new eval harness/runner wiring
+
+canonical_manifest_schema:
+  purpose: >-
+    The EXACT closed schema for the Sonnet-authored artifact
+    configs/eval/core_annotation_bundle.yaml. This artifact is DISTINCT from
+    this planner spec: it has its own schema id and its own artifact status.
+    OFF1 must check THESE values, never the planner spec's schema/status.
+  schema: raptor-core-annotation-bundle-manifest-v1
+  status: pinned_historical_evidence
+  status_note: >-
+    status describes the ARTIFACT (deployed historical evidence is pinned), not
+    planner readiness; it must NOT be planner_contract_ready_for_implementation.
+  closed: true
+  reject_unknown_top_level_keys: true
+  top_level_keys_exact:
+    - schema
+    - status
+    - readiness
+    - runtime
+    - data_sources
+    - structured_fields
+    - arm_inventory
+    - historical_run_attestation
+    - current_x64_reannotation_readiness
+    - pp3_bp4_suppression_prerequisite
+    - reuse_vs_reannotate
+    - licensing
+    - deferred_upgrades
+    - x64_handoff_requirements
+  readiness:
+    closed: true
+    required_keys_exact: [reuse_readiness, reannotation_readiness, licensing_readiness]
+    enums:
+      reuse_readiness: [BLOCKED_POLICY_IMPLEMENTATION, GO_REUSE]
+      reannotation_readiness: [X64_WORKER_UNVERIFIED_UNTIL_OPERATOR_MAKES_AVAILABLE, X64_WORKER_VERIFIED]
+      licensing_readiness: [PENDING_PERMITTED_USE_REVIEW, CLEARED_BY_OWNER_RECORD]
+    pinned_now:
+      reuse_readiness: BLOCKED_POLICY_IMPLEMENTATION
+      reannotation_readiness: X64_WORKER_UNVERIFIED_UNTIL_OPERATOR_MAKES_AVAILABLE
+      licensing_readiness: PENDING_PERMITTED_USE_REVIEW
+  runtime:
+    closed: true
+    required_keys_exact: [annotator, runtime_banner, nirvana_data_version, nirvana_schema_version, genome_assembly, bias_version, bias_commit, dotnet_runtime]
+    pinned:
+      annotator: Nirvana 3.18.1
+      runtime_banner: 3.18.1-0-g05f88047
+      nirvana_data_version: '91.27.66'
+      nirvana_schema_version: 6
+      genome_assembly: GRCh38
+      bias_version: '3.0.0'
+      bias_commit: ade13f206f3e2c2efe3ec92715d974645fc8da8f
+      dotnet_runtime: '6.0.36'
+  data_sources:
+    closed: true
+    type: list of exactly 28 source_entry
+    count: 28
+    source_entry_shape:
+      closed: true
+      required_keys_exact: [name, version, release_date]
+      reject_extra_keys: true
+    values: the 28 pinned triples in deployed_data_sources.sources (authoritative)
+  structured_fields:
+    closed: true
+    required_keys_exact: [revel, alphamissense, scalars, forbidden_source]
+    revel:
+      required_keys_exact: [json_path, value_type]
+      json_path: 'positions[].variants[].revel.score'
+      value_type: float
+    alphamissense:
+      required_keys_exact: [json_path, value_type]
+      json_path: 'positions[].variants[].AlphaMissense.AM_score'
+      value_type: float
+    scalars:
+      required_keys_exact: [phylop, gerp]
+    forbidden_source_rule: REVEL must not be sourced from BIAS free-form rationale
+  arm_inventory:
+    closed: true
+    required_keys_exact: [data_root, present_hashed, worker_only]
+    present_hashed:
+      type: list of exactly 14 file_entry
+      constraint: every entry has location arm and presence present_hashed
+    worker_only:
+      type: list of file_entry
+      constraint: every entry has location x64 and presence worker_only
+    file_entry_shape:
+      closed: true
+      required_keys_exact: [id, location, path, sha256, bytes, presence]
+      allowed_optional_keys: [attributes]
+      reject_keys_outside: required_keys_exact plus allowed_optional_keys
+      enums:
+        location: [arm, x64]
+        presence: [present_hashed, worker_only]
+      invariants:
+        - 'location == arm iff presence == present_hashed'
+        - 'location == x64 iff presence == worker_only'
+        - 'sha256 is 64 lowercase hex; bytes is a positive integer'
+        - 'entry-specific extras (rows, duplicate_ids, contents, role, needed_for, provenance_path) live only under attributes'
+  historical_run_attestation:
+    closed: true
+    required_keys_exact: [claim, proven_by, hashes, independent_of]
+    hashes:
+      closed: true
+      required_keys_exact: [input_vcf_sha256, provenance_sha256, provenance_manifest_hash, provenance_vcf_hash, return_manifest_sha256, scoring_report_sha256, bias_tsv_sha256, heldout_nirvana_json_sha256]
+      pinned:
+        input_vcf_sha256: '4dcba7c882b65838cedf8ce0ad56e0f7764df34b247ab412aac144d4027c622d'
+        provenance_sha256: '63f1881287f1e3aa0b36ca14e1a7329ef2bcacc7b9674c2489f5e1d4352a6ac8'
+        provenance_manifest_hash: '9e588cdf8ebaea2e3793e0ea74721ab5283b57c2abf045dbf3070cb6e81ec9e4'
+        provenance_vcf_hash: '4dcba7c882b65838cedf8ce0ad56e0f7764df34b247ab412aac144d4027c622d'
+        return_manifest_sha256: '5efdccdc57f7d2bdf774486dfbde106ab173bf87412c6db103aaba9958d9ac91'
+        scoring_report_sha256: 'e5351a42e3120083d21d6b82775a38aee2a5d9bcf8586da08b3b239f24c35b3c'
+        bias_tsv_sha256: '7eece438a880e0c6a591df62e231bc93848eeb42277a2f4360983914298fc512'
+        heldout_nirvana_json_sha256: '315e601cc9ede55c07c4a59de796c2be5cf0f2827e441101ceea236390675d13'
+    independent_of: current_x64_reannotation_readiness
+    no_current_x64_dependency: true
+  current_x64_reannotation_readiness:
+    closed: true
+    required_keys_exact: [required_only_for, status, presence_proof_when_needed, boundary_rule]
+    required_only_for: X64_REANNOTATE
+    status_enum: [UNVERIFIED, VERIFIED]
+    contains_only: reannotation proof requirements (no historical-evidence hashes)
+  pp3_bp4_suppression_prerequisite:
+    closed: true
+    required_keys_exact: [id, finding, evidence, requirement, until_then]
+    id: PP3_BP4_SUPPRESSION_CONTRACT_REQUIRED
+    until_then: BLOCKED_POLICY_IMPLEMENTATION
+  reuse_vs_reannotate:
+    closed: true
+    required_keys_exact: [principle, reuse_path, reannotate_path, decision_table]
+    reuse_path_current_route: BLOCKED_POLICY_IMPLEMENTATION
+  licensing:
+    closed: true
+    required_keys_exact: [model, historical_execution_observed, channels, downstream_use_rule, cloud_egress_rule, per_source]
+    model: fail_closed
+    historical_execution_observed: true
+    channels:
+      required_keys_exact: [local_execution_status, raw_public_redistribution, raw_cloud_egress]
+      allowed_values:
+        local_execution_status: [pending_permitted_use_review]
+        raw_public_redistribution: [false]
+        raw_cloud_egress: [false]
+    per_source:
+      required_keys_exact: [revel, alphamissense]
+      revel_allowed:
+        local_status: [pending_permitted_use_review]
+        raw_public_redistribution: [false]
+        raw_cloud_egress: [false]
+      alphamissense_allowed:
+        local_status: [pending_permitted_use_review]
+        raw_public_redistribution: [false]
+        raw_cloud_egress: [false]
+        licence_version: [confirm_pending]
+    recursive_permission_reject: >-
+      OFF5 walks the whole licensing subtree and FAILS if any boolean is true,
+      any status field is outside its allowed set, or any value asserts
+      permission, redistribution or egress beyond the specified pending/false
+      values.
+  deferred_upgrades:
+    closed: true
+    required_keys_exact: [out_of_scope_until_a_separate_approved_refresh, rule]
+    must_include: [dbNSFP 5.x, MANE 1.5, gnomAD 4.1.1, dbSNP 157, RepeatMasker]
+  x64_handoff_requirements:
+    closed: true
+    required_keys_exact: [bundle_presence_proof, reannotation_commands_reference, return_handoff_manifest, required_artifact]
+    required_artifact: x64_bundle_verification.json
 
 deployed_bundle:
   provenance: >-
@@ -449,15 +635,15 @@ test_matrix:
     runs_in_ci: true
     inputs: committed configs/eval/core_annotation_bundle.yaml and docs/reference/core-annotation-bundle-2026-07.md only
     tests:
-      - {id: OFF1_schema, asserts: 'the canonical manifest parses and has the required keys and enums (schema-valid).'}
-      - {id: OFF2_source_values_28, asserts: 'manifest data_sources equal the 28 pinned name/version/release_date values exactly; any missing, extra or mismatch fails.'}
-      - {id: OFF3_presence_enums, asserts: 'every file entry presence is present_hashed or worker_only; worker_only files are not marked present on ARM; x64_bundle_present is false.'}
+      - {id: OFF1_schema, asserts: 'manifest schema equals raptor-core-annotation-bundle-manifest-v1 and status equals pinned_historical_evidence (NOT the planner spec raptor-core-annotation-bundle-v1 / planner_contract_ready_for_implementation); manifest top-level keys equal canonical_manifest_schema.top_level_keys_exact with no missing or extra key; readiness has the three keys with valid enum values.'}
+      - {id: OFF2_source_values_28, asserts: 'data_sources is exactly 28 entries; every entry has exactly the source_entry keys name/version/release_date with no missing or extra key; the 28 name/version/release_date triples equal the pinned set exactly.'}
+      - {id: OFF3_presence_enums, asserts: 'every arm_inventory file entry matches file_entry_shape exactly (all required keys present; no key outside required plus allowed_optional); presence in present_hashed or worker_only; location arm iff present_hashed and location x64 iff worker_only; present_hashed count is 14.'}
       - {id: OFF4_reuse_blocked_on_suppression, asserts: 'with the PP3/BP4 suppression contract absent, the reuse route resolves to BLOCKED_POLICY_IMPLEMENTATION and never GO_REUSE.'}
-      - {id: OFF5_licensing_egress_flags, asserts: 'channel local_execution_status is pending_permitted_use_review; raw_public_redistribution and raw_cloud_egress are false for the channel and every per-source; AlphaMissense licence_version is confirm_pending; no field asserts currently-permitted use.'}
+      - {id: OFF5_licensing_egress_flags, asserts: 'exact-match: channel and per-source local status equals pending_permitted_use_review; raw_public_redistribution and raw_cloud_egress equal false everywhere; AlphaMissense licence_version equals confirm_pending; AND a RECURSIVE walk of the licensing subtree fails on any boolean that is true or any status/value outside the allowed pending/false set (no vacuous substring check).'}
       - {id: OFF6_deferred_upgrade_guard, asserts: 'fails if MANE 1.5, dbNSFP 5.x, gnomAD 4.1.1, dbSNP 157, RepeatMasker or a newer primary ClinVar appears in data_sources.'}
       - {id: OFF7_structured_path_contract, asserts: 'REVEL path is positions[].variants[].revel.score and AlphaMissense is AlphaMissense.AM_score; a BIAS-rationale REVEL path is rejected.'}
       - {id: OFF8_revel_label_guard, asserts: 'REVEL version is 20200205; fails if 1.3 or 2021 is asserted without a provenance record.'}
-      - {id: OFF9_historical_vs_current_split, asserts: 'historical_run_attestation references only immutable ARM evidence and has no dependency on current_x64_reannotation_readiness.'}
+      - {id: OFF9_historical_vs_current_split, asserts: 'historical_run_attestation.hashes contains the exact input_vcf, provenance, provenance_manifest, provenance_vcf, return_manifest, scoring_report, bias_tsv and heldout_nirvana_json hashes and declares no current-x64 dependency; current_x64_reannotation_readiness contains only reannotation proof requirements and no historical-evidence hashes.'}
   data_backed_local:
     runs_in_ci: false
     marker: requires_reference
@@ -465,8 +651,8 @@ test_matrix:
     skip_rule: 'pytest.skip only when RAPTOR_DATA_ROOT or a listed file is absent; never silently pass and never treat an assertion failure as a skip.'
     inputs: the 14 arm_inventory.present_hashed files under RAPTOR_DATA_ROOT
     tests:
-      - {id: REF1_arm_hash_bytes, asserts: 'each of the 14 present_hashed files exists and its recomputed SHA256 and byte size equal the pinned values.'}
-      - {id: REF2_vcf_provenance_return_consistency, asserts: 'holdout_input.vcf SHA256 equals provenance.json vcf_hash equals 4dcba7c8...; manifest.jsonl SHA256 equals provenance.manifest_hash; RETURN_MANIFEST-listed hashes match the ARM copies.'}
+      - {id: REF1_arm_hash_bytes, asserts: 'every manifest-declared present_hashed file (all 14) exists under RAPTOR_DATA_ROOT and its recomputed SHA256 and byte size equal the manifest-pinned values; a missing present_hashed file is a failure, not a skip.'}
+      - {id: REF2_return_manifest_and_provenance, asserts: 'holdout_input.vcf SHA256 equals provenance.json vcf_hash equals 4dcba7c8...; manifest.jsonl SHA256 equals provenance.manifest_hash; and for EVERY artifact listed in RETURN_MANIFEST.sha256.txt, any basename classified as ARM-present must exist and hash-match, and only the explicit worker-only basenames may be absent (no if-exists-ignore path for expected ARM artifacts).'}
       - {id: REF3_bias_tsv_invariants, asserts: 'the masked BIAS TSV has 2577 rows and 0 duplicate keys and parses via BiasTsvSource with no BiasContractError.'}
     missing_data_report: >-
       Absent reference data must be reported by the required local presence gate
@@ -490,7 +676,7 @@ test_matrix:
   validation_commands:
     offline_ci: 'pytest tests/eval/test_core_annotation_bundle.py -m "not requires_reference"'
     local_data_backed_pwsh: '$env:RAPTOR_DATA_ROOT="D:\AIProjects\raptor-data"; pytest tests/eval/test_core_annotation_bundle.py -m requires_reference'
-    local_reference_gate: 'required local command that verifies the 14 present_hashed files exist under RAPTOR_DATA_ROOT and exits non-zero listing any missing (distinct from a pytest skip).'
+    local_reference_gate: 'required local command: verify the hardcoded 14 present_hashed files exist under RAPTOR_DATA_ROOT and, once configs/eval/core_annotation_bundle.yaml exists, ALSO verify every manifest-declared present_hashed entry; exit non-zero listing any missing (distinct from a pytest skip). CI and no-RAPTOR_DATA_ROOT behavior unchanged.'
     gpt_diff_scope: 'git diff --name-only <impl_base>..HEAD must equal the three implementation files (GPT-5.4 probe, not pytest).'
     ci_fetch_depth: 'unchanged; do not modify actions/checkout fetch-depth and do not add a data-fetch step.'
   implementation_status_rule: >-
@@ -524,6 +710,12 @@ downstream_policy_handoff:
   does_not: [make the PP3/BP4 activation or owner decision, select reuse or reannotate, clear cloud-egress for raw scores]
 
 beat4_self_audit:
+  - failure_mode: 'Canonical manifest schema/status undefined or conflated with the planner spec'
+    mitigation: 'canonical_manifest_schema pins schema raptor-core-annotation-bundle-manifest-v1 and status pinned_historical_evidence, distinct from the planner spec, with closed top-level keys and entry shapes'
+    caught_by: OFF1
+  - failure_mode: 'Closed shapes not enforced so missing/extra keys or a permissive licensing substring check pass'
+    mitigation: 'closed file_entry and source_entry shapes; recursive licensing permission reject'
+    caught_by: OFF2/OFF3/OFF5
   - failure_mode: 'ARM-present evidence mislabeled x64-only'
     mitigation: 'arm_inventory present_hashed with recomputed hashes; x64 paths are provenance only'
     caught_by: OFF3/REF1
