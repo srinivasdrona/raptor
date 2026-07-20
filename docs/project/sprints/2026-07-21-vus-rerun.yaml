@@ -1,0 +1,189 @@
+schema: raptor-sprint-plan-v1
+sprint_id: vus-rerun-2026-07-21
+status: active
+timebox:
+  execution_start: "2026-07-21"
+  execution_end: "2026-07-31"
+  grant_packaging_window:
+    - "2026-08-01"
+    - "2026-08-02"
+
+planning_standard:
+  framework: Scrum Sprint Goal + Sprint Backlog, adapted for a solo research program
+  source: https://scrumguides.org/docs/scrumguide/v2020/2020-Scrum-Guide-US.pdf
+
+sprint_goal: >-
+  Produce and independently check a production-faithful masked held-out result,
+  then recompute the TSC1/TSC2 VUS census and generate non-authoritative,
+  provenance-complete expert-review packets. Begin a bounded TSC2 Mechanism
+  Atlas pilot only after the masked rerun is technically complete.
+
+non_goals:
+  - Build a comprehensive Mechanism Atlas before the masked rerun.
+  - Expand to TSC1 or another mTORopathy during this sprint.
+  - Produce clinical classifications or imply molecular-geneticist approval.
+  - Build grant-specific infrastructure, UI, orchestration or source breadth.
+  - Integrate all 16 predictors.
+  - Delay the core path to improve the Anthropic application narrative.
+
+wip_policy:
+  technical_tracks: 1
+  parallel_long_lead_tracks:
+    - engagement-recruit-molecular-geneticist
+  operational_capture:
+    grant_evidence_minutes_per_day_max: 15
+  rule: >-
+    Only one technical critical-path task is active. Research/recruitment may
+    run in background but cannot consume the implementation slot.
+
+critical_path:
+  - sources-expand-predictor-matrix
+  - sources-pin-core-annotation-bundle
+  - resolve-pp3-bp4-activation
+  - rerun-masked-gate
+  - recompute-vus-census
+  - core-generate-review-packets
+  - define-variant-mechanism-atlas
+
+policy_resolution_rule: >-
+  PP3/BP4 activation is resolved when a hash-bound decision is recorded.
+  "Remain disabled/manual because evidence is insufficient" is a valid
+  resolution and must not leave the masked rerun indefinitely blocked.
+
+daily_plan:
+  - date: "2026-07-21"
+    goal: Complete the calibrated predictor matrix work package.
+    outputs:
+      - GPT-5.4 CLEAN planner contract
+      - Gemini RED tests
+      - Sonnet matrix/configuration documentation implementation
+      - GPT-5.4 implementation verdict
+    exit: Matrix work is merged or has one named blocker with evidence.
+
+  - date: "2026-07-22"
+    goal: Pin the minimum reproducible annotation bundle contract.
+    outputs:
+      - exact REVEL/dbNSFP or Nirvana field path
+      - version, checksum, licence and permitted-use record
+      - MANE/reference/transcript routing inputs required for the rerun
+      - explicit exclusions for non-required predictors
+    exit: Bundle is pinned or BLOCKED_DATA names the unavailable artifact and fallback.
+
+  - date: "2026-07-23"
+    goal: Acquire and validate the minimum structured development score path.
+    outputs:
+      - structured-score acquisition result
+      - leakage/training-manifest status
+      - transportability evidence or honest UNDERPOWERED/BLOCKED_DATA result
+    exit: Evidence needed for the PP3/BP4 decision is frozen.
+
+  - date: "2026-07-24"
+    goal: Resolve PP3/BP4 activation.
+    outputs:
+      - explicit activate or remain-disabled/manual decision
+      - policy/config hashes
+      - GPT-5.4 review
+      - owner decision record
+    exit: rerun-masked-gate has no unresolved predictor-policy dependency.
+
+  - date: "2026-07-25"
+    goal: Preflight the production-faithful masked rerun.
+    outputs:
+      - exact 2,577-row ID-set and resource hashes
+      - x64 environment/data-root/disk/runtime preflight
+      - masked-resource and forbidden-answer checks
+      - deterministic command and checkpoint location
+    exit: Dry run succeeds without reading held-out answers or VUS outputs.
+
+  - date: "2026-07-26"
+    goal: Execute the masked held-out rerun.
+    outputs:
+      - immutable raw run artifacts
+      - scope-specific v2 gate report
+      - complete logs and content hashes
+    exit: Run completes or a resumable checkpoint plus exact blocker is persisted.
+
+  - date: "2026-07-27"
+    goal: Independently audit and freeze the held-out result.
+    outputs:
+      - GPT-5.4 checker verdict
+      - stratified PASS/FAIL/UNDERPOWERED results
+      - limitations and contrary case
+    exit: Result is accepted as technically valid; scientific failure is not rerun away.
+
+  - date: "2026-07-28"
+    goal: Recompute the corrected 6,618-VUS census.
+    outputs:
+      - hash-bound census aggregates
+      - unresolved/manual-review counts
+      - no clinical-authorization claim
+    exit: Census is reproducible from the approved policy and frozen inputs.
+
+  - date: "2026-07-29"
+    goal: Generate corrected expert-review packets.
+    outputs:
+      - provenance-complete packet set
+      - bounded review queue
+      - 5-10 application-safe research examples with explicit unknowns
+    exit: Packets are non-authoritative and ready for future geneticist review.
+
+  - date: "2026-07-30"
+    goal: Define the bounded TSC2 Mechanism Atlas pilot.
+    condition: Start only if the masked result is technically frozen.
+    outputs:
+      - internal schema and module contract
+      - prior-art inventory
+      - 5-10-variant pilot selection
+      - DisMech one-way crosswalk requirements
+    fallback: Continue unresolved VUS critical-path work; do not start Atlas for grant optics.
+
+  - date: "2026-07-31"
+    goal: Produce the first Atlas/evaluation pilot and freeze application evidence.
+    condition: Atlas design passed its entry gate.
+    outputs:
+      - grounded sample records
+      - one small blinded Claude evaluation with failure analysis
+      - application evidence manifest of resolvable artifacts and limitations
+    fallback: Freeze the honest current RAPTOR state without projecting Atlas results.
+
+grant_packaging:
+  - date: "2026-08-01"
+    goal: Draft the Track-One application from frozen evidence.
+    timebox_hours_max: 6
+    outputs:
+      - scientific question and preliminary evidence
+      - six-month VUS-to-mechanism aims
+      - Claude-specific acceleration
+      - Monarch/DisMech public-output plan
+      - limitations, team gaps and data-use boundary
+
+  - date: "2026-08-02"
+    goal: Adversarial fact-check, owner approval and submission.
+    outputs:
+      - claim-to-artifact audit
+      - no clinical/institutional/expert overclaims
+      - submitted application receipt
+    deadline_buffer: Submit by 18:00 Asia/Kolkata; do not use the final external deadline minute.
+
+daily_operational_preflight:
+  - Machine connected to power and sleep/maintenance risk understood by the operator.
+  - Required x64 worker and RAPTOR_DATA_ROOT are reachable.
+  - Sufficient disk space is confirmed before data-backed runs.
+  - Worktree and branch are recorded before delegation.
+  - Every long-running agent/run has a persisted commit, result artifact or resumable checkpoint.
+  - No essential state exists only in a chat session at end of day.
+
+definition_of_done:
+  - Artifact resolves to a commit, content hash or immutable run output.
+  - Gemini owns new tests; Sonnet owns production/config/docs implementation.
+  - GPT-5.4 independently checks the final diff/result.
+  - Existing protected tests are not weakened.
+  - Missing data produces BLOCKED_DATA/UNKNOWN/UNDERPOWERED, not success.
+  - Held-out scientific failure is reported, not tuned away.
+  - Clinical and expert-approval claims remain absent without the oracle.
+
+carryover_rule: >-
+  An unfinished daily item moves to the next day and displaces later optional
+  work. Atlas and grant-enhancement work are displaced first. The masked rerun,
+  census and packets remain the sprint priority.
+
