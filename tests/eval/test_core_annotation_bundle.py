@@ -155,6 +155,48 @@ def load_reference():
         return f.read()
 
 
+def check_file_entry_shape(entry):
+    required_keys = {"id", "location", "path", "sha256", "bytes", "presence"}
+    allowed_optional = {"attributes"}
+    entry_keys = set(entry.keys())
+    
+    # Reject keys outside required + allowed_optional
+    forbidden_keys = entry_keys - (required_keys | allowed_optional)
+    assert not forbidden_keys, f"File entry contains forbidden keys: {forbidden_keys}"
+    
+    # Check all required keys are present
+    missing_keys = required_keys - entry_keys
+    assert not missing_keys, f"File entry is missing required keys: {missing_keys}"
+    
+    loc = entry["location"]
+    pres = entry["presence"]
+    sha = entry["sha256"]
+    size = entry["bytes"]
+    
+    # Enums
+    assert loc in ["arm", "x64"], f"Invalid location: {loc}"
+    assert pres in ["present_hashed", "worker_only"], f"Invalid presence: {pres}"
+    
+    # Invariants
+    if loc == "arm":
+        assert pres == "present_hashed", f"Invalid presence {pres} for location arm"
+    else:  # loc == x64
+        assert pres == "worker_only", f"Invalid presence {pres} for location x64"
+        
+    # Check sha256 is 64 lowercase hex
+    assert len(sha) == 64 and all(c in "0123456789abcdef" for c in sha), f"Invalid sha256: {sha}"
+    # Check bytes is a positive integer
+    assert isinstance(size, int) and size > 0, f"Invalid bytes: {size}"
+    
+    # Check entry-specific extras live only under attributes
+    forbidden_direct_extras = {"rows", "duplicate_ids", "contents", "role", "needed_for", "provenance_path"}
+    found_extras = entry_keys & forbidden_direct_extras
+    assert not found_extras, f"File entry has direct extras outside attributes: {found_extras}"
+    
+    if "attributes" in entry:
+        assert isinstance(entry["attributes"], dict), "attributes must be a dict"
+
+
 # ==========================================
 # Always-On Offline Tests (OFF1 - OFF9)
 # ==========================================
@@ -163,24 +205,49 @@ def test_OFF1_schema():
     manifest = load_manifest()
     ref_content = load_reference()
     
-    assert manifest.get("schema") == "raptor-core-annotation-bundle-v1", "Incorrect schema identifier"
-    assert manifest.get("status") == "planner_contract_ready_for_implementation", "Incorrect status value"
-    assert manifest.get("reuse_readiness") == "BLOCKED_POLICY_IMPLEMENTATION", "Incorrect reuse_readiness enum"
-    assert manifest.get("reannotation_readiness") == "X64_WORKER_UNVERIFIED_UNTIL_OPERATOR_MAKES_AVAILABLE", "Incorrect reannotation_readiness enum"
-    assert manifest.get("licensing_readiness") == "PENDING_PERMITTED_USE_REVIEW", "Incorrect licensing_readiness enum"
+    assert manifest.get("schema") == "raptor-core-annotation-bundle-manifest-v1", "Incorrect schema identifier"
+    assert manifest.get("status") == "pinned_historical_evidence", "Incorrect status value"
+    
+    # Exact 14 top-level keys
+    expected_top_keys = {
+        "schema", "status", "readiness", "runtime", "data_sources", "structured_fields",
+        "arm_inventory", "historical_run_attestation", "current_x64_reannotation_readiness",
+        "pp3_bp4_suppression_prerequisite", "reuse_vs_reannotate", "licensing",
+        "deferred_upgrades", "x64_handoff_requirements"
+    }
+    actual_top_keys = set(manifest.keys())
+    assert actual_top_keys == expected_top_keys, f"Manifest keys mismatch: missing {expected_top_keys - actual_top_keys}, extra {actual_top_keys - expected_top_keys}"
+    
+    # Under readiness
+    readiness = manifest.get("readiness", {})
+    assert set(readiness.keys()) == {"reuse_readiness", "reannotation_readiness", "licensing_readiness"}
+    
+    assert readiness.get("reuse_readiness") == "BLOCKED_POLICY_IMPLEMENTATION", "Incorrect reuse_readiness enum"
+    assert readiness.get("reannotation_readiness") == "X64_WORKER_UNVERIFIED_UNTIL_OPERATOR_MAKES_AVAILABLE", "Incorrect reannotation_readiness enum"
+    assert readiness.get("licensing_readiness") == "PENDING_PERMITTED_USE_REVIEW", "Incorrect licensing_readiness enum"
     
     # Assert human reference mirrors the manifest
-    assert "Nirvana 3.18.1" in ref_content, "Human reference must mention Nirvana 3.18.1"
-    assert "BIAS 3.0.0" in ref_content, "Human reference must mention BIAS 3.0.0"
-    assert "28-source" in ref_content or "28 sources" in ref_content, "Human reference must mention 28 sources"
+    assert "raptor-core-annotation-bundle-manifest-v1" in ref_content, "Human reference must mention manifest schema id"
+    assert "pinned_historical_evidence" in ref_content, "Human reference must mention manifest status"
     assert "BLOCKED_POLICY_IMPLEMENTATION" in ref_content, "Human reference must mention reuse state is BLOCKED_POLICY_IMPLEMENTATION"
+    assert "X64_WORKER_UNVERIFIED_UNTIL_OPERATOR_MAKES_AVAILABLE" in ref_content, "Human reference must mention reannotation state"
+    assert "PENDING_PERMITTED_USE_REVIEW" in ref_content, "Human reference must mention licensing state"
+    assert "historical evidence is pinned" in ref_content or "pinned" in ref_content.lower(), "Human reference must state historical evidence is pinned"
+    assert "reuse is blocked" in ref_content.lower(), "Human reference must state reuse is blocked"
+    assert "unverified" in ref_content.lower() or "unverified_until_operator_makes_available" in ref_content.lower(), "Human reference must state x64 reannotation is unverified"
+    assert "raw-predictor-score permissions are pending permitted-use review" in ref_content.lower() or "pending_permitted_use_review" in ref_content.lower(), "Human reference must state raw score permissions are pending review"
 
 
 def test_OFF2_source_values_28():
     manifest = load_manifest()
-    sources = manifest.get("data_sources", []) or manifest.get("deployed_data_sources", []) or manifest.get("deployed_bundle", {}).get("deployed_data_sources", [])
+    sources = manifest.get("data_sources", [])
     
     assert len(sources) == 28, f"Expected exactly 28 sources, got {len(sources)}"
+    
+    # Closed shape for each source entry
+    required_keys = {"name", "version", "release_date"}
+    for idx, s in enumerate(sources):
+        assert set(s.keys()) == required_keys, f"Source entry {idx} has incorrect keys: {set(s.keys())}"
     
     # Check exact equality (order-independent)
     def sort_key(s):
@@ -195,28 +262,27 @@ def test_OFF2_source_values_28():
 def test_OFF3_presence_enums():
     manifest = load_manifest()
     inventory = manifest.get("arm_inventory", {})
-    present_hashed = inventory.get("present_hashed", [])
-    worker_only_absent = inventory.get("worker_only_absent_on_arm", {}).get("items", []) or inventory.get("worker_only_absent_on_arm", [])
     
-    # Assert that everything is either present_hashed or worker_only
-    for item in present_hashed:
-        assert "arm_path" in item or "path" in item
-        assert "sha256" in item
-        assert "bytes" in item
-        
-    # Check that worker_only files are not marked present on ARM
-    for item in worker_only_absent:
-        assert item.get("arm_path") is None or "D:\\raptor-x64" in item.get("x64_path", "")
-        
-    # Verify overall presence claims
-    assert manifest.get("x64_bundle_present", False) is False, "x64_bundle_present must be False on ARM/CI"
+    # Check required keys for arm_inventory are exactly data_root, present_hashed, worker_only
+    assert set(inventory.keys()) == {"data_root", "present_hashed", "worker_only"}
+    
+    present_hashed = inventory.get("present_hashed", [])
+    worker_only = inventory.get("worker_only", [])
+    
+    assert len(present_hashed) == 14, f"Expected exactly 14 present_hashed files, got {len(present_hashed)}"
+    
+    # Check shapes of all entries
+    for list_name, entry_list in [("present_hashed", present_hashed), ("worker_only", worker_only)]:
+        for item in entry_list:
+            check_file_entry_shape(item)
 
 
 def test_OFF4_reuse_blocked_on_suppression():
     manifest = load_manifest()
+    readiness = manifest.get("readiness", {})
     
     # Reuse route must resolve to BLOCKED_POLICY_IMPLEMENTATION, never GO_REUSE
-    assert manifest.get("reuse_readiness") == "BLOCKED_POLICY_IMPLEMENTATION"
+    assert readiness.get("reuse_readiness") == "BLOCKED_POLICY_IMPLEMENTATION"
     
     # Check PP3_BP4_SUPPRESSION_CONTRACT_REQUIRED or similar is required
     suppression_req = manifest.get("pp3_bp4_suppression_prerequisite", {})
@@ -227,30 +293,70 @@ def test_OFF5_licensing_egress_flags():
     manifest = load_manifest()
     licensing = manifest.get("licensing", {})
     
-    # Channel local status
+    # Required keys under licensing
+    expected_lic_keys = {"model", "historical_execution_observed", "channels", "downstream_use_rule", "cloud_egress_rule", "per_source"}
+    assert set(licensing.keys()) == expected_lic_keys, f"Licensing keys mismatch: expected {expected_lic_keys}, got {set(licensing.keys())}"
+    
+    assert licensing.get("model") == "fail_closed"
+    assert licensing.get("historical_execution_observed") is True
+    
     channels = licensing.get("channels", {})
+    assert set(channels.keys()) == {"local_execution_status", "raw_public_redistribution", "raw_cloud_egress"}
     assert channels.get("local_execution_status") == "pending_permitted_use_review"
     assert channels.get("raw_public_redistribution") is False
     assert channels.get("raw_cloud_egress") is False
     
-    # Every per-source status and egress flags
     per_source = licensing.get("per_source", {})
-    for src_name, src_info in per_source.items():
-        assert src_info.get("local_status") == "pending_permitted_use_review" or src_info.get("local_execution_status") == "pending_permitted_use_review"
-        assert src_info.get("raw_public_redistribution") is False
-        assert src_info.get("raw_cloud_egress") is False
-        
-    # AlphaMissense licence_version
-    am_lic = per_source.get("alphamissense", {})
-    assert am_lic.get("licence_version") == "confirm_pending"
+    assert set(per_source.keys()) == {"revel", "alphamissense"}
     
-    # No field asserts raw predictor score use is currently permitted
-    assert "permitted" not in str(licensing).lower() or "pending_permitted_use_review" in str(licensing)
+    revel = per_source.get("revel", {})
+    assert set(revel.keys()) == {"local_status", "raw_public_redistribution", "raw_cloud_egress"}
+    assert revel.get("local_status") == "pending_permitted_use_review"
+    assert revel.get("raw_public_redistribution") is False
+    assert revel.get("raw_cloud_egress") is False
+    
+    alphamissense = per_source.get("alphamissense", {})
+    assert set(alphamissense.keys()) == {"local_status", "raw_public_redistribution", "raw_cloud_egress", "licence_version"}
+    assert alphamissense.get("local_status") == "pending_permitted_use_review"
+    assert alphamissense.get("raw_public_redistribution") is False
+    assert alphamissense.get("raw_cloud_egress") is False
+    assert alphamissense.get("licence_version") == "confirm_pending"
+    
+    # Recursive walk check to fail if any boolean is True (except historical_execution_observed),
+    # or any status field is outside its allowed set, or any value asserts permission.
+    def check_node_recursively(node, key_name=None):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                check_node_recursively(v, k)
+        elif isinstance(node, list):
+            for item in node:
+                check_node_recursively(item, key_name)
+        elif isinstance(node, bool):
+            # historical_execution_observed is allowed to be True, all other booleans must be False
+            if key_name == "historical_execution_observed":
+                assert node is True, "historical_execution_observed must be True"
+            else:
+                assert node is False, f"Forbidden True boolean value found at {key_name}"
+        elif isinstance(node, str):
+            # Allowed string statuses
+            if key_name in ["local_execution_status", "local_status", "status"]:
+                assert node == "pending_permitted_use_review", f"Forbidden status value '{node}' at {key_name}"
+            elif key_name == "licence_version":
+                assert node == "confirm_pending", f"Forbidden licence_version value '{node}'"
+            else:
+                # Any other string value must not assert currently permitted or allowed egress
+                lower_val = node.lower()
+                if "permitted" in lower_val:
+                    assert "pending" in lower_val or "pending_permitted_use_review" in lower_val, f"Forbidden permissive phrasing: '{node}'"
+                if "egress" in lower_val:
+                    assert "false" in lower_val or "deny" in lower_val or "pending" in lower_val, f"Forbidden egress phrasing: '{node}'"
+                    
+    check_node_recursively(licensing)
 
 
 def test_OFF6_deferred_upgrade_guard():
     manifest = load_manifest()
-    sources = manifest.get("data_sources", []) or manifest.get("deployed_data_sources", []) or manifest.get("deployed_bundle", {}).get("deployed_data_sources", [])
+    sources = manifest.get("data_sources", [])
     
     for s in sources:
         name = s.get("name", "")
@@ -271,13 +377,17 @@ def test_OFF6_deferred_upgrade_guard():
 
 def test_OFF7_structured_path_contract():
     manifest = load_manifest()
-    fields = manifest.get("structured_fields", {}) or manifest.get("deployed_bundle", {}).get("structured_fields", {})
+    fields = manifest.get("structured_fields", {})
     
-    revel_path = fields.get("revel", {}).get("json_path")
-    am_path = fields.get("alphamissense", {}).get("json_path")
+    assert set(fields.keys()) == {"revel", "alphamissense", "scalars", "forbidden_source"}
     
-    assert revel_path == "positions[].variants[].revel.score"
-    assert am_path == "positions[].variants[].AlphaMissense.AM_score"
+    revel = fields.get("revel", {})
+    assert revel.get("json_path") == "positions[].variants[].revel.score"
+    assert revel.get("value_type") == "float"
+    
+    alphamissense = fields.get("alphamissense", {})
+    assert alphamissense.get("json_path") == "positions[].variants[].AlphaMissense.AM_score"
+    assert alphamissense.get("value_type") == "float"
     
     # Reject BIAS-rationale REVEL path
     assert "rationale" not in str(fields).lower()
@@ -285,7 +395,7 @@ def test_OFF7_structured_path_contract():
 
 def test_OFF8_revel_label_guard():
     manifest = load_manifest()
-    sources = manifest.get("data_sources", []) or manifest.get("deployed_data_sources", []) or manifest.get("deployed_bundle", {}).get("deployed_data_sources", [])
+    sources = manifest.get("data_sources", [])
     
     revel_ver = None
     for s in sources:
@@ -299,12 +409,37 @@ def test_OFF9_historical_vs_current_split():
     manifest = load_manifest()
     
     hist = manifest.get("historical_run_attestation", {})
-    curr = manifest.get("current_x64_reannotation_readiness", {})
+    assert set(hist.keys()) == {"claim", "proven_by", "hashes", "independent_of"}
+    assert hist.get("independent_of") == "current_x64_reannotation_readiness"
     
-    # Historical run attestation references only immutable ARM evidence and has no dependency on current_x64_reannotation_readiness
-    assert hist is not None
-    assert curr is not None
-    assert "current_x64_reannotation_readiness" not in str(hist)
+    hashes = hist.get("hashes", {})
+    expected_hashes_keys = {
+        "input_vcf_sha256", "provenance_sha256", "provenance_manifest_hash", "provenance_vcf_hash",
+        "return_manifest_sha256", "scoring_report_sha256", "bias_tsv_sha256", "heldout_nirvana_json_sha256"
+    }
+    assert set(hashes.keys()) == expected_hashes_keys, f"Historical hashes keys mismatch: expected {expected_hashes_keys}, got {set(hashes.keys())}"
+    
+    # Assert exact pinned hash values
+    assert hashes.get("input_vcf_sha256") == '4dcba7c882b65838cedf8ce0ad56e0f7764df34b247ab412aac144d4027c622d'
+    assert hashes.get("provenance_sha256") == '63f1881287f1e3aa0b36ca14e1a7329ef2bcacc7b9674c2489f5e1d4352a6ac8'
+    assert hashes.get("provenance_manifest_hash") == '9e588cdf8ebaea2e3793e0ea74721ab5283b57c2abf045dbf3070cb6e81ec9e4'
+    assert hashes.get("provenance_vcf_hash") == '4dcba7c882b65838cedf8ce0ad56e0f7764df34b247ab412aac144d4027c622d'
+    assert hashes.get("return_manifest_sha256") == '5efdccdc57f7d2bdf774486dfbde106ab173bf87412c6db103aaba9958d9ac91'
+    assert hashes.get("scoring_report_sha256") == 'e5351a42e3120083d21d6b82775a38aee2a5d9bcf8586da08b3b239f24c35b3c'
+    assert hashes.get("bias_tsv_sha256") == '7eece438a880e0c6a591df62e231bc93848eeb42277a2f4360983914298fc512'
+    assert hashes.get("heldout_nirvana_json_sha256") == '315e601cc9ede55c07c4a59de796c2be5cf0f2827e441101ceea236390675d13'
+    
+    # Strict independence from current x64 readiness (no references in hist)
+    assert "current_x64" not in str(hist).lower() or hist.get("independent_of") == "current_x64_reannotation_readiness"
+    
+    curr = manifest.get("current_x64_reannotation_readiness", {})
+    assert set(curr.keys()) == {"required_only_for", "status", "presence_proof_when_needed", "boundary_rule"}
+    assert curr.get("required_only_for") == "X64_REANNOTATE"
+    
+    # current_x64_reannotation_readiness must contain NO historical evidence hashes
+    curr_str = str(curr)
+    for h_val in hashes.values():
+        assert h_val not in curr_str, f"Historical hash {h_val} found in current x64 readiness section!"
 
 
 # ==========================================
@@ -327,12 +462,30 @@ def test_REF1_arm_hash_bytes():
         actual_sha = compute_sha256(full_path)
         assert actual_sha == item["sha256"], f"SHA256 mismatch for {item['id']}: expected {item['sha256']}, got {actual_sha}"
         
-    # Attempt to load canonical manifest
-    load_manifest()
+    # Load canonical manifest and compare manifest-declared present_hashed inventory
+    manifest = load_manifest()
+    inventory = manifest.get("arm_inventory", {})
+    present_hashed = inventory.get("present_hashed", [])
+    
+    assert len(present_hashed) == 14, f"Expected exactly 14 present_hashed files in manifest, got {len(present_hashed)}"
+    
+    # Compare each entry between manifest-declared and hardcoded expected inventory
+    manifest_by_id = {entry["id"]: entry for entry in present_hashed}
+    expected_by_id = {item["id"]: item for item in ARM_INVENTORY}
+    
+    assert set(manifest_by_id.keys()) == set(expected_by_id.keys()), "Manifest-declared arm_inventory.present_hashed IDs do not match the expected set"
+    
+    for item_id, expected_item in expected_by_id.items():
+        manifest_item = manifest_by_id[item_id]
+        assert manifest_item["path"] == expected_item["path"], f"Path mismatch for {item_id}"
+        assert manifest_item["sha256"] == expected_item["sha256"], f"SHA256 mismatch for {item_id}"
+        assert manifest_item["bytes"] == expected_item["bytes"], f"Bytes size mismatch for {item_id}"
+        assert manifest_item["location"] == "arm", f"Location mismatch for {item_id}"
+        assert manifest_item["presence"] == "present_hashed", f"Presence mismatch for {item_id}"
 
 
 @pytest.mark.requires_reference
-def test_REF2_vcf_provenance_return_consistency():
+def test_REF2_return_manifest_and_provenance():
     data_root = os.environ.get("RAPTOR_DATA_ROOT")
     if not data_root:
         pytest.skip("RAPTOR_DATA_ROOT environment variable is not set; skipping REF2")
@@ -374,11 +527,28 @@ def test_REF2_vcf_provenance_return_consistency():
             expected_hash = parts[0].strip().lower()
             rel_file_path = parts[1].strip()
             clean_rel_path = rel_file_path.lstrip("*").replace("./", "").replace(".\\", "")
+            basename = os.path.basename(clean_rel_path)
             
-            file_to_check = return_manifest_path.parent / clean_rel_path
-            if file_to_check.exists():
+            # Explicit worker-only files that can be absent
+            worker_only_basenames = {
+                "holdout_input_nirvana.json.gz",
+                "nirvana-grch38-full.sha256.txt",
+                "nirvana-grch38-updates.sha256.txt",
+                "bias-hg38-data.sha256.txt"
+            }
+            
+            file_to_check = return_manifest_path.parent / basename
+            
+            if basename in worker_only_basenames:
+                # Allowed to be absent, but if it exists, check its hash
+                if file_to_check.exists():
+                    actual_hash = compute_sha256(file_to_check)
+                    assert actual_hash == expected_hash, f"Hash mismatch for worker-only {basename}"
+            else:
+                # MUST exist and match
+                assert file_to_check.exists(), f"ARM-present file listed in RETURN_MANIFEST does not exist: {file_to_check}"
                 actual_hash = compute_sha256(file_to_check)
-                assert actual_hash == expected_hash, f"Hash mismatch in RETURN_MANIFEST for {clean_rel_path}: expected {expected_hash}, got {actual_hash}"
+                assert actual_hash == expected_hash, f"Hash mismatch in RETURN_MANIFEST for {basename}: expected {expected_hash}, got {actual_hash}"
 
     # Attempt to load canonical manifest
     load_manifest()
@@ -426,31 +596,76 @@ if __name__ == "__main__":
     missing_files = []
     print(f"Executing local reference gate under RAPTOR_DATA_ROOT: {data_root_env}")
     
+    # 1. Verify the hardcoded 14 present_hashed files
     for item in ARM_INVENTORY:
         full_path = Path(data_root_env) / item["path"]
         if not full_path.exists():
-            print(f"MISSING: {item['path']}", file=sys.stderr)
+            print(f"MISSING hardcoded file: {item['path']}", file=sys.stderr)
             missing_files.append(item["path"])
             continue
             
         actual_size = full_path.stat().st_size
         if actual_size != item["bytes"]:
-            print(f"SIZE MISMATCH for {item['path']}: expected {item['bytes']}, got {actual_size}", file=sys.stderr)
+            print(f"SIZE MISMATCH for hardcoded {item['path']}: expected {item['bytes']}, got {actual_size}", file=sys.stderr)
             missing_files.append(item["path"])
             continue
             
         actual_sha = compute_sha256(full_path)
         if actual_sha != item["sha256"]:
-            print(f"HASH MISMATCH for {item['path']}: expected {item['sha256']}, got {actual_sha}", file=sys.stderr)
+            print(f"HASH MISMATCH for hardcoded {item['path']}: expected {item['sha256']}, got {actual_sha}", file=sys.stderr)
             missing_files.append(item["path"])
             continue
             
-        print(f"MATCHED: {item['id']}")
+        print(f"MATCHED hardcoded: {item['id']}")
         
+    # 2. Once manifest exists, ALSO verify every manifest-declared present_hashed entry
+    if MANIFEST_PATH.exists():
+        print(f"Manifest exists. Validating manifest-declared arm_inventory.")
+        try:
+            with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
+                manifest_data = yaml.safe_load(f)
+            present_hashed_manifest = manifest_data.get("arm_inventory", {}).get("present_hashed", [])
+            
+            # Compare ID sets to ensure exact equality
+            manifest_ids = {entry["id"] for entry in present_hashed_manifest}
+            hardcoded_ids = {item["id"] for item in ARM_INVENTORY}
+            if manifest_ids != hardcoded_ids:
+                print(f"Error: Manifest IDs mismatch with hardcoded IDs. Manifest: {manifest_ids}, Hardcoded: {hardcoded_ids}", file=sys.stderr)
+                sys.exit(2)
+                
+            for entry in present_hashed_manifest:
+                entry_id = entry.get("id")
+                entry_path = entry.get("path")
+                entry_sha = entry.get("sha256")
+                entry_bytes = entry.get("bytes")
+                
+                full_path = Path(data_root_env) / entry_path
+                if not full_path.exists():
+                    print(f"MISSING manifest-declared file: {entry_path}", file=sys.stderr)
+                    missing_files.append(entry_path)
+                    continue
+                    
+                actual_size = full_path.stat().st_size
+                if actual_size != entry_bytes:
+                    print(f"SIZE MISMATCH for manifest-declared {entry_path}: expected {entry_bytes}, got {actual_size}", file=sys.stderr)
+                    missing_files.append(entry_path)
+                    continue
+                    
+                actual_sha = compute_sha256(full_path)
+                if actual_sha != entry_sha:
+                    print(f"HASH MISMATCH for manifest-declared {entry_path}: expected {entry_sha}, got {actual_sha}", file=sys.stderr)
+                    missing_files.append(entry_path)
+                    continue
+                    
+                print(f"MATCHED manifest-declared: {entry_id}")
+        except Exception as e:
+            print(f"Error while validating manifest-declared inventory: {e}", file=sys.stderr)
+            sys.exit(2)
+            
     if missing_files:
         print(f"\nVerification FAILED. {len(missing_files)} files missing/mismatched.", file=sys.stderr)
         sys.stderr.flush()
         sys.exit(2)
         
-    print("\nVerification SUCCESS. All 14 files exist and match hashes/bytes perfectly.")
+    print("\nVerification SUCCESS. All files exist and match hashes/bytes perfectly.")
     sys.exit(0)
