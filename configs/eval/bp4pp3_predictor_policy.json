@@ -1,6 +1,6 @@
 {
   "schema": "bp4pp3-predictor-policy/2",
-  "status": "proposed",
+  "status": "approved",
   "mode": "disabled_manual",
   "production_config_hash": "1ba8066accd8eda16e20518abbeaedb61247fea372675f519f02a8574ff9350e",
   "eval_config_hash": "ea4ff684bdc2ae6b079f352816b3993ac813af0e2654b851c30c1f4ef577a293",
