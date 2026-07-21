@@ -568,6 +568,54 @@ def test_oracle_pin_drift_keeps_valid_numeric_types():
     decide_tiered_gate(metrics, config, run_meta, make_tiered_authorization_dict())
 
 
+@pytest.mark.parametrize(
+    "invalid_bound",
+    [
+        -0.1,
+        1.1,
+        float("inf"),
+        float("-inf"),
+        float("nan"),
+        "0.95",
+        True,
+    ],
+)
+def test_conditional_lower_bounds_fail_closed(invalid_bound):
+    """Malformed confidence bounds never become MET or post-hoc support."""
+    config = make_test_config()
+    run_meta = MockRunMeta()
+    metrics_row = Metrics(
+        precision=1.0,
+        recall=1.0,
+        concordance=1.0,
+        counts={
+            "total": 50,
+            "total_called": 40,
+            "abstain": 10,
+            "path_actual": 40,
+            "path_called": 40,
+            "benign_actual": 10,
+            "benign_called": 0,
+            "tp": 40,
+            "tn": 0,
+            "fp": 0,
+            "fn": 0,
+        },
+        stratum="truncating",
+        gating=True,
+    )
+    metrics_row.precision_lb = invalid_bound
+    metrics_row.recall_lb = invalid_bound
+
+    with pytest.raises(TieredReadjudicationInputError):
+        decide_tiered_gate(
+            {"truncating": metrics_row},
+            config,
+            run_meta,
+            make_tiered_authorization_dict(),
+        )
+
+
 def test_synthetic_full_spectrum_requires():
     """Test 9: full_spectrum authorization requires ALL three requires-scopes VALIDATED_PROSPECTIVE.
 
