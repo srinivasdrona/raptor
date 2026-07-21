@@ -73,6 +73,42 @@ python scripts/build_masked_holdout_gate_aggregate.py \
   --output data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json
 ```
 
+`tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json` (ADR-0012) is the
+packet-free, non-identifying binding census aggregate over the same
+6,618-VUS TSC1/TSC2 run under the PP3/BP4-disabled-automated-emission /
+manual policy: candidate LP/LB directions, pattern compression, raw and
+consumed-automated criterion incidence, PP3/BP4 suppression counts, the
+signed-points distribution, per-gene/per-consequence corpus and direction
+breakdowns, and a superseded-historical-comparison delta against
+`tsc_vus_clinvar_2026-07-07_stats.json`. It is produced by the packet-free
+`raptor.census` package (`raptor.census.strata` + `raptor.census.aggregate`)
+and is a DOER RUNTIME OUTPUT, never hand-authored or committed by an
+implementation change. `non_authoritative_boundary` is recorded on every
+emitted record: this aggregate is an internal, eval-only triage signal, not
+a validated classification, an expert-reviewed VUS worklist, or a clinical
+report.
+
+Reproduce it (byte-identical, never overwriting an existing artifact) with:
+
+```text
+python -m raptor.census.cli \
+  --manifest <raptor-data manifest.jsonl> \
+  --bias-tsv <raptor-data BIAS output.tsv> \
+  --provenance <run-pins.json> \
+  --scorer-config configs/acmg/tsc.yaml \
+  --eval-config configs/eval/tsc2.yaml \
+  --predictor-policy configs/eval/bp4pp3_predictor_policy.json \
+  --lineage-policy <bias lineage policy.json> \
+  --historical-stats data/census/tsc_vus_clinvar_2026-07-07_stats.json \
+  --emit-census-record data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json
+```
+
+Pass `--dry-run` or `--summary` instead of `--emit-census-record` to prove
+source-of-record conservation and bound-config-hash verification with no
+write. The CLI fails closed (no output) on any path other than the single
+hard-pinned target above, and on any attempt to overwrite an existing
+artifact, including the historical stats and the certified masked gate.
+
 `tsc2_mave_clipe_orthogonal_2026-07-13.json` records the first orthogonal,
 non-gating MAVE (multiplexed assay of variant effect) validation track for
 TSC2, sourced from the public MaveDB cliPE prime-editing scoreset
