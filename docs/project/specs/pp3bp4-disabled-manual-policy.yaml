@@ -1,4 +1,4 @@
-# RAPTOR PP3/BP4 disabled/manual policy — Opus planner contract (rev 5).
+# RAPTOR PP3/BP4 disabled/manual policy — Opus planner contract (rev 6).
 #
 # Purpose: an implementation-ready, hash-bound plan for a FIRST-CLASS
 # disabled/manual PP3/BP4 policy mode. It permits the production-faithful
@@ -37,6 +37,17 @@
 # two stale claims to the deferred invariant and widens Gemini scope to TWO test
 # files (create the new disabled-policy suite AND update that AC-A6 assertion to
 # expect deferred), so the branch total is planner + 2 Gemini + 7 Sonnet = 10.
+#
+# Rev 6 supersedes commit cd49e1e after a Gemini test-validity review: the
+# subprocess PROCEED tests (G-DM4/7/12) cannot satisfy the real manifest/
+# benchmark/reference/mask contracts and used dummy runtime-bundle hashes. Rev 6
+# adds three PURE, offline-testable seams inside the same runner file
+# (resolve_policy_state, build_policy_evidence_source, build_disabled_policy_pins),
+# rewrites the Gemini matrix to unit-test those seams offline (no subprocess, no
+# fake holdout), removes the invalid mock-holdout fixture, and defers the real
+# 2,577-row PROCEED to the formal masked rerun after owner approval. Scope stays
+# 10 files (seams live in the existing Sonnet runner file); state/hash/lineage
+# semantics, neutral gate and no-x64 preserved.
 #
 # This file is the planner PLAN. It performs NO implementation, NO tests, NO
 # runner/config/code edits, NO owner approval and NO held-out run. It names the
@@ -149,6 +160,25 @@ revision_log:
       - validation_scope + protected_tests_expectations + owner_decision_gate + migration (aggregation-wrapper update)
     preserved:
       - 'ALL other closed behavior: narrowed threat_model; neutral existing-gate authorization; no x64; runtime_bundle_hash accidental-drift; actual-path CHECK-BEFORE-LOAD; owner status-only approval; corrected_enabled + v1 blocked; D12 deferred + lineage_policy_hash; 7 Sonnet files'
+  - rev: 6
+    supersedes_commit: cd49e1e82766713908a76d5612e510d31a38f199
+    trigger: Gemini test-validity review -- the subprocess PROCEED tests were not implementable
+    attribution:
+      real_blocker_fixed:
+        - 'G-DM4/7/12 assumed a subprocess masked-holdout PROCEED, but a valid run needs the real manifest + frozen benchmark + reference genome + mask ledger + return manifest + 2,577-row BIAS TSV, none of which can be faked; a mock fixture would use dummy runtime-bundle hashes and un-runnable CI. Requiring a fake end-to-end before owner approval was wrong.'
+      fix:
+        - 'add three PURE seams to scripts/run_masked_holdout_eval.py (same file, no scope change): resolve_policy_state (hash+mode/status dispatch, opens no held-out input), build_policy_evidence_source (wrap PolicyDisabledEvidenceSource for approved-disabled only), build_disabled_policy_pins (pure provenance dict incl. zero scored calls). main() composes them before the existing runtime/eval flow.'
+        - 'rewrite the Gemini matrix to unit-test the seams offline (G-DM4 offline composition; G-DM5/6/7/8 call resolve_policy_state; G-DM12 calls verify_disabled_config_hashes; G-DM13 exercises decide_gate/decide_scope_gate directly; G-DM14 clones live records back to allowed before omission; G-DM10 dummy source defines variant_ids). Remove _create_mock_holdout_package / mini OTOF / empty-reference fixtures. Keep the existing protected blocked-policy subprocess tests.'
+        - 'the real 2,577-row PROCEED is the FORMAL masked rerun AFTER the ADR + status flip, not a CI test; GPT reviews main composition + pins (P13) before the owner gate.'
+      not_changed:
+        - '10-file scope, state/hash/lineage semantics, neutral existing-gate authorization, no x64.'
+    corrections_in:
+      - runner_behavior (pure_seams + dispatch/composition)
+      - test_matrix (G-DM4/5/6/7/8/10/12/13/14 rewritten offline; removed_from_required_tests; integration_boundary)
+      - implementation_scope (runner change describes the seams; still 7 Sonnet files)
+      - gpt_probes P13; owner_decision_gate; validation_scope; acceptance; beat4_self_audit
+    preserved:
+      - 'ALL other closed behavior incl. rev-1..5 decisions: threat_model; neutral gate; no x64; runtime_bundle_hash; actual-path CHECK-BEFORE-LOAD; owner status-only approval; corrected_enabled + v1 blocked; D12 deferred + lineage_policy_hash; two Gemini files; 10-file branch'
 
 planner:
   model: claude-opus-4.8
@@ -729,15 +759,54 @@ config_changes:
 # ---------------------------------------------------------------------------
 runner_behavior:
   file: scripts/run_masked_holdout_eval.py
+  pure_seams:
+    rationale: >-
+      Factor the policy gate into PURE, offline-testable seams so the Gemini
+      matrix never needs a fake masked-holdout subprocess (the real manifest/
+      benchmark/reference/mask contracts and a real 2,577-row BIAS TSV cannot be
+      faked, and a mock would use dummy hashes). main() composes the seams before
+      the existing runtime/eval flow; SAME Sonnet file, NO scope expansion.
+    seams:
+      - name: resolve_policy_state
+        signature: 'resolve_policy_state(policy, scorer_config_path, eval_config_path, lineage_path, runtime_bundle_paths) -> (state, reason)'
+        does: >-
+          mode/status dispatch + path-byte/hash checks ONLY
+          (verify_disabled_config_hashes over the three config paths +
+          verify_runtime_bundle_hash over the code bundle). Returns a state in
+          {MALFORMED, UNSUPPORTED_MODE, CORRECTED_ENABLED_OUT_OF_SCOPE,
+          PROPOSED_DISABLED, CONFIG_DRIFT, RUNTIME_BUNDLE_DRIFT, APPROVED_DISABLED}
+          + a reason string. Opens NO held-out input (no manifest/benchmark/
+          reference/mask/TSV).
+      - name: build_policy_evidence_source
+        signature: 'build_policy_evidence_source(source, policy_or_state) -> PolicyDisabledEvidenceSource'
+        does: >-
+          for APPROVED_DISABLED only, wrap the given evidence source in
+          PolicyDisabledEvidenceSource(disabled_criteria={PP3,BP4}); corrected/
+          legacy/any non-approved state never reaches this seam (fail closed).
+          NEVER constructs PredictorCorrectedEvidenceSource.
+      - name: build_disabled_policy_pins
+        signature: 'build_disabled_policy_pins(policy, disabled_source, scorer_config, eval_config, lineage_policy) -> dict'
+        does: >-
+          pure provenance dict (the config_pins additions): policy_mode,
+          pp3bp4_suppressed_counts, pp3bp4_scored_calls=0,
+          pp3bp4_lineage_disposition, the three config hashes + runtime_bundle_hash
+          + predictor provenance. NO report/gate mutation; returns data only.
+    composition: >-
+      main(): parse args -> load_predictor_policy -> resolve_policy_state; if the
+      state is not APPROVED_DISABLED, print a BLOCKED_POLICY GateDecision and
+      return 0 (NO held-out input opened); else run the existing runtime-input
+      verification + load configs/lineage, build BiasEvidenceSource, wrap via
+      build_policy_evidence_source, run_eval, attach build_disabled_policy_pins,
+      render. main never overrides gate/scope_gate output.
   dispatch:
     - 'load_predictor_policy(args.predictor_policy) -> MALFORMED => BLOCKED_POLICY'
-    - 'resolve effective_state via state_machine; every non-PROCEED state prints a BLOCKED_POLICY GateDecision (vus_authorized=False) and returns 0 with NO metrics'
-    - 'PROCEED only for APPROVED_DISABLED, after: verify_runtime_bundle_hash(policy, [predictor_policy.py, terminal_source.py, run_masked_holdout_eval.py]) AND verify_disabled_config_hashes(policy, args.scorer_config, args.eval_config, lineage_policy_path=configs/eval/bias_lineage.yaml) on the ACTUAL loaded paths, BEFORE load_scorer_config/load_eval_config/load_lineage_policy'
+    - 'resolve_policy_state(...) does the hash + mode/status checks WITHOUT opening held-out inputs; every non-APPROVED_DISABLED state prints a BLOCKED_POLICY GateDecision (vus_authorized=False) and returns 0 with NO metrics'
+    - 'PROCEED only for APPROVED_DISABLED: the three config path-byte hashes + runtime_bundle_hash are verified inside resolve_policy_state BEFORE any config/holdout load'
     - 'on PROCEED the runner is authorization-NEUTRAL: it never sets vus_authorized/scope booleans; the gate/scope_gate decide from metrics (see authorization_semantics)'
   disabled_manual_proceed_path:
     evidence_wrapping:
       - 'source = BiasEvidenceSource(...)  # unchanged; reads the immutable masked BIAS TSV'
-      - 'disabled = PolicyDisabledEvidenceSource(source, disabled_criteria={PP3, BP4})  # strips + COUNTS; REPLACES PredictorCorrectedEvidenceSource'
+      - 'disabled = build_policy_evidence_source(source, state)  # -> PolicyDisabledEvidenceSource({PP3,BP4}) for APPROVED_DISABLED only; strips + COUNTS; REPLACES PredictorCorrectedEvidenceSource'
       - 'production = ProductionVocabEvidenceSource(disabled, scorer_config.acmg_criteria, eval_config.automatable_criteria)  # unchanged; now a no-op on PP3/BP4 (not automatable)'
       - 'DO NOT construct PredictorCorrectedEvidenceSource in this branch (no correction applied)'
     guards_before_load:
@@ -749,7 +818,7 @@ runner_behavior:
       - 'assert the loaded lineage policy has PP3/BP4 validation_disposition == production_disposition == deferred (decision_dependency bp4pp3-predictor-policy) or BLOCKED_POLICY'
       - 'assert_registry_consistency(policy, scorer_config, eval_config) is already run first inside audit_lineage (live_source.py:251) -- a residual omitted_without_disposition would raise there before any scoring'
     after_run_eval:
-      - 'assert emitted PP3/BP4 scored calls == 0 (invariant; derived from evidence, not hardcoded)'
+      - 'pins = build_disabled_policy_pins(policy, disabled, scorer_config, eval_config, lineage_policy); assert pins["pp3bp4_scored_calls"] == 0 (invariant; derived from evidence, not hardcoded); attach pins to report.config_pins'
       - 'do NOT alter gate/scope_gate output: the pre-registered gate decides PASS/FAIL/authorization from metrics. PP3/BP4 removal is NOT a "skipped criterion", so the existing PASS+skipped->UNVERIFIED demotion (about PM1-type parity skips) does not apply to PP3/BP4 and is left unchanged.'
   evidence_source_construction:
     new_class: src/raptor/eval/terminal_source.py::PolicyDisabledEvidenceSource
@@ -849,15 +918,20 @@ implementation_scope:
         modify PredictorCorrectedEvidenceSource / ProductionVocabEvidenceSource.
     - path: scripts/run_masked_holdout_eval.py
       change: >-
-        Replace the status-only gate with the state_machine dispatch on
-        (status, mode, config-hash, runtime-bundle-hash). Disabled_manual proceed
-        path: verify_runtime_bundle_hash + verify_disabled_config_hashes on
-        args.scorer_config/args.eval_config BEFORE load; then load; then
-        defense-in-depth parity/absence asserts; wrap PolicyDisabledEvidenceSource
-        instead of PredictorCorrectedEvidenceSource; add suppression + hash pins;
-        assert pp3bp4_scored_calls==0. Stay AUTHORIZATION-NEUTRAL: do not set or
-        force any gate/scope authorization value. corrected_enabled and
-        legacy/unknown mode => BLOCKED_POLICY.
+        Factor the gate into THREE PURE seams (same file, NO scope change):
+        resolve_policy_state(policy, scorer_config_path, eval_config_path,
+        lineage_path, runtime_bundle_paths) -> (state, reason) doing mode/status
+        dispatch + the three config path-byte hashes + runtime_bundle_hash WITHOUT
+        opening any held-out input; build_policy_evidence_source(source, state) ->
+        PolicyDisabledEvidenceSource for APPROVED_DISABLED only (never
+        PredictorCorrectedEvidenceSource); build_disabled_policy_pins(...) -> the
+        pure provenance dict (policy_mode, suppressed_counts, pp3bp4_scored_calls=0,
+        pp3bp4_lineage_disposition, hashes) with NO report/gate mutation. main()
+        composes them: non-APPROVED_DISABLED prints BLOCKED_POLICY and returns 0;
+        else the existing runtime-input verification + load + run_eval, then attach
+        pins. Keep defense-in-depth parity/absence/lineage-disposition asserts after
+        load. Stay AUTHORIZATION-NEUTRAL; corrected_enabled and legacy/unknown mode
+        => BLOCKED_POLICY.
     - path: configs/acmg/tsc.yaml
       change: 'Remove PP3, BP4 from included_criteria (keep them in acmg_criteria).'
     - path: configs/eval/tsc2.yaml
@@ -948,27 +1022,30 @@ test_matrix:
         suppressed_counts, and is IDEMPOTENT: two get_evidence calls for one
         variant do not double-count.
     - id: G-DM4
-      target: 'run_masked_holdout_eval.py (subprocess, PROCEED path)'
+      target: 'run_masked_holdout_eval seams (offline unit composition; NO subprocess)'
       asserts: >-
-        approved+disabled_manual with matching config + enforcement hashes +
-        masked inputs => gate status != BLOCKED_POLICY and is the metric-derived
-        decide_gate result (NOT forced by mode); config_pins show
-        policy_mode=disabled_manual, pp3bp4_scored_calls=0, non-empty
-        pp3bp4_suppressed_counts, predictor_correction_applied=false. Provide an
-        offline synthetic-source variant plus a reference-partition variant (gate
-        on data availability like the existing enabled tests).
+        build a CONTRACT-VALID BiasEvidenceSource offline (one canonical manifest
+        row + a matching single BIAS TSV row + a FakeCanonicalNormalizer or
+        equivalent); write temp scorer/eval/lineage configs and a v2 policy whose
+        three config hashes match those temp bytes and whose runtime_bundle_hash
+        is the REAL repo bundle hash; resolve_policy_state(...) == APPROVED_DISABLED;
+        build_policy_evidence_source wraps it in PolicyDisabledEvidenceSource;
+        build_disabled_policy_pins returns policy_mode=disabled_manual,
+        pp3bp4_scored_calls=0, non-empty pp3bp4_suppressed_counts,
+        pp3bp4_lineage_disposition=deferred, predictor_correction_applied=false.
+        NO subprocess, NO benchmark/reference/mask pretense, NO 2,577-row TSV.
     - id: G-DM5
-      target: 'run_masked_holdout_eval.py (subprocess)'
-      asserts: 'proposed+disabled_manual => BLOCKED_POLICY, no metrics.'
+      target: 'resolve_policy_state (unit)'
+      asserts: 'a proposed+disabled_manual v2 fixture => state PROPOSED_DISABLED (blocked); reason names "proposed". No subprocess, no held-out input.'
     - id: G-DM6
-      target: 'run_masked_holdout_eval.py (subprocess)'
-      asserts: 'approved+corrected_enabled => BLOCKED_POLICY (out-of-scope activation), no metrics.'
+      target: 'resolve_policy_state (unit)'
+      asserts: 'an approved+corrected_enabled fixture => state CORRECTED_ENABLED_OUT_OF_SCOPE (blocked). No subprocess.'
     - id: G-DM7
-      target: 'run_masked_holdout_eval.py (subprocess)'
-      asserts: 'approved+disabled_manual but a CHANGED byte in ANY of the three pinned paths (scorer config, eval config, or bias_lineage.yaml) => BLOCKED_POLICY (drift); parametrize over all three; models an accidental edit/stale approval, not an attacker.'
+      target: 'resolve_policy_state (unit, parametrized over the three config files)'
+      asserts: 'approved+disabled_manual but a CHANGED byte in ANY ONE of the three temp pinned paths (scorer config, eval config, or bias_lineage) => state CONFIG_DRIFT (blocked); parametrize over all three; models an accidental edit/stale approval, not an attacker. No subprocess.'
     - id: G-DM8
-      target: 'run_masked_holdout_eval.py (subprocess)'
-      asserts: 'legacy v1 schema status=approved (no mode) => BLOCKED_POLICY -- proves status alone never enables.'
+      target: 'resolve_policy_state (unit)'
+      asserts: 'a legacy v1-schema status=approved fixture (no mode/lineage/runtime hashes) => state UNSUPPORTED_MODE (blocked) -- proves status alone never enables. No subprocess.'
     - id: G-DM9
       target: 'configs + config.py + lineage'
       asserts: >-
@@ -980,10 +1057,11 @@ test_matrix:
         non-empty decision_rationale; load_lineage_policy + assert_registry_consistency
         pass; the existing tests/eval/test_bias_lineage_registry.py suite passes.
     - id: G-DM10
-      target: 'end-to-end suppression'
+      target: 'PolicyDisabledEvidenceSource (unit)'
       asserts: >-
-        a BIAS record firing PP3+BP4+PVS1 yields zero emitted PP3/BP4, a counted
-        suppression of 2, and a still-emitted PVS1.
+        a dummy source that DEFINES variant_ids and whose get_evidence yields
+        PP3+BP4+PVS1 for a variant, wrapped by PolicyDisabledEvidenceSource, emits
+        zero PP3/BP4, a counted suppression of 2, and a still-emitted PVS1.
     - id: G-DM11
       target: 'predictor_policy.verify_runtime_bundle_hash + runner (accidental drift)'
       asserts: >-
@@ -994,31 +1072,33 @@ test_matrix:
         runner BLOCKED_POLICY. (Scope note: exercises accidental byte drift; a
         change that also removes the verifier is out of scope -- threat_model.)
     - id: G-DM12
-      target: 'run_masked_holdout_eval.py (subprocess, alternate config modified BEFORE invocation)'
+      target: 'predictor_policy.verify_disabled_config_hashes (unit; NO subprocess)'
       asserts: >-
-        an alternate --scorer-config/--eval-config path that is BYTE-IDENTICAL to
-        the pinned config => PROCEED; a config modified BEFORE invocation that
-        removes PP3/BP4 but changes a threshold/scope/authorization byte =>
-        BLOCKED_POLICY (check-before-load hash mismatch), proving absence alone is
-        insufficient. (Models an accidental/incorrect path, not concurrent
-        mutation between check and load -- threat_model.)
+        byte-identical alternate scorer/eval/lineage paths (same bytes, different
+        path) PASS; a changed byte in any of the three (a config that removes
+        PP3/BP4 but changes a threshold/scope/auth byte) raises PredictorPolicyError,
+        proving absence alone is insufficient. Models an accidental/incorrect path,
+        not concurrent mutation between check and load (threat_model).
     - id: G-DM13
-      target: 'authorization neutrality'
+      target: 'authorization neutrality (unit via existing decide_gate/decide_scope_gate/compute_report_scope_gate)'
       asserts: >-
-        (a) policy approval/mode ALONE cannot alter a synthetic gate decision --
-        feeding fixed metrics yields the same decide_gate/decide_scope_gate
-        result regardless of policy_mode/status; (b) a passing metric set and a
-        failing metric set each produce the SAME gate semantics as the existing
-        code, while pp3bp4 scored calls == 0 is guaranteed in both. The runner
-        neither force-allows nor force-denies.
+        feed BOTH a passing and a failing metric set through decide_gate /
+        decide_scope_gate / compute_report_scope_gate and confirm (a) none takes a
+        policy/mode/status parameter or override, and (b) each yields the SAME
+        verdict as the existing code. Scope note: this proves the gate functions
+        are policy-independent; it does NOT by itself prove main never overrides a
+        gate output -- that is the GPT-review probe P13 over main composition.
     - id: G-DM14
-      target: 'lineage_registry.assert_registry_consistency (negative control)'
+      target: 'lineage_registry.assert_registry_consistency (negative control, unit)'
       asserts: >-
-        a control where PP3/BP4 are removed from included_criteria/automatable_criteria
-        but their bias_lineage disposition is left `allowed` raises
-        LineageRegistryMismatchError with breach kind omitted_without_disposition --
-        proving the deferred change is load-bearing and that the registry check
-        fails closed rather than silently omitting the criteria.
+        CLONE the live PP3/BP4 lineage records and force
+        validation_disposition=production_disposition=allowed (so the control
+        stays REAL even AFTER Sonnet flips the live config to deferred), then
+        remove PP3/BP4 from the included/automatable registries:
+        assert_registry_consistency raises LineageRegistryMismatchError with
+        breach kind omitted_without_disposition -- proving the deferred change is
+        load-bearing and the registry check fails closed rather than silently
+        omitting the criteria.
     - id: G-DM15
       target: 'tests/eval/test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance (Gemini updates)'
       asserts: >-
@@ -1035,6 +1115,13 @@ test_matrix:
     - 'existing gate.py / scope_gate.py (ADR-0011) tests stay GREEN and unmodified; disabled mode does not change gate semantics.'
     - 'tests/eval/test_bias_lineage_registry.py and test_bias_lineage_audit.py stay GREEN with PP3/BP4 deferred; only bias_lineage.yaml DATA changed, no lineage code -- Gemini does not edit these two.'
     - 'tests/eval/test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance is INTENTIONALLY UPDATED by Gemini (production_disposition allowed -> deferred + decision_dependency). Its old assertion encoded the PRE-decision `allowed` disposition; the approved disabled/manual contract flips it to deferred, so matching the assertion to the contract is REQUIRED, not a weakening -- it still asserts an exact disposition. Sonnet does NOT touch it.'
+  removed_from_required_tests:
+    - 'the invalid subprocess PROCEED fixture is REMOVED: no _create_mock_holdout_package, no mini OTOF / empty-reference genome, no fake manifest/benchmark/mask/return-manifest, no dummy runtime-bundle hash. A real masked-holdout PROCEED cannot be faked, so it is NOT a required test.'
+    - 'the existing protected blocked-policy subprocess tests remain valid and unchanged (test_predictor_policy_gate.py::test_acg8_terminal_runner_blocked_policy: missing/malformed/unapproved policy => BLOCKED_POLICY) -- they return before opening any held-out input.'
+  integration_boundary:
+    before_owner_approval: 'ONLY the offline unit seams (G-DM4..G-DM14) are tested; NO real 2,577-row PROCEED is run in CI.'
+    after_owner_approval: 'the actual 2,577-row masked rerun is the FORMAL PROCEED after the ADR + status flip -- the real manifest/benchmark/reference/mask/return-manifest contracts are satisfied then, never faked.'
+    gpt_review: 'GPT-5.4 reviews main()''s composition of the seams + build_disabled_policy_pins output BEFORE the owner gate (P13), in place of a fake end-to-end proceed.'
 
 # ---------------------------------------------------------------------------
 # GPT-5.4 review probes.
@@ -1054,6 +1141,7 @@ gpt_probes:
     - 'P10: config hashes are computed over the ACTUAL --scorer-config/--eval-config bytes and verified BEFORE load; a byte-identical alternate path passes, but changed thresholds/scope/auth (despite PP3/BP4 absence) => BLOCKED_POLICY.'
     - 'P11: the runner is authorization-NEUTRAL -- it sets no gate/scope authorization value; decide_gate/decide_scope_gate (ADR-0011) still decide from metrics; gate.py/scope_gate.py are unchanged; a synthetic gate decision is unaffected by policy mode.'
     - 'P12: bias_lineage.yaml PP3/BP4 are deferred/deferred with decision_dependency bp4pp3-predictor-policy + non-empty decision_rationale; assert_registry_consistency passes (no omitted_without_disposition); lineage_policy_hash is bound + check-before-load; NO lineage-registry/policy/audit code changed; audit_lineage adds no new block because PP3/BP4 are not automatable (would_be_scored False).'
+    - 'P13: review main() composition of the three seams -- resolve_policy_state gates BEFORE any held-out input is opened; build_policy_evidence_source only wraps PolicyDisabledEvidenceSource for APPROVED_DISABLED (never PredictorCorrectedEvidenceSource); build_disabled_policy_pins is pure (no report/gate mutation); main does not override decide_gate/decide_scope_gate output. This human/GPT review replaces the removed fake end-to-end PROCEED test and is done BEFORE the owner gate.'
 
 # ---------------------------------------------------------------------------
 # Owner decision gate — no self-approval.
@@ -1062,10 +1150,10 @@ owner_decision_gate:
   sequence:
     - '1. Gemini authors the RED test matrix in ONE Gemini commit: creates tests/eval/test_pp3bp4_disabled_policy.py AND updates tests/eval/test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance disposition assertions (allowed -> deferred + decision_dependency). Both are RED until Sonnet implements.'
     - '2. Sonnet implements implementation_scope in one commit; artifact stays status=proposed, mode=disabled_manual with post-removal config hashes and re-pinned correction_hash; all tests green (sentinel green after re-pin).'
-    - '3. GPT-5.4 runs gpt_probes.'
+    - '3. GPT-5.4 runs gpt_probes, including reviewing main()''s composition of the three seams and the build_disabled_policy_pins output (P11/P13) -- this replaces a fake end-to-end PROCEED.'
     - '4. Owner (operator/domain owner, @dronasrinivas) records ADR-0012 in docs/DECISIONS.md (MADR, Accepted). The ADR states that disabled/manual permits EVALUATION (use of the disabled/manual evidence mode) and does NOT grant automatic VUS/scope authorization -- the pre-registered gate/scope_gate outcome remains authoritative -- and records the unmet activation evidence (exact_revel_compatibility unresolved, permitted_use pending, training_overlap UNKNOWN, transportability BLOCKED_DATA_UNDERPOWERED).'
     - '5. Owner, in a SEPARATE status-only commit, flips configs/eval/bp4pp3_predictor_policy.json status proposed->approved after independently verifying production_config_hash/eval_config_hash/lineage_policy_hash (vs the actual configs) and runtime_bundle_hash (vs the runtime code bundle). No other field changes.'
-    - '6. Only then may the terminal runner PROCEED in disabled_manual mode.'
+    - '6. Only AFTER the status flip is the actual 2,577-row masked rerun run as the FORMAL PROCEED (real manifest/benchmark/reference/mask/return-manifest contracts satisfied); it is NOT run in CI before approval (integration_boundary).'
   no_self_approval:
     - 'the planner (Opus) never approves; the doer (Sonnet) never sets status=approved.'
     - 'approval is a distinct human commit bound to the config hashes; drift after approval fails closed.'
@@ -1146,6 +1234,7 @@ validation_scope:
     - 'the targeted PP3/BP4 policy + terminal-runner + config + lineage tests (the Gemini G-DM matrix and the affected protected tests in tests/eval/) must pass; this is the smallest set that covers the changed behavior.'
     - 'run via `python -m pytest` (NOT bare `pytest`) so the checkout src/ is importable. Example selector: python -m pytest tests/eval/test_pp3bp4_disabled_policy.py tests/eval/test_predictor_policy_gate.py tests/eval/test_terminal_runner_controls.py tests/eval/test_bias_lineage_registry.py tests/eval/test_bias_lineage_audit.py tests/eval/test_predictor_aggregation_wrapper.py'
     - 'test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance is in this binding set AND the protected-test audit: its PP3/BP4 production_disposition expectation is updated allowed -> deferred to MATCH the approved planner contract (D4/D12 flip the config to deferred). Required by the contract, NOT a weakening -- it still asserts an exact disposition + decision_dependency.'
+    - 'the PROCEED path is covered by the OFFLINE seam composition (G-DM4) via `python -m pytest`; NO masked-holdout subprocess is invoked by the binding tests, and the real 2,577-row PROCEED is NOT run before owner approval (integration_boundary).'
   not_acceptance_blocking:
     - 'a full-suite run that errors only due to a missing optional dependency (e.g. pysam not installed) is an ENVIRONMENT issue, not a plan or implementation defect; a collection/import error from pysam does not fail plan acceptance.'
   best_effort_post_implementation:
@@ -1178,10 +1267,12 @@ beat4_self_audit:
       control: 'D11 authorization-neutral runner; gate.py/scope_gate.py untouched; a synthetic gate decision is unaffected by policy mode (G-DM13, P11).'
     - failure: 'PP3/BP4 removed from included/automatable but left `allowed` in bias_lineage.yaml -> the disabled run crashes with omitted_without_disposition (or a hand-edited lineage silently re-allows automated PP3/BP4).'
       control: 'D12 flips PP3/BP4 to deferred/deferred (decision_dependency bp4pp3-predictor-policy) in the SAME commit; lineage_policy_hash binds the file check-before-load; assert_registry_consistency passes; G-DM9 + G-DM14 (P12).'
+    - failure: 'A required test fakes a masked-holdout PROCEED (mock manifest/benchmark/reference/mask + dummy runtime-bundle hashes), giving a false green and un-runnable CI.'
+      control: 'pure seams (resolve_policy_state/build_policy_evidence_source/build_disabled_policy_pins) unit-tested OFFLINE (G-DM4..G-DM14); the fake subprocess fixture is removed (removed_from_required_tests); the real 2,577-row PROCEED is the post-approval formal rerun; GPT reviews main composition (P13).'
   planner_scope_inversions:
     - 'Editing code/config/tests instead of only the YAML: this planner commit modifies exactly one file (verified in VERIFICATION).'
     - 'Wrong or missing commit trailers: the corrected trailer Copilot-Session 7c146921-... is pinned in planner.required_trailers and verified post-commit; rev 1 (878bff8) used 90703341 and, per the no-amend rule, is left as-is with the spec corrected.'
-    - 'Committing on the wrong branch/base: worktree/branch pinned; rev-5 parent is b465a9c and is verified before/after commit.'
+    - 'Committing on the wrong branch/base: worktree/branch pinned; rev-6 parent is cd49e1e and is verified before/after commit.'
   empty_beat4_allowed: false
 
 # ---------------------------------------------------------------------------
@@ -1190,6 +1281,8 @@ beat4_self_audit:
 acceptance_mapping:
   - acceptance: 'Plan is implementation-ready and self-contained.'
     satisfied_by: 'implementation_scope + policy_schema_v2 + state_machine + runner_behavior + test_matrix name exact files, fields and probes.'
+  - acceptance: 'The policy gate is offline-testable without faking a masked-holdout run.'
+    satisfied_by: 'runner_behavior.pure_seams (resolve_policy_state/build_policy_evidence_source/build_disabled_policy_pins); G-DM4 offline composition + G-DM5..G-DM14 unit tests; integration_boundary defers the real 2,577-row PROCEED to the post-approval formal rerun (P13 review).'
   - acceptance: 'Disabled/manual mode is explicit and cannot be confused with predictor approval.'
     satisfied_by: 'D1/D2 orthogonal mode; corrected_enabled + legacy => BLOCKED_POLICY; D11 approval authorizes only the evidence mode.'
   - acceptance: 'Production-faithful rerun is preserved: policy approval never forces authorization; the gate decides from metrics (ADR-0011 preserved).'
@@ -1211,9 +1304,9 @@ acceptance_mapping:
 # VERIFICATION (slot 1) — filled by the planner after the commit.
 # ---------------------------------------------------------------------------
 verification:
-  expected: 'one follow-up (rev-5) commit on track/pp3bp4-resolution-2026-07 modifying exactly docs/project/specs/pp3bp4-disabled-manual-policy.yaml; parent b465a9c; both trailers; no amend; no push.'
+  expected: 'one follow-up (rev-6) commit on track/pp3bp4-resolution-2026-07 modifying exactly docs/project/specs/pp3bp4-disabled-manual-policy.yaml; parent cd49e1e; both trailers; no amend; no push.'
   checks:
     - 'git show --stat HEAD => 1 file changed (this file only).'
     - 'git log -1 shows Co-authored-by Copilot AND Copilot-Session: 7c146921-f3dd-4a1e-8cf0-8f574de49204.'
-    - 'HEAD~1 == b465a9cdbe9fd7bb5ae7eb968ad291c4c77ce2c1 (no amend); git status clean; branch unchanged; no remote update.'
+    - 'HEAD~1 == cd49e1e82766713908a76d5612e510d31a38f199 (no amend); git status clean; branch unchanged; no remote update.'
   verdict: recorded_in_final_response
