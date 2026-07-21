@@ -9,5 +9,5 @@
   "predictor_source_hash": "2c89bb17dea68fc9ed294eee2108bdd528e551eb4882b47cc4a400d683aca2ae",
   "correction_hash": "4bbdd1ddaeb45a7182126a70a5bb7eebb672f57de6e97e449b5b69584987d34f",
   "runtime_bundle_hash": "9b785e35ed143e90ee72a5ca2dc0f4293ae44e2554703fd44ef31e8564b2be65",
-  "decision_reference": "docs/DECISIONS.md#adr-0012-pp3bp4-disabled-manual-policy (rev9 follow-up: added REQUIRED packet_policy_hash binding configs/packet/candidate_direction.yaml after its PP3/BP4 criterion_strength_points rows were removed to match the derived candidate_set; verify_disabled_config_hashes now verifies FOUR config/policy paths -- production, eval, lineage, packet -- before proceed; runtime_bundle_hash re-pinned after the resolve_policy_state/verify_disabled_config_hashes packet-path signature change in run_masked_holdout_eval.py. production_config_hash/eval_config_hash/lineage_policy_hash/predictor_source_hash/correction_hash unchanged from the prior rev7 migration. status remains proposed -- owner approval is a separate, distinct commit per D7, now verifying FIVE hashes.)"
+  "decision_reference": "docs/DECISIONS.md#adr-0012--pp3bp4-automated-emission-disabled-for-the-current-masked-rerun"
 }
