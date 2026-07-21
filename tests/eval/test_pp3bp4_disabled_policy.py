@@ -26,25 +26,30 @@ def _get_real_bundle_hash_and_files():
     return digest.hexdigest(), sorted_files
 
 
-def _make_temp_policy_and_configs(tmp_path, status, mode, scorer_bytes=None, eval_bytes=None, lineage_bytes=None):
+def _make_temp_policy_and_configs(tmp_path, status, mode, scorer_bytes=None, eval_bytes=None, lineage_bytes=None, packet_bytes=None):
     if scorer_bytes is None:
         scorer_bytes = b"scorer"
     if eval_bytes is None:
         eval_bytes = b"eval"
     if lineage_bytes is None:
         lineage_bytes = b"lineage"
+    if packet_bytes is None:
+        packet_bytes = b"packet"
         
     scorer_file = tmp_path / "tsc.yaml"
     eval_file = tmp_path / "tsc2.yaml"
     lineage_file = tmp_path / "bias_lineage.yaml"
+    packet_file = tmp_path / "candidate_direction.yaml"
     
     scorer_file.write_bytes(scorer_bytes)
     eval_file.write_bytes(eval_bytes)
     lineage_file.write_bytes(lineage_bytes)
+    packet_file.write_bytes(packet_bytes)
     
     scorer_hash = hashlib.sha256(scorer_bytes).hexdigest()
     eval_hash = hashlib.sha256(eval_bytes).hexdigest()
     lineage_hash = hashlib.sha256(lineage_bytes).hexdigest()
+    packet_hash = hashlib.sha256(packet_bytes).hexdigest()
     
     bundle_hash, bundle_files = _get_real_bundle_hash_and_files()
         
@@ -57,6 +62,7 @@ def _make_temp_policy_and_configs(tmp_path, status, mode, scorer_bytes=None, eva
         "production_config_hash": scorer_hash,
         "eval_config_hash": eval_hash,
         "lineage_policy_hash": lineage_hash,
+        "packet_policy_hash": packet_hash,
         "runtime_bundle_hash": bundle_hash,
         "decision_reference": "ADR-0012"
     }
@@ -67,14 +73,14 @@ def _make_temp_policy_and_configs(tmp_path, status, mode, scorer_bytes=None, eva
     from raptor.eval.predictor_policy import load_predictor_policy
     policy = load_predictor_policy(policy_path)
     
-    return policy, scorer_file, eval_file, lineage_file, bundle_files
+    return policy, scorer_file, eval_file, lineage_file, packet_file, bundle_files
 
 
 def test_g_dm1_v2_loader_validation(tmp_path):
     """
-    G-DM1: v2 loader accepts the exact closed v2 field set and populates
+    G-DM1: v2 loader accepts the exact closed v2 field set (including packet_policy_hash) and populates
     PredictorPolicy properties; rejects unknown/extra fields, missing required fields,
-    unknown mode values, and non-64-hex hashes (including production, eval, lineage, and bundle hashes).
+    unknown mode values, and non-64-hex hashes (including production, eval, lineage, packet, and bundle hashes).
     """
     try:
         from raptor.eval.predictor_policy import load_predictor_policy, PredictorPolicyError
@@ -90,7 +96,8 @@ def test_g_dm1_v2_loader_validation(tmp_path):
         "production_config_hash": "c" * 64,
         "eval_config_hash": "d" * 64,
         "lineage_policy_hash": "e" * 64,
-        "runtime_bundle_hash": "f" * 64,
+        "packet_policy_hash": "f" * 64,
+        "runtime_bundle_hash": "g" * 64,
         "decision_reference": "ADR-0012"
     }
 
@@ -109,7 +116,8 @@ def test_g_dm1_v2_loader_validation(tmp_path):
     assert policy.production_config_hash == "c" * 64
     assert policy.eval_config_hash == "d" * 64
     assert policy.lineage_policy_hash == "e" * 64
-    assert policy.runtime_bundle_hash == "f" * 64
+    assert policy.packet_policy_hash == "f" * 64
+    assert policy.runtime_bundle_hash == "g" * 64
     assert policy.decision_reference == "ADR-0012"
     assert policy.approved is True
 
@@ -120,7 +128,7 @@ def test_g_dm1_v2_loader_validation(tmp_path):
         load_predictor_policy(write_policy("extra.json", extra_field))
 
     # 3. Reject missing required v2 fields
-    for field in ("mode", "lineage_policy_hash", "runtime_bundle_hash"):
+    for field in ("mode", "lineage_policy_hash", "packet_policy_hash", "runtime_bundle_hash"):
         missing_field = valid_v2.copy()
         del missing_field[field]
         with pytest.raises(PredictorPolicyError, match="missing required field"):
@@ -132,8 +140,8 @@ def test_g_dm1_v2_loader_validation(tmp_path):
     with pytest.raises(PredictorPolicyError, match="unknown mode"):
         load_predictor_policy(write_policy("bad_mode.json", bad_mode))
 
-    # 5. Reject non-64-hex config/lineage/bundle hashes
-    for field in ("production_config_hash", "eval_config_hash", "lineage_policy_hash", "runtime_bundle_hash"):
+    # 5. Reject non-64-hex config/lineage/packet/bundle hashes
+    for field in ("production_config_hash", "eval_config_hash", "lineage_policy_hash", "packet_policy_hash", "runtime_bundle_hash"):
         bad_hash = valid_v2.copy()
         bad_hash[field] = "not-64-hex"
         with pytest.raises(PredictorPolicyError, match="64-hex|hash|sha256"):
@@ -142,7 +150,7 @@ def test_g_dm1_v2_loader_validation(tmp_path):
 
 def test_g_dm2_verify_disabled_config_hashes(tmp_path):
     """
-    G-DM2: verify_disabled_config_hashes hashes the ACTUAL given config paths
+    G-DM2: verify_disabled_config_hashes hashes the ACTUAL given config paths (scorer, eval, lineage, packet)
     and passes when all match, raising PredictorPolicyError on mismatch or missing file.
     """
     try:
@@ -157,18 +165,22 @@ def test_g_dm2_verify_disabled_config_hashes(tmp_path):
     scorer_bytes = b"production scorer configuration bytes"
     eval_bytes = b"evaluation metrics configuration bytes"
     lineage_bytes = b"bias lineage configuration bytes"
+    packet_bytes = b"candidate direction configuration bytes"
 
     scorer_file = tmp_path / "tsc.yaml"
     eval_file = tmp_path / "tsc2.yaml"
     lineage_file = tmp_path / "bias_lineage.yaml"
+    packet_file = tmp_path / "candidate_direction.yaml"
 
     scorer_file.write_bytes(scorer_bytes)
     eval_file.write_bytes(eval_bytes)
     lineage_file.write_bytes(lineage_bytes)
+    packet_file.write_bytes(packet_bytes)
 
     scorer_hash = hashlib.sha256(scorer_bytes).hexdigest()
     eval_hash = hashlib.sha256(eval_bytes).hexdigest()
     lineage_hash = hashlib.sha256(lineage_bytes).hexdigest()
+    packet_hash = hashlib.sha256(packet_bytes).hexdigest()
 
     policy_data = {
         "schema": "bp4pp3-predictor-policy/2",
@@ -179,6 +191,7 @@ def test_g_dm2_verify_disabled_config_hashes(tmp_path):
         "production_config_hash": scorer_hash,
         "eval_config_hash": eval_hash,
         "lineage_policy_hash": lineage_hash,
+        "packet_policy_hash": packet_hash,
         "runtime_bundle_hash": "c" * 64,
         "decision_reference": "ADR-0012"
     }
@@ -187,25 +200,26 @@ def test_g_dm2_verify_disabled_config_hashes(tmp_path):
     policy_path.write_text(json.dumps(policy_data))
     policy = load_predictor_policy(policy_path)
 
-    # Passes when all three match
-    verify_disabled_config_hashes(policy, scorer_file, eval_file, lineage_file)
+    # Passes when all match
+    verify_disabled_config_hashes(policy, scorer_file, eval_file, lineage_file, packet_file)
 
     # Raises on any mismatch
     for bad_file, content in (
         (scorer_file, b"mismatched scorer"),
         (eval_file, b"mismatched eval"),
         (lineage_file, b"mismatched lineage"),
+        (packet_file, b"mismatched packet"),
     ):
         original_bytes = bad_file.read_bytes()
         bad_file.write_bytes(content)
         with pytest.raises(PredictorPolicyError, match="mismatch|hash"):
-            verify_disabled_config_hashes(policy, scorer_file, eval_file, lineage_file)
+            verify_disabled_config_hashes(policy, scorer_file, eval_file, lineage_file, packet_file)
         bad_file.write_bytes(original_bytes)  # restore
 
     # Raises on missing file
     missing_file = tmp_path / "missing.yaml"
     with pytest.raises(PredictorPolicyError, match="not found|missing"):
-        verify_disabled_config_hashes(policy, missing_file, eval_file, lineage_file)
+        verify_disabled_config_hashes(policy, missing_file, eval_file, lineage_file, packet_file)
 
 
 def test_g_dm3_policy_disabled_evidence_source():
@@ -264,7 +278,7 @@ def test_g_dm4_offline_seams_composition(tmp_path):
     """
     G-DM4: offline unit composition:
     - Build a contract-valid BiasEvidenceSource (one canonical manifest row + single BIAS TSV row + FakeCanonicalNormalizer).
-    - Write temp post-removal configs/lineage.
+    - Write temp post-removal configs/lineage/packet.
     - Write approved v2 policy whose config hashes match those temp bytes and whose runtime_bundle_hash is the REAL repo bundle hash.
     - resolve_policy_state(...) == ("APPROVED_DISABLED", reason).
     - build_policy_evidence_source(source, state) wraps it in PolicyDisabledEvidenceSource.
@@ -312,18 +326,22 @@ def test_g_dm4_offline_seams_composition(tmp_path):
     scorer_bytes = Path("configs/acmg/tsc.yaml").read_bytes()
     eval_bytes = Path("configs/eval/tsc2.yaml").read_bytes()
     lineage_bytes = Path("configs/eval/bias_lineage.yaml").read_bytes()
+    packet_bytes = Path("configs/packet/candidate_direction.yaml").read_bytes()
 
     scorer_path = tmp_path / "tsc.yaml"
     eval_path = tmp_path / "tsc2.yaml"
     lineage_path = tmp_path / "bias_lineage.yaml"
+    packet_path = tmp_path / "candidate_direction.yaml"
 
     scorer_path.write_bytes(scorer_bytes)
     eval_path.write_bytes(eval_bytes)
     lineage_path.write_bytes(lineage_bytes)
+    packet_path.write_bytes(packet_bytes)
 
     scorer_hash = hashlib.sha256(scorer_bytes).hexdigest()
     eval_hash = hashlib.sha256(eval_bytes).hexdigest()
     lineage_hash = hashlib.sha256(lineage_bytes).hexdigest()
+    packet_hash = hashlib.sha256(packet_bytes).hexdigest()
 
     from raptor.eval.config import load_config as load_eval_config
     from raptor.scorer.config import load_config as load_scorer_config
@@ -354,6 +372,7 @@ def test_g_dm4_offline_seams_composition(tmp_path):
         "production_config_hash": scorer_hash,
         "eval_config_hash": eval_hash,
         "lineage_policy_hash": lineage_hash,
+        "packet_policy_hash": packet_hash,
         "runtime_bundle_hash": real_bundle_hash,
         "decision_reference": "ADR-0012"
     }
@@ -362,9 +381,9 @@ def test_g_dm4_offline_seams_composition(tmp_path):
     policy_path.write_text(json.dumps(policy_data))
     policy = load_predictor_policy(policy_path)
 
-    # 1. resolve_policy_state == APPROVED_DISABLED
+    # 1. resolve_policy_state == APPROVED_DISABLED (now with packet_path seam)
     state, reason = resolve_policy_state(
-        policy, scorer_path, eval_path, lineage_path, bundle_files
+        policy, scorer_path, eval_path, lineage_path, packet_path, bundle_files
     )
     assert state == "APPROVED_DISABLED", f"Expected APPROVED_DISABLED, got {state} ({reason})"
 
@@ -376,7 +395,7 @@ def test_g_dm4_offline_seams_composition(tmp_path):
     # Retrieve evidence to count suppression
     wrapped_source.get_evidence(canonical_id)
 
-    # 3. build_disabled_policy_pins called EXACTLY per signature with 5 arguments
+    # 3. build_disabled_policy_pins called EXACTLY per planner signature with 5 arguments
     pins = build_disabled_policy_pins(policy, wrapped_source, scorer_cfg, eval_cfg, lineage_policy)
     assert pins["policy_mode"] == "disabled_manual"
     assert pins["pp3bp4_scored_calls"] == 0
@@ -394,11 +413,11 @@ def test_g_dm5_resolve_policy_state_proposed(tmp_path):
     except ImportError:
         pytest.fail("Missing resolve_policy_state implementation")
 
-    policy, s_file, e_file, l_file, b_files = _make_temp_policy_and_configs(
+    policy, s_file, e_file, l_file, p_file, b_files = _make_temp_policy_and_configs(
         tmp_path, "proposed", "disabled_manual"
     )
 
-    state, reason = resolve_policy_state(policy, s_file, e_file, l_file, b_files)
+    state, reason = resolve_policy_state(policy, s_file, e_file, l_file, p_file, b_files)
     assert state == "PROPOSED_DISABLED"
     assert "proposed" in reason.lower()
 
@@ -412,25 +431,25 @@ def test_g_dm6_resolve_policy_state_corrected_enabled_blocked(tmp_path):
     except ImportError:
         pytest.fail("Missing resolve_policy_state implementation")
 
-    policy, s_file, e_file, l_file, b_files = _make_temp_policy_and_configs(
+    policy, s_file, e_file, l_file, p_file, b_files = _make_temp_policy_and_configs(
         tmp_path, "approved", "corrected_enabled"
     )
 
-    state, reason = resolve_policy_state(policy, s_file, e_file, l_file, b_files)
+    state, reason = resolve_policy_state(policy, s_file, e_file, l_file, p_file, b_files)
     assert state == "CORRECTED_ENABLED_OUT_OF_SCOPE"
 
 
-@pytest.mark.parametrize("mutilated_file", ["scorer", "eval", "lineage"])
+@pytest.mark.parametrize("mutilated_file", ["scorer", "eval", "lineage", "packet"])
 def test_g_dm7_resolve_policy_state_drift_blocked(tmp_path, mutilated_file):
     """
-    G-DM7: approved + disabled_manual but config byte mismatch => CONFIG_DRIFT.
+    G-DM7: approved + disabled_manual but config/policy byte mismatch => CONFIG_DRIFT.
     """
     try:
         from scripts.run_masked_holdout_eval import resolve_policy_state
     except ImportError:
         pytest.fail("Missing resolve_policy_state implementation")
 
-    policy, s_file, e_file, l_file, b_files = _make_temp_policy_and_configs(
+    policy, s_file, e_file, l_file, p_file, b_files = _make_temp_policy_and_configs(
         tmp_path, "approved", "disabled_manual"
     )
 
@@ -440,8 +459,10 @@ def test_g_dm7_resolve_policy_state_drift_blocked(tmp_path, mutilated_file):
         e_file.write_bytes(b"mutilated eval")
     elif mutilated_file == "lineage":
         l_file.write_bytes(b"mutilated lineage")
+    elif mutilated_file == "packet":
+        p_file.write_bytes(b"mutilated packet")
 
-    state, reason = resolve_policy_state(policy, s_file, e_file, l_file, b_files)
+    state, reason = resolve_policy_state(policy, s_file, e_file, l_file, p_file, b_files)
     assert state == "CONFIG_DRIFT"
 
 
@@ -467,11 +488,11 @@ def test_g_dm8_resolve_policy_state_legacy_blocked(tmp_path):
     policy_path.write_text(json.dumps(policy_data))
     policy = load_predictor_policy(policy_path)
 
-    _, s_file, e_file, l_file, b_files = _make_temp_policy_and_configs(
+    _, s_file, e_file, l_file, p_file, b_files = _make_temp_policy_and_configs(
         tmp_path, "approved", "disabled_manual"
     )
 
-    state, reason = resolve_policy_state(policy, s_file, e_file, l_file, b_files)
+    state, reason = resolve_policy_state(policy, s_file, e_file, l_file, p_file, b_files)
     assert state == "UNSUPPORTED_MODE"
 
 
@@ -538,8 +559,8 @@ def test_g_dm9_configs_and_lineage_policy():
     assert len(automatable) == 12
     assert set(included) == set(automatable)
 
-    # Vocabulary is retained
-    from raptor.scorer.config import VALID_CRITERIA
+    # Vocabulary is retained (imported from eval config to resolve authorship defect)
+    from raptor.eval.config import VALID_CRITERIA
     assert "PP3" in VALID_CRITERIA
     assert "BP4" in VALID_CRITERIA
     assert "PP3" in acmg_cfg.get("acmg_criteria", {})
@@ -632,6 +653,7 @@ def test_g_dm11_accidental_drift_enforcement(tmp_path):
         "production_config_hash": "c" * 64,
         "eval_config_hash": "d" * 64,
         "lineage_policy_hash": "e" * 64,
+        "packet_policy_hash": "f" * 64,
         "runtime_bundle_hash": bundle_hash,
         "decision_reference": "ADR-0012"
     }
@@ -651,7 +673,7 @@ def test_g_dm11_accidental_drift_enforcement(tmp_path):
 
 def test_g_dm12_verify_disabled_config_hashes_unit(tmp_path):
     """
-    G-DM12: verify_disabled_config_hashes directly verifies byte-identical alternate scorer/eval/lineage paths,
+    G-DM12: verify_disabled_config_hashes directly verifies byte-identical alternate scorer/eval/lineage/packet paths,
     raising PredictorPolicyError on modified config files. (NO subprocess)
     """
     try:
@@ -666,19 +688,23 @@ def test_g_dm12_verify_disabled_config_hashes_unit(tmp_path):
     scorer_bytes = b"production scorer configuration bytes"
     eval_bytes = b"evaluation metrics configuration bytes"
     lineage_bytes = b"bias lineage configuration bytes"
+    packet_bytes = b"packet direction configuration bytes"
 
     # Create original config files
     scorer_file = tmp_path / "tsc.yaml"
     eval_file = tmp_path / "tsc2.yaml"
     lineage_file = tmp_path / "bias_lineage.yaml"
+    packet_file = tmp_path / "candidate_direction.yaml"
 
     scorer_file.write_bytes(scorer_bytes)
     eval_file.write_bytes(eval_bytes)
     lineage_file.write_bytes(lineage_bytes)
+    packet_file.write_bytes(packet_bytes)
 
     scorer_hash = hashlib.sha256(scorer_bytes).hexdigest()
     eval_hash = hashlib.sha256(eval_bytes).hexdigest()
     lineage_hash = hashlib.sha256(lineage_bytes).hexdigest()
+    packet_hash = hashlib.sha256(packet_bytes).hexdigest()
 
     policy_data = {
         "schema": "bp4pp3-predictor-policy/2",
@@ -689,6 +715,7 @@ def test_g_dm12_verify_disabled_config_hashes_unit(tmp_path):
         "production_config_hash": scorer_hash,
         "eval_config_hash": eval_hash,
         "lineage_policy_hash": lineage_hash,
+        "packet_policy_hash": packet_hash,
         "runtime_bundle_hash": "c" * 64,
         "decision_reference": "ADR-0012"
     }
@@ -703,22 +730,25 @@ def test_g_dm12_verify_disabled_config_hashes_unit(tmp_path):
     alt_scorer = alt_dir / "tsc.yaml"
     alt_eval = alt_dir / "tsc2.yaml"
     alt_lineage = alt_dir / "bias_lineage.yaml"
+    alt_packet = alt_dir / "candidate_direction.yaml"
 
     alt_scorer.write_bytes(scorer_bytes)
     alt_eval.write_bytes(eval_bytes)
     alt_lineage.write_bytes(lineage_bytes)
+    alt_packet.write_bytes(packet_bytes)
 
-    verify_disabled_config_hashes(policy, alt_scorer, alt_eval, alt_lineage)
+    verify_disabled_config_hashes(policy, alt_scorer, alt_eval, alt_lineage, alt_packet)
 
-    # 2. Changed byte in any of the three -> PredictorPolicyError
+    # 2. Changed byte in any of the four -> PredictorPolicyError
     for alt_file, original in (
         (alt_scorer, scorer_bytes),
         (alt_eval, eval_bytes),
         (alt_lineage, lineage_bytes),
+        (alt_packet, packet_bytes),
     ):
         alt_file.write_text("changed content for threshold/scope/auth", encoding="utf-8")
         with pytest.raises(PredictorPolicyError, match="mismatch|hash"):
-            verify_disabled_config_hashes(policy, alt_scorer, alt_eval, alt_lineage)
+            verify_disabled_config_hashes(policy, alt_scorer, alt_eval, alt_lineage, alt_packet)
         alt_file.write_bytes(original)  # restore
 
 
@@ -877,3 +907,90 @@ def test_g_dm14_lineage_consistency_negative_control():
 
     assert "omitted_without_disposition" in exc.value.sets_by_kind
     assert exc.value.sets_by_kind["omitted_without_disposition"] == {"PP3", "BP4"}
+
+
+def test_g_dm16_packet_parity(tmp_path):
+    """
+    G-DM16: Packet parity verification:
+    - candidate_direction.yaml keys must be exactly the post-removal set {PVS1,PM2,PM4,BA1,BS1,BP3,BP7}.
+    - packet_policy_hash binds those exact bytes (governance).
+    - Packet drift resolves to CONFIG_DRIFT inside resolve_policy_state.
+    """
+    try:
+        from raptor.packet.config import load_candidate_direction_policy
+        from scripts.run_masked_holdout_eval import resolve_policy_state
+    except ImportError as exc:
+        pytest.fail(f"Missing candidate_direction/runner seams: {exc}")
+
+    # 1. Validate keys
+    packet_path = Path("configs/packet/candidate_direction.yaml")
+    assert packet_path.is_file()
+    policy = load_candidate_direction_policy(packet_path)
+    assert set(policy.criterion_strength_points.keys()) == {"PVS1", "PM2", "PM4", "BA1", "BS1", "BP3", "BP7"}
+
+    # 2. Verify drift blocks resolve_policy_state
+    temp_policy, s_file, e_file, l_file, p_file, b_files = _make_temp_policy_and_configs(
+        tmp_path, "approved", "disabled_manual", packet_bytes=packet_path.read_bytes()
+    )
+    
+    # Matching hash and path resolves to APPROVED_DISABLED
+    state, reason = resolve_policy_state(temp_policy, s_file, e_file, l_file, p_file, b_files)
+    assert state == "APPROVED_DISABLED"
+
+    # Mutation to packet file byte => CONFIG_DRIFT
+    p_file.write_bytes(b"mutilated packet bytes for drift")
+    state_drift, reason_drift = resolve_policy_state(temp_policy, s_file, e_file, l_file, p_file, b_files)
+    assert state_drift == "CONFIG_DRIFT"
+
+
+def test_g_dm17_calibration_propagation():
+    """
+    G-DM17: Calibration propagation verification:
+    Derive and assert exact post-disabled behavior from unchanged calibration fixtures.
+    """
+    from test_tsc_calibration_batch import (
+        _api,
+        _row,
+        configs,
+    )
+    api = _api()
+    # Instantiate rows and compute strata
+    rows = (
+        _row(1, {"pvs1": (4, "very strong")}),
+        _row(2, {"pm2": (3, "strong"), "pp3": (2, "moderate")}),
+        _row(3, {"bp4": (3, "strong"), "pp3": (2, "moderate"), "pm2": (1, "supporting")}),
+        _row(4, {"ba1": (5, "stand alone")}, gene="TSC1"),
+        _row(5, {}),
+        _row(6, {"pm2": (1, "supporting")}, gene="NTHL1"),
+    )
+    
+    m_entries = []
+    for row in rows:
+        accession = "NC_000009.12" if row.gene_name == "TSC1" else "NC_000016.10"
+        m_entries.append(
+            api["ManifestEntry"](
+                variant_id=f"{accession}:{row.position - 1}:A:G",
+                vcf_key=f"{row.chromosome}:{row.position}:{row.ref_allele}:{row.alt_allele}"
+            )
+        )
+    m_entries = tuple(m_entries)
+
+    cfgs = configs()
+    manifest_by_key = {entry.vcf_key: entry for entry in m_entries}
+    strata = api["reproduce_census_strata"](
+        rows,
+        manifest_by_key,
+        cfgs["scorer"],
+        cfgs["eval"],
+    )
+
+    # Strata propagate deferred dispositions for deactivated PP3 & BP4
+    assert [entry.stratum for entry in strata] == [
+        "candidate_LP_review",
+        "no_deterministic_resolution",
+        "no_deterministic_resolution",
+        "candidate_LB_review",
+        "no_deterministic_resolution",
+        "manual_review",
+    ]
+    assert [entry.signed_points for entry in strata] == [8, 4, 1, -8, 0, 0]

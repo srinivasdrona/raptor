@@ -25,7 +25,7 @@ def test_ac_d1_dependency_readiness():
     assert Path("src/raptor/ingest/transcript_reconcile.py").exists()
 
 def test_ac_d2_criteria_parity():
-    """AC-D2: criterion_strength_points keys == the derived candidate_set."""
+    """AC-D2: criterion_strength_points keys == the derived candidate_set {PVS1,PM2,PM4,BA1,BS1,BP3,BP7}."""
     eval_config = load_eval_config("configs/eval/tsc2.yaml")
     lineage_policy = load_lineage_policy("configs/eval/bias_lineage.yaml")
 
@@ -45,11 +45,15 @@ def test_ac_d2_criteria_parity():
     policy = load_candidate_direction_policy("configs/packet/candidate_direction.yaml")
 
     # The policy should be populated regardless of unapproved status (per D contract)
-    assert set(policy.criterion_strength_points.keys()) == candidate_set
+    expected_set = {"PVS1", "PM2", "PM4", "BA1", "BS1", "BP3", "BP7"}
+    assert set(policy.criterion_strength_points.keys()) == expected_set
+    assert candidate_set == expected_set
 
     # Record excluded set + reasons
     excluded = {
         "BS2": "deferred",
+        "PP3": "deferred",
+        "BP4": "deferred",
     }
     for crit in FORBIDDEN_CRITERIA:
         excluded[crit] = "forbidden"
@@ -61,21 +65,10 @@ def test_ac_d2_criteria_parity():
         assert crit not in excluded
 
 def test_ac_d3_corrected_strengths():
-    """AC-D3: PP3/BP4 point contributions use A's corrected aggregation strength."""
+    """AC-D3: PP3/BP4 are excluded; PM2, PM4, BP3, etc. point contributions are correct."""
     policy = load_candidate_direction_policy("configs/packet/candidate_direction.yaml")
-    assert "PP3" in policy.criterion_strength_points
-    assert "BP4" in policy.criterion_strength_points
-    assert policy.criterion_strength_points["PP3"] == {
-        "supporting": 1,
-        "moderate": 2,
-        "strong": 4,
-    }
-    assert policy.criterion_strength_points["BP4"] == {
-        "supporting": -1,
-        "moderate": -2,
-        "strong": -4,
-        "very_strong": -8,
-    }
+    assert "PP3" not in policy.criterion_strength_points
+    assert "BP4" not in policy.criterion_strength_points
     assert policy.criterion_strength_points["PM2"] == {
         "supporting": 1,
         "moderate": 2,

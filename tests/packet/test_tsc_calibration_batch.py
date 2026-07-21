@@ -149,14 +149,14 @@ def _synthetic_stats(run_pins):
             "nirvana": run_pins.nirvana_version,
         },
         "raptor_current_policy_internal_direction": {
-            "candidate_LP_review": 2,
-            "candidate_LB_review": 2,
-            "no_deterministic_resolution": 1,
+            "candidate_LP_review": 1,
+            "candidate_LB_review": 1,
+            "no_deterministic_resolution": 3,
             "annotation_manual_review": 1,
         },
         "candidate_pattern_compression": {
-            "candidate_LP_review": {"exact_strength_patterns": 2},
-            "candidate_LB_review": {"exact_strength_patterns": 2},
+            "candidate_LP_review": {"exact_strength_patterns": 1},
+            "candidate_LB_review": {"exact_strength_patterns": 1},
         },
     }
 
@@ -182,15 +182,15 @@ def test_cal_ac1_reproduces_strata_and_fails_loud_on_conservation_drift(
 
     assert [entry.stratum for entry in strata] == [
         "candidate_LP_review",
-        "candidate_LP_review",
-        "candidate_LB_review",
+        "no_deterministic_resolution",
+        "no_deterministic_resolution",
         "candidate_LB_review",
         "no_deterministic_resolution",
         "manual_review",
     ]
-    assert [entry.signed_points for entry in strata] == [8, 6, -1, -8, 0, 0]
+    assert [entry.signed_points for entry in strata] == [8, 4, 1, -8, 0, 0]
     assert all(entry.basis == api["BASIS"] for entry in strata)
-    assert len({entry.pattern_id for entry in strata if entry.pattern_id}) == 4
+    assert len({entry.pattern_id for entry in strata if entry.pattern_id}) == 2
 
     stats = _synthetic_stats(run_pins)
     api["assert_source_of_record_conservation"](
@@ -280,7 +280,7 @@ def test_cal_ac2_real_provenance_and_packet_conformance(
         configs["packet"],
         run_pins,
     )
-    assert len(universe) == 4
+    assert len(universe) == 2
     for packet in universe:
         assert packet.candidate_direction.direction is None
         assert packet.candidate_direction.null_reason == "production_policy_unapproved"
@@ -311,7 +311,7 @@ def test_cal_ac3_coverage_and_ac4_first_pass_redaction(
     )
     batch = api["select_batch"](universe, configs["selection"])
     api["assert_batch_coverage"](batch, strata)
-    assert len(batch.selected_packet_ids) == 4
+    assert len(batch.selected_packet_ids) == 2
     assert batch.coverage.missing == {
         "pattern": (),
         "gene": (),

@@ -452,13 +452,13 @@ def test_ac7_ac22_lineage_precedence_is_exhaustive_and_policy_derived() -> None:
         buckets[disposition].add(criterion)
 
     assert buckets[api["PacketPolicyDisposition"].INCLUDED] == {
-        "PVS1", "PM2", "PM4", "PP3", "BA1", "BS1", "BP3", "BP4", "BP7",
+        "PVS1", "PM2", "PM4", "BA1", "BS1", "BP3", "BP7",
     }
     assert buckets[api["PacketPolicyDisposition"].MASKED] == {
         "PS1", "PM5", "PM1", "PP2", "BP1",
     }
     assert buckets[api["PacketPolicyDisposition"].EXCLUDED] == {"PS4", "PP5", "BP6"}
-    assert buckets[api["PacketPolicyDisposition"].DEFERRED] == {"PS3", "BS2"}
+    assert buckets[api["PacketPolicyDisposition"].DEFERRED] == {"PS3", "BS2", "PP3", "BP4"}
 
     dispositions = ("allowed", "requires_heldout_mask", "forbidden", "deferred")
     expected = {}
