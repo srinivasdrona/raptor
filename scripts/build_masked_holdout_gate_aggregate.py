@@ -52,6 +52,20 @@ _SCOPE_REQUIRED_FIELDS: tuple = (
     "scope_status", "reasons",
 )
 
+#: aggregate_compatibility_contract (rev 10, D14): the exact six
+#: `config_pins` keys the disabled/manual producer
+#: (`build_disabled_policy_pins` in `scripts/run_masked_holdout_eval.py`)
+#: emits INSTEAD of `predictor_correction_counts`. The presence of ANY one
+#: of these six keys marks `config_pins` as disabled/manual-shaped.
+_DISABLED_POLICY_PINS: tuple = (
+    "policy_mode",
+    "pp3bp4_automation_disabled",
+    "predictor_correction_applied",
+    "pp3bp4_suppressed_counts",
+    "pp3bp4_suppressed_variant_count",
+    "pp3bp4_scored_calls",
+)
+
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -66,6 +80,85 @@ def _read_json(path: Path) -> dict:
     if not isinstance(payload, dict):
         raise ValueError(f"JSON root must be an object: {path}")
     return payload
+
+
+def _correction_or_disabled_policy_fields(config_pins: Mapping[str, Any]) -> dict:
+    """The `predictor_correction_counts`-or-disabled-provenance fields of
+    `report.policy` (aggregate_compatibility_contract, D14).
+
+    Exactly two, mutually-exclusive `config_pins` shapes are accepted:
+
+    - historical corrected/enabled (no `_DISABLED_POLICY_PINS` key present):
+      `predictor_correction_counts` is REQUIRED and emitted UNCHANGED -- a
+      missing key raises the historical `KeyError` (byte-compatible with
+      every legacy envelope; never converted to `ValueError`).
+    - disabled/manual (ANY of the six `_DISABLED_POLICY_PINS` present): ALL
+      six are then REQUIRED, `predictor_correction_counts` must be ABSENT
+      (a mixed shape is malformed), and the six values must be internally
+      consistent. Any violation raises `ValueError` -- never a silent
+      default and never a synthesized zero-valued
+      `predictor_correction_counts` (D14 design choice B).
+    """
+    disabled_present = [pin for pin in _DISABLED_POLICY_PINS if pin in config_pins]
+    if not disabled_present:
+        # Historical shape: unconditional read -- a missing key raises the
+        # documented, byte-compatible legacy KeyError.
+        return {"predictor_correction_counts": config_pins["predictor_correction_counts"]}
+
+    missing = [pin for pin in _DISABLED_POLICY_PINS if pin not in config_pins]
+    if missing:
+        raise ValueError(
+            "disabled/manual config_pins is missing required pin(s) "
+            f"{missing!r} (present disabled-shape pin(s): {disabled_present!r})"
+        )
+    if "predictor_correction_counts" in config_pins:
+        raise ValueError(
+            "config_pins carries BOTH disabled/manual suppression pins and "
+            "predictor_correction_counts -- mixed policy shape is rejected"
+        )
+
+    policy_mode = config_pins["policy_mode"]
+    automation_disabled = config_pins["pp3bp4_automation_disabled"]
+    correction_applied = config_pins["predictor_correction_applied"]
+    suppressed_counts = config_pins["pp3bp4_suppressed_counts"]
+    suppressed_variant_count = config_pins["pp3bp4_suppressed_variant_count"]
+    scored_calls = config_pins["pp3bp4_scored_calls"]
+
+    if policy_mode != "disabled_manual":
+        raise ValueError(
+            f"disabled/manual config_pins policy_mode must be 'disabled_manual', got {policy_mode!r}"
+        )
+    if automation_disabled is not True:
+        raise ValueError(
+            f"disabled/manual config_pins pp3bp4_automation_disabled must be True, got {automation_disabled!r}"
+        )
+    if correction_applied is not False:
+        raise ValueError(
+            f"disabled/manual config_pins predictor_correction_applied must be False, got {correction_applied!r}"
+        )
+    if not isinstance(suppressed_counts, Mapping):
+        raise ValueError(
+            "disabled/manual config_pins pp3bp4_suppressed_counts must be a mapping, "
+            f"got {type(suppressed_counts).__name__}"
+        )
+    if not _valid_count(suppressed_variant_count):
+        raise ValueError(
+            "disabled/manual config_pins pp3bp4_suppressed_variant_count must be a "
+            f"non-negative int, got {suppressed_variant_count!r}"
+        )
+    if not _valid_count(scored_calls) or scored_calls != 0:
+        raise ValueError(
+            f"disabled/manual config_pins pp3bp4_scored_calls must be 0, got {scored_calls!r}"
+        )
+
+    return {
+        "policy_mode": policy_mode,
+        "pp3bp4_automation_disabled": automation_disabled,
+        "predictor_correction_applied": correction_applied,
+        "pp3bp4_suppressed_counts": suppressed_counts,
+        "pp3bp4_suppressed_variant_count": suppressed_variant_count,
+        "pp3bp4_scored_calls": scored_calls,
+    }
 
 
 def build_aggregate(
@@ -85,6 +178,7 @@ def build_aggregate(
     lineage = envelope["lineage_audit"]
     skipped = list(config_pins["evaluation_skipped_criteria"])
     pm1_skipped = "PM1" in skipped
+    correction_or_disabled_fields = _correction_or_disabled_policy_fields(config_pins)
 
     return {
         "schema": "raptor.tsc.masked_holdout_gate.v1",
@@ -117,7 +211,7 @@ def build_aggregate(
         },
         "policy": {
             "bp4pp3": envelope["predictor_policy"],
-            "predictor_correction_counts": config_pins["predictor_correction_counts"],
+            **correction_or_disabled_fields,
             "operationally_skipped": config_pins["operational_skipped_criteria"],
             "evaluation_skipped": skipped,
             "pm1_status": (
