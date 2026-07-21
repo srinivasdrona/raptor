@@ -29,9 +29,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -88,6 +90,39 @@ def _sha256_bytes(raw: bytes) -> str:
 
 def _sha256_lf(raw: bytes) -> str:
     return hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest()
+
+
+def _unique_staged_path(final_path: Path) -> Path:
+    """Allocate a per-invocation-unique staged temp file in `final_path`'s
+    OWN directory (never a fixed/shared name -- two concurrent invocations
+    must never race on the same staged file) via `tempfile.mkstemp`, which
+    atomically creates the file with a collision-free name. Living in the
+    same directory as `final_path` is required so `_publish_exclusive` can
+    `os.link` it onto `final_path` (a hard link cannot cross filesystems/
+    volumes). The name keeps `final_path`'s original suffix so staged
+    writes/failures are identifiable per-artifact (e.g. `.sha256` vs
+    `.json`), while also containing `.tmp` so it is unambiguously a
+    staging artifact, never mistaken for a published final."""
+    fd, name = tempfile.mkstemp(
+        dir=str(final_path.parent),
+        prefix=f".{final_path.name}.tmp-",
+        suffix=final_path.suffix,
+    )
+    os.close(fd)
+    return Path(name)
+
+
+def _publish_exclusive(staged_path: Path, final_path: Path) -> None:
+    """Cross-platform atomic no-overwrite publish: hard-link the fully
+    staged+verified `staged_path` onto `final_path` via `os.link`.
+    `os.link`/`CreateHardLink` is itself the atomic create-if-absent
+    primitive on both POSIX and Windows -- it raises `FileExistsError`
+    (never overwrites, never deletes) if `final_path` already exists, so
+    there is no separate `exists()`-check-then-`replace()` step and thus no
+    TOCTOU window in which a concurrent invocation's competing bytes could
+    be clobbered. On success, `final_path` is a second, independent
+    directory entry for the SAME verified bytes as `staged_path`."""
+    os.link(str(staged_path), str(final_path))
 
 
 def _require_canonical_path(provided: str, canonical_relative: str) -> Path:
@@ -377,40 +412,46 @@ def main(argv: Any = None) -> int:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Atomic/no-residue publication: stage to temp files first, fully
-    # verify the staged bytes, THEN publish (atomic rename) to the
-    # canonical final paths, THEN reverify the published bytes. On ANY
-    # exception from here on, guarded cleanup removes every temp file and
-    # any final output/manifest THIS invocation itself created before
-    # re-raising a typed `InputError` -- never overwriting a pre-existing
-    # file and never leaving a partial/residual artifact behind.
-    temp_output_path = output_path.with_name(".tmp-" + output_path.name)
-    temp_manifest_path = manifest_path.with_name(".tmp-" + manifest_path.name)
-    for stale in (temp_output_path, temp_manifest_path):
-        if stale.exists():
-            stale.unlink()
-
+    # Atomic/no-residue publication: stage to per-invocation-unique temp
+    # files first, fully verify the staged bytes, THEN publish via
+    # `_publish_exclusive` (atomic hard-link, never an `exists()`-check-
+    # then-`replace()` TOCTOU race) to the canonical final paths, THEN
+    # reverify the published bytes. On ANY exception from here on, guarded
+    # cleanup removes every temp file this invocation staged and any final
+    # output/manifest THIS invocation itself created (tracked via
+    # `output_published`/`manifest_published`) before re-raising a typed
+    # `InputError` -- a pre-existing/competing final this invocation did
+    # NOT create is NEVER unlinked, and no partial/residual temp file is
+    # ever left behind.
+    temp_paths: list = []
     output_published = False
     manifest_published = False
     try:
         # --- Stage ---
+        temp_output_path = _unique_staged_path(output_path)
+        temp_paths.append(temp_output_path)
         temp_output_path.write_bytes(output_bytes)
         if _sha256_bytes(temp_output_path.read_bytes()) != output_sha256:
             raise InputError("staged output bytes failed verification before publication")
 
+        temp_manifest_path = _unique_staged_path(manifest_path)
+        temp_paths.append(temp_manifest_path)
         temp_manifest_path.write_bytes(manifest_bytes)
         if temp_manifest_path.read_bytes() != manifest_bytes:
             raise InputError("staged external manifest bytes failed verification before publication")
 
-        # --- Publish (never overwrite a pre-existing final file) ---
-        if output_path.exists():
-            raise InputError(f"refusing to overwrite existing output: {output_path}")
-        temp_output_path.replace(output_path)
+        # --- Publish (atomic no-overwrite hard-link; never clobbers a
+        # concurrently-created competing final) ---
+        try:
+            _publish_exclusive(temp_output_path, output_path)
+        except FileExistsError as exc:
+            raise InputError(f"refusing to overwrite existing output: {output_path}") from exc
         output_published = True
 
-        if manifest_path.exists():
-            raise InputError(f"refusing to overwrite existing external manifest: {manifest_path}")
-        temp_manifest_path.replace(manifest_path)
+        try:
+            _publish_exclusive(temp_manifest_path, manifest_path)
+        except FileExistsError as exc:
+            raise InputError(f"refusing to overwrite existing external manifest: {manifest_path}") from exc
         manifest_published = True
 
         # --- Reverify the PUBLISHED artifacts ---
@@ -422,12 +463,19 @@ def main(argv: Any = None) -> int:
         for path, published in ((output_path, output_published), (manifest_path, manifest_published)):
             if published and path.exists():
                 path.unlink()
-        for temp in (temp_output_path, temp_manifest_path):
+        for temp in temp_paths:
             if temp.exists():
                 temp.unlink()
         if isinstance(exc, InputError):
             raise
         raise InputError(f"tiered readjudication publication failed: {exc}") from exc
+
+    # Success: the per-invocation staged temp files are redundant copies of
+    # the now-published final bytes (published via hard link) -- remove
+    # them so no staging residue is left behind.
+    for temp in temp_paths:
+        if temp.exists():
+            temp.unlink()
 
     return 0
 

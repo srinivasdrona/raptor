@@ -163,6 +163,19 @@ def _validate_config(config: EvalConfig, tiered_authorization: Any) -> Mapping[s
     return tiered_authorization
 
 
+def _valid_pin_value(value: Any) -> bool:
+    """A pinned Oracle numeric value (confidence/precision/recall) MUST be an
+    actual non-bool `int`/`float` AND finite -- `float("0.95")` silently
+    succeeding for a numeric STRING (or `float("nan")`/`float("inf")`
+    slipping through an `isclose` comparison) is exactly the coercion gap
+    this closes. Type/finiteness is validated BEFORE any
+    equality/`isclose` comparison is ever attempted (spec §4b: drift in
+    TYPE is exactly as fatal as drift in VALUE and is rejected fail-closed)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    return math.isfinite(value)
+
+
 def _validate_oracle_pins(oracle_thresholds: Any) -> None:
     """Runtime Oracle-pin defense-in-depth: re-validate `oracle_thresholds`
     (confidence + EVERY pinned stratum's precision, recall, gating,
@@ -175,12 +188,9 @@ def _validate_oracle_pins(oracle_thresholds: Any) -> None:
     thresholds = oracle_thresholds if isinstance(oracle_thresholds, Mapping) else {}
 
     confidence = thresholds.get("confidence")
-    try:
-        confidence_ok = not isinstance(confidence, bool) and math.isclose(
-            float(confidence), _PINNED_ORACLE_CONFIDENCE, rel_tol=0.0, abs_tol=1e-9
-        )
-    except (TypeError, ValueError):
-        confidence_ok = False
+    confidence_ok = _valid_pin_value(confidence) and math.isclose(
+        float(confidence), _PINNED_ORACLE_CONFIDENCE, rel_tol=0.0, abs_tol=1e-9
+    )
     if not confidence_ok:
         raise TieredReadjudicationConfigError(
             "`oracle_thresholds.confidence` must equal the pinned pre-registered "
@@ -208,12 +218,9 @@ def _validate_oracle_pins(oracle_thresholds: Any) -> None:
             )
         for metric_key, pinned_value in pinned_metrics.items():
             value = spec.get(metric_key)
-            try:
-                metric_ok = not isinstance(value, bool) and math.isclose(
-                    float(value), pinned_value, rel_tol=0.0, abs_tol=1e-9
-                )
-            except (TypeError, ValueError):
-                metric_ok = False
+            metric_ok = _valid_pin_value(value) and math.isclose(
+                float(value), pinned_value, rel_tol=0.0, abs_tol=1e-9
+            )
             if not metric_ok:
                 raise TieredReadjudicationConfigError(
                     f"`oracle_thresholds.strata[{name!r}][{metric_key!r}]`={value!r} does "
