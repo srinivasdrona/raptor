@@ -85,9 +85,11 @@ def test_aca6_scope_invariance():
     bp4 = lineage["records"]["BP4"]
     pp3 = lineage["records"]["PP3"]
     assert bp4["lineage_class"] == "label_independent_reference_or_predictor"
-    assert bp4["production_disposition"] == "allowed"
+    assert bp4["production_disposition"] == "deferred"
+    assert bp4["decision_dependency"] == "bp4pp3-predictor-policy"
     assert pp3["lineage_class"] == "label_independent_reference_or_predictor"
-    assert pp3["production_disposition"] == "allowed"
+    assert pp3["production_disposition"] == "deferred"
+    assert pp3["decision_dependency"] == "bp4pp3-predictor-policy"
 
 def test_aca3_real_materiality_persisted():
     """
