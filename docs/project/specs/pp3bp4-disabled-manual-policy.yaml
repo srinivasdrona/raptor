@@ -1,4 +1,4 @@
-# RAPTOR PP3/BP4 disabled/manual policy — Opus planner contract (rev 8).
+# RAPTOR PP3/BP4 disabled/manual policy — Opus planner contract (rev 9).
 #
 # Purpose: an implementation-ready, hash-bound plan for a FIRST-CLASS
 # disabled/manual PP3/BP4 policy mode. It permits the production-faithful
@@ -71,6 +71,18 @@
 # (raptor.eval.config), and requires NO packet source-code change
 # (resolve_packet_policy_disposition already derives DEFERRED from lineage). All
 # policy/state/hash/neutral-gate/no-x64 behavior preserved.
+#
+# Rev 9 supersedes commit 9058786 (planner rev 8) to add the one missing hash
+# surface: a REQUIRED packet_policy_hash in policy schema v2 binding the raw
+# bytes of configs/packet/candidate_direction.yaml (after PP3/BP4 row removal).
+# The disabled/manual decision now governs packet candidate-direction scoring,
+# so future packet config drift must not re-enable PP3/BP4 under a stale owner
+# approval. verify_disabled_config_hashes now verifies FOUR config/policy paths
+# (production, eval, lineage, packet) before proceed; the owner verifies FIVE
+# hashes (those four + runtime_bundle_hash). main() uses the CANONICAL packet
+# path (packet config is not a CLI arg). runtime_bundle_hash and the 14-file
+# scope are unchanged; packet behavior, G-DM16/17, neutral gate and no-x64
+# preserved.
 #
 # This file is the planner PLAN. It performs NO implementation, NO tests, NO
 # runner/config/code edits, NO owner approval and NO held-out run. It names the
@@ -229,6 +241,19 @@ revision_log:
     counts: {sonnet: 8, gemini: 5, planner: 1, total_branch: 14}
     preserved:
       - 'ALL prior behavior: policy schema v2 status x mode; state machine; production/eval/lineage config hashes + runtime_bundle_hash; deferred lineage + lineage_policy_hash; pure seams; neutral existing-gate authorization; no x64; owner status-only approval; corrected_enabled + v1 blocked; offline unit tests + integration_boundary'
+  - rev: 9
+    supersedes_commit: 90587860327599fa1d5977d19b0468ff69e64827
+    stacked_after: 'Sonnet impl e2bac85 + Gemini test commits interleave; stacked on current head, no fixed parent.'
+    trigger: one missing hash surface -- the packet candidate-direction config was not hash-bound
+    fix:
+      - 'add REQUIRED packet_policy_hash (4th config/policy hash) to policy v2, binding raw bytes of configs/packet/candidate_direction.yaml (post PP3/BP4 removal).'
+      - 'verify_disabled_config_hashes now verifies production/eval/lineage/packet (four) before proceed; lineage + packet use CANONICAL paths (not CLI args); byte-identical alternate paths are helper/unit coverage only; production/eval remain the actual --scorer-config/--eval-config CLI bytes.'
+      - 'packet drift => CONFIG_DRIFT; owner gate = FIVE hashes (production+eval+lineage+packet+runtime_bundle); backout/reactivation re-pin packet_policy_hash together with the packet rows.'
+      - 'G-DM1/2/7/12 include the packet hash/path; G-DM7 parametrizes packet drift; G-DM16 also asserts packet_policy_hash binds the exact post-removal bytes.'
+    unchanged:
+      - 'runtime_bundle_hash; the 14-file scope (candidate_direction.yaml already added in rev 8); packet behavior; G-DM16/17; neutral existing-gate authorization; no x64.'
+    preserved:
+      - 'ALL prior rev-1..8 behavior/decisions.'
 
 planner:
   model: claude-opus-4.8
@@ -294,7 +319,7 @@ intent:
       (Copilot-Session 7c146921), no amend, no push.
     - >-
       Post-implementation (Sonnet, separate track): with an APPROVED
-      disabled/manual artifact + matching production/eval/lineage config hashes +
+      disabled/manual artifact + matching production/eval/lineage/packet config hashes +
       runtime_bundle_hash + the masked runtime inputs,
       `scripts/run_masked_holdout_eval.py` prints a gate status that is NOT
       BLOCKED_POLICY, and config_pins report policy_mode=disabled_manual,
@@ -483,9 +508,9 @@ decision_ledger:
     decision: >-
       Owner approval is a SEPARATE human step: an ADR plus a distinct owner
       commit flipping status proposed->approved after independently verifying
-      production_config_hash, eval_config_hash, lineage_policy_hash AND
-      runtime_bundle_hash (all four) against the actual configs + runtime code
-      bundle. The doer leaves status=proposed.
+      production_config_hash, eval_config_hash, lineage_policy_hash,
+      packet_policy_hash AND runtime_bundle_hash (all FIVE) against the
+      actual/canonical configs + runtime code bundle. The doer leaves status=proposed.
     rationale: >-
       Kills beat4 #7 (owner approval embedded by the doer). Self-approval by the
       planner or doer is structurally impossible.
@@ -516,15 +541,20 @@ decision_ledger:
       and staleness cases it targets.
   - id: D10
     decision: >-
-      verify_disabled_config_hashes receives the ACTUAL --scorer-config and
-      --eval-config paths the runner will load, hashes THOSE bytes against
-      production_config_hash/eval_config_hash BEFORE loading/using them, and
-      blocks on mismatch. Alternate paths are allowed only if byte-identical.
+      verify_disabled_config_hashes verifies FOUR config/policy paths before
+      proceed: the ACTUAL --scorer-config and --eval-config CLI paths (hashed
+      against production_config_hash/eval_config_hash), plus the CANONICAL lineage
+      (bias_lineage.yaml) and packet (candidate_direction.yaml) paths (hashed
+      against lineage_policy_hash/packet_policy_hash). Blocks on any mismatch.
+      Alternate paths are allowed only if byte-identical (unit coverage).
     rationale: >-
-      Binding hardcoded paths would let a caller load a DIFFERENT config than the
-      one hashed. Hashing the actual loaded bytes means a config that drops
+      Binding hardcoded CLI paths would let a caller load a DIFFERENT config than
+      the one hashed; hashing the actual loaded bytes means a config that drops
       PP3/BP4 but changes thresholds/scope/authorization is a different byte
-      string => hash mismatch => BLOCKED_POLICY.
+      string => BLOCKED_POLICY. lineage + packet use canonical paths (not CLI
+      args); the packet hash is a governance binding (the runner verifies it, the
+      raptor.packet surface consumes it) so packet drift cannot re-enable PP3/BP4
+      under a stale approval.
   - id: D11
     decision: >-
       The runner is AUTHORIZATION-NEUTRAL. Policy status/mode approves ONLY use
@@ -565,8 +595,9 @@ decision_ledger:
       Propagate the disabled/manual decision into the PRD-04 packet
       candidate-direction policy: configs/packet/candidate_direction.yaml drops
       its PP3/BP4 criterion_strength_points rows so its keys equal the derived
-      candidate_set {PVS1, PM2, PM4, BA1, BS1, BP3, BP7} (no PP3/BP4). Make NO
-      packet source-code change.
+      candidate_set {PVS1, PM2, PM4, BA1, BS1, BP3, BP7} (no PP3/BP4), and bind
+      its raw bytes via a REQUIRED packet_policy_hash so packet drift fails closed.
+      Make NO packet source-code change.
     rationale: >-
       candidate_direction.yaml's candidate_set is derived from eval
       automatable_criteria (minus deferred BS2, FORBIDDEN, requires_heldout_mask);
@@ -641,6 +672,7 @@ policy_schema_v2:
     production_config_hash: '64-hex sha256 of the raw bytes of configs/acmg/tsc.yaml (post-removal)'
     eval_config_hash: '64-hex sha256 of the raw bytes of configs/eval/tsc2.yaml (post-removal)'
     lineage_policy_hash: '64-hex sha256 of the raw bytes of configs/eval/bias_lineage.yaml (PP3/BP4 deferred); REQUIRED'
+    packet_policy_hash: '64-hex sha256 of the raw bytes of configs/packet/candidate_direction.yaml (PP3/BP4 rows removed); REQUIRED; governance binding for packet candidate-direction'
     predictor_source_hash: '64-hex sha256 of configs/eval/predictor_aggregation.yaml (retained audit provenance)'
     correction_hash: '64-hex sha256 over the [predictor_aggregation.py, terminal_source.py] bundle, RE-PINNED (retained audit provenance)'
     runtime_bundle_hash: '64-hex sha256 over the runtime code bundle [predictor_policy.py, terminal_source.py, run_masked_holdout_eval.py] (see runtime_bundle_hash_spec); REQUIRED; recomputed+compared on the disabled proceed path to detect ACCIDENTAL byte drift (not tamper-proof)'
@@ -653,12 +685,13 @@ policy_schema_v2:
     - policy_sha256
   field_rules:
     - 'unknown/extra field => malformed (fail closed), as in v1 loader semantics'
-    - 'each hash (production_config_hash, eval_config_hash, lineage_policy_hash, predictor_source_hash, correction_hash, runtime_bundle_hash) must match ^[0-9a-fA-F]{64}$'
+    - 'each hash (production_config_hash, eval_config_hash, lineage_policy_hash, packet_policy_hash, predictor_source_hash, correction_hash, runtime_bundle_hash) must match ^[0-9a-fA-F]{64}$'
     - 'mode is REQUIRED for schema v2; a v2 artifact missing mode is malformed'
     - 'runtime_bundle_hash is REQUIRED for schema v2; a v2 artifact missing it is malformed'
     - 'lineage_policy_hash is REQUIRED for schema v2; a v2 artifact missing it is malformed'
+    - 'packet_policy_hash is REQUIRED for schema v2; a v2 artifact missing it is malformed'
     - 'status and mode are independent: no field derives from the other'
-    - 'production_config_hash/eval_config_hash/lineage_policy_hash bind the ACTUAL loaded --scorer-config/--eval-config/bias-lineage bytes (verified before load), not a hardcoded path'
+    - 'production_config_hash/eval_config_hash bind the ACTUAL loaded --scorer-config/--eval-config CLI bytes; lineage_policy_hash/packet_policy_hash bind the CANONICAL bias_lineage.yaml / candidate_direction.yaml paths (not CLI args). All four are verified before proceed, not against a hardcoded path.'
   hash_canonicalization: >-
     Single-file hashes (production_config_hash, eval_config_hash,
     predictor_source_hash) are raw file-bytes sha256 via
@@ -687,6 +720,7 @@ policy_schema_v2:
     production_config_hash: '<sha256(configs/acmg/tsc.yaml) after PP3/BP4 removal>'
     eval_config_hash: '<sha256(configs/eval/tsc2.yaml) after PP3/BP4 removal>'
     lineage_policy_hash: '<sha256(configs/eval/bias_lineage.yaml) after PP3/BP4 -> deferred>'
+    packet_policy_hash: '<sha256(configs/packet/candidate_direction.yaml) after PP3/BP4 rows removed>'
     predictor_source_hash: '<sha256(configs/eval/predictor_aggregation.yaml)>'
     correction_hash: '<sha256 bundle over predictor_aggregation.py + terminal_source.py, re-pinned>'
     runtime_bundle_hash: '<sha256 bundle over predictor_policy.py + terminal_source.py + run_masked_holdout_eval.py>'
@@ -718,15 +752,15 @@ state_machine:
       runner_action: BLOCKED_POLICY
       reason_prefix: 'disabled/manual policy is proposed, not owner-approved'
     - state: CONFIG_DRIFT
-      when: 'mode == disabled_manual AND status == approved AND (sha256(actual --scorer-config bytes) != production_config_hash OR sha256(actual --eval-config bytes) != eval_config_hash OR sha256(actual configs/eval/bias_lineage.yaml bytes) != lineage_policy_hash) (checked BEFORE load)'
+      when: 'mode == disabled_manual AND status == approved AND (sha256(actual --scorer-config bytes) != production_config_hash OR sha256(actual --eval-config bytes) != eval_config_hash OR sha256(canonical configs/eval/bias_lineage.yaml bytes) != lineage_policy_hash OR sha256(canonical configs/packet/candidate_direction.yaml bytes) != packet_policy_hash) (checked BEFORE proceed)'
       runner_action: BLOCKED_POLICY
-      reason_prefix: 'disabled/manual approval is not bound to the actually-loaded production/eval/lineage configs (drift)'
+      reason_prefix: 'disabled/manual approval is not bound to the production/eval/lineage/packet configs (drift)'
     - state: RUNTIME_BUNDLE_DRIFT
       when: 'mode == disabled_manual AND status == approved AND runtime_bundle_hash != sha256 bundle over [predictor_policy.py, terminal_source.py, run_masked_holdout_eval.py]'
       runner_action: BLOCKED_POLICY
       reason_prefix: 'disabled/manual runtime code changed since approval (accidental byte drift; not a tamper claim)'
     - state: APPROVED_DISABLED
-      when: 'mode == disabled_manual AND status == approved AND all THREE config hashes (production/eval/lineage) match the actual loaded bytes AND runtime_bundle_hash matches'
+      when: 'mode == disabled_manual AND status == approved AND all FOUR config/policy hashes (production/eval/lineage/packet) match AND runtime_bundle_hash matches'
       runner_action: PROCEED_DISABLED_MANUAL
       reason_prefix: 'approved disabled/manual policy; PP3/BP4 automation suppressed'
   proceed_preconditions_all_required:
@@ -734,7 +768,8 @@ state_machine:
     - 'mode == disabled_manual'
     - 'sha256(actual --scorer-config bytes) == production_config_hash  (verified before load)'
     - 'sha256(actual --eval-config bytes) == eval_config_hash  (verified before load)'
-    - 'sha256(actual configs/eval/bias_lineage.yaml bytes) == lineage_policy_hash  (verified before load)'
+    - 'sha256(canonical configs/eval/bias_lineage.yaml bytes) == lineage_policy_hash  (verified before load)'
+    - 'sha256(canonical configs/packet/candidate_direction.yaml bytes) == packet_policy_hash  (verified before proceed; governance binding)'
     - 'runtime_bundle_hash == sha256 bundle over [predictor_policy.py, terminal_source.py, run_masked_holdout_eval.py]'
     - 'PP3 and BP4 absent from scorer_config.included_criteria AND eval_config.automatable_criteria (defense-in-depth, after load)'
     - 'PP3 and BP4 present in VALID_CRITERIA and scorer acmg_criteria (registry/vocabulary retained)'
@@ -762,6 +797,10 @@ hash_contract:
       target: 'the ACTUAL bias-lineage bytes (configs/eval/bias_lineage.yaml, loaded via lineage_policy._LINEAGE_POLICY_PATH), verified BEFORE load'
       meaning: 'binds the disabled decision to the exact lineage policy with PP3/BP4 deferred; a lineage file that re-allows PP3/BP4 or drops the deferral is a different byte string => BLOCKED'
       runtime_invariant: 'in main() the lineage path passed to verify_disabled_config_hashes MUST be the same canonical configs/eval/bias_lineage.yaml path that BiasEvidenceSource/load_lineage_policy then CONSUMES (_LINEAGE_POLICY_PATH) -- verify exactly the file you consume, never verify one lineage file and consume another. verify_disabled_config_hashes accepting an alternate byte-identical path is helper/unit coverage (G-DM12), not a runtime capability.'
+    - name: packet_policy_hash
+      target: 'the canonical configs/packet/candidate_direction.yaml bytes (packet candidate-direction policy after PP3/BP4 row removal), verified BEFORE proceed'
+      meaning: 'GOVERNANCE binding: ties the disabled/manual owner approval to the exact packet candidate-direction config so future packet drift (re-adding PP3/BP4 rows) => CONFIG_DRIFT => BLOCKED under the stale approval. The terminal runner VERIFIES this hash (check-before-proceed) but does not itself consume the packet config -- the raptor.packet surface consumes it separately under its own approval_status gate.'
+      runtime_invariant: 'main() hashes the CANONICAL configs/packet/candidate_direction.yaml path (packet config is NOT a CLI arg); a byte-identical alternate packet path is helper/unit coverage (G-DM12/G-DM16), not a runtime capability.'
     - name: runtime_bundle_hash
       target: '[src/raptor/eval/predictor_policy.py, src/raptor/eval/terminal_source.py, scripts/run_masked_holdout_eval.py] bundle'
       meaning: 'detects ACCIDENTAL byte drift of the runtime code (loader/wrapper/runner) between approval and a run; a byte change the verifier still sees => BLOCKED_POLICY. NOT tamper-proof (threat_model): a malicious verifier removal is out of scope this phase'
@@ -847,6 +886,7 @@ packet_policy_changes:
     - 'calibration synthetic rows whose candidate direction depended on PP3/BP4 (now DEFERRED, unscored) move to no_deterministic_resolution / annotation_manual_review per policy; RECOMPUTE the exact strata/universe/batch counts from the UNCHANGED synthetic fixtures -- never hardcode a guess -- test_tsc_calibration_batch.py.'
     - 'first-pass redaction/provenance/conservation invariants remain unchanged.'
   pp3bp4_representation: 'PP3/BP4 stay represented as DEFERRED (manual context) via lineage + resolve_packet_policy_disposition; never scored in candidate direction, never dropped from the vocabulary.'
+  hash_binding: 'the disabled/manual policy artifact binds packet_policy_hash = sha256(configs/packet/candidate_direction.yaml after removal); the runner verifies it check-before-proceed (governance) so future packet drift => CONFIG_DRIFT => BLOCKED under a stale owner approval. packet config is NOT a CLI arg (canonical path).'
 
 # ---------------------------------------------------------------------------
 # Runner behavior + evidence source construction (the disabled data flow).
@@ -862,11 +902,12 @@ runner_behavior:
       the existing runtime/eval flow; SAME Sonnet file, NO scope expansion.
     seams:
       - name: resolve_policy_state
-        signature: 'resolve_policy_state(policy, scorer_config_path, eval_config_path, lineage_path, runtime_bundle_paths) -> (state, reason)'
+        signature: 'resolve_policy_state(policy, scorer_config_path, eval_config_path, lineage_path, packet_path, runtime_bundle_paths) -> (state, reason)'
         does: >-
           mode/status dispatch + path-byte/hash checks ONLY
-          (verify_disabled_config_hashes over the three config paths +
-          verify_runtime_bundle_hash over the code bundle). Returns a state in
+          (verify_disabled_config_hashes over the four config/policy paths
+          (production/eval/lineage/packet) + verify_runtime_bundle_hash over the
+          code bundle). Returns a state in
           {MALFORMED, UNSUPPORTED_MODE, CORRECTED_ENABLED_OUT_OF_SCOPE,
           PROPOSED_DISABLED, CONFIG_DRIFT, RUNTIME_BUNDLE_DRIFT, APPROVED_DISABLED}
           + a reason string. Opens NO held-out input (no manifest/benchmark/
@@ -883,7 +924,7 @@ runner_behavior:
         does: >-
           pure provenance dict (the config_pins additions): policy_mode,
           pp3bp4_suppressed_counts, pp3bp4_scored_calls=0,
-          pp3bp4_lineage_disposition, the three config hashes + runtime_bundle_hash
+          pp3bp4_lineage_disposition, the four config hashes + runtime_bundle_hash
           + predictor provenance. NO report/gate mutation; returns data only.
     composition: >-
       main(): parse args -> load_predictor_policy -> resolve_policy_state; if the
@@ -895,7 +936,7 @@ runner_behavior:
   dispatch:
     - 'load_predictor_policy(args.predictor_policy) -> MALFORMED => BLOCKED_POLICY'
     - 'resolve_policy_state(...) does the hash + mode/status checks WITHOUT opening held-out inputs; every non-APPROVED_DISABLED state prints a BLOCKED_POLICY GateDecision (vus_authorized=False) and returns 0 with NO metrics'
-    - 'PROCEED only for APPROVED_DISABLED: the three config path-byte hashes + runtime_bundle_hash are verified inside resolve_policy_state BEFORE any config/holdout load'
+    - 'PROCEED only for APPROVED_DISABLED: the four config/policy path-byte hashes + runtime_bundle_hash are verified inside resolve_policy_state BEFORE any config/holdout load'
     - 'on PROCEED the runner is authorization-NEUTRAL: it never sets vus_authorized/scope booleans; the gate/scope_gate decide from metrics (see authorization_semantics)'
   disabled_manual_proceed_path:
     evidence_wrapping:
@@ -905,7 +946,7 @@ runner_behavior:
       - 'DO NOT construct PredictorCorrectedEvidenceSource in this branch (no correction applied)'
     guards_before_load:
       - 'verify_runtime_bundle_hash(policy, [predictor_policy.py, terminal_source.py, run_masked_holdout_eval.py]) or BLOCKED_POLICY  # accidental-drift detection, not tamper-proof'
-      - 'verify_disabled_config_hashes(policy, args.scorer_config, args.eval_config, lineage_policy_path=configs/eval/bias_lineage.yaml) -- CHECK-BEFORE-LOAD path-byte verification of ALL THREE configs: hash the bytes at each path immediately before load and require a match, or BLOCKED_POLICY. The lineage_policy_path passed here is the CANONICAL configs/eval/bias_lineage.yaml (lineage_policy._LINEAGE_POLICY_PATH) that BiasEvidenceSource then CONSUMES -- main() verifies exactly the file it consumes, never a different one (byte-identical alternate paths are only exercised in the G-DM12 unit). This does NOT prove the loader consumes the same in-memory bytes; concurrent adversarial mutation between check and load is out of scope (threat_model).'
+      - 'verify_disabled_config_hashes(policy, args.scorer_config, args.eval_config, lineage_policy_path=configs/eval/bias_lineage.yaml, packet_policy_path=configs/packet/candidate_direction.yaml) -- CHECK-BEFORE-PROCEED path-byte verification of ALL FOUR configs: hash the bytes at each path and require a match, or BLOCKED_POLICY. lineage_policy_path and packet_policy_path are CANONICAL (not CLI args); the lineage file is the one BiasEvidenceSource then CONSUMES (verify==consume), while the packet file is a GOVERNANCE binding the runner verifies but does not consume (the raptor.packet surface consumes it separately under its own approval gate). Byte-identical alternate paths are only exercised in the G-DM12/G-DM16 units. This does NOT prove the loader consumes the same in-memory bytes; concurrent mutation between check and load is out of scope (threat_model).'
     guards_after_load_defense_in_depth:
       - 'assert {PP3,BP4} disjoint from scorer_config.included_criteria and eval_config.automatable_criteria or BLOCKED_POLICY (kept as belt-and-suspenders on top of the hash)'
       - 'assert scorer_config.included_criteria == eval_config.automatable_criteria (parity; live_source.py:243 also enforces this)'
@@ -940,7 +981,8 @@ report_provenance_fields:
     predictor_correction_applied: false
     production_config_hash: '<policy.production_config_hash>  # verified against actual --scorer-config bytes'
     eval_config_hash: '<policy.eval_config_hash>  # verified against actual --eval-config bytes'
-    lineage_policy_hash: '<policy.lineage_policy_hash>  # verified against actual configs/eval/bias_lineage.yaml bytes'
+    lineage_policy_hash: '<policy.lineage_policy_hash>  # verified against canonical configs/eval/bias_lineage.yaml bytes'
+    packet_policy_hash: '<policy.packet_policy_hash>  # verified against canonical configs/packet/candidate_direction.yaml bytes (governance)'
     runtime_bundle_hash: '<policy.runtime_bundle_hash>  # runtime code bundle; accidental-drift check'
     predictor_policy_source_hash: '<policy.predictor_source_hash>  # provenance'
     predictor_policy_correction_hash: '<policy.correction_hash>  # provenance'
@@ -993,13 +1035,13 @@ implementation_scope:
     - path: src/raptor/eval/predictor_policy.py
       change: >-
         Add schema-v2 support: dispatch on schema; v2 closed field set incl.
-        mode/production_config_hash/eval_config_hash/lineage_policy_hash/runtime_bundle_hash;
-        extend PredictorPolicy with mode + lineage_policy_hash + runtime_bundle_hash
-        (default None for v1). Add verify_disabled_config_hashes(policy,
-        scorer_config_path, eval_config_path, lineage_policy_path) that hashes the
-        ACTUAL given paths (single-file _sha256_file) against
-        production_config_hash/eval_config_hash/lineage_policy_hash immediately
-        before load. Add verify_runtime_bundle_hash(policy, code_paths) using the
+        mode/production_config_hash/eval_config_hash/lineage_policy_hash/packet_policy_hash/runtime_bundle_hash;
+        extend PredictorPolicy with mode + lineage_policy_hash + packet_policy_hash
+        + runtime_bundle_hash (default None for v1). Add verify_disabled_config_hashes(policy,
+        scorer_config_path, eval_config_path, lineage_policy_path, packet_policy_path)
+        that hashes the four given paths (single-file _sha256_file) against
+        production_config_hash/eval_config_hash/lineage_policy_hash/packet_policy_hash
+        before proceed. Add verify_runtime_bundle_hash(policy, code_paths) using the
         existing multi-file bundle convention over [predictor_policy.py,
         terminal_source.py, run_masked_holdout_eval.py] to detect accidental byte
         drift. Both are plain sha256 helpers alongside the existing
@@ -1014,8 +1056,8 @@ implementation_scope:
       change: >-
         Factor the gate into THREE PURE seams (same file, NO scope change):
         resolve_policy_state(policy, scorer_config_path, eval_config_path,
-        lineage_path, runtime_bundle_paths) -> (state, reason) doing mode/status
-        dispatch + the three config path-byte hashes + runtime_bundle_hash WITHOUT
+        lineage_path, packet_path, runtime_bundle_paths) -> (state, reason) doing mode/status
+        dispatch + the four config/policy path-byte hashes + runtime_bundle_hash WITHOUT
         opening any held-out input; build_policy_evidence_source(source, state) ->
         PolicyDisabledEvidenceSource for APPROVED_DISABLED only (never
         PredictorCorrectedEvidenceSource); build_disabled_policy_pins(...) -> the
@@ -1042,7 +1084,7 @@ implementation_scope:
       change: >-
         Migrate to schema bp4pp3-predictor-policy/2; status=proposed;
         mode=disabled_manual; add production_config_hash + eval_config_hash +
-        lineage_policy_hash (post-change bytes) + runtime_bundle_hash (bundle over
+        lineage_policy_hash + packet_policy_hash (post-change bytes) + runtime_bundle_hash (bundle over
         predictor_policy.py + terminal_source.py + run_masked_holdout_eval.py);
         RE-PIN correction_hash to the new terminal_source.py bundle; keep
         predictor_source_hash; update decision_reference to ADR-0012. Leave
@@ -1126,13 +1168,14 @@ test_matrix:
       target: predictor_policy.py
       asserts: >-
         v2 loader accepts the exact closed v2 field set and populates
-        PredictorPolicy.mode + lineage_policy_hash + runtime_bundle_hash; rejects
-        an unknown/extra field; rejects a v2 artifact missing mode,
-        lineage_policy_hash or runtime_bundle_hash; rejects an unknown mode value;
-        rejects a non-64-hex production_config_hash/eval_config_hash/lineage_policy_hash.
+        PredictorPolicy.mode + lineage_policy_hash + packet_policy_hash +
+        runtime_bundle_hash; rejects an unknown/extra field; rejects a v2 artifact
+        missing mode, lineage_policy_hash, packet_policy_hash or runtime_bundle_hash;
+        rejects an unknown mode value; rejects a non-64-hex
+        production_config_hash/eval_config_hash/lineage_policy_hash/packet_policy_hash.
     - id: G-DM2
       target: predictor_policy.verify_disabled_config_hashes
-      asserts: 'hashes the ACTUAL passed --scorer-config/--eval-config/bias_lineage bytes; passes when all THREE match; PredictorPolicyError on any mismatch and on a missing file.'
+      asserts: 'hashes the four passed paths (--scorer-config/--eval-config CLI + canonical bias_lineage.yaml + canonical candidate_direction.yaml); passes when all FOUR match; PredictorPolicyError on any mismatch and on a missing file.'
     - id: G-DM3
       target: terminal_source.PolicyDisabledEvidenceSource
       asserts: >-
@@ -1144,9 +1187,10 @@ test_matrix:
       asserts: >-
         build a CONTRACT-VALID BiasEvidenceSource offline (one canonical manifest
         row + a matching single BIAS TSV row + a FakeCanonicalNormalizer or
-        equivalent); write temp scorer/eval/lineage configs and a v2 policy whose
-        three config hashes match those temp bytes and whose runtime_bundle_hash
-        is the REAL repo bundle hash; resolve_policy_state(...) == APPROVED_DISABLED;
+        equivalent); write temp scorer/eval/lineage/packet configs and a v2 policy
+        whose four config/policy hashes match those temp bytes and whose
+        runtime_bundle_hash is the REAL repo bundle hash;
+        resolve_policy_state(...) == APPROVED_DISABLED;
         build_policy_evidence_source wraps it in PolicyDisabledEvidenceSource;
         build_disabled_policy_pins returns policy_mode=disabled_manual,
         pp3bp4_scored_calls=0, non-empty pp3bp4_suppressed_counts,
@@ -1159,8 +1203,8 @@ test_matrix:
       target: 'resolve_policy_state (unit)'
       asserts: 'an approved+corrected_enabled fixture => state CORRECTED_ENABLED_OUT_OF_SCOPE (blocked). No subprocess.'
     - id: G-DM7
-      target: 'resolve_policy_state (unit, parametrized over the three config files)'
-      asserts: 'approved+disabled_manual but a CHANGED byte in ANY ONE of the three temp pinned paths (scorer config, eval config, or bias_lineage) => state CONFIG_DRIFT (blocked); parametrize over all three; models an accidental edit/stale approval, not an attacker. No subprocess.'
+      target: 'resolve_policy_state (unit, parametrized over the four config/policy files)'
+      asserts: 'approved+disabled_manual but a CHANGED byte in ANY ONE of the four temp pinned paths (scorer config, eval config, bias_lineage, or candidate_direction) => state CONFIG_DRIFT (blocked); parametrize over all four (incl. packet drift); models an accidental edit/stale approval, not an attacker. No subprocess.'
     - id: G-DM8
       target: 'resolve_policy_state (unit)'
       asserts: 'a legacy v1-schema status=approved fixture (no mode/lineage/runtime hashes) => state UNSUPPORTED_MODE (blocked) -- proves status alone never enables. No subprocess.'
@@ -1195,14 +1239,14 @@ test_matrix:
     - id: G-DM12
       target: 'predictor_policy.verify_disabled_config_hashes (unit; NO subprocess)'
       asserts: >-
-        byte-identical alternate scorer/eval/lineage paths (same bytes, different
-        path) PASS; a changed byte in any of the three (a config that removes
-        PP3/BP4 but changes a threshold/scope/auth byte) raises PredictorPolicyError,
-        proving absence alone is insufficient. This alternate-path flexibility is
-        HELPER/UNIT coverage only -- main() always verifies AND consumes the
-        canonical configs/eval/bias_lineage.yaml (_LINEAGE_POLICY_PATH). Models an
-        accidental/incorrect path, not concurrent mutation between check and load
-        (threat_model).
+        byte-identical alternate scorer/eval/lineage/packet paths (same bytes,
+        different path) PASS; a changed byte in any of the FOUR (a config that
+        removes PP3/BP4 but changes a threshold/scope/auth/packet byte) raises
+        PredictorPolicyError, proving absence alone is insufficient. This
+        alternate-path flexibility is HELPER/UNIT coverage only -- main() uses the
+        canonical bias_lineage.yaml (consumed) and candidate_direction.yaml
+        (governance) paths. Models an accidental/incorrect path, not concurrent
+        mutation between check and load (threat_model).
     - id: G-DM13
       target: 'authorization neutrality (unit via existing decide_gate/decide_scope_gate/compute_report_scope_gate)'
       asserts: >-
@@ -1233,7 +1277,7 @@ test_matrix:
         updated assertion is RED until Sonnet's config change lands, then GREEN.
         The AC-A6 recompute-strength behavior the test also covers is unchanged.
     - id: G-DM16
-      target: 'packet candidate-direction parity (test_candidate_direction_policy.py + test_packet_core.py)'
+      target: 'packet candidate-direction parity + hash (test_candidate_direction_policy.py + test_packet_core.py + predictor_policy)'
       asserts: >-
         after Sonnet drops PP3/BP4 from candidate_direction.yaml: (a)
         criterion_strength_points keys EQUAL the derived candidate_set
@@ -1241,7 +1285,10 @@ test_matrix:
         succeeds (keys subset of VALID_CRITERIA - FORBIDDEN_CRITERIA); (c) the
         lineage INCLUDED bucket == {PVS1,PM2,PM4,BA1,BS1,BP3,BP7} and DEFERRED ==
         {PS3,BS2,PP3,BP4}; resolve_packet_policy_disposition("deferred","deferred")
-        is DEFERRED. NO packet source-code change.
+        is DEFERRED; (d) packet_policy_hash binds the EXACT post-removal
+        candidate_direction.yaml bytes -- verify_disabled_config_hashes passes on
+        the pinned bytes and a single changed packet byte => CONFIG_DRIFT. NO
+        packet source-code change.
     - id: G-DM17
       target: 'calibration propagation (test_tsc_calibration_batch.py)'
       asserts: >-
@@ -1282,11 +1329,11 @@ gpt_probes:
     - 'P7: the correction_hash re-pin reflects exactly the new terminal_source.py bundle and predictor_source_hash did not drift unintentionally.'
     - 'P8: disabled mode adds no new scoring input (POLICY_ONLY_REUSE), so no x64 reannotation is triggered.'
     - 'P9: runtime_bundle_hash covers [predictor_policy.py, terminal_source.py, run_masked_holdout_eval.py]; an ACCIDENTAL change to any of them (or the pin), with the verifier intact, => BLOCKED_POLICY. It is a drift detector, not tamper-proof/self-authenticating (threat_model); confirm the spec makes no stronger claim.'
-    - 'P10: config hashes are computed over the ACTUAL --scorer-config/--eval-config bytes and verified BEFORE load; a byte-identical alternate path passes, but changed thresholds/scope/auth (despite PP3/BP4 absence) => BLOCKED_POLICY.'
+    - 'P10: FOUR config/policy hashes are verified before proceed -- production/eval over the ACTUAL --scorer-config/--eval-config CLI bytes, lineage/packet over the CANONICAL bias_lineage.yaml/candidate_direction.yaml paths; a byte-identical alternate path passes, but any changed byte (despite PP3/BP4 absence) => BLOCKED_POLICY.'
     - 'P11: the runner is authorization-NEUTRAL -- it sets no gate/scope authorization value; decide_gate/decide_scope_gate (ADR-0011) still decide from metrics; gate.py/scope_gate.py are unchanged; a synthetic gate decision is unaffected by policy mode.'
     - 'P12: bias_lineage.yaml PP3/BP4 are deferred/deferred with decision_dependency bp4pp3-predictor-policy + non-empty decision_rationale; assert_registry_consistency passes (no omitted_without_disposition); lineage_policy_hash is bound + check-before-load; NO lineage-registry/policy/audit code changed; audit_lineage adds no new block because PP3/BP4 are not automatable (would_be_scored False).'
     - 'P13: review main() composition of the three seams -- resolve_policy_state gates BEFORE any held-out input is opened; build_policy_evidence_source only wraps PolicyDisabledEvidenceSource for APPROVED_DISABLED (never PredictorCorrectedEvidenceSource); build_disabled_policy_pins is pure (no report/gate mutation); main does not override decide_gate/decide_scope_gate output. This human/GPT review replaces the removed fake end-to-end PROCEED test and is done BEFORE the owner gate.'
-    - 'P14: packet propagation -- candidate_direction.yaml criterion_strength_points keys == derived candidate_set (no PP3/BP4); the lineage INCLUDED bucket drops PP3/BP4 and DEFERRED gains them; resolve_packet_policy_disposition + direction.py + packet/config.py are UNCHANGED (NO packet source-code change); calibration strata/universe/batch counts are recomputed from unchanged fixtures; redaction/provenance/conservation intact.'
+    - 'P14: packet propagation -- candidate_direction.yaml criterion_strength_points keys == derived candidate_set (no PP3/BP4); packet_policy_hash binds those exact bytes (governance) so packet drift => CONFIG_DRIFT; the lineage INCLUDED bucket drops PP3/BP4 and DEFERRED gains them; resolve_packet_policy_disposition + direction.py + packet/config.py are UNCHANGED (NO packet source-code change); calibration strata/universe/batch counts are recomputed from unchanged fixtures; redaction/provenance/conservation intact.'
 
 # ---------------------------------------------------------------------------
 # Owner decision gate — no self-approval.
@@ -1297,7 +1344,7 @@ owner_decision_gate:
     - '2. Sonnet implements implementation_scope in one commit; artifact stays status=proposed, mode=disabled_manual with post-removal config hashes and re-pinned correction_hash; all tests green (sentinel green after re-pin).'
     - '3. GPT-5.4 runs gpt_probes, including reviewing main()''s composition of the three seams and the build_disabled_policy_pins output (P11/P13) -- this replaces a fake end-to-end PROCEED.'
     - '4. Owner (operator/domain owner, @dronasrinivas) records ADR-0012 in docs/DECISIONS.md (MADR, Accepted). The ADR states that disabled/manual permits EVALUATION (use of the disabled/manual evidence mode) and does NOT grant automatic VUS/scope authorization -- the pre-registered gate/scope_gate outcome remains authoritative -- and records the unmet activation evidence (exact_revel_compatibility unresolved, permitted_use pending, training_overlap UNKNOWN, transportability BLOCKED_DATA_UNDERPOWERED).'
-    - '5. Owner, in a SEPARATE status-only commit, flips configs/eval/bp4pp3_predictor_policy.json status proposed->approved after independently verifying production_config_hash/eval_config_hash/lineage_policy_hash (vs the actual configs) and runtime_bundle_hash (vs the runtime code bundle). No other field changes.'
+    - '5. Owner, in a SEPARATE status-only commit, flips configs/eval/bp4pp3_predictor_policy.json status proposed->approved after independently verifying FIVE hashes -- production_config_hash/eval_config_hash/lineage_policy_hash/packet_policy_hash (vs the actual/canonical configs) and runtime_bundle_hash (vs the runtime code bundle). No other field changes.'
     - '6. Only AFTER the status flip is the actual 2,577-row masked rerun run as the FORMAL PROCEED (real manifest/benchmark/reference/mask/return-manifest contracts satisfied); it is NOT run in CI before approval (integration_boundary).'
   no_self_approval:
     - 'the planner (Opus) never approves; the doer (Sonnet) never sets status=approved.'
@@ -1344,12 +1391,12 @@ migration_and_backout:
     - 'the terminal_source.py edit trips the sentinel; the co-located correction_hash re-pin restores it.'
     - 'artifact remains status=proposed (BLOCKED) until the separate owner approval; the doer enables nothing.'
   backout:
-    - 'revert the Sonnet commit: PP3/BP4 return to included_criteria + automatable_criteria, their bias_lineage disposition returns to allowed/allowed, AND the configs/packet/candidate_direction.yaml PP3/BP4 criterion_strength_points rows return; the artifact returns to v1/pending; the runner + packet candidate-direction return to prior behavior.'
+    - 'revert the Sonnet commit: PP3/BP4 return to included_criteria + automatable_criteria, their bias_lineage disposition returns to allowed/allowed, AND the configs/packet/candidate_direction.yaml PP3/BP4 criterion_strength_points rows return; the v2 artifact (incl. packet_policy_hash) returns to v1/pending; the runner + packet candidate-direction return to prior behavior.'
     - 'a partial/one-sided revert fails closed at load (parity + lineage-registry + packet candidate_set==keys invariants) -- no drifted half-state can ship.'
   future_reactivation_gate:
     - 'corrected_enabled/REVEL requires a NEW owner ADR + new hash-bound artifact + the recommendation section-8 activation checklist + a fresh masked rerun.'
     - 'mode=corrected_enabled stays BLOCKED_POLICY; config drift fails closed under any stale approval.'
-    - 'reactivation ALSO restores the configs/packet/candidate_direction.yaml PP3/BP4 rows (together with production/eval/lineage) ONLY under that new activation decision -- never independently.'
+    - 'reactivation ALSO restores the configs/packet/candidate_direction.yaml PP3/BP4 rows and re-pins packet_policy_hash (together with production/eval/lineage/runtime hashes) ONLY under that new activation decision -- never independently.'
 
 # ---------------------------------------------------------------------------
 # Residual risk — what these proportionate controls do NOT cover.
@@ -1417,11 +1464,11 @@ beat4_self_audit:
     - failure: 'A required test fakes a masked-holdout PROCEED (mock manifest/benchmark/reference/mask + dummy runtime-bundle hashes), giving a false green and un-runnable CI.'
       control: 'pure seams (resolve_policy_state/build_policy_evidence_source/build_disabled_policy_pins) unit-tested OFFLINE (G-DM4..G-DM14); the fake subprocess fixture is removed (removed_from_required_tests); the real 2,577-row PROCEED is the post-approval formal rerun; GPT reviews main composition (P13).'
     - failure: 'Removing PP3/BP4 from eval/lineage but NOT from configs/packet/candidate_direction.yaml -> derived candidate_set != criterion_strength_points keys (test_candidate_direction_policy.py AC-D2 fails), or a packet path scores a disabled criterion.'
-      control: 'D13 drops the PP3/BP4 packet rows in the SAME Sonnet commit; resolve_packet_policy_disposition derives DEFERRED so direction.py never scores them; G-DM16/G-DM17 + P14; NO packet source-code change.'
+      control: 'D13 drops the PP3/BP4 packet rows in the SAME Sonnet commit; resolve_packet_policy_disposition derives DEFERRED so direction.py never scores them; packet_policy_hash binds candidate_direction.yaml so later packet drift => CONFIG_DRIFT => BLOCKED under a stale approval; G-DM16/G-DM17 + P14; NO packet source-code change.'
   planner_scope_inversions:
     - 'Editing code/config/tests instead of only the YAML: this planner commit modifies exactly one file (verified in VERIFICATION).'
     - 'Wrong or missing commit trailers: the corrected trailer Copilot-Session 7c146921-... is pinned in planner.required_trailers and verified post-commit; rev 1 (878bff8) used 90703341 and, per the no-amend rule, is left as-is with the spec corrected.'
-    - 'Committing on the wrong branch/base: worktree/branch pinned; this rev-8 commit supersedes rev-7 (8210ff5) and stacks on the current branch head. Planner/Sonnet/Gemini commits interleave, so no fixed HEAD~1 SHA is asserted -- verify only that HEAD is a descendant of 8210ff5, exactly the spec changed, and both trailers present.'
+    - 'Committing on the wrong branch/base: worktree/branch pinned; this rev-9 commit supersedes rev-8 (9058786) and stacks on the current branch head. Planner/Sonnet/Gemini commits interleave, so no fixed HEAD~1 SHA is asserted -- verify only that HEAD is a descendant of 9058786, exactly the spec changed, and both trailers present.'
   empty_beat4_allowed: false
 
 # ---------------------------------------------------------------------------
@@ -1432,8 +1479,8 @@ acceptance_mapping:
     satisfied_by: 'implementation_scope + policy_schema_v2 + state_machine + runner_behavior + test_matrix name exact files, fields and probes.'
   - acceptance: 'The policy gate is offline-testable without faking a masked-holdout run.'
     satisfied_by: 'runner_behavior.pure_seams (resolve_policy_state/build_policy_evidence_source/build_disabled_policy_pins); G-DM4 offline composition + G-DM5..G-DM14 unit tests; integration_boundary defers the real 2,577-row PROCEED to the post-approval formal rerun (P13 review).'
-  - acceptance: 'Packet candidate-direction + calibration stay consistent with PP3/BP4 disabled (no packet code change).'
-    satisfied_by: 'D13 + packet_policy_changes; candidate_direction.yaml keys == derived candidate_set; PP3/BP4 DEFERRED via lineage; G-DM16/G-DM17/P14; 8 Sonnet + 5 Gemini + 1 planner = 14.'
+  - acceptance: 'Packet candidate-direction + calibration stay consistent with PP3/BP4 disabled and hash-bound (no packet code change).'
+    satisfied_by: 'D13 + packet_policy_changes; candidate_direction.yaml keys == derived candidate_set; packet_policy_hash binds those bytes (packet drift => CONFIG_DRIFT); PP3/BP4 DEFERRED via lineage; G-DM16/G-DM17/P14; 8 Sonnet + 5 Gemini + 1 planner = 14.'
   - acceptance: 'Disabled/manual mode is explicit and cannot be confused with predictor approval.'
     satisfied_by: 'D1/D2 orthogonal mode; corrected_enabled + legacy => BLOCKED_POLICY; D11 approval authorizes only the evidence mode.'
   - acceptance: 'Production-faithful rerun is preserved: policy approval never forces authorization; the gate decides from metrics (ADR-0011 preserved).'
@@ -1455,9 +1502,9 @@ acceptance_mapping:
 # VERIFICATION (slot 1) — filled by the planner after the commit.
 # ---------------------------------------------------------------------------
 verification:
-  expected: 'one follow-up (rev-8) planner commit on track/pp3bp4-resolution-2026-07 modifying exactly docs/project/specs/pp3bp4-disabled-manual-policy.yaml; both trailers; no amend; no push. This rev supersedes prior planner content (rev 7 = 8210ff5) and is STACKED on the current branch head (Sonnet impl e2bac85 + Gemini test commits interleave), so NO fixed HEAD~1 ancestry is asserted.'
+  expected: 'one follow-up (rev-9) planner commit on track/pp3bp4-resolution-2026-07 modifying exactly docs/project/specs/pp3bp4-disabled-manual-policy.yaml; both trailers; no amend; no push. This rev supersedes prior planner content (rev 8 = 9058786) and is STACKED on the current branch head (Sonnet/Gemini commits interleave), so NO fixed HEAD~1 ancestry is asserted.'
   checks:
     - 'git show --stat HEAD => exactly 1 file changed (this spec only); Sonnet/Gemini code+test commits are NOT included.'
     - 'git log -1 shows Co-authored-by Copilot AND Copilot-Session: 7c146921-f3dd-4a1e-8cf0-8f574de49204.'
-    - 'HEAD is a descendant of 8210ff5 (rev 7); the parent is whatever the branch head is at commit time (a Sonnet/Gemini commit), NOT a fixed planner SHA. no amend; no push; branch unchanged.'
+    - 'HEAD is a descendant of 9058786 (rev 8); the parent is whatever the branch head is at commit time, NOT a fixed planner SHA. no amend; no push; branch unchanged.'
   verdict: recorded_in_final_response
