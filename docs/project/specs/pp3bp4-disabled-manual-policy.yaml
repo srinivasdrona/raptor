@@ -1,4 +1,4 @@
-# RAPTOR PP3/BP4 disabled/manual policy — Opus planner contract (rev 4).
+# RAPTOR PP3/BP4 disabled/manual policy — Opus planner contract (rev 5).
 #
 # Purpose: an implementation-ready, hash-bound plan for a FIRST-CLASS
 # disabled/manual PP3/BP4 policy mode. It permits the production-faithful
@@ -29,6 +29,14 @@
 # required lineage_policy_hash (third bound config), extends the parity/lineage
 # preconditions, and grows Sonnet scope to 7 files (branch total 9). No
 # lineage-registry code change; all prior closed decisions preserved.
+#
+# Rev 5 supersedes commit b465a9c after a final GPT-5.4 check found stale
+# `allowed` lineage claims contradicting rev 4 (D4, P6) and a protected test
+# (tests/eval/test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance)
+# that still asserts PP3/BP4 production_disposition == allowed. Rev 5 rewrites the
+# two stale claims to the deferred invariant and widens Gemini scope to TWO test
+# files (create the new disabled-policy suite AND update that AC-A6 assertion to
+# expect deferred), so the branch total is planner + 2 Gemini + 7 Sonnet = 10.
 #
 # This file is the planner PLAN. It performs NO implementation, NO tests, NO
 # runner/config/code edits, NO owner approval and NO held-out run. It names the
@@ -126,6 +134,21 @@ revision_log:
       - decision_ledger (D12)
     preserved:
       - 'ALL prior closed decisions: narrowed threat_model; neutral existing-gate authorization; no x64; runtime_bundle_hash accidental-drift control; actual-path CHECK-BEFORE-LOAD semantics; owner status-only approval; corrected_enabled + v1 blocked'
+  - rev: 5
+    supersedes_commit: b465a9cdbe9fd7bb5ae7eb968ad291c4c77ce2c1
+    trigger: final GPT-5.4 check found stale `allowed` lineage claims + a protected test asserting the old disposition
+    attribution:
+      stale_contradictions_fixed:
+        - 'D4 and P6 still said PP3/BP4 lineage stays can_fire/allowed / must not be relabeled -- contradicting the rev-4 deferred decision (D12). Rewritten to the deferred invariant: retain can_fire/lineage_class/source_dependencies; validation_disposition=deferred, production_disposition=deferred, decision_dependency=bp4pp3-predictor-policy, non-blank rationale; bind lineage_policy_hash.'
+      protected_test_must_update:
+        - 'tests/eval/test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance asserts PP3/BP4 production_disposition == "allowed"; the approved disabled/manual contract flips that to deferred, so the assertion MUST be updated (allowed->deferred + decision_dependency). This is a contract-driven expectation change, NOT a weakening -- it still pins an exact disposition.'
+    corrections_in:
+      - decision_ledger D4 + gpt_probes P6 (deferred invariant; removed stale allowed claims)
+      - test_matrix (two Gemini files: create test_pp3bp4_disabled_policy.py + update test_predictor_aggregation_wrapper.py AC-A6; new G-DM15)
+      - implementation_scope branch_scope (Gemini 2 files; branch total 10; Sonnet still 7)
+      - validation_scope + protected_tests_expectations + owner_decision_gate + migration (aggregation-wrapper update)
+    preserved:
+      - 'ALL other closed behavior: narrowed threat_model; neutral existing-gate authorization; no x64; runtime_bundle_hash accidental-drift; actual-path CHECK-BEFORE-LOAD; owner status-only approval; corrected_enabled + v1 blocked; D12 deferred + lineage_policy_hash; 7 Sonnet files'
 
 planner:
   model: claude-opus-4.8
@@ -347,11 +370,17 @@ decision_ledger:
     decision: >-
       Remove PP3/BP4 from included_criteria AND automatable_criteria in ONE
       commit; retain them in VALID_CRITERIA, scorer acmg_criteria, and the BIAS
-      lineage can_fire/allowed set. Only automation is disabled.
+      lineage can_fire set (keeping lineage_class + source_dependencies), but
+      flip their lineage validation_disposition AND production_disposition to
+      deferred (see D12). Only automated emission is disabled; the codes and
+      their can-fire lineage facts are retained.
     rationale: >-
       Preserves eval==production parity (kills beat4 #2 via the load-time
       invariant) and keeps PP3/BP4 available for future manual review and future
-      activation without relabeling data lineage.
+      activation. The lineage disposition MUST move allowed->deferred (D12) or an
+      omitted can-fire criterion trips assert_registry_consistency; can_fire,
+      lineage_class and source_dependencies are unchanged, so this is a
+      disposition update, not a data-lineage relabel.
   - id: D5
     decision: >-
       Add a dedicated, counting PolicyDisabledEvidenceSource that strips PP3/BP4
@@ -859,15 +888,17 @@ implementation_scope:
     - 'any protected test file (Gemini-owned)'
     - 'setting status=approved / writing an ADR acceptance (owner-only)'
   branch_scope:
-    total_files_on_branch: 9
+    total_files_on_branch: 10
     per_agent_commits:
       - agent: opus_planner
         model: claude-opus-4.8
         commit_scope: [docs/project/specs/pp3bp4-disabled-manual-policy.yaml]
-        note: 'this planner spec only (rev 1 = 878bff8, rev 2 = d40b6da, rev 3 = 6ae94bc, rev 4 = this commit)'
+        note: 'this planner spec only (rev 1 = 878bff8, rev 2 = d40b6da, rev 3 = 6ae94bc, rev 4 = b465a9c, rev 5 = this commit)'
       - agent: gemini
-        commit_scope: [tests/eval/test_pp3bp4_disabled_policy.py]
-        note: 'ONE new RED test file; no edits to protected tests or any src/config'
+        commit_scope:
+          - tests/eval/test_pp3bp4_disabled_policy.py
+          - tests/eval/test_predictor_aggregation_wrapper.py
+        note: 'TWO test files in the Gemini commit: CREATE the new RED disabled-policy suite AND UPDATE test_aca6_scope_invariance disposition assertions (allowed -> deferred + decision_dependency). No other test, no src/config.'
       - agent: sonnet_5
         commit_scope:
           - src/raptor/eval/predictor_policy.py
@@ -877,7 +908,7 @@ implementation_scope:
           - configs/eval/tsc2.yaml
           - configs/eval/bias_lineage.yaml
           - configs/eval/bp4pp3_predictor_policy.json
-        note: 'exactly seven files in ONE commit; NO gate.py/scope_gate.py and NO lineage-registry/policy/audit CODE change; artifact stays status=proposed'
+        note: 'exactly seven files in ONE commit; NO gate.py/scope_gate.py and NO lineage-registry/policy/audit CODE change; edits NO test (incl. test_predictor_aggregation_wrapper.py -- Gemini owns that); artifact stays status=proposed'
     excluded_from_branch:
       - src/raptor/eval/gate.py
       - src/raptor/eval/scope_gate.py
@@ -890,8 +921,14 @@ implementation_scope:
 # ---------------------------------------------------------------------------
 test_matrix:
   author: gemini
-  new_file_suggestion: tests/eval/test_pp3bp4_disabled_policy.py
-  authorship_rule: 'Sonnet must not edit Gemini tests; Gemini must not edit the protected v1 tests below except by adding new cases in the new file.'
+  gemini_files:
+    - path: tests/eval/test_pp3bp4_disabled_policy.py
+      action: create
+      note: 'the new RED disabled-policy suite (G-DM1..G-DM14)'
+    - path: tests/eval/test_predictor_aggregation_wrapper.py
+      action: update_assertions
+      note: 'update test_aca6_scope_invariance: PP3/BP4 production_disposition expectation allowed -> deferred (+ assert decision_dependency == "bp4pp3-predictor-policy"); keep the lineage_class assertions. Contract-driven expectation change (see G-DM15), NOT a weakening.'
+  authorship_rule: 'Gemini owns test authorship: it CREATES tests/eval/test_pp3bp4_disabled_policy.py and INTENTIONALLY updates the disposition assertions in tests/eval/test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance (allowed -> deferred). Sonnet must not edit any test. Gemini touches no other protected test and no src/config.'
   red_tests:
     - id: G-DM1
       target: predictor_policy.py
@@ -982,12 +1019,22 @@ test_matrix:
         LineageRegistryMismatchError with breach kind omitted_without_disposition --
         proving the deferred change is load-bearing and that the registry check
         fails closed rather than silently omitting the criteria.
+    - id: G-DM15
+      target: 'tests/eval/test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance (Gemini updates)'
+      asserts: >-
+        after Sonnet flips bias_lineage.yaml, this test expects PP3 and BP4
+        production_disposition == "deferred" (was "allowed") AND
+        decision_dependency == "bp4pp3-predictor-policy", with lineage_class
+        unchanged (label_independent_reference_or_predictor). RED-first: the
+        updated assertion is RED until Sonnet's config change lands, then GREEN.
+        The AC-A6 recompute-strength behavior the test also covers is unchanged.
   protected_tests_expectations:
     - 'tests/eval/test_predictor_policy_gate.py v1 loader/hash/BLOCKED cases stay GREEN.'
     - 'tests/eval/test_terminal_runner_controls.py stays GREEN.'
     - 'test_approved_predictor_policy_hashes_pin_current_terminal_source_bundle goes RED on the terminal_source.py edit and returns GREEN only after the artifact re-pins correction_hash (config change, not a test edit).'
     - 'existing gate.py / scope_gate.py (ADR-0011) tests stay GREEN and unmodified; disabled mode does not change gate semantics.'
-    - 'tests/eval/test_bias_lineage_registry.py and test_bias_lineage_audit.py stay GREEN with PP3/BP4 deferred; only bias_lineage.yaml DATA changed, no lineage code -- Gemini does not edit these protected tests.'
+    - 'tests/eval/test_bias_lineage_registry.py and test_bias_lineage_audit.py stay GREEN with PP3/BP4 deferred; only bias_lineage.yaml DATA changed, no lineage code -- Gemini does not edit these two.'
+    - 'tests/eval/test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance is INTENTIONALLY UPDATED by Gemini (production_disposition allowed -> deferred + decision_dependency). Its old assertion encoded the PRE-decision `allowed` disposition; the approved disabled/manual contract flips it to deferred, so matching the assertion to the contract is REQUIRED, not a weakening -- it still asserts an exact disposition. Sonnet does NOT touch it.'
 
 # ---------------------------------------------------------------------------
 # GPT-5.4 review probes.
@@ -1000,7 +1047,7 @@ gpt_probes:
     - 'P3: eval==production parity is enforced at load (live_source.py:243) and lineage_registry.py:67; a one-sided removal fails closed.'
     - 'P4: pp3bp4_scored_calls==0 is an asserted invariant and pp3bp4_suppressed_counts is derived from actual dropped calls (not a literal).'
     - 'P5: a single CHANGED config byte at the pinned path flips APPROVED_DISABLED -> BLOCKED_POLICY (accidental drift / stale approval); the owner status flip is a separate commit/artifact, absent from the doer commit.'
-    - 'P6: PP3/BP4 remain in VALID_CRITERIA, scorer acmg_criteria, and bias_lineage can_fire/allowed (vocabulary + lineage retained; only automation disabled).'
+    - 'P6: PP3/BP4 remain in VALID_CRITERIA, scorer acmg_criteria, and bias_lineage can_fire with lineage_class + source_dependencies unchanged; their validation_disposition and production_disposition are now deferred (NOT allowed), decision_dependency bp4pp3-predictor-policy. Vocabulary + can-fire lineage retained; only automated emission is disabled.'
     - 'P7: the correction_hash re-pin reflects exactly the new terminal_source.py bundle and predictor_source_hash did not drift unintentionally.'
     - 'P8: disabled mode adds no new scoring input (POLICY_ONLY_REUSE), so no x64 reannotation is triggered.'
     - 'P9: runtime_bundle_hash covers [predictor_policy.py, terminal_source.py, run_masked_holdout_eval.py]; an ACCIDENTAL change to any of them (or the pin), with the verifier intact, => BLOCKED_POLICY. It is a drift detector, not tamper-proof/self-authenticating (threat_model); confirm the spec makes no stronger claim.'
@@ -1013,7 +1060,7 @@ gpt_probes:
 # ---------------------------------------------------------------------------
 owner_decision_gate:
   sequence:
-    - '1. Gemini authors the RED test matrix (separate authorship/commit).'
+    - '1. Gemini authors the RED test matrix in ONE Gemini commit: creates tests/eval/test_pp3bp4_disabled_policy.py AND updates tests/eval/test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance disposition assertions (allowed -> deferred + decision_dependency). Both are RED until Sonnet implements.'
     - '2. Sonnet implements implementation_scope in one commit; artifact stays status=proposed, mode=disabled_manual with post-removal config hashes and re-pinned correction_hash; all tests green (sentinel green after re-pin).'
     - '3. GPT-5.4 runs gpt_probes.'
     - '4. Owner (operator/domain owner, @dronasrinivas) records ADR-0012 in docs/DECISIONS.md (MADR, Accepted). The ADR states that disabled/manual permits EVALUATION (use of the disabled/manual evidence mode) and does NOT grant automatic VUS/scope authorization -- the pre-registered gate/scope_gate outcome remains authoritative -- and records the unmet activation evidence (exact_revel_compatibility unresolved, permitted_use pending, training_overlap UNKNOWN, transportability BLOCKED_DATA_UNDERPOWERED).'
@@ -1060,6 +1107,7 @@ migration_and_backout:
   migration:
     - 'one atomic Sonnet commit edits both criteria configs + bias_lineage.yaml + policy artifact + loader + wrapper + runner so parity AND lineage-registry consistency never break mid-flight.'
     - 'removing PP3/BP4 from included_criteria/automatable_criteria and flipping their bias_lineage disposition to deferred MUST be in the SAME commit -- an intermediate state (removed but still `allowed`) would trip assert_registry_consistency (omitted_without_disposition).'
+    - 'the Gemini commit updates test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance to expect deferred (RED until the Sonnet config change lands, then GREEN); Sonnet does not touch that test.'
     - 'the terminal_source.py edit trips the sentinel; the co-located correction_hash re-pin restores it.'
     - 'artifact remains status=proposed (BLOCKED) until the separate owner approval; the doer enables nothing.'
   backout:
@@ -1096,7 +1144,8 @@ residual_risk:
 validation_scope:
   binding:
     - 'the targeted PP3/BP4 policy + terminal-runner + config + lineage tests (the Gemini G-DM matrix and the affected protected tests in tests/eval/) must pass; this is the smallest set that covers the changed behavior.'
-    - 'run via `python -m pytest` (NOT bare `pytest`) so the checkout src/ is importable. Example selector: python -m pytest tests/eval/test_pp3bp4_disabled_policy.py tests/eval/test_predictor_policy_gate.py tests/eval/test_terminal_runner_controls.py tests/eval/test_bias_lineage_registry.py tests/eval/test_bias_lineage_audit.py'
+    - 'run via `python -m pytest` (NOT bare `pytest`) so the checkout src/ is importable. Example selector: python -m pytest tests/eval/test_pp3bp4_disabled_policy.py tests/eval/test_predictor_policy_gate.py tests/eval/test_terminal_runner_controls.py tests/eval/test_bias_lineage_registry.py tests/eval/test_bias_lineage_audit.py tests/eval/test_predictor_aggregation_wrapper.py'
+    - 'test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance is in this binding set AND the protected-test audit: its PP3/BP4 production_disposition expectation is updated allowed -> deferred to MATCH the approved planner contract (D4/D12 flip the config to deferred). Required by the contract, NOT a weakening -- it still asserts an exact disposition + decision_dependency.'
   not_acceptance_blocking:
     - 'a full-suite run that errors only due to a missing optional dependency (e.g. pysam not installed) is an ENVIRONMENT issue, not a plan or implementation defect; a collection/import error from pysam does not fail plan acceptance.'
   best_effort_post_implementation:
@@ -1132,7 +1181,7 @@ beat4_self_audit:
   planner_scope_inversions:
     - 'Editing code/config/tests instead of only the YAML: this planner commit modifies exactly one file (verified in VERIFICATION).'
     - 'Wrong or missing commit trailers: the corrected trailer Copilot-Session 7c146921-... is pinned in planner.required_trailers and verified post-commit; rev 1 (878bff8) used 90703341 and, per the no-amend rule, is left as-is with the spec corrected.'
-    - 'Committing on the wrong branch/base: worktree/branch pinned; rev-4 parent is 6ae94bc and is verified before/after commit.'
+    - 'Committing on the wrong branch/base: worktree/branch pinned; rev-5 parent is b465a9c and is verified before/after commit.'
   empty_beat4_allowed: false
 
 # ---------------------------------------------------------------------------
@@ -1156,15 +1205,15 @@ acceptance_mapping:
   - acceptance: 'No held-out run, census, activation or owner approval occurs in planning.'
     satisfied_by: 'planner.prohibited_in_this_task; this commit writes only the YAML.'
   - acceptance: 'Tests authored by Gemini, implementation by Sonnet 5, review by GPT-5.4.'
-    satisfied_by: 'test_matrix.author=gemini; implementation_scope.doer=claude-sonnet-5; gpt_probes.reviewer=gpt-5.4.'
+    satisfied_by: 'test_matrix.author=gemini (TWO files: create test_pp3bp4_disabled_policy.py + update test_predictor_aggregation_wrapper.py AC-A6 disposition); implementation_scope.doer=claude-sonnet-5 (7 files); gpt_probes.reviewer=gpt-5.4; branch total 10.'
 
 # ---------------------------------------------------------------------------
 # VERIFICATION (slot 1) — filled by the planner after the commit.
 # ---------------------------------------------------------------------------
 verification:
-  expected: 'one follow-up (rev-4) commit on track/pp3bp4-resolution-2026-07 modifying exactly docs/project/specs/pp3bp4-disabled-manual-policy.yaml; parent 6ae94bc; both trailers; no amend; no push.'
+  expected: 'one follow-up (rev-5) commit on track/pp3bp4-resolution-2026-07 modifying exactly docs/project/specs/pp3bp4-disabled-manual-policy.yaml; parent b465a9c; both trailers; no amend; no push.'
   checks:
     - 'git show --stat HEAD => 1 file changed (this file only).'
     - 'git log -1 shows Co-authored-by Copilot AND Copilot-Session: 7c146921-f3dd-4a1e-8cf0-8f574de49204.'
-    - 'HEAD~1 == 6ae94bc323b0621a78f924cf3f9dcc1edcf22796 (no amend); git status clean; branch unchanged; no remote update.'
+    - 'HEAD~1 == b465a9cdbe9fd7bb5ae7eb968ad291c4c77ce2c1 (no amend); git status clean; branch unchanged; no remote update.'
   verdict: recorded_in_final_response
