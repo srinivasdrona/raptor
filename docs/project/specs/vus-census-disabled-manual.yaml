@@ -1,0 +1,582 @@
+# RAPTOR 6,618-VUS census recomputation under ADR-0012 — Opus planner contract (rev 1).
+#
+# Purpose: an implementation-ready, hash-bound, DRY plan to recompute the
+# existing `clinvar_2026-07-07` internal VUS evidence census under the approved
+# ADR-0012 disabled/manual PP3/BP4 policy, and to emit a NEW, versioned,
+# non-identifying aggregate record while preserving the historical
+# `data/census/tsc_vus_clinvar_2026-07-07_stats.json` unchanged.
+#
+# This file is the planner PLAN ONLY. It performs NO implementation, NO tests,
+# NO runner/config/code edits, NO packet generation, NO gate/scope-gate/policy
+# change, NO x64 run, NO new annotation, NO owner approval, and NO census-record
+# write. It names the exact downstream implementation scope, input/output
+# schemas and hash contracts, the reuse-vs-extract architecture decision, the
+# Gemini RED/unit/integration matrix, the Sonnet file boundaries, the GPT-5.4
+# anti-trace-cribbing and privacy probes, the deterministic CLI + output
+# boundary, the migration/backout + next packet-stage handoff, and the Beat-4
+# self-audit.
+#
+# Schema: raptor-vus-census-disabled-manual-planning-v1 (planner). The emitted
+# census record uses schema raptor.tsc.vus_census.disabled_manual.v1 (defined
+# in output_schema).
+
+schema: raptor-vus-census-disabled-manual-planning-v1
+status: planner_contract_ready_for_implementation
+task_id: recompute-vus-census-adr-0012
+title: >-
+  Recompute the 6,618-VUS clinvar_2026-07-07 internal evidence census under the
+  ADR-0012 disabled/manual PP3/BP4 policy — hash-bound, DRY, non-authoritative
+
+worktree: 'D:\AIProjects\raptor-worktrees\vus-census'
+branch: track/vus-census-2026-07
+base_commit: 46298e4248d1d53f55b1f2561c208fd124ff0e3f
+
+roles:
+  planner: Claude Opus (this contract)
+  test_author: Gemini 3.5 Flash (owns new tests before the doer)
+  doer: Claude Sonnet 5 (implementation only)
+  checker: GPT-5.4 (anti-trace-cribbing + privacy + policy probes)
+
+# --------------------------------------------------------------------------
+# 1. Binding decisions (ADR-0012 + certified negative gate)
+# --------------------------------------------------------------------------
+
+binding_decisions:
+  adr_0012:
+    reference: 'docs/DECISIONS.md#adr-0012--pp3bp4-automated-emission-disabled-for-the-current-masked-rerun'
+    status: approved
+    mode: disabled_manual
+    invariants:
+      - PP3/BP4 are absent from production `included_criteria`, evaluation
+        `automatable_criteria`, and packet candidate-direction points.
+      - PP3/BP4 remain in the ACMG vocabulary and BIAS can-fire lineage with
+        `deferred` dispositions for manual review (never deleted).
+      - Every automated PP3/BP4 call is suppressed and reported; the run must
+        record ZERO scored PP3/BP4 calls.
+      - Approval authorizes only the disabled/manual evidence mode. It does NOT
+        authorize a VUS classification, research scope, clinical claim, public
+        worklist, or ClinVar submission.
+      - ADR-0011's metric-driven gate and scope gate remain authoritative and
+        unchanged; corrected/REVEL-enabled PP3/BP4 remains BLOCKED_POLICY.
+  certified_masked_gate_is_negative:
+    record: data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json
+    sha256: e914f65231c8004b1c7a96d2fe80bd49bac591433112699ff91cc5b027e55207
+    legacy_v1_gate: FAIL
+    full_spectrum_status: BLOCKED_POLICY
+    vus_authorized: false
+    governance_state: NONE_VALIDATED
+    note: >-
+      This masked-holdout gate is a DIFFERENT corpus (2,577 masked held-out
+      rows) from the 6,618-VUS census. Its suppression pins (BP4 1929, PP3 134,
+      union 2043) are the benchmark-subset numbers and MUST NOT be copied into
+      the full-census aggregate, whose own suppression totals are measured
+      independently over all 6,618 rows (see expected_real_data_measurements).
+  authority_boundary:
+    statement: >-
+      A census organizes INTERNAL, eval-only review directions. It cannot
+      create a public worklist, a classification, a research authorization, or
+      a clinical claim. Candidate LP/LB directions are non-authoritative
+      review metadata only.
+
+# --------------------------------------------------------------------------
+# 2. Decision ledger + rejected alternatives
+# --------------------------------------------------------------------------
+
+decision_ledger:
+  D1_architecture_extract_shared_seam:
+    decision: >-
+      Extract the pure census-selection core (ManifestEntry, StratumEntry, the
+      pinned STRENGTH_MAP, load_manifest, reproduce_census_strata, and the
+      consequence-grouping helpers) OUT of scripts/build_tsc_calibration_batch.py
+      into a new packet-free package src/raptor/census/, and reuse it from both
+      the existing calibration script and the new census tool. This is the
+      smallest DRY change that (a) does not duplicate the census-selection
+      algorithm, (b) keeps packet code NON-authoritative for the census (the
+      census package imports only raptor.scorer + raptor.eval, never
+      raptor.packet), and (c) preserves the calibration script's behavior
+      byte-for-byte (pure move + import).
+    rationale: >-
+      The census-selection algorithm already exists and is verified against the
+      historical record; the only packet coupling is at the script's module
+      import. Extraction removes that coupling for the census path without a
+      behavior change to the packet batch builder.
+  D2_policy_invariant_conservation_only:
+    decision: >-
+      The census tool conserves ONLY the policy-invariant identity/row/join/
+      source-hash invariants (6,618 manifest identities, 6,618 BIAS rows, exact
+      one-to-one vcf_key<->SPDI join, input VCF / BIAS TSV / manifest SHA-256).
+      It MUST NOT reuse assert_source_of_record_conservation's historical
+      direction assertions (238 LP / 1,333 LB / 20 / 10 patterns): those are the
+      PP3/BP4-ACTIVE numbers and would falsely fail (or tempt an edit) under the
+      disabled/manual policy. Direction, pattern, and suppression counts are
+      MEASURED fresh and compared to the historical record as a reported delta,
+      never asserted equal to it.
+    rationale: >-
+      Reproducing a superseded census's direction totals is the wrong oracle
+      for a policy change; the invariant conservation is the correct shared
+      guard.
+  D3_derive_counts_never_crib:
+    decision: >-
+      Production code in src/raptor/census/ derives every count from the
+      immutable inputs + approved configs. It contains NO expected-count literal
+      (157/7/6424/30/238/1,333/5,017/2,226/3,696/5,474/7/2) and never reads this
+      spec, the historical stats file, or the masked gate as a scoring input.
+      The historical stats file may be READ only to compute the reported
+      comparison delta, never to source current-policy counts.
+    rationale: STRATEGY GP anti-trace-cribbing; slot-2/slot-3 hard requirement.
+  D4_new_versioned_record_preserve_historical:
+    decision: >-
+      Emit a NEW record at data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json;
+      leave data/census/tsc_vus_clinvar_2026-07-07_stats.json byte-unchanged
+      (superseded, PP3/BP4-active). The new record is aggregate + non-identifying
+      only.
+    rationale: Historical artifacts stay immutable and clearly superseded.
+  D5_hash_bind_current_approved_policy:
+    decision: >-
+      Verify the approved disabled/manual policy status/mode and bind the CURRENT
+      raw SHA-256 of every policy/config input BEFORE processing; fail closed on
+      drift. The planner-verified current hashes (see hash_contract) equal the
+      hashes the approved policy records, confirming the on-disk configs are the
+      approved-policy configs.
+    rationale: ADR-0012 requires verifying hashes before use; no restating.
+  D6_no_packets_no_gate_change_no_x64:
+    decision: >-
+      Generate NO review packets in this track; change NO classification, gate,
+      scope-gate, packet, or predictor policy; run NO x64 worker and NO new
+      annotation. Reuse the immutable committed BIAS TSV.
+    rationale: slot-3 implementation constraints.
+
+rejected_alternatives:
+  - id: R1_import_calibration_script_directly
+    option: >-
+      Reuse reproduce_census_strata by importing scripts/build_tsc_calibration_batch.py
+      from the new census tool.
+    rejected_because: >-
+      That module imports the entire packet path (build_packet, queue, render,
+      model) at module scope, making packet code a load-time dependency of the
+      census and violating "do not make packet code authoritative"; the script
+      also is not an installable package under src/.
+  - id: R2_duplicate_algorithm
+    option: Re-implement the census-selection algorithm inside the census tool.
+    rejected_because: >-
+      Violates DRY and slot-2 "do not duplicate the census-selection algorithm";
+      two copies would drift from the calibration oracle.
+  - id: R3_reuse_historical_direction_conservation
+    option: Reuse assert_source_of_record_conservation as-is for the new census.
+    rejected_because: >-
+      It asserts the PP3/BP4-ACTIVE historical totals (238/1,333/20/10), which
+      the disabled/manual policy legitimately changes to 157/7/7/2; reusing it
+      would either fail closed on correct data or invite an edit to a shared,
+      calibration-critical guard.
+  - id: R4_mutate_historical_record
+    option: Overwrite tsc_vus_clinvar_2026-07-07_stats.json in place.
+    rejected_because: Destroys the immutable superseded provenance; forbidden.
+  - id: R5_emit_into_raw_data_dir
+    option: Write the aggregate next to the raptor-data inputs.
+    rejected_because: >-
+      Output must be an explicit in-repo data/census/*.json path; writing into
+      an external raw-data directory is refused by the output boundary.
+
+# --------------------------------------------------------------------------
+# 3. Immutable external inputs (identity + checksums)
+# --------------------------------------------------------------------------
+
+immutable_external_inputs:
+  do_not: >-
+    Do not alter, copy into the repository, or emit identities from these
+    external inputs. They are read across the arm's-length data boundary only.
+  manifest:
+    path: 'D:\AIProjects\raptor-data\clinvar\vus-run\clinvar_2026-07-07\tsc_vus_input.manifest.jsonl'
+    sha256: 7f9937521a425e73b31422fa9191c90e67fa80cc58f351517ac732b1d32fcbba
+    verified: true
+  provenance:
+    path: 'D:\AIProjects\raptor-data\clinvar\vus-run\clinvar_2026-07-07\tsc_vus_input.provenance.json'
+    provides: {vcf_hash: input VCF SHA-256, source_snapshot: clinvar_2026-07-07}
+  bias_tsv:
+    path: 'D:\AIProjects\raptor-data\clinvar\vus-run\tsc-vus-2026-07-07\tsc_vus_input.bias_output.tsv'
+    sha256: 0a55cab470d3de93f06cd87ba30957fd1674c0ae2098ec86350f5aaac1a1162e
+    verified: true
+  input_vcf_sha256: 3fff6de7ae9b2b202642e498c4c49532cf1aaf5c2734f0e8341d5ace88fa3a09
+  historical_aggregate:
+    path: data/census/tsc_vus_clinvar_2026-07-07_stats.json
+    sha256: 6ad96909637118aab415ec24d7ea63992eea99df03590508a223c6742621200d
+    role: superseded_pp3bp4_active_reference_read_only
+  reused_census_seam:
+    path: scripts/build_tsc_calibration_batch.py
+    functions: [load_manifest, reproduce_census_strata]
+    note: source of the extraction in D1; behavior preserved.
+
+# --------------------------------------------------------------------------
+# 4. Approved repository policy/config inputs + hash contract
+# --------------------------------------------------------------------------
+
+hash_contract:
+  verification_rule: >-
+    The census tool verifies these path bytes (check-before-load SHA-256) and
+    the approved policy status/mode BEFORE processing; any drift fails closed.
+    Hashes below are the planner-verified CURRENT raw file SHA-256; they equal
+    the hashes recorded inside bp4pp3_predictor_policy.json, confirming the
+    on-disk configs are the approved-policy configs. Production code DERIVES
+    these hashes at runtime and never hardcodes their values.
+  inputs:
+    approved_predictor_policy:
+      path: configs/eval/bp4pp3_predictor_policy.json
+      sha256: ac9d361aa57686c736a527a9256ea7fd22c4292709f5e6b3482e1c3c4546c72b
+      must_assert: {schema: 'bp4pp3-predictor-policy/2', status: approved, mode: disabled_manual}
+    acmg_scorer_policy:
+      path: configs/acmg/tsc.yaml
+      sha256: 1ba8066accd8eda16e20518abbeaedb61247fea372675f519f02a8574ff9350e
+      equals_policy_field: production_config_hash
+      note: PP3/BP4 absent from included_criteria; retained in acmg_criteria vocabulary.
+    eval_config:
+      path: configs/eval/tsc2.yaml
+      sha256: ea4ff684bdc2ae6b079f352816b3993ac813af0e2654b851c30c1f4ef577a293
+      equals_policy_field: eval_config_hash
+      note: >-
+        automatable_criteria = [PVS1, PS1, PM1, PM2, PM4, PM5, PP2, BA1, BS1,
+        BP1, BP3, BP7]; PP3/BP4 removed 2026-07 per ADR-0012.
+    bias_lineage_policy:
+      path: configs/eval/bias_lineage.yaml
+      sha256: d2312b2c74f125204ababe9731fc4e37a8e0f30d1608b75f8457aae6591689df
+      equals_policy_field: lineage_policy_hash
+      note: PP3/BP4 validation/production_disposition -> deferred.
+    packet_candidate_direction:
+      path: configs/packet/candidate_direction.yaml
+      sha256: 778882c500adc43bfca8e6311d3d2038f96e32f05faff7dcda50560ee3448d67
+      equals_policy_field: packet_policy_hash
+      role: read_only_context_not_used_by_census_scoring
+  strength_map_pin:
+    values: {'1': supporting, '2': moderate, '3': strong, '4': very_strong, '5': stand_alone}
+    source: configs/acmg/tsc.yaml::strength_map
+    guard: >-
+      reproduce_census_strata raises ConservationError if the injected
+      ScorerConfig.strength_map differs from this pin (drift is a blocker, never
+      a silent re-label).
+
+# --------------------------------------------------------------------------
+# 5. Independently reproduced planning probe (measured, NOT a code input)
+# --------------------------------------------------------------------------
+
+planning_probe:
+  method: >-
+    The planner independently re-ran the extracted reproduce_census_strata logic
+    over the immutable manifest + BIAS TSV with the CURRENT (PP3/BP4-suppressed)
+    scorer/eval configs, importing only raptor.scorer + raptor.eval. All eight
+    orchestrator-supplied probe values reproduced exactly. These values live in
+    this spec + in Gemini's tests ONLY; production code must not contain them.
+  reproduced_exactly:
+    rows: 6618
+    manifest_identities: 6618
+    candidate_LP_review: 157
+    candidate_LB_review: 7
+    no_deterministic_resolution: 6424
+    annotation_manual_review: 30
+    lp_exact_strength_patterns: 7
+    lb_exact_strength_patterns: 2
+
+expected_real_data_measurements:
+  note: >-
+    Grouping-independent totals below are BINDING oracles for the opt-in
+    real-data integration test. Per-consequence-group and per-gene breakdowns
+    are pinned by that same test against whatever the REUSED grouping helper
+    (_variant_class_for, split on ',') actually yields — never a
+    planner-invented split.
+  direction_totals:
+    candidate_LP_review: 157
+    candidate_LB_review: 7
+    no_deterministic_resolution: 6424
+    annotation_manual_review: 30
+    total: 6618
+  pattern_compression:
+    lp_exact_strength_patterns: 7
+    lb_exact_strength_patterns: 2
+  pp3bp4_suppression_full_census:
+    raw_pp3_firings: 2226
+    raw_bp4_firings: 3696
+    pp3_affected_variants: 2226
+    bp4_affected_variants: 3696
+    pp3_or_bp4_union_variants: 5474
+    scored_pp3bp4_calls: 0
+    method: >-
+      Raw firings/affected variants are parsed from the raw BIAS rationale
+      across all 6,618 rows (policy-invariant; equals the historical
+      criterion_firing PP3=2,226 / BP4=3,696 cross-check). scored=0 because
+      neither criterion is in automatable_criteria. Union 5,474 (=> 448 variants
+      fire both) is measured fresh.
+  point_distribution_expected:
+    '-8': 1
+    '-3': 6
+    '0': 119
+    '1': 5651
+    '2': 61
+    '3': 172
+    '4': 395
+    '5': 26
+    '6': 2
+    '7': 5
+    '9': 143
+    '11': 1
+    '12': 6
+    invariants:
+      - LP (points>=6) sum = 157
+      - LB (points<=-1) sum = 7
+      - no_deterministic_resolution (0<=points<=5) sum = 6424
+  historical_comparison_superseded:
+    source: data/census/tsc_vus_clinvar_2026-07-07_stats.json (PP3/BP4 ACTIVE)
+    candidate_LP_review: {historical: 238, disabled_manual: 157, delta: -81}
+    candidate_LB_review: {historical: 1333, disabled_manual: 7, delta: -1326}
+    no_deterministic_resolution: {historical: 5017, disabled_manual: 6424, delta: 1407}
+    annotation_manual_review: {historical: 30, disabled_manual: 30, delta: 0}
+    interpretation: >-
+      Suppressing automated PP3/BP4 collapses most benign-leaning candidate
+      directions (BP4-driven) and many pathogenic-leaning ones (PP3-driven) into
+      no_deterministic_resolution. This result is scientifically disappointing
+      and MUST NOT be tuned.
+
+# --------------------------------------------------------------------------
+# 6. Output schema (new aggregate record) — non-identifying only
+# --------------------------------------------------------------------------
+
+output_schema:
+  emitted_record:
+    path: data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json
+    schema: raptor.tsc.vus_census.disabled_manual.v1
+    write_rule: >-
+      Written ONLY by the census CLI to an explicit data/census/*.json path via
+      the census-record output boundary; a dry-run/summary mode proves no output
+      precedes conservation. This record is a DOER RUNTIME OUTPUT, not part of
+      this planner commit.
+  required_fields:
+    - schema, status, snapshot, policy_mode, non_authoritative_boundary
+    - source_hashes (input_vcf, bias_tsv, manifest) + row/identity counts + exact-join/duplicate/parser checks
+    - code_commit + all bound config/policy hashes (section 4)
+    - corpus/gene/transcript/consequence-group counts (from reused grouping helper)
+    - raw_bias_criterion_incidence
+    - consumed_automated_criterion_incidence (PP3/BP4 == 0)
+    - pp3bp4_suppression {raw_pp3, raw_bp4, affected_union, scored_calls: 0}
+    - aggregate direction counts + shares
+    - direction counts by consequence group and by gene
+    - point_distribution + LP/LB exact-strength pattern compression
+    - explicit comparison with the historical 238/1,333/5,017/30 record
+    - limitations (see limitations)
+  forbidden_fields:
+    rule: >-
+      No committed field may contain a variant ID, VCF key, SPDI, row locator,
+      HGVS, rationale text, patient identifier, ClinVar/benchmark label, or
+      packet ID. Only aggregate counts, hashes, and pattern-signature strings
+      (e.g. "PM2 Supporting|PVS1 Very Strong") that carry no per-variant identity.
+  limitations:
+    - negative certified masked gate (legacy FAIL, v2 BLOCKED_POLICY, vus_authorized=false)
+    - PM1 evaluation parity blocker (authorization_blockers: evaluation_skipped_criteria:PM1)
+    - 30 TSC2-region inputs annotated as NTHL1 require manual resolution
+    - BIAS emits .4 transcripts while production config pins .5 (transcript drift)
+    - PS1/PM5 use ClinVar-derived comparator resources pending held-out masking
+    - no expert approval; candidate directions are eval-only, non-authoritative
+
+# --------------------------------------------------------------------------
+# 7. Implementation + preservation file scopes
+# --------------------------------------------------------------------------
+
+implementation_scope:
+  planner_commit_this_track:
+    files: [docs/project/specs/vus-census-disabled-manual.yaml]
+    count: 1
+  sonnet_doer:
+    files:
+      - path: src/raptor/census/__init__.py
+        action: create (package marker + public exports)
+      - path: src/raptor/census/strata.py
+        action: >-
+          create by MOVING ManifestEntry, StratumEntry, STRENGTH_MAP,
+          ManifestError, ConservationError, load_manifest,
+          reproduce_census_strata, and the consequence-grouping helpers
+          (_split_consequence_terms, _variant_class_for) out of the calibration
+          script verbatim; imports only raptor.scorer + raptor.eval (NO packet).
+      - path: src/raptor/census/aggregate.py
+        action: >-
+          create the pure aggregate builder: given strata + bias_rows + manifest
+          + run pins + bound hashes, derive the non-identifying record dict
+          (counts, incidences, suppression union, direction-by-group/gene, point
+          distribution, pattern compression, historical delta, limitations).
+          No expected-count literals; reads historical stats only for the delta.
+      - path: src/raptor/census/cli.py
+        action: >-
+          create the deterministic CLI: verify policy status/mode + config
+          hashes, load inputs, conserve identity/row/join/hash invariants BEFORE
+          any write, support --dry-run/--summary, refuse output outside an
+          explicit data/census/*.json child (reuse the census-record boundary
+          semantics), emit canonical sorted-key JSON.
+      - path: scripts/build_tsc_calibration_batch.py
+        action: >-
+          REFACTOR to import the moved symbols from raptor.census.strata and
+          delete the local duplicates; behavior byte-preserving. No packet,
+          gate, scope-gate, or policy change.
+      - path: data/census/README.md
+        action: >-
+          document the new census command + output path + non-authoritative
+          boundary (documentation only).
+    count: 6
+    generated_runtime_output_not_hand_authored:
+      - data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json
+  gemini_test_author:
+    files:
+      - tests/census/test_census_strata.py
+      - tests/census/test_census_aggregate.py
+      - tests/census/test_census_cli.py
+      - tests/census/test_census_real_data_integration.py
+    count: 4
+    ordering: Gemini authors + RED-verifies these before Sonnet implements.
+  preservation_scope_do_not_touch:
+    - data/census/tsc_vus_clinvar_2026-07-07_stats.json (historical, immutable)
+    - data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json (certified gate)
+    - src/raptor/eval/gate.py, src/raptor/eval/scope_gate.py (authoritative gates)
+    - src/raptor/packet/** (packet path; never imported by census)
+    - configs/** (all policy/config; read-only, hash-bound)
+    - the external raptor-data inputs (arm's-length, read-only)
+  branch_counts: {planner: 1, sonnet: 6, gemini: 4, total_branch: 11}
+
+# --------------------------------------------------------------------------
+# 8. Gemini RED / unit / integration test matrix
+# --------------------------------------------------------------------------
+
+test_matrix:
+  principles:
+    - A test that merely loads the final aggregate and asserts its recorded
+      values is VACUOUS and forbidden.
+    - Synthetic unit tests exercise the algorithm; the real-data check recomputes
+      from raw inputs through the seam.
+  unit_strata:
+    - 'G-VC1 PP3/BP4 suppression — a synthetic variant that would be LP with PP3 (or LB with BP4) but abstains without it routes to no_deterministic_resolution; the scored automatable set excludes PP3/BP4.'
+    - 'G-VC2 NTHL1 pre-routing — an NTHL1-gene row goes to manual_review, never LP/LB.'
+    - 'G-VC3 manifest duplicate variant_id/vcf_key fails loud (ManifestError).'
+    - 'G-VC4 exact one-to-one join — a BIAS row with no manifest entry fails loud (ConservationError).'
+    - 'G-VC5 strength_map drift raises ConservationError (no silent re-label).'
+    - 'G-VC6 pattern signature is the sorted automatable-call catalog; identical patterns compress.'
+  unit_aggregate:
+    - 'G-VC7 all counts derived from injected inputs (change an input, count moves); no expected-count literal in production code.'
+    - 'G-VC8 suppression union computed as the size of (PP3 union BP4); scored PP3/BP4 == 0.'
+    - 'G-VC9 emitted record contains NO variant_id/vcf_key/SPDI/HGVS/rationale/label/packet_id (privacy schema assertion).'
+    - 'G-VC10 historical comparison delta computed from the historical file, not hardcoded; point-distribution invariants (LP>=6, LB<=-1) hold.'
+  unit_cli:
+    - 'G-VC11 output boundary — external raw-data dir refused; in-repo non-census or non-.json path refused; only data/census/*.json accepted.'
+    - 'G-VC12 --dry-run/--summary writes NO file; conservation runs before any write.'
+    - 'G-VC13 canonical JSON is deterministic (sorted keys, byte-stable).'
+    - 'G-VC14 policy/hash verification fails closed on a drifted config hash or a non-approved/non-disabled_manual policy.'
+  integration_real_data:
+    cases:
+      - 'G-VC15 opt-in (env-gated, e.g. RAPTOR_VUS_REAL_DATA=1) run over the immutable manifest + BIAS TSV + current configs asserts the binding oracles — 6,618 identities/rows; 157/7/6,424/30 directions; 7/2 patterns; raw PP3 2,226 / BP4 3,696 / union 5,474 / scored 0; and the reused-helper per-group/per-gene breakdowns. Skipped cleanly when inputs/env absent.'
+    boundary: >-
+      This is the ONLY test touching raptor-data; it recomputes through the
+      seam and never reads the emitted aggregate as its own oracle.
+
+# --------------------------------------------------------------------------
+# 9. Sonnet implementation contract
+# --------------------------------------------------------------------------
+
+sonnet_contract:
+  must:
+    - Make Gemini's RED tests pass by implementing the extraction + aggregate +
+      CLI exactly as scoped; keep the calibration script behavior byte-identical.
+    - Derive every count from inputs; keep production code free of benchmark
+      labels and expected-count literals.
+    - Verify approved policy status/mode + config hashes before processing; fail
+      closed on drift; run identity/row/join/hash conservation before any write.
+    - Ensure src/raptor/census/ imports only raptor.scorer + raptor.eval.
+    - Route NTHL1 to manual_review disjoint from LP/LB; both PP3 and BP4 scored 0.
+  must_not:
+    - Import raptor.packet from the census package or generate any packet.
+    - Edit gate.py, scope_gate.py, any config, the historical stats file, or the
+      certified masked gate.
+    - Reuse assert_source_of_record_conservation's historical direction assertions.
+    - Write outside an explicit data/census/*.json path or into raptor-data.
+    - Tune, round, or "fix" the disappointing disabled-mode counts.
+
+# --------------------------------------------------------------------------
+# 10. GPT-5.4 checker probes (anti-trace-cribbing + privacy + policy)
+# --------------------------------------------------------------------------
+
+gpt_probes:
+  probes:
+    - 'P1 trace_cribbing — no expected-count literal (157/7/6,424/30/238/1,333/5,017/2,226/3,696/5,474/7/2) appears in src/raptor/census/; counts are derived; the spec/historical/masked-gate are never scoring inputs.'
+    - 'P2 identity_leakage — the emitted aggregate and its builder expose no variant_id/vcf_key/SPDI/HGVS/rationale/label/patient/packet_id field.'
+    - 'P3 stale_policy — the tool verifies CURRENT approved/disabled_manual policy + config hashes before processing and fails closed on drift.'
+    - 'P4 one_sided_suppression — BOTH PP3 and BP4 are scored 0 and BOTH are counted in suppression; neither leaks into automation.'
+    - 'P5 manual_routing — NTHL1 -> manual_review, disjoint from candidate LP/LB.'
+    - 'P6 output_before_conservation — identity/row/join/hash conservation precedes any write; --dry-run proves no output precedes checks.'
+    - 'P7 packet_non_authoritative — src/raptor/census/ has no raptor.packet import; the calibration script behavior is unchanged by the extraction.'
+  posture: >-
+    The measured result may be scientifically disappointing and must not be
+    tuned; the checker verifies faithfulness, not favorable numbers.
+
+# --------------------------------------------------------------------------
+# 11. Deterministic CLI + output boundary
+# --------------------------------------------------------------------------
+
+cli_and_output_boundary:
+  cli:
+    args: [--manifest, --bias-tsv, --provenance, --scorer-config, --eval-config,
+           --predictor-policy, --lineage-policy, --historical-stats,
+           --emit-census-record, --dry-run, --summary]
+    determinism: canonical JSON (sort_keys, compact separators, UTF-8, trailing newline).
+  output_boundary:
+    accept: a direct .json child of <repo>/data/census
+    refuse:
+      - any path outside the repository tree (e.g. the raptor-data inputs)
+      - any in-repo path that is not a direct data/census/*.json child
+    enforcement: check-before-write; raised before any aggregate bytes are emitted.
+  dry_run: proves the full conservation path runs and produces a summary without writing.
+
+# --------------------------------------------------------------------------
+# 12. Migration / backout + next packet-stage handoff
+# --------------------------------------------------------------------------
+
+migration_and_backout:
+  migration:
+    - Land planner spec (this commit) → Gemini RED tests → Sonnet extraction +
+      aggregate + CLI → checker probes → run the CLI to emit the new record.
+    - The extraction is a pure move + import; the calibration script and its
+      tests remain green (behavior-preserving).
+  backout:
+    - Revert the census package + script import to restore the inline seam; the
+      historical stats file and gates were never touched, so no data backout is
+      needed.
+  next_packet_stage_handoff:
+    - This track emits NO packets. A future packet/worklist stage is BLOCKED
+      until leakage-safe validation and expert sign-off; the negative masked
+      gate (vus_authorized=false, BLOCKED_POLICY) and PM1 parity blocker gate it.
+    - The new aggregate + reused census seam are the inputs a later, separately
+      approved packet stage would consume — never authorized by this census.
+
+# --------------------------------------------------------------------------
+# 13. Beat-4 self-audit (inversion / pre-mortem)
+# --------------------------------------------------------------------------
+
+beat4_self_audit:
+  worst_ways_this_passes_while_wrong:
+    - false_real_test: >-
+        The integration test loads the emitted aggregate and asserts its own
+        recorded values (vacuous). MITIGATION: G-VC15 recomputes through the
+        seam from raw inputs; the emitted record is never its oracle.
+    - cribbed_constants: >-
+        Production code hardcodes 157/7/6,424/30 (or reads this spec). MITIGATION:
+        D3 + P1 forbid literals; probe values live only in spec + tests.
+    - packet_leak: >-
+        The extraction accidentally drags raptor.packet into the census package.
+        MITIGATION: D1 + P7 assert census imports only scorer + eval.
+    - historical_oracle_misuse: >-
+        The census reuses assert_source_of_record_conservation and either
+        falsely fails on correct 157/7 data or the doer edits that shared guard.
+        MITIGATION: D2 + R3 conserve only identity/row/join/hash; direction
+        counts are measured, not asserted equal to historical.
+    - one_sided_suppression: >-
+        Only BP4 (or only PP3) is counted/suppressed. MITIGATION: G-VC8 + P4
+        assert both scored 0 and both in the union.
+    - silent_regrouping: >-
+        A planner-invented consequence split replaces the historical grouping,
+        shifting per-group counts. MITIGATION: reuse _variant_class_for; G-VC15
+        pins per-group counts from the reused helper.
+  empty_beats: none — every beat applied.
+
+required_trailers:
+  - 'Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>'
+  - 'Copilot-Session: 7c146921-f3dd-4a1e-8cf0-8f574de49204'
