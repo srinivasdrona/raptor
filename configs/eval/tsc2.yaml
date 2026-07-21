@@ -153,3 +153,118 @@ scope_authorization:
 # The benchmark-freeze script (scripts/build_tsc_benchmark.py) verifies the raw
 # snapshot sha256 before deriving the GRCh38/TSC benchmark.
 labels_snapshot: "clinvar_2026-07-07"
+
+# v3 tiered post-hoc re-adjudication config (NEW, additive,
+# docs/project/specs/tiered-gate-v3-posthoc.yaml). Re-interprets the frozen
+# R2 masked-holdout aggregate
+# (data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json,
+# schema unchanged/untouched) under six independent per-scope axes instead
+# of v2's single overloaded `scope_status`, via
+# raptor.eval.tiered_gate.decide_tiered_gate
+# (scripts/build_tiered_readjudication.py). Performs NO new run, scoring,
+# annotation, benchmark read, network access, or data generation -- see
+# `no_new_evidence_statement` below. This block is semantics-locked
+# (`raptor.eval.config._PINNED_TIERED_AUTHORIZATION`) -- `load_config`
+# rejects ANY drift (a modified criterion-scope map, modified
+# full_spectrum/research-scope requires, modified governance statement,
+# disclaimer, no-new-evidence statement, or prospective dataset rule) with
+# a typed `TieredReadjudicationConfigError`. It authorizes NO clinical
+# action, VUS worklist, or ClinVar submission, and (being purely post-hoc)
+# NEVER emits `VALIDATED_PROSPECTIVE`/`AUTHORIZED_RESEARCH_ONLY` anywhere.
+tiered_authorization:
+  schema_version: 3
+  axis_enums:
+    A0_run_integrity:
+    - PASS
+    - INVALID
+    A1_data_sufficiency:
+    - ADEQUATE
+    - UNDERPOWERED
+    - NO_CALLS
+    A2_conditional_performance:
+    - MET
+    - UNMET
+    - NOT_ESTIMABLE
+    - NOT_APPLICABLE
+    A3_policy_parity:
+    - CLEAR
+    - BLOCKED
+    A5_scope_evidence_status:
+    - INVALID
+    - NOT_APPLICABLE
+    - NO_CALLS
+    - UNDERPOWERED
+    - BLOCKED_POLICY
+    - NOT_SUPPORTED
+    - SUPPORTED_POSTHOC
+    - VALIDATED_PROSPECTIVE
+    A6_authorization_status:
+    - NOT_AUTHORIZED
+    - PENDING_PROSPECTIVE
+    - AUTHORIZED_RESEARCH_ONLY
+  criterion_scope_applicability:
+    PM1:
+    - missense:pathogenic
+    PP3:
+    - missense:pathogenic
+    - other:pathogenic
+    BP4:
+    - missense:benign
+    - other:benign
+    PP5:
+    - missense:pathogenic
+    - truncating:pathogenic
+    - other:pathogenic
+    BP6:
+    - missense:benign
+    - truncating:benign
+    - other:benign
+    PS4:
+    - missense:pathogenic
+    - truncating:pathogenic
+    - other:pathogenic
+  full_spectrum:
+    requires:
+    - missense:pathogenic
+    - missense:benign
+    - truncating:pathogenic
+  research_scopes:
+    truncating_pathogenic_research_scope_validated:
+      requires:
+      - truncating:pathogenic
+  governance_statements:
+    RESEARCH_ONLY_NO_CLINICAL_USE: This is a post-hoc re-adjudication of the frozen ADR-0012 masked-holdout
+      counts for research evidence only; no scope is authorized, and this authorizes no clinical classification,
+      VUS worklist, or ClinVar submission pending a prospective validation on unseen data.
+    TRUNCATING_PATHOGENIC_PROSPECTIVE_AUTHORIZED: Prospective validation on unseen data has authorized
+      the truncating-pathogenic research scope for research-evidence use only; full-spectrum VUS automation
+      remains not authorized while missense is unvalidated, and this authorizes no clinical classification,
+      VUS worklist, or ClinVar submission.
+  research_use_disclaimer: Research-evidence validation only; this authorizes no clinical classification,
+    VUS worklist, or ClinVar submission.
+  no_new_evidence_statement: 'No new evidence was generated: this record re-interprets the frozen R2 aggregate
+    (source_canonical_lf_sha256 7c55cd4e3059713d1d53886d8893a3819153375b62ce9d37187d731132c6a77f) under
+    the versioned tiered rule and performs no new run, scoring, annotation, benchmark read, network access,
+    or data generation.'
+  prospective_validation:
+    status: PENDING
+    dataset_rule:
+      registered_dataset: 'The FIRST NCBI ClinVar GRCh38 variant_summary MONTHLY archive whose NCBI-published
+        official archive date is on or after 2026-08-01 — i.e. the 2026-08 monthly release, file variant_summary_2026-08.txt.gz
+        under https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary/. Selection
+        is deterministic and yields EXACTLY ONE archive: order the monthly archives by official published
+        archive date ascending, take the first with date >= 2026-08-01; ties broken by lexicographically
+        smallest archive filename.'
+      freeze_before_labels_scoring:
+        snapshot: clinvar_2026-08-01
+        url: https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary/variant_summary_2026-08.txt.gz
+        official_md5_to_be_frozen_when_exists: PENDING_ARCHIVE_GENERATION
+        official_sha256_to_be_frozen_when_exists: PENDING_ARCHIVE_GENERATION
+      unavailable_or_contract_invalid:
+        fallback_status: BLOCKED_DATA
+        outcome_dependent_fallback: false
+      future_authorized_surfaces_pinned:
+        active: false
+        pinned_surfaces:
+        - full_spectrum
+        - research_scopes
