@@ -1,4 +1,4 @@
-# RAPTOR PP3/BP4 disabled/manual policy — Opus planner contract (rev 7).
+# RAPTOR PP3/BP4 disabled/manual policy — Opus planner contract (rev 8).
 #
 # Purpose: an implementation-ready, hash-bound plan for a FIRST-CLASS
 # disabled/manual PP3/BP4 policy mode. It permits the production-faithful
@@ -58,6 +58,19 @@
 # one lineage file and consume another), and corrects brittle fixed-ancestry
 # assertions in the verification block. No behavioral/scope/test change; the pure
 # seams and 10-file contract are preserved.
+#
+# Rev 8 supersedes commit 8210ff5 (planner rev 7) after Sonnet's implementation
+# (e2bac85) exposed a packet-policy dependency the earlier revs missed: removing
+# PP3/BP4 from eval automatable_criteria + deferring them in lineage makes the
+# PRD-04 packet candidate-direction policy's DERIVED candidate_set drop PP3/BP4,
+# so configs/packet/candidate_direction.yaml (its PP3/BP4 criterion_strength_points
+# rows) must drop them too, and three packet tests must update their INCLUDED/
+# DEFERRED and calibration expectations. Rev 8 adds candidate_direction.yaml to
+# Sonnet scope (8 files), widens Gemini to five test files, keeps planner at 1
+# (branch total 14), adds G-DM16/G-DM17, fixes the G-DM9 VALID_CRITERIA import
+# (raptor.eval.config), and requires NO packet source-code change
+# (resolve_packet_policy_disposition already derives DEFERRED from lineage). All
+# policy/state/hash/neutral-gate/no-x64 behavior preserved.
 #
 # This file is the planner PLAN. It performs NO implementation, NO tests, NO
 # runner/config/code edits, NO owner approval and NO held-out run. It names the
@@ -200,6 +213,22 @@ revision_log:
       - 'rejected_alternatives: drop the stale "two" config-hash count'
     preserved:
       - 'rev-6 pure seams (resolve_policy_state/build_policy_evidence_source/build_disabled_policy_pins); 10-file contract; state/hash/lineage semantics; neutral gate; no x64; owner status-only approval; corrected_enabled + v1 blocked'
+  - rev: 8
+    supersedes_commit: 8210ff5b3d9d72a1c1ceea972cb52f9b9645f647
+    stacked_after: 'Sonnet implementation e2bac85 + Gemini test commits interleave on the shared branch; stacked on the current head, no fixed parent.'
+    trigger: Sonnet implementation e2bac85 exposed packet candidate-direction/calibration dependencies (planner scope gap)
+    attribution:
+      planner_scope_gap:
+        - 'the PRD-04 packet candidate-direction policy (configs/packet/candidate_direction.yaml) derives its candidate_set from eval automatable_criteria + lineage; removing PP3/BP4 from automatable and deferring them in lineage drops PP3/BP4 from the derived candidate_set, but the config still pinned PP3/BP4 criterion_strength_points rows and three packet tests still asserted the old INCLUDED/candidate/calibration sets.'
+      gemini_test_miss:
+        - 'G-DM9 imported VALID_CRITERIA from raptor.scorer.config; the canonical (only) definition is raptor.eval.config (config.py:197). Fixed in the plan.'
+      fix:
+        - 'add configs/packet/candidate_direction.yaml to Sonnet scope (8th file): drop PP3/BP4 criterion_strength_points rows; update the derived-candidate_set comment to {PVS1,PM2,PM4,BA1,BS1,BP3,BP7}; candidate-direction scoring must not use disabled criteria.'
+        - 'NO packet source-code change: resolve_packet_policy_disposition (model.py:762) already maps deferred/deferred -> DEFERRED; direction.py scores only INCLUDED; config.py key-subset validation still passes. PP3/BP4 represented via deferred lineage/manual context.'
+        - 'widen Gemini to FIVE test files (add test_candidate_direction_policy.py, test_packet_core.py, test_tsc_calibration_batch.py); add G-DM16 (packet parity) + G-DM17 (calibration propagation); recompute calibration strata/universe/batch counts from the UNCHANGED fixtures.'
+    counts: {sonnet: 8, gemini: 5, planner: 1, total_branch: 14}
+    preserved:
+      - 'ALL prior behavior: policy schema v2 status x mode; state machine; production/eval/lineage config hashes + runtime_bundle_hash; deferred lineage + lineage_policy_hash; pure seams; neutral existing-gate authorization; no x64; owner status-only approval; corrected_enabled + v1 blocked; offline unit tests + integration_boundary'
 
 planner:
   model: claude-opus-4.8
@@ -531,6 +560,23 @@ decision_ledger:
       PP3/BP4 are no longer automatable `would_be_scored` is False in
       audit_lineage -- so the deferred disposition adds NO new lineage-gate
       block. This mirrors the existing PS3/BS2 deferred pattern.
+  - id: D13
+    decision: >-
+      Propagate the disabled/manual decision into the PRD-04 packet
+      candidate-direction policy: configs/packet/candidate_direction.yaml drops
+      its PP3/BP4 criterion_strength_points rows so its keys equal the derived
+      candidate_set {PVS1, PM2, PM4, BA1, BS1, BP3, BP7} (no PP3/BP4). Make NO
+      packet source-code change.
+    rationale: >-
+      candidate_direction.yaml's candidate_set is derived from eval
+      automatable_criteria (minus deferred BS2, FORBIDDEN, requires_heldout_mask);
+      once PP3/BP4 leave automatable and become deferred in lineage they leave the
+      candidate_set, and test_candidate_direction_policy.py AC-D2 asserts keys ==
+      candidate_set. The packet code already handles this: resolve_packet_policy_disposition
+      (model.py:762) maps deferred/deferred -> DEFERRED, direction.py scores only
+      INCLUDED, and config.py validates keys are a subset of VALID_CRITERIA -
+      FORBIDDEN_CRITERIA -- all satisfied with PP3/BP4 removed. PP3/BP4 stay
+      represented as DEFERRED (manual context), never scored in candidate direction.
 
 rejected_alternatives:
   - option: 'Reuse status=="approved" on the v1 schema to mean "disabled".'
@@ -779,6 +825,30 @@ config_changes:
     - 'PP3/BP4 remain available for future manual review and future activation'
 
 # ---------------------------------------------------------------------------
+# Packet candidate-direction + calibration propagation (PRD-04, D13).
+# ---------------------------------------------------------------------------
+packet_policy_changes:
+  config:
+    file: configs/packet/candidate_direction.yaml
+    change: >-
+      remove the PP3 and BP4 rows from criterion_strength_points; update the
+      header comment so the derived candidate_set reads {PVS1, PM2, PM4, BA1,
+      BS1, BP3, BP7} (was {PVS1, PM2, PM4, PP3, BA1, BS1, BP3, BP4, BP7}); state
+      candidate-direction scoring must not use disabled criteria.
+    keep_unchanged: [policy_id, version, 'approval_status (unapproved)', approved_by, approval_ref, candidate_lp_min, candidate_lb_max, 'all non-PP3/BP4 rows']
+  no_packet_code_change:
+    - 'resolve_packet_policy_disposition (src/raptor/packet/model.py:762) maps validation==deferred & production==deferred -> DEFERRED, so PP3/BP4 auto-derive DEFERRED from the lineage change -- no code edit.'
+    - 'direction.py scores only INCLUDED criteria; deferred PP3/BP4 are never summed into candidate direction.'
+    - 'packet.config.load_candidate_direction_policy validates keys are a subset of VALID_CRITERIA - FORBIDDEN_CRITERIA and exclude BS2; removing PP3/BP4 keeps that valid.'
+    - 'no src/raptor/packet/* or scripts/build_tsc_calibration_batch.py change unless a proven code defect appears.'
+  expected_behavior:
+    - 'candidate_direction criterion_strength_points keys EQUAL the new derived candidate_set (no PP3/BP4) -- test_candidate_direction_policy.py AC-D2.'
+    - 'packet lineage INCLUDED bucket DROPS PP3/BP4 (-> {PVS1,PM2,PM4,BA1,BS1,BP3,BP7}); DEFERRED bucket ADDS PP3/BP4 (-> {PS3,BS2,PP3,BP4}) -- test_packet_core.py.'
+    - 'calibration synthetic rows whose candidate direction depended on PP3/BP4 (now DEFERRED, unscored) move to no_deterministic_resolution / annotation_manual_review per policy; RECOMPUTE the exact strata/universe/batch counts from the UNCHANGED synthetic fixtures -- never hardcode a guess -- test_tsc_calibration_batch.py.'
+    - 'first-pass redaction/provenance/conservation invariants remain unchanged.'
+  pp3bp4_representation: 'PP3/BP4 stay represented as DEFERRED (manual context) via lineage + resolve_packet_policy_disposition; never scored in candidate direction, never dropped from the vocabulary.'
+
+# ---------------------------------------------------------------------------
 # Runner behavior + evidence source construction (the disabled data flow).
 # ---------------------------------------------------------------------------
 runner_behavior:
@@ -977,8 +1047,17 @@ implementation_scope:
         RE-PIN correction_hash to the new terminal_source.py bundle; keep
         predictor_source_hash; update decision_reference to ADR-0012. Leave
         status=proposed (owner flips separately).
+    - path: configs/packet/candidate_direction.yaml
+      change: >-
+        Remove the PP3 and BP4 rows from criterion_strength_points so its keys
+        equal the derived candidate_set {PVS1, PM2, PM4, BA1, BS1, BP3, BP7};
+        update the header comment (the derived candidate_set no longer lists
+        PP3/BP4; candidate-direction scoring must not use disabled criteria). Keep
+        approval_status=unapproved and all non-PP3/BP4 rows. NO src/raptor/packet/*
+        code change.
   explicitly_out_of_scope:
     - 'src/raptor/eval/gate.py and src/raptor/eval/scope_gate.py (ADR-0011 gate/scope authorization logic; MUST NOT change -- authorization stays metric-driven)'
+    - 'src/raptor/packet/* and scripts/build_tsc_calibration_batch.py (NO code change; resolve_packet_policy_disposition already derives DEFERRED from lineage, direction.py scores only INCLUDED, config.py key-subset validation still passes)'
     - 'src/raptor/eval/lineage_registry.py, lineage_policy.py, lineage_audit.py (NO code change; only the bias_lineage.yaml DATA changes to deferred)'
     - 'any external signature/release-verification harness or loader-API/principal-auth change (excluded by threat_model at current scale; a documented residual_risk revisit trigger, not this phase)'
     - 'configs/eval/predictor_aggregation.yaml, pp3bp4_candidate_policy.json, pp3bp4_predictor_matrix.yaml (REVEL shadow scope untouched)'
@@ -986,17 +1065,20 @@ implementation_scope:
     - 'any protected test file (Gemini-owned)'
     - 'setting status=approved / writing an ADR acceptance (owner-only)'
   branch_scope:
-    total_files_on_branch: 10
+    total_files_on_branch: 14
     per_agent_commits:
       - agent: opus_planner
         model: claude-opus-4.8
         commit_scope: [docs/project/specs/pp3bp4-disabled-manual-policy.yaml]
-        note: 'this planner spec only (rev 1 = 878bff8, rev 2 = d40b6da, rev 3 = 6ae94bc, rev 4 = b465a9c, rev 5 = this commit)'
+        note: 'this planner spec only (revs 1..8; rev 8 = this commit); Sonnet/Gemini commits interleave on the shared branch'
       - agent: gemini
         commit_scope:
           - tests/eval/test_pp3bp4_disabled_policy.py
           - tests/eval/test_predictor_aggregation_wrapper.py
-        note: 'TWO test files in the Gemini commit: CREATE the new RED disabled-policy suite AND UPDATE test_aca6_scope_invariance disposition assertions (allowed -> deferred + decision_dependency). No other test, no src/config.'
+          - tests/packet/test_candidate_direction_policy.py
+          - tests/packet/test_packet_core.py
+          - tests/packet/test_tsc_calibration_batch.py
+        note: 'FIVE test files: CREATE test_pp3bp4_disabled_policy.py; UPDATE test_aca6_scope_invariance (allowed->deferred); UPDATE the three packet tests (candidate_set keys, INCLUDED/DEFERRED buckets, calibration strata/universe/batch) intentionally changed by disabled policy. Update ONLY assertions/fixtures the policy changes; do NOT weaken unrelated invariants. No src/config.'
       - agent: sonnet_5
         commit_scope:
           - src/raptor/eval/predictor_policy.py
@@ -1006,13 +1088,16 @@ implementation_scope:
           - configs/eval/tsc2.yaml
           - configs/eval/bias_lineage.yaml
           - configs/eval/bp4pp3_predictor_policy.json
-        note: 'exactly seven files in ONE commit; NO gate.py/scope_gate.py and NO lineage-registry/policy/audit CODE change; edits NO test (incl. test_predictor_aggregation_wrapper.py -- Gemini owns that); artifact stays status=proposed'
+          - configs/packet/candidate_direction.yaml
+        note: 'exactly EIGHT files in ONE commit; NO gate.py/scope_gate.py, NO lineage-registry/policy/audit CODE change, NO src/raptor/packet/* code change; edits NO test; artifact stays status=proposed'
     excluded_from_branch:
       - src/raptor/eval/gate.py
       - src/raptor/eval/scope_gate.py
       - src/raptor/eval/lineage_registry.py
       - src/raptor/eval/lineage_policy.py
       - src/raptor/eval/lineage_audit.py
+      - src/raptor/packet/ (all module code)
+      - scripts/build_tsc_calibration_batch.py
 
 # ---------------------------------------------------------------------------
 # Gemini RED test matrix (authored by Gemini; RED before Sonnet implements).
@@ -1022,11 +1107,20 @@ test_matrix:
   gemini_files:
     - path: tests/eval/test_pp3bp4_disabled_policy.py
       action: create
-      note: 'the new RED disabled-policy suite (G-DM1..G-DM14)'
+      note: 'the new RED disabled-policy suite (G-DM1..G-DM17)'
     - path: tests/eval/test_predictor_aggregation_wrapper.py
       action: update_assertions
       note: 'update test_aca6_scope_invariance: PP3/BP4 production_disposition expectation allowed -> deferred (+ assert decision_dependency == "bp4pp3-predictor-policy"); keep the lineage_class assertions. Contract-driven expectation change (see G-DM15), NOT a weakening.'
-  authorship_rule: 'Gemini owns test authorship: it CREATES tests/eval/test_pp3bp4_disabled_policy.py and INTENTIONALLY updates the disposition assertions in tests/eval/test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance (allowed -> deferred). Sonnet must not edit any test. Gemini touches no other protected test and no src/config.'
+    - path: tests/packet/test_candidate_direction_policy.py
+      action: update_assertions
+      note: 'AC-D2: derived candidate_set + criterion_strength_points keys now {PVS1,PM2,PM4,BA1,BS1,BP3,BP7} (no PP3/BP4). AC-D3: PP3/BP4 are no longer in criterion_strength_points (DEFERRED); update/replace the PP3/BP4 point-value assertions accordingly. Do NOT weaken unrelated invariants.'
+    - path: tests/packet/test_packet_core.py
+      action: update_assertions
+      note: 'INCLUDED bucket drops PP3/BP4 (-> {PVS1,PM2,PM4,BA1,BS1,BP3,BP7}); DEFERRED bucket adds PP3/BP4 (-> {PS3,BS2,PP3,BP4}); update any direction/signed_points fixture that relied on PP3/BP4 being INCLUDED. Keep redaction/provenance/conservation invariants.'
+    - path: tests/packet/test_tsc_calibration_batch.py
+      action: update_assertions
+      note: 'RECOMPUTE expected strata/universe/batch counts from the UNCHANGED synthetic rows under the new policy: rows whose direction depended on PP3/BP4 (now DEFERRED) move to no_deterministic_resolution/annotation_manual_review. Never hardcode a guess; keep conservation/redaction invariants.'
+  authorship_rule: 'Gemini owns test authorship across FIVE files: CREATE tests/eval/test_pp3bp4_disabled_policy.py; UPDATE tests/eval/test_predictor_aggregation_wrapper.py and the three tests/packet/ suites, changing ONLY the assertions/fixtures the disabled policy actually changes (dispositions, candidate_set, INCLUDED/DEFERRED, calibration counts). Do NOT weaken unrelated invariants. Sonnet must not edit any test; Gemini touches no src/config.'
   red_tests:
     - id: G-DM1
       target: predictor_policy.py
@@ -1080,6 +1174,9 @@ test_matrix:
         == deferred with decision_dependency "bp4pp3-predictor-policy" and a
         non-empty decision_rationale; load_lineage_policy + assert_registry_consistency
         pass; the existing tests/eval/test_bias_lineage_registry.py suite passes.
+        NOTE (Gemini miss fix): import VALID_CRITERIA from raptor.eval.config --
+        NOT raptor.scorer.config, which does not define it (config.py:197 is the
+        only definition); the wrong import is an ImportError, not a real failure.
     - id: G-DM10
       target: 'PolicyDisabledEvidenceSource (unit)'
       asserts: >-
@@ -1135,6 +1232,25 @@ test_matrix:
         unchanged (label_independent_reference_or_predictor). RED-first: the
         updated assertion is RED until Sonnet's config change lands, then GREEN.
         The AC-A6 recompute-strength behavior the test also covers is unchanged.
+    - id: G-DM16
+      target: 'packet candidate-direction parity (test_candidate_direction_policy.py + test_packet_core.py)'
+      asserts: >-
+        after Sonnet drops PP3/BP4 from candidate_direction.yaml: (a)
+        criterion_strength_points keys EQUAL the derived candidate_set
+        {PVS1,PM2,PM4,BA1,BS1,BP3,BP7} (no PP3/BP4); (b) load_candidate_direction_policy
+        succeeds (keys subset of VALID_CRITERIA - FORBIDDEN_CRITERIA); (c) the
+        lineage INCLUDED bucket == {PVS1,PM2,PM4,BA1,BS1,BP3,BP7} and DEFERRED ==
+        {PS3,BS2,PP3,BP4}; resolve_packet_policy_disposition("deferred","deferred")
+        is DEFERRED. NO packet source-code change.
+    - id: G-DM17
+      target: 'calibration propagation (test_tsc_calibration_batch.py)'
+      asserts: >-
+        with the UNCHANGED synthetic rows, rows whose candidate direction
+        depended on PP3/BP4 (now DEFERRED, unscored) resolve to
+        no_deterministic_resolution / annotation_manual_review; the expected
+        strata list, candidate universe and batch counts are RECOMPUTED from
+        those fixtures (never hardcoded), and conservation/redaction/provenance
+        invariants still hold.
   protected_tests_expectations:
     - 'tests/eval/test_predictor_policy_gate.py v1 loader/hash/BLOCKED cases stay GREEN.'
     - 'tests/eval/test_terminal_runner_controls.py stays GREEN.'
@@ -1142,6 +1258,7 @@ test_matrix:
     - 'existing gate.py / scope_gate.py (ADR-0011) tests stay GREEN and unmodified; disabled mode does not change gate semantics.'
     - 'tests/eval/test_bias_lineage_registry.py and test_bias_lineage_audit.py stay GREEN with PP3/BP4 deferred; only bias_lineage.yaml DATA changed, no lineage code -- Gemini does not edit these two.'
     - 'tests/eval/test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance is INTENTIONALLY UPDATED by Gemini (production_disposition allowed -> deferred + decision_dependency). Its old assertion encoded the PRE-decision `allowed` disposition; the approved disabled/manual contract flips it to deferred, so matching the assertion to the contract is REQUIRED, not a weakening -- it still asserts an exact disposition. Sonnet does NOT touch it.'
+    - 'tests/packet/test_candidate_direction_policy.py, test_packet_core.py, test_tsc_calibration_batch.py are INTENTIONALLY UPDATED by Gemini (candidate_set keys, INCLUDED/DEFERRED buckets, calibration counts) to match D13; ONLY the policy-changed assertions/fixtures change -- redaction/provenance/conservation invariants are preserved. Sonnet does NOT touch them.'
   removed_from_required_tests:
     - 'the invalid subprocess PROCEED fixture is REMOVED: no _create_mock_holdout_package, no mini OTOF / empty-reference genome, no fake manifest/benchmark/mask/return-manifest, no dummy runtime-bundle hash. A real masked-holdout PROCEED cannot be faked, so it is NOT a required test.'
     - 'the existing protected blocked-policy subprocess tests remain valid and unchanged (test_predictor_policy_gate.py::test_acg8_terminal_runner_blocked_policy: missing/malformed/unapproved policy => BLOCKED_POLICY) -- they return before opening any held-out input.'
@@ -1169,6 +1286,7 @@ gpt_probes:
     - 'P11: the runner is authorization-NEUTRAL -- it sets no gate/scope authorization value; decide_gate/decide_scope_gate (ADR-0011) still decide from metrics; gate.py/scope_gate.py are unchanged; a synthetic gate decision is unaffected by policy mode.'
     - 'P12: bias_lineage.yaml PP3/BP4 are deferred/deferred with decision_dependency bp4pp3-predictor-policy + non-empty decision_rationale; assert_registry_consistency passes (no omitted_without_disposition); lineage_policy_hash is bound + check-before-load; NO lineage-registry/policy/audit code changed; audit_lineage adds no new block because PP3/BP4 are not automatable (would_be_scored False).'
     - 'P13: review main() composition of the three seams -- resolve_policy_state gates BEFORE any held-out input is opened; build_policy_evidence_source only wraps PolicyDisabledEvidenceSource for APPROVED_DISABLED (never PredictorCorrectedEvidenceSource); build_disabled_policy_pins is pure (no report/gate mutation); main does not override decide_gate/decide_scope_gate output. This human/GPT review replaces the removed fake end-to-end PROCEED test and is done BEFORE the owner gate.'
+    - 'P14: packet propagation -- candidate_direction.yaml criterion_strength_points keys == derived candidate_set (no PP3/BP4); the lineage INCLUDED bucket drops PP3/BP4 and DEFERRED gains them; resolve_packet_policy_disposition + direction.py + packet/config.py are UNCHANGED (NO packet source-code change); calibration strata/universe/batch counts are recomputed from unchanged fixtures; redaction/provenance/conservation intact.'
 
 # ---------------------------------------------------------------------------
 # Owner decision gate — no self-approval.
@@ -1220,17 +1338,18 @@ reuse_vs_x64_conclusion:
 # ---------------------------------------------------------------------------
 migration_and_backout:
   migration:
-    - 'one atomic Sonnet commit edits both criteria configs + bias_lineage.yaml + policy artifact + loader + wrapper + runner so parity AND lineage-registry consistency never break mid-flight.'
+    - 'one atomic Sonnet commit edits both criteria configs + bias_lineage.yaml + policy artifact + loader + wrapper + runner + configs/packet/candidate_direction.yaml so parity, lineage-registry consistency AND packet candidate_set==keys never break mid-flight.'
     - 'removing PP3/BP4 from included_criteria/automatable_criteria and flipping their bias_lineage disposition to deferred MUST be in the SAME commit -- an intermediate state (removed but still `allowed`) would trip assert_registry_consistency (omitted_without_disposition).'
     - 'the Gemini commit updates test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance to expect deferred (RED until the Sonnet config change lands, then GREEN); Sonnet does not touch that test.'
     - 'the terminal_source.py edit trips the sentinel; the co-located correction_hash re-pin restores it.'
     - 'artifact remains status=proposed (BLOCKED) until the separate owner approval; the doer enables nothing.'
   backout:
-    - 'revert the Sonnet commit: PP3/BP4 return to included_criteria + automatable_criteria AND their bias_lineage disposition returns to allowed/allowed; the artifact returns to v1/pending; the runner returns to the prior behavior.'
-    - 'a partial/one-sided revert fails closed at load (parity + lineage-registry invariants) -- no drifted half-state can ship.'
+    - 'revert the Sonnet commit: PP3/BP4 return to included_criteria + automatable_criteria, their bias_lineage disposition returns to allowed/allowed, AND the configs/packet/candidate_direction.yaml PP3/BP4 criterion_strength_points rows return; the artifact returns to v1/pending; the runner + packet candidate-direction return to prior behavior.'
+    - 'a partial/one-sided revert fails closed at load (parity + lineage-registry + packet candidate_set==keys invariants) -- no drifted half-state can ship.'
   future_reactivation_gate:
     - 'corrected_enabled/REVEL requires a NEW owner ADR + new hash-bound artifact + the recommendation section-8 activation checklist + a fresh masked rerun.'
     - 'mode=corrected_enabled stays BLOCKED_POLICY; config drift fails closed under any stale approval.'
+    - 'reactivation ALSO restores the configs/packet/candidate_direction.yaml PP3/BP4 rows (together with production/eval/lineage) ONLY under that new activation decision -- never independently.'
 
 # ---------------------------------------------------------------------------
 # Residual risk — what these proportionate controls do NOT cover.
@@ -1259,7 +1378,8 @@ residual_risk:
 validation_scope:
   binding:
     - 'the targeted PP3/BP4 policy + terminal-runner + config + lineage tests (the Gemini G-DM matrix and the affected protected tests in tests/eval/) must pass; this is the smallest set that covers the changed behavior.'
-    - 'run via `python -m pytest` (NOT bare `pytest`) so the checkout src/ is importable. Example selector: python -m pytest tests/eval/test_pp3bp4_disabled_policy.py tests/eval/test_predictor_policy_gate.py tests/eval/test_terminal_runner_controls.py tests/eval/test_bias_lineage_registry.py tests/eval/test_bias_lineage_audit.py tests/eval/test_predictor_aggregation_wrapper.py'
+    - 'run via `python -m pytest` (NOT bare `pytest`) so the checkout src/ is importable. Example selector: python -m pytest tests/eval/test_pp3bp4_disabled_policy.py tests/eval/test_predictor_policy_gate.py tests/eval/test_terminal_runner_controls.py tests/eval/test_bias_lineage_registry.py tests/eval/test_bias_lineage_audit.py tests/eval/test_predictor_aggregation_wrapper.py tests/packet/test_candidate_direction_policy.py tests/packet/test_packet_core.py tests/packet/test_tsc_calibration_batch.py'
+    - 'the three tests/packet/ suites are in the binding set: candidate_set / INCLUDED-DEFERRED / calibration expectations are updated to D13 (PP3/BP4 removed from candidate_strength_points, deferred in lineage); contract-driven propagation, not a weakening, and NO packet source code changes.'
     - 'test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance is in this binding set AND the protected-test audit: its PP3/BP4 production_disposition expectation is updated allowed -> deferred to MATCH the approved planner contract (D4/D12 flip the config to deferred). Required by the contract, NOT a weakening -- it still asserts an exact disposition + decision_dependency.'
     - 'the PROCEED path is covered by the OFFLINE seam composition (G-DM4) via `python -m pytest`; NO masked-holdout subprocess is invoked by the binding tests, and the real 2,577-row PROCEED is NOT run before owner approval (integration_boundary).'
   not_acceptance_blocking:
@@ -1296,10 +1416,12 @@ beat4_self_audit:
       control: 'D12 flips PP3/BP4 to deferred/deferred (decision_dependency bp4pp3-predictor-policy) in the SAME commit; lineage_policy_hash binds the file check-before-load; assert_registry_consistency passes; G-DM9 + G-DM14 (P12).'
     - failure: 'A required test fakes a masked-holdout PROCEED (mock manifest/benchmark/reference/mask + dummy runtime-bundle hashes), giving a false green and un-runnable CI.'
       control: 'pure seams (resolve_policy_state/build_policy_evidence_source/build_disabled_policy_pins) unit-tested OFFLINE (G-DM4..G-DM14); the fake subprocess fixture is removed (removed_from_required_tests); the real 2,577-row PROCEED is the post-approval formal rerun; GPT reviews main composition (P13).'
+    - failure: 'Removing PP3/BP4 from eval/lineage but NOT from configs/packet/candidate_direction.yaml -> derived candidate_set != criterion_strength_points keys (test_candidate_direction_policy.py AC-D2 fails), or a packet path scores a disabled criterion.'
+      control: 'D13 drops the PP3/BP4 packet rows in the SAME Sonnet commit; resolve_packet_policy_disposition derives DEFERRED so direction.py never scores them; G-DM16/G-DM17 + P14; NO packet source-code change.'
   planner_scope_inversions:
     - 'Editing code/config/tests instead of only the YAML: this planner commit modifies exactly one file (verified in VERIFICATION).'
     - 'Wrong or missing commit trailers: the corrected trailer Copilot-Session 7c146921-... is pinned in planner.required_trailers and verified post-commit; rev 1 (878bff8) used 90703341 and, per the no-amend rule, is left as-is with the spec corrected.'
-    - 'Committing on the wrong branch/base: worktree/branch pinned; this rev-7 commit supersedes rev-6 (977eea5) and stacks on the current branch head. Planner and Gemini commits interleave, so no fixed HEAD~1 SHA is asserted -- verify only that HEAD is a descendant of 977eea5, exactly the spec changed, and both trailers present.'
+    - 'Committing on the wrong branch/base: worktree/branch pinned; this rev-8 commit supersedes rev-7 (8210ff5) and stacks on the current branch head. Planner/Sonnet/Gemini commits interleave, so no fixed HEAD~1 SHA is asserted -- verify only that HEAD is a descendant of 8210ff5, exactly the spec changed, and both trailers present.'
   empty_beat4_allowed: false
 
 # ---------------------------------------------------------------------------
@@ -1310,6 +1432,8 @@ acceptance_mapping:
     satisfied_by: 'implementation_scope + policy_schema_v2 + state_machine + runner_behavior + test_matrix name exact files, fields and probes.'
   - acceptance: 'The policy gate is offline-testable without faking a masked-holdout run.'
     satisfied_by: 'runner_behavior.pure_seams (resolve_policy_state/build_policy_evidence_source/build_disabled_policy_pins); G-DM4 offline composition + G-DM5..G-DM14 unit tests; integration_boundary defers the real 2,577-row PROCEED to the post-approval formal rerun (P13 review).'
+  - acceptance: 'Packet candidate-direction + calibration stay consistent with PP3/BP4 disabled (no packet code change).'
+    satisfied_by: 'D13 + packet_policy_changes; candidate_direction.yaml keys == derived candidate_set; PP3/BP4 DEFERRED via lineage; G-DM16/G-DM17/P14; 8 Sonnet + 5 Gemini + 1 planner = 14.'
   - acceptance: 'Disabled/manual mode is explicit and cannot be confused with predictor approval.'
     satisfied_by: 'D1/D2 orthogonal mode; corrected_enabled + legacy => BLOCKED_POLICY; D11 approval authorizes only the evidence mode.'
   - acceptance: 'Production-faithful rerun is preserved: policy approval never forces authorization; the gate decides from metrics (ADR-0011 preserved).'
@@ -1325,15 +1449,15 @@ acceptance_mapping:
   - acceptance: 'No held-out run, census, activation or owner approval occurs in planning.'
     satisfied_by: 'planner.prohibited_in_this_task; this commit writes only the YAML.'
   - acceptance: 'Tests authored by Gemini, implementation by Sonnet 5, review by GPT-5.4.'
-    satisfied_by: 'test_matrix.author=gemini (TWO files: create test_pp3bp4_disabled_policy.py + update test_predictor_aggregation_wrapper.py AC-A6 disposition); implementation_scope.doer=claude-sonnet-5 (7 files); gpt_probes.reviewer=gpt-5.4; branch total 10.'
+    satisfied_by: 'test_matrix.author=gemini (FIVE files: create test_pp3bp4_disabled_policy.py + update test_predictor_aggregation_wrapper.py AC-A6 and the three tests/packet/ suites); implementation_scope.doer=claude-sonnet-5 (8 files, incl. configs/packet/candidate_direction.yaml); gpt_probes.reviewer=gpt-5.4; branch total 14.'
 
 # ---------------------------------------------------------------------------
 # VERIFICATION (slot 1) — filled by the planner after the commit.
 # ---------------------------------------------------------------------------
 verification:
-  expected: 'one follow-up (rev-7) planner commit on track/pp3bp4-resolution-2026-07 modifying exactly docs/project/specs/pp3bp4-disabled-manual-policy.yaml; both trailers; no amend; no push. This rev supersedes prior planner content (rev 6 = 977eea5) and is STACKED on the current branch head -- Gemini/other agent commits interleave on the shared branch, so NO fixed HEAD~1 ancestry is asserted.'
+  expected: 'one follow-up (rev-8) planner commit on track/pp3bp4-resolution-2026-07 modifying exactly docs/project/specs/pp3bp4-disabled-manual-policy.yaml; both trailers; no amend; no push. This rev supersedes prior planner content (rev 7 = 8210ff5) and is STACKED on the current branch head (Sonnet impl e2bac85 + Gemini test commits interleave), so NO fixed HEAD~1 ancestry is asserted.'
   checks:
-    - 'git show --stat HEAD => exactly 1 file changed (this spec only); a pre-existing uncommitted Gemini test edit, if any, is NOT included.'
+    - 'git show --stat HEAD => exactly 1 file changed (this spec only); Sonnet/Gemini code+test commits are NOT included.'
     - 'git log -1 shows Co-authored-by Copilot AND Copilot-Session: 7c146921-f3dd-4a1e-8cf0-8f574de49204.'
-    - 'HEAD is a descendant of 977eea5 (rev 6); the parent is whatever the branch head is at commit time (may be a Gemini test commit), NOT a fixed planner SHA. no amend; no push; branch unchanged.'
+    - 'HEAD is a descendant of 8210ff5 (rev 7); the parent is whatever the branch head is at commit time (a Sonnet/Gemini commit), NOT a fixed planner SHA. no amend; no push; branch unchanged.'
   verdict: recorded_in_final_response
