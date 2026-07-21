@@ -60,7 +60,17 @@ binding_decisions:
         unchanged; corrected/REVEL-enabled PP3/BP4 remains BLOCKED_POLICY.
   certified_masked_gate_is_negative:
     record: data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json
-    sha256: e914f65231c8004b1c7a96d2fe80bd49bac591433112699ff91cc5b027e55207
+    sha256: 7c55cd4e3059713d1d53886d8893a3819153375b62ce9d37187d731132c6a77f
+    sha256_provenance: committed_git_lf_blob
+    sha256_windows_crlf_checkout_do_not_pin: e914f65231c8004b1c7a96d2fe80bd49bac591433112699ff91cc5b027e55207
+    hash_rule: >-
+      Committed data-artifact identity is the canonical Git/LF blob SHA-256
+      (7c55…), NOT the Windows autocrlf CRLF checkout SHA-256 (e914…). Repo
+      artifacts are verified against their canonical LF blob bytes on EVERY
+      platform; the CRLF checkout hash is a local-filesystem artifact and must
+      never be pinned. Config/policy inputs in hash_contract are the deliberate
+      exception: they are verified as RAW PATH BYTES because the approved policy
+      pins those exact on-disk bytes.
     legacy_v1_gate: FAIL
     full_spectrum_status: BLOCKED_POLICY
     vus_authorized: false
@@ -199,8 +209,15 @@ immutable_external_inputs:
   input_vcf_sha256: 3fff6de7ae9b2b202642e498c4c49532cf1aaf5c2734f0e8341d5ace88fa3a09
   historical_aggregate:
     path: data/census/tsc_vus_clinvar_2026-07-07_stats.json
-    sha256: 6ad96909637118aab415ec24d7ea63992eea99df03590508a223c6742621200d
+    sha256: 389e93d5b37f686b8d5e1115e2ebbfcdee6a060417300e5ed38d46304abac6e7
+    sha256_provenance: committed_git_lf_blob
+    sha256_windows_crlf_checkout_do_not_pin: 6ad96909637118aab415ec24d7ea63992eea99df03590508a223c6742621200d
     role: superseded_pp3bp4_active_reference_read_only
+    hash_rule: >-
+      Committed data-artifact identity is the canonical Git/LF blob SHA-256
+      (389e93d5…); the prior 6ad9… value was a Windows CRLF checkout hash and
+      must not be pinned. This file is read only to compute the historical
+      comparison delta and is never overwritten.
   reused_census_seam:
     path: scripts/build_tsc_calibration_batch.py
     functions: [load_manifest, reproduce_census_strata]
@@ -217,7 +234,13 @@ hash_contract:
     Hashes below are the planner-verified CURRENT raw file SHA-256; they equal
     the hashes recorded inside bp4pp3_predictor_policy.json, confirming the
     on-disk configs are the approved-policy configs. Production code DERIVES
-    these hashes at runtime and never hardcodes their values.
+    these hashes at runtime and never hardcodes their values. NOTE ON HASH
+    PROVENANCE: config/policy inputs here are verified as RAW PATH BYTES (the
+    approved policy pins those exact on-disk bytes), which is DISTINCT from
+    committed data-artifact identity — the historical aggregate, the certified
+    masked gate, and the emitted census record — whose identity is the canonical
+    Git/LF blob SHA-256 verified on every platform, never the Windows CRLF
+    checkout hash.
   inputs:
     approved_predictor_policy:
       path: configs/eval/bp4pp3_predictor_policy.json
@@ -304,9 +327,16 @@ expected_real_data_measurements:
       neither criterion is in automatable_criteria. Union 5,474 (=> 448 variants
       fire both) is measured fresh.
   point_distribution_expected:
+    domain: >-
+      Covers ALL 6,618 strata; every stratum contributes to exactly one
+      signed_points band. signed_points==0 counts BOTH the 119
+      no_deterministic_resolution rows that score 0 AND the 30
+      annotation_manual_review rows (manual rows carry signed_points=0), so the
+      0 band is 149 (=119+30), never 119. The distribution is an all-strata
+      derivation, not a per-direction one.
     '-8': 1
     '-3': 6
-    '0': 119
+    '0': 149
     '1': 5651
     '2': 61
     '3': 172
@@ -318,9 +348,12 @@ expected_real_data_measurements:
     '11': 1
     '12': 6
     invariants:
-      - LP (points>=6) sum = 157
-      - LB (points<=-1) sum = 7
-      - no_deterministic_resolution (0<=points<=5) sum = 6424
+      - all-strata coverage — sum of every band == 6618.
+      - signed_points==0 band == 149 == 119 no_deterministic_resolution rows + 30 annotation_manual_review rows (=119 unresolved + 30 manual).
+      - LP (points>=6) band sum == 157 == candidate_LP_review direction total.
+      - LB (points<=-1) band sum == 7 == candidate_LB_review direction total.
+      - 0<=points<=5 band sum == 6454 == 6424 no_deterministic_resolution + 30 annotation_manual_review; the 30 manual rows share the 0-point band but are a SEPARATE direction.
+      - Direction totals (candidate_LP_review / candidate_LB_review / no_deterministic_resolution / annotation_manual_review) are derived from STRATUM routing, never from point bands; a point band is never used to source a direction count.
   historical_comparison_superseded:
     source: data/census/tsc_vus_clinvar_2026-07-07_stats.json (PP3/BP4 ACTIVE)
     candidate_LP_review: {historical: 238, disabled_manual: 157, delta: -81}
@@ -341,9 +374,24 @@ output_schema:
   emitted_record:
     path: data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json
     schema: raptor.tsc.vus_census.disabled_manual.v1
+    only_permitted_output_path: data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json
+    no_overwrite: >-
+      The single permitted output path above is the ONLY file the census may
+      write. If it already exists the CLI fails closed. NO existing artifact —
+      including the historical stats (tsc_vus_clinvar_2026-07-07_stats.json), the
+      certified masked gate (tsc_masked_holdout_gate_disabled_manual_2026-07-21.json),
+      or any other census file — may ever be overwritten.
+    canonical_bytes: >-
+      Emitted bytes are UTF-8, sort_keys=True, indent=2, exactly ONE terminal
+      LF, and LF-only line endings on EVERY platform. The CLI encodes the JSON
+      to UTF-8 bytes and writes them explicitly in binary mode (e.g.
+      open(path, 'wb').write(payload)); it never uses Path.write_text or any
+      text-mode write that platform-translates LF to CRLF. Any repo-artifact
+      SHA test hashes these canonical LF bytes (the Git blob), never the Windows
+      CRLF checkout bytes.
     write_rule: >-
-      Written ONLY by the census CLI to an explicit data/census/*.json path via
-      the census-record output boundary; a dry-run/summary mode proves no output
+      Written ONLY by the census CLI to the hard-pinned path above via the
+      census-record output boundary; a dry-run/summary mode proves no output
       precedes conservation. This record is a DOER RUNTIME OUTPUT, not part of
       this planner commit.
   required_fields:
@@ -403,9 +451,12 @@ implementation_scope:
         action: >-
           create the deterministic CLI: verify policy status/mode + config
           hashes, load inputs, conserve identity/row/join/hash invariants BEFORE
-          any write, support --dry-run/--summary, refuse output outside an
-          explicit data/census/*.json child (reuse the census-record boundary
-          semantics), emit canonical sorted-key JSON.
+          any write, support --dry-run/--summary, refuse any output other than
+          the single hard-pinned
+          data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json
+          target, never overwrite an existing file, and emit canonical JSON
+          bytes (UTF-8, sort_keys, indent 2, one terminal LF, LF-only on every
+          platform) via an explicit binary byte write, never Path.write_text.
       - path: scripts/build_tsc_calibration_batch.py
         action: >-
           REFACTOR to import the moved symbols from raptor.census.strata and
@@ -456,15 +507,15 @@ test_matrix:
     - 'G-VC7 all counts derived from injected inputs (change an input, count moves); no expected-count literal in production code.'
     - 'G-VC8 suppression union computed as the size of (PP3 union BP4); scored PP3/BP4 == 0.'
     - 'G-VC9 emitted record contains NO variant_id/vcf_key/SPDI/HGVS/rationale/label/packet_id (privacy schema assertion).'
-    - 'G-VC10 historical comparison delta computed from the historical file, not hardcoded; point-distribution invariants (LP>=6, LB<=-1) hold.'
+    - 'G-VC10 historical comparison delta computed from the historical file, not hardcoded; the point distribution covers all 6,618 strata (sum==6618), the signed_points==0 band==149 (119 unresolved + 30 manual), and the LP(points>=6)==157 / LB(points<=-1)==7 invariants hold.'
   unit_cli:
-    - 'G-VC11 output boundary — external raw-data dir refused; in-repo non-census or non-.json path refused; only data/census/*.json accepted.'
+    - 'G-VC11 output boundary — the ONLY accepted output is the hard-pinned data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json. Fail closed (no write) on attempts to overwrite the historical stats (tsc_vus_clinvar_2026-07-07_stats.json) or the certified masked gate (tsc_masked_holdout_gate_disabled_manual_2026-07-21.json), on any external/raw-data directory, on any nested path under data/census/, on any non-.json or wrong-extension path, and on any already-existing artifact; no existing file is ever overwritten.'
     - 'G-VC12 --dry-run/--summary writes NO file; conservation runs before any write.'
-    - 'G-VC13 canonical JSON is deterministic (sorted keys, byte-stable).'
+    - 'G-VC13 canonical JSON bytes are deterministic and byte-stable: UTF-8, sort_keys, indent 2, exactly one terminal LF, LF-only on every platform, written via explicit binary byte write (not Path.write_text); the SHA test hashes these canonical LF bytes / Git blob, never CRLF checkout bytes.'
     - 'G-VC14 policy/hash verification fails closed on a drifted config hash or a non-approved/non-disabled_manual policy.'
   integration_real_data:
     cases:
-      - 'G-VC15 opt-in (env-gated, e.g. RAPTOR_VUS_REAL_DATA=1) run over the immutable manifest + BIAS TSV + current configs asserts the binding oracles — 6,618 identities/rows; 157/7/6,424/30 directions; 7/2 patterns; raw PP3 2,226 / BP4 3,696 / union 5,474 / scored 0; and the reused-helper per-group/per-gene breakdowns. Skipped cleanly when inputs/env absent.'
+      - 'G-VC15 opt-in (env-gated, e.g. RAPTOR_VUS_REAL_DATA=1) run over the immutable manifest + BIAS TSV + current configs asserts the binding oracles — 6,618 identities/rows; 157/7/6,424/30 directions; 7/2 patterns; raw PP3 2,226 / BP4 3,696 / union 5,474 / scored 0; the all-strata point distribution summing to 6,618 with the signed_points==0 band==149 (119 unresolved + 30 manual); and the reused-helper per-group/per-gene breakdowns. Skipped cleanly when inputs/env absent.'
     boundary: >-
       This is the ONLY test touching raptor-data; it recomputes through the
       seam and never reads the emitted aggregate as its own oracle.
@@ -488,7 +539,7 @@ sonnet_contract:
     - Edit gate.py, scope_gate.py, any config, the historical stats file, or the
       certified masked gate.
     - Reuse assert_source_of_record_conservation's historical direction assertions.
-    - Write outside an explicit data/census/*.json path or into raptor-data.
+    - Write anywhere other than the single hard-pinned data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json target, overwrite any existing artifact, or write into raptor-data.
     - Tune, round, or "fix" the disappointing disabled-mode counts.
 
 # --------------------------------------------------------------------------
@@ -517,12 +568,24 @@ cli_and_output_boundary:
     args: [--manifest, --bias-tsv, --provenance, --scorer-config, --eval-config,
            --predictor-policy, --lineage-policy, --historical-stats,
            --emit-census-record, --dry-run, --summary]
-    determinism: canonical JSON (sort_keys, compact separators, UTF-8, trailing newline).
+    determinism: >-
+      Canonical JSON bytes: UTF-8, sort_keys=True, indent=2, exactly one
+      terminal LF, LF-only on every platform, written via explicit byte encode +
+      binary write (never Path.write_text / text-mode LF->CRLF translation).
   output_boundary:
-    accept: a direct .json child of <repo>/data/census
+    accept: >-
+      ONLY the hard-pinned path
+      data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json (a direct
+      .json child of <repo>/data/census), and only when it does not already
+      exist.
     refuse:
       - any path outside the repository tree (e.g. the raptor-data inputs)
-      - any in-repo path that is not a direct data/census/*.json child
+      - any external/raw-data directory
+      - any in-repo path that is not the single hard-pinned data/census/*.json target
+      - any nested path under data/census/ (subdirectories) or a wrong/absent .json extension
+      - overwriting ANY existing artifact, explicitly including the historical
+        stats (tsc_vus_clinvar_2026-07-07_stats.json) and the certified masked
+        gate (tsc_masked_holdout_gate_disabled_manual_2026-07-21.json)
     enforcement: check-before-write; raised before any aggregate bytes are emitted.
   dry_run: proves the full conservation path runs and produces a summary without writing.
 
@@ -533,7 +596,9 @@ cli_and_output_boundary:
 migration_and_backout:
   migration:
     - Land planner spec (this commit) → Gemini RED tests → Sonnet extraction +
-      aggregate + CLI → checker probes → run the CLI to emit the new record.
+      aggregate + CLI → checker probes → run the CLI to emit the new record to
+      the hard-pinned data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json
+      path as canonical LF bytes, failing closed if that file already exists.
     - The extraction is a pure move + import; the calibration script and its
       tests remain green (behavior-preserving).
   backout:
@@ -575,6 +640,23 @@ beat4_self_audit:
         A planner-invented consequence split replaces the historical grouping,
         shifting per-group counts. MITIGATION: reuse _variant_class_for; G-VC15
         pins per-group counts from the reused helper.
+    - checkout_hash_pinned: >-
+        A repo data-artifact (certified masked gate, historical aggregate, or
+        the emitted record) is pinned/verified against its Windows CRLF checkout
+        SHA instead of the canonical Git/LF blob SHA. MITIGATION: data-artifact
+        identity is the committed LF blob (gate 7c55…, historical 389e93d5…);
+        G-VC13 hashes canonical LF bytes; config inputs stay raw-path-bytes by
+        design.
+    - point_band_direction_conflation: >-
+        A direction total is sourced from a point band (e.g. treating
+        no_deterministic_resolution as the 0<=points<=5 band) or the 30 manual
+        rows (signed_points=0) are dropped from the all-strata distribution.
+        MITIGATION: distribution covers all 6,618 (0 band==149==119+30, sum
+        6618); directions are derived from stratum routing (G-VC10/G-VC15).
+    - overwrite_existing_artifact: >-
+        The emitter writes over the historical stats, the certified masked gate,
+        or any pre-existing file. MITIGATION: single hard-pinned output path +
+        fail-closed no-overwrite; G-VC11 asserts refusal.
   empty_beats: none — every beat applied.
 
 required_trailers:
