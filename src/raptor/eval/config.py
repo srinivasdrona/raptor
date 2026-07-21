@@ -246,15 +246,19 @@ class TieredReadjudicationConfigError(TieredReadjudicationError, ConfigError):
     `ConfigError` (existing `load_config`-style `except` clause)."""
 
 
-#: The locked v3 `tiered_authorization` config block (spec §4a/§8), pinned
-#: verbatim -- embedded as a raw JSON string (never hand re-typed, to
+#: The locked v3 `tiered_authorization` config block (spec §4a/§8, rev 3),
+#: pinned verbatim -- embedded as a raw JSON string (never hand re-typed, to
 #: guarantee byte-exact preservation of the pinned safety strings, including
 #: the U+2014 em dash in `prospective_validation.dataset_rule.registered_dataset`)
-#: and parsed once at import time. `load_config`/`decide_tiered_gate` both
-#: validate `EvalConfig.tiered_authorization == _PINNED_TIERED_AUTHORIZATION`
-#: by strict recursive equality -- ANY drift (a modified criterion map, a
-#: modified `full_spectrum.requires`, a modified dataset-rule sentence, ...)
-#: fails equality and raises `TieredReadjudicationConfigError` fail-closed.
+#: and parsed once at import time. `load_tiered_authorization`/`decide_tiered_gate`
+#: both validate a loaded/passed `tiered_authorization` mapping against
+#: `_PINNED_TIERED_AUTHORIZATION` by strict recursive equality -- ANY drift (a
+#: modified criterion map, a modified `full_spectrum.requires`, a modified
+#: dataset-rule sentence, ...) fails equality and raises
+#: `TieredReadjudicationConfigError` fail-closed. This block is NEVER read
+#: from or stored on `configs/eval/tsc2.yaml`/`EvalConfig` -- it lives ONLY in
+#: the standalone `configs/eval/tiered_gate_v3.yaml` (schema
+#: `raptor.eval.tiered_authorization.v3`), loaded via `load_tiered_authorization`.
 _PINNED_TIERED_AUTHORIZATION_JSON = '''
 {
   "schema_version": 3,
@@ -338,6 +342,64 @@ def _validate_tiered_authorization(value: Any) -> None:
         )
 
 
+#: The schema tag every standalone v3 tiered-authorization config
+#: (`configs/eval/tiered_gate_v3.yaml`) must declare at its `schema:` key --
+#: this file is standalone/additive and is NEVER merged into or read from
+#: `configs/eval/tsc2.yaml` (rev 3: relocated OUT of tsc2.yaml so the
+#: policy-bound, census/ADR-0012-verified tsc2.yaml stays byte-identical at
+#: its approved SHA-256).
+SCHEMA_TIERED_AUTHORIZATION_V3 = "raptor.eval.tiered_authorization.v3"
+
+
+def load_tiered_authorization(path: str | Path) -> Mapping[str, Any]:
+    """Load + strictly validate the STANDALONE v3 tiered-authorization config
+    (`configs/eval/tiered_gate_v3.yaml`) -- entirely separate from
+    `load_config`/`configs/eval/tsc2.yaml`, which stays byte/behaviour
+    compatible and never reads, requires, or stores a tiered block.
+
+    The file's top level carries a `schema:` tag (must equal
+    `SCHEMA_TIERED_AUTHORIZATION_V3` exactly) alongside every
+    `tiered_authorization` field (`schema_version`, `axis_enums`,
+    `criterion_scope_applicability`, `full_spectrum`, `research_scopes`,
+    `governance_statements`, `research_use_disclaimer`,
+    `no_new_evidence_statement`, `prospective_validation`) as SIBLING keys
+    (no nested `tiered_authorization:` wrapper). Returns every key EXCEPT
+    `schema` -- the resulting mapping is validated by strict recursive
+    equality against `_PINNED_TIERED_AUTHORIZATION` and returned only on an
+    exact match.
+
+    Raises `TieredReadjudicationConfigError` (a `ConfigError` subclass, so
+    existing `except ConfigError` call sites still catch it) fail-closed on
+    a missing file, invalid/non-mapping YAML, a missing/mismatched `schema`
+    tag, or ANY drift from the locked pin.
+    """
+    file_path = Path(path)
+    if not file_path.exists():
+        raise TieredReadjudicationConfigError(
+            f"standalone tiered-authorization config not found: {file_path}"
+        )
+    try:
+        raw = yaml.safe_load(file_path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise TieredReadjudicationConfigError(
+            f"standalone tiered-authorization config {file_path} is not valid YAML: {exc}"
+        ) from exc
+    if not isinstance(raw, dict):
+        raise TieredReadjudicationConfigError(
+            f"standalone tiered-authorization config {file_path} root must be a mapping, "
+            f"got {type(raw).__name__}"
+        )
+    schema = raw.get("schema")
+    if schema != SCHEMA_TIERED_AUTHORIZATION_V3:
+        raise TieredReadjudicationConfigError(
+            f"standalone tiered-authorization config {file_path} `schema` must equal "
+            f"{SCHEMA_TIERED_AUTHORIZATION_V3!r} -- got {schema!r}"
+        )
+    tiered_authorization = {k: v for k, v in raw.items() if k != "schema"}
+    _validate_tiered_authorization(tiered_authorization)
+    return tiered_authorization
+
+
 def _require(mapping: Mapping[str, Any], key: str, *, ctx: str = "") -> Any:
     if key not in mapping:
         raise ConfigError(f"missing required config key: {ctx}{key!r}")
@@ -379,15 +441,6 @@ class EvalConfig:
     #: {FULL_SPECTRUM, TRUNCATING_PATHOGENIC_ONLY, NONE_VALIDATED}}` when
     #: present. Never read by v1 `decide_gate`.
     scope_authorization: Mapping[str, Any] | None = None
-    #: v3 tiered post-hoc re-adjudication (ADDITIVE,
-    #: `docs/project/specs/tiered-gate-v3-posthoc.yaml`,
-    #: `raptor.eval.tiered_gate.decide_tiered_gate`) -- `None` is the fully
-    #: v1/v2-compatible default (absent block). When present it MUST equal
-    #: `_PINNED_TIERED_AUTHORIZATION` exactly (validated at `load_config`
-    #: time via `_validate_tiered_authorization`, and defensively re-checked
-    #: inside `decide_tiered_gate` for a hand-built `EvalConfig` that bypasses
-    #: the loader). Never read by v1 `decide_gate` or v2 `decide_scope_gate`.
-    tiered_authorization: Mapping[str, Any] | None = None
 
 
 def _validate_points(points: Any) -> None:
@@ -789,28 +842,6 @@ def load_config(path: str | Path) -> EvalConfig:
     else:
         scope_authorization_raw = None
 
-    # v3 tiered post-hoc re-adjudication (ADDITIVE): the block is OPTIONAL,
-    # with the same strict presence semantics as `scope_authorization` --
-    # only KEY ABSENCE means "no v3 tiered_authorization"
-    # (`tiered_authorization=None`); any explicitly present value must equal
-    # the locked pin exactly or loading fails loud.
-    if "tiered_authorization" in raw:
-        tiered_authorization_raw = raw["tiered_authorization"]
-        _validate_tiered_authorization(tiered_authorization_raw)
-        # Once a config declares a v3 `tiered_authorization` block,
-        # `min_count_per_class` must equal exactly the preregistered v2/v3
-        # floor (36) -- the same pinned power floor `scope_authorization`
-        # enforces. Legacy configs without `tiered_authorization` are
-        # unaffected.
-        if min_count != _PINNED_MIN_COUNT_PER_CLASS:
-            raise TieredReadjudicationConfigError(
-                "`min_count_per_class` must equal the pinned pre-registered floor "
-                f"{_PINNED_MIN_COUNT_PER_CLASS} once `tiered_authorization` is present -- "
-                f"got {min_count!r}"
-            )
-    else:
-        tiered_authorization_raw = None
-
     return EvalConfig(
         automatable_criteria=normalized_criteria,
         tavtigian_points={str(k): int(v) for k, v in raw["tavtigian_points"].items()},
@@ -821,5 +852,4 @@ def load_config(path: str | Path) -> EvalConfig:
         labels_snapshot=str(raw["labels_snapshot"]),
         clinvar_snapshot_file_checksum=str(raw.get("clinvar_snapshot_file_checksum", "") or ""),
         scope_authorization=_build_scope_authorization(scope_authorization_raw),
-        tiered_authorization=tiered_authorization_raw,
     )

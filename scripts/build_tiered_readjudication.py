@@ -4,12 +4,17 @@
 
 Re-adjudicates the frozen R2 masked-holdout aggregate
 (`data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json`)
-under the locked `configs/eval/tsc2.yaml` `tiered_authorization` rule via
-`raptor.eval.tiered_gate.decide_tiered_gate` and writes the resulting
-`TieredGateDecision` as a canonical-LF JSON record plus an external sha256
-manifest. Performs NO new run, scoring, annotation, benchmark read, network
-access, or data generation -- purely a deterministic re-interpretation of
-already-frozen counts (`no_new_evidence_statement`).
+under the locked STANDALONE `configs/eval/tiered_gate_v3.yaml`
+`tiered_authorization` rule (`--tiered-config`, loaded via
+`raptor.eval.config.load_tiered_authorization` -- entirely separate from
+`configs/eval/tsc2.yaml`, which supplies only the Oracle thresholds/
+`min_count_per_class` via the UNCHANGED `load_config` and is never
+mutated) via `raptor.eval.tiered_gate.decide_tiered_gate` and writes the
+resulting `TieredGateDecision` as a canonical-LF JSON record plus an
+external sha256 manifest. Performs NO new run, scoring, annotation,
+benchmark read, network access, or data generation -- purely a
+deterministic re-interpretation of already-frozen counts
+(`no_new_evidence_statement`).
 
 Fail-closed: every input path must resolve to its EXACT canonical location
 under `REPO_ROOT`; the source record's canonical-LF sha256 AND internal
@@ -30,12 +35,14 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 _SCRIPT_PATH = Path(__file__).resolve()
 _SRC = _SCRIPT_PATH.parents[1] / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from raptor.eval.config import ConfigError, load_config  # noqa: E402
+from raptor.eval.config import ConfigError, load_config, load_tiered_authorization  # noqa: E402
 from raptor.eval.model import Metrics  # noqa: E402
 from raptor.eval.tiered_gate import (  # noqa: E402
     SOURCE_R2_CANONICAL_SHA256,
@@ -53,6 +60,7 @@ REPO_ROOT = str(_SCRIPT_PATH.parents[1])
 
 _CANONICAL_SOURCE_RECORD = "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
 _CANONICAL_EVAL_CONFIG = "configs/eval/tsc2.yaml"
+_CANONICAL_TIERED_CONFIG = "configs/eval/tiered_gate_v3.yaml"
 _CANONICAL_OUTPUT = "data/census/tsc_tiered_readjudication_2026-07-21.json"
 _CANONICAL_MANIFEST = "data/census/tsc_tiered_readjudication_2026-07-21.sha256"
 
@@ -205,6 +213,7 @@ def _parse_args(argv: Any) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-record", required=True)
     parser.add_argument("--eval-config", required=True)
+    parser.add_argument("--tiered-config", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--external-manifest", required=True)
     return parser.parse_args(argv)
@@ -215,6 +224,7 @@ def main(argv: Any = None) -> int:
 
     source_path = _require_canonical_path(args.source_record, _CANONICAL_SOURCE_RECORD)
     config_path = _require_canonical_path(args.eval_config, _CANONICAL_EVAL_CONFIG)
+    tiered_config_path = _require_canonical_path(args.tiered_config, _CANONICAL_TIERED_CONFIG)
     output_path = _require_canonical_path(args.output, _CANONICAL_OUTPUT)
     manifest_path = _require_canonical_path(args.external_manifest, _CANONICAL_MANIFEST)
 
@@ -226,6 +236,8 @@ def main(argv: Any = None) -> int:
         raise InputError(f"source record not found: {source_path}")
     if not config_path.exists():
         raise InputError(f"eval config not found: {config_path}")
+    if not tiered_config_path.exists():
+        raise InputError(f"tiered-authorization config not found: {tiered_config_path}")
 
     raw_bytes = source_path.read_bytes()
     lf_hash = _sha256_lf(raw_bytes)
@@ -254,18 +266,30 @@ def main(argv: Any = None) -> int:
     except ConfigError as exc:
         raise InputError(f"eval config failed to load/validate: {exc}") from exc
 
-    if config.tiered_authorization is None:
-        raise InputError(f"eval config {config_path} has no `tiered_authorization` block")
+    # The standalone v3 tiered-authorization block is loaded SEPARATELY from
+    # tsc2.yaml (rev 3) -- `tiered_config_raw_mapping` is the RAW top-level
+    # YAML mapping (as-is, INCLUDING the `schema` tag) used ONLY to derive
+    # `tiered_config_canonical_sha256`; `tiered_authorization` is the
+    # validated block (schema tag stripped, checked against the locked pin)
+    # passed explicitly to `decide_tiered_gate`.
+    try:
+        tiered_config_raw_mapping = yaml.safe_load(tiered_config_path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise InputError(f"tiered-authorization config is not valid YAML: {exc}") from exc
+    try:
+        tiered_authorization = load_tiered_authorization(tiered_config_path)
+    except ConfigError as exc:
+        raise InputError(f"tiered-authorization config failed to load/validate: {exc}") from exc
 
     metrics_map = _build_metrics_map(payload)
     run_meta = _ReconstructedRunMeta(payload.get("integrity", {}), payload.get("policy", {}))
 
     try:
-        decision = decide_tiered_gate(metrics_map, config, run_meta)
+        decision = decide_tiered_gate(metrics_map, config, run_meta, tiered_authorization)
         # Independent cross-check re-derivation: a fresh call from freshly
         # reconstructed metrics must produce byte-identical scope verdicts
         # before ANY artifact is written.
-        cross_check = decide_tiered_gate(_build_metrics_map(payload), config, run_meta)
+        cross_check = decide_tiered_gate(_build_metrics_map(payload), config, run_meta, tiered_authorization)
     except TieredReadjudicationError as exc:
         raise InputError(f"decide_tiered_gate rejected the reconstructed input: {exc}") from exc
 
@@ -278,7 +302,7 @@ def main(argv: Any = None) -> int:
     implementation_commit = _git_head_commit()
     module_sha256 = _sha256_lf((_SRC / "raptor" / "eval" / "tiered_gate.py").read_bytes())
     tiered_config_canonical_sha256 = hashlib.sha256(
-        json.dumps(config.tiered_authorization, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        json.dumps(tiered_config_raw_mapping, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
 
     old_semantic_outcome = _build_old_semantic_outcome(payload)

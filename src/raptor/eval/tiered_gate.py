@@ -31,6 +31,7 @@ per-scope decision on a fail-closed error (spec §4b).
 """
 from __future__ import annotations
 
+import math
 from typing import Any, Mapping
 
 from .config import (
@@ -39,6 +40,9 @@ from .config import (
     TieredReadjudicationError,
     TieredReadjudicationInputError,
     _PINNED_MIN_COUNT_PER_CLASS,
+    _PINNED_ORACLE_CONFIDENCE,
+    _PINNED_STRATUM_SEMANTICS,
+    _PINNED_STRATUM_THRESHOLDS,
     _PINNED_TIERED_AUTHORIZATION,
 )
 from .gate import _DIRECTION_COUNT_FIELDS, _DIRECTION_LB_FIELDS
@@ -121,16 +125,22 @@ def _validate_metrics_counts(metrics: Mapping[str, Metrics]) -> None:
                 )
 
 
-def _validate_config(config: EvalConfig) -> Mapping[str, Any]:
-    """Validate `config.tiered_authorization` against the locked pin
-    (`_PINNED_TIERED_AUTHORIZATION`, strict recursive equality) AND the
-    pinned `min_count_per_class` floor. Defense-in-depth: this re-checks a
-    hand-built `EvalConfig` that bypasses `config.load_config`'s own
-    `_validate_tiered_authorization` call, exactly mirroring
-    `scope_gate.py`'s pattern for `scope_authorization`. Returns the
-    validated `tiered_authorization` mapping on success."""
-    tiered_auth = getattr(config, "tiered_authorization", None)
-    if tiered_auth != _PINNED_TIERED_AUTHORIZATION:
+def _validate_config(config: EvalConfig, tiered_authorization: Any) -> Mapping[str, Any]:
+    """Validate the SEPARATELY-supplied `tiered_authorization` mapping
+    against the locked pin (`_PINNED_TIERED_AUTHORIZATION`, strict recursive
+    equality) AND defensively re-validate every Oracle constant a hand-built
+    `EvalConfig` could drift (confidence, missense/truncating precision +
+    recall + gating + directions) plus `min_count_per_class` against the
+    EXISTING pinned v2 constants in `raptor.eval.config` -- mirroring
+    `scope_gate.py`'s defense-in-depth pattern. `tiered_authorization` is no
+    longer read off `config` (rev 3: it lives ONLY in the standalone
+    `configs/eval/tiered_gate_v3.yaml`, loaded via `load_tiered_authorization`
+    and passed explicitly) -- `config` supplies only the Oracle/min-count
+    constants this re-validates. Returns the validated `tiered_authorization`
+    mapping on success; raises `TieredReadjudicationConfigError` fail-closed
+    on ANY drift, BEFORE any axis is computed.
+    """
+    if tiered_authorization != _PINNED_TIERED_AUTHORIZATION:
         raise TieredReadjudicationConfigError(
             "`tiered_authorization` does not match the locked pinned v3 config block "
             "(docs/project/specs/tiered-gate-v3-posthoc.yaml §4a/§8) -- any drift in the "
@@ -149,7 +159,69 @@ def _validate_config(config: EvalConfig) -> Mapping[str, Any]:
             f"{_PINNED_MIN_COUNT_PER_CLASS} for a v3 tiered re-adjudication -- "
             f"got {min_count_per_class!r}"
         )
-    return tiered_auth
+    _validate_oracle_pins(getattr(config, "oracle_thresholds", None))
+    return tiered_authorization
+
+
+def _validate_oracle_pins(oracle_thresholds: Any) -> None:
+    """Runtime Oracle-pin defense-in-depth: re-validate `oracle_thresholds`
+    (confidence + EVERY pinned stratum's precision, recall, gating,
+    directions) against the EXISTING `raptor.eval.config` pinned v2
+    constants BEFORE any axis is computed -- a hand-built `EvalConfig`
+    bypasses `config._validate_oracle_thresholds` entirely, so this closes
+    the same gap `scope_gate._pinned_oracle_semantics_valid` closes for v2.
+    Any drift (confidence, missense/truncating precision/recall, gating, or
+    directions) raises `TieredReadjudicationConfigError` fail-closed."""
+    thresholds = oracle_thresholds if isinstance(oracle_thresholds, Mapping) else {}
+
+    confidence = thresholds.get("confidence")
+    try:
+        confidence_ok = not isinstance(confidence, bool) and math.isclose(
+            float(confidence), _PINNED_ORACLE_CONFIDENCE, rel_tol=0.0, abs_tol=1e-9
+        )
+    except (TypeError, ValueError):
+        confidence_ok = False
+    if not confidence_ok:
+        raise TieredReadjudicationConfigError(
+            "`oracle_thresholds.confidence` must equal the pinned pre-registered "
+            f"Clopper-Pearson confidence {_PINNED_ORACLE_CONFIDENCE!r} for a v3 tiered "
+            f"re-adjudication -- got {confidence!r}"
+        )
+
+    strata_cfg = thresholds.get("strata")
+    strata_cfg = strata_cfg if isinstance(strata_cfg, Mapping) else {}
+    for name, pinned_metrics in _PINNED_STRATUM_THRESHOLDS.items():
+        spec = strata_cfg.get(name)
+        if not isinstance(spec, Mapping):
+            raise TieredReadjudicationConfigError(
+                f"`oracle_thresholds.strata` is missing the pinned stratum {name!r} "
+                "required for a v3 tiered re-adjudication"
+            )
+        for metric_key, pinned_value in pinned_metrics.items():
+            value = spec.get(metric_key)
+            try:
+                metric_ok = not isinstance(value, bool) and math.isclose(
+                    float(value), pinned_value, rel_tol=0.0, abs_tol=1e-9
+                )
+            except (TypeError, ValueError):
+                metric_ok = False
+            if not metric_ok:
+                raise TieredReadjudicationConfigError(
+                    f"`oracle_thresholds.strata[{name!r}][{metric_key!r}]`={value!r} does "
+                    f"not match the pinned pre-registered value {pinned_value!r}"
+                )
+        pinned_gating, pinned_directions = _PINNED_STRATUM_SEMANTICS[name]
+        if spec.get("gating") is not pinned_gating:
+            raise TieredReadjudicationConfigError(
+                f"`oracle_thresholds.strata[{name!r}].gating` must equal the pinned "
+                f"{pinned_gating!r} for a v3 tiered re-adjudication -- got {spec.get('gating')!r}"
+            )
+        if tuple(spec.get("directions", []) or []) != pinned_directions:
+            raise TieredReadjudicationConfigError(
+                f"`oracle_thresholds.strata[{name!r}].directions` must equal the pinned "
+                f"{list(pinned_directions)!r} for a v3 tiered re-adjudication -- "
+                f"got {spec.get('directions')!r}"
+            )
 
 
 def _validate_evaluation_skipped(run_meta: Any, criterion_map: Mapping[str, Any]) -> list:
@@ -272,20 +344,39 @@ def _build_scope_verdict(
         out_precision_lb = precision_lb
         out_recall_lb = recall_lb
 
-    # A3_policy_parity
+    # A3_policy_parity -- one applicable criterion per scope is possible;
+    # collect ALL of them (sorted ascending by criterion id) so every
+    # blocking criterion is independently visible in `reasons` (spec
+    # §3 A3_policy_parity.reason_visibility), never just a single boolean.
     scope_key_str = _scope_key(stratum, direction)
-    blocked = any(scope_key_str in (criterion_map.get(c) or []) for c in evaluation_skipped)
-    policy_parity = "BLOCKED" if blocked else "CLEAR"
+    applicable_criteria = sorted(
+        c for c in evaluation_skipped if scope_key_str in (criterion_map.get(c) or [])
+    )
+    policy_parity = "BLOCKED" if applicable_criteria else "CLEAR"
 
     # A4_end_to_end_coverage -- CORRECT counts (never `called`) over `actual`.
     correct = tp if direction == "pathogenic" else tn
     end_to_end_correct_call_coverage = f"{correct}/{actual_count}"
 
+    # A3 policy-parity reasons are recorded INDEPENDENTLY of the A5
+    # precedence summary below (spec §3 A3_policy_parity.reason_visibility):
+    # whenever A3 == BLOCKED, one reason entry is appended PER applicable
+    # `evaluation_skipped` criterion, even when A5 resolves to a
+    # higher-precedence label such as NO_CALLS/UNDERPOWERED that "hides"
+    # BLOCKED from the A5 summary -- e.g. missense:pathogenic under PM1
+    # stays A5=NO_CALLS but STILL carries the exact pinned reason string
+    # "policy_parity=BLOCKED: PM1 evaluation_skipped applies_to
+    # missense:pathogenic". Policy-parity reasons precede the A0/A1/A2/A5
+    # narrative reason appended below.
+    reasons: list = [
+        f"policy_parity=BLOCKED: {criterion} evaluation_skipped applies_to {scope_key_str}"
+        for criterion in applicable_criteria
+    ]
+
     # A5_scope_evidence_status -- deterministic precedence (spec §3):
     # INVALID > NOT_APPLICABLE > NO_CALLS > UNDERPOWERED > BLOCKED_POLICY >
     # NOT_SUPPORTED > SUPPORTED_POSTHOC. Data-first precedence keeps a
     # no-calls/underpowered scope from being mislabeled a policy failure.
-    reasons: list = []
     if run_integrity == "INVALID":
         scope_evidence_status = "INVALID"
         reasons.append("A0_run_integrity == INVALID: whole-run integrity meta failed")
@@ -303,7 +394,6 @@ def _build_scope_verdict(
         )
     elif policy_parity == "BLOCKED":
         scope_evidence_status = "BLOCKED_POLICY"
-        reasons.append(f"blocked by evaluation_skipped criterion mapped to {scope_key_str!r}")
     elif conditional_performance == "UNMET":
         scope_evidence_status = "NOT_SUPPORTED"
         reasons.append(f"{precision_field}={out_precision_lb!r}<{precision_threshold!r} or {recall_field}={out_recall_lb!r}<{recall_threshold!r}")
@@ -341,9 +431,20 @@ def _build_scope_verdict(
     )
 
 
-def decide_tiered_gate(metrics: Mapping[str, Metrics], config: EvalConfig, run_meta: Any) -> TieredGateDecision:
+def decide_tiered_gate(
+    metrics: Mapping[str, Metrics],
+    config: EvalConfig,
+    run_meta: Any,
+    tiered_authorization: Mapping[str, Any],
+) -> TieredGateDecision:
     """v3 tiered post-hoc re-adjudication of a frozen masked-holdout
-    aggregate (spec `docs/project/specs/tiered-gate-v3-posthoc.yaml`).
+    aggregate (spec `docs/project/specs/tiered-gate-v3-posthoc.yaml`, rev 3).
+
+    Pure API: `tiered_authorization` is the SEPARATELY-loaded standalone v3
+    block (`configs/eval/tiered_gate_v3.yaml`, `load_tiered_authorization`)
+    passed explicitly as the fourth argument -- it is NEVER read off `config`
+    (`config` supplies only the Oracle thresholds/`min_count_per_class`
+    already pinned in `raptor.eval.config` for `tsc2.yaml`/v1/v2).
 
     Emits a `TieredGateDecision` with one `TieredScopeVerdict` per
     `(stratum, direction)` scope for EVERY stratum present in `metrics`
@@ -351,14 +452,16 @@ def decide_tiered_gate(metrics: Mapping[str, Metrics], config: EvalConfig, run_m
     source of which strata exist; `config.oracle_thresholds` supplies
     thresholds where registered (else `NOT_APPLICABLE`, never fabricated).
 
-    Raises `TieredReadjudicationConfigError` on any `tiered_authorization`/
-    `min_count_per_class` drift from the locked pin, or an
+    Raises `TieredReadjudicationConfigError` on any `tiered_authorization`
+    drift from the locked pin, any Oracle-constant drift (confidence /
+    missense-truncating precision, recall, gating, directions) or
+    `min_count_per_class` drift from the existing pinned v2 constants, or an
     `evaluation_skipped` criterion absent from `criterion_scope_applicability`.
     Raises `TieredReadjudicationInputError` on any malformed (non-int / bool
     / negative) per-scope count. Both are raised BEFORE any axis is
     computed -- there is no partial decision on a fail-closed error.
     """
-    tiered_auth = _validate_config(config)
+    tiered_auth = _validate_config(config, tiered_authorization)
     _validate_metrics_counts(metrics)
 
     criterion_map = tiered_auth["criterion_scope_applicability"]
