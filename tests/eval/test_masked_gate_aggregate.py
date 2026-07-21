@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from scripts.build_masked_holdout_gate_aggregate import build_aggregate, build_aggregate_v2
+import pytest
+from scripts.build_masked_holdout_gate_aggregate import build_aggregate, build_aggregate_v2, build_aggregate_for_envelope
 
 # NOTE: these two imports must stay at module level (not deferred inside a
 # test function body). `conftest` and `test_scope_gate_final_blocker` are
@@ -2959,13 +2960,6 @@ def test_v1_historical_limitations_remain_unchanged():
     assert "PM1 was excluded from this fixed evaluation after both published and reproduced resources had zero held-out-reachable rows; production PM1 remains unvalidated." in agg_skip["limitations"]
 
 
-# =========================================================================
-# G-AG1..G-AG4 DISABLED ENVELOPE AGGREGATE CONTRACT TESTS
-# =========================================================================
-
-import pytest
-
-
 def _make_g_ag_envelope(pins_overrides=None, policy_overrides=None, with_scope_gate=False) -> dict:
     _scopes = {
         "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "VALIDATED"),
@@ -3003,7 +2997,7 @@ def _make_g_ag_envelope(pins_overrides=None, policy_overrides=None, with_scope_g
         "eval_config_hash": "d" * 64,
         "lineage_policy_hash": "e" * 64,
         "packet_policy_hash": "f" * 64,
-        "runtime_bundle_hash": "0" * 64,  # valid hex character '0'
+        "runtime_bundle_hash": "0" * 64,
         "decision_reference": "ADR-0012",
     }
     if policy_overrides:
@@ -3080,7 +3074,6 @@ def test_g_ag1_v1_build_aggregate_disabled_envelope() -> None:
 
 def test_g_ag2_v2_build_aggregate_disabled_envelope() -> None:
     """G-AG2: build_aggregate_for_envelope handles disabled envelope and yields v2 schema."""
-    from scripts.build_masked_holdout_gate_aggregate import build_aggregate_for_envelope
     envelope = _make_g_ag_envelope(with_scope_gate=True)
 
     aggregate = build_aggregate_for_envelope(
@@ -3112,7 +3105,8 @@ def test_g_ag3_legacy_corrected_envelope_compatibility() -> None:
     pins = {
         "predictor_correction_counts": {"PP3": 1, "BP4": 2},
     }
-    envelope = _make_g_ag_envelope(pins_overrides=pins, policy_overrides={"schema": "bp4pp3-predictor-policy"})
+    envelope = _make_g_ag_envelope(pins_overrides=pins)
+    envelope["predictor_policy"] = {"status": "approved"}
     for pin in ("policy_mode", "pp3bp4_automation_disabled", "predictor_correction_applied", "pp3bp4_suppressed_counts", "pp3bp4_suppressed_variant_count", "pp3bp4_scored_calls"):
         del envelope["report"]["config_pins"][pin]
         
@@ -3168,7 +3162,7 @@ def test_g_ag4_malformed_disabled_envelope_missing_pins(missing_pin) -> None:
     ("pp3bp4_scored_calls", 1),
     ("pp3bp4_automation_disabled", False),
     ("predictor_correction_applied", True),
-    ("policy_mode", "active_enforced")
+    ("policy_mode", "corrected_enabled")
 ])
 def test_g_ag4_malformed_disabled_envelope_invalid_pin_values(bad_pin_value) -> None:
     """G-AG4: malformed disabled envelopes with invalid/inconsistent pin values raise ValueError."""
