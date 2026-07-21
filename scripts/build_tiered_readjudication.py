@@ -144,6 +144,12 @@ def _git_head_commit() -> str:
     BEFORE any artifact is written (spec: implementation_commit is never
     null)."""
     try:
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=all"],
+            cwd=str(_SCRIPT_PATH.parents[1]),
+            capture_output=True,
+            text=True,
+        )
         result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             cwd=str(_SCRIPT_PATH.parents[1]),
@@ -151,7 +157,12 @@ def _git_head_commit() -> str:
             text=True,
         )
     except Exception as exc:
-        raise InputError(f"failed to invoke `git rev-parse HEAD`: {exc}") from exc
+        raise InputError(f"failed to verify clean git HEAD: {exc}") from exc
+    if status_result.returncode != 0 or status_result.stdout.strip():
+        raise InputError(
+            "artifact generation requires a clean implementation worktree; "
+            f"returncode={status_result.returncode!r} status={status_result.stdout!r}"
+        )
     commit = result.stdout.strip()
     if result.returncode != 0 or not _FULL_COMMIT_SHA_RE.match(commit):
         raise InputError(
