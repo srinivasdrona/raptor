@@ -3193,3 +3193,97 @@ def test_g_ag4_malformed_disabled_envelope_mixed_shape() -> None:
             reproduced_pm1_scope={"reachable_pm1_rows": 0},
             production_policy_status="approved",
         )
+
+
+@pytest.mark.parametrize("invalid_suppressed_counts", [
+    # Missing PP3
+    {"BP4": 2},
+    # Missing BP4
+    {"PP3": 1},
+    # Extra key
+    {"PP3": 1, "BP4": 2, "extra": 3},
+    # Lowercase key pp3
+    {"pp3": 1, "BP4": 2},
+    # Lowercase key bp4
+    {"PP3": 1, "bp4": 2},
+    # Lowercase keys pp3 and bp4
+    {"pp3": 1, "bp4": 2},
+    # Negative value for PP3
+    {"PP3": -1, "BP4": 2},
+    # Negative value for BP4
+    {"PP3": 1, "BP4": -2},
+    # String value for PP3
+    {"PP3": "1", "BP4": 2},
+    # String value for BP4
+    {"PP3": 1, "BP4": "2"},
+    # Bool value True for PP3
+    {"PP3": True, "BP4": 2},
+    # Bool value False for BP4
+    {"PP3": 1, "BP4": False},
+    # Float value for PP3
+    {"PP3": 1.5, "BP4": 2},
+    # Float value for BP4
+    {"PP3": 1, "BP4": 2.5},
+    # None value for PP3
+    {"PP3": None, "BP4": 2},
+    # Wrong type (already raises ValueError)
+    "not-a-mapping"
+])
+def test_g_ag4_malformed_suppressed_counts_schema(invalid_suppressed_counts) -> None:
+    """G-AG4: build_aggregate raises ValueError for invalid/malformed suppressed counts schemas."""
+    envelope = _make_g_ag_envelope(pins_overrides={"pp3bp4_suppressed_counts": invalid_suppressed_counts})
+    with pytest.raises(ValueError):
+        build_aggregate(
+            envelope,
+            date="2026-07-13",
+            terminal_json_hash="json",
+            terminal_report_hash="text",
+            published_pm1_scope={"reachable_pm1_rows": 0},
+            reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="approved",
+        )
+
+
+@pytest.mark.parametrize("counts,variant_count", [
+    # total calls = 0 (0+0), but variant count = 1 -> inconsistent
+    ({"PP3": 0, "BP4": 0}, 1),
+    # total calls = 3 (1+2), but variant count = 0 -> inconsistent
+    ({"PP3": 1, "BP4": 2}, 0),
+    # variant count exceeds total calls: total calls = 2 (1+1), variant count = 3 -> inconsistent
+    ({"PP3": 1, "BP4": 1}, 3),
+])
+def test_g_ag4_suppressed_variant_consistency(counts, variant_count) -> None:
+    """G-AG4: build_aggregate raises ValueError for inconsistent suppressed count and variant count."""
+    envelope = _make_g_ag_envelope(pins_overrides={
+        "pp3bp4_suppressed_counts": counts,
+        "pp3bp4_suppressed_variant_count": variant_count
+    })
+    with pytest.raises(ValueError):
+        build_aggregate(
+            envelope,
+            date="2026-07-13",
+            terminal_json_hash="json",
+            terminal_report_hash="text",
+            published_pm1_scope={"reachable_pm1_rows": 0},
+            reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="approved",
+        )
+
+
+def test_g_ag4_suppressed_both_zero_is_valid() -> None:
+    """G-AG4: Both zero together is valid and builds aggregate successfully."""
+    envelope = _make_g_ag_envelope(pins_overrides={
+        "pp3bp4_suppressed_counts": {"PP3": 0, "BP4": 0},
+        "pp3bp4_suppressed_variant_count": 0
+    })
+    aggregate = build_aggregate(
+        envelope,
+        date="2026-07-13",
+        terminal_json_hash="json",
+        terminal_report_hash="text",
+        published_pm1_scope={"reachable_pm1_rows": 0},
+        reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="approved",
+    )
+    assert aggregate["policy"]["pp3bp4_suppressed_counts"] == {"PP3": 0, "BP4": 0}
+    assert aggregate["policy"]["pp3bp4_suppressed_variant_count"] == 0
