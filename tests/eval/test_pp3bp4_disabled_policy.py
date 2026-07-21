@@ -376,7 +376,7 @@ def test_g_dm4_offline_seams_composition(tmp_path):
     # Retrieve evidence to count suppression
     wrapped_source.get_evidence(canonical_id)
 
-    # 3. build_disabled_policy_pins called EXACTLY per planner signature with 5 arguments
+    # 3. build_disabled_policy_pins called EXACTLY per signature with 5 arguments
     pins = build_disabled_policy_pins(policy, wrapped_source, scorer_cfg, eval_cfg, lineage_policy)
     assert pins["policy_mode"] == "disabled_manual"
     assert pins["pp3bp4_scored_calls"] == 0
@@ -747,7 +747,7 @@ def test_g_dm13_authorization_neutrality_unit():
     from conftest import make_eval_config, Metrics
     from test_scope_gate import make_v2_auth_config, make_oracle_thresholds
 
-    # PASSING CASE (distinct Metrics objects for each stratum)
+    # PASSING CASE (distinct Metrics objects for each stratum with passing pathogenic and benign bounds)
     passing_config = make_eval_config(
         min_count_per_class=36,
         oracle_thresholds=make_oracle_thresholds(),
@@ -760,6 +760,8 @@ def test_g_dm13_authorization_neutrality_unit():
     )
     m_missense_ok.precision_lb = 0.98
     m_missense_ok.recall_lb = 0.98
+    m_missense_ok.benign_precision_lb = 0.98
+    m_missense_ok.benign_recall_lb = 0.98
 
     m_truncating_ok = Metrics(
         precision=1.0, recall=1.0, concordance=1.0,
@@ -768,10 +770,12 @@ def test_g_dm13_authorization_neutrality_unit():
     )
     m_truncating_ok.precision_lb = 0.98
     m_truncating_ok.recall_lb = 0.98
+    m_truncating_ok.benign_precision_lb = 0.98
+    m_truncating_ok.benign_recall_lb = 0.98
 
     passing_metrics = {"missense": m_missense_ok, "truncating": m_truncating_ok}
 
-    # FAILING CASE (distinct Metrics objects for each stratum)
+    # FAILING CASE (distinct Metrics objects for each stratum with failing pathogenic and benign bounds)
     failing_config = make_eval_config(
         min_count_per_class=36,
         oracle_thresholds=make_oracle_thresholds(),
@@ -784,6 +788,8 @@ def test_g_dm13_authorization_neutrality_unit():
     )
     m_missense_fail.precision_lb = 0.3
     m_missense_fail.recall_lb = 0.3
+    m_missense_fail.benign_precision_lb = 0.3
+    m_missense_fail.benign_recall_lb = 0.3
 
     m_truncating_fail = Metrics(
         precision=0.4, recall=0.4, concordance=0.4,
@@ -792,6 +798,8 @@ def test_g_dm13_authorization_neutrality_unit():
     )
     m_truncating_fail.precision_lb = 0.3
     m_truncating_fail.recall_lb = 0.3
+    m_truncating_fail.benign_precision_lb = 0.3
+    m_truncating_fail.benign_recall_lb = 0.3
 
     failing_metrics = {"missense": m_missense_fail, "truncating": m_truncating_fail}
 
