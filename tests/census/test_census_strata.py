@@ -81,7 +81,7 @@ def eval_config():
         # PP3-driven LP suppression (PP3 is not in automatable_criteria)
         ({"pm2": (3, "strong"), "pp3": (2, "moderate")}, "no_deterministic_resolution", "NC_000016.10:999:A:G"),
         # BP4-driven LB suppression (BP4 is not in automatable_criteria)
-        ({"bp1": (1, "supporting"), "bp4": (3, "strong")}, "no_deterministic_resolution", "NC_000016.10:1000:A:G"),
+        ({"bp4": (1, "supporting")}, "no_deterministic_resolution", "NC_000016.10:1000:A:G"),
     ]
 )
 def test_g_vc1_pp3_bp4_suppression(scorer_config, eval_config, criteria, expected_stratum, spdi) -> None:
