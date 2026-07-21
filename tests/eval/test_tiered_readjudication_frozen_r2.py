@@ -845,3 +845,24 @@ def test_cli_concurrent_publication_fail_closed(tmp_path, monkeypatch):
         assert path.name != ".tmp-tsc_tiered_readjudication_2026-07-21.json"
         assert path.name != ".tmp-tsc_tiered_readjudication_2026-07-21.sha256"
 
+
+def test_dirty_worktree_provenance_fails_closed(monkeypatch):
+    """Artifact generation refuses a dirty implementation worktree."""
+    import scripts.build_tiered_readjudication as cli_mod
+
+    full_sha = "ade13f206f3e2c2efe3ec92715d974645fc8da8f"
+
+    class Result:
+        def __init__(self, stdout: str, returncode: int = 0):
+            self.stdout = stdout
+            self.stderr = ""
+            self.returncode = returncode
+
+    def fake_run(args, **kwargs):
+        if args[:2] == ["git", "status"]:
+            return Result(" M src/raptor/eval/config.py\n")
+        return Result(full_sha + "\n")
+
+    monkeypatch.setattr(cli_mod.subprocess, "run", fake_run)
+    with pytest.raises(InputError):
+        cli_mod._git_head_commit()
