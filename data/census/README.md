@@ -101,7 +101,8 @@ constant (`raptor.census.cli`); a malformed/missing provenance `vcf_hash`
 unresolvable current git commit (a git-invocation failure, blank, or
 non-hex `rev-parse` result never falls back to an `unknown` sentinel).
 
-Reproduce it (byte-identical, never overwriting an existing artifact) with:
+Reproduce it (byte-identical, never overwriting an existing artifact) from an
+editable install (`python -m pip install -e .`) or with `PYTHONPATH=src` set:
 
 ```text
 python -m raptor.census.cli \

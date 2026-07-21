@@ -61,7 +61,7 @@ APPROVED_PREDICTOR_POLICY_SHA256 = "85e9e92fa9f4c221c02af30e787315a88ed2bef51f6f
 
 _VCF_HASH_LOWER_RE = re.compile(r"^[0-9a-f]{64}$")
 _VCF_HASH_UPPER_RE = re.compile(r"^[0-9A-F]{64}$")
-_CODE_COMMIT_RE = re.compile(r"^[0-9a-f]+$")
+_CODE_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 
 #: Approved predictor-policy contract (hash_contract.inputs.approved_predictor_policy).
 _PREDICTOR_POLICY_SCHEMA = "bp4pp3-predictor-policy/2"
@@ -245,14 +245,14 @@ def _validate_provenance(provenance: Mapping[str, Any]) -> None:
 
 
 def _resolve_code_commit() -> str:
-    """Resolve the current git commit (short hex SHA). Fails closed with
+    """Resolve the current git commit (full 40-hex SHA). Fails closed with
     `CodeCommitResolutionError` on a git invocation failure, blank stdout,
     or non-hex output -- never a broad catch that falls back to an
     `unknown` sentinel (provenance must always be a real, verifiable
     commit or the run must refuse to proceed)."""
     try:
         result = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
+            ["git", "rev-parse", "HEAD"],
             capture_output=True,
             text=True,
             check=True,
@@ -263,7 +263,7 @@ def _resolve_code_commit() -> str:
     commit = result.stdout.strip()
     if not commit or not _CODE_COMMIT_RE.fullmatch(commit):
         raise CodeCommitResolutionError(
-            f"git rev-parse returned a blank or non-hex commit: {commit!r}"
+            f"git rev-parse returned a non-40-hex commit: {commit!r}"
         )
     return commit
 

@@ -229,22 +229,20 @@ immutable_external_inputs:
 
 hash_contract:
   verification_rule: >-
-    The census tool verifies these path bytes (check-before-load SHA-256) and
-    the approved policy status/mode BEFORE processing; any drift fails closed.
-    Hashes below are the planner-verified CURRENT raw file SHA-256; they equal
-    the hashes recorded inside bp4pp3_predictor_policy.json, confirming the
-    on-disk configs are the approved-policy configs. Production code DERIVES
-    these hashes at runtime and never hardcodes their values. NOTE ON HASH
-    PROVENANCE: config/policy inputs here are verified as RAW PATH BYTES (the
-    approved policy pins those exact on-disk bytes), which is DISTINCT from
-    committed data-artifact identity — the historical aggregate, the certified
-    masked gate, and the emitted census record — whose identity is the canonical
-    Git/LF blob SHA-256 verified on every platform, never the Windows CRLF
-    checkout hash.
+    The census tool verifies the approved predictor policy by exact canonical
+    repository path plus canonical Git/LF SHA-256 BEFORE parsing it. The four
+    subordinate configs are then verified as raw path bytes against the hashes
+    recorded inside that approved policy. Any drift fails closed. Committed
+    data-artifact identity — the policy anchor, historical aggregate, certified
+    masked gate, and emitted census record — uses canonical Git/LF bytes on
+    every platform; only the subordinate config comparisons use raw checkout
+    bytes because those are the bytes the approved policy pins.
   inputs:
     approved_predictor_policy:
       path: configs/eval/bp4pp3_predictor_policy.json
-      sha256: ac9d361aa57686c736a527a9256ea7fd22c4292709f5e6b3482e1c3c4546c72b
+      sha256: 85e9e92fa9f4c221c02af30e787315a88ed2bef51f6f58d25c5dc267eb55a34a
+      sha256_provenance: committed_git_lf_blob
+      sha256_windows_crlf_checkout_do_not_pin: ac9d361aa57686c736a527a9256ea7fd22c4292709f5e6b3482e1c3c4546c72b
       must_assert: {schema: 'bp4pp3-predictor-policy/2', status: approved, mode: disabled_manual}
     acmg_scorer_policy:
       path: configs/acmg/tsc.yaml
@@ -572,6 +570,8 @@ cli_and_output_boundary:
       Canonical JSON bytes: UTF-8, sort_keys=True, indent=2, exactly one
       terminal LF, LF-only on every platform, written via explicit byte encode +
       binary write (never Path.write_text / text-mode LF->CRLF translation).
+      code_commit is the full fixed-width 40-hex `git rev-parse HEAD`, never a
+      repository-state-dependent abbreviated SHA.
   output_boundary:
     accept: >-
       ONLY the hard-pinned path
