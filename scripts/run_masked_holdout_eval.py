@@ -48,6 +48,13 @@ _AGGREGATION_SPEC = ROOT / "configs" / "eval" / "predictor_aggregation.yaml"
 #: `BiasEvidenceSource`/`load_lineage_policy` CONSUME the identical file;
 #: never verify one lineage path and consume another (D12, planner rev 7).
 _LINEAGE_POLICY_CONFIG = ROOT / "configs" / "eval" / "bias_lineage.yaml"
+#: The canonical packet candidate-direction policy path (mirrors
+#: `raptor.packet.config.load_candidate_direction_policy`'s default caller
+#: path) -- `main()` verifies exactly this file's bytes via
+#: `verify_disabled_config_hashes` (governance binding; D13). Packet config
+#: is NOT a CLI arg: the raptor.packet surface consumes it separately under
+#: its own approval_status gate; the runner only verifies, never consumes.
+_PACKET_POLICY_CONFIG = ROOT / "configs" / "packet" / "candidate_direction.yaml"
 #: The disabled/manual runtime code bundle (D9/`runtime_bundle_hash_spec`):
 #: the loader, the disabled evidence wrapper, and this runner itself.
 _RUNTIME_BUNDLE_FILES = (
@@ -81,16 +88,18 @@ def resolve_policy_state(
     scorer_config_path: str | Path,
     eval_config_path: str | Path,
     lineage_path: str | Path,
+    packet_path: str | Path,
     runtime_bundle_paths,
 ) -> tuple[str, str]:
-    """Pure mode/status dispatch + path-byte/hash checks (rev 6 pure seam).
+    """Pure mode/status dispatch + path-byte/hash checks (rev 6 pure seam;
+    rev 9 adds the packet governance hash).
 
     Opens NO held-out input (no manifest/benchmark/reference/mask/TSV) --
-    only the three pinned config paths and the runtime code bundle are
-    touched. Returns `(state, reason)` where `state` is one of
-    `_POLICY_STATES`; only `APPROVED_DISABLED` may proceed
-    (`build_policy_evidence_source`/`main` fail closed on every other
-    state).
+    only the four pinned config/policy paths (production/eval/lineage/
+    packet) and the runtime code bundle are touched. Returns
+    `(state, reason)` where `state` is one of `_POLICY_STATES`; only
+    `APPROVED_DISABLED` may proceed (`build_policy_evidence_source`/`main`
+    fail closed on every other state).
     """
     if policy.mode is None or policy.mode not in {"disabled_manual", "corrected_enabled"}:
         return (
@@ -122,12 +131,14 @@ def resolve_policy_state(
         )
 
     try:
-        verify_disabled_config_hashes(policy, scorer_config_path, eval_config_path, lineage_path)
+        verify_disabled_config_hashes(
+            policy, scorer_config_path, eval_config_path, lineage_path, packet_path
+        )
     except PredictorPolicyError as exc:
         return (
             "CONFIG_DRIFT",
-            f"disabled/manual approval is not bound to the actually-loaded production/eval/"
-            f"lineage configs: {exc}",
+            f"disabled/manual approval is not bound to the production/eval/lineage/"
+            f"packet configs: {exc}",
         )
 
     return (
@@ -199,6 +210,7 @@ def build_disabled_policy_pins(
         "production_config_hash": policy.production_config_hash,
         "eval_config_hash": policy.eval_config_hash,
         "lineage_policy_hash": policy.lineage_policy_hash,
+        "packet_policy_hash": policy.packet_policy_hash,
         "runtime_bundle_hash": policy.runtime_bundle_hash,
         "predictor_policy_source_hash": policy.predictor_source_hash,
         "predictor_policy_correction_hash": policy.correction_hash,
@@ -464,18 +476,20 @@ def main(argv: list[str] | None = None) -> int:
         print(_blocked(f"predictor-policy artifact missing or malformed: {exc}"))
         return 0
 
-    # `resolve_policy_state` does the mode/status dispatch + the three
-    # config path-byte hashes + `runtime_bundle_hash` WITHOUT opening any
-    # held-out input (rev 6 pure seam). Every non-`APPROVED_DISABLED` state
-    # -- malformed mode, `corrected_enabled` (out of scope this track),
-    # proposed-not-approved, or a config/runtime-bundle drift -- fails
-    # closed here, before any manifest/benchmark/reference/mask/TSV is
-    # touched.
+    # `resolve_policy_state` does the mode/status dispatch + the four
+    # config/policy path-byte hashes (production/eval/lineage/packet) +
+    # `runtime_bundle_hash` WITHOUT opening any held-out input (rev 6 pure
+    # seam; rev 9 adds the packet governance hash). Every
+    # non-`APPROVED_DISABLED` state -- malformed mode, `corrected_enabled`
+    # (out of scope this track), proposed-not-approved, or a
+    # config/runtime-bundle drift -- fails closed here, before any
+    # manifest/benchmark/reference/mask/TSV is touched.
     state, reason = resolve_policy_state(
         policy,
         args.scorer_config,
         args.eval_config,
         _LINEAGE_POLICY_CONFIG,
+        _PACKET_POLICY_CONFIG,
         _RUNTIME_BUNDLE_FILES,
     )
     if state != "APPROVED_DISABLED":

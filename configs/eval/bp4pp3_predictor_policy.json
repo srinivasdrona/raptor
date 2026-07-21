@@ -5,8 +5,9 @@
   "production_config_hash": "1ba8066accd8eda16e20518abbeaedb61247fea372675f519f02a8574ff9350e",
   "eval_config_hash": "ea4ff684bdc2ae6b079f352816b3993ac813af0e2654b851c30c1f4ef577a293",
   "lineage_policy_hash": "d2312b2c74f125204ababe9731fc4e37a8e0f30d1608b75f8457aae6591689df",
+  "packet_policy_hash": "778882c500adc43bfca8e6311d3d2038f96e32f05faff7dcda50560ee3448d67",
   "predictor_source_hash": "2c89bb17dea68fc9ed294eee2108bdd528e551eb4882b47cc4a400d683aca2ae",
   "correction_hash": "4bbdd1ddaeb45a7182126a70a5bb7eebb672f57de6e97e449b5b69584987d34f",
-  "runtime_bundle_hash": "331998352c9773ad2e587bba98ae9ebeaee58c58eee50e06e45653916d4e4804",
-  "decision_reference": "docs/DECISIONS.md#adr-0012-pp3bp4-disabled-manual-policy (migrated to schema v2 disabled_manual mode 2026-07; production_config_hash/eval_config_hash re-pinned after PP3/BP4 removal from included_criteria/automatable_criteria; lineage_policy_hash added after PP3/BP4 -> deferred/deferred in configs/eval/bias_lineage.yaml; correction_hash re-pinned to the terminal_source.py PolicyDisabledEvidenceSource addition; runtime_bundle_hash added over predictor_policy.py+terminal_source.py+run_masked_holdout_eval.py. status remains proposed -- owner approval is a separate, distinct commit per D7.)"
+  "runtime_bundle_hash": "9b785e35ed143e90ee72a5ca2dc0f4293ae44e2554703fd44ef31e8564b2be65",
+  "decision_reference": "docs/DECISIONS.md#adr-0012-pp3bp4-disabled-manual-policy (rev9 follow-up: added REQUIRED packet_policy_hash binding configs/packet/candidate_direction.yaml after its PP3/BP4 criterion_strength_points rows were removed to match the derived candidate_set; verify_disabled_config_hashes now verifies FOUR config/policy paths -- production, eval, lineage, packet -- before proceed; runtime_bundle_hash re-pinned after the resolve_policy_state/verify_disabled_config_hashes packet-path signature change in run_masked_holdout_eval.py. production_config_hash/eval_config_hash/lineage_policy_hash/predictor_source_hash/correction_hash unchanged from the prior rev7 migration. status remains proposed -- owner approval is a separate, distinct commit per D7, now verifying FIVE hashes.)"
 }

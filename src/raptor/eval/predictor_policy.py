@@ -42,8 +42,9 @@ _REQUIRED_FIELDS: tuple[str, ...] = (
 
 #: The v2 artifact's exact, closed field set (policy_schema_v2 §
 #: `closed_field_set`) -- `mode`, `production_config_hash`,
-#: `eval_config_hash`, `lineage_policy_hash` and `runtime_bundle_hash` are
-#: all REQUIRED for schema v2; an unknown/extra field is malformed.
+#: `eval_config_hash`, `lineage_policy_hash`, `packet_policy_hash` and
+#: `runtime_bundle_hash` are all REQUIRED for schema v2; an unknown/extra
+#: field is malformed.
 _REQUIRED_FIELDS_V2: tuple[str, ...] = (
     "schema",
     "status",
@@ -51,6 +52,7 @@ _REQUIRED_FIELDS_V2: tuple[str, ...] = (
     "production_config_hash",
     "eval_config_hash",
     "lineage_policy_hash",
+    "packet_policy_hash",
     "predictor_source_hash",
     "correction_hash",
     "runtime_bundle_hash",
@@ -67,6 +69,7 @@ _HASH_FIELDS_V2: tuple[str, ...] = (
     "production_config_hash",
     "eval_config_hash",
     "lineage_policy_hash",
+    "packet_policy_hash",
     "predictor_source_hash",
     "correction_hash",
     "runtime_bundle_hash",
@@ -95,10 +98,11 @@ class PredictorPolicy:
     runner) is responsible for fail-closed `BLOCKED_POLICY` wiring on
     `approved=False`.
 
-    `mode` and the four v2-only hashes (`production_config_hash`,
-    `eval_config_hash`, `lineage_policy_hash`, `runtime_bundle_hash`) are
-    `None` for a schema-v1 artifact (D2) -- `status` and `mode` are always
-    independent; enablement is NEVER inferred from `status` alone (D1).
+    `mode` and the five v2-only hashes (`production_config_hash`,
+    `eval_config_hash`, `lineage_policy_hash`, `packet_policy_hash`,
+    `runtime_bundle_hash`) are `None` for a schema-v1 artifact (D2) --
+    `status` and `mode` are always independent; enablement is NEVER
+    inferred from `status` alone (D1).
     """
 
     schema: str
@@ -111,6 +115,7 @@ class PredictorPolicy:
     production_config_hash: str | None = None
     eval_config_hash: str | None = None
     lineage_policy_hash: str | None = None
+    packet_policy_hash: str | None = None
     runtime_bundle_hash: str | None = None
 
 
@@ -191,8 +196,9 @@ def _load_v1(raw: dict[str, Any]) -> PredictorPolicy:
 
 def _load_v2(raw: dict[str, Any]) -> PredictorPolicy:
     """Load the v2 closed field set (policy_schema_v2): `mode` is REQUIRED
-    and ORTHOGONAL to `status` (D1); `lineage_policy_hash` and
-    `runtime_bundle_hash` are REQUIRED (D9/D12)."""
+    and ORTHOGONAL to `status` (D1); `lineage_policy_hash`,
+    `packet_policy_hash` and `runtime_bundle_hash` are REQUIRED
+    (D9/D12/D13)."""
     _require_non_blank_fields(raw, _REQUIRED_FIELDS_V2)
 
     mode = raw["mode"]
@@ -216,6 +222,7 @@ def _load_v2(raw: dict[str, Any]) -> PredictorPolicy:
         production_config_hash=raw["production_config_hash"],
         eval_config_hash=raw["eval_config_hash"],
         lineage_policy_hash=raw["lineage_policy_hash"],
+        packet_policy_hash=raw["packet_policy_hash"],
         runtime_bundle_hash=raw["runtime_bundle_hash"],
     )
 
@@ -294,19 +301,21 @@ def verify_disabled_config_hashes(
     scorer_config_path: str | Path,
     eval_config_path: str | Path,
     lineage_policy_path: str | Path,
+    packet_policy_path: str | Path,
 ) -> None:
-    """CHECK-BEFORE-LOAD: hash the ACTUAL given
-    `--scorer-config`/`--eval-config`/bias-lineage bytes and compare to the
-    v2 artifact's pinned `production_config_hash`/`eval_config_hash`/
-    `lineage_policy_hash` (D10/D12) -- an alternate path passes only if
-    byte-identical; a changed byte (even one that also drops PP3/BP4) fails
-    closed. Never proves the loader consumes these exact in-memory bytes
-    afterward (TOCTOU is out of scope this phase; see the planner's
-    `threat_model`/`residual_risk`)."""
+    """CHECK-BEFORE-PROCEED: hash the ACTUAL given
+    `--scorer-config`/`--eval-config`/bias-lineage/candidate-direction bytes
+    and compare to the v2 artifact's pinned `production_config_hash`/
+    `eval_config_hash`/`lineage_policy_hash`/`packet_policy_hash` (D10/D12/
+    D13) -- an alternate path passes only if byte-identical; a changed byte
+    (even one that also drops PP3/BP4) fails closed. Never proves the
+    loader consumes these exact in-memory bytes afterward (TOCTOU is out of
+    scope this phase; see the planner's `threat_model`/`residual_risk`)."""
     checks = (
         ("production_config_hash", scorer_config_path, policy.production_config_hash),
         ("eval_config_hash", eval_config_path, policy.eval_config_hash),
         ("lineage_policy_hash", lineage_policy_path, policy.lineage_policy_hash),
+        ("packet_policy_hash", packet_policy_path, policy.packet_policy_hash),
     )
     for hash_name, candidate_path, expected in checks:
         candidate = Path(candidate_path)
