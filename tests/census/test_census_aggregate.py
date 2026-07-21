@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-import json
+import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+import json
 import pytest
 
 from raptor.scorer.model import BiasRecord
@@ -79,12 +83,12 @@ def test_g_vc7_all_counts_derived(base_inputs) -> None:
     check_aggregate_implemented()
     run_pins, bound_hashes, historical_stats = base_inputs
 
-    # Setup base inputs
+    # Setup base inputs with valid identities
     row1 = _row(1, {"pm2": (1, "supporting")})
-    manifest1 = [ManifestEntry(variant_id="V1", vcf_key=row1.variant_id)]
+    manifest1 = [ManifestEntry(variant_id="NC_000016.10:1001:A:G", vcf_key=row1.variant_id)]
     stratum1 = [
         StratumEntry(
-            variant_id="V1",
+            variant_id="NC_000016.10:1001:A:G",
             stratum="no_deterministic_resolution",
             pattern_id="",
             pattern_signature=(),
@@ -102,15 +106,15 @@ def test_g_vc7_all_counts_derived(base_inputs) -> None:
         historical_stats=historical_stats,
     )
 
-    # Now change/double the inputs
+    # Now change/double the inputs with valid identities
     row2 = _row(2, {"pm2": (1, "supporting")})
     manifest2 = [
-        ManifestEntry(variant_id="V1", vcf_key=row1.variant_id),
-        ManifestEntry(variant_id="V2", vcf_key=row2.variant_id),
+        ManifestEntry(variant_id="NC_000016.10:1001:A:G", vcf_key=row1.variant_id),
+        ManifestEntry(variant_id="NC_000016.10:1002:A:G", vcf_key=row2.variant_id),
     ]
     stratum2 = [
         StratumEntry(
-            variant_id="V1",
+            variant_id="NC_000016.10:1001:A:G",
             stratum="no_deterministic_resolution",
             pattern_id="",
             pattern_signature=(),
@@ -118,7 +122,7 @@ def test_g_vc7_all_counts_derived(base_inputs) -> None:
             basis="eval_only_census_selection_metadata",
         ),
         StratumEntry(
-            variant_id="V2",
+            variant_id="NC_000016.10:1002:A:G",
             stratum="no_deterministic_resolution",
             pattern_id="",
             pattern_signature=(),
@@ -160,7 +164,7 @@ def test_g_vc8_suppression_union(base_inputs) -> None:
         _row(4, {"pm2": (1, "supporting")}),
     ]
 
-    manifest = [ManifestEntry(variant_id=f"V{i}", vcf_key=r.variant_id) for i, r in enumerate(rows, start=1)]
+    manifest = [ManifestEntry(variant_id=f"NC_000016.10:100{i}:A:G", vcf_key=r.variant_id) for i, r in enumerate(rows, start=1)]
     strata = [
         StratumEntry(
             variant_id=entry.variant_id,
@@ -195,11 +199,13 @@ def test_g_vc9_emitted_record_privacy(base_inputs) -> None:
     check_aggregate_implemented()
     run_pins, bound_hashes, historical_stats = base_inputs
 
-    row = _row(1, {"pm2": (1, "supporting")})
-    manifest = [ManifestEntry(variant_id="V_IDENTIFIER_SPDI", vcf_key=row.variant_id)]
+    distinctive_spdi = "NC_000016.10:777777:A:G"
+    distinctive_vcf_key = "chr16:777777:A:G"
+    row = _row(776777, {"pm2": (1, "supporting")})
+    manifest = [ManifestEntry(variant_id=distinctive_spdi, vcf_key=distinctive_vcf_key)]
     strata = [
         StratumEntry(
-            variant_id="V_IDENTIFIER_SPDI",
+            variant_id=distinctive_spdi,
             stratum="no_deterministic_resolution",
             pattern_id="",
             pattern_signature=(),
@@ -220,7 +226,7 @@ def test_g_vc9_emitted_record_privacy(base_inputs) -> None:
     # Recursively check the record to ensure no leak of identifiers or raw rationale
     def check_clean(val: any) -> None:
         if isinstance(val, str):
-            for forbidden in ("V_IDENTIFIER", "SPDI", "chr16:1001", "A>G", "A:G"):
+            for forbidden in (distinctive_spdi, distinctive_vcf_key, "777777", "NC_000016.10"):
                 assert forbidden not in val, f"Leaked forbidden term {forbidden!r} in string {val!r}"
         elif isinstance(val, dict):
             for k, v in val.items():
@@ -247,12 +253,12 @@ def test_g_vc10_historical_comparison_and_point_distribution(base_inputs) -> Non
     # - 1 manual stratum (points 0, stratum manual_review)
     # Total = 5 strata
     rows = [_row(i, {}) for i in range(1, 6)]
-    manifest = [ManifestEntry(variant_id=f"V{i}", vcf_key=r.variant_id) for i, r in enumerate(rows, start=1)]
+    manifest = [ManifestEntry(variant_id=f"NC_000016.10:100{i}:A:G", vcf_key=r.variant_id) for i, r in enumerate(rows, start=1)]
 
     strata = [
         # LP
         StratumEntry(
-            variant_id="V1",
+            variant_id="NC_000016.10:1001:A:G",
             stratum="candidate_LP_review",
             pattern_id="P1",
             pattern_signature=("PM2 Supporting",),
@@ -261,7 +267,7 @@ def test_g_vc10_historical_comparison_and_point_distribution(base_inputs) -> Non
         ),
         # LB
         StratumEntry(
-            variant_id="V2",
+            variant_id="NC_000016.10:1002:A:G",
             stratum="candidate_LB_review",
             pattern_id="P2",
             pattern_signature=("BP4 Strong",),
@@ -270,7 +276,7 @@ def test_g_vc10_historical_comparison_and_point_distribution(base_inputs) -> Non
         ),
         # Unresolved 0 points
         StratumEntry(
-            variant_id="V3",
+            variant_id="NC_000016.10:1003:A:G",
             stratum="no_deterministic_resolution",
             pattern_id="",
             pattern_signature=(),
@@ -279,7 +285,7 @@ def test_g_vc10_historical_comparison_and_point_distribution(base_inputs) -> Non
         ),
         # Unresolved 4 points
         StratumEntry(
-            variant_id="V4",
+            variant_id="NC_000016.10:1004:A:G",
             stratum="no_deterministic_resolution",
             pattern_id="",
             pattern_signature=(),
@@ -288,7 +294,7 @@ def test_g_vc10_historical_comparison_and_point_distribution(base_inputs) -> Non
         ),
         # Manual (0 points)
         StratumEntry(
-            variant_id="V5",
+            variant_id="NC_000016.10:1005:A:G",
             stratum="manual_review",
             pattern_id="",
             pattern_signature=(),
@@ -337,3 +343,11 @@ def test_g_vc10_historical_comparison_and_point_distribution(base_inputs) -> Non
     assert comp["annotation_manual_review"]["historical"] == 5
     assert comp["annotation_manual_review"]["disabled_manual"] == 1
     assert comp["annotation_manual_review"]["delta"] == -4
+
+    # G-VC10 asserts direction totals come from stratum, not point bands, and point sum includes manual rows
+    assert comp["candidate_LP_review"]["disabled_manual"] == sum(1 for s in strata if s.stratum == "candidate_LP_review")
+    assert comp["candidate_LB_review"]["disabled_manual"] == sum(1 for s in strata if s.stratum == "candidate_LB_review")
+    assert comp["no_deterministic_resolution"]["disabled_manual"] == sum(1 for s in strata if s.stratum == "no_deterministic_resolution")
+    assert comp["annotation_manual_review"]["disabled_manual"] == sum(1 for s in strata if s.stratum == "manual_review")
+    assert sum(dist.values()) == len(strata)
+

@@ -1,7 +1,14 @@
 from __future__ import annotations
 
-import os
+import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+import os
+import json
+import hashlib
+import subprocess
 import pytest
 
 try:
@@ -15,12 +22,27 @@ try:
     from scripts.build_tsc_calibration_batch import RunPins
     HAS_ALL = True
 except ImportError:
+    from scripts.build_tsc_calibration_batch import (
+        ManifestEntry,
+        StratumEntry,
+        load_manifest,
+        reproduce_census_strata,
+        RunPins,
+    )
+    build_census_record = None
     HAS_ALL = False
 
 
 def check_all_implemented() -> None:
-    if not HAS_ALL:
+    if not HAS_ALL or build_census_record is None:
         pytest.fail("Missing planned implementation: raptor.census modules")
+
+
+def _get_sha256(path: Path) -> str:
+    content = path.read_bytes()
+    # Normalize CRLF to LF to be checkout-insensitive
+    content_lf = content.replace(b"\r\n", b"\n")
+    return hashlib.sha256(content_lf).hexdigest()
 
 
 @pytest.mark.skipif(
@@ -37,8 +59,13 @@ def test_g_vc15_real_data_integration() -> None:
     provenance_path = Path("D:/AIProjects/raptor-data/clinvar/vus-run/clinvar_2026-07-07/tsc_vus_input.provenance.json")
 
     # Verify input existence
-    if not manifest_path.is_file() or not bias_path.is_file():
+    if not manifest_path.is_file() or not bias_path.is_file() or not provenance_path.is_file():
         pytest.fail("Real data inputs are missing or inaccessible")
+
+    # Verify provenance source/hash
+    provenance_data = json.loads(provenance_path.read_text(encoding="utf-8"))
+    assert provenance_data["vcf_hash"] == "3fff6de7ae9b2b202642e498c4c49532cf1aaf5c2734f0e8341d5ace88fa3a09"
+    assert provenance_data["source_snapshot"] == "clinvar_2026-07-07"
 
     # Load real manifest
     manifest_entries = load_manifest(manifest_path)
@@ -47,13 +74,13 @@ def test_g_vc15_real_data_integration() -> None:
     # Load configs
     from raptor.scorer.config import load_config as load_scorer_config
     from raptor.eval.config import load_config as load_eval_config
-    from scripts.build_tsc_calibration_batch import load_bias_rows
+    from raptor.scorer.bias_source import BiasTsvSource
 
     scorer_config = load_scorer_config("configs/acmg/tsc.yaml")
     eval_config = load_eval_config("configs/eval/tsc2.yaml")
 
-    # Load bias rows
-    bias_rows = load_bias_rows(bias_path)
+    # Load bias rows directly via BiasTsvSource (reused public API)
+    bias_rows = tuple(BiasTsvSource(bias_path).records())
 
     # 1. Assert row & manifest counts match oracle (6618)
     assert len(manifest_entries) == 6618
@@ -67,7 +94,21 @@ def test_g_vc15_real_data_integration() -> None:
         eval_config,
     )
 
-    # Build the record
+    # Derive current Git commit rather than stale 7e03ca4
+    repo_root = Path(__file__).resolve().parents[2]
+    try:
+        res = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=repo_root
+        )
+        current_commit = res.stdout.strip()
+    except Exception:
+        current_commit = "unknown"
+
+    # Build the record with Derived current Git commit and exact Nirvana version
     run_pins = RunPins(
         input_sha256="3fff6de7ae9b2b202642e498c4c49532cf1aaf5c2734f0e8341d5ace88fa3a09",
         output_sha256="0a55cab470d3de93f06cd87ba30957fd1674c0ae2098ec86350f5aaac1a1162e",
@@ -75,21 +116,23 @@ def test_g_vc15_real_data_integration() -> None:
         source_snapshot="clinvar_2026-07-07",
         bias_version="3.0.0",
         bias_commit="ade13f206f3e2c2efe3ec92715d974645fc8da8f",
-        nirvana_version="3.18.1",
-        code_commit="7e03ca4",
+        nirvana_version="3.18.1-0-g05f88047",
+        code_commit=current_commit,
     )
 
+    # Derive actual bound path hashes at runtime (including all 5 spec-bound surfaces)
     bound_hashes = {
-        "approved_predictor_policy": "ac9d361aa57686c736a527a9256ea7fd22c4292709f5e6b3482e1c3c4546c72b",
-        "acmg_scorer_policy": "1ba8066accd8eda16e20518abbeaedb61247fea372675f519f02a8574ff9350e",
-        "eval_config": "ea4ff684bdc2ae6b079f352816b3993ac813af0e2654b851c30c1f4ef577a293",
-        "bias_lineage_policy": "d2312b2c74f125204ababe9731fc4e37a8e0f30d1608b75f8457aae6591689df",
+        "approved_predictor_policy": _get_sha256(repo_root / "configs/eval/bp4pp3_predictor_policy.json"),
+        "acmg_scorer_policy": _get_sha256(repo_root / "configs/acmg/tsc.yaml"),
+        "eval_config": _get_sha256(repo_root / "configs/eval/tsc2.yaml"),
+        "bias_lineage_policy": _get_sha256(repo_root / "configs/eval/bias_lineage.yaml"),
+        "packet_candidate_direction": _get_sha256(repo_root / "configs/packet/candidate_direction.yaml"),
     }
 
-    import json
     with open("data/census/tsc_vus_clinvar_2026-07-07_stats.json", "r", encoding="utf-8") as h:
         historical_stats = json.load(h)
 
+    # Build the final census record from computed objects -- never read from the new final aggregate
     record = build_census_record(
         strata=strata,
         bias_rows=bias_rows,
@@ -120,7 +163,7 @@ def test_g_vc15_real_data_integration() -> None:
     # 5. Assert point distribution summing to 6618 & signed_points == 0 is exactly 149
     dist = record["point_distribution"]
     assert sum(dist.values()) == 6618
-    assert dist["0"] == 149  # 119 unresolved with 0 points + 30 manual rows carrying 0 points
+    assert dist["0"] == 149
 
     # Check other point bands
     assert dist["-8"] == 1
@@ -135,3 +178,33 @@ def test_g_vc15_real_data_integration() -> None:
     assert dist["9"] == 143
     assert dist["11"] == 1
     assert dist["12"] == 6
+
+    # 6. Assert per-gene/per-consequence breakdowns named in the spec
+    corpus = record["corpus"]
+    assert corpus["TSC1"] == 2249
+    assert corpus["TSC2"] == 4369
+    assert corpus["missense"] == 5645
+    assert corpus["other"] == 893
+    assert corpus["truncating"] == 80
+
+    # 7. Assert privacy of the record (strictly contains NO SPDI, VCF keys, or raw rationale/patient identifiers)
+    sample_manifest_spdis = [entry.variant_id for entry in manifest_entries[:20]]
+    sample_manifest_vcf_keys = [entry.vcf_key for entry in manifest_entries[:20]]
+
+    def assert_privacy_recursive(val: any) -> None:
+        if isinstance(val, str):
+            for forbidden_spdi in sample_manifest_spdis:
+                assert forbidden_spdi not in val, f"Leaked variant SPDI {forbidden_spdi!r} in record"
+            for forbidden_key in sample_manifest_vcf_keys:
+                assert forbidden_key not in val, f"Leaked variant vcf_key {forbidden_key!r} in record"
+        elif isinstance(val, dict):
+            for k, v in val.items():
+                for forbidden_key_name in ("variant_id", "vcf_key", "spdi", "hgvs", "rationale", "packet_id"):
+                    assert forbidden_key_name not in str(k).lower(), f"Leaked schema/identity key name {k!r} in record"
+                assert_privacy_recursive(v)
+        elif isinstance(val, (list, tuple, set)):
+            for item in val:
+                assert_privacy_recursive(item)
+
+    assert_privacy_recursive(record)
+
