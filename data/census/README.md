@@ -111,7 +111,8 @@ python -m raptor.census.cli \
   --scorer-config configs/acmg/tsc.yaml \
   --eval-config configs/eval/tsc2.yaml \
   --predictor-policy configs/eval/bp4pp3_predictor_policy.json \
-  --lineage-policy <bias lineage policy.json> \
+  --lineage-policy configs/eval/bias_lineage.yaml \
+  --packet-candidate-direction configs/packet/candidate_direction.yaml \
   --historical-stats data/census/tsc_vus_clinvar_2026-07-07_stats.json \
   --emit-census-record data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json
 ```

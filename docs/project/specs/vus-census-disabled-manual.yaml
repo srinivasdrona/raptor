@@ -566,8 +566,8 @@ gpt_probes:
 cli_and_output_boundary:
   cli:
     args: [--manifest, --bias-tsv, --provenance, --scorer-config, --eval-config,
-           --predictor-policy, --lineage-policy, --historical-stats,
-           --emit-census-record, --dry-run, --summary]
+           --predictor-policy, --lineage-policy, --packet-candidate-direction,
+           --historical-stats, --emit-census-record, --dry-run, --summary]
     determinism: >-
       Canonical JSON bytes: UTF-8, sort_keys=True, indent=2, exactly one
       terminal LF, LF-only on every platform, written via explicit byte encode +
