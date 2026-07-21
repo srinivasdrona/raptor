@@ -135,10 +135,11 @@ todos:
   created: '2026-07-13'
 - id: recompute-vus-census
   title: Recomputing corrected VUS census
-  description: Re-run all 6,618 VUS through the approved production-parity criterion/strength
-    policy under ADR-0012 disabled_manual mode, consuming zero automated PP3/BP4 calls; replace
-    provisional LP/LB/unresolved/manual aggregates and preserve non-clinical status.
-  status: in_progress
+  description: Completed the packet-free, non-identifying 6,618-VUS census under ADR-0012
+    disabled_manual mode. Aggregate SHA-256 45ff9f9abada7d5369c131bf7ffde28d0786eea41ff9bf7905f51da0cabd59ac;
+    157 candidate-LP review, 7 candidate-LB review, 6,424 unresolved and 30 manual;
+    PP3/BP4 scored calls zero. GPT-5.4 artifact audit CLEAN_WITH_NONBLOCKING_NOTES.
+  status: done
   depends_on:
   - enforce-production-vocab
   - reconcile-strength-policy
@@ -146,6 +147,15 @@ todos:
   - rerun-masked-gate
   - select-validate-pp3-bp4-policy
   created: '2026-07-13'
+- id: harden-calibration-code-provenance
+  title: Hardening calibration artifact code provenance
+  description: 'Non-blocking pre-existing debt from commit 75258c26: scripts/build_tsc_calibration_batch.py
+    still records git rev-parse --short HEAD and can fall back to unknown. Migrate that separate
+    calibration artifact path to a fail-closed full 40-hex commit without coupling it to the
+    completed VUS census track.'
+  status: pending
+  depends_on: []
+  created: '2026-07-21'
 - id: reconcile-strength-policy
   title: Reconciling criterion strength policy
   description: For BP4, PM2, PM4, PS1, BP3, and PM5, trace BIAS behavior, current ClinGen
@@ -376,7 +386,7 @@ todos:
   description: 'Track: CORE-CLASSIFICATION. After the production-faithful gate and VUS census,
     generate provenance-complete candidate packets and review queue with explicit unknowns,
     contradictions, policy version and non-clinical status.'
-  status: pending
+  status: in_progress
   depends_on:
   - recompute-vus-census
   - rerun-masked-gate

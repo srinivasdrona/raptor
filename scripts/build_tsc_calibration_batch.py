@@ -15,7 +15,15 @@ census selection stratum; the basis token `eval_only_census_selection_metadata`
 records that non-authoritative provenance. The packet path never imports the
 eval combiner and every packet keeps `candidate_direction=null`.
 
-Reused frozen public APIs only: `raptor.scorer.bias_source.BiasTsvSource`,
+ADR-0012 census extraction (D1): the pure census-selection core
+(`ManifestEntry`, `StratumEntry`, `STRENGTH_MAP`, `ManifestError`,
+`ConservationError`, `load_manifest`, `reproduce_census_strata`,
+`_split_consequence_terms`, `_variant_class_for`) now lives in the
+packet-free `raptor.census.strata` and is imported back here VERBATIM
+(pure move + import) so this script's behavior is unchanged byte-for-byte.
+
+Reused frozen public APIs only: `raptor.census.strata.*` (packet-free),
+`raptor.scorer.bias_source.BiasTsvSource`,
 `raptor.scorer.config.load_config`, `raptor.scorer.parse.parse_rationale`,
 `raptor.eval.config.load_config`, `raptor.eval.combine.implied_direction`,
 `raptor.eval.lineage_policy.load_lineage_policy` (via `load_packet_config`),
@@ -37,6 +45,18 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from raptor.census.strata import (
+    BASIS,
+    ConservationError,
+    ManifestEntry,
+    ManifestError,
+    STRENGTH_MAP,
+    StratumEntry,
+    _split_consequence_terms,
+    _variant_class_for,
+    load_manifest,
+    reproduce_census_strata,
+)
 from raptor.eval.combine import implied_direction
 from raptor.eval.config import EvalConfig
 from raptor.eval.config import load_config as load_eval_config
@@ -75,11 +95,11 @@ from raptor.scorer.parse import parse_rationale
 # --------------------------------------------------------------------------
 # Pinned constants (slot 2)
 # --------------------------------------------------------------------------
-
-#: The eval-only, non-authoritative basis token recorded on every reproduced
-#: `StratumEntry` (CAL-AC7). `implied_direction` is used only to reproduce the
-#: already-recorded census selection stratum -- never a production policy.
-BASIS = "eval_only_census_selection_metadata"
+#
+# `BASIS`, `STRENGTH_MAP`, `ManifestEntry`, `StratumEntry`, `ManifestError`,
+# `ConservationError`, `load_manifest`, and `reproduce_census_strata` moved
+# to `raptor.census.strata` (ADR-0012 D1) and are imported above -- this
+# script no longer defines them locally.
 
 #: Pinned batch + census-manifest limitations (CAL-AC5), fixed order.
 LIMITATIONS: tuple[str, ...] = (
@@ -91,25 +111,6 @@ LIMITATIONS: tuple[str, ...] = (
     "nthl1_misannotation",
 )
 
-#: STRENGTH-LABELING PIN: the generic BIAS fired-int -> RAPTOR strength-vocab
-#: convention (1..5), exactly `configs/acmg/tsc.yaml::strength_map`. This is
-#: the exact tuple that reproduces the census 238 LP / 1,333 LB counts and the
-#: 20 + 10 exact-strength pattern catalog (e.g. BP4 int 3 -> strong, PM2 int 1
-#: -> supporting => {BP4 Strong, PM2 Supporting} = -3). `reproduce_census_strata`
-#: asserts the injected `ScorerConfig.strength_map` matches this pin exactly --
-#: any drift is a blocker to resolve against the census oracle, never a silent
-#: re-label. `build_packet_input`/`derive_quality_flags` do not receive a
-#: `ScorerConfig` (every fired BIAS criterion must appear on the packet, not
-#: just the automatable subset the eval combiner scores), so they parse
-#: against this same pinned constant.
-STRENGTH_MAP: Mapping[str, str] = {
-    "1": "supporting",
-    "2": "moderate",
-    "3": "strong",
-    "4": "very_strong",
-    "5": "stand_alone",
-}
-
 #: Per-gene production MANE `.5` transcript identity (independent of the raw
 #: `.4` BIAS transcript -- see `transcript_version_drift`).
 _GENE_MANE_TRANSCRIPTS: Mapping[str, str] = {
@@ -117,34 +118,11 @@ _GENE_MANE_TRANSCRIPTS: Mapping[str, str] = {
     "TSC2": "NM_000548.5",
 }
 
-#: SO consequence terms that resolve to the `truncating` variant class.
-_TRUNCATING_CONSEQUENCE_TERMS = frozenset({
-    "frameshift_variant",
-    "stop_gained",
-    "stop_lost",
-    "start_lost",
-    "splice_donor_variant",
-    "splice_acceptor_variant",
-    "transcript_ablation",
-})
-
-#: SO consequence terms that resolve to the `missense` variant class.
-_MISSENSE_CONSEQUENCE_TERMS = frozenset({"missense_variant", "protein_altering_variant"})
-
-_VALID_STRATA = frozenset({
-    "candidate_LP_review",
-    "candidate_LB_review",
-    "no_deterministic_resolution",
-    "manual_review",
-})
-
 _PRIMARY_REQUIRED_REASON = "no_primary_literature_or_ps3_assay"
 _NOT_REQUIRED_REASON = "primary_not_required_by_policy"
 
 _HEX64_RE = __import__("re").compile(r"^[0-9a-f]{64}$")
 _HEX40_RE = __import__("re").compile(r"^[0-9a-f]{40}$")
-_VARIANT_ID_RE = __import__("re").compile(r"^[^:]+:[0-9]+:[ACGTN]*:[ACGTN]*$")
-_VCF_KEY_RE = __import__("re").compile(r"^[^:]+:[0-9]+:[ACGTN]+:[ACGTN]+$")
 
 
 def _is_hex64(value: object) -> bool:
@@ -164,39 +142,14 @@ def _non_blank(value: object) -> bool:
 # --------------------------------------------------------------------------
 
 
-class ConservationError(RuntimeError):
-    """The reproduced strata / manifest / BIAS rows no longer conserve the
-    pinned census source of record (CAL-AC1) -- raised before any output."""
-
-
 class OutputBoundaryError(RuntimeError):
     """`--output-dir` is missing or resolves inside the repository tree
     (CAL-AC8) -- refused before any write."""
 
 
-class ManifestError(ValueError):
-    """A `configs`/raptor-data manifest row fails strict `ManifestEntry`
-    validation, or the manifest carries a duplicate `variant_id`/`vcf_key`."""
-
-
 # --------------------------------------------------------------------------
 # 0. Exact input value objects
 # --------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class ManifestEntry:
-    """One strict manifest identity row: `variant_id` is the canonical GRCh38
-    SPDI; `vcf_key` (`chr:pos:ref:alt`) is the exact BIAS raw-row join key."""
-
-    variant_id: str
-    vcf_key: str
-
-    def __post_init__(self) -> None:
-        if not _VARIANT_ID_RE.fullmatch(self.variant_id or ""):
-            raise ManifestError(f"ManifestEntry.variant_id is not a canonical SPDI: {self.variant_id!r}")
-        if not _VCF_KEY_RE.fullmatch(self.vcf_key or ""):
-            raise ManifestError(f"ManifestEntry.vcf_key is not chr:pos:ref:alt: {self.vcf_key!r}")
 
 
 @dataclass(frozen=True)
@@ -224,136 +177,13 @@ class RunPins:
                 raise ValueError(f"RunPins.{name} must be non-blank")
 
 
-@dataclass(frozen=True)
-class StratumEntry:
-    """One reproduced census-selection stratum row (eval-only, script-scope
-    only -- never a production candidate direction)."""
-
-    variant_id: str
-    stratum: str
-    pattern_id: str
-    pattern_signature: tuple[str, ...]
-    signed_points: int
-    basis: str
-
-    def __post_init__(self) -> None:
-        if not _non_blank(self.variant_id):
-            raise ValueError("StratumEntry.variant_id must be non-blank")
-        if self.stratum not in _VALID_STRATA:
-            raise ValueError(f"StratumEntry.stratum must be one of {sorted(_VALID_STRATA)!r}")
-        object.__setattr__(self, "pattern_signature", tuple(self.pattern_signature))
-        if isinstance(self.signed_points, bool) or not isinstance(self.signed_points, int):
-            raise ValueError("StratumEntry.signed_points must be an int")
-        if self.basis != BASIS:
-            raise ValueError(f"StratumEntry.basis must be {BASIS!r}; got {self.basis!r}")
-
-
-def load_manifest(path: str | Path) -> tuple[ManifestEntry, ...]:
-    """Strictly parse the `raptor-data` manifest JSONL (one `{variant_id,
-    vcf_key, ...}` object per line); rejects a duplicate `variant_id` or
-    `vcf_key` (never silently deduplicated)."""
-    entries: list[ManifestEntry] = []
-    seen_variant_ids: set[str] = set()
-    seen_vcf_keys: set[str] = set()
-    with open(path, "r", encoding="utf-8") as handle:
-        for line_no, raw_line in enumerate(handle, start=1):
-            line = raw_line.strip()
-            if not line:
-                continue
-            raw = json.loads(line)
-            entry = ManifestEntry(variant_id=str(raw["variant_id"]), vcf_key=str(raw["vcf_key"]))
-            if entry.variant_id in seen_variant_ids:
-                raise ManifestError(f"manifest line {line_no}: duplicate variant_id {entry.variant_id!r}")
-            if entry.vcf_key in seen_vcf_keys:
-                raise ManifestError(f"manifest line {line_no}: duplicate vcf_key {entry.vcf_key!r}")
-            seen_variant_ids.add(entry.variant_id)
-            seen_vcf_keys.add(entry.vcf_key)
-            entries.append(entry)
-    return tuple(entries)
-
-
 # --------------------------------------------------------------------------
 # 1. Census-stratum reproduction (eval-only, outside the packet path)
 # --------------------------------------------------------------------------
-
-
-def reproduce_census_strata(
-    bias_rows: Sequence[BiasRecord],
-    manifest_by_vcf_key: Mapping[str, ManifestEntry],
-    scorer_config: ScorerConfig,
-    eval_config: EvalConfig,
-) -> tuple[StratumEntry, ...]:
-    """Join each BIAS row to its canonical SPDI (exact `vcf_key` join), score
-    only `eval_config.automatable_criteria` via the eval-only
-    `implied_direction` combiner, and map the implied call to the recorded
-    census stratum token. NTHL1-annotated rows are pre-routed to
-    `manual_review` and never scored (never enter LP/LB)."""
-    if dict(scorer_config.strength_map) != dict(STRENGTH_MAP):
-        raise ConservationError(
-            "scorer_config.strength_map does not match the pinned strength-labeling tuple "
-            f"required to reproduce the census pattern catalog: expected {dict(STRENGTH_MAP)!r}, "
-            f"got {dict(scorer_config.strength_map)!r}"
-        )
-
-    automatable = frozenset(str(c).strip().upper() for c in eval_config.automatable_criteria)
-
-    entries: list[StratumEntry] = []
-    for row in bias_rows:
-        manifest_entry = manifest_by_vcf_key.get(row.variant_id)
-        if manifest_entry is None:
-            raise ConservationError(
-                f"BIAS row {row.variant_id!r} has no manifest entry (vcf_key join miss)"
-            )
-        variant_id = manifest_entry.variant_id
-
-        if row.gene_name == "NTHL1":
-            entries.append(
-                StratumEntry(
-                    variant_id=variant_id,
-                    stratum="manual_review",
-                    pattern_id="",
-                    pattern_signature=(),
-                    signed_points=0,
-                    basis=BASIS,
-                )
-            )
-            continue
-
-        all_calls = parse_rationale(row.criteria, STRENGTH_MAP)
-        automatable_calls = [call for call in all_calls if call.criterion in automatable]
-        implied = implied_direction(
-            [(call.criterion, call.strength, call.direction) for call in automatable_calls],
-            eval_config,
-        )
-
-        if implied.implied == "LP":
-            stratum = "candidate_LP_review"
-        elif implied.implied == "LB":
-            stratum = "candidate_LB_review"
-        else:
-            stratum = "no_deterministic_resolution"
-
-        if stratum in ("candidate_LP_review", "candidate_LB_review"):
-            signature = tuple(sorted(
-                f"{call.criterion} {call.strength.replace('_', ' ').title()}"
-                for call in automatable_calls
-            ))
-            pattern_id = "|".join(signature)
-        else:
-            signature = ()
-            pattern_id = ""
-
-        entries.append(
-            StratumEntry(
-                variant_id=variant_id,
-                stratum=stratum,
-                pattern_id=pattern_id,
-                pattern_signature=signature,
-                signed_points=implied.points,
-                basis=BASIS,
-            )
-        )
-    return tuple(entries)
+#
+# `StratumEntry`, `load_manifest`, and `reproduce_census_strata` moved to
+# `raptor.census.strata` (ADR-0012 D1) and are imported above -- this script
+# no longer defines them locally, and reuses them verbatim.
 
 
 # --------------------------------------------------------------------------
@@ -528,13 +358,9 @@ def derive_quality_flags(
 # --------------------------------------------------------------------------
 
 
-def _split_consequence_terms(consequence: str) -> tuple[str, ...]:
-    """Split a raw BIAS `consequence` cell on `,` and strip surrounding
-    whitespace only -- every raw SO token is preserved verbatim (exact case,
-    no spelling/lowercasing/re-encoding)."""
-    return tuple(
-        stripped for term in consequence.split(",") if (stripped := term.strip())
-    )
+# `_split_consequence_terms` and `_variant_class_for` moved to
+# `raptor.census.strata` (ADR-0012 D1) and are imported above; only
+# `_primary_consequence` (packet-only, raises `PacketValidationError`) stays.
 
 
 def _primary_consequence(consequence: str) -> str:
@@ -542,15 +368,6 @@ def _primary_consequence(consequence: str) -> str:
     if not terms:
         raise PacketValidationError(f"BIAS row consequence is blank: {consequence!r}")
     return ",".join(terms)
-
-
-def _variant_class_for(consequence: str) -> str:
-    terms = set(_split_consequence_terms(consequence))
-    if terms & _TRUNCATING_CONSEQUENCE_TERMS:
-        return "truncating"
-    if terms & _MISSENSE_CONSEQUENCE_TERMS:
-        return "missense"
-    return "other"
 
 
 def _hex64_of_obj(obj: Any) -> str:
