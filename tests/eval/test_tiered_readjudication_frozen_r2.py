@@ -490,13 +490,20 @@ def test_cli_happy_path(tmp_path, monkeypatch):
     assert output_data["old_semantic_outcome"].get("vus_authorized") is False
 
     # 3. tiered_config_canonical_sha256 equals SHA-256 of loaded config's block (compact JSON, sort_keys=True)
-    if real_tiered_config_path.exists():
-        loaded_block = yaml.safe_load(real_tiered_config_path.read_text(encoding="utf-8"))
-    else:
-        loaded_block = {}
-    compact_auth = json.dumps(loaded_block, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    expected_config_sha = hashlib.sha256(compact_auth).hexdigest()
-    assert output_data.get("tiered_config_canonical_sha256") == expected_config_sha
+    from raptor.eval.config import load_tiered_authorization
+    loaded_auth = load_tiered_authorization(canonical_tiered_config)
+    compact_loaded = json.dumps(loaded_auth, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    expected_loaded_block_sha = hashlib.sha256(compact_loaded).hexdigest()
+
+    raw_mapping = yaml.safe_load(canonical_tiered_config.read_text(encoding="utf-8"))
+    compact_raw = json.dumps(raw_mapping, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    expected_raw_sha = hashlib.sha256(compact_raw).hexdigest()
+
+    # Explicitly assert it differs from hashing the raw YAML wrapper containing top-level schema
+    assert expected_loaded_block_sha != expected_raw_sha
+
+    # and record must equal the loaded-block hash.
+    assert output_data.get("tiered_config_canonical_sha256") == expected_loaded_block_sha
 
     # 4. implementation_module_sha256 equals Git-blob SHA-256 of tiered_gate.py
     tiered_gate_file = ROOT / "src" / "raptor" / "eval" / "tiered_gate.py"

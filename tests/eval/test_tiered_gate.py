@@ -474,6 +474,10 @@ def test_synthetic_typed_fail_closed_errors():
         {"min_count_per_class": 35},
         # drift in min_count_per_class (above pre-registered floor)
         {"min_count_per_class": 37},
+        # drift with extra registered 'other' threshold
+        {"oracle_thresholds": {"confidence": 0.95, "strata": {"missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]}, "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]}, "other": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]}}}},
+        # drift with extra registered 'foo' threshold
+        {"oracle_thresholds": {"confidence": 0.95, "strata": {"missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]}, "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]}, "foo": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]}}}},
     ]
 )
 def test_oracle_pin_drift_raises_config_error(override_config_kwargs):
