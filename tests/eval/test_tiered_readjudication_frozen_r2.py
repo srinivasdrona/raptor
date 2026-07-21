@@ -743,7 +743,7 @@ def test_cli_concurrent_publication_fail_closed(tmp_path, monkeypatch):
     """Test concurrent-publication fail-closed behavior:
     - canonical happy setup;
     - simulate another process atomically creating the final output after initial preflight but before publication
-      (monkeypatch Path.replace / os.replace or os.link seam);
+      (monkeypatch the planned _publish_exclusive seam);
     - main must raise typed InputError, preserve the competing file's sentinel bytes unchanged,
       create no manifest, and leave no temp files.
     - Also assert staged temp names are per-invocation unique (no shared fixed name).
@@ -807,15 +807,18 @@ def test_cli_concurrent_publication_fail_closed(tmp_path, monkeypatch):
 
     monkeypatch.setattr(Path, "write_bytes", custom_write_bytes)
 
-    # We intercept replace to simulate atomic concurrent file creation
-    orig_replace = Path.replace
+    # We intercept _publish_exclusive to simulate atomic concurrent file creation
+    if not hasattr(cli_mod, "_publish_exclusive"):
+        raise AttributeError("missing _publish_exclusive/current unsafe publication only")
 
-    def custom_replace(self, target, *args, **kwargs):
-        # Atomic simulation: Another process writes the target file right before we try to replace/link it!
-        target.write_bytes(sentinel_bytes)
-        return orig_replace(self, target, *args, **kwargs)
+    orig_publish_exclusive = cli_mod._publish_exclusive
 
-    monkeypatch.setattr(Path, "replace", custom_replace)
+    def custom_publish_exclusive(staged_path, final_path, *args, **kwargs):
+        # Wrapper creates the competing final sentinel immediately before invoking the real _publish_exclusive
+        final_path.write_bytes(sentinel_bytes)
+        return orig_publish_exclusive(staged_path, final_path, *args, **kwargs)
+
+    monkeypatch.setattr(cli_mod, "_publish_exclusive", custom_publish_exclusive)
 
     # Assert output and manifest do not exist beforehand
     assert not canonical_output.exists()
