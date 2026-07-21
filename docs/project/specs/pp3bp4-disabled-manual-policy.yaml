@@ -1,4 +1,4 @@
-# RAPTOR PP3/BP4 disabled/manual policy — Opus planner contract (rev 9).
+# RAPTOR PP3/BP4 disabled/manual policy — Opus planner contract (rev 10).
 #
 # Purpose: an implementation-ready, hash-bound plan for a FIRST-CLASS
 # disabled/manual PP3/BP4 policy mode. It permits the production-faithful
@@ -83,6 +83,36 @@
 # path (packet config is not a CLI arg). runtime_bundle_hash and the 14-file
 # scope are unchanged; packet behavior, G-DM16/17, neutral gate and no-x64
 # preserved.
+#
+# Rev 10 supersedes commit 9058786's successor planner rev (rev 9) after GPT-5.4
+# reproduced a REAL aggregate-consumer defect the disabled-mode design missed:
+# the rev-9 producer intentionally OMITS predictor_correction_counts in
+# disabled/manual mode (report_provenance_fields.removed_in_disabled_mode), but
+# scripts/build_masked_holdout_gate_aggregate.py:120 still reads
+# config_pins["predictor_correction_counts"] UNCONDITIONALLY, so the documented
+# data/census/README.md aggregate command (both the v1 build_aggregate route and
+# the v2 build_aggregate_v2 route, which wraps v1) raises
+# KeyError: predictor_correction_counts on a disabled envelope. This is a
+# planner-commanded SCOPE defect (the rev-9 8-file Sonnet scope never included the
+# aggregate builder, and the binding selector never included its test), NOT a
+# Sonnet miss. Rev 10 adds scripts/build_masked_holdout_gate_aggregate.py to
+# Sonnet scope (9th file) and tests/eval/test_masked_gate_aggregate.py to Gemini
+# scope (6th file), and defines a FAIL-CLOSED aggregate-compatibility contract
+# (aggregate_compatibility_contract): historical corrected/enabled envelopes keep
+# REQUIRING and emitting predictor_correction_counts; disabled/manual envelopes
+# are identified from explicit policy/provenance fields (policy_mode ==
+# disabled_manual + predictor_correction_applied == false), REQUIRE their complete
+# suppression pins, and emit a disabled-shaped aggregate policy block (mode,
+# automation-disabled flag, correction-applied false, suppressed counts,
+# suppressed variant count, scored calls zero) — never a semantically false zero
+# predictor_correction_counts; malformed/internally inconsistent disabled
+# envelopes are REJECTED, not defaulted. Chosen design: teach the consumer the
+# explicit disabled/manual shape (truthful + fail-closed), NOT revive a
+# backward-compatible zero-valued producer field. counts -> {sonnet: 9, gemini: 6,
+# planner: 1, total_branch: 16}; GP15 aggregate probe added; validation selector,
+# owner gate, migration/backout and Beat-4 self-audit updated consistently. NO
+# gate.py/scope_gate.py/packet source/held-out/x64 change; ALL prior rev-1..9
+# behavior preserved.
 #
 # This file is the planner PLAN. It performs NO implementation, NO tests, NO
 # runner/config/code edits, NO owner approval and NO held-out run. It names the
@@ -254,6 +284,25 @@ revision_log:
       - 'runtime_bundle_hash; the 14-file scope (candidate_direction.yaml already added in rev 8); packet behavior; G-DM16/17; neutral existing-gate authorization; no x64.'
     preserved:
       - 'ALL prior rev-1..8 behavior/decisions.'
+  - rev: 10
+    supersedes_commit: 9058786_successor_planner_rev9
+    stacked_after: 'Sonnet impl e2bac85 + Gemini test commits interleave; stacked on current head, no fixed parent.'
+    trigger: 'GPT-5.4 reproduced KeyError: predictor_correction_counts at scripts/build_masked_holdout_gate_aggregate.py:120 -- the disabled-mode producer omits predictor_correction_counts but the aggregate consumer (v1 build_aggregate + v2 build_aggregate_v2, which wraps v1) reads it unconditionally, crashing the documented data/census/README.md aggregate command on a disabled envelope.'
+    attribution:
+      planner_scope_gap:
+        - 'the rev-9 8-file Sonnet scope never included scripts/build_masked_holdout_gate_aggregate.py, and the binding selector never included tests/eval/test_masked_gate_aggregate.py, so the producer field removal (removed_in_disabled_mode: predictor_correction_counts) shipped a downstream consumer crash. This is a planner-commanded scope defect, not a Sonnet instruction violation.'
+    fix:
+      - 'add scripts/build_masked_holdout_gate_aggregate.py to Sonnet scope (9th file) and tests/eval/test_masked_gate_aggregate.py to Gemini scope (6th file).'
+      - 'define aggregate_compatibility_contract: corrected/enabled envelopes keep REQUIRING + emitting predictor_correction_counts; disabled/manual envelopes are identified from explicit policy_mode==disabled_manual + predictor_correction_applied==false, REQUIRE their complete suppression pins, and emit a disabled-shaped policy block (mode, pp3bp4_automation_disabled, predictor_correction_applied=false, pp3bp4_suppressed_counts, pp3bp4_suppressed_variant_count, pp3bp4_scored_calls=0); malformed/inconsistent disabled envelopes are REJECTED (ValueError), not defaulted.'
+      - 'design choice: teach the consumer the explicit disabled/manual shape (semantically truthful, fail-closed, resists producer/consumer drift); REJECT the backward-compatible zero-valued predictor_correction_counts option, which would masquerade suppression as correction (self-audit false-correction-count row).'
+      - 'Sonnet makes the smallest consumer change in build_aggregate (inherited by build_aggregate_v2); NO producer change needed (build_disabled_policy_pins already emits the truthful pins); Sonnet edits NO test.'
+      - 'Gemini adds RED disabled-envelope aggregate tests over BOTH the v1 and v2 routes and keeps the existing corrected-envelope tests as legacy-compatibility controls (G-AG1..G-AG4).'
+      - 'add GP15 (GPT-5.4 aggregate probe: both v1 and v2 routes on a production-shaped disabled envelope succeed and preserve disabled provenance; a legacy corrected envelope still requires + emits predictor_correction_counts; a malformed disabled envelope is rejected).'
+      - 'update branch counts {sonnet: 9, gemini: 6, planner: 1, total_branch: 16}, validation selector (+ tests/eval/test_masked_gate_aggregate.py), owner_decision_gate prerequisites, migration_and_backout and beat4_self_audit consistently.'
+    unchanged:
+      - 'src/raptor/eval/gate.py, scope_gate.py (authorization stays metric-driven); packet source code; held-out inputs; no x64; runtime_bundle_hash + the FIVE-hash owner gate; neutral existing-gate authorization; status stays proposed.'
+    preserved:
+      - 'ALL prior rev-1..9 behavior/decisions.'
 
 planner:
   model: claude-opus-4.8
@@ -608,6 +657,32 @@ decision_ledger:
       INCLUDED, and config.py validates keys are a subset of VALID_CRITERIA -
       FORBIDDEN_CRITERIA -- all satisfied with PP3/BP4 removed. PP3/BP4 stay
       represented as DEFERRED (manual context), never scored in candidate direction.
+  - id: D14
+    decision: >-
+      Add scripts/build_masked_holdout_gate_aggregate.py to Sonnet scope and
+      teach its build_aggregate (inherited by the v2 build_aggregate_v2 wrapper)
+      the explicit disabled/manual envelope shape per
+      aggregate_compatibility_contract: corrected/enabled envelopes keep
+      REQUIRING + emitting predictor_correction_counts; disabled/manual envelopes
+      (identified from policy_mode==disabled_manual + predictor_correction_applied
+      ==false) do NOT read predictor_correction_counts, REQUIRE their complete
+      suppression pins, and emit a disabled-shaped policy block preserving them;
+      malformed/inconsistent/mixed-shape disabled envelopes are REJECTED
+      (ValueError), never defaulted and never given a synthesized zero correction
+      count. NO producer change (build_disabled_policy_pins already truthful), NO
+      gate.py/scope_gate.py change.
+    rationale: >-
+      GPT-5.4 reproduced KeyError: predictor_correction_counts at
+      build_masked_holdout_gate_aggregate.py:120 on a disabled envelope; the
+      rev-9 producer intentionally omits that pin, but the consumer (on the
+      documented data/census/README.md path, both v1 and v2 routes) read it
+      unconditionally. Of the two fixes -- (A) revive a backward-compatible
+      zero-valued predictor_correction_counts, or (B) teach the consumer the
+      explicit disabled shape -- B is chosen (design_choice): a zero correction
+      count is semantically FALSE (masquerades suppression as correction) and
+      lets the consumer silently accept any envelope, hiding future
+      producer/consumer drift; B is truthful, fail-closed, and drift-resistant.
+      The change is the smallest surgical consumer edit and touches no test.
 
 rejected_alternatives:
   - option: 'Reuse status=="approved" on the v1 schema to mean "disabled".'
@@ -991,7 +1066,7 @@ report_provenance_fields:
     - 'the runner sets NO authorization value; gate.status / gate.vus_authorized / scope_gate are computed by the pre-registered gate/scope_gate from metrics exactly as today.'
     - 'these mode/zero-consumed pins make the gate result INTERPRETABLE (the reader knows PP3/BP4 carried no automated evidence), without changing it.'
   removed_in_disabled_mode:
-    - 'predictor_correction_counts (enabled-path only; no correction is applied)'
+    - 'predictor_correction_counts (enabled-path only; no correction is applied). Its ABSENCE is the disabled-envelope signal the aggregate consumer must handle fail-closed -- see aggregate_compatibility_contract; the consumer must NOT read it on a disabled envelope nor synthesize a zero-valued stand-in.'
   unchanged:
     - 'production_vocab_manual_routed_counts (now reflects only still-automatable criteria)'
     - 'gate + scope_gate fields (decide_gate/decide_scope_gate output, unaltered)'
@@ -1020,6 +1095,100 @@ authorization_semantics:
     The report records policy_mode + pp3bp4_scored_calls=0 + pp3bp4_suppressed_counts
     so a reader can interpret the (unchanged) gate result knowing PP3/BP4 were not
     automated.
+
+# ---------------------------------------------------------------------------
+# Aggregate-compatibility contract (rev 10) — the disabled/manual envelope must
+# be consumable by the committed aggregate builder WITHOUT reviving a false
+# correction count, and legacy corrected envelopes must stay byte-compatible.
+# ---------------------------------------------------------------------------
+aggregate_compatibility_contract:
+  proven_failure:
+    reproduced_by: gpt-5.4
+    error: 'KeyError: predictor_correction_counts'
+    at: 'scripts/build_masked_holdout_gate_aggregate.py:120'
+    cause: >-
+      build_aggregate (v1) unconditionally reads
+      config_pins["predictor_correction_counts"] while building report.policy;
+      the rev-9 disabled/manual producer (build_disabled_policy_pins in
+      scripts/run_masked_holdout_eval.py) intentionally OMITS that pin, so a
+      disabled envelope crashes the consumer.
+    both_routes: >-
+      the crash is on the documented data/census/README.md post-run path for
+      BOTH aggregate routes: the v1 build_aggregate route AND the v2
+      build_aggregate_v2 route (build_aggregate_v2 wraps build_aggregate, so it
+      inherits the same read at line 120 before it can produce the v2 schema).
+  producer_contract:
+    file: scripts/run_masked_holdout_eval.py
+    disabled_envelope_emits: >-
+      report.config_pins carries policy_mode=disabled_manual,
+      pp3bp4_automation_disabled=true, predictor_correction_applied=false,
+      pp3bp4_suppressed_counts, pp3bp4_suppressed_variant_count,
+      pp3bp4_scored_calls=0 (asserted invariant) -- and DOES NOT carry
+      predictor_correction_counts.
+    corrected_envelope_emits: >-
+      the historical enabled/corrected path carries predictor_correction_counts
+      (and no disabled markers); UNCHANGED by this revision.
+    no_producer_change_needed: >-
+      build_disabled_policy_pins already emits exactly the truthful disabled
+      pins the consumer needs; the surgical fix is on the CONSUMER. Do NOT add a
+      zero-valued predictor_correction_counts to the producer.
+  consumer_contract:
+    file: scripts/build_masked_holdout_gate_aggregate.py
+    identification: >-
+      A disabled/manual envelope is identified from EXPLICIT provenance:
+      config_pins["policy_mode"] == "disabled_manual" AND
+      config_pins["predictor_correction_applied"] is False. A corrected/enabled
+      envelope is the historical shape (predictor_correction_counts present, no
+      disabled markers). Identification is fail-closed: an envelope that mixes
+      the two shapes (e.g. both predictor_correction_counts AND disabled markers,
+      or policy_mode==disabled_manual with predictor_correction_applied truthy)
+      is REJECTED.
+    corrected_path: >-
+      keep REQUIRING config_pins["predictor_correction_counts"] and emit it in
+      report.policy exactly as today (byte-identical for legacy envelopes).
+    disabled_path: >-
+      do NOT read predictor_correction_counts; REQUIRE the complete suppression
+      pins (policy_mode, pp3bp4_automation_disabled, predictor_correction_applied,
+      pp3bp4_suppressed_counts, pp3bp4_suppressed_variant_count,
+      pp3bp4_scored_calls) and emit a disabled-shaped report.policy block that
+      preserves them; NEVER synthesize a zero-valued predictor_correction_counts.
+    fail_closed: >-
+      a disabled envelope missing ANY required suppression pin, or with
+      pp3bp4_scored_calls != 0, or internally inconsistent, raises ValueError
+      (never a silent default); the change applies in build_aggregate so both v1
+      and the v2 build_aggregate_v2 wrapper inherit it.
+  preserved_disabled_provenance:
+    required_in_final_aggregate:
+      - 'policy_mode (disabled_manual)'
+      - 'pp3bp4_automation_disabled (true)'
+      - 'predictor_correction_applied (false)'
+      - 'pp3bp4_suppressed_counts'
+      - 'pp3bp4_suppressed_variant_count'
+      - 'pp3bp4_scored_calls (0)'
+    why: >-
+      the metric-driven gate/scope_gate result is UNCHANGED by disabled mode;
+      the aggregate must carry enough disabled/manual provenance for a reader to
+      interpret that unchanged gate knowing PP3/BP4 carried zero automated
+      evidence. Authorization stays metric-driven (gate.py/scope_gate.py
+      untouched).
+  design_choice:
+    evaluated:
+      - option: 'A -- retain a backward-compatible zero-valued predictor_correction_counts producer field for disabled envelopes.'
+        rejected_because: >-
+          semantically FALSE -- a zero correction count asserts "a correction
+          ran and corrected nothing", masquerading suppression as correction
+          (predictor_correction_applied would be false yet the count would
+          imply a correction path). It also lets the consumer accept any envelope
+          without checking the disabled markers, HIDING future producer/consumer
+          drift. This is the self-audit false-correction-count failure mode.
+      - option: 'B -- teach the aggregate consumer the explicit disabled/manual envelope shape (CHOSEN).'
+        chosen_because: >-
+          semantically truthful (no fake correction), fail-closed (rejects
+          malformed/inconsistent disabled envelopes), and least likely to hide a
+          future producer/consumer drift (the consumer must positively recognize
+          the disabled markers). Not chosen for fewer files -- it is chosen for
+          truthfulness and drift-resistance.
+    decision: B
 
 # ---------------------------------------------------------------------------
 # Implementation scope (Sonnet 5) — exact files, nothing else.
@@ -1097,6 +1266,26 @@ implementation_scope:
         PP3/BP4; candidate-direction scoring must not use disabled criteria). Keep
         approval_status=unapproved and all non-PP3/BP4 rows. NO src/raptor/packet/*
         code change.
+    - path: scripts/build_masked_holdout_gate_aggregate.py
+      change: >-
+        Teach build_aggregate (v1; inherited by the v2 build_aggregate_v2
+        wrapper) the explicit disabled/manual envelope shape per
+        aggregate_compatibility_contract. Branch on the envelope identity:
+        corrected/enabled (predictor_correction_counts present, no disabled
+        markers) keeps REQUIRING + emitting predictor_correction_counts exactly
+        as today (byte-identical for legacy envelopes); disabled/manual
+        (config_pins["policy_mode"] == "disabled_manual" AND
+        predictor_correction_applied is False) does NOT read
+        predictor_correction_counts, REQUIRES the complete suppression pins
+        (policy_mode, pp3bp4_automation_disabled, predictor_correction_applied,
+        pp3bp4_suppressed_counts, pp3bp4_suppressed_variant_count,
+        pp3bp4_scored_calls) and emits a disabled-shaped report.policy block
+        preserving them (never a synthesized zero predictor_correction_counts).
+        Fail closed with ValueError on a disabled envelope missing any required
+        pin, on pp3bp4_scored_calls != 0, or on a mixed/internally inconsistent
+        shape -- NO silent default. Smallest change that makes both the v1 and v2
+        aggregate routes consumable; touch NOTHING else in this file. NO
+        gate.py/scope_gate.py change; authorization stays metric-driven.
   explicitly_out_of_scope:
     - 'src/raptor/eval/gate.py and src/raptor/eval/scope_gate.py (ADR-0011 gate/scope authorization logic; MUST NOT change -- authorization stays metric-driven)'
     - 'src/raptor/packet/* and scripts/build_tsc_calibration_batch.py (NO code change; resolve_packet_policy_disposition already derives DEFERRED from lineage, direction.py scores only INCLUDED, config.py key-subset validation still passes)'
@@ -1107,31 +1296,33 @@ implementation_scope:
     - 'any protected test file (Gemini-owned)'
     - 'setting status=approved / writing an ADR acceptance (owner-only)'
   branch_scope:
-    total_files_on_branch: 14
+    total_files_on_branch: 16
     per_agent_commits:
       - agent: opus_planner
         model: claude-opus-4.8
         commit_scope: [docs/project/specs/pp3bp4-disabled-manual-policy.yaml]
-        note: 'this planner spec only (revs 1..8; rev 8 = this commit); Sonnet/Gemini commits interleave on the shared branch'
+        note: 'this planner spec only (revs 1..10; rev 10 = this commit); Sonnet/Gemini commits interleave on the shared branch'
       - agent: gemini
         commit_scope:
           - tests/eval/test_pp3bp4_disabled_policy.py
           - tests/eval/test_predictor_aggregation_wrapper.py
+          - tests/eval/test_masked_gate_aggregate.py
           - tests/packet/test_candidate_direction_policy.py
           - tests/packet/test_packet_core.py
           - tests/packet/test_tsc_calibration_batch.py
-        note: 'FIVE test files: CREATE test_pp3bp4_disabled_policy.py; UPDATE test_aca6_scope_invariance (allowed->deferred); UPDATE the three packet tests (candidate_set keys, INCLUDED/DEFERRED buckets, calibration strata/universe/batch) intentionally changed by disabled policy. Update ONLY assertions/fixtures the policy changes; do NOT weaken unrelated invariants. No src/config.'
+        note: 'SIX test files: CREATE test_pp3bp4_disabled_policy.py; UPDATE test_aca6_scope_invariance (allowed->deferred); UPDATE test_masked_gate_aggregate.py to ADD RED disabled-envelope aggregate tests over BOTH v1 and v2 routes (G-AG1..G-AG4) while keeping the existing corrected-envelope tests as legacy-compat controls; UPDATE the three packet tests (candidate_set keys, INCLUDED/DEFERRED buckets, calibration strata/universe/batch) intentionally changed by disabled policy. Update ONLY assertions/fixtures the policy changes; do NOT weaken unrelated invariants. No src/config.'
       - agent: sonnet_5
         commit_scope:
           - src/raptor/eval/predictor_policy.py
           - src/raptor/eval/terminal_source.py
           - scripts/run_masked_holdout_eval.py
+          - scripts/build_masked_holdout_gate_aggregate.py
           - configs/acmg/tsc.yaml
           - configs/eval/tsc2.yaml
           - configs/eval/bias_lineage.yaml
           - configs/eval/bp4pp3_predictor_policy.json
           - configs/packet/candidate_direction.yaml
-        note: 'exactly EIGHT files in ONE commit; NO gate.py/scope_gate.py, NO lineage-registry/policy/audit CODE change, NO src/raptor/packet/* code change; edits NO test; artifact stays status=proposed'
+        note: 'exactly NINE files in ONE commit; build_masked_holdout_gate_aggregate.py gains the disabled/manual envelope branch (aggregate_compatibility_contract); NO gate.py/scope_gate.py, NO lineage-registry/policy/audit CODE change, NO src/raptor/packet/* code change; edits NO test; artifact stays status=proposed'
     excluded_from_branch:
       - src/raptor/eval/gate.py
       - src/raptor/eval/scope_gate.py
@@ -1162,7 +1353,10 @@ test_matrix:
     - path: tests/packet/test_tsc_calibration_batch.py
       action: update_assertions
       note: 'RECOMPUTE expected strata/universe/batch counts from the UNCHANGED synthetic rows under the new policy: rows whose direction depended on PP3/BP4 (now DEFERRED) move to no_deterministic_resolution/annotation_manual_review. Never hardcode a guess; keep conservation/redaction invariants.'
-  authorship_rule: 'Gemini owns test authorship across FIVE files: CREATE tests/eval/test_pp3bp4_disabled_policy.py; UPDATE tests/eval/test_predictor_aggregation_wrapper.py and the three tests/packet/ suites, changing ONLY the assertions/fixtures the disabled policy actually changes (dispositions, candidate_set, INCLUDED/DEFERRED, calibration counts). Do NOT weaken unrelated invariants. Sonnet must not edit any test; Gemini touches no src/config.'
+    - path: tests/eval/test_masked_gate_aggregate.py
+      action: update_assertions
+      note: 'ADD RED disabled-envelope aggregate tests (G-AG1..G-AG4) exercising BOTH the v1 build_aggregate route and the v2 build_aggregate_v2 route with a production-shaped disabled envelope (config_pins carry policy_mode=disabled_manual, pp3bp4_automation_disabled=true, predictor_correction_applied=false, pp3bp4_suppressed_counts, pp3bp4_suppressed_variant_count, pp3bp4_scored_calls=0, NO predictor_correction_counts). Keep the EXISTING corrected-envelope tests (which supply predictor_correction_counts) as legacy-compatibility controls. Update ONLY assertions/fixtures the contract changes; do NOT weaken the existing v2 scope-integrity invariants.'
+  authorship_rule: 'Gemini owns test authorship across SIX files: CREATE tests/eval/test_pp3bp4_disabled_policy.py; UPDATE tests/eval/test_predictor_aggregation_wrapper.py, tests/eval/test_masked_gate_aggregate.py, and the three tests/packet/ suites, changing ONLY the assertions/fixtures the disabled policy actually changes (dispositions, candidate_set, INCLUDED/DEFERRED, calibration counts, disabled-envelope aggregate compatibility). Do NOT weaken unrelated invariants. Sonnet must not edit any test; Gemini touches no src/config.'
   red_tests:
     - id: G-DM1
       target: predictor_policy.py
@@ -1298,6 +1492,40 @@ test_matrix:
         strata list, candidate universe and batch counts are RECOMPUTED from
         those fixtures (never hardcoded), and conservation/redaction/provenance
         invariants still hold.
+    - id: G-AG1
+      target: 'build_masked_holdout_gate_aggregate.build_aggregate (v1 route, disabled envelope)'
+      asserts: >-
+        a production-shaped disabled envelope (config_pins carry
+        policy_mode=disabled_manual, pp3bp4_automation_disabled=true,
+        predictor_correction_applied=false, pp3bp4_suppressed_counts,
+        pp3bp4_suppressed_variant_count, pp3bp4_scored_calls=0, and NO
+        predictor_correction_counts) builds a v1 aggregate WITHOUT KeyError; the
+        resulting report.policy preserves the disabled provenance (mode,
+        automation-disabled, correction-applied false, suppressed counts,
+        suppressed variant count, scored calls zero) and carries NO synthesized
+        predictor_correction_counts.
+    - id: G-AG2
+      target: 'build_masked_holdout_gate_aggregate.build_aggregate_for_envelope / build_aggregate_v2 (v2 route, disabled envelope)'
+      asserts: >-
+        the same disabled envelope, routed with report.scope_gate present so
+        build_aggregate_v2 (which wraps build_aggregate) runs, builds a
+        raptor.tsc.masked_holdout_gate.v2 aggregate WITHOUT KeyError and
+        preserves the disabled provenance in the inherited v1 policy block; the
+        v2 scope-integrity invariants are unaffected.
+    - id: G-AG3
+      target: 'build_aggregate (legacy corrected envelope, compatibility control)'
+      asserts: >-
+        an unchanged historical corrected/enabled envelope (predictor_correction_counts
+        present, no disabled markers) still REQUIRES and emits
+        predictor_correction_counts byte-identically -- the disabled branch does
+        not regress the legacy path.
+    - id: G-AG4
+      target: 'build_aggregate (malformed/inconsistent disabled envelope, fail-closed)'
+      asserts: >-
+        a disabled envelope missing a required suppression pin, OR with
+        pp3bp4_scored_calls != 0, OR a mixed shape (both predictor_correction_counts
+        AND disabled markers), raises ValueError -- never a silent default and
+        never a fabricated zero correction count.
   protected_tests_expectations:
     - 'tests/eval/test_predictor_policy_gate.py v1 loader/hash/BLOCKED cases stay GREEN.'
     - 'tests/eval/test_terminal_runner_controls.py stays GREEN.'
@@ -1306,11 +1534,12 @@ test_matrix:
     - 'tests/eval/test_bias_lineage_registry.py and test_bias_lineage_audit.py stay GREEN with PP3/BP4 deferred; only bias_lineage.yaml DATA changed, no lineage code -- Gemini does not edit these two.'
     - 'tests/eval/test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance is INTENTIONALLY UPDATED by Gemini (production_disposition allowed -> deferred + decision_dependency). Its old assertion encoded the PRE-decision `allowed` disposition; the approved disabled/manual contract flips it to deferred, so matching the assertion to the contract is REQUIRED, not a weakening -- it still asserts an exact disposition. Sonnet does NOT touch it.'
     - 'tests/packet/test_candidate_direction_policy.py, test_packet_core.py, test_tsc_calibration_batch.py are INTENTIONALLY UPDATED by Gemini (candidate_set keys, INCLUDED/DEFERRED buckets, calibration counts) to match D13; ONLY the policy-changed assertions/fixtures change -- redaction/provenance/conservation invariants are preserved. Sonnet does NOT touch them.'
+    - 'tests/eval/test_masked_gate_aggregate.py is INTENTIONALLY UPDATED by Gemini to ADD disabled-envelope aggregate tests (G-AG1..G-AG4) over the v1 and v2 routes; the existing corrected-envelope tests stay as legacy-compat controls and the existing v2 scope-integrity invariants are preserved. Sonnet does NOT touch it.'
   removed_from_required_tests:
     - 'the invalid subprocess PROCEED fixture is REMOVED: no _create_mock_holdout_package, no mini OTOF / empty-reference genome, no fake manifest/benchmark/mask/return-manifest, no dummy runtime-bundle hash. A real masked-holdout PROCEED cannot be faked, so it is NOT a required test.'
     - 'the existing protected blocked-policy subprocess tests remain valid and unchanged (test_predictor_policy_gate.py::test_acg8_terminal_runner_blocked_policy: missing/malformed/unapproved policy => BLOCKED_POLICY) -- they return before opening any held-out input.'
   integration_boundary:
-    before_owner_approval: 'ONLY the offline unit seams (G-DM4..G-DM14) are tested; NO real 2,577-row PROCEED is run in CI.'
+    before_owner_approval: 'ONLY the offline unit seams (G-DM4..G-DM14) and the offline aggregate tests (G-AG1..G-AG4) are tested; NO real 2,577-row PROCEED is run in CI.'
     after_owner_approval: 'the actual 2,577-row masked rerun is the FORMAL PROCEED after the ADR + status flip -- the real manifest/benchmark/reference/mask/return-manifest contracts are satisfied then, never faked.'
     gpt_review: 'GPT-5.4 reviews main()''s composition of the seams + build_disabled_policy_pins output BEFORE the owner gate (P13), in place of a fake end-to-end proceed.'
 
@@ -1334,15 +1563,16 @@ gpt_probes:
     - 'P12: bias_lineage.yaml PP3/BP4 are deferred/deferred with decision_dependency bp4pp3-predictor-policy + non-empty decision_rationale; assert_registry_consistency passes (no omitted_without_disposition); lineage_policy_hash is bound + check-before-load; NO lineage-registry/policy/audit code changed; audit_lineage adds no new block because PP3/BP4 are not automatable (would_be_scored False).'
     - 'P13: review main() composition of the three seams -- resolve_policy_state gates BEFORE any held-out input is opened; build_policy_evidence_source only wraps PolicyDisabledEvidenceSource for APPROVED_DISABLED (never PredictorCorrectedEvidenceSource); build_disabled_policy_pins is pure (no report/gate mutation); main does not override decide_gate/decide_scope_gate output. This human/GPT review replaces the removed fake end-to-end PROCEED test and is done BEFORE the owner gate.'
     - 'P14: packet propagation -- candidate_direction.yaml criterion_strength_points keys == derived candidate_set (no PP3/BP4); packet_policy_hash binds those exact bytes (governance) so packet drift => CONFIG_DRIFT; the lineage INCLUDED bucket drops PP3/BP4 and DEFERRED gains them; resolve_packet_policy_disposition + direction.py + packet/config.py are UNCHANGED (NO packet source-code change); calibration strata/universe/batch counts are recomputed from unchanged fixtures; redaction/provenance/conservation intact.'
+    - 'P15: aggregate compatibility -- run BOTH aggregate routes (v1 build_aggregate and v2 build_aggregate_for_envelope/build_aggregate_v2) on a production-shaped disabled envelope (policy_mode=disabled_manual, predictor_correction_applied=false, suppression pins present, NO predictor_correction_counts): both succeed WITHOUT KeyError and the final aggregate preserves the disabled provenance (mode, automation-disabled, correction-applied false, suppressed counts, suppressed variant count, scored calls zero) with no synthesized zero predictor_correction_counts. Confirm a legacy corrected envelope still REQUIRES + emits predictor_correction_counts byte-identically, and a malformed/inconsistent disabled envelope (missing pin / scored_calls != 0 / mixed shape) is REJECTED (ValueError), not defaulted. gate.py/scope_gate.py unchanged; authorization stays metric-driven.'
 
 # ---------------------------------------------------------------------------
 # Owner decision gate — no self-approval.
 # ---------------------------------------------------------------------------
 owner_decision_gate:
   sequence:
-    - '1. Gemini authors the RED test matrix in ONE Gemini commit: creates tests/eval/test_pp3bp4_disabled_policy.py AND updates tests/eval/test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance disposition assertions (allowed -> deferred + decision_dependency). Both are RED until Sonnet implements.'
+    - '1. Gemini authors the RED test matrix in ONE Gemini commit: creates tests/eval/test_pp3bp4_disabled_policy.py, updates tests/eval/test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance disposition assertions (allowed -> deferred + decision_dependency), adds the disabled-envelope aggregate tests (G-AG1..G-AG4) to tests/eval/test_masked_gate_aggregate.py, and updates the three tests/packet/ suites. All new/updated assertions are RED until Sonnet implements.'
     - '2. Sonnet implements implementation_scope in one commit; artifact stays status=proposed, mode=disabled_manual with post-removal config hashes and re-pinned correction_hash; all tests green (sentinel green after re-pin).'
-    - '3. GPT-5.4 runs gpt_probes, including reviewing main()''s composition of the three seams and the build_disabled_policy_pins output (P11/P13) -- this replaces a fake end-to-end PROCEED.'
+    - '3. GPT-5.4 runs gpt_probes, including reviewing main()''s composition of the three seams and the build_disabled_policy_pins output (P11/P13) and exercising both aggregate routes on a disabled envelope plus the legacy/malformed controls (P15) -- this replaces a fake end-to-end PROCEED.'
     - '4. Owner (operator/domain owner, @dronasrinivas) records ADR-0012 in docs/DECISIONS.md (MADR, Accepted). The ADR states that disabled/manual permits EVALUATION (use of the disabled/manual evidence mode) and does NOT grant automatic VUS/scope authorization -- the pre-registered gate/scope_gate outcome remains authoritative -- and records the unmet activation evidence (exact_revel_compatibility unresolved, permitted_use pending, training_overlap UNKNOWN, transportability BLOCKED_DATA_UNDERPOWERED).'
     - '5. Owner, in a SEPARATE status-only commit, flips configs/eval/bp4pp3_predictor_policy.json status proposed->approved after independently verifying FIVE hashes -- production_config_hash/eval_config_hash/lineage_policy_hash/packet_policy_hash (vs the actual/canonical configs) and runtime_bundle_hash (vs the runtime code bundle). No other field changes.'
     - '6. Only AFTER the status flip is the actual 2,577-row masked rerun run as the FORMAL PROCEED (real manifest/benchmark/reference/mask/return-manifest contracts satisfied); it is NOT run in CI before approval (integration_boundary).'
@@ -1385,13 +1615,13 @@ reuse_vs_x64_conclusion:
 # ---------------------------------------------------------------------------
 migration_and_backout:
   migration:
-    - 'one atomic Sonnet commit edits both criteria configs + bias_lineage.yaml + policy artifact + loader + wrapper + runner + configs/packet/candidate_direction.yaml so parity, lineage-registry consistency AND packet candidate_set==keys never break mid-flight.'
+    - 'one atomic Sonnet commit edits both criteria configs + bias_lineage.yaml + policy artifact + loader + wrapper + runner + configs/packet/candidate_direction.yaml + scripts/build_masked_holdout_gate_aggregate.py so parity, lineage-registry consistency, packet candidate_set==keys AND aggregate consumability never break mid-flight.'
     - 'removing PP3/BP4 from included_criteria/automatable_criteria and flipping their bias_lineage disposition to deferred MUST be in the SAME commit -- an intermediate state (removed but still `allowed`) would trip assert_registry_consistency (omitted_without_disposition).'
     - 'the Gemini commit updates test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance to expect deferred (RED until the Sonnet config change lands, then GREEN); Sonnet does not touch that test.'
     - 'the terminal_source.py edit trips the sentinel; the co-located correction_hash re-pin restores it.'
     - 'artifact remains status=proposed (BLOCKED) until the separate owner approval; the doer enables nothing.'
   backout:
-    - 'revert the Sonnet commit: PP3/BP4 return to included_criteria + automatable_criteria, their bias_lineage disposition returns to allowed/allowed, AND the configs/packet/candidate_direction.yaml PP3/BP4 criterion_strength_points rows return; the v2 artifact (incl. packet_policy_hash) returns to v1/pending; the runner + packet candidate-direction return to prior behavior.'
+    - 'revert the Sonnet commit: PP3/BP4 return to included_criteria + automatable_criteria, their bias_lineage disposition returns to allowed/allowed, AND the configs/packet/candidate_direction.yaml PP3/BP4 criterion_strength_points rows return; the v2 artifact (incl. packet_policy_hash) returns to v1/pending; the runner + packet candidate-direction + the aggregate consumer''s disabled/manual branch return to prior behavior.'
     - 'a partial/one-sided revert fails closed at load (parity + lineage-registry + packet candidate_set==keys invariants) -- no drifted half-state can ship.'
   future_reactivation_gate:
     - 'corrected_enabled/REVEL requires a NEW owner ADR + new hash-bound artifact + the recommendation section-8 activation checklist + a fresh masked rerun.'
@@ -1425,7 +1655,8 @@ residual_risk:
 validation_scope:
   binding:
     - 'the targeted PP3/BP4 policy + terminal-runner + config + lineage tests (the Gemini G-DM matrix and the affected protected tests in tests/eval/) must pass; this is the smallest set that covers the changed behavior.'
-    - 'run via `python -m pytest` (NOT bare `pytest`) so the checkout src/ is importable. Example selector: python -m pytest tests/eval/test_pp3bp4_disabled_policy.py tests/eval/test_predictor_policy_gate.py tests/eval/test_terminal_runner_controls.py tests/eval/test_bias_lineage_registry.py tests/eval/test_bias_lineage_audit.py tests/eval/test_predictor_aggregation_wrapper.py tests/packet/test_candidate_direction_policy.py tests/packet/test_packet_core.py tests/packet/test_tsc_calibration_batch.py'
+    - 'run via `python -m pytest` (NOT bare `pytest`) so the checkout src/ is importable. Example selector: python -m pytest tests/eval/test_pp3bp4_disabled_policy.py tests/eval/test_predictor_policy_gate.py tests/eval/test_terminal_runner_controls.py tests/eval/test_bias_lineage_registry.py tests/eval/test_bias_lineage_audit.py tests/eval/test_predictor_aggregation_wrapper.py tests/eval/test_masked_gate_aggregate.py tests/packet/test_candidate_direction_policy.py tests/packet/test_packet_core.py tests/packet/test_tsc_calibration_batch.py'
+    - 'tests/eval/test_masked_gate_aggregate.py is in the binding set: the disabled-envelope aggregate tests (G-AG1..G-AG4) cover the reproduced KeyError fix over both the v1 and v2 routes, and the existing corrected-envelope tests remain as legacy-compatibility controls; NO gate.py/scope_gate.py change.'
     - 'the three tests/packet/ suites are in the binding set: candidate_set / INCLUDED-DEFERRED / calibration expectations are updated to D13 (PP3/BP4 removed from candidate_strength_points, deferred in lineage); contract-driven propagation, not a weakening, and NO packet source code changes.'
     - 'test_predictor_aggregation_wrapper.py::test_aca6_scope_invariance is in this binding set AND the protected-test audit: its PP3/BP4 production_disposition expectation is updated allowed -> deferred to MATCH the approved planner contract (D4/D12 flip the config to deferred). Required by the contract, NOT a weakening -- it still asserts an exact disposition + decision_dependency.'
     - 'the PROCEED path is covered by the OFFLINE seam composition (G-DM4) via `python -m pytest`; NO masked-holdout subprocess is invoked by the binding tests, and the real 2,577-row PROCEED is NOT run before owner approval (integration_boundary).'
@@ -1465,10 +1696,15 @@ beat4_self_audit:
       control: 'pure seams (resolve_policy_state/build_policy_evidence_source/build_disabled_policy_pins) unit-tested OFFLINE (G-DM4..G-DM14); the fake subprocess fixture is removed (removed_from_required_tests); the real 2,577-row PROCEED is the post-approval formal rerun; GPT reviews main composition (P13).'
     - failure: 'Removing PP3/BP4 from eval/lineage but NOT from configs/packet/candidate_direction.yaml -> derived candidate_set != criterion_strength_points keys (test_candidate_direction_policy.py AC-D2 fails), or a packet path scores a disabled criterion.'
       control: 'D13 drops the PP3/BP4 packet rows in the SAME Sonnet commit; resolve_packet_policy_disposition derives DEFERRED so direction.py never scores them; packet_policy_hash binds candidate_direction.yaml so later packet drift => CONFIG_DRIFT => BLOCKED under a stale approval; G-DM16/G-DM17 + P14; NO packet source-code change.'
+    - failure: 'The disabled-mode producer omits predictor_correction_counts but the aggregate consumer reads it unconditionally -> the documented v1/v2 aggregate command crashes with KeyError on a disabled envelope.'
+      control: 'D14 adds scripts/build_masked_holdout_gate_aggregate.py to Sonnet scope and teaches build_aggregate (inherited by build_aggregate_v2) the explicit disabled/manual shape (aggregate_compatibility_contract); both routes consume a disabled envelope and preserve its provenance; G-AG1/G-AG2 + P15.'
+    - failure: 'The aggregate fix revives a zero-valued predictor_correction_counts (producer or consumer), masquerading suppression as correction and letting the consumer silently accept any envelope (hiding future drift).'
+      control: 'D14 chooses the truthful consumer-shape option (design_choice B), FORBIDS a synthesized zero correction count, requires the complete suppression pins, and REJECTS malformed/inconsistent or mixed-shape disabled envelopes fail-closed; a legacy corrected envelope still requires + emits predictor_correction_counts (G-AG3/G-AG4, P15).'
   planner_scope_inversions:
     - 'Editing code/config/tests instead of only the YAML: this planner commit modifies exactly one file (verified in VERIFICATION).'
     - 'Wrong or missing commit trailers: the corrected trailer Copilot-Session 7c146921-... is pinned in planner.required_trailers and verified post-commit; rev 1 (878bff8) used 90703341 and, per the no-amend rule, is left as-is with the spec corrected.'
-    - 'Committing on the wrong branch/base: worktree/branch pinned; this rev-9 commit supersedes rev-8 (9058786) and stacks on the current branch head. Planner/Sonnet/Gemini commits interleave, so no fixed HEAD~1 SHA is asserted -- verify only that HEAD is a descendant of 9058786, exactly the spec changed, and both trailers present.'
+    - 'Committing on the wrong branch/base: worktree/branch pinned; this rev-10 commit supersedes the rev-9 planner rev and stacks on the current branch head (69301cf). Planner/Sonnet/Gemini commits interleave, so no fixed HEAD~1 SHA is asserted -- verify only that HEAD is a descendant of 69301cf, exactly the spec changed, and both trailers present.'
+    - 'Choosing the aggregate fix for fewer files rather than truthfulness: design_choice explicitly evaluates both options and picks the truthful, fail-closed consumer shape (B), NOT the fewer-files zero-field option (A).'
   empty_beat4_allowed: false
 
 # ---------------------------------------------------------------------------
