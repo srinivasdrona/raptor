@@ -73,7 +73,7 @@ def test_aca5_arms_length():
 
 def test_aca6_scope_invariance():
     """
-    AC-A6 (scope invariance): PP3/BP4 stay allowed, correction changes strength only.
+    AC-A6 (scope invariance): PP3/BP4 stay deferred, correction changes strength only.
     """
     import yaml
     lineage_path = Path("configs/eval/bias_lineage.yaml")

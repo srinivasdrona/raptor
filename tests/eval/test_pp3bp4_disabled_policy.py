@@ -9,6 +9,64 @@ from pathlib import Path
 # to ensure the test suite collects cleanly under pytest even
 # when implementation elements are absent.
 
+def _get_real_bundle_hash_and_files():
+    f1 = Path("src/raptor/eval/predictor_policy.py")
+    f2 = Path("src/raptor/eval/terminal_source.py")
+    f3 = Path("scripts/run_masked_holdout_eval.py")
+    
+    digest = hashlib.sha256()
+    for f in (f1, f2, f3):
+        digest.update(f.name.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(f.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest(), (f1, f2, f3)
+
+
+def _make_temp_policy_and_configs(tmp_path, status, mode, scorer_bytes=None, eval_bytes=None, lineage_bytes=None):
+    if scorer_bytes is None:
+        scorer_bytes = b"scorer"
+    if eval_bytes is None:
+        eval_bytes = b"eval"
+    if lineage_bytes is None:
+        lineage_bytes = b"lineage"
+        
+    scorer_file = tmp_path / "tsc.yaml"
+    eval_file = tmp_path / "tsc2.yaml"
+    lineage_file = tmp_path / "bias_lineage.yaml"
+    
+    scorer_file.write_bytes(scorer_bytes)
+    eval_file.write_bytes(eval_bytes)
+    lineage_file.write_bytes(lineage_bytes)
+    
+    scorer_hash = hashlib.sha256(scorer_bytes).hexdigest()
+    eval_hash = hashlib.sha256(eval_bytes).hexdigest()
+    lineage_hash = hashlib.sha256(lineage_bytes).hexdigest()
+    
+    bundle_hash, bundle_files = _get_real_bundle_hash_and_files()
+        
+    policy_data = {
+        "schema": "bp4pp3-predictor-policy/2",
+        "status": status,
+        "mode": mode,
+        "predictor_source_hash": "a" * 64,
+        "correction_hash": "b" * 64,
+        "production_config_hash": scorer_hash,
+        "eval_config_hash": eval_hash,
+        "lineage_policy_hash": lineage_hash,
+        "runtime_bundle_hash": bundle_hash,
+        "decision_reference": "ADR-0012"
+    }
+    
+    policy_path = tmp_path / "policy.json"
+    policy_path.write_text(json.dumps(policy_data))
+    
+    from raptor.eval.predictor_policy import load_predictor_policy
+    policy = load_predictor_policy(policy_path)
+    
+    return policy, scorer_file, eval_file, lineage_file, bundle_files
+
+
 def test_g_dm1_v2_loader_validation(tmp_path):
     """
     G-DM1: v2 loader accepts the exact closed v2 field set and populates
@@ -199,124 +257,88 @@ def test_g_dm3_policy_disabled_evidence_source():
     assert wrapped.suppressed_counts == {"PP3": 1, "BP4": 2}
 
 
-def _write_manifest_line(data):
-    return json.dumps(data) + "\n"
-
-
-def _create_mock_holdout_package(tmp_path):
+def test_g_dm4_offline_seams_composition(tmp_path):
     """
-    Helper to setup realistic control/manifest/evidence structure for subprocess tests.
+    G-DM4: offline unit composition:
+    - Build a contract-valid BiasEvidenceSource (one canonical manifest row + single BIAS TSV row + FakeCanonicalNormalizer).
+    - Write temp post-removal configs/lineage.
+    - Write approved v2 policy whose config hashes match those temp bytes and whose runtime_bundle_hash is the REAL repo bundle hash.
+    - resolve_policy_state(...) == ("APPROVED_DISABLED", reason).
+    - build_policy_evidence_source(source, state) wraps it in PolicyDisabledEvidenceSource.
+    - build_disabled_policy_pins returns policy_mode=disabled_manual, pp3bp4_scored_calls=0, non-empty pp3bp4_suppressed_counts, pp3bp4_lineage_disposition=deferred, predictor_correction_applied=false.
+    NO subprocess, NO benchmark/reference/mask pretense, NO 2,577-row TSV.
     """
-    ref_root = tmp_path / "reference-root"
-    ref_root.mkdir()
-    
-    # 1. Scorer, eval, and lineage config files
+    try:
+        from scripts.run_masked_holdout_eval import (
+            resolve_policy_state,
+            build_policy_evidence_source,
+            build_disabled_policy_pins,
+        )
+        from raptor.eval.predictor_policy import load_predictor_policy
+    except ImportError as exc:
+        pytest.fail(f"Missing implementation seams: {exc}")
+
+    from test_live_source import _source, FakeCanonicalNormalizer
+
+    canonical_id = "NC_000002.11:26684722:G:A"
+    manifest_rows = [{
+        "variant_id": canonical_id,
+        "vcf_key": "chr2:26684723:G:A",
+        "accession": "NC_000002.11",
+        "contig": "chr2"
+    }]
+    bias_rows = [{
+        "chromosome": "chr2",
+        "position": 26684723,
+        "ref": "G",
+        "alt": "A",
+        "classification": "pathogenic",
+        "criteria": {
+            "pp3": (3, "strong revel"),
+            "bp4": (1, "supporting")
+        }
+    }]
+
+    mapping = {
+        ("chr2", 26684723, "G", "A", "NC_000002.11"): canonical_id,
+    }
+    normalizer = FakeCanonicalNormalizer(mapping)
+
+    # Copy current configs to temp
     scorer_bytes = Path("configs/acmg/tsc.yaml").read_bytes()
     eval_bytes = Path("configs/eval/tsc2.yaml").read_bytes()
     lineage_bytes = Path("configs/eval/bias_lineage.yaml").read_bytes()
 
-    scorer_file = tmp_path / "tsc.yaml"
-    eval_file = tmp_path / "tsc2.yaml"
-    lineage_file = tmp_path / "bias_lineage.yaml"
+    scorer_path = tmp_path / "tsc.yaml"
+    eval_path = tmp_path / "tsc2.yaml"
+    lineage_path = tmp_path / "bias_lineage.yaml"
 
-    scorer_file.write_bytes(scorer_bytes)
-    eval_file.write_bytes(eval_bytes)
-    lineage_file.write_bytes(lineage_bytes)
+    scorer_path.write_bytes(scorer_bytes)
+    eval_path.write_bytes(eval_bytes)
+    lineage_path.write_bytes(lineage_bytes)
 
     scorer_hash = hashlib.sha256(scorer_bytes).hexdigest()
     eval_hash = hashlib.sha256(eval_bytes).hexdigest()
     lineage_hash = hashlib.sha256(lineage_bytes).hexdigest()
 
-    # 2. Control files
-    status_file = tmp_path / "TERMINAL_STATUS.txt"
-    status_file.write_text("SCORED_MASKED\n", encoding="utf-8")
-    skip_file = tmp_path / "evaluation_skip_list.txt"
-    skip_file.write_text("\n", encoding="utf-8")
+    from raptor.eval.config import load_config as load_eval_config
+    from raptor.scorer.config import load_config as load_scorer_config
 
-    # 3. TSV bias output with PP3 & BP4 firings
-    bias_tsv = tmp_path / "bias_output_slice.tsv"
-    # Mini slice containing PP3 & BP4
-    bias_header = "chromosome\tposition\trefAllele\taltAllele\tvariantType\tconsequence\tacmgClassification\talleleFreq\thgvsg\thgvsc\thgvsp\taaChange\tgeneName\tpubmedIds\tassociatedDiseases\tdbSnpids\ttranscript\trationale\n"
-    bias_row = 'chr2\t26684723\tG\tA\tSNV\tmissense_variant\tpathogenic\t\tNC_000002.11:g.26684723G>A\tNM_194248.2:c.5374C>T\tNP_919224.1:p.(Arg1792Cys)\tR1792C\tOTOF\t28492532\tautosomal recessive nonsyndromic hearing loss 9\trs142111099\tNM_194248.2\t{"pvs": {"pvs1": [0, ""]}, "ps": {"ps1": [0, ""], "ps2": [0, ""], "ps3": [0, ""], "ps4": [0, ""]}, "pm": {"pm1": [0, ""], "pm2": [0, ""], "pm3": [0, ""], "pm4": [0, ""], "pm5": [0, ""], "pm6": [0, ""]}, "pp": {"pp1": [0, ""], "pp2": [0, ""], "pp3": [3, "PP3_strong: 2 line(s); strong revel 0.8 | strong AlphaMissense 0.9"], "pp4": [0, ""], "pp5": [0, ""]}, "ba": {"ba1": [0, ""]}, "bs": {"bs1": [0, ""], "bs2": [0, ""], "bs3": [0, ""], "bs4": [0, ""]}, "bp": {"bp1": [0, ""], "bp2": [0, ""], "bp3": [0, ""], "bp4": [1, "BP4_supporting: supporting REVEL 0.1"], "bp5": [0, ""], "bp6": [0, ""], "bp7": [0, ""]}}\n'
-    bias_tsv.write_text(bias_header + bias_row, encoding="utf-8")
+    eval_cfg = load_eval_config(eval_path)
+    scorer_cfg = load_scorer_config(scorer_path)
 
-    # 4. Holdout manifest
-    manifest_file = tmp_path / "holdout_manifest.json"
-    manifest_file.write_text('{"variant_id": "chr2:g.26684723G>A"}\n', encoding="utf-8")
+    # Build pure BiasEvidenceSource offline
+    source = _source(
+        tmp_path / "evidence_src",
+        bias_rows=bias_rows,
+        manifest_rows=manifest_rows,
+        normalizer=normalizer,
+        eval_config=eval_cfg,
+        scorer_config=scorer_cfg,
+    )
 
-    # 5. Benchmark files
-    benchmark_file = tmp_path / "benchmark.json"
-    benchmark_file.write_text('{"variant_id": "chr2:g.26684723G>A", "label": "P"}\n', encoding="utf-8")
-
-    # 6. Mask ledgers matching holdout count conservation
-    mask_ledger = tmp_path / "mask_ledger.json"
-    mask_ledger.write_text(json.dumps({
-        "input_records": 10,
-        "output_records": 9,
-        "matched_records_removed": 1,
-        "matched_holdout_identities": ["chr2:g.26684723G>A"],
-        "holdout_identities_not_present": []
-    }), encoding="utf-8")
-
-    remask_audit = tmp_path / "remask_audit.json"
-    remask_audit.write_text(json.dumps({
-        "input_records": 9,
-        "output_records": 9,
-        "matched_records_removed": 0,
-        "matched_holdout_identities": [],
-        "holdout_identities_not_present": ["chr2:g.26684723G>A"]
-    }), encoding="utf-8")
-
-    # 7. Return manifest binding hashes
-    return_manifest = tmp_path / "return_manifest.txt"
-    with open(return_manifest, "w", encoding="utf-8") as f:
-        for f_item in (status_file, skip_file, bias_tsv, mask_ledger, remask_audit):
-            digest = hashlib.sha256(f_item.read_bytes()).hexdigest()
-            f.write(f"{digest} *{f_item.name}\n")
-
-    # 8. Compute bundle hash over actual runtime verifier components
-    # We will simulate mock enforcement files
-    f_policy = tmp_path / "predictor_policy.py"
-    f_source = tmp_path / "terminal_source.py"
-    f_runner = tmp_path / "run_masked_holdout_eval.py"
-    f_policy.write_text("dummy policy content", encoding="utf-8")
-    f_source.write_text("dummy source content", encoding="utf-8")
-    f_runner.write_text("dummy runner content", encoding="utf-8")
-
-    digest_bundle = hashlib.sha256()
-    for f_item in (f_policy, f_source, f_runner):
-        digest_bundle.update(f_item.name.encode("utf-8"))
-        digest_bundle.update(b"\0")
-        digest_bundle.update(f_item.read_bytes())
-        digest_bundle.update(b"\0")
-    bundle_hash = digest_bundle.hexdigest()
-
-    return {
-        "scorer_file": scorer_file,
-        "eval_file": eval_file,
-        "lineage_file": lineage_file,
-        "scorer_hash": scorer_hash,
-        "eval_hash": eval_hash,
-        "lineage_hash": lineage_hash,
-        "bias_tsv": bias_tsv,
-        "manifest_file": manifest_file,
-        "benchmark_file": benchmark_file,
-        "mask_ledger": mask_ledger,
-        "remask_audit": remask_audit,
-        "return_manifest": return_manifest,
-        "reference_root": ref_root,
-        "bundle_hash": bundle_hash,
-        "bundle_files": (f_policy, f_source, f_runner),
-    }
-
-
-def test_g_dm4_run_masked_holdout_eval_proceed(tmp_path):
-    """
-    G-DM4: approved+disabled_manual policy with matching hashes and masked inputs
-    results in gate status != BLOCKED_POLICY (determined by decide_gate metrics)
-    and config_pins asserting policy_mode=disabled_manual, pp3bp4_scored_calls=0, etc.
-    """
-    env_inputs = _create_mock_holdout_package(tmp_path)
+    # Get actual real bundle hash
+    real_bundle_hash, bundle_files = _get_real_bundle_hash_and_files()
 
     policy_data = {
         "schema": "bp4pp3-predictor-policy/2",
@@ -324,196 +346,110 @@ def test_g_dm4_run_masked_holdout_eval_proceed(tmp_path):
         "mode": "disabled_manual",
         "predictor_source_hash": "a" * 64,
         "correction_hash": "b" * 64,
-        "production_config_hash": env_inputs["scorer_hash"],
-        "eval_config_hash": env_inputs["eval_hash"],
-        "lineage_policy_hash": env_inputs["lineage_hash"],
-        "runtime_bundle_hash": env_inputs["bundle_hash"],
+        "production_config_hash": scorer_hash,
+        "eval_config_hash": eval_hash,
+        "lineage_policy_hash": lineage_hash,
+        "runtime_bundle_hash": real_bundle_hash,
         "decision_reference": "ADR-0012"
     }
 
-    policy_path = tmp_path / "approved_policy.json"
+    policy_path = tmp_path / "policy.json"
     policy_path.write_text(json.dumps(policy_data))
+    policy = load_predictor_policy(policy_path)
 
-    output_report = tmp_path / "report.txt"
-    output_json = tmp_path / "report.json"
+    # 1. resolve_policy_state == APPROVED_DISABLED
+    state, reason = resolve_policy_state(
+        policy, scorer_path, eval_path, lineage_path, bundle_files
+    )
+    assert state == "APPROVED_DISABLED", f"Expected APPROVED_DISABLED, got {state} ({reason})"
 
-    # Invoke runner subprocess
-    cmd = [
-        sys.executable, "scripts/run_masked_holdout_eval.py",
-        "--predictor-policy", str(policy_path),
-        "--bias-tsv", str(env_inputs["bias_tsv"]),
-        "--manifest", str(env_inputs["manifest_file"]),
-        "--benchmark", str(env_inputs["benchmark_file"]),
-        "--mask-ledger", str(env_inputs["mask_ledger"]),
-        "--remask-audit", str(env_inputs["remask_audit"]),
-        "--return-manifest", str(env_inputs["return_manifest"]),
-        "--reference-root", str(env_inputs["reference_root"]),
-        "--scorer-config", str(env_inputs["scorer_file"]),
-        "--eval-config", str(env_inputs["eval_file"]),
-        "--output-report", str(output_report),
-        "--output-json", str(output_json),
-    ]
+    # 2. build_policy_evidence_source wraps BiasEvidenceSource
+    wrapped_source = build_policy_evidence_source(source, state)
+    from raptor.eval.terminal_source import PolicyDisabledEvidenceSource
+    assert isinstance(wrapped_source, PolicyDisabledEvidenceSource)
 
-    # In the RED test, this fails because schema v2/mode support isn't implemented yet,
-    # causing PredictorPolicyError or exiting with BLOCKED_POLICY.
-    # We assert the expected success properties which are currently RED.
-    res = subprocess.run(cmd, capture_output=True, text=True)
-    
-    # We expect that when implemented, the exit code is 0 and status is not BLOCKED_POLICY.
-    # In RED-first, this assertion will fail.
-    assert res.returncode == 0, f"Subprocess failed: {res.stderr}"
-    assert "BLOCKED_POLICY" not in res.stdout, "Policy should proceed, not block"
+    # Retrieve evidence to count suppression
+    wrapped_source.get_evidence(canonical_id)
 
-    # Load produced JSON report and check the config pins
-    assert output_json.exists(), "Should have produced output report"
-    report = json.loads(output_json.read_text(encoding="utf-8"))
-    
-    config_pins = report["report"]["config_pins"]
-    assert config_pins["policy_mode"] == "disabled_manual"
-    assert config_pins["pp3bp4_scored_calls"] == 0
-    assert config_pins["pp3bp4_suppressed_counts"] == {"PP3": 1, "BP4": 1}
-    assert config_pins["predictor_correction_applied"] is False
+    # 3. build_disabled_policy_pins returns correct dictionary
+    pins = build_disabled_policy_pins(policy, wrapped_source)
+    assert pins["policy_mode"] == "disabled_manual"
+    assert pins["pp3bp4_scored_calls"] == 0
+    assert pins["pp3bp4_suppressed_counts"] == {"PP3": 1, "BP4": 1}
+    assert pins["pp3bp4_lineage_disposition"] == "deferred"
+    assert pins["predictor_correction_applied"] is False
 
 
-def test_g_dm5_run_masked_holdout_eval_proposed_blocked(tmp_path):
+def test_g_dm5_resolve_policy_state_proposed(tmp_path):
     """
-    G-DM5: proposed+disabled_manual policy => BLOCKED_POLICY with no computed metrics.
+    G-DM5: Proposed status + disabled_manual mode => PROPOSED_DISABLED.
     """
-    env_inputs = _create_mock_holdout_package(tmp_path)
+    try:
+        from scripts.run_masked_holdout_eval import resolve_policy_state
+    except ImportError:
+        pytest.fail("Missing resolve_policy_state implementation")
 
-    policy_data = {
-        "schema": "bp4pp3-predictor-policy/2",
-        "status": "proposed",  # unapproved proposed status
-        "mode": "disabled_manual",
-        "predictor_source_hash": "a" * 64,
-        "correction_hash": "b" * 64,
-        "production_config_hash": env_inputs["scorer_hash"],
-        "eval_config_hash": env_inputs["eval_hash"],
-        "lineage_policy_hash": env_inputs["lineage_hash"],
-        "runtime_bundle_hash": env_inputs["bundle_hash"],
-        "decision_reference": "ADR-0012"
-    }
+    policy, s_file, e_file, l_file, b_files = _make_temp_policy_and_configs(
+        tmp_path, "proposed", "disabled_manual"
+    )
 
-    policy_path = tmp_path / "proposed_policy.json"
-    policy_path.write_text(json.dumps(policy_data))
-
-    cmd = [
-        sys.executable, "scripts/run_masked_holdout_eval.py",
-        "--predictor-policy", str(policy_path),
-        "--bias-tsv", str(env_inputs["bias_tsv"]),
-        "--manifest", str(env_inputs["manifest_file"]),
-        "--benchmark", str(env_inputs["benchmark_file"]),
-        "--mask-ledger", str(env_inputs["mask_ledger"]),
-        "--remask-audit", str(env_inputs["remask_audit"]),
-        "--return-manifest", str(env_inputs["return_manifest"]),
-        "--reference-root", str(env_inputs["reference_root"]),
-        "--scorer-config", str(env_inputs["scorer_file"]),
-        "--eval-config", str(env_inputs["eval_file"]),
-    ]
-
-    res = subprocess.run(cmd, capture_output=True, text=True)
-    # Must fail closed with BLOCKED_POLICY in stdout/stderr
-    assert "BLOCKED_POLICY" in res.stdout or "BLOCKED_POLICY" in res.stderr
-    assert "precision=" not in res.stdout
+    state, reason = resolve_policy_state(policy, s_file, e_file, l_file, b_files)
+    assert state == "PROPOSED_DISABLED"
+    assert "proposed" in reason.lower()
 
 
-def test_g_dm6_run_masked_holdout_eval_corrected_enabled_blocked(tmp_path):
+def test_g_dm6_resolve_policy_state_corrected_enabled_blocked(tmp_path):
     """
-    G-DM6: approved+corrected_enabled policy => BLOCKED_POLICY (as it is out of scope).
+    G-DM6: approved status + corrected_enabled mode => CORRECTED_ENABLED_OUT_OF_SCOPE.
     """
-    env_inputs = _create_mock_holdout_package(tmp_path)
+    try:
+        from scripts.run_masked_holdout_eval import resolve_policy_state
+    except ImportError:
+        pytest.fail("Missing resolve_policy_state implementation")
 
-    policy_data = {
-        "schema": "bp4pp3-predictor-policy/2",
-        "status": "approved",
-        "mode": "corrected_enabled",  # un-approved mode in this track
-        "predictor_source_hash": "a" * 64,
-        "correction_hash": "b" * 64,
-        "production_config_hash": env_inputs["scorer_hash"],
-        "eval_config_hash": env_inputs["eval_hash"],
-        "lineage_policy_hash": env_inputs["lineage_hash"],
-        "runtime_bundle_hash": env_inputs["bundle_hash"],
-        "decision_reference": "ADR-0012"
-    }
+    policy, s_file, e_file, l_file, b_files = _make_temp_policy_and_configs(
+        tmp_path, "approved", "corrected_enabled"
+    )
 
-    policy_path = tmp_path / "enabled_policy.json"
-    policy_path.write_text(json.dumps(policy_data))
-
-    cmd = [
-        sys.executable, "scripts/run_masked_holdout_eval.py",
-        "--predictor-policy", str(policy_path),
-        "--bias-tsv", str(env_inputs["bias_tsv"]),
-        "--manifest", str(env_inputs["manifest_file"]),
-        "--benchmark", str(env_inputs["benchmark_file"]),
-        "--mask-ledger", str(env_inputs["mask_ledger"]),
-        "--remask-audit", str(env_inputs["remask_audit"]),
-        "--return-manifest", str(env_inputs["return_manifest"]),
-        "--reference-root", str(env_inputs["reference_root"]),
-        "--scorer-config", str(env_inputs["scorer_file"]),
-        "--eval-config", str(env_inputs["eval_file"]),
-    ]
-
-    res = subprocess.run(cmd, capture_output=True, text=True)
-    assert "BLOCKED_POLICY" in res.stdout or "BLOCKED_POLICY" in res.stderr
-    assert "precision=" not in res.stdout
+    state, reason = resolve_policy_state(policy, s_file, e_file, l_file, b_files)
+    assert state == "CORRECTED_ENABLED_OUT_OF_SCOPE"
 
 
-def test_g_dm7_run_masked_holdout_eval_drift_blocked(tmp_path):
+@pytest.mark.parametrize("mutilated_file", ["scorer", "eval", "lineage"])
+def test_g_dm7_resolve_policy_state_drift_blocked(tmp_path, mutilated_file):
     """
-    G-DM7: approved+disabled_manual policy but with a mutated configuration file
-    byte => BLOCKED_POLICY (accidental byte drift detection).
+    G-DM7: approved + disabled_manual but config byte mismatch => CONFIG_DRIFT.
     """
-    env_inputs = _create_mock_holdout_package(tmp_path)
+    try:
+        from scripts.run_masked_holdout_eval import resolve_policy_state
+    except ImportError:
+        pytest.fail("Missing resolve_policy_state implementation")
 
-    policy_data = {
-        "schema": "bp4pp3-predictor-policy/2",
-        "status": "approved",
-        "mode": "disabled_manual",
-        "predictor_source_hash": "a" * 64,
-        "correction_hash": "b" * 64,
-        "production_config_hash": env_inputs["scorer_hash"],
-        "eval_config_hash": env_inputs["eval_hash"],
-        "lineage_policy_hash": env_inputs["lineage_hash"],
-        "runtime_bundle_hash": env_inputs["bundle_hash"],
-        "decision_reference": "ADR-0012"
-    }
+    policy, s_file, e_file, l_file, b_files = _make_temp_policy_and_configs(
+        tmp_path, "approved", "disabled_manual"
+    )
 
-    policy_path = tmp_path / "drift_policy.json"
-    policy_path.write_text(json.dumps(policy_data))
+    if mutilated_file == "scorer":
+        s_file.write_bytes(b"mutilated scorer")
+    elif mutilated_file == "eval":
+        e_file.write_bytes(b"mutilated eval")
+    elif mutilated_file == "lineage":
+        l_file.write_bytes(b"mutilated lineage")
 
-    # Test parametrized over mutations to scorer config, eval config, and lineage config
-    for key_file in ("scorer_file", "eval_file", "lineage_file"):
-        original_bytes = env_inputs[key_file].read_bytes()
-        env_inputs[key_file].write_text("mutated config data", encoding="utf-8")
-
-        cmd = [
-            sys.executable, "scripts/run_masked_holdout_eval.py",
-            "--predictor-policy", str(policy_path),
-            "--bias-tsv", str(env_inputs["bias_tsv"]),
-            "--manifest", str(env_inputs["manifest_file"]),
-            "--benchmark", str(env_inputs["benchmark_file"]),
-            "--mask-ledger", str(env_inputs["mask_ledger"]),
-            "--remask-audit", str(env_inputs["remask_audit"]),
-            "--return-manifest", str(env_inputs["return_manifest"]),
-            "--reference-root", str(env_inputs["reference_root"]),
-            "--scorer-config", str(env_inputs["scorer_file"]),
-            "--eval-config", str(env_inputs["eval_file"]),
-        ]
-
-        res = subprocess.run(cmd, capture_output=True, text=True)
-        assert "BLOCKED_POLICY" in res.stdout or "BLOCKED_POLICY" in res.stderr
-        
-        # Restore configuration
-        env_inputs[key_file].write_bytes(original_bytes)
+    state, reason = resolve_policy_state(policy, s_file, e_file, l_file, b_files)
+    assert state == "CONFIG_DRIFT"
 
 
-def test_g_dm8_run_masked_holdout_eval_legacy_blocked(tmp_path):
+def test_g_dm8_resolve_policy_state_legacy_blocked(tmp_path):
     """
-    G-DM8: legacy v1 schema approved policy => BLOCKED_POLICY (never allows disabled).
+    G-DM8: Legacy v1 policy structure (no mode field) => UNSUPPORTED_MODE.
     """
-    env_inputs = _create_mock_holdout_package(tmp_path)
+    try:
+        from scripts.run_masked_holdout_eval import resolve_policy_state
+        from raptor.eval.predictor_policy import load_predictor_policy
+    except ImportError:
+        pytest.fail("Missing resolve_policy_state implementation")
 
-    # v1 policy has no mode field and old schema id
     policy_data = {
         "schema": "bp4pp3-predictor-policy",
         "status": "approved",
@@ -524,23 +460,42 @@ def test_g_dm8_run_masked_holdout_eval_legacy_blocked(tmp_path):
 
     policy_path = tmp_path / "legacy_policy.json"
     policy_path.write_text(json.dumps(policy_data))
+    policy = load_predictor_policy(policy_path)
 
-    cmd = [
-        sys.executable, "scripts/run_masked_holdout_eval.py",
-        "--predictor-policy", str(policy_path),
-        "--bias-tsv", str(env_inputs["bias_tsv"]),
-        "--manifest", str(env_inputs["manifest_file"]),
-        "--benchmark", str(env_inputs["benchmark_file"]),
-        "--mask-ledger", str(env_inputs["mask_ledger"]),
-        "--remask-audit", str(env_inputs["remask_audit"]),
-        "--return-manifest", str(env_inputs["return_manifest"]),
-        "--reference-root", str(env_inputs["reference_root"]),
-        "--scorer-config", str(env_inputs["scorer_file"]),
-        "--eval-config", str(env_inputs["eval_file"]),
-    ]
+    _, s_file, e_file, l_file, b_files = _make_temp_policy_and_configs(
+        tmp_path, "approved", "disabled_manual"
+    )
 
-    res = subprocess.run(cmd, capture_output=True, text=True)
+    state, reason = resolve_policy_state(policy, s_file, e_file, l_file, b_files)
+    assert state == "UNSUPPORTED_MODE"
+
+
+def test_g_dm8_terminal_runner_blocked_policy_subprocess(tmp_path):
+    """
+    Protected runner blocked subprocess test (requires no mock clinical files):
+    Missing policy or unapproved policy fails closed returning status 0 with BLOCKED_POLICY.
+    """
+    script_path = Path("scripts/run_masked_holdout_eval.py")
+    if not script_path.exists():
+        pytest.skip("run_masked_holdout_eval.py not found")
+
+    # 1. Missing policy file
+    res = subprocess.run([sys.executable, str(script_path), "--predictor-policy", str(tmp_path / "missing.json")], capture_output=True, text=True)
     assert "BLOCKED_POLICY" in res.stdout or "BLOCKED_POLICY" in res.stderr
+    assert "precision=" not in res.stdout
+
+    # 2. Unapproved policy file
+    unapproved = tmp_path / "unapproved.json"
+    unapproved.write_text(json.dumps({
+        "schema": "bp4pp3-predictor-policy",
+        "status": "rejected",
+        "predictor_source_hash": "a" * 64,
+        "correction_hash": "b" * 64,
+        "decision_reference": "ADR-0010"
+    }))
+    res3 = subprocess.run([sys.executable, str(script_path), "--predictor-policy", str(unapproved)], capture_output=True, text=True)
+    assert "BLOCKED_POLICY" in res3.stdout or "BLOCKED_POLICY" in res3.stderr
+    assert "precision=" not in res3.stdout
 
 
 def test_g_dm9_configs_and_lineage_policy():
@@ -598,8 +553,8 @@ def test_g_dm9_configs_and_lineage_policy():
 
 def test_g_dm10_end_to_end_suppression():
     """
-    G-DM10: BIAS record containing PVS1 + PP3 + BP4 is filtered cleanly
-    to PVS1 alone, with suppressed counts reflecting PP3 and BP4.
+    G-DM10: PolicyDisabledEvidenceSource wrapped dummy source that DEFINES variant_ids
+    yields zero emitted PP3/BP4, a counted suppression of 2, and still emits PVS1.
     """
     try:
         from raptor.eval.terminal_source import PolicyDisabledEvidenceSource
@@ -607,14 +562,22 @@ def test_g_dm10_end_to_end_suppression():
         pytest.fail("Missing terminal_source implementation")
 
     class DummySource:
-        def get_evidence(self, variant_id):
-            return (
-                ("PVS1", "very_strong", "pathogenic"),
-                ("PP3", "moderate", "pathogenic"),
-                ("BP4", "supporting", "benign")
-            )
+        def __init__(self, evidence_map):
+            self.evidence_map = evidence_map
+            self.variant_ids = tuple(evidence_map.keys())
 
-    wrapped = PolicyDisabledEvidenceSource(DummySource())
+        def get_evidence(self, variant_id):
+            return self.evidence_map[variant_id]
+
+    raw_evidence = {
+        "v1": (
+            ("PVS1", "very_strong", "pathogenic"),
+            ("PP3", "moderate", "pathogenic"),
+            ("BP4", "supporting", "benign")
+        )
+    }
+
+    wrapped = PolicyDisabledEvidenceSource(DummySource(raw_evidence))
     filtered = wrapped.get_evidence("v1")
 
     # PP3 & BP4 stripped, PVS1 retained
@@ -678,12 +641,36 @@ def test_g_dm11_accidental_drift_enforcement(tmp_path):
         verify_runtime_bundle_hash(policy, (f1, f2, f3))
 
 
-def test_g_dm12_alternate_config_mismatch(tmp_path):
+def test_g_dm12_verify_disabled_config_hashes_unit(tmp_path):
     """
-    G-DM12: Alternate --scorer-config or --eval-config paths that are byte-identical
-    to the pinned policy hashes PROCEED, but any modification/threshold changes fail closed.
+    G-DM12: verify_disabled_config_hashes directly verifies byte-identical alternate scorer/eval/lineage paths,
+    raising PredictorPolicyError on modified config files. (NO subprocess)
     """
-    env_inputs = _create_mock_holdout_package(tmp_path)
+    try:
+        from raptor.eval.predictor_policy import (
+            load_predictor_policy,
+            verify_disabled_config_hashes,
+            PredictorPolicyError,
+        )
+    except ImportError:
+        pytest.fail("Missing predictor_policy implementation")
+
+    scorer_bytes = b"production scorer configuration bytes"
+    eval_bytes = b"evaluation metrics configuration bytes"
+    lineage_bytes = b"bias lineage configuration bytes"
+
+    # Create original config files
+    scorer_file = tmp_path / "tsc.yaml"
+    eval_file = tmp_path / "tsc2.yaml"
+    lineage_file = tmp_path / "bias_lineage.yaml"
+
+    scorer_file.write_bytes(scorer_bytes)
+    eval_file.write_bytes(eval_bytes)
+    lineage_file.write_bytes(lineage_bytes)
+
+    scorer_hash = hashlib.sha256(scorer_bytes).hexdigest()
+    eval_hash = hashlib.sha256(eval_bytes).hexdigest()
+    lineage_hash = hashlib.sha256(lineage_bytes).hexdigest()
 
     policy_data = {
         "schema": "bp4pp3-predictor-policy/2",
@@ -691,86 +678,116 @@ def test_g_dm12_alternate_config_mismatch(tmp_path):
         "mode": "disabled_manual",
         "predictor_source_hash": "a" * 64,
         "correction_hash": "b" * 64,
-        "production_config_hash": env_inputs["scorer_hash"],
-        "eval_config_hash": env_inputs["eval_hash"],
-        "lineage_policy_hash": env_inputs["lineage_hash"],
-        "runtime_bundle_hash": env_inputs["bundle_hash"],
+        "production_config_hash": scorer_hash,
+        "eval_config_hash": eval_hash,
+        "lineage_policy_hash": lineage_hash,
+        "runtime_bundle_hash": "c" * 64,
         "decision_reference": "ADR-0012"
     }
 
     policy_path = tmp_path / "policy.json"
     policy_path.write_text(json.dumps(policy_data))
+    policy = load_predictor_policy(policy_path)
 
-    # Create byte-identical alternate configurations
-    alt_scorer = tmp_path / "alt_scorer.yaml"
-    alt_eval = tmp_path / "alt_eval.yaml"
-    alt_scorer.write_bytes(env_inputs["scorer_file"].read_bytes())
-    alt_eval.write_bytes(env_inputs["eval_file"].read_bytes())
+    # 1. Byte-identical alternate paths -> PASS
+    alt_dir = tmp_path / "alt"
+    alt_dir.mkdir()
+    alt_scorer = alt_dir / "tsc.yaml"
+    alt_eval = alt_dir / "tsc2.yaml"
+    alt_lineage = alt_dir / "bias_lineage.yaml"
 
-    # Byte-identical alternate paths -> PROCEED
-    cmd_alt = [
-        sys.executable, "scripts/run_masked_holdout_eval.py",
-        "--predictor-policy", str(policy_path),
-        "--bias-tsv", str(env_inputs["bias_tsv"]),
-        "--manifest", str(env_inputs["manifest_file"]),
-        "--benchmark", str(env_inputs["benchmark_file"]),
-        "--mask-ledger", str(env_inputs["mask_ledger"]),
-        "--remask-audit", str(env_inputs["remask_audit"]),
-        "--return-manifest", str(env_inputs["return_manifest"]),
-        "--reference-root", str(env_inputs["reference_root"]),
-        "--scorer-config", str(alt_scorer),
-        "--eval-config", str(alt_eval),
-    ]
-    res_alt = subprocess.run(cmd_alt, capture_output=True, text=True)
-    assert res_alt.returncode == 0
-    assert "BLOCKED_POLICY" not in res_alt.stdout
+    alt_scorer.write_bytes(scorer_bytes)
+    alt_eval.write_bytes(eval_bytes)
+    alt_lineage.write_bytes(lineage_bytes)
 
-    # Modified alternate configs BEFORE invocation -> BLOCKED_POLICY
-    alt_scorer.write_text("mutated scorer threshold bytes", encoding="utf-8")
-    res_drift = subprocess.run(cmd_alt, capture_output=True, text=True)
-    assert "BLOCKED_POLICY" in res_drift.stdout or "BLOCKED_POLICY" in res_drift.stderr
+    verify_disabled_config_hashes(policy, alt_scorer, alt_eval, alt_lineage)
+
+    # 2. Changed byte in any of the three -> PredictorPolicyError
+    for alt_file, original in (
+        (alt_scorer, scorer_bytes),
+        (alt_eval, eval_bytes),
+        (alt_lineage, lineage_bytes),
+    ):
+        alt_file.write_text("changed content for threshold/scope/auth", encoding="utf-8")
+        with pytest.raises(PredictorPolicyError, match="mismatch|hash"):
+            verify_disabled_config_hashes(policy, alt_scorer, alt_eval, alt_lineage)
+        alt_file.write_bytes(original)  # restore
 
 
-def test_g_dm13_authorization_neutrality():
+def test_g_dm13_authorization_neutrality_unit():
     """
     G-DM13: Policy approval/mode has NO influence on the metric-driven decide_gate
     or decide_scope_gate results; the runner remains strictly authorization-neutral.
     """
     try:
+        from raptor.eval.gate import decide_gate
+        from raptor.eval.scope_gate import decide_scope_gate
         from scripts.run_masked_holdout_eval import compute_report_scope_gate
     except ImportError:
-        pytest.fail("Missing run_masked_holdout_eval implementation")
+        pytest.fail("Missing gate/scope implementation")
 
+    import inspect
+    # Confirm they do not accept any policy / status / mode parameters in their signatures
+    for func in (decide_gate, decide_scope_gate, compute_report_scope_gate):
+        sig = inspect.signature(func)
+        assert "policy" not in sig.parameters
+        assert "status" not in sig.parameters
+        assert "mode" not in sig.parameters
+        assert "policy_mode" not in sig.parameters
+
+    # Run them with passing and failing metrics and verify they behave normally without any policy override
     from conftest import make_eval_config, Metrics
-    from raptor.eval.model import ScopeGateDecision
     from test_scope_gate import make_v2_auth_config, make_oracle_thresholds
 
-    # Gate decision depends on Metrics, never the Policy Mode
-    config = make_eval_config(
+    # PASSING CASE
+    passing_config = make_eval_config(
         min_count_per_class=36,
         oracle_thresholds=make_oracle_thresholds(),
         scope_authorization=make_v2_auth_config()
     )
-    m_truncating = Metrics(
+    m_ok = Metrics(
         precision=1.0, recall=1.0, concordance=1.0,
-        counts={"path_called": 40, "benign_called": 1, "path_actual": 40, "benign_actual": 1},
-        stratum="truncating", gating=True, benign_precision=1.0, benign_recall=1.0
+        counts={"path_called": 40, "benign_called": 40, "path_actual": 40, "benign_actual": 40},
+        stratum="missense", gating=True, benign_precision=1.0, benign_recall=1.0
     )
-    m_truncating.precision_lb = 0.96
-    m_truncating.recall_lb = 0.96
+    m_ok.precision_lb = 0.98
+    m_ok.recall_lb = 0.98
 
-    metrics = {"truncating": m_truncating}
+    passing_metrics = {"missense": m_ok, "truncating": m_ok}
 
-    result = compute_report_scope_gate(metrics, config, skipped=set())
-    assert isinstance(result, ScopeGateDecision)
-    assert result.research_scope_flags["truncating_pathogenic_research_scope_validated"] is True
+    # FAILING CASE
+    failing_config = make_eval_config(
+        min_count_per_class=36,
+        oracle_thresholds=make_oracle_thresholds(),
+        scope_authorization=make_v2_auth_config()
+    )
+    m_fail = Metrics(
+        precision=0.4, recall=0.4, concordance=0.4,
+        counts={"path_called": 40, "benign_called": 40, "path_actual": 40, "benign_actual": 40},
+        stratum="missense", gating=True, benign_precision=0.4, benign_recall=0.4
+    )
+    m_fail.precision_lb = 0.3
+    m_fail.recall_lb = 0.3
+
+    failing_metrics = {"missense": m_fail, "truncating": m_fail}
+
+    # Verify verdicts with no policy intervention
+    d_pass = decide_gate(passing_metrics, passing_config)
+    d_fail = decide_gate(failing_metrics, failing_config)
+    assert d_pass.vus_authorized is True
+    assert d_fail.vus_authorized is False
+
+    sd_pass = compute_report_scope_gate(passing_metrics, passing_config)
+    sd_fail = compute_report_scope_gate(failing_metrics, failing_config)
+    assert sd_pass.research_scope_flags["truncating_pathogenic_research_scope_validated"] is True
+    assert sd_fail.research_scope_flags["truncating_pathogenic_research_scope_validated"] is False
 
 
 def test_g_dm14_lineage_consistency_negative_control():
     """
     G-DM14: Negative control proving that removing PP3/BP4 from automatable_criteria
-    while leaving their bias_lineage.yaml disposition as 'allowed' raises
-    LineageRegistryMismatchError with set 'omitted_without_disposition'.
+    while forcing their validation_disposition/production_disposition to 'allowed' (via cloned record)
+    raises LineageRegistryMismatchError with set 'omitted_without_disposition'.
     """
     try:
         from raptor.eval.lineage_policy import load_lineage_policy
@@ -793,15 +810,32 @@ def test_g_dm14_lineage_consistency_negative_control():
     scorer_config = load_scorer_config(scorer_path)
     eval_config = load_eval_config(eval_path)
 
-    # Simulate omission: remove PP3 & BP4 from automatable and included criteria,
-    # but keep them 'allowed' in the policy (since bias_lineage.yaml has them as allowed before Sonnet edit).
+    # 1. Clone live records and force allowed
+    cloned_records = dict(policy.records)
+    cloned_records["PP3"] = replace(
+        cloned_records["PP3"],
+        validation_disposition="allowed",
+        production_disposition="allowed",
+        decision_dependency="",
+        decision_rationale=""
+    )
+    cloned_records["BP4"] = replace(
+        cloned_records["BP4"],
+        validation_disposition="allowed",
+        production_disposition="allowed",
+        decision_dependency="",
+        decision_rationale=""
+    )
+    cloned_policy = replace(policy, records=cloned_records)
+
+    # Remove PP3 & BP4 from included and automatable criteria
     test_included = tuple(c for c in scorer_config.included_criteria if c not in {"PP3", "BP4"})
     test_scorer = replace(scorer_config, included_criteria=test_included)
     test_eval = replace(eval_config, automatable_criteria=test_included)
 
     # Registry check fails closed because of the omitted PP3 & BP4 with allowed disposition
     with pytest.raises(LineageRegistryMismatchError) as exc:
-        assert_registry_consistency(policy, test_scorer, test_eval)
+        assert_registry_consistency(cloned_policy, test_scorer, test_eval)
 
     assert "omitted_without_disposition" in exc.value.sets_by_kind
     assert exc.value.sets_by_kind["omitted_without_disposition"] == {"PP3", "BP4"}
