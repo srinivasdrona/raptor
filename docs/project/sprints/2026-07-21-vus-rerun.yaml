@@ -45,6 +45,25 @@ critical_path:
   - core-generate-review-packets
   - define-variant-mechanism-atlas
 
+progress_as_of_2026_07_21:
+  completed:
+    - sources-expand-predictor-matrix
+    - sources-pin-core-annotation-bundle
+    - resolve-pp3-bp4-activation
+    - rerun-masked-gate
+  current: recompute-vus-census
+  rerun_result:
+    policy_mode: disabled_manual
+    legacy_v1_status: FAIL
+    full_spectrum_status: BLOCKED_POLICY
+    vus_authorized: false
+    authorization_blockers:
+      - evaluation_skipped_criteria:PM1
+    pp3bp4_scored_calls: 0
+    pp3bp4_suppressed_variant_count: 2043
+    aggregate_sha256: 7c55cd4e3059713d1d53886d8893a3819153375b62ce9d37187d731132c6a77f
+    checker_verdict: CLEAN
+
 policy_resolution_rule: >-
   PP3/BP4 activation is resolved when a hash-bound decision is recorded.
   "Remain disabled/manual because evidence is insufficient" is a valid
@@ -186,4 +205,3 @@ carryover_rule: >-
   An unfinished daily item moves to the next day and displaces later optional
   work. Atlas and grant-enhancement work are displaced first. The masked rerun,
   census and packets remain the sprint priority.
-

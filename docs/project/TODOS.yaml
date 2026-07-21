@@ -136,8 +136,9 @@ todos:
 - id: recompute-vus-census
   title: Recomputing corrected VUS census
   description: Re-run all 6,618 VUS through the approved production-parity criterion/strength
-    policy and corrected BP4/PP3 wrapper; replace provisional LP/LB/unresolved/manual aggregates.
-  status: pending
+    policy under ADR-0012 disabled_manual mode, consuming zero automated PP3/BP4 calls; replace
+    provisional LP/LB/unresolved/manual aggregates and preserve non-clinical status.
+  status: in_progress
   depends_on:
   - enforce-production-vocab
   - reconcile-strength-policy
@@ -172,10 +173,10 @@ todos:
   created: '2026-07-13'
 - id: rerun-masked-gate
   title: Rerunning production-parity masked gate
-  description: Re-run the verified 2,577-row masked held-out terminal evaluation using the
-    approved production vocabulary and criterion policy; preserve thresholds and report PASS/FAIL/UNDERPOWERED
-    honestly.
-  status: pending
+  description: Completed the verified 2,577-row masked held-out terminal evaluation under
+    ADR-0012 disabled_manual mode at head 18938c3. R2 aggregate SHA-256 7c55cd4e3059713d1d53886d8893a3819153375b62ce9d37187d731132c6a77f;
+    GPT-5.4 CLEAN. Legacy v1 gate FAIL and v2 full-spectrum BLOCKED_POLICY; vus_authorized=false.
+  status: done
   depends_on:
   - enforce-production-vocab
   - reconcile-strength-policy
@@ -247,13 +248,12 @@ todos:
   created: '2026-07-18'
 - id: resolve-pp3-bp4-activation
   title: Resolving PP3/BP4 activation blockers
-  description: Step 8 after the completed shadow-policy work. Pin the exact REVEL/dbNSFP version
-    and verified license; obtain and audit direct/component training manifests; acquire a
-    structured dev score table; resolve leakage UNKNOWN and transportability BLOCKED_DATA/UNDERPOWERED;
-    decide whether evidence supports activation; obtain GPT-5.4 review; and record explicit
-    owner approval bound to hashes. Do not activate by default or run held-out/VUS workflows
-    before completion.
-  status: in_progress
+  description: Resolved without activating REVEL. Exact release compatibility, permitted use,
+    training overlap and transportability remain insufficient for corrected_enabled. ADR-0012
+    owner-approved the hash-bound disabled_manual mode; production/eval/lineage/packet/runtime
+    hashes were verified, the policy implementation and formal R2 result received GPT-5.4 CLEAN,
+    and automated PP3/BP4 remains deferred pending a future activation decision.
+  status: done
   depends_on:
   - select-validate-pp3-bp4-policy
   - sources-expand-predictor-matrix
