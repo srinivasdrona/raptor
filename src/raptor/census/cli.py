@@ -49,6 +49,16 @@ _HISTORICAL_STATS_FILENAME = "tsc_vus_clinvar_2026-07-07_stats.json"
 #: before any processing or output (never applied to raw config hashes).
 HISTORICAL_CENSUS_SHA256 = "389e93d5b37f686b8d5e1115e2ebbfcdee6a060417300e5ed38d46304abac6e7"
 
+#: Canonical LF/Git-blob sha256 of the ONLY approved predictor-policy
+#: artifact `configs/eval/bp4pp3_predictor_policy.json` (same canonical-LF
+#: convention as `HISTORICAL_CENSUS_SHA256`, i.e. `git hash-object`'s
+#: content hash, NOT the raw CRLF-checkout bytes on Windows): anchors the
+#: approved policy's identity so a byte-identical copy served from any
+#: other path, or a one-byte/metadata-only tamper at the canonical path,
+#: fails closed before any semantic/config verification (never applied to
+#: any raw config hash computed by `_sha256_bytes`).
+APPROVED_PREDICTOR_POLICY_SHA256 = "85e9e92fa9f4c221c02af30e787315a88ed2bef51f6f58d25c5dc267eb55a34a"
+
 _VCF_HASH_LOWER_RE = re.compile(r"^[0-9a-f]{64}$")
 _VCF_HASH_UPPER_RE = re.compile(r"^[0-9A-F]{64}$")
 _CODE_COMMIT_RE = re.compile(r"^[0-9a-f]+$")
@@ -101,13 +111,38 @@ def _sha256_bytes(path: str | Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def _historical_stats_lf_sha256(path: str | Path) -> str:
-    """Hash the committed historical-stats data artifact using its
-    canonical LF bytes: a Windows CRLF checkout is normalized ONLY for this
-    committed-data-artifact identity check, never for any raw config hash
-    computed by `_sha256_bytes` above."""
+def _canonical_lf_sha256(path: str | Path) -> str:
+    """Hash a committed data/policy artifact using its canonical LF bytes
+    (`git hash-object`'s content hash): a Windows CRLF checkout is
+    normalized ONLY for these two committed-artifact identity checks
+    (historical-stats, approved predictor-policy), never for any raw
+    config hash computed by `_sha256_bytes` above."""
     raw = Path(path).read_bytes()
     return hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest()
+
+
+def _validate_predictor_policy_source(path: str | Path) -> str:
+    """Require `--predictor-policy` to resolve EXACTLY to the single
+    approved, committed `configs/eval/bp4pp3_predictor_policy.json` policy
+    artifact, and its canonical LF-normalized sha256 to match
+    `APPROVED_PREDICTOR_POLICY_SHA256` -- fails closed (before any
+    semantic policy check or bound-config-hash verification) on any
+    alternate path, byte-identical substitution, or one-byte/metadata-only
+    tamper. Returns the verified canonical hash for recording in aggregate
+    bound provenance (never the raw checkout hash -- see `_sha256_bytes`).
+    """
+    canonical_path = (REPO_ROOT / "configs" / "eval" / "bp4pp3_predictor_policy.json").resolve()
+    resolved = Path(path).resolve()
+    if resolved != canonical_path:
+        raise ValueError(f"--predictor-policy must be exactly {canonical_path}; got {resolved}")
+    current_hash = _canonical_lf_sha256(resolved)
+    if current_hash != APPROVED_PREDICTOR_POLICY_SHA256:
+        raise ValueError(
+            "predictor-policy content drift: canonical LF sha256 does not match "
+            f"APPROVED_PREDICTOR_POLICY_SHA256 (expected {APPROVED_PREDICTOR_POLICY_SHA256!r}, "
+            f"got {current_hash!r})"
+        )
+    return current_hash
 
 
 def _validate_predictor_policy(policy: Mapping[str, Any]) -> None:
@@ -135,10 +170,12 @@ def _verify_bound_hashes(policy: Mapping[str, Any], paths: Mapping[str, Path]) -
     """Verify the CURRENT raw sha256 of every bound config surface equals the
     hash the approved policy already records for it; fail closed on drift.
     Never hardcodes an expected hash value (D5) -- always derived + cross-
-    checked against the policy's own recorded fields."""
-    bound_hashes: dict[str, str] = {
-        "approved_predictor_policy": _sha256_bytes(paths["predictor_policy"]),
-    }
+    checked against the policy's own recorded fields. The predictor-policy
+    artifact's OWN identity is anchored separately by
+    `_validate_predictor_policy_source`'s canonical LF hash (never this raw
+    checkout hash) -- the caller records that value under
+    `approved_predictor_policy` in bound provenance."""
+    bound_hashes: dict[str, str] = {}
     for arg_key, record_key, policy_field in _BOUND_CONFIG_CONTRACT:
         file_path = paths[arg_key]
         current_hash = _sha256_bytes(file_path)
@@ -180,7 +217,7 @@ def _validate_historical_stats_source(path: str | Path) -> str:
     resolved = Path(path).resolve()
     if resolved != canonical_path:
         raise ValueError(f"--historical-stats must be exactly {canonical_path}; got {resolved}")
-    current_hash = _historical_stats_lf_sha256(resolved)
+    current_hash = _canonical_lf_sha256(resolved)
     if current_hash != HISTORICAL_CENSUS_SHA256:
         raise ValueError(
             "historical-stats content drift: canonical LF sha256 does not match "
@@ -257,19 +294,27 @@ def _build_arg_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _build_arg_parser().parse_args(argv)
 
+    # Anchor the approved predictor-policy artifact's own path + canonical
+    # LF-normalized identity BEFORE any semantic (schema/status/mode) or
+    # bound-config-hash verification: a byte-identical policy served from
+    # an alternate path, or a single-byte/metadata-only tamper at the
+    # canonical path, must fail closed here first.
+    approved_policy_hash = _validate_predictor_policy_source(args.predictor_policy)
+
     predictor_policy = json.loads(Path(args.predictor_policy).read_text(encoding="utf-8"))
     _validate_predictor_policy(predictor_policy)
 
     bound_hashes = _verify_bound_hashes(
         predictor_policy,
         {
-            "predictor_policy": Path(args.predictor_policy),
             "scorer_config": Path(args.scorer_config),
             "eval_config": Path(args.eval_config),
             "lineage_policy": Path(args.lineage_policy),
             "packet_candidate_direction": Path(args.packet_candidate_direction),
         },
     )
+    # Record the anchored canonical-LF policy hash, never the raw checkout hash.
+    bound_hashes["approved_predictor_policy"] = approved_policy_hash
     bound_hashes["historical_stats"] = _validate_historical_stats_source(args.historical_stats)
 
     provenance = json.loads(Path(args.provenance).read_text(encoding="utf-8"))

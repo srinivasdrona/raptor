@@ -21,7 +21,7 @@ from raptor.eval.knowns import classify_variant
 from raptor.scorer.model import BiasRecord
 from raptor.scorer.parse import parse_rationale
 
-from .strata import STRENGTH_MAP, ManifestEntry, StratumEntry, _variant_class_for
+from .strata import ConservationError, STRENGTH_MAP, ManifestEntry, StratumEntry, _variant_class_for
 
 #: Fixed schema/policy vocabulary (ADR-0012), not measured census data.
 CENSUS_SCHEMA = "raptor.tsc.vus_census.disabled_manual.v1"
@@ -212,6 +212,74 @@ def _validate_automatable_criteria(automatable_criteria: Iterable[str]) -> tuple
     return normalized
 
 
+def _require_unique_identities(label: str, values: Sequence[str]) -> None:
+    """Fail closed with `ConservationError` if `values` carries any
+    duplicate -- called BEFORE any mapping/count is constructed from the
+    identity in question."""
+    counts = Counter(values)
+    duplicates = sorted(value for value, count in counts.items() if count > 1)
+    if duplicates:
+        raise ConservationError(f"{label} carries duplicate value(s): {duplicates!r}")
+
+
+def _conserve_stratum_identity(
+    *,
+    manifest: Sequence[ManifestEntry],
+    bias_rows: Sequence[BiasRecord],
+    strata: Sequence[StratumEntry],
+) -> None:
+    """Conserve the exact manifest<->BIAS-row<->stratum identity join
+    BEFORE `build_census_record` constructs a single mapping, index, or
+    count from these inputs (the aggregate-side mirror of
+    `raptor.census.strata.reproduce_census_strata`'s own join
+    conservation, re-asserted here because `build_census_record` is a
+    separate, independently callable entry point).
+
+    Requires: every manifest `variant_id`, manifest `vcf_key`, BIAS raw
+    `variant_id`, and stratum `variant_id` is unique; the manifest/
+    bias_rows/strata cardinalities all agree exactly; and the identity
+    sets `{manifest.vcf_key} == {bias_row.variant_id}` and
+    `{manifest.variant_id} == {strata.variant_id}` hold EXACTLY (no
+    missing, no extra, no duplicate). Raises `ConservationError` before
+    any record is produced -- never reports a `run_integrity.exact_join =
+    false` "success"."""
+    manifest_variant_ids = [entry.variant_id for entry in manifest]
+    manifest_vcf_keys = [entry.vcf_key for entry in manifest]
+    bias_raw_keys = [row.variant_id for row in bias_rows]
+    strata_variant_ids = [entry.variant_id for entry in strata]
+
+    _require_unique_identities("manifest.variant_id", manifest_variant_ids)
+    _require_unique_identities("manifest.vcf_key", manifest_vcf_keys)
+    _require_unique_identities("bias_row.variant_id", bias_raw_keys)
+    _require_unique_identities("strata.variant_id", strata_variant_ids)
+
+    if not (len(manifest) == len(bias_rows) == len(strata)):
+        raise ConservationError(
+            "manifest/bias_rows/strata cardinality mismatch: "
+            f"manifest={len(manifest)}, bias_rows={len(bias_rows)}, strata={len(strata)}"
+        )
+
+    manifest_vcf_key_set = set(manifest_vcf_keys)
+    bias_raw_key_set = set(bias_raw_keys)
+    if manifest_vcf_key_set != bias_raw_key_set:
+        missing = sorted(manifest_vcf_key_set - bias_raw_key_set)
+        extra = sorted(bias_raw_key_set - manifest_vcf_key_set)
+        raise ConservationError(
+            "manifest.vcf_key does not exactly match bias_row.variant_id: "
+            f"missing={missing!r}, extra={extra!r}"
+        )
+
+    manifest_variant_id_set = set(manifest_variant_ids)
+    strata_variant_id_set = set(strata_variant_ids)
+    if manifest_variant_id_set != strata_variant_id_set:
+        missing = sorted(manifest_variant_id_set - strata_variant_id_set)
+        extra = sorted(strata_variant_id_set - manifest_variant_id_set)
+        raise ConservationError(
+            "manifest.variant_id does not exactly match strata.variant_id: "
+            f"missing={missing!r}, extra={extra!r}"
+        )
+
+
 def build_census_record(
     *,
     strata: Sequence[StratumEntry],
@@ -240,6 +308,12 @@ def build_census_record(
     bias_rows = tuple(bias_rows)
     strata = tuple(strata)
     automatable_normalized = _validate_automatable_criteria(automatable_criteria)
+
+    # Conserve the exact manifest<->BIAS-row<->stratum identity join BEFORE
+    # constructing a single mapping/count below: a duplicate/missing/extra
+    # identity fails closed with `ConservationError` here, never silently
+    # collapsing/dropping a row via `dict` construction or a `continue`.
+    _conserve_stratum_identity(manifest=manifest, bias_rows=bias_rows, strata=strata)
 
     manifest_by_vcf_key = {entry.vcf_key: entry for entry in manifest}
     strata_by_variant_id = {entry.variant_id: entry for entry in strata}
@@ -329,15 +403,15 @@ def build_census_record(
     point_distribution = {str(points): count for points, count in sorted(points_counter.items())}
 
     # --- direction-by-gene / direction-by-consequence (raw stratum labels) ---
+    # `_conserve_stratum_identity` above already guarantees every BIAS row's
+    # `variant_id` has a manifest entry and every manifest `variant_id` has
+    # a stratum entry (exact one-to-one join), so both lookups index
+    # directly -- no silent `continue` can ever drop a row here.
     direction_by_gene: dict[str, Counter[str]] = {}
     direction_by_consequence: dict[str, Counter[str]] = {}
     for row in bias_rows:
-        manifest_entry = manifest_by_vcf_key.get(row.variant_id)
-        if manifest_entry is None:
-            continue
-        stratum_entry = strata_by_variant_id.get(manifest_entry.variant_id)
-        if stratum_entry is None:
-            continue
+        manifest_entry = manifest_by_vcf_key[row.variant_id]
+        stratum_entry = strata_by_variant_id[manifest_entry.variant_id]
         direction = stratum_entry.stratum
         direction_by_gene.setdefault(row.gene_name, Counter())[direction] += 1
         conseq_class = _variant_class_for(row.consequence)
