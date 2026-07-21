@@ -95,8 +95,15 @@ def _correction_or_disabled_policy_fields(config_pins: Mapping[str, Any]) -> dic
     - disabled/manual (ANY of the six `_DISABLED_POLICY_PINS` present): ALL
       six are then REQUIRED, `predictor_correction_counts` must be ABSENT
       (a mixed shape is malformed), and the six values must be internally
-      consistent. Any violation raises `ValueError` -- never a silent
-      default and never a synthesized zero-valued
+      consistent. `pp3bp4_suppressed_counts` must be a mapping whose keys
+      are EXACTLY `{"PP3", "BP4"}`, each value a non-negative int (GPT-5.4
+      suppression-provenance finding); `pp3bp4_suppressed_variant_count`
+      must be a non-negative int consistent with the derived total
+      suppressed calls (`PP3 + BP4`): the total is zero if, and only if,
+      the variant count is zero, and the variant count never exceeds the
+      total (one variant may suppress more than one call, so exact
+      equality is never required). Any violation raises `ValueError` --
+      never a silent default and never a synthesized zero-valued
       `predictor_correction_counts` (D14 design choice B).
     """
     disabled_present = [pin for pin in _DISABLED_POLICY_PINS if pin in config_pins]
@@ -149,6 +156,34 @@ def _correction_or_disabled_policy_fields(config_pins: Mapping[str, Any]) -> dic
     if not _valid_count(scored_calls) or scored_calls != 0:
         raise ValueError(
             f"disabled/manual config_pins pp3bp4_scored_calls must be 0, got {scored_calls!r}"
+        )
+
+    suppressed_counts_keys = set(suppressed_counts.keys())
+    if suppressed_counts_keys != {"PP3", "BP4"}:
+        raise ValueError(
+            "disabled/manual config_pins pp3bp4_suppressed_counts keys must be exactly "
+            f"{{'PP3', 'BP4'}}, got {sorted(suppressed_counts_keys)!r}"
+        )
+    for criterion in ("PP3", "BP4"):
+        if not _valid_count(suppressed_counts[criterion]):
+            raise ValueError(
+                f"disabled/manual config_pins pp3bp4_suppressed_counts[{criterion!r}] must be a "
+                f"non-negative int, got {suppressed_counts[criterion]!r}"
+            )
+
+    total_suppressed_calls = suppressed_counts["PP3"] + suppressed_counts["BP4"]
+    if (total_suppressed_calls == 0) != (suppressed_variant_count == 0):
+        raise ValueError(
+            "disabled/manual config_pins pp3bp4_suppressed_variant_count "
+            f"({suppressed_variant_count!r}) is inconsistent with pp3bp4_suppressed_counts total "
+            f"({total_suppressed_calls!r}) -- total suppressed calls must be 0 if, and only if, "
+            "the suppressed variant count is 0"
+        )
+    if suppressed_variant_count > total_suppressed_calls:
+        raise ValueError(
+            f"disabled/manual config_pins pp3bp4_suppressed_variant_count ({suppressed_variant_count!r}) "
+            f"must not exceed the total suppressed calls ({total_suppressed_calls!r}) derived from "
+            "pp3bp4_suppressed_counts"
         )
 
     return {
