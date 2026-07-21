@@ -125,6 +125,51 @@ def _validate_metrics_counts(metrics: Mapping[str, Metrics]) -> None:
                 )
 
 
+#: Every conditional confidence-lower-bound attribute an A2 axis reads
+#: (directly or via `_DIRECTION_LB_FIELDS`) -- each MUST be either `None`
+#: or a non-bool finite int/float within `[0, 1]` before any axis is
+#: computed (spec §4b: malformed/missing input ABORTS generation
+#: fail-closed). A string, bool, NaN, infinity, negative, or >1 value is
+#: exactly as fatal as a malformed count -- never coerced or treated as
+#: unset.
+_CONDITIONAL_LB_FIELDS: tuple = (
+    "precision_lb",
+    "recall_lb",
+    "benign_precision_lb",
+    "benign_recall_lb",
+)
+
+
+def _valid_lower_bound(value: Any) -> bool:
+    """`None`, or a non-bool finite int/float within `[0, 1]` -- the only
+    shapes a conditional precision/recall lower-bound attribute may take
+    (spec A2_conditional_performance: malformed bounds ABORT generation
+    fail-closed BEFORE any axis is computed)."""
+    if value is None:
+        return True
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    if not math.isfinite(value):
+        return False
+    return 0 <= value <= 1
+
+
+def _validate_conditional_lower_bounds(metrics: Mapping[str, Metrics]) -> None:
+    """Validate EVERY present conditional lower-bound attribute
+    (`precision_lb`/`recall_lb`/`benign_precision_lb`/`benign_recall_lb`)
+    on EVERY stratum's `Metrics` -- a string, bool, NaN, infinity,
+    negative, or >1 value fails closed exactly like a malformed count,
+    BEFORE any axis is computed (spec §4b)."""
+    for stratum, m in metrics.items():
+        for field in _CONDITIONAL_LB_FIELDS:
+            value = getattr(m, field, None)
+            if not _valid_lower_bound(value):
+                raise TieredReadjudicationInputError(
+                    f"stratum {stratum!r} Metrics.{field}={value!r} is not None or a valid "
+                    "non-bool finite int/float in [0, 1]"
+                )
+
+
 def _validate_config(config: EvalConfig, tiered_authorization: Any) -> Mapping[str, Any]:
     """Validate the SEPARATELY-supplied `tiered_authorization` mapping
     against the locked pin (`_PINNED_TIERED_AUTHORIZATION`, strict recursive
@@ -479,6 +524,7 @@ def decide_tiered_gate(
     """
     tiered_auth = _validate_config(config, tiered_authorization)
     _validate_metrics_counts(metrics)
+    _validate_conditional_lower_bounds(metrics)
 
     criterion_map = tiered_auth["criterion_scope_applicability"]
     evaluation_skipped = _validate_evaluation_skipped(run_meta, criterion_map)
