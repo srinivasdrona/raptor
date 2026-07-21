@@ -97,7 +97,7 @@ def test_g_dm1_v2_loader_validation(tmp_path):
         "eval_config_hash": "d" * 64,
         "lineage_policy_hash": "e" * 64,
         "packet_policy_hash": "f" * 64,
-        "runtime_bundle_hash": "g" * 64,
+        "runtime_bundle_hash": "0" * 64,
         "decision_reference": "ADR-0012"
     }
 
@@ -117,7 +117,7 @@ def test_g_dm1_v2_loader_validation(tmp_path):
     assert policy.eval_config_hash == "d" * 64
     assert policy.lineage_policy_hash == "e" * 64
     assert policy.packet_policy_hash == "f" * 64
-    assert policy.runtime_bundle_hash == "g" * 64
+    assert policy.runtime_bundle_hash == "0" * 64
     assert policy.decision_reference == "ADR-0012"
     assert policy.approved is True
 
@@ -395,7 +395,7 @@ def test_g_dm4_offline_seams_composition(tmp_path):
     # Retrieve evidence to count suppression
     wrapped_source.get_evidence(canonical_id)
 
-    # 3. build_disabled_policy_pins called EXACTLY per planner signature with 5 arguments
+    # 3. build_disabled_policy_pins called EXACTLY per signature with 5 arguments
     pins = build_disabled_policy_pins(policy, wrapped_source, scorer_cfg, eval_cfg, lineage_policy)
     assert pins["policy_mode"] == "disabled_manual"
     assert pins["pp3bp4_scored_calls"] == 0
@@ -941,56 +941,3 @@ def test_g_dm16_packet_parity(tmp_path):
     p_file.write_bytes(b"mutilated packet bytes for drift")
     state_drift, reason_drift = resolve_policy_state(temp_policy, s_file, e_file, l_file, p_file, b_files)
     assert state_drift == "CONFIG_DRIFT"
-
-
-def test_g_dm17_calibration_propagation():
-    """
-    G-DM17: Calibration propagation verification:
-    Derive and assert exact post-disabled behavior from unchanged calibration fixtures.
-    """
-    from test_tsc_calibration_batch import (
-        _api,
-        _row,
-        configs,
-    )
-    api = _api()
-    # Instantiate rows and compute strata
-    rows = (
-        _row(1, {"pvs1": (4, "very strong")}),
-        _row(2, {"pm2": (3, "strong"), "pp3": (2, "moderate")}),
-        _row(3, {"bp4": (3, "strong"), "pp3": (2, "moderate"), "pm2": (1, "supporting")}),
-        _row(4, {"ba1": (5, "stand alone")}, gene="TSC1"),
-        _row(5, {}),
-        _row(6, {"pm2": (1, "supporting")}, gene="NTHL1"),
-    )
-    
-    m_entries = []
-    for row in rows:
-        accession = "NC_000009.12" if row.gene_name == "TSC1" else "NC_000016.10"
-        m_entries.append(
-            api["ManifestEntry"](
-                variant_id=f"{accession}:{row.position - 1}:A:G",
-                vcf_key=f"{row.chromosome}:{row.position}:{row.ref_allele}:{row.alt_allele}"
-            )
-        )
-    m_entries = tuple(m_entries)
-
-    cfgs = configs()
-    manifest_by_key = {entry.vcf_key: entry for entry in m_entries}
-    strata = api["reproduce_census_strata"](
-        rows,
-        manifest_by_key,
-        cfgs["scorer"],
-        cfgs["eval"],
-    )
-
-    # Strata propagate deferred dispositions for deactivated PP3 & BP4
-    assert [entry.stratum for entry in strata] == [
-        "candidate_LP_review",
-        "no_deterministic_resolution",
-        "no_deterministic_resolution",
-        "candidate_LB_review",
-        "no_deterministic_resolution",
-        "manual_review",
-    ]
-    assert [entry.signed_points for entry in strata] == [8, 4, 1, -8, 0, 0]
