@@ -616,6 +616,55 @@ def test_conditional_lower_bounds_fail_closed(invalid_bound):
         )
 
 
+def test_pooled_overall_metrics_never_become_scopes():
+    """The descriptive pooled `overall` stratum is excluded from scope axes."""
+    config = make_test_config()
+    run_meta = MockRunMeta()
+    counts = {
+        "total": 50,
+        "total_called": 40,
+        "abstain": 10,
+        "path_actual": 40,
+        "path_called": 40,
+        "benign_actual": 10,
+        "benign_called": 0,
+        "tp": 40,
+        "tn": 0,
+        "fp": 0,
+        "fn": 0,
+    }
+    truncating = Metrics(
+        precision=1.0,
+        recall=1.0,
+        concordance=1.0,
+        counts=dict(counts),
+        stratum="truncating",
+        gating=True,
+    )
+    truncating.precision_lb = 0.98
+    truncating.recall_lb = 0.98
+    overall = Metrics(
+        precision=1.0,
+        recall=1.0,
+        concordance=1.0,
+        counts=dict(counts),
+        stratum="overall",
+        gating=True,
+    )
+    overall.precision_lb = 0.98
+    overall.recall_lb = 0.98
+
+    decision = decide_tiered_gate(
+        {"truncating": truncating, "overall": overall},
+        config,
+        run_meta,
+        make_tiered_authorization_dict(),
+    )
+
+    assert "truncating:pathogenic" in decision.scopes
+    assert not any(key.startswith("overall:") for key in decision.scopes)
+
+
 def test_synthetic_full_spectrum_requires():
     """Test 9: full_spectrum authorization requires ALL three requires-scopes VALIDATED_PROSPECTIVE.
 
