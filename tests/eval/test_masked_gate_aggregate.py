@@ -2959,6 +2959,342 @@ def test_v1_historical_limitations_remain_unchanged():
     assert "PM1 was excluded from this fixed evaluation after both published and reproduced resources had zero held-out-reachable rows; production PM1 remains unvalidated." in agg_skip["limitations"]
 
 
+# =========================================================================
+# GEMINI G-AG1..G-AG4 DISABLED ENVELOPE AGGREGATE CONTRACT TESTS
+# =========================================================================
+
+
+def test_g_ag1_v1_build_aggregate_disabled_envelope() -> None:
+    """
+    G-AG1: build_aggregate (v1) builds aggregate from production-shaped disabled envelope.
+    Resulting policy block preserves disabled/manual mode and suppression counts without Keynes or KeyErrors.
+    """
+    envelope = {
+        "content_hash": "content",
+        "predictor_policy": {
+            "schema": "bp4pp3-predictor-policy/2",
+            "status": "approved",
+            "mode": "disabled_manual",
+            "predictor_source_hash": "a" * 64,
+            "correction_hash": "b" * 64,
+            "production_config_hash": "c" * 64,
+            "eval_config_hash": "d" * 64,
+            "lineage_policy_hash": "e" * 64,
+            "packet_policy_hash": "f" * 64,
+            "runtime_bundle_hash": "g" * 64,
+            "decision_reference": "ADR-0012",
+        },
+        "mask_attestation": {
+            "removed_count": 2,
+            "zero_survivors": True,
+        },
+        "lineage_audit": {"effective_blocking_criteria": []},
+        "verified_return_artifacts": {"a": "hash", "b": "hash"},
+        "report": {
+            "labels_snapshot": "snapshot",
+            "benchmark_size": 3,
+            "train_dev_size": 1,
+            "holdout_size": 2,
+            "holdout_label_counts": {"P": 1, "B": 1},
+            "holdout_class_counts": {"missense": 2},
+            "metrics": {"missense": {"precision": 0.5}},
+            "gate": {
+                "status": "FAIL",
+                "stratum": "missense",
+                "reason": "below threshold",
+                "vus_authorized": False,
+                "per_stratum": {},
+            },
+            "config_pins": {
+                "bias_tsv_sha256": "bias",
+                "manifest_sha256": "manifest",
+                "mask_ledger_sha256": "ledger",
+                "remask_audit_sha256": "remask",
+                "return_manifest_sha256": "return",
+                "policy_mode": "disabled_manual",
+                "pp3bp4_automation_disabled": True,
+                "predictor_correction_applied": False,
+                "pp3bp4_suppressed_counts": {"PP3": 1, "BP4": 2},
+                "pp3bp4_suppressed_variant_count": 1,
+                "pp3bp4_scored_calls": 0,
+                "operational_skipped_criteria": ["PM1", "PS4"],
+                "evaluation_skipped_criteria": ["PM1"],
+                "oracle_thresholds": {"confidence": 0.95},
+            },
+        },
+    }
+
+    aggregate = build_aggregate(
+        envelope,
+        date="2026-07-13",
+        terminal_json_hash="json",
+        terminal_report_hash="text",
+        published_pm1_scope={"reachable_pm1_rows": 0},
+        reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="approved",
+    )
+    assert aggregate["status"] == "FAIL"
+    policy_block = aggregate["policy"]
+    assert policy_block["policy_mode"] == "disabled_manual"
+    assert policy_block["pp3bp4_automation_disabled"] is True
+    assert policy_block["predictor_correction_applied"] is False
+    assert policy_block["pp3bp4_suppressed_counts"] == {"PP3": 1, "BP4": 2}
+    assert policy_block["pp3bp4_suppressed_variant_count"] == 1
+    assert policy_block["pp3bp4_scored_calls"] == 0
+    assert "predictor_correction_counts" not in policy_block
+
+
+def test_g_ag2_v2_build_aggregate_disabled_envelope() -> None:
+    """
+    G-AG2: build_aggregate_v2 (v2 route) handles the same disabled envelope and produces v2 aggregate without KeyError,
+    preserving v1-inherited disabled policy block and v2 scope invariants.
+    """
+    _scopes = {
+        "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "VALIDATED"),
+        "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
+        "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
+        "truncating:benign": _get_consistent_scope("truncating:benign", "DESCRIPTIVE"),
+    }
+    envelope = {
+        "content_hash": "content",
+        "predictor_policy": {
+            "schema": "bp4pp3-predictor-policy/2",
+            "status": "approved",
+            "mode": "disabled_manual",
+            "predictor_source_hash": "a" * 64,
+            "correction_hash": "b" * 64,
+            "production_config_hash": "c" * 64,
+            "eval_config_hash": "d" * 64,
+            "lineage_policy_hash": "e" * 64,
+            "packet_policy_hash": "f" * 64,
+            "runtime_bundle_hash": "g" * 64,
+            "decision_reference": "ADR-0012",
+        },
+        "mask_attestation": {
+            "removed_count": 2,
+            "zero_survivors": True,
+        },
+        "lineage_audit": {"effective_blocking_criteria": []},
+        "verified_return_artifacts": {"a": "hash", "b": "hash"},
+        "report": {
+            "labels_snapshot": "snapshot",
+            "benchmark_size": 3,
+            "train_dev_size": 1,
+            "holdout_size": 2,
+            "holdout_label_counts": {"P": 1, "B": 1},
+            "holdout_class_counts": {"missense": 2},
+            "metrics": _metrics_from_scopes(_scopes),
+            "gate": {
+                "status": "FAIL",
+                "stratum": "missense",
+                "reason": "below threshold",
+                "vus_authorized": False,
+                "per_stratum": {},
+            },
+            "scope_gate": {
+                "schema_version": "2",
+                "full_spectrum_status": "PASS",
+                "full_spectrum_vus_authorized": True,
+                "research_scope_flags": {"truncating_pathogenic_research_scope_validated": True},
+                "governance_state": "FULL_SPECTRUM",
+                "governance_statement": "All pre-registered research scopes are validated for research-evidence use only.",
+                "research_use_disclaimer": "Research-evidence validation only.",
+                "reason": "all validated",
+                "scopes": _scopes,
+            },
+            "config_pins": {
+                "bias_tsv_sha256": "bias",
+                "manifest_sha256": "manifest",
+                "mask_ledger_sha256": "ledger",
+                "remask_audit_sha256": "remask",
+                "return_manifest_sha256": "return",
+                "policy_mode": "disabled_manual",
+                "pp3bp4_automation_disabled": True,
+                "predictor_correction_applied": False,
+                "pp3bp4_suppressed_counts": {"PP3": 1, "BP4": 2},
+                "pp3bp4_suppressed_variant_count": 1,
+                "pp3bp4_scored_calls": 0,
+                "operational_skipped_criteria": ["PM1", "PS4"],
+                "evaluation_skipped_criteria": [],
+                "oracle_thresholds": make_oracle_thresholds(),
+            },
+        },
+    }
+
+    aggregate = build_aggregate_v2(
+        envelope,
+        date="2026-07-14",
+        terminal_json_hash="json",
+        terminal_report_hash="text",
+        published_pm1_scope={"reachable_pm1_rows": 0},
+        reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="approved",
+    )
+
+    assert aggregate["schema"] == "raptor.tsc.masked_holdout_gate.v2"
+    assert aggregate["full_spectrum_status"] == "PASS"
+    assert aggregate["vus_authorized"] is True
+    
+    policy_block = aggregate["policy"]
+    assert policy_block["policy_mode"] == "disabled_manual"
+    assert policy_block["pp3bp4_automation_disabled"] is True
+    assert policy_block["predictor_correction_applied"] is False
+    assert policy_block["pp3bp4_suppressed_counts"] == {"PP3": 1, "BP4": 2}
+    assert policy_block["pp3bp4_suppressed_variant_count"] == 1
+    assert policy_block["pp3bp4_scored_calls"] == 0
+    assert "predictor_correction_counts" not in policy_block
+
+
+def test_g_ag3_legacy_corrected_envelope_compatibility() -> None:
+    """
+    G-AG3: legacy envelope with predictor_correction_counts and no disabled pins is processed byte-identically,
+    still requiring and emitting predictor_correction_counts.
+    """
+    envelope = {
+        "content_hash": "content",
+        "predictor_policy": {"status": "approved"},
+        "mask_attestation": {
+            "removed_count": 2,
+            "zero_survivors": True,
+        },
+        "lineage_audit": {"effective_blocking_criteria": []},
+        "verified_return_artifacts": {"a": "hash", "b": "hash"},
+        "report": {
+            "labels_snapshot": "snapshot",
+            "benchmark_size": 3,
+            "train_dev_size": 1,
+            "holdout_size": 2,
+            "holdout_label_counts": {"P": 1, "B": 1},
+            "holdout_class_counts": {"missense": 2},
+            "metrics": {"missense": {"precision": 0.5}},
+            "gate": {
+                "status": "FAIL",
+                "stratum": "missense",
+                "reason": "below threshold",
+                "vus_authorized": False,
+                "per_stratum": {},
+            },
+            "config_pins": {
+                "bias_tsv_sha256": "bias",
+                "manifest_sha256": "manifest",
+                "mask_ledger_sha256": "ledger",
+                "remask_audit_sha256": "remask",
+                "return_manifest_sha256": "return",
+                "predictor_correction_counts": {"PP3": 1, "BP4": 2},
+                "operational_skipped_criteria": ["PM1", "PS4"],
+                "evaluation_skipped_criteria": ["PM1"],
+                "oracle_thresholds": {"confidence": 0.95},
+            },
+        },
+    }
+
+    aggregate = build_aggregate(
+        envelope,
+        date="2026-07-13",
+        terminal_json_hash="json",
+        terminal_report_hash="text",
+        published_pm1_scope={"reachable_pm1_rows": 0},
+        reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="approved",
+    )
+    assert aggregate["policy"]["predictor_correction_counts"] == {"PP3": 1, "BP4": 2}
+
+
+def test_g_ag4_malformed_disabled_envelope_fail_closed() -> None:
+    """
+    G-AG4: malformed, incomplete or mixed disabled envelopes raise ValueError.
+    """
+    def make_valid_pins():
+        return {
+            "bias_tsv_sha256": "bias",
+            "manifest_sha256": "manifest",
+            "mask_ledger_sha256": "ledger",
+            "remask_audit_sha256": "remask",
+            "return_manifest_sha256": "return",
+            "policy_mode": "disabled_manual",
+            "pp3bp4_automation_disabled": True,
+            "predictor_correction_applied": False,
+            "pp3bp4_suppressed_counts": {"PP3": 1, "BP4": 2},
+            "pp3bp4_suppressed_variant_count": 1,
+            "pp3bp4_scored_calls": 0,
+            "operational_skipped_criteria": ["PM1", "PS4"],
+            "evaluation_skipped_criteria": ["PM1"],
+            "oracle_thresholds": {"confidence": 0.95},
+        }
+
+    def make_envelope(pins):
+        return {
+            "content_hash": "content",
+            "predictor_policy": {"status": "approved"},
+            "mask_attestation": {
+                "removed_count": 2,
+                "zero_survivors": True,
+            },
+            "lineage_audit": {"effective_blocking_criteria": []},
+            "verified_return_artifacts": {"a": "hash", "b": "hash"},
+            "report": {
+                "labels_snapshot": "snapshot",
+                "benchmark_size": 3,
+                "train_dev_size": 1,
+                "holdout_size": 2,
+                "holdout_label_counts": {"P": 1, "B": 1},
+                "holdout_class_counts": {"missense": 2},
+                "metrics": {"missense": {"precision": 0.5}},
+                "gate": {
+                    "status": "FAIL",
+                    "stratum": "missense",
+                    "reason": "below threshold",
+                    "vus_authorized": False,
+                    "per_stratum": {},
+                },
+                "config_pins": pins,
+            },
+        }
+
+    # Case 1: Missing a required suppression pin (e.g. policy_mode)
+    pins1 = make_valid_pins()
+    del pins1["policy_mode"]
+    with pytest.raises(ValueError):
+        build_aggregate(
+            make_envelope(pins1),
+            date="2026-07-13",
+            terminal_json_hash="json",
+            terminal_report_hash="text",
+            published_pm1_scope={"reachable_pm1_rows": 0},
+            reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="approved",
+        )
+
+    # Case 2: pp3bp4_scored_calls != 0
+    pins2 = make_valid_pins()
+    pins2["pp3bp4_scored_calls"] = 1
+    with pytest.raises(ValueError):
+        build_aggregate(
+            make_envelope(pins2),
+            date="2026-07-13",
+            terminal_json_hash="json",
+            terminal_report_hash="text",
+            published_pm1_scope={"reachable_pm1_rows": 0},
+            reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="approved",
+        )
+
+    # Case 3: Mixed shape (both predictor_correction_counts AND disabled markers present)
+    pins3 = make_valid_pins()
+    pins3["predictor_correction_counts"] = {"PP3": 1}
+    with pytest.raises(ValueError):
+        build_aggregate(
+            make_envelope(pins3),
+            date="2026-07-13",
+            terminal_json_hash="json",
+            terminal_report_hash="text",
+            published_pm1_scope={"reachable_pm1_rows": 0},
+            reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="approved",
+        )
+
+
+
 
 
 
