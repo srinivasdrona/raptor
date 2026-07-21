@@ -42,6 +42,7 @@ critical_path:
   - resolve-pp3-bp4-activation
   - rerun-masked-gate
   - recompute-vus-census
+  - revise-tiered-gate-semantics
   - core-generate-review-packets
   - define-variant-mechanism-atlas
 
@@ -74,6 +75,16 @@ progress_as_of_2026_07_21:
     pp3bp4_scored_calls: 0
     aggregate_sha256: 45ff9f9abada7d5369c131bf7ffde28d0786eea41ff9bf7905f51da0cabd59ac
     checker_verdict: CLEAN_WITH_NONBLOCKING_NOTES
+  tiered_readjudication:
+    post_hoc: true
+    no_new_evidence: true
+    full_spectrum_status: NOT_VALIDATED
+    full_spectrum_authorization: NOT_AUTHORIZED
+    truncating_pathogenic_evidence: SUPPORTED_POSTHOC
+    truncating_pathogenic_authorization: PENDING_PROSPECTIVE
+    prospective_validation_status: PENDING
+    aggregate_sha256: 1e36b2d07767fdd8e32fbf07dd42f60a2b4cae2ff9b21c7dfb9430d741c5bc5f
+    checker_verdict: CLEAN
 
 policy_resolution_rule: >-
   PP3/BP4 activation is resolved when a hash-bound decision is recorded.

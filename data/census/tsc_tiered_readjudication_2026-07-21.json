@@ -1,0 +1,218 @@
+{
+  "content_hash": "46e797d4a5db20eae8ff32d369b689ca8b6d63f5ef404b0bdde3edc3122ec7bc",
+  "date": "2026-07-21",
+  "implementation_commit": "c56cb8914b8bf91b40a81f41fb7c5d8140e13f38",
+  "implementation_module_sha256": "d33243dff1145d4ca6c6d674b2effe7dd9ceaa4e4e613e40c3b86f7b94b92960",
+  "new_tiered_outcome": {
+    "full_spectrum_authorization": "NOT_AUTHORIZED",
+    "full_spectrum_status": "NOT_VALIDATED",
+    "governance_state": "RESEARCH_ONLY_NO_CLINICAL_USE",
+    "governance_statement": "This is a post-hoc re-adjudication of the frozen ADR-0012 masked-holdout counts for research evidence only; no scope is authorized, and this authorizes no clinical classification, VUS worklist, or ClinVar submission pending a prospective validation on unseen data.",
+    "no_new_evidence_statement": "No new evidence was generated: this record re-interprets the frozen R2 aggregate (source_canonical_lf_sha256 7c55cd4e3059713d1d53886d8893a3819153375b62ce9d37187d731132c6a77f) under the versioned tiered rule and performs no new run, scoring, annotation, benchmark read, network access, or data generation.",
+    "prospective_validation_status": "PENDING",
+    "reason": "post-hoc re-adjudication complete: no scope is authorized pending a prospective validation",
+    "research_scope_authorization": "PENDING_PROSPECTIVE",
+    "research_scope_evidence_status": "SUPPORTED_POSTHOC",
+    "research_scope_flags": {
+      "truncating_pathogenic_research_scope_validated": false
+    },
+    "research_use_disclaimer": "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+    "run_integrity": "PASS",
+    "scopes": {
+      "missense:benign": {
+        "abstain_count": 145,
+        "actual_count": 103,
+        "authorization_status": "NOT_AUTHORIZED",
+        "called_count": 9,
+        "conditional_performance": "NOT_ESTIMABLE",
+        "data_sufficiency": "UNDERPOWERED",
+        "direction": "benign",
+        "end_to_end_correct_call_coverage": "9/103",
+        "fn": 0,
+        "fp": 0,
+        "min_count": 36,
+        "policy_parity": "CLEAR",
+        "precision_lb": null,
+        "precision_threshold": 0.9,
+        "reasons": [
+          "min(benign_actual=103, benign_called=9) < min_count_per_class=36"
+        ],
+        "recall_lb": null,
+        "recall_threshold": 0.85,
+        "scope_evidence_status": "UNDERPOWERED",
+        "stratum": "missense",
+        "tn": 9,
+        "tp": 0
+      },
+      "missense:pathogenic": {
+        "abstain_count": 145,
+        "actual_count": 51,
+        "authorization_status": "NOT_AUTHORIZED",
+        "called_count": 0,
+        "conditional_performance": "NOT_ESTIMABLE",
+        "data_sufficiency": "NO_CALLS",
+        "direction": "pathogenic",
+        "end_to_end_correct_call_coverage": "0/51",
+        "fn": 0,
+        "fp": 0,
+        "min_count": 36,
+        "policy_parity": "BLOCKED",
+        "precision_lb": null,
+        "precision_threshold": 0.9,
+        "reasons": [
+          "policy_parity=BLOCKED: PM1 evaluation_skipped applies_to missense:pathogenic",
+          "path_called=0"
+        ],
+        "recall_lb": null,
+        "recall_threshold": 0.85,
+        "scope_evidence_status": "NO_CALLS",
+        "stratum": "missense",
+        "tn": 9,
+        "tp": 0
+      },
+      "other:benign": {
+        "abstain_count": 2010,
+        "actual_count": 2095,
+        "authorization_status": "NOT_AUTHORIZED",
+        "called_count": 113,
+        "conditional_performance": "NOT_APPLICABLE",
+        "data_sufficiency": "ADEQUATE",
+        "direction": "benign",
+        "end_to_end_correct_call_coverage": "112/2095",
+        "fn": 0,
+        "fp": 1,
+        "min_count": 36,
+        "policy_parity": "CLEAR",
+        "precision_lb": null,
+        "precision_threshold": null,
+        "reasons": [
+          "no Oracle threshold registered for this scope"
+        ],
+        "recall_lb": null,
+        "recall_threshold": null,
+        "scope_evidence_status": "NOT_APPLICABLE",
+        "stratum": "other",
+        "tn": 112,
+        "tp": 89
+      },
+      "other:pathogenic": {
+        "abstain_count": 2010,
+        "actual_count": 117,
+        "authorization_status": "NOT_AUTHORIZED",
+        "called_count": 89,
+        "conditional_performance": "NOT_APPLICABLE",
+        "data_sufficiency": "ADEQUATE",
+        "direction": "pathogenic",
+        "end_to_end_correct_call_coverage": "89/117",
+        "fn": 0,
+        "fp": 1,
+        "min_count": 36,
+        "policy_parity": "CLEAR",
+        "precision_lb": null,
+        "precision_threshold": null,
+        "reasons": [
+          "no Oracle threshold registered for this scope"
+        ],
+        "recall_lb": null,
+        "recall_threshold": null,
+        "scope_evidence_status": "NOT_APPLICABLE",
+        "stratum": "other",
+        "tn": 112,
+        "tp": 89
+      },
+      "truncating:benign": {
+        "abstain_count": 22,
+        "actual_count": 1,
+        "authorization_status": "NOT_AUTHORIZED",
+        "called_count": 0,
+        "conditional_performance": "NOT_APPLICABLE",
+        "data_sufficiency": "NO_CALLS",
+        "direction": "benign",
+        "end_to_end_correct_call_coverage": "0/1",
+        "fn": 0,
+        "fp": 0,
+        "min_count": 36,
+        "policy_parity": "CLEAR",
+        "precision_lb": null,
+        "precision_threshold": null,
+        "reasons": [
+          "no Oracle threshold registered for this scope"
+        ],
+        "recall_lb": null,
+        "recall_threshold": null,
+        "scope_evidence_status": "NOT_APPLICABLE",
+        "stratum": "truncating",
+        "tn": 0,
+        "tp": 189
+      },
+      "truncating:pathogenic": {
+        "abstain_count": 22,
+        "actual_count": 210,
+        "authorization_status": "PENDING_PROSPECTIVE",
+        "called_count": 189,
+        "conditional_performance": "MET",
+        "data_sufficiency": "ADEQUATE",
+        "direction": "pathogenic",
+        "end_to_end_correct_call_coverage": "189/210",
+        "fn": 0,
+        "fp": 0,
+        "min_count": 36,
+        "policy_parity": "CLEAR",
+        "precision_lb": 0.9806713599320976,
+        "precision_threshold": 0.95,
+        "reasons": [],
+        "recall_lb": 0.9806713599320976,
+        "recall_threshold": 0.95,
+        "scope_evidence_status": "SUPPORTED_POSTHOC",
+        "stratum": "truncating",
+        "tn": 0,
+        "tp": 189
+      }
+    }
+  },
+  "old_semantic_outcome": {
+    "authorization_blockers": [
+      "evaluation_skipped_criteria:PM1"
+    ],
+    "full_spectrum_status": "BLOCKED_POLICY",
+    "governance_state": "NONE_VALIDATED",
+    "legacy_v1_gate": {
+      "per_stratum": {
+        "missense": {
+          "gating": true,
+          "met": false,
+          "powered": true,
+          "precision_lb": 0.0,
+          "recall_lb": 0.0,
+          "threshold": {
+            "directions": [
+              "pathogenic",
+              "benign"
+            ],
+            "gating": true,
+            "precision": 0.9,
+            "recall": 0.85
+          }
+        }
+      },
+      "reason": "missense metric(s) below Oracle threshold (95% CI lower bound): precision_lb=0.0<0.9; recall_lb=0.0<0.85; benign_precision_lb=0.6637328831200572<0.9; benign_recall_lb=0.6637328831200572<0.85",
+      "status": "FAIL",
+      "stratum": "missense",
+      "vus_authorized": false
+    },
+    "legacy_v1_missense_gate": "FAIL",
+    "research_scope_flags": {
+      "truncating_pathogenic_research_scope_validated": false
+    },
+    "schema": "raptor.tsc.masked_holdout_gate.v2",
+    "scope_gate_reason": "BLOCKED_POLICY: evaluation_skipped_criteria:PM1 | missense:benign=FAIL; missense:pathogenic=FAIL; other:benign=DESCRIPTIVE; other:pathogenic=DESCRIPTIVE; truncating:benign=DESCRIPTIVE; truncating:pathogenic=VALIDATED",
+    "vus_authorized": false
+  },
+  "post_hoc": true,
+  "schema": "raptor.tsc.tiered_readjudication.v3",
+  "schema_version": "3",
+  "source_canonical_lf_sha256": "7c55cd4e3059713d1d53886d8893a3819153375b62ce9d37187d731132c6a77f",
+  "source_content_hash": "2ead589d2f129f988d9932bb01153891902f0d675000554887a1524e567413b2",
+  "source_record": "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json",
+  "tiered_config_canonical_sha256": "eb4fad80c5da514c61a3bb2fd426b0771142a2a3d582e8054971bbd7da62d840"
+}
