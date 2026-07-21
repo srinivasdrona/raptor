@@ -438,6 +438,32 @@ def test_git_failure_fails_closed(cli_args_dict, tmp_path: Path, monkeypatch) ->
     assert not canonical_path.exists()
 
 
+def test_code_commit_is_fixed_width_full_sha(monkeypatch) -> None:
+    """Code provenance uses the full 40-hex commit, never an abbreviation."""
+    import raptor.census.cli as census_cli
+
+    full_sha = "ade13f206f3e2c2efe3ec92715d974645fc8da8f"
+
+    class Result:
+        stdout = full_sha + "\n"
+
+    def full_result(args, **kwargs):
+        assert args == ["git", "rev-parse", "HEAD"]
+        return Result()
+
+    monkeypatch.setattr(census_cli.subprocess, "run", full_result)
+    assert census_cli._resolve_code_commit() == full_sha
+
+    class ShortResult:
+        stdout = full_sha[:7] + "\n"
+
+    monkeypatch.setattr(
+        census_cli.subprocess, "run", lambda *args, **kwargs: ShortResult()
+    )
+    with pytest.raises(census_cli.CodeCommitResolutionError):
+        census_cli._resolve_code_commit()
+
+
 def test_historical_stats_path_rejection(cli_args_dict, tmp_path: Path, monkeypatch) -> None:
     """Fail closed when `--historical-stats` path is an arbitrary alternate path."""
     check_cli_implemented()
@@ -555,4 +581,3 @@ def test_anchor_approved_predictor_policy(cli_args_dict, tmp_path: Path, monkeyp
             
     # Restore correct policy content
     canonical_policy_path.write_bytes(policy_bytes)
-
