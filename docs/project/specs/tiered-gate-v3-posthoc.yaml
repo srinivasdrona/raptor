@@ -12,8 +12,10 @@
 # single locked prospective dataset rule (no OR) with BLOCKED_DATA + no
 # outcome-dependent fallback; (5) frozen-R2 tests over all six scopes and all
 # axes incl. other:benign 112/2095 (called 113) and other:pathogenic 89/117
-# (correct/actual, never called/actual); (6) config/impl/source/self hashes with
-# an exact canonical-LF hash payload; (7) consistent test/Beat-4/migration/
+# (correct/actual, never called/actual); (6) config/impl/source/self content
+# hashes over compact JSON PLUS the written artifact's canonical-LF file SHA-256
+# recorded as an EXTERNAL manifest identity (a file cannot embed its own final
+# hash without self-reference); (7) consistent test/Beat-4/migration/
 # expected-R2/count updates, additive architecture, R2/v1/v2 immutable.
 #
 # Purpose: an implementation-ready, hash-bound, additive plan that RE-ADJUDICATES
@@ -213,8 +215,9 @@ decision_ledger:
     decision: >-
       A SUPPORTED_POSTHOC scope-evidence status is research-evidence support of
       the frozen data only. It sets authorization_status = PENDING_PROSPECTIVE,
-      never AUTHORIZED. full_spectrum and clinical/production authorization stay
-      NOT_AUTHORIZED. No VUS worklist, classification, or ClinVar submission.
+      never AUTHORIZED_RESEARCH_ONLY. full_spectrum and clinical/production
+      authorization stay NOT_AUTHORIZED. No VUS worklist, classification, or
+      ClinVar submission.
     rationale: The operator directive and slot-2/§10 anti-success-ladder rule.
   D5_pure_readjudication_cli:
     decision: >-
@@ -239,7 +242,7 @@ decision_ledger:
         change the meaning of the frozen v2 path.
     - id: R3_authorize_truncating_now
       rejected: >-
-        Promoting truncating:pathogenic to AUTHORIZED because it is MET+ADEQUATE.
+        Promoting truncating:pathogenic to AUTHORIZED_RESEARCH_ONLY because it is MET+ADEQUATE.
         Rejected: post-hoc support is not prospective authorization; a favorable
         headline is exactly the failure mode slot 2 §10 forbids.
     - id: R4_drop_missense_from_full_spectrum
@@ -339,15 +342,17 @@ tiered_model:
         recorded in reasons. SUPPORTED_POSTHOC requires all of adequate data,
         clear policy parity, and a met conditional threshold.
     A6_authorization_status:
-      enum: [AUTHORIZED, NOT_AUTHORIZED, PENDING_PROSPECTIVE]
+      enum: [NOT_AUTHORIZED, PENDING_PROSPECTIVE, AUTHORIZED_RESEARCH_ONLY]
       arithmetic: >-
-        Post-hoc re-adjudication NEVER emits AUTHORIZED. A scope whose
-        A5 == SUPPORTED_POSTHOC gets PENDING_PROSPECTIVE (research-evidence
+        Post-hoc re-adjudication NEVER emits AUTHORIZED_RESEARCH_ONLY. A scope
+        whose A5 == SUPPORTED_POSTHOC gets PENDING_PROSPECTIVE (research-evidence
         support recorded; authorization withheld pending a prospective run).
         Every other scope gets NOT_AUTHORIZED. Full-spectrum authorization is
         NOT_AUTHORIZED unless every full_spectrum.requires scope is
-        SUPPORTED_POSTHOC AND a prospective validation has actually executed
-        (never true in a re-adjudication) — so it is always NOT_AUTHORIZED here.
+        VALIDATED_PROSPECTIVE AND its policy_parity is CLEAR AND a prospective
+        validation has actually executed under the locked contract (never true
+        in a re-adjudication); SUPPORTED_POSTHOC can NEVER by itself satisfy
+        future authorization — so full-spectrum is always NOT_AUTHORIZED here.
   criterion_scope_applicability:
     schema_note: >-
       Versioned, derived from ACMG/AMP evidence semantics + existing config
@@ -401,9 +406,13 @@ tiered_model:
         validation has actually executed under the locked contract (§8); else
         NOT_VALIDATED. A post-hoc re-adjudication ALWAYS yields NOT_VALIDATED.
       authorization:
-        enum: [NOT_AUTHORIZED, AUTHORIZED]
-        rule: AUTHORIZED only when full_spectrum_status == VALIDATED_PROSPECTIVE;
-          post-hoc ALWAYS NOT_AUTHORIZED.
+        enum: [NOT_AUTHORIZED, PENDING_PROSPECTIVE, AUTHORIZED_RESEARCH_ONLY]
+        rule: >-
+          AUTHORIZED_RESEARCH_ONLY only when full_spectrum_status ==
+          VALIDATED_PROSPECTIVE (i.e. every full_spectrum.requires scope is
+          VALIDATED_PROSPECTIVE with CLEAR policy_parity under an executed
+          prospective run); SUPPORTED_POSTHOC alone can NEVER authorize.
+          Post-hoc ALWAYS NOT_AUTHORIZED.
     research_scope_evidence_status:
       key: truncating_pathogenic_research_scope_validated   # canonical ADR-0011/v2 key
       enum: [NOT_SUPPORTED, SUPPORTED_POSTHOC, VALIDATED_PROSPECTIVE]
@@ -420,12 +429,16 @@ tiered_model:
         FALSE for NOT_SUPPORTED and for SUPPORTED_POSTHOC. Post-hoc it stays
         false — SUPPORTED_POSTHOC evidence does NOT set the "_validated" boolean.
     authorization_status:
-      enum: [AUTHORIZED, NOT_AUTHORIZED, PENDING_PROSPECTIVE]
+      enum: [NOT_AUTHORIZED, PENDING_PROSPECTIVE, AUTHORIZED_RESEARCH_ONLY]
       arithmetic: >-
-        Per-scope A6 and every aggregate authorization surface. Post-hoc:
-        SUPPORTED_POSTHOC → PENDING_PROSPECTIVE; all else NOT_AUTHORIZED; never
-        AUTHORIZED. Future: AUTHORIZED only after a prospective run graduates the
-        scope to VALIDATED_PROSPECTIVE via a new owner decision + fresh hashes.
+        The SINGLE tri-state authorization contract shared by per-scope A6 and
+        EVERY aggregate authorization surface (full_spectrum, research_scope).
+        Post-hoc: SUPPORTED_POSTHOC → PENDING_PROSPECTIVE; all else
+        NOT_AUTHORIZED; never AUTHORIZED_RESEARCH_ONLY. Future:
+        AUTHORIZED_RESEARCH_ONLY only after a prospective run graduates every
+        required scope to VALIDATED_PROSPECTIVE with CLEAR policy_parity, via a
+        new owner decision + fresh hashes; SUPPORTED_POSTHOC can NEVER by itself
+        satisfy future authorization.
     governance_state:
       enum: [RESEARCH_ONLY_NO_CLINICAL_USE, TRUNCATING_PATHOGENIC_PROSPECTIVE_AUTHORIZED]
       arithmetic: >-
@@ -669,19 +682,32 @@ interfaces_and_schemas:
       equals the decision (integrity boundary, mirrors build_aggregate_v2's
       cross-check); (6) compute tiered_config_canonical_sha256, capture the full
       implementation_commit + implementation_module_sha256, embed
-      source_content_hash (2ead…), compute the record's own content_hash, and
-      write the NEW record. Deterministic, offline, idempotent.
+      source_content_hash (2ead…) and source_canonical_lf_sha256 (7c55…),
+      compute the record's own content_hash (over compact JSON, excluding
+      content_hash), and write the NEW record; then (7) compute the written
+      file's canonical-LF SHA-256 and record it in an EXTERNAL manifest
+      alongside the artifact (the record never embeds its OWN file SHA) and
+      re-verify the on-disk file against that manifest hash. Deterministic,
+      offline, idempotent.
   hash_payload:
     content_hash: >-
       SHA-256 (hex) over
       json.dumps(record_without_content_hash, sort_keys=True, separators=(",", ":"))
       .encode("utf-8") — compact canonical JSON with the content_hash field
       itself excluded, mirroring report.py content_hash().
-    canonical_lf_blob: >-
+    canonical_lf_file_sha256_external: >-
       The committed file is json.dumps(record, indent=2, sort_keys=True) + "\n"
-      written UTF-8 with LF newlines; its Git/LF blob SHA-256 is the record's
-      canonical identity. A Windows CRLF checkout hash is a local-filesystem
-      artifact and is NEVER pinned (exactly as R2's 7c55… vs e914…).
+      written UTF-8 with LF newlines; its Git/LF blob SHA-256 is the artifact's
+      canonical FILE identity. This hash is EXTERNAL: a file cannot embed its own
+      final hash without self-reference, so the record does NOT contain (pin) its
+      OWN canonical-LF file SHA. Instead the orchestrator computes this SHA AFTER
+      writing the file and records it in an external manifest alongside the
+      artifact, then re-verifies the on-disk file against that manifest hash on
+      every read; fail-closed on mismatch. Only the SOURCE R2 record's
+      already-committed canonical-LF SHA (7c55…) is embedded in this record, as
+      source provenance — never this record's own. A Windows CRLF checkout hash
+      is a local-filesystem artifact and is NEVER recorded as the canonical
+      identity (exactly as R2's 7c55… vs e914…).
     tiered_config_canonical_sha256: >-
       SHA-256 over
       json.dumps(loaded_tiered_authorization_block, sort_keys=True, separators=(",", ":"))
@@ -706,8 +732,16 @@ interfaces_and_schemas:
       - prospective_validation_status: PENDING (+ locked contract ref)
       - research_use_disclaimer (verbatim) + governance_state
         RESEARCH_ONLY_NO_CLINICAL_USE + governance_statement (verbatim)
-    never: overwrite/relabel R2; write any per-variant row; assert AUTHORIZED or
-      set the truncating_pathogenic_research_scope_validated boolean true.
+    external_artifact_identity: >-
+      The written file's canonical-LF SHA-256 is recorded and verified by the
+      orchestrator in an EXTERNAL manifest alongside the artifact — it is NOT a
+      field of the record (a file cannot embed its own final hash without
+      self-reference). Only the SOURCE R2 canonical-LF SHA (7c55…) appears inside
+      the record, as provenance.
+    never: overwrite/relabel R2; write any per-variant row; assert
+      AUTHORIZED_RESEARCH_ONLY or set the
+      truncating_pathogenic_research_scope_validated boolean true; embed/pin this
+      record's OWN canonical-LF file SHA inside the record.
 
 # ---------------------------------------------------------------------------
 # 7. Test matrix — Gemini RED first, then Sonnet build, then GPT-5.4 check
@@ -727,7 +761,7 @@ test_matrix:
       - UNDERPOWERED (0<min<36) → NOT_ESTIMABLE, scope UNDERPOWERED; a nonzero
         stored precision_lb on <36 calls is NOT read as MET.
       - ADEQUATE+MET → SUPPORTED_POSTHOC + authorization PENDING_PROSPECTIVE,
-        never AUTHORIZED.
+        never AUTHORIZED_RESEARCH_ONLY.
       - ADEQUATE+UNMET (clear policy) → NOT_SUPPORTED.
       - No registered threshold → NOT_APPLICABLE (never fabricated threshold).
       - PM1 excluded → BLOCKS only missense:pathogenic; truncating:pathogenic and
@@ -741,11 +775,12 @@ test_matrix:
         raises TieredReadjudication* and
         produces NO scope record (an unknown criterion never yields a per-scope
         BLOCKED).
-      - full_spectrum requires all three scopes SUPPORTED_POSTHOC; dropping a
-        missense scope never authorizes full-spectrum (anti-cherry-pick).
+      - full_spectrum authorization requires ALL three requires-scopes
+        VALIDATED_PROSPECTIVE (SUPPORTED_POSTHOC alone never authorizes);
+        dropping a missense scope never authorizes full-spectrum (anti-cherry-pick).
       - INVALID run integrity (A0) → every scope A5 INVALID, no authorization,
         BUT an artifact is still emitted (distinct from the typed abort).
-      - Post-hoc path NEVER emits AUTHORIZED, VALIDATED_PROSPECTIVE, or a true
+      - Post-hoc path NEVER emits AUTHORIZED_RESEARCH_ONLY, VALIDATED_PROSPECTIVE, or a true
         truncating_pathogenic_research_scope_validated boolean.
   frozen_r2_readjudication_test:
     file: tests/eval/test_tiered_readjudication_frozen_r2.py
@@ -769,8 +804,10 @@ test_matrix:
       RESEARCH_ONLY_NO_CLINICAL_USE with its pinned verbatim statement;
       no_new_evidence_statement + research_use_disclaimer verbatim; prospective
       PENDING; the source_content_hash (2ead…) and source_canonical_lf_sha256
-      (7c55…) are recorded; and the wrong-hash (e914…) input is rejected with
-      the typed error and NO artifact.
+      (7c55…) are recorded; the emitted record contains NO field pinning its OWN
+      canonical-LF file SHA, while the orchestrator records/verifies that file
+      SHA in an external manifest alongside the artifact; and the wrong-hash
+      (e914…) input is rejected with the typed error and NO artifact.
   preservation_regression_test:
     file: tests/eval/test_tiered_gate_preservation.py
     asserts: >-
@@ -844,13 +881,15 @@ prospective_validation:
         thresholds / criterion map / min_count_per_class as the post-hoc rule.
     future_authorization_and_governance_outcomes:   # pinned NOW
       pass: >-
-        If truncating:pathogenic clears its locked 0.95/0.95 at ADEQUATE power on
-        the registered dataset, a NEW owner decision may graduate it to
-        research_scope_evidence_status VALIDATED_PROSPECTIVE, authorization_status
-        AUTHORIZED, governance_state TRUNCATING_PATHOGENIC_PROSPECTIVE_AUTHORIZED
+        If truncating:pathogenic clears its locked 0.95/0.95 at ADEQUATE power
+        with CLEAR policy_parity on the registered dataset, a NEW owner decision
+        may graduate it to research_scope_evidence_status VALIDATED_PROSPECTIVE,
+        authorization_status AUTHORIZED_RESEARCH_ONLY, governance_state
+        TRUNCATING_PATHOGENIC_PROSPECTIVE_AUTHORIZED
         (pinned verbatim statement, §4a), and set the canonical boolean
         truncating_pathogenic_research_scope_validated true — via a FRESH record
-        + fresh hashes, never by editing this post-hoc record.
+        + fresh hashes, never by editing this post-hoc record. SUPPORTED_POSTHOC
+        alone can NEVER satisfy this future authorization.
       fail_or_blocked: >-
         Otherwise governance_state stays RESEARCH_ONLY_NO_CLINICAL_USE,
         authorization_status stays PENDING_PROSPECTIVE/NOT_AUTHORIZED, and the
@@ -865,7 +904,8 @@ prospective_validation:
       claim.
     graduation: >-
       Only a run under this locked contract on the registered unseen dataset may
-      move a scope from PENDING_PROSPECTIVE to AUTHORIZED, via a new owner
+      move a scope from PENDING_PROSPECTIVE to AUTHORIZED_RESEARCH_ONLY (via
+      VALIDATED_PROSPECTIVE evidence with CLEAR policy parity), via a new owner
       decision + fresh hashes.
 
 # ---------------------------------------------------------------------------
@@ -928,9 +968,10 @@ beat4_self_audit:
   - id: posthoc_laundering
     risk: >-
       SUPPORTED_POSTHOC quietly read as authorization downstream.
-    control: A6 never emits AUTHORIZED in a re-adjudication; record carries
-      post_hoc=true + no_new_evidence_statement + PENDING prospective; checker
-      probe asserts no AUTHORIZED anywhere.
+    control: A6 never emits AUTHORIZED_RESEARCH_ONLY in a re-adjudication; record
+      carries post_hoc=true + no_new_evidence_statement + PENDING prospective;
+      checker probe asserts no AUTHORIZED_RESEARCH_ONLY (and no ambiguous bare
+      AUTHORIZED) anywhere.
   - id: undefined_metric_coercion
     risk: >-
       Consuming R2's stored 0.0 / 0.6637 lower bounds as real, reproducing the
@@ -997,8 +1038,14 @@ beat4_self_audit:
   - id: hash_provenance_gap
     risk: >-
       The v3 record omits config/impl/source/self hashes so drift is
-      unverifiable or a CRLF hash is pinned as canonical.
-    control: the record pins tiered_config_canonical_sha256, implementation_commit
-      + implementation_module_sha256, source_canonical_lf_sha256 (7c55…) +
-      source_content_hash (2ead…), and its own content_hash over the exact
-      canonical-LF payload; the CRLF e914… hash is never pinned.
+      unverifiable, a CRLF hash is recorded as canonical, or the record is
+      claimed to pin its OWN canonical-LF file hash (an impossible
+      self-reference).
+    control: the record embeds tiered_config_canonical_sha256,
+      implementation_commit + implementation_module_sha256,
+      source_canonical_lf_sha256 (7c55…) + source_content_hash (2ead…), and its
+      own content_hash computed over the COMPACT JSON payload (excluding
+      content_hash) — never over the canonical-LF file. The written file's
+      canonical-LF SHA-256 is an EXTERNAL manifest identity recorded/verified by
+      the orchestrator alongside the artifact (a file cannot embed its own final
+      hash); the CRLF e914… hash is never recorded as canonical.
