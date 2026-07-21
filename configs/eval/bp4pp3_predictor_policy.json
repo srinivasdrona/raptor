@@ -1,7 +1,12 @@
 {
-  "schema": "bp4pp3-predictor-policy",
-  "status": "pending",
+  "schema": "bp4pp3-predictor-policy/2",
+  "status": "proposed",
+  "mode": "disabled_manual",
+  "production_config_hash": "1ba8066accd8eda16e20518abbeaedb61247fea372675f519f02a8574ff9350e",
+  "eval_config_hash": "ea4ff684bdc2ae6b079f352816b3993ac813af0e2654b851c30c1f4ef577a293",
+  "lineage_policy_hash": "d2312b2c74f125204ababe9731fc4e37a8e0f30d1608b75f8457aae6591689df",
   "predictor_source_hash": "2c89bb17dea68fc9ed294eee2108bdd528e551eb4882b47cc4a400d683aca2ae",
-  "correction_hash": "4df24b704a06a13131884c3831e3fac82c1af7a9b7d483a511a161f14c91ce3d",
-  "decision_reference": "docs/DECISIONS.md#evaluation-only-bp4pp3-correction-approval-2026-07-13 (REAPPROVAL REQUIRED: correction_hash re-pinned 2026-07 for the production-vocabulary-parity ProductionVocabEvidenceSource addition to terminal_source.py; the prior 2026-07-13 approval covered only the pre-parity bundle and does not authorize this bundle)"
+  "correction_hash": "4bbdd1ddaeb45a7182126a70a5bb7eebb672f57de6e97e449b5b69584987d34f",
+  "runtime_bundle_hash": "331998352c9773ad2e587bba98ae9ebeaee58c58eee50e06e45653916d4e4804",
+  "decision_reference": "docs/DECISIONS.md#adr-0012-pp3bp4-disabled-manual-policy (migrated to schema v2 disabled_manual mode 2026-07; production_config_hash/eval_config_hash re-pinned after PP3/BP4 removal from included_criteria/automatable_criteria; lineage_policy_hash added after PP3/BP4 -> deferred/deferred in configs/eval/bias_lineage.yaml; correction_hash re-pinned to the terminal_source.py PolicyDisabledEvidenceSource addition; runtime_bundle_hash added over predictor_policy.py+terminal_source.py+run_masked_holdout_eval.py. status remains proposed -- owner approval is a separate, distinct commit per D7.)"
 }

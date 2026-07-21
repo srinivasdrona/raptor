@@ -26,13 +26,19 @@ included_criteria:
   - PM4
   - PM5
   - PP2
-  - PP3
   - BA1
   - BS1
   - BP1
   - BP3
-  - BP4
   - BP7
+  # PP3/BP4 removed 2026-07 (docs/DECISIONS.md#adr-0012-pp3bp4-disabled-manual-policy):
+  # the approved disabled/manual policy (configs/eval/bp4pp3_predictor_policy.json,
+  # docs/project/specs/pp3bp4-disabled-manual-policy.yaml) suppresses automated
+  # PP3/BP4 emission pending a future activation decision
+  # (decision_dependency `bp4pp3-predictor-policy`). Vocabulary is retained --
+  # both codes stay in `acmg_criteria` below -- only automation is disabled;
+  # see configs/eval/bias_lineage.yaml (validation/production_disposition ->
+  # deferred) for the data-lineage side of this change.
   # Deliberately NOT included by default: PP5, BP6, PS4 (R-A2 direct-copy
   # circularity -- all derive from the variant's OWN ClinVar assertion; PS4
   # via BIAS-3.0.0's ClinVar-submitter fallback). Oracle decision 2026-07.
