@@ -14,13 +14,16 @@ def _get_real_bundle_hash_and_files():
     f2 = Path("src/raptor/eval/terminal_source.py")
     f3 = Path("scripts/run_masked_holdout_eval.py")
     
+    files = [f1, f2, f3]
+    sorted_files = sorted(files, key=lambda f: f.name)
+    
     digest = hashlib.sha256()
-    for f in (f1, f2, f3):
+    for f in sorted_files:
         digest.update(f.name.encode("utf-8"))
         digest.update(b"\0")
         digest.update(f.read_bytes())
         digest.update(b"\0")
-    return digest.hexdigest(), (f1, f2, f3)
+    return digest.hexdigest(), sorted_files
 
 
 def _make_temp_policy_and_configs(tmp_path, status, mode, scorer_bytes=None, eval_bytes=None, lineage_bytes=None):
@@ -71,7 +74,7 @@ def test_g_dm1_v2_loader_validation(tmp_path):
     """
     G-DM1: v2 loader accepts the exact closed v2 field set and populates
     PredictorPolicy properties; rejects unknown/extra fields, missing required fields,
-    unknown mode values, and non-64-hex hashes.
+    unknown mode values, and non-64-hex hashes (including production, eval, lineage, and bundle hashes).
     """
     try:
         from raptor.eval.predictor_policy import load_predictor_policy, PredictorPolicyError
@@ -129,8 +132,8 @@ def test_g_dm1_v2_loader_validation(tmp_path):
     with pytest.raises(PredictorPolicyError, match="unknown mode"):
         load_predictor_policy(write_policy("bad_mode.json", bad_mode))
 
-    # 5. Reject non-64-hex config/lineage hashes
-    for field in ("production_config_hash", "eval_config_hash", "lineage_policy_hash"):
+    # 5. Reject non-64-hex config/lineage/bundle hashes
+    for field in ("production_config_hash", "eval_config_hash", "lineage_policy_hash", "runtime_bundle_hash"):
         bad_hash = valid_v2.copy()
         bad_hash[field] = "not-64-hex"
         with pytest.raises(PredictorPolicyError, match="64-hex|hash|sha256"):
@@ -265,7 +268,7 @@ def test_g_dm4_offline_seams_composition(tmp_path):
     - Write approved v2 policy whose config hashes match those temp bytes and whose runtime_bundle_hash is the REAL repo bundle hash.
     - resolve_policy_state(...) == ("APPROVED_DISABLED", reason).
     - build_policy_evidence_source(source, state) wraps it in PolicyDisabledEvidenceSource.
-    - build_disabled_policy_pins returns policy_mode=disabled_manual, pp3bp4_scored_calls=0, non-empty pp3bp4_suppressed_counts, pp3bp4_lineage_disposition=deferred, predictor_correction_applied=false.
+    - build_disabled_policy_pins called EXACTLY per signature build_disabled_policy_pins(policy, wrapped_source, scorer_cfg, eval_cfg, lineage_policy)
     NO subprocess, NO benchmark/reference/mask pretense, NO 2,577-row TSV.
     """
     try:
@@ -275,6 +278,7 @@ def test_g_dm4_offline_seams_composition(tmp_path):
             build_disabled_policy_pins,
         )
         from raptor.eval.predictor_policy import load_predictor_policy
+        from raptor.eval.lineage_policy import load_lineage_policy
     except ImportError as exc:
         pytest.fail(f"Missing implementation seams: {exc}")
 
@@ -326,6 +330,7 @@ def test_g_dm4_offline_seams_composition(tmp_path):
 
     eval_cfg = load_eval_config(eval_path)
     scorer_cfg = load_scorer_config(scorer_path)
+    lineage_policy = load_lineage_policy(lineage_path)
 
     # Build pure BiasEvidenceSource offline
     source = _source(
@@ -337,7 +342,7 @@ def test_g_dm4_offline_seams_composition(tmp_path):
         scorer_config=scorer_cfg,
     )
 
-    # Get actual real bundle hash
+    # Get actual real bundle hash (sorted properly by name)
     real_bundle_hash, bundle_files = _get_real_bundle_hash_and_files()
 
     policy_data = {
@@ -371,8 +376,8 @@ def test_g_dm4_offline_seams_composition(tmp_path):
     # Retrieve evidence to count suppression
     wrapped_source.get_evidence(canonical_id)
 
-    # 3. build_disabled_policy_pins returns correct dictionary
-    pins = build_disabled_policy_pins(policy, wrapped_source)
+    # 3. build_disabled_policy_pins called EXACTLY per planner signature with 5 arguments
+    pins = build_disabled_policy_pins(policy, wrapped_source, scorer_cfg, eval_cfg, lineage_policy)
     assert pins["policy_mode"] == "disabled_manual"
     assert pins["pp3bp4_scored_calls"] == 0
     assert pins["pp3bp4_suppressed_counts"] == {"PP3": 1, "BP4": 1}
@@ -587,7 +592,7 @@ def test_g_dm10_end_to_end_suppression():
 
 def test_g_dm11_accidental_drift_enforcement(tmp_path):
     """
-    G-DM11: verify_runtime_bundle_hash validates the actual bytes of specified files;
+    G-DM11: verify_runtime_bundle_hash validates the actual bytes of specified files (sorted by name);
     mutating any bundle file throws PredictorPolicyError and triggers runner block.
     """
     try:
@@ -607,8 +612,11 @@ def test_g_dm11_accidental_drift_enforcement(tmp_path):
     f2.write_text("source 2", encoding="utf-8")
     f3.write_text("source 3", encoding="utf-8")
 
+    files = [f1, f2, f3]
+    sorted_files = sorted(files, key=lambda f: f.name)
+
     digest = hashlib.sha256()
-    for f in (f1, f2, f3):
+    for f in sorted_files:
         digest.update(f.name.encode("utf-8"))
         digest.update(b"\0")
         digest.update(f.read_bytes())
@@ -632,13 +640,13 @@ def test_g_dm11_accidental_drift_enforcement(tmp_path):
     policy_path.write_text(json.dumps(policy_data))
     policy = load_predictor_policy(policy_path)
 
-    # Clean bundle verifies correctly
-    verify_runtime_bundle_hash(policy, (f1, f2, f3))
+    # Clean bundle verifies correctly with sorted files
+    verify_runtime_bundle_hash(policy, sorted_files)
 
     # Mutated file fails validation
     f1.write_text("tampered/drifted content", encoding="utf-8")
     with pytest.raises(PredictorPolicyError, match="runtime_bundle_hash mismatch|mismatch"):
-        verify_runtime_bundle_hash(policy, (f1, f2, f3))
+        verify_runtime_bundle_hash(policy, sorted_files)
 
 
 def test_g_dm12_verify_disabled_config_hashes_unit(tmp_path):
@@ -716,8 +724,8 @@ def test_g_dm12_verify_disabled_config_hashes_unit(tmp_path):
 
 def test_g_dm13_authorization_neutrality_unit():
     """
-    G-DM13: Policy approval/mode has NO influence on the metric-driven decide_gate
-    or decide_scope_gate results; the runner remains strictly authorization-neutral.
+    G-DM13: Policy approval/mode has NO influence on the metric-driven decide_gate,
+    decide_scope_gate or compute_report_scope_gate results; the runner remains strictly authorization-neutral.
     """
     try:
         from raptor.eval.gate import decide_gate
@@ -739,37 +747,53 @@ def test_g_dm13_authorization_neutrality_unit():
     from conftest import make_eval_config, Metrics
     from test_scope_gate import make_v2_auth_config, make_oracle_thresholds
 
-    # PASSING CASE
+    # PASSING CASE (distinct Metrics objects for each stratum)
     passing_config = make_eval_config(
         min_count_per_class=36,
         oracle_thresholds=make_oracle_thresholds(),
         scope_authorization=make_v2_auth_config()
     )
-    m_ok = Metrics(
+    m_missense_ok = Metrics(
         precision=1.0, recall=1.0, concordance=1.0,
         counts={"path_called": 40, "benign_called": 40, "path_actual": 40, "benign_actual": 40},
         stratum="missense", gating=True, benign_precision=1.0, benign_recall=1.0
     )
-    m_ok.precision_lb = 0.98
-    m_ok.recall_lb = 0.98
+    m_missense_ok.precision_lb = 0.98
+    m_missense_ok.recall_lb = 0.98
 
-    passing_metrics = {"missense": m_ok, "truncating": m_ok}
+    m_truncating_ok = Metrics(
+        precision=1.0, recall=1.0, concordance=1.0,
+        counts={"path_called": 40, "benign_called": 40, "path_actual": 40, "benign_actual": 40},
+        stratum="truncating", gating=True, benign_precision=1.0, benign_recall=1.0
+    )
+    m_truncating_ok.precision_lb = 0.98
+    m_truncating_ok.recall_lb = 0.98
 
-    # FAILING CASE
+    passing_metrics = {"missense": m_missense_ok, "truncating": m_truncating_ok}
+
+    # FAILING CASE (distinct Metrics objects for each stratum)
     failing_config = make_eval_config(
         min_count_per_class=36,
         oracle_thresholds=make_oracle_thresholds(),
         scope_authorization=make_v2_auth_config()
     )
-    m_fail = Metrics(
+    m_missense_fail = Metrics(
         precision=0.4, recall=0.4, concordance=0.4,
         counts={"path_called": 40, "benign_called": 40, "path_actual": 40, "benign_actual": 40},
         stratum="missense", gating=True, benign_precision=0.4, benign_recall=0.4
     )
-    m_fail.precision_lb = 0.3
-    m_fail.recall_lb = 0.3
+    m_missense_fail.precision_lb = 0.3
+    m_missense_fail.recall_lb = 0.3
 
-    failing_metrics = {"missense": m_fail, "truncating": m_fail}
+    m_truncating_fail = Metrics(
+        precision=0.4, recall=0.4, concordance=0.4,
+        counts={"path_called": 40, "benign_called": 40, "path_actual": 40, "benign_actual": 40},
+        stratum="truncating", gating=True, benign_precision=0.4, benign_recall=0.4
+    )
+    m_truncating_fail.precision_lb = 0.3
+    m_truncating_fail.recall_lb = 0.3
+
+    failing_metrics = {"missense": m_missense_fail, "truncating": m_truncating_fail}
 
     # Verify verdicts with no policy intervention
     d_pass = decide_gate(passing_metrics, passing_config)
@@ -781,6 +805,12 @@ def test_g_dm13_authorization_neutrality_unit():
     sd_fail = compute_report_scope_gate(failing_metrics, failing_config)
     assert sd_pass.research_scope_flags["truncating_pathogenic_research_scope_validated"] is True
     assert sd_fail.research_scope_flags["truncating_pathogenic_research_scope_validated"] is False
+
+    # Also exercise decide_scope_gate directly
+    sd_gate_pass = decide_scope_gate(passing_metrics, passing_config)
+    sd_gate_fail = decide_scope_gate(failing_metrics, failing_config)
+    assert sd_gate_pass.research_scope_flags["truncating_pathogenic_research_scope_validated"] is True
+    assert sd_gate_fail.research_scope_flags["truncating_pathogenic_research_scope_validated"] is False
 
 
 def test_g_dm14_lineage_consistency_negative_control():
