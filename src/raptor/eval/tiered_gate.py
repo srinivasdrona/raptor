@@ -523,8 +523,13 @@ def decide_tiered_gate(
     computed -- there is no partial decision on a fail-closed error.
     """
     tiered_auth = _validate_config(config, tiered_authorization)
-    _validate_metrics_counts(metrics)
-    _validate_conditional_lower_bounds(metrics)
+    scope_metrics = {
+        stratum: stratum_metrics
+        for stratum, stratum_metrics in metrics.items()
+        if stratum != "overall"
+    }
+    _validate_metrics_counts(scope_metrics)
+    _validate_conditional_lower_bounds(scope_metrics)
 
     criterion_map = tiered_auth["criterion_scope_applicability"]
     evaluation_skipped = _validate_evaluation_skipped(run_meta, criterion_map)
@@ -534,7 +539,7 @@ def decide_tiered_gate(
     min_count_per_class = config.min_count_per_class
 
     scopes: dict = {}
-    for stratum, m in metrics.items():
+    for stratum, m in scope_metrics.items():
         for direction in _DIRECTIONS:
             scopes[_scope_key(stratum, direction)] = _build_scope_verdict(
                 stratum=stratum,
