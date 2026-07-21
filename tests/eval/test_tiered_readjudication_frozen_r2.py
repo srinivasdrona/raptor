@@ -8,6 +8,10 @@ import json
 import hashlib
 from pathlib import Path
 import pytest
+import sys
+_REPO_ROOT = str(Path(__file__).resolve().parents[2])
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 from raptor.eval.config import EvalConfig
 from raptor.eval.model import Metrics
@@ -455,3 +459,182 @@ def test_cli_happy_path(tmp_path, monkeypatch):
     calculated_sha256 = hashlib.sha256(output_bytes).hexdigest()
     assert calculated_sha256 in manifest_text
     assert canonical_output.name in manifest_text
+
+    # Finding 2: Canonical provenance/hash schema assertions
+    # 1. schema, date, post_hoc fields
+    assert output_data.get("schema") == "raptor.tsc.tiered_readjudication.v3"
+    assert output_data.get("date") == "2026-07-21"
+    assert output_data.get("post_hoc") is True
+
+    # 2. separate old_semantic_outcome and new_tiered_outcome
+    assert "old_semantic_outcome" in output_data
+    assert "new_tiered_outcome" in output_data
+    assert isinstance(output_data["old_semantic_outcome"], dict)
+    assert isinstance(output_data["new_tiered_outcome"], dict)
+    # Old semantic outcome checks:
+    assert output_data["old_semantic_outcome"].get("legacy_v1_missense_gate") == "FAIL"
+    assert output_data["old_semantic_outcome"].get("full_spectrum_status") == "BLOCKED_POLICY"
+    assert output_data["old_semantic_outcome"].get("vus_authorized") is False
+
+    # 3. tiered_config_canonical_sha256 equals SHA-256 of loaded config's block (compact JSON, sort_keys=True)
+    from raptor.eval.config import load_config
+    loaded_cfg = load_config(real_config_path)
+    compact_auth = json.dumps(loaded_cfg.tiered_authorization, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    expected_config_sha = hashlib.sha256(compact_auth).hexdigest()
+    assert output_data.get("tiered_config_canonical_sha256") == expected_config_sha
+
+    # 4. implementation_module_sha256 equals Git-blob SHA-256 of tiered_gate.py
+    tiered_gate_file = ROOT / "src" / "raptor" / "eval" / "tiered_gate.py"
+    gate_lf_bytes = tiered_gate_file.read_bytes().replace(b"\r\n", b"\n")
+    expected_module_sha = hashlib.sha256(gate_lf_bytes).hexdigest()
+    assert output_data.get("implementation_module_sha256") == expected_module_sha
+
+    # 5. implementation_commit is full 40 lowercase hex and non-null
+    import re
+    commit = output_data.get("implementation_commit")
+    assert commit is not None
+    assert isinstance(commit, str)
+    assert re.match(r"^[0-9a-f]{40}$", commit)
+
+    # 6. content_hash equals compact canonical JSON of the entire record excluding content_hash
+    record_no_hash = {k: v for k, v in output_data.items() if k != "content_hash"}
+    expected_content_hash = hashlib.sha256(
+        json.dumps(record_no_hash, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+    assert output_data.get("content_hash") == expected_content_hash
+
+    # 7. emitted bytes equal json.dumps(record, indent=2, sort_keys=True, ensure_ascii=False).encode()+b'\n' and LF-only
+    expected_bytes = json.dumps(output_data, indent=2, sort_keys=True, ensure_ascii=False).encode("utf-8") + b"\n"
+    assert output_bytes == expected_bytes
+    assert b"\r\n" not in output_bytes
+
+    # 8. external manifest equals actual output file SHA
+    manifest_lines = canonical_manifest.read_text(encoding="utf-8").strip().splitlines()
+    assert len(manifest_lines) == 1
+    manifest_sha, manifest_file = manifest_lines[0].split()
+    assert manifest_sha == calculated_sha256
+    assert manifest_file == canonical_output.name
+
+
+def test_cli_partial_write_cleanup(tmp_path, monkeypatch):
+    """Test that manifest publication failure cleans up output staging/publication."""
+    ROOT = Path(__file__).resolve().parents[2]
+
+    canonical_source = tmp_path / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
+    canonical_config = tmp_path / "configs/eval/tsc2.yaml"
+    canonical_output = tmp_path / "data/census/tsc_tiered_readjudication_2026-07-21.json"
+    canonical_manifest = tmp_path / "data/census/tsc_tiered_readjudication_2026-07-21.sha256"
+
+    canonical_source.parent.mkdir(parents=True, exist_ok=True)
+    canonical_config.parent.mkdir(parents=True, exist_ok=True)
+
+    real_r2_path = ROOT / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
+    real_config_path = ROOT / "configs/eval/tsc2.yaml"
+
+    assert real_r2_path.exists()
+    canonical_source.write_bytes(real_r2_path.read_bytes())
+    if real_config_path.exists():
+        canonical_config.write_bytes(real_config_path.read_bytes())
+    else:
+        canonical_config.write_text("{}")
+
+    try:
+        import sys
+        this_mod = sys.modules[__name__]
+        import scripts.build_tiered_readjudication as cli_mod
+        monkeypatch.setattr(cli_mod, "REPO_ROOT", str(tmp_path))
+        monkeypatch.setattr(this_mod, "REPO_ROOT", str(tmp_path))
+    except ImportError:
+        import sys
+        this_mod = sys.modules[__name__]
+        monkeypatch.setattr(this_mod, "REPO_ROOT", str(tmp_path))
+
+    argv = [
+        "--source-record", str(canonical_source),
+        "--eval-config", str(canonical_config),
+        "--output", str(canonical_output),
+        "--external-manifest", str(canonical_manifest),
+    ]
+
+    # Intercept write_bytes: succeed on output json, fail on manifest sha256
+    orig_write_bytes = Path.write_bytes
+    def mocked_write_bytes(self, data, *args, **kwargs):
+        if self.name.endswith(".sha256"):
+            raise IOError("Simulated manifest publication failure")
+        return orig_write_bytes(self, data, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_bytes", mocked_write_bytes)
+
+    # Assert output and manifest do not exist beforehand
+    assert not canonical_output.exists()
+    assert not canonical_manifest.exists()
+
+    with pytest.raises((Exception, IOError)):
+        main(argv)
+
+    # On the current implementation, this assertion will FAIL because canonical_output was written
+    # but not deleted after manifest write failed! This is a RED regression.
+    assert not canonical_output.exists()
+    assert not canonical_manifest.exists()
+
+
+def test_cli_post_write_reverify_failure(tmp_path, monkeypatch):
+    """Test that post-write reverification failure cleans up both output and manifest."""
+    ROOT = Path(__file__).resolve().parents[2]
+
+    canonical_source = tmp_path / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
+    canonical_config = tmp_path / "configs/eval/tsc2.yaml"
+    canonical_output = tmp_path / "data/census/tsc_tiered_readjudication_2026-07-21.json"
+    canonical_manifest = tmp_path / "data/census/tsc_tiered_readjudication_2026-07-21.sha256"
+
+    canonical_source.parent.mkdir(parents=True, exist_ok=True)
+    canonical_config.parent.mkdir(parents=True, exist_ok=True)
+
+    real_r2_path = ROOT / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
+    real_config_path = ROOT / "configs/eval/tsc2.yaml"
+
+    assert real_r2_path.exists()
+    canonical_source.write_bytes(real_r2_path.read_bytes())
+    if real_config_path.exists():
+        canonical_config.write_bytes(real_config_path.read_bytes())
+    else:
+        canonical_config.write_text("{}")
+
+    try:
+        import sys
+        this_mod = sys.modules[__name__]
+        import scripts.build_tiered_readjudication as cli_mod
+        monkeypatch.setattr(cli_mod, "REPO_ROOT", str(tmp_path))
+        monkeypatch.setattr(this_mod, "REPO_ROOT", str(tmp_path))
+    except ImportError:
+        import sys
+        this_mod = sys.modules[__name__]
+        monkeypatch.setattr(this_mod, "REPO_ROOT", str(tmp_path))
+
+    argv = [
+        "--source-record", str(canonical_source),
+        "--eval-config", str(canonical_config),
+        "--output", str(canonical_output),
+        "--external-manifest", str(canonical_manifest),
+    ]
+
+    # Intercept read_bytes: during reverification on canonical_output, return corrupted bytes
+    orig_read_bytes = Path.read_bytes
+    def mocked_read_bytes(self, *args, **kwargs):
+        if self == canonical_output:
+            return b"corrupted bytes"
+        return orig_read_bytes(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_bytes", mocked_read_bytes)
+
+    # Assert output and manifest do not exist beforehand
+    assert not canonical_output.exists()
+    assert not canonical_manifest.exists()
+
+    with pytest.raises(InputError):
+        main(argv)
+
+    # On the current implementation, this assertion will FAIL because canonical_output and canonical_manifest
+    # were written but not deleted when the InputError was raised! This is a RED regression.
+    assert not canonical_output.exists()
+    assert not canonical_manifest.exists()

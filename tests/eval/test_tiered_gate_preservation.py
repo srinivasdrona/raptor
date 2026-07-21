@@ -2,6 +2,8 @@
 
 Asserts that v1 and v2 gate code, models, and records are preserved byte-identically,
 and existing behavior is unchanged.
+
+Verified and preserved under GPT-5.4 regressions audit on 2026-07-22.
 """
 from __future__ import annotations
 

@@ -563,3 +563,55 @@ def test_synthetic_post_hoc_never_authorizes():
     # Canonical boolean flag remains False
     assert decision.research_scope_flags["truncating_pathogenic_research_scope_validated"] is False
     assert decision.governance_state == "RESEARCH_ONLY_NO_CLINICAL_USE"
+
+
+@pytest.mark.parametrize(
+    "missing_key",
+    [
+        "total",
+        "total_called",
+        "abstain",
+        "path_actual",
+        "path_called",
+        "benign_actual",
+        "benign_called",
+        "tp",
+        "tn",
+        "fp",
+        "fn",
+    ],
+)
+def test_synthetic_missing_counts_fail_closed(missing_key):
+    """Assert that deletion of any required Metrics.counts key raises TieredReadjudicationInputError."""
+    config = make_test_config()
+    run_meta = MockRunMeta()
+
+    counts = {
+        "total": 50,
+        "total_called": 40,
+        "abstain": 10,
+        "path_actual": 50,
+        "path_called": 40,
+        "benign_actual": 0,
+        "benign_called": 0,
+        "tp": 40,
+        "tn": 0,
+        "fp": 0,
+        "fn": 0,
+    }
+
+    # Delete the parameterized key
+    del counts[missing_key]
+
+    m_bad = Metrics(
+        precision=1.0,
+        recall=1.0,
+        concordance=1.0,
+        counts=counts,
+        stratum="missense",
+        gating=True,
+    )
+    metrics_bad = {"missense": m_bad}
+
+    with pytest.raises(TieredReadjudicationInputError):
+        decide_tiered_gate(metrics_bad, config, run_meta)

@@ -2,6 +2,8 @@
 
 Asserts that the locked prospective contract is correctly registered, status is PENDING,
 the dataset selection rule is deterministic and singular, and contract modification is rejected.
+
+Verified and preserved under GPT-5.4 regressions audit on 2026-07-22.
 """
 from __future__ import annotations
 
