@@ -11,12 +11,13 @@ import pytest
 from raptor.scorer.model import BiasRecord
 
 try:
-    from raptor.census.strata import ManifestEntry, StratumEntry, STRENGTH_MAP
+    from raptor.census.strata import ManifestEntry, StratumEntry, STRENGTH_MAP, ConservationError
     from raptor.census.aggregate import build_census_record
     from scripts.build_tsc_calibration_batch import RunPins
     HAS_AGGREGATE = True
 except ImportError:
     from scripts.build_tsc_calibration_batch import ManifestEntry, StratumEntry, STRENGTH_MAP, RunPins
+    from raptor.census.strata import ConservationError
     build_census_record = None
     HAS_AGGREGATE = False
 
@@ -532,4 +533,181 @@ def test_build_census_record_invalid_historical_directions(base_inputs) -> None:
             historical_stats=bad_stats_3,
             automatable_criteria=["PVS1", "PM2"],
         )
+
+
+def test_aggregate_stratum_identity_conservation(base_inputs) -> None:
+    """Test aggregate stratum identity conservation.
+    
+    - Two manifest/bias rows with two strata sharing one variant_id must raise ConservationError/ValueError;
+    - Missing stratum for a manifest identity and extra unknown stratum identity each fail closed;
+    - A valid record asserts exact_join true and sums for top-level directions, direction_by_gene, direction_by_consequence, transcript, and corpus all cover the same total; no silent skips.
+    - Explicitly require build_census_record rejects before producing a record rather than reporting exact_join=false success.
+    """
+    check_aggregate_implemented()
+    from raptor.census.strata import ConservationError
+    run_pins, bound_hashes, historical_stats = base_inputs
+
+    # Setup base rows
+    row1 = _row(1, {"pm2": (1, "supporting")})
+    row2 = _row(2, {"pm2": (1, "supporting")})
+
+    # --- Case 1: Two manifest/bias rows with two strata sharing one variant_id must raise ConservationError/ValueError ---
+    # Since they share one variant_id, let's create two strata with identical variant_id
+    strata_duplicate = [
+        StratumEntry(
+            variant_id="NC_000016.10:1001:A:G",
+            stratum="no_deterministic_resolution",
+            pattern_id="",
+            pattern_signature=(),
+            signed_points=1,
+            basis="eval_only_census_selection_metadata",
+        ),
+        StratumEntry(
+            variant_id="NC_000016.10:1001:A:G",
+            stratum="no_deterministic_resolution",
+            pattern_id="",
+            pattern_signature=(),
+            signed_points=1,
+            basis="eval_only_census_selection_metadata",
+        )
+    ]
+    manifest_dup = [
+        ManifestEntry(variant_id="NC_000016.10:1001:A:G", vcf_key=row1.variant_id),
+        ManifestEntry(variant_id="NC_000016.10:1002:A:G", vcf_key=row2.variant_id),
+    ]
+
+    with pytest.raises((ConservationError, ValueError)):
+        build_census_record(
+            strata=strata_duplicate,
+            bias_rows=[row1, row2],
+            manifest=manifest_dup,
+            run_pins=run_pins,
+            bound_hashes=bound_hashes,
+            historical_stats=historical_stats,
+            automatable_criteria=["PVS1", "PM2"],
+        )
+
+    # --- Case 2: Missing stratum for a manifest identity fails closed ---
+    manifest_valid = [
+        ManifestEntry(variant_id="NC_000016.10:1001:A:G", vcf_key=row1.variant_id),
+        ManifestEntry(variant_id="NC_000016.10:1002:A:G", vcf_key=row2.variant_id),
+    ]
+    # strata only contains one entry (for row1), but manifest and bias have two -> missing stratum for row2
+    strata_missing = [
+        StratumEntry(
+            variant_id="NC_000016.10:1001:A:G",
+            stratum="no_deterministic_resolution",
+            pattern_id="",
+            pattern_signature=(),
+            signed_points=1,
+            basis="eval_only_census_selection_metadata",
+        )
+    ]
+
+    with pytest.raises((ConservationError, ValueError)):
+        build_census_record(
+            strata=strata_missing,
+            bias_rows=[row1, row2],
+            manifest=manifest_valid,
+            run_pins=run_pins,
+            bound_hashes=bound_hashes,
+            historical_stats=historical_stats,
+            automatable_criteria=["PVS1", "PM2"],
+        )
+
+    # --- Case 3: Extra unknown stratum identity fails closed ---
+    # Strata has extra entry that is not in manifest / bias rows
+    strata_extra = [
+        StratumEntry(
+            variant_id="NC_000016.10:1001:A:G",
+            stratum="no_deterministic_resolution",
+            pattern_id="",
+            pattern_signature=(),
+            signed_points=1,
+            basis="eval_only_census_selection_metadata",
+        ),
+        StratumEntry(
+            variant_id="NC_000016.10:1002:A:G",
+            stratum="no_deterministic_resolution",
+            pattern_id="",
+            pattern_signature=(),
+            signed_points=1,
+            basis="eval_only_census_selection_metadata",
+        ),
+        StratumEntry(
+            variant_id="NC_000016.10:9999:A:G",  # Unknown extra stratum
+            stratum="no_deterministic_resolution",
+            pattern_id="",
+            pattern_signature=(),
+            signed_points=1,
+            basis="eval_only_census_selection_metadata",
+        )
+    ]
+
+    with pytest.raises((ConservationError, ValueError)):
+        build_census_record(
+            strata=strata_extra,
+            bias_rows=[row1, row2],
+            manifest=manifest_valid,
+            run_pins=run_pins,
+            bound_hashes=bound_hashes,
+            historical_stats=historical_stats,
+            automatable_criteria=["PVS1", "PM2"],
+        )
+
+    # --- Case 4: A valid record asserts exact_join true and sums for top-level directions, direction_by_gene, direction_by_consequence, transcript, and corpus all cover the same total ---
+    strata_valid = [
+        StratumEntry(
+            variant_id="NC_000016.10:1001:A:G",
+            stratum="candidate_LP_review",
+            pattern_id="PM2",
+            pattern_signature=("PM2 Supporting",),
+            signed_points=1,
+            basis="eval_only_census_selection_metadata",
+        ),
+        StratumEntry(
+            variant_id="NC_000016.10:1002:A:G",
+            stratum="no_deterministic_resolution",
+            pattern_id="",
+            pattern_signature=(),
+            signed_points=0,
+            basis="eval_only_census_selection_metadata",
+        ),
+    ]
+
+    record = build_census_record(
+        strata=strata_valid,
+        bias_rows=[row1, row2],
+        manifest=manifest_valid,
+        run_pins=run_pins,
+        bound_hashes=bound_hashes,
+        historical_stats=historical_stats,
+        automatable_criteria=["PVS1", "PM2"],
+    )
+
+    # Assert exact_join is true
+    assert record["run_integrity"]["exact_join"] is True
+
+    # Total number of items
+    total = len(manifest_valid)
+    assert total == 2
+
+    # Corpus total
+    assert record["corpus"]["total_vus"] == total
+
+    # Sum of top-level directions
+    top_level_sum = sum(record["raptor_current_policy_internal_direction"].values())
+    assert top_level_sum == total
+
+    # Sum of direction_by_gene
+    gene_sum = sum(count for gene_dict in record["direction_by_gene"].values() for count in gene_dict.values())
+    assert gene_sum == total
+
+    # Sum of direction_by_consequence
+    consequence_sum = sum(count for conseq_dict in record["direction_by_consequence"].values() for count in conseq_dict.values())
+    assert consequence_sum == total
+
+    # Sum of transcripts
+    transcript_sum = sum(record["bias_gene_transcript"].values())
+    assert transcript_sum == total
 

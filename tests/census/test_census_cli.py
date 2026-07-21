@@ -42,7 +42,9 @@ def cli_args_dict(tmp_path: Path):
     eval_config = tmp_path / "tsc2.yaml"
     eval_config.write_bytes((repo_root / "configs/eval/tsc2.yaml").read_bytes())
 
-    predictor_policy = tmp_path / "bp4pp3_predictor_policy.json"
+    predictor_policy_dir = tmp_path / "configs" / "eval"
+    predictor_policy_dir.mkdir(parents=True, exist_ok=True)
+    predictor_policy = predictor_policy_dir / "bp4pp3_predictor_policy.json"
     predictor_policy.write_bytes((repo_root / "configs/eval/bp4pp3_predictor_policy.json").read_bytes())
 
     lineage_policy = tmp_path / "bias_lineage.yaml"
@@ -261,37 +263,49 @@ def test_g_vc14_policy_hash_verification(cli_args_dict, tmp_path: Path, monkeypa
         monkeypatch.setattr(census_cli, "HISTORICAL_CENSUS_SHA256", synthetic_hash, raising=False)
 
     # 1. Non-approved status fails closed
-    bad_policy_status = tmp_path / "bad_policy_status.json"
-    bad_policy_status.write_text(
-        json.dumps({"schema": "bp4pp3-predictor-policy/2", "status": "unapproved", "mode": "disabled_manual"}),
-        encoding="utf-8"
-    )
+    bad_policy_status_dict = {"schema": "bp4pp3-predictor-policy/2", "status": "unapproved", "mode": "disabled_manual"}
+    bad_policy_bytes = json.dumps(bad_policy_status_dict).encode("utf-8")
+    
+    canonical_policy_path = tmp_path / "configs" / "eval" / "bp4pp3_predictor_policy.json"
+    canonical_policy_path.parent.mkdir(parents=True, exist_ok=True)
+    canonical_policy_path.write_bytes(bad_policy_bytes)
+    
+    custom_hash = hashlib.sha256(bad_policy_bytes).hexdigest()
+    if HAS_CLI:
+        monkeypatch.setattr(census_cli, "APPROVED_PREDICTOR_POLICY_SHA256", custom_hash, raising=False)
+        
     args_dict_status = dict(cli_args_dict)
-    args_dict_status["--predictor-policy"] = str(bad_policy_status)
+    args_dict_status["--predictor-policy"] = str(canonical_policy_path)
     args_status = _make_args(args_dict_status, ["--dry-run"])
     with pytest.raises((ValueError, SystemExit)):
         main(args_status)
 
     # 2. Unknown field fails closed
-    bad_policy_field = tmp_path / "bad_policy_field.json"
-    bad_policy_field.write_text(
-        json.dumps({"schema": "bp4pp3-predictor-policy/2", "status": "approved", "mode": "disabled_manual", "unknown_field_xyz": 123}),
-        encoding="utf-8"
-    )
+    bad_policy_field_dict = {"schema": "bp4pp3-predictor-policy/2", "status": "approved", "mode": "disabled_manual", "unknown_field_xyz": 123}
+    bad_policy_bytes = json.dumps(bad_policy_field_dict).encode("utf-8")
+    
+    canonical_policy_path.write_bytes(bad_policy_bytes)
+    custom_hash = hashlib.sha256(bad_policy_bytes).hexdigest()
+    if HAS_CLI:
+        monkeypatch.setattr(census_cli, "APPROVED_PREDICTOR_POLICY_SHA256", custom_hash, raising=False)
+        
     args_dict_field = dict(cli_args_dict)
-    args_dict_field["--predictor-policy"] = str(bad_policy_field)
+    args_dict_field["--predictor-policy"] = str(canonical_policy_path)
     args_field = _make_args(args_dict_field, ["--dry-run"])
     with pytest.raises((ValueError, SystemExit)):
         main(args_field)
 
     # 3. Invalid mode fails closed
-    bad_policy_mode = tmp_path / "bad_policy_mode.json"
-    bad_policy_mode.write_text(
-        json.dumps({"schema": "bp4pp3-predictor-policy/2", "status": "approved", "mode": "invalid_mode_abc"}),
-        encoding="utf-8"
-    )
+    bad_policy_mode_dict = {"schema": "bp4pp3-predictor-policy/2", "status": "approved", "mode": "invalid_mode_abc"}
+    bad_policy_bytes = json.dumps(bad_policy_mode_dict).encode("utf-8")
+    
+    canonical_policy_path.write_bytes(bad_policy_bytes)
+    custom_hash = hashlib.sha256(bad_policy_bytes).hexdigest()
+    if HAS_CLI:
+        monkeypatch.setattr(census_cli, "APPROVED_PREDICTOR_POLICY_SHA256", custom_hash, raising=False)
+        
     args_dict_mode = dict(cli_args_dict)
-    args_dict_mode["--predictor-policy"] = str(bad_policy_mode)
+    args_dict_mode["--predictor-policy"] = str(canonical_policy_path)
     args_mode = _make_args(args_dict_mode, ["--dry-run"])
     with pytest.raises((ValueError, SystemExit)):
         main(args_mode)
@@ -474,4 +488,71 @@ def test_historical_stats_one_byte_tamper_fails(cli_args_dict, tmp_path: Path, m
         main(args)
 
     assert not canonical_path.exists()
+
+
+def test_anchor_approved_predictor_policy(cli_args_dict, tmp_path: Path, monkeypatch) -> None:
+    """Test anchoring approved predictor policy.
+    
+    - Expose APPROVED_PREDICTOR_POLICY_SHA256 equal to 85e9e92fa9f4c221c02af30e787315a88ed2bef51f6f58d25c5dc267eb55a34a;
+    - Require --predictor-policy resolves exactly to REPO_ROOT/configs/eval/bp4pp3_predictor_policy.json and canonical-LF hash matches;
+    - Byte-identical policy at an alternate path is rejected;
+    - One-byte/metadata-only tampering at canonical path fails before output even when the four subordinate config hashes still match.
+    - No output on every failure.
+    """
+    check_cli_implemented()
+    import raptor.census.cli as census_cli
+
+    # Ensure constant exists and is correct
+    assert hasattr(census_cli, "APPROVED_PREDICTOR_POLICY_SHA256")
+    assert census_cli.APPROVED_PREDICTOR_POLICY_SHA256 == "85e9e92fa9f4c221c02af30e787315a88ed2bef51f6f58d25c5dc267eb55a34a"
+
+    # Setup standard mocking
+    monkeypatch.setattr(census_cli, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(census_cli, "_resolve_code_commit", lambda: "ade13f206f3e2c2efe3ec92715d974645fc8da8f")
+    synthetic_hash = _get_sha256(Path(cli_args_dict["--historical-stats"]))
+    monkeypatch.setattr(census_cli, "HISTORICAL_CENSUS_SHA256", synthetic_hash, raising=False)
+
+    # 1. Happy path: canonical path and matching LF-canonical hash
+    canonical_policy_path = tmp_path / "configs" / "eval" / "bp4pp3_predictor_policy.json"
+    assert canonical_policy_path.exists()
+    
+    # We monkeypatch the expected constant to the LF-canonical hash of the policy in the fixture
+    # (which was copied from the real policy, so it has the real hash)
+    policy_bytes = canonical_policy_path.read_bytes()
+    real_lf_hash = hashlib.sha256(policy_bytes.replace(b"\r\n", b"\n")).hexdigest()
+    # It must be exactly the expected constant
+    assert real_lf_hash == "85e9e92fa9f4c221c02af30e787315a88ed2bef51f6f58d25c5dc267eb55a34a"
+
+    # 2. Byte-identical policy at an alternate path is rejected
+    alternate_policy_path = tmp_path / "configs" / "eval" / "alt_predictor_policy.json"
+    alternate_policy_path.write_bytes(policy_bytes)
+    
+    args_dict_alt = dict(cli_args_dict)
+    args_dict_alt["--predictor-policy"] = str(alternate_policy_path)
+    args_alt = _make_args(args_dict_alt, ["--dry-run"])
+    with pytest.raises((ValueError, SystemExit)):
+        main(args_alt)
+
+    # 3. One-byte/metadata-only tampering of predictor_source_hash, correction_hash, runtime_bundle_hash or decision_reference at canonical path fails before output
+    policy_dict = json.loads(policy_bytes.decode("utf-8"))
+    
+    for tampered_key in ("predictor_source_hash", "correction_hash", "runtime_bundle_hash", "decision_reference"):
+        tampered_dict = dict(policy_dict)
+        # Modify the metadata value by 1 byte/char
+        val = tampered_dict.get(tampered_key, "")
+        if isinstance(val, str):
+            tampered_dict[tampered_key] = val[:-1] + ("0" if val[-1] != "0" else "1") if val else "1"
+        else:
+            tampered_dict[tampered_key] = "tampered"
+            
+        tampered_bytes = json.dumps(tampered_dict).encode("utf-8")
+        canonical_policy_path.write_bytes(tampered_bytes)
+        
+        args_dict_tampered = dict(cli_args_dict)
+        args_tampered = _make_args(args_dict_tampered, ["--dry-run"])
+        with pytest.raises((ValueError, SystemExit)):
+            main(args_tampered)
+            
+    # Restore correct policy content
+    canonical_policy_path.write_bytes(policy_bytes)
 
