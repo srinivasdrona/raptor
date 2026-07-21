@@ -17,6 +17,7 @@ try:
         StratumEntry,
         load_manifest,
         reproduce_census_strata,
+        _variant_class_for,
     )
     from raptor.census.aggregate import build_census_record
     from scripts.build_tsc_calibration_batch import RunPins
@@ -28,6 +29,7 @@ except ImportError:
         load_manifest,
         reproduce_census_strata,
         RunPins,
+        _variant_class_for,
     )
     build_census_record = None
     HAS_ALL = False
@@ -39,10 +41,7 @@ def check_all_implemented() -> None:
 
 
 def _get_sha256(path: Path) -> str:
-    content = path.read_bytes()
-    # Normalize CRLF to LF to be checkout-insensitive
-    content_lf = content.replace(b"\r\n", b"\n")
-    return hashlib.sha256(content_lf).hexdigest()
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 @pytest.mark.skipif(
@@ -96,17 +95,14 @@ def test_g_vc15_real_data_integration() -> None:
 
     # Derive current Git commit rather than stale 7e03ca4
     repo_root = Path(__file__).resolve().parents[2]
-    try:
-        res = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            capture_output=True,
-            text=True,
-            check=True,
-            cwd=repo_root
-        )
-        current_commit = res.stdout.strip()
-    except Exception:
-        current_commit = "unknown"
+    res = subprocess.run(
+        ["git", "rev-parse", "--short", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=repo_root
+    )
+    current_commit = res.stdout.strip()
 
     # Build the record with Derived current Git commit and exact Nirvana version
     run_pins = RunPins(
@@ -186,6 +182,31 @@ def test_g_vc15_real_data_integration() -> None:
     assert corpus["missense"] == 5645
     assert corpus["other"] == 893
     assert corpus["truncating"] == 80
+
+    # Assert direction-by-gene and direction-by-consequence maps equal independently-derived Counters in the test
+    from collections import Counter
+    expected_direction_by_gene: dict[str, Counter[str]] = {}
+    expected_direction_by_consequence: dict[str, Counter[str]] = {}
+    
+    strata_by_var_id = {s.variant_id: s for s in strata}
+    for row in bias_rows:
+        m_entry = manifest_by_vcf_key[row.variant_id]
+        stratum = strata_by_var_id[m_entry.variant_id]
+        direction = stratum.stratum
+        
+        gene = row.gene_name
+        expected_direction_by_gene.setdefault(gene, Counter())[direction] += 1
+        
+        conseq_class = _variant_class_for(row.consequence)
+        expected_direction_by_consequence.setdefault(conseq_class, Counter())[direction] += 1
+
+    # Ensure direction-by-gene in record matches our independently derived expected Counters
+    for gene, counter in expected_direction_by_gene.items():
+        assert dict(record["direction_by_gene"][gene]) == dict(counter)
+
+    # Ensure direction-by-consequence in record matches our independently derived expected Counters
+    for conseq_class, counter in expected_direction_by_consequence.items():
+        assert dict(record["direction_by_consequence"][conseq_class]) == dict(counter)
 
     # 7. Assert privacy of the record (strictly contains NO SPDI, VCF keys, or raw rationale/patient identifiers)
     sample_manifest_spdis = [entry.variant_id for entry in manifest_entries[:20]]

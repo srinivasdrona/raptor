@@ -10,13 +10,14 @@ import json
 import hashlib
 import pytest
 
-from scripts.build_tsc_calibration_batch import OutputBoundaryError
-
 try:
-    from raptor.census.cli import main
+    from raptor.census.cli import main, OutputBoundaryError, REPO_ROOT
     HAS_CLI = True
 except ImportError:
     main = None
+    class OutputBoundaryError(Exception):
+        pass
+    REPO_ROOT = Path(__file__).resolve().parents[2]
     HAS_CLI = False
 
 
@@ -26,10 +27,7 @@ def check_cli_implemented() -> None:
 
 
 def _get_sha256(path: Path) -> str:
-    content = path.read_bytes()
-    # Normalize CRLF to LF to be checkout-insensitive
-    content_lf = content.replace(b"\r\n", b"\n")
-    return hashlib.sha256(content_lf).hexdigest()
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 @pytest.fixture
@@ -146,9 +144,7 @@ def test_g_vc11_output_boundary(cli_args_dict, tmp_path: Path, monkeypatch) -> N
     # Define testability contract for the planned CLI: monkeypatch REPO_ROOT to tmp_path
     if HAS_CLI:
         import raptor.census.cli as census_cli
-        for attr in ("REPO_ROOT", "_REPO_ROOT"):
-            if hasattr(census_cli, attr):
-                monkeypatch.setattr(census_cli, attr, tmp_path)
+        monkeypatch.setattr(census_cli, "REPO_ROOT", tmp_path)
 
     census_dir = tmp_path / "data" / "census"
     census_dir.mkdir(parents=True, exist_ok=True)
@@ -164,7 +160,7 @@ def test_g_vc11_output_boundary(cli_args_dict, tmp_path: Path, monkeypatch) -> N
         # exact historical stats path
         str(census_dir / "tsc_vus_clinvar_2026-07-07_stats.json"),
         # certified masked-gate path
-        str(census_dir / "tsc_masked_holdout_gate_2026-07-13.json"),
+        str(census_dir / "tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"),
     ]
 
     for p in forbidden_paths:
@@ -193,9 +189,7 @@ def test_g_vc12_dry_run_summary(cli_args_dict, tmp_path: Path, monkeypatch) -> N
 
     if HAS_CLI:
         import raptor.census.cli as census_cli
-        for attr in ("REPO_ROOT", "_REPO_ROOT"):
-            if hasattr(census_cli, attr):
-                monkeypatch.setattr(census_cli, attr, tmp_path)
+        monkeypatch.setattr(census_cli, "REPO_ROOT", tmp_path)
 
     census_dir = tmp_path / "data" / "census"
     census_dir.mkdir(parents=True, exist_ok=True)
@@ -215,9 +209,7 @@ def test_g_vc13_canonical_json_bytes(cli_args_dict, tmp_path: Path, monkeypatch)
 
     if HAS_CLI:
         import raptor.census.cli as census_cli
-        for attr in ("REPO_ROOT", "_REPO_ROOT"):
-            if hasattr(census_cli, attr):
-                monkeypatch.setattr(census_cli, attr, tmp_path)
+        monkeypatch.setattr(census_cli, "REPO_ROOT", tmp_path)
 
     census_dir = tmp_path / "data" / "census"
     census_dir.mkdir(parents=True, exist_ok=True)
@@ -248,26 +240,47 @@ def test_g_vc13_canonical_json_bytes(cli_args_dict, tmp_path: Path, monkeypatch)
 
 
 def test_g_vc14_policy_hash_verification(cli_args_dict, tmp_path: Path) -> None:
-    """G-VC14 policy/hash verification fails closed on a drifted config hash or non-approved policy."""
+    """G-VC14 policy/hash verification fails closed on invalid/unapproved predictor policy, or drifted config hash."""
     check_cli_implemented()
 
-    # Change policy status to unapproved
-    bad_policy = tmp_path / "bad_policy.json"
-    bad_policy.write_text(
+    # 1. Non-approved status fails closed
+    bad_policy_status = tmp_path / "bad_policy_status.json"
+    bad_policy_status.write_text(
         json.dumps({"schema": "bp4pp3-predictor-policy/2", "status": "unapproved", "mode": "disabled_manual"}),
         encoding="utf-8"
     )
-
-    args_dict = dict(cli_args_dict)
-    args_dict["--predictor-policy"] = str(bad_policy)
-
-    args = _make_args(args_dict, ["--dry-run"])
+    args_dict_status = dict(cli_args_dict)
+    args_dict_status["--predictor-policy"] = str(bad_policy_status)
+    args_status = _make_args(args_dict_status, ["--dry-run"])
     with pytest.raises((ValueError, SystemExit)):
-        main(args)
+        main(args_status)
 
-    # Prove one-byte drift fails closed for EACH bound config surface
+    # 2. Unknown field fails closed
+    bad_policy_field = tmp_path / "bad_policy_field.json"
+    bad_policy_field.write_text(
+        json.dumps({"schema": "bp4pp3-predictor-policy/2", "status": "approved", "mode": "disabled_manual", "unknown_field_xyz": 123}),
+        encoding="utf-8"
+    )
+    args_dict_field = dict(cli_args_dict)
+    args_dict_field["--predictor-policy"] = str(bad_policy_field)
+    args_field = _make_args(args_dict_field, ["--dry-run"])
+    with pytest.raises((ValueError, SystemExit)):
+        main(args_field)
+
+    # 3. Invalid mode fails closed
+    bad_policy_mode = tmp_path / "bad_policy_mode.json"
+    bad_policy_mode.write_text(
+        json.dumps({"schema": "bp4pp3-predictor-policy/2", "status": "approved", "mode": "invalid_mode_abc"}),
+        encoding="utf-8"
+    )
+    args_dict_mode = dict(cli_args_dict)
+    args_dict_mode["--predictor-policy"] = str(bad_policy_mode)
+    args_mode = _make_args(args_dict_mode, ["--dry-run"])
+    with pytest.raises((ValueError, SystemExit)):
+        main(args_mode)
+
+    # Prove one-byte drift fails closed for the four policy-bound config surfaces (excluding --predictor-policy)
     bound_keys = [
-        "--predictor-policy",
         "--scorer-config",
         "--eval-config",
         "--lineage-policy",

@@ -344,7 +344,12 @@ def test_g_vc10_historical_comparison_and_point_distribution(base_inputs) -> Non
     assert comp["annotation_manual_review"]["disabled_manual"] == 1
     assert comp["annotation_manual_review"]["delta"] == -4
 
-    # G-VC10 asserts direction totals come from stratum, not point bands, and point sum includes manual rows
+    # G-VC10 additionally assert the four aggregate direction counts come from the supplied stratum labels
+    # even though the manual and unresolved rows share point 0; no inference from point bands.
+    assert comp["no_deterministic_resolution"]["disabled_manual"] == 2  # unresolved 0-pts (1) + unresolved 4-pts (1) = 2
+    assert comp["annotation_manual_review"]["disabled_manual"] == 1    # manual (1)
+
+    # Asserting these are strictly derived from supplied stratum labels:
     assert comp["candidate_LP_review"]["disabled_manual"] == sum(1 for s in strata if s.stratum == "candidate_LP_review")
     assert comp["candidate_LB_review"]["disabled_manual"] == sum(1 for s in strata if s.stratum == "candidate_LB_review")
     assert comp["no_deterministic_resolution"]["disabled_manual"] == sum(1 for s in strata if s.stratum == "no_deterministic_resolution")

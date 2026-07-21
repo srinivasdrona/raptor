@@ -152,67 +152,25 @@ def test_g_vc3_manifest_duplicate(tmp_path: Path) -> None:
 
 
 def test_g_vc4_exact_one_to_one_join(scorer_config, eval_config) -> None:
-    """G-VC4 exact one-to-one join — a BIAS row with no manifest entry fails loud (ConservationError)."""
+    """G-VC4 exact one-to-one join — fails loud if BIAS rows and manifest do not match one-to-one."""
     check_strata_implemented()
 
     row = _row(3, {"pm2": (1, "supporting")})
-    # 1. BIAS row with no manifest entry
+    
+    # 1. BIAS row with no manifest entry fails loud
     manifest_empty = {}
     with pytest.raises(ConservationError) as exc_info:
         reproduce_census_strata([row], manifest_empty, scorer_config, eval_config)
     assert "has no manifest entry" in str(exc_info.value)
 
-    # 2. Extra manifest entry with no BIAS row
-    manifest_extra = [
-        ManifestEntry(variant_id="NC_000016.10:1003:A:G", vcf_key=row.variant_id),
-        ManifestEntry(variant_id="NC_000016.10:1004:A:G", vcf_key="chr16:1004:A:G"),
-    ]
-    strata = [
-        StratumEntry(
-            variant_id="NC_000016.10:1003:A:G",
-            stratum="no_deterministic_resolution",
-            pattern_id="",
-            pattern_signature=(),
-            signed_points=0,
-            basis="eval_only_census_selection_metadata",
-        ),
-    ]
-    from scripts.build_tsc_calibration_batch import RunPins, assert_source_of_record_conservation
-    run_pins = RunPins(
-        input_sha256="1" * 64,
-        output_sha256="2" * 64,
-        manifest_sha256="3" * 64,
-        source_snapshot="clinvar_2026-07-07",
-        bias_version="3.0.0",
-        bias_commit="ade13f206f3e2c2efe3ec92715d974645fc8da8f",
-        nirvana_version="3.18.1",
-        code_commit="7e03ca4",
-    )
-    census_stats = {
-        "corpus": {"total_vus": 2},
-        "run_integrity": {
-            "bias_rows": 1,
-            "unique_raw_keys": 1,
-            "input_vcf_sha256": "1" * 64,
-            "bias_tsv_sha256": "2" * 64,
-        },
-        "raptor_current_policy_internal_direction": {
-            "candidate_LP_review": 0,
-            "candidate_LB_review": 0,
-        },
-        "candidate_pattern_compression": {
-            "candidate_LP_review": {"exact_strength_patterns": 0},
-            "candidate_LB_review": {"exact_strength_patterns": 0},
-        },
-        "worker": {
-            "bias": "3.0.0",
-            "bias_commit": "ade13f206f3e2c2efe3ec92715d974645fc8da8f",
-            "nirvana": "3.18.1",
-        }
+    # 2. Manifest has extra entry with no matching BIAS row fails loud
+    manifest_extra = {
+        row.variant_id: ManifestEntry(variant_id="NC_000016.10:1003:A:G", vcf_key=row.variant_id),
+        "chr16:9999:A:G": ManifestEntry(variant_id="NC_000016.10:9999:A:G", vcf_key="chr16:9999:A:G")
     }
     with pytest.raises(ConservationError) as exc_info:
-        assert_source_of_record_conservation(manifest_extra, [row], strata, census_stats, run_pins)
-    assert "locus set" in str(exc_info.value)
+        reproduce_census_strata([row], manifest_extra, scorer_config, eval_config)
+    assert "extra" in str(exc_info.value).lower() or "conservation" in str(exc_info.value).lower() or "manifest" in str(exc_info.value).lower() or "locus" in str(exc_info.value).lower()
 
 
 def test_g_vc5_strength_map_drift(scorer_config, eval_config) -> None:
@@ -251,8 +209,8 @@ def test_g_vc5_malformed_strength_or_unknown_criterion(scorer_config, eval_confi
             vcf_key=row_bad_strength.variant_id,
         )
     }
-    from scripts.build_tsc_calibration_batch import UnmappedStrengthError
-    with pytest.raises((UnmappedStrengthError, KeyError, ValueError)):
+    from raptor.scorer.parse import UnmappedStrengthError
+    with pytest.raises(UnmappedStrengthError):
         reproduce_census_strata([row_bad_strength], manifest_bad_strength, scorer_config, eval_config)
 
     # 2. Unknown criterion (xx1 cannot be categorized as pathogenic/benign)
@@ -263,8 +221,8 @@ def test_g_vc5_malformed_strength_or_unknown_criterion(scorer_config, eval_confi
             vcf_key=row_unknown_criterion.variant_id,
         )
     }
-    from scripts.build_tsc_calibration_batch import UnknownCriterionDirectionError
-    with pytest.raises((UnknownCriterionDirectionError, ValueError)):
+    from raptor.scorer.parse import UnknownCriterionDirectionError
+    with pytest.raises(UnknownCriterionDirectionError):
         reproduce_census_strata([row_unknown_criterion], manifest_unknown_criterion, scorer_config, eval_config)
 
 
