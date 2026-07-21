@@ -1,5 +1,5 @@
 # RAPTOR tiered gate v3 — post-hoc re-adjudication of the frozen ADR-0012
-# masked-holdout gate (R2). Claude Opus planner contract (rev 2).
+# masked-holdout gate (R2). Claude Opus planner contract (rev 3).
 #
 # rev 2 applies every GPT-5.4 planner finding consistently: (1) reuse the exact
 # canonical ADR-0011/v2 research key truncating_pathogenic_research_scope_validated
@@ -17,6 +17,28 @@
 # recorded as an EXTERNAL manifest identity (a file cannot embed its own final
 # hash without self-reference); (7) consistent test/Beat-4/migration/
 # expected-R2/count updates, additive architecture, R2/v1/v2 immutable.
+#
+# rev 3 corrects a policy-hash regression in rev 2's config PLACEMENT: rev 2
+# commanded APPENDING the tiered_authorization block to the policy-bound,
+# census/ADR-0012-verified configs/eval/tsc2.yaml, which changed that file's
+# APPROVED raw SHA-256 from ea4ff… to 38f729… and broke ADR-0012 / census
+# policy verification (the approved scoring config was re-signed for an additive
+# block it should never have carried). rev 3 relocates the ENTIRE v3 rule into a
+# NEW STANDALONE configs/eval/tiered_gate_v3.yaml (its own schema
+# raptor.eval.tiered_authorization.v3 + its own canonical hash), preserves
+# tsc2.yaml BYTE-IDENTICAL at approved ea4ff…, adds a dedicated
+# load_tiered_authorization(path) loader + typed validation while
+# load_config(tsc2.yaml) and every v1/v2 policy-bound flow stay byte/behaviour
+# compatible, a CLI arg --tiered-config configs/eval/tiered_gate_v3.yaml whose
+# separately-loaded block drives tiered_config_canonical_sha256, DEFENSIVE
+# Oracle-constant runtime validation inside decide_tiered_gate (confidence /
+# thresholds / directions / gating / min_count must match the pinned v2
+# constants; drift raises TieredReadjudicationConfigError before any decision),
+# and an A3 policy-parity reason that stays visible INDEPENDENTLY of the A5
+# precedence label (PM1 recorded for missense:pathogenic even when A5 is
+# NO_CALLS/UNDERPOWERED). No tsc2 mutation and no policy-hash change: the
+# standalone config is purely additive, and v1/v2/R2/census plus the approved
+# tsc2 policy stay immutable and byte-identical.
 #
 # Purpose: an implementation-ready, hash-bound, additive plan that RE-ADJUDICATES
 # the FROZEN R2 masked-holdout aggregate under a new, multi-axis tiered gate
@@ -109,7 +131,12 @@ decision_context:
       adopting it as research support is post-hoc rule-making.
     controls:
       - No threshold, direction, gating flag, confidence, min_count, split, or
-        Tavtigian value changes (all inherited locked from tsc2.yaml).
+        Tavtigian value changes (all inherited locked from tsc2.yaml, which stays
+        BYTE-IDENTICAL at approved SHA-256 ea4ff… — no additive block).
+      - The versioned tiered rule (axis enums, criterion→scope map, governance
+        statements, prospective registration) lives ENTIRELY in the new
+        standalone configs/eval/tiered_gate_v3.yaml; the policy-bound scoring
+        config tsc2.yaml is never mutated or re-signed.
       - The rule only NARROWS what a pass can mean (research-evidence, post-hoc,
         non-clinical); it grants no new capability.
       - Full-spectrum authorization still hard-requires the missense scopes and
@@ -195,13 +222,17 @@ decision_ledger:
     decision: >-
       The tiered gate REUSES the existing locked oracle_thresholds (missense
       0.90/0.85, truncating 0.95/0.95, confidence 0.95, gating/directions) and
-      min_count_per_class=36 from configs/eval/tsc2.yaml. The new v3 config block
-      adds ONLY the axis enums, the criterion→scope applicability map, and the
-      prospective registration. It introduces NO new numeric threshold and
-      changes NO existing pinned value.
+      min_count_per_class=36 from configs/eval/tsc2.yaml via the UNCHANGED
+      load_config(tsc2.yaml) path. The versioned v3 rule (axis enums, the
+      criterion→scope applicability map, governance statements, and the
+      prospective registration) lives in the NEW standalone
+      configs/eval/tiered_gate_v3.yaml — NOT appended to tsc2.yaml. It introduces
+      NO new numeric threshold and changes NO existing pinned value.
     rationale: >-
       Post-hoc defensibility (ADR-0011 §non-blind control 1) rests on no
-      threshold moving. A git diff of tsc2.yaml must show ONLY an additive block.
+      threshold moving. tsc2.yaml is policy-bound (census/ADR-0012 verifies its
+      approved raw SHA-256 ea4ff…): a `git diff` of tsc2.yaml MUST be EMPTY. The
+      only new config surface is the additive standalone tiered_gate_v3.yaml.
   D3_derive_axes_from_counts_never_crib:
     decision: >-
       Every axis is derived from the frozen called/actual/tp/tn/fp/fn counts and
@@ -229,6 +260,26 @@ decision_ledger:
       frozen aggregate + versioned config.
     rationale: Slot-3 "prefer additive tiered_gate.py + versioned config + pure
       re-adjudication CLI"; keeps the transform auditable and deterministic.
+  D6_standalone_tiered_config_preserves_policy_hash:
+    decision: >-
+      The ENTIRE tiered_authorization rule is a NEW standalone file
+      configs/eval/tiered_gate_v3.yaml (top-level schema
+      raptor.eval.tiered_authorization.v3, its own schema_version: 3, its own
+      canonical hash). configs/eval/tsc2.yaml carries NO tiered_authorization
+      block and stays byte-identical at approved SHA-256 ea4ff…. config.py adds
+      load_tiered_authorization(path) with typed validation; load_config(tsc2.yaml)
+      is untouched and never reads a tiered block. The production CLI loads BOTH
+      exact files (tsc2 via load_config, tiered_gate_v3 via
+      load_tiered_authorization) and combines them WITHOUT changing tsc2 bytes;
+      decide_tiered_gate consumes the separately-loaded tiered block (passed
+      explicitly, or as a test-injected EvalConfig optional field) alongside the
+      locked v2 Oracle constants.
+    rationale: >-
+      rev 2 appended the block to tsc2.yaml, changing its raw SHA-256 from
+      approved ea4ff… to 38f729… and breaking ADR-0012 / census policy
+      verification. Splitting the tiered rule into a standalone additive config
+      re-approves NO unchanged scoring config, keeps the policy hash stable, and
+      still gives the v3 rule its own independent schema and hash.
   rejected_alternatives:
     - id: R1_relabel_r2_in_place
       rejected: >-
@@ -249,6 +300,14 @@ decision_ledger:
       rejected: >-
         Narrowing full_spectrum.requires to exclude the unvalidated missense
         scopes. Rejected: semantics-locked anti-cherry-pick (ADR-0011).
+    - id: R5_append_tiered_block_to_tsc2
+      rejected: >-
+        Appending the tiered_authorization block to configs/eval/tsc2.yaml (the
+        rev-2 placement). Rejected: tsc2.yaml is the policy-bound scoring config
+        whose approved raw SHA-256 (ea4ff…) is verified by census/ADR-0012;
+        appending re-signed it to 38f729… and broke that policy verification. The
+        tiered rule MUST be a standalone additive file (tiered_gate_v3.yaml) so
+        no approved, unchanged scoring config is re-hashed (D6).
 
 # ---------------------------------------------------------------------------
 # 4. Tiered model — independent axes, enums, and arithmetic
@@ -306,6 +365,20 @@ tiered_model:
         a mapped, per-scope effect. pp3/bp4 disabled_manual suppression is NOT
         an evaluation_skipped blocker — it is a declared ADR-0012 policy
         condition recorded on the run, not a scope blocker.
+      reason_visibility: >-
+        A3 is recorded in TieredScopeVerdict.reasons INDEPENDENTLY of the A5
+        precedence summary. Whenever A3 == BLOCKED, one reason entry is appended
+        PER applicable evaluation_skipped criterion (sorted ascending by
+        criterion id), even when A5 resolves to a higher-precedence label such as
+        NO_CALLS or UNDERPOWERED that "hides" BLOCKED from the summary. So
+        missense:pathogenic — whose A5 is NO_CALLS by precedence — STILL carries
+        the PM1 policy-block reason. The reason entry has the pinned exact shape
+        (semantics-locked, asserted verbatim by tests):
+          "policy_parity=BLOCKED: <CRITERION> evaluation_skipped applies_to <stratum:direction>"
+        e.g. for missense:pathogenic under PM1 the exact string is
+          "policy_parity=BLOCKED: PM1 evaluation_skipped applies_to missense:pathogenic"
+        A CLEAR scope appends NO policy_parity reason. Reasons are an ordered
+        list; policy-parity reasons precede A2/coverage narrative reasons.
     A4_end_to_end_coverage:
       kind: reported metric (not an enum gate)
       arithmetic: >-
@@ -338,9 +411,12 @@ tiered_model:
         re-adjudication can NEVER emit VALIDATED_PROSPECTIVE.
       rationale: >-
         Data-first precedence keeps a no-calls/underpowered scope from being
-        mislabeled a policy or performance failure, while A3=BLOCKED is still
-        recorded in reasons. SUPPORTED_POSTHOC requires all of adequate data,
-        clear policy parity, and a met conditional threshold.
+        mislabeled a policy or performance failure, while A3=BLOCKED is ALWAYS
+        still recorded in reasons independently of this summary label (see
+        A3_policy_parity.reason_visibility — PM1 stays visible on
+        missense:pathogenic even though its A5 summary is NO_CALLS).
+        SUPPORTED_POSTHOC requires all of adequate data, clear policy parity, and
+        a met conditional threshold.
     A6_authorization_status:
       enum: [NOT_AUTHORIZED, PENDING_PROSPECTIVE, AUTHORIZED_RESEARCH_ONLY]
       arithmetic: >-
@@ -451,8 +527,10 @@ tiered_model:
     provenance: >-
       research_use_disclaimer and the v2 scope-gate governance statements are
       reused VERBATIM from ADR-0011 / configs/eval/tsc2.yaml /
-      config._PINNED_* (never re-authored). The v3-specific governance
-      statements and no_new_evidence_statement are pinned HERE, in full, so the
+      config._PINNED_* (never re-authored; read-only reuse, tsc2.yaml is not
+      edited). The v3-specific governance statements and no_new_evidence_statement
+      are pinned HERE, in full, and are carried by the NEW standalone
+      configs/eval/tiered_gate_v3.yaml (validated against config.py pins), so the
       implementation invents no wording (checker finding 2).
     research_use_disclaimer: "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission."
     governance_statements:
@@ -469,7 +547,10 @@ tiered_model:
       A single typed TieredReadjudicationError with two subclasses:
       TieredReadjudicationInputError (raised inside decide_tiered_gate on
       malformed counts / source hash drift) and TieredReadjudicationConfigError
-      (raised by the config loader/validator on mapping or config drift).
+      (raised by load_tiered_authorization / _validate_tiered_authorization on
+      standalone-config drift, AND defensively re-raised inside decide_tiered_gate
+      when a hand-built EvalConfig's Oracle constants drift from the pinned v2
+      values — see tiered_config_oracle_constants_runtime_validation).
     semantics: >-
       Raised BEFORE any axis (A1..A6) is computed. When raised, decide_tiered_gate
       returns NO TieredGateDecision and the CLI writes NO v3 artifact and exits
@@ -487,9 +568,29 @@ tiered_model:
         the pinned map).
       - frozen source-record hash drift (R2 canonical LF blob sha256 != 7c55…,
         or the CRLF e914… hash supplied as an input pin).
-      - config drift (any altered threshold / min_count_per_class /
-        full_spectrum.requires / research-scope requires / governance statement /
-        research_use_disclaimer / no_new_evidence_statement vs the pins).
+      - standalone tiered-config drift in configs/eval/tiered_gate_v3.yaml (any
+        altered axis enum / criterion map / full_spectrum.requires /
+        research-scope requires / governance statement / research_use_disclaimer /
+        no_new_evidence_statement / prospective dataset rule vs the config.py
+        pins; raised by load_tiered_authorization / _validate_tiered_authorization).
+      - Oracle-constant drift in a hand-built EvalConfig that bypasses load_config
+        (oracle confidence not 0.95, any stratum precision/recall not the pinned
+        missense 0.90/0.85 or truncating 0.95/0.95, drifted directions/gating, or
+        min_count_per_class not 36 — re-checked inside decide_tiered_gate and
+        raised as TieredReadjudicationConfigError BEFORE any decision; see
+        tiered_config_oracle_constants_runtime_validation).
+    tiered_config_oracle_constants_runtime_validation: >-
+      decide_tiered_gate reuses the locked v2 Oracle constants (oracle_thresholds
+      confidence + per-stratum precision/recall/gating/directions and
+      min_count_per_class) from the EvalConfig it is handed. load_config(tsc2.yaml)
+      already value-locks these, but a TEST-INJECTED / hand-built EvalConfig can
+      bypass the loader, so decide_tiered_gate DEFENSIVELY re-validates them
+      against config.py's pinned v2 constants (_PINNED_ORACLE_CONFIDENCE=0.95,
+      _PINNED_STRATUM_THRESHOLDS missense 0.90/0.85 + truncating 0.95/0.95 with
+      their pinned gating/directions, _PINNED_MIN_COUNT_PER_CLASS=36) and raises
+      TieredReadjudicationConfigError on ANY drift BEFORE computing A1..A6. This
+      guarantees the tiered rule can never silently score against a moved
+      threshold even when tsc2.yaml is not the config source.
     boundary_vs_A0_invalid: >-
       A0 == INVALID is a DISTINCT failure mode: input+config are VALID but the
       run's integrity meta failed — that DOES emit an artifact with every scope
@@ -511,7 +612,7 @@ expected_r2_tiered_outcome:
     missense:pathogenic:
       data_sufficiency: NO_CALLS
       conditional_performance: NOT_ESTIMABLE
-      policy_parity: BLOCKED          # PM1 applies (recorded in reasons)
+      policy_parity: BLOCKED          # PM1 applies; reasons carry "policy_parity=BLOCKED: PM1 evaluation_skipped applies_to missense:pathogenic" even though A5=NO_CALLS
       end_to_end_correct_call_coverage: 0/51
       conditional_lower_bounds: null   # NOT 0.0
       scope_evidence_status: NO_CALLS
@@ -596,15 +697,26 @@ expected_r2_tiered_outcome:
 interfaces_and_schemas:
   new_module:
     path: src/raptor/eval/tiered_gate.py
-    entrypoint: decide_tiered_gate(metrics, config, run_meta) -> TieredGateDecision
+    entrypoint: >-
+      decide_tiered_gate(metrics, config, run_meta, tiered_authorization=None) ->
+      TieredGateDecision
     contract: >-
-      Pure function of (per-scope counts from Metrics, versioned tiered config,
-      whole-run integrity meta). No I/O, no network. Raises the typed
-      fail-closed error (fail_closed_input_config_error) BEFORE any axis on
-      malformed counts / unknown excluded criterion / mapping drift / config
-      drift / source-hash drift — returning NO decision (no partial record).
-      Otherwise emits every axis for every scope; never coerces undefined
-      metrics to 0.0; A4 coverage is correct/actual (tp/tn), never called/actual.
+      Pure function of (per-scope counts from Metrics, the locked v2 EvalConfig,
+      whole-run integrity meta, and the SEPARATELY-loaded tiered_authorization
+      block). No I/O, no network. The tiered block is supplied EXPLICITLY (the
+      production CLI passes the block returned by load_tiered_authorization) OR
+      via a test-injected EvalConfig.tiered_authorization optional field; it is
+      NEVER read from tsc2.yaml. BEFORE any axis, decide_tiered_gate raises the
+      typed fail-closed error (fail_closed_input_config_error) on malformed
+      counts / unknown excluded criterion / mapping drift / tiered-config drift /
+      source-hash drift AND on Oracle-constant drift in a hand-built EvalConfig
+      (confidence != 0.95, stratum precision/recall != pinned missense 0.90/0.85
+      or truncating 0.95/0.95, drifted directions/gating, min_count_per_class !=
+      36 — see tiered_config_oracle_constants_runtime_validation) — returning NO
+      decision (no partial record). Otherwise emits every axis for every scope;
+      records A3=BLOCKED in reasons independently of the A5 summary label
+      (A3_policy_parity.reason_visibility); never coerces undefined metrics to
+      0.0; A4 coverage is correct/actual (tp/tn), never called/actual.
   new_models:
     path: src/raptor/eval/model.py  (additive dataclasses ONLY)
     TieredScopeVerdict:
@@ -629,13 +741,20 @@ interfaces_and_schemas:
         tiered_config_canonical_sha256, implementation_commit,
         implementation_module_sha256, content_hash, post_hoc: true,
         no_new_evidence_statement, reason]
-  new_config_block:
-    path: configs/eval/tsc2.yaml  (ADDITIVE block ONLY)
-    key: tiered_authorization
+  new_standalone_config:
+    path: configs/eval/tiered_gate_v3.yaml   # NEW standalone file (unless a better explicit name is chosen)
+    schema: raptor.eval.tiered_authorization.v3
+    top_level_key: tiered_authorization      # single root block; own schema + own hash
     schema_version: 3
+    rationale: >-
+      The ENTIRE v3 rule is a NEW standalone additive config so that the
+      policy-bound configs/eval/tsc2.yaml is NOT appended to, NOT re-signed, and
+      stays byte-identical at approved SHA-256 ea4ff… (rev-2 appended it and
+      broke the census/ADR-0012 policy hash → 38f729…). This file has its OWN
+      schema and its OWN canonical hash (tiered_config_canonical_sha256).
     contents:
-      - "reuse_reference: oracle_thresholds + min_count_per_class are referenced,
-        NOT redefined"
+      - "reuse_reference: oracle_thresholds + min_count_per_class are referenced
+        from the SEPARATELY-loaded tsc2.yaml EvalConfig, NOT redefined here"
       - "axis_enums: the six per-scope axis enum vocabularies + the aggregate
         surface enums (§4/§4a) (frozen, semantics-locked)"
       - "criterion_scope_applicability: the map in section 4 (semantics-locked;
@@ -652,43 +771,70 @@ interfaces_and_schemas:
       - "no_new_evidence_statement: pinned verbatim (§4a)"
       - "prospective_validation: the locked registration in section 8, status PENDING"
     invariant: >-
-      git diff on tsc2.yaml shows ONLY this additive block. No existing key,
-      threshold, direction, gating flag, min_count, split, or Tavtigian value is
-      altered (load_config value-lock still passes).
+      configs/eval/tsc2.yaml has an EMPTY git diff (byte-identical at approved
+      ea4ff…) and carries NO tiered_authorization block. tiered_gate_v3.yaml is a
+      brand-new file (git add only). No existing tsc2 key, threshold, direction,
+      gating flag, min_count, split, or Tavtigian value is altered; load_config
+      value-lock and the census/ADR-0012 policy-hash check still pass unchanged.
   new_config_pins:
-    path: src/raptor/eval/config.py  (additive pins + loader ONLY)
+    path: src/raptor/eval/config.py  (additive pins + standalone loader ONLY)
     additions:
       - _PINNED_CRITERION_SCOPE_APPLICABILITY (semantics-locked map)
       - _PINNED_TIERED_GOVERNANCE_STATEMENTS (RESEARCH_ONLY_NO_CLINICAL_USE +
         TRUNCATING_PATHOGENIC_PROSPECTIVE_AUTHORIZED, verbatim)
       - _PINNED_NO_NEW_EVIDENCE_STATEMENT (verbatim)
       - _PINNED_PROSPECTIVE_VALIDATION (locked single-dataset contract)
+      - "_PINNED_TIERED_AUTHORIZATION (the full standalone block, verbatim) — the
+        equality target for the tiered-config validator"
       - "TieredReadjudicationError / TieredReadjudicationConfigError /
         TieredReadjudicationInputError (typed fail-closed exceptions)"
+      - "load_tiered_authorization(path) -> Mapping: reads
+        configs/eval/tiered_gate_v3.yaml, checks schema ==
+        raptor.eval.tiered_authorization.v3, extracts the tiered_authorization
+        block, calls _validate_tiered_authorization, and returns the validated
+        block. It NEVER reads or mutates tsc2.yaml."
       - "_validate_tiered_authorization (raises the typed config error on unknown
         criterion, drifted applies_to, altered governance/disclaimer/
         no_new_evidence_statement, changed full_spectrum.requires or
-        research-scope requires)"
-    constraint: no edit to existing v1/v2 pins or validators.
+        research-scope requires — by strict equality vs _PINNED_TIERED_AUTHORIZATION)"
+      - "an OPTIONAL EvalConfig.tiered_authorization field used ONLY for
+        test-injection (a hand-built EvalConfig); load_config(tsc2.yaml) leaves it
+        None and NEVER populates it from tsc2 — tsc2 has no tiered block."
+    constraint: >-
+      no edit to existing v1/v2 pins or validators; load_config(tsc2.yaml) is
+      byte/behaviour compatible and does not read, require, or forbid a tiered
+      block — the tiered rule enters ONLY through load_tiered_authorization or
+      explicit test injection.
   new_cli:
     path: scripts/build_tiered_readjudication.py
+    args:
+      - "--tiered-config configs/eval/tiered_gate_v3.yaml (exact canonical
+        default; the standalone v3 rule file loaded via load_tiered_authorization)"
+      - "the existing tsc2.yaml EvalConfig is loaded via the UNCHANGED
+        load_config for the locked Oracle constants; both exact files are loaded
+        and combined WITHOUT mutating tsc2 bytes."
     behavior: >-
       (1) read frozen R2 record; (2) verify its canonical LF blob SHA-256 ==
       7c55… (typed fail-closed InputError on mismatch, and reject the CRLF
-      e914… hash as an input pin); (3) reconstruct per-scope Metrics + run_meta
-      from frozen fields (tp/tn/fp/fn per direction); (4) call decide_tiered_gate
-      (which validates config/input, else raises the typed error and writes
-      NOTHING); (5) independently re-derive the axis summary and cross-check it
-      equals the decision (integrity boundary, mirrors build_aggregate_v2's
-      cross-check); (6) compute tiered_config_canonical_sha256, capture the full
-      implementation_commit + implementation_module_sha256, embed
+      e914… hash as an input pin); (3) load configs/eval/tsc2.yaml via load_config
+      (byte-unchanged) AND configs/eval/tiered_gate_v3.yaml via
+      load_tiered_authorization (typed ConfigError on drift), combining them
+      without touching tsc2 bytes; (4) reconstruct per-scope Metrics + run_meta
+      from frozen fields (tp/tn/fp/fn per direction); (5) call
+      decide_tiered_gate(metrics, config, run_meta,
+      tiered_authorization=<loaded block>) (which re-validates config/input/Oracle
+      constants, else raises the typed error and writes NOTHING); (6)
+      independently re-derive the axis summary and cross-check it equals the
+      decision (integrity boundary, mirrors build_aggregate_v2's cross-check); (7)
+      compute tiered_config_canonical_sha256 over the LOADED standalone block,
+      capture the full implementation_commit + implementation_module_sha256, embed
       source_content_hash (2ead…) and source_canonical_lf_sha256 (7c55…),
       compute the record's own content_hash (over compact JSON, excluding
-      content_hash), and write the NEW record; then (7) compute the written
+      content_hash), and write the NEW record; then (8) compute the written
       file's canonical-LF SHA-256 and record it in an EXTERNAL manifest
       alongside the artifact (the record never embeds its OWN file SHA) and
       re-verify the on-disk file against that manifest hash. Deterministic,
-      offline, idempotent.
+      offline, idempotent. tsc2.yaml is never written.
   hash_payload:
     content_hash: >-
       SHA-256 (hex) over
@@ -711,8 +857,11 @@ interfaces_and_schemas:
     tiered_config_canonical_sha256: >-
       SHA-256 over
       json.dumps(loaded_tiered_authorization_block, sort_keys=True, separators=(",", ":"))
-      .encode("utf-8") — the additive tsc2.yaml block after load/validation, so
-      any config drift changes the hash.
+      .encode("utf-8") — the standalone configs/eval/tiered_gate_v3.yaml
+      tiered_authorization block AFTER load_tiered_authorization/validation, so
+      any drift in the standalone config changes the hash. It is derived from the
+      separately loaded standalone config, NOT from tsc2.yaml (whose approved
+      policy hash ea4ff… is unaffected).
     implementation_commit: full 40-hex git HEAD commit that built the record.
     implementation_module_sha256: Git/LF blob SHA-256 of src/raptor/eval/tiered_gate.py.
   output_schema:
@@ -722,7 +871,7 @@ interfaces_and_schemas:
     required_fields:
       - schema, date, post_hoc: true
       - source_record + source_canonical_lf_sha256 (7c55…) + source_content_hash (2ead…)
-      - tiered_config_canonical_sha256 (canonical hash of the tiered_authorization block)
+      - tiered_config_canonical_sha256 (canonical hash of the standalone configs/eval/tiered_gate_v3.yaml tiered_authorization block)
       - implementation_commit (full 40-hex) + implementation_module_sha256 (tiered_gate.py LF blob)
       - content_hash (this record's own deterministic hash; see hash_payload)
       - old_semantic_outcome (from R2) and new_tiered_outcome (per-scope axes incl. A4 correct/actual)
@@ -766,12 +915,32 @@ test_matrix:
       - No registered threshold → NOT_APPLICABLE (never fabricated threshold).
       - PM1 excluded → BLOCKS only missense:pathogenic; truncating:pathogenic and
         every benign scope stay CLEAR (global-blocker-leakage guard).
+      - A3 reason visibility → when PM1 is excluded, missense:pathogenic (whose A5
+        summary is NO_CALLS/UNDERPOWERED by precedence) STILL carries the exact
+        pinned PM1 policy-block reason (the verbatim
+        A3_policy_parity.reason_visibility string, tokens policy_parity=BLOCKED /
+        PM1 / evaluation_skipped / applies_to / missense:pathogenic) in its
+        reasons list; a CLEAR scope carries NO policy_parity reason; multiple
+        applicable criteria append one sorted entry each.
       - A4 correct-call coverage uses CORRECT counts (tp/tn) — benign with fp>0
         yields tn/actual < called/actual (called/actual can NEVER be substituted
         for correct/actual).
+      - Oracle-constant runtime validation → a hand-built EvalConfig whose
+        oracle confidence != 0.95, whose missense/truncating precision-recall !=
+        pinned 0.90/0.85 or 0.95/0.95, whose gating/directions drift, or whose
+        min_count_per_class != 36 raises TieredReadjudicationConfigError from
+        decide_tiered_gate BEFORE any axis and yields NO decision/artifact; a
+        matching pinned EvalConfig proceeds.
+      - Standalone tiered-config loading → load_tiered_authorization reads
+        configs/eval/tiered_gate_v3.yaml, validates it, and returns the block;
+        drift in that file (criterion map / requires / governance / disclaimer /
+        no_new_evidence_statement / dataset rule) raises
+        TieredReadjudicationConfigError; load_config(tsc2.yaml) is unaffected and
+        never yields a tiered block.
       - Typed fail-closed error (no decision / no artifact) — triggers are
         non-int/bool/negative counts; unknown excluded criterion;
-        criterion-map applies_to drift; source-hash drift; config drift — each
+        criterion-map applies_to drift; source-hash drift; standalone
+        tiered-config drift; Oracle-constant drift — each
         raises TieredReadjudication* and
         produces NO scope record (an unknown criterion never yields a per-scope
         BLOCKED).
@@ -789,7 +958,10 @@ test_matrix:
       for ALL SIX scopes across ALL axes (data_sufficiency, conditional_
       performance, policy_parity, A4 correct-call coverage, conditional_lower_
       bounds, scope_evidence_status, authorization_status):
-      missense:pathogenic NO_CALLS/NOT_ESTIMABLE/BLOCKED/0-of-51/null/NO_CALLS;
+      missense:pathogenic NO_CALLS/NOT_ESTIMABLE/BLOCKED/0-of-51/null/NO_CALLS
+      (with reasons containing the exact pinned "policy_parity=BLOCKED: PM1
+      evaluation_skipped applies_to missense:pathogenic" even though the A5
+      summary is NO_CALLS);
       missense:benign UNDERPOWERED/NOT_ESTIMABLE/CLEAR/9-of-103/null/UNDERPOWERED;
       truncating:pathogenic ADEQUATE/MET/CLEAR/189-of-210/SUPPORTED_POSTHOC/
       PENDING_PROSPECTIVE; truncating:benign NO_CALLS/NOT_APPLICABLE/CLEAR/0-of-1/
@@ -814,17 +986,23 @@ test_matrix:
       gate.py / scope_gate.py / model v1+v2 classes / R2 record
       (tsc_masked_holdout_gate_disabled_manual_2026-07-21.json) / the 2026-07-13
       v1 record are byte-identical to base 037701e; decide_gate + decide_scope_gate
-      outputs unchanged on the existing fixtures; the additive tsc2.yaml diff is
-      the tiered_authorization block ONLY.
+      outputs unchanged on the existing fixtures; configs/eval/tsc2.yaml is
+      BYTE-IDENTICAL (empty git diff, approved SHA-256 ea4ff… unchanged, NO
+      tiered_authorization block, census/ADR-0012 policy-hash check still passes);
+      and configs/eval/tiered_gate_v3.yaml is a NEW standalone additive file
+      (present, git-added) that load_config never reads.
   prospective_registration_test:
     file: tests/eval/test_tiered_prospective_registration.py
     asserts: >-
-      The locked prospective contract exists with status PENDING and matches the
+      The locked prospective contract (carried by the standalone
+      configs/eval/tiered_gate_v3.yaml, loaded via load_tiered_authorization)
+      exists with status PENDING and matches the
       tiered axis enums, thresholds, scope lattice, and criterion map; the
       dataset rule resolves to EXACTLY ONE registered archive (single rule, not
       an OR); the BLOCKED_DATA path chooses NO outcome-dependent fallback; and
       any edit to states/thresholds/scope/map/dataset-rule after the contract is
-      locked is rejected.
+      locked is rejected (TieredReadjudicationConfigError). tsc2.yaml carries no
+      part of this contract.
 
 # ---------------------------------------------------------------------------
 # 8. Prospective validation — registered now, PENDING
@@ -832,6 +1010,11 @@ test_matrix:
 
 prospective_validation:
   status: PENDING
+  config_location: >-
+    The locked prospective contract is registered in the NEW standalone
+    configs/eval/tiered_gate_v3.yaml (tiered_authorization.prospective_validation),
+    loaded via load_tiered_authorization — NOT in tsc2.yaml. tsc2.yaml stays
+    byte-identical at approved ea4ff… and carries no part of this contract.
   claim: >-
     No prospective validation has occurred. This re-adjudication is post-hoc on
     frozen R2 and cannot and does not claim otherwise.
@@ -917,24 +1100,33 @@ preservation_and_migration:
     - src/raptor/eval/gate.py (decide_gate, GateDecision, StratumVerdict)
     - src/raptor/eval/scope_gate.py (decide_scope_gate)
     - existing model.py v1/v2 dataclasses (only NEW dataclasses appended)
+    - configs/eval/tsc2.yaml (approved SHA-256 ea4ff…; NO tiered_authorization
+      block; empty git diff; census/ADR-0012 policy-hash check unchanged)
     - data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json (R2)
     - data/census/tsc_masked_holdout_gate_2026-07-13.json (v1)
     - the VUS census records
   additive_only_edits:
     - src/raptor/eval/tiered_gate.py (new; decide_tiered_gate + TieredReadjudication* errors)
     - src/raptor/eval/model.py (append TieredScopeVerdict, TieredGateDecision)
-    - src/raptor/eval/config.py (append pins + tiered validator + typed config error)
-    - configs/eval/tsc2.yaml (append tiered_authorization block ONLY)
-    - scripts/build_tiered_readjudication.py (new)
+    - src/raptor/eval/config.py (append pins + load_tiered_authorization +
+      _validate_tiered_authorization + typed config error + OPTIONAL
+      test-injection EvalConfig.tiered_authorization field; load_config unchanged)
+    - configs/eval/tiered_gate_v3.yaml (NEW standalone file — the entire v3 rule;
+      own schema raptor.eval.tiered_authorization.v3 + own canonical hash)
+    - scripts/build_tiered_readjudication.py (new; --tiered-config arg)
     - tests/eval/test_tiered_*.py (new)
   additive_architecture: >-
     Every edit is purely additive; the architecture adds a NEW axis module,
-    NEW dataclasses, a NEW config block, a NEW CLI, and a NEW v3 record. R2 and
-    all v1/v2 code, records, and hashes remain immutable and byte-identical.
+    NEW dataclasses, a NEW standalone config file, a NEW CLI, and a NEW v3
+    record. configs/eval/tsc2.yaml is NOT touched (no appended block, no policy
+    re-hash). R2 and all v1/v2 code, records, and hashes remain immutable and
+    byte-identical.
   backout: >-
-    Delete the new module/CLI/tests and the additive tsc2.yaml block and config
-    pins; nothing in v1/v2 depends on them, so removal restores base 037701e
-    behavior exactly. No data record needs reverting (the v3 record is new).
+    Delete the new module/CLI/tests, the new standalone
+    configs/eval/tiered_gate_v3.yaml, and the additive config.py pins/loader;
+    nothing in v1/v2 depends on them and tsc2.yaml was never edited, so removal
+    restores base 037701e behavior exactly. No data record needs reverting (the
+    v3 record is new) and no tsc2/policy-hash revert is required.
   handoff: >-
     MADR/ADR handoff — after checker CLEAN and the re-adjudication record is
     produced, draft ADR-0013 "Tiered gate v3 post-hoc re-adjudication" recording
@@ -965,6 +1157,38 @@ validation:
 beat4_self_audit:
   empty_beat4: false
   findings:
+  - id: policy_hash_regression
+    risk: >-
+      Appending the tiered rule to the policy-bound configs/eval/tsc2.yaml (the
+      rev-2 defect) changes its approved raw SHA-256 (ea4ff… → 38f729…) and
+      breaks ADR-0012 / census policy verification even though scoring is
+      unchanged.
+    control: the ENTIRE v3 rule lives in the NEW standalone
+      configs/eval/tiered_gate_v3.yaml (own schema + own hash); tsc2.yaml is
+      byte-identical (empty git diff, ea4ff… unchanged, no tiered block); the
+      preservation test asserts the empty tsc2 diff and that the census/ADR-0012
+      policy-hash check still passes; tiered_config_canonical_sha256 derives from
+      the standalone file, not tsc2.
+  - id: oracle_constant_bypass
+    risk: >-
+      A hand-built / test-injected EvalConfig bypasses load_config's value-lock
+      and scores the tiered rule against a moved threshold, confidence, gating,
+      direction, or min_count.
+    control: decide_tiered_gate DEFENSIVELY re-validates the Oracle constants
+      against config.py pins (_PINNED_ORACLE_CONFIDENCE=0.95, _PINNED_STRATUM_
+      THRESHOLDS 0.90/0.85 + 0.95/0.95, pinned gating/directions,
+      _PINNED_MIN_COUNT_PER_CLASS=36) and raises TieredReadjudicationConfigError
+      BEFORE any axis; synthetic test asserts drift yields NO decision/artifact.
+  - id: a3_reason_hidden_by_precedence
+    risk: >-
+      The A5 precedence summary (NO_CALLS/UNDERPOWERED) masks a real A3=BLOCKED,
+      so the PM1 policy block on missense:pathogenic silently disappears from the
+      record.
+    control: >-
+      A3=BLOCKED is appended to reasons INDEPENDENTLY of A5 with the exact
+      pinned string "policy_parity=BLOCKED: PM1 evaluation_skipped applies_to
+      missense:pathogenic"; the synthetic and frozen-R2 tests assert it is
+      present even though missense:pathogenic's A5 is NO_CALLS.
   - id: posthoc_laundering
     risk: >-
       SUPPORTED_POSTHOC quietly read as authorization downstream.
