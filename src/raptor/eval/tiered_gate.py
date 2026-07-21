@@ -62,6 +62,26 @@ SOURCE_R2_INTERNAL_CONTENT_HASH = "2ead589d2f129f988d9932bb01153891902f0d6750005
 
 _DIRECTIONS: tuple = ("pathogenic", "benign")
 
+#: Every `Metrics.counts` key a v3 axis reads (directly or via
+#: `_DIRECTION_COUNT_FIELDS`/`tp`/`tn`/`fp`/`fn`/`abstain`) -- ALL eleven
+#: MUST be present with a valid non-bool non-negative int value before any
+#: axis is computed (spec §4b: malformed/missing input ABORTS generation
+#: fail-closed). A key silently absent from `counts` is exactly as fatal as
+#: a malformed value for that key -- never defaulted via `.get(key, 0)`.
+_REQUIRED_COUNT_KEYS: tuple = (
+    "total",
+    "total_called",
+    "abstain",
+    "path_actual",
+    "path_called",
+    "benign_actual",
+    "benign_called",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
+)
+
 
 def _scope_key(stratum: str, direction: str) -> str:
     return f"{stratum}:{direction}"
@@ -75,16 +95,24 @@ def _valid_count(value: Any) -> bool:
 
 
 def _validate_metrics_counts(metrics: Mapping[str, Metrics]) -> None:
-    """Validate EVERY key/value pair in EVERY stratum's `Metrics.counts`
-    mapping -- not merely a fixed subset of "meaningful" fields -- since a
-    malformed value can appear on any key (e.g. `"total": -10` while every
-    gating-relevant field is otherwise valid)."""
+    """Validate EVERY required key's PRESENCE and value in EVERY stratum's
+    `Metrics.counts` mapping -- not merely a fixed subset of "meaningful"
+    fields, and not merely the keys that happen to be present. A key
+    entirely ABSENT from `counts` is exactly as fatal as a malformed value
+    for that key (e.g. a stratum missing `"fn"` fails closed exactly like
+    `"total": -10` would) -- callers must never `.get(key, 0)` a required
+    count and silently treat a missing key as zero."""
     for stratum, m in metrics.items():
         counts = getattr(m, "counts", None)
         if not isinstance(counts, Mapping):
             raise TieredReadjudicationInputError(
                 f"stratum {stratum!r} Metrics.counts must be a mapping, got {type(counts).__name__}"
             )
+        for key in _REQUIRED_COUNT_KEYS:
+            if key not in counts:
+                raise TieredReadjudicationInputError(
+                    f"stratum {stratum!r} Metrics.counts is missing required key {key!r}"
+                )
         for key, value in counts.items():
             if not _valid_count(value):
                 raise TieredReadjudicationInputError(
@@ -193,13 +221,17 @@ def _build_scope_verdict(
     actual_field, called_field = _DIRECTION_COUNT_FIELDS[direction]
     precision_field, recall_field = _DIRECTION_LB_FIELDS[direction]
 
-    actual_count = int(m.counts.get(actual_field, 0))
-    called_count = int(m.counts.get(called_field, 0))
-    tp = int(m.counts.get("tp", 0))
-    tn = int(m.counts.get("tn", 0))
-    fp = int(m.counts.get("fp", 0))
-    fn = int(m.counts.get("fn", 0))
-    abstain_count = int(m.counts.get("abstain", 0))
+    # No `.get(key, 0)` masking here: `_validate_metrics_counts` has
+    # already required every key in `_REQUIRED_COUNT_KEYS` to be present
+    # (spec §4b) -- direct indexing is the only shape that can't silently
+    # substitute 0 for an absent key.
+    actual_count = m.counts[actual_field]
+    called_count = m.counts[called_field]
+    tp = m.counts["tp"]
+    tn = m.counts["tn"]
+    fp = m.counts["fp"]
+    fn = m.counts["fn"]
+    abstain_count = m.counts["abstain"]
 
     # A1_data_sufficiency
     if called_count == 0:
