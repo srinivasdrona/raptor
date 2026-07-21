@@ -125,18 +125,24 @@ def _pattern_stats(strata_subset: Sequence[StratumEntry]) -> dict[str, Any]:
 
 
 def _criterion_incidence_and_suppression(
-    bias_rows: Iterable[BiasRecord],
-) -> tuple[dict[str, int], dict[str, int]]:
+    bias_rows: Sequence[BiasRecord],
+) -> tuple[dict[str, int], dict[str, int], int]:
     """Parse EVERY BIAS row's full (non-automatable-filtered) criteria table
-    and derive (a) the raw fired-criterion incidence across all rows, and
-    (b) the PP3/BP4 raw-firing + union suppression counts. Both are measured
-    fresh from the immutable BIAS rows -- never read from any stats file."""
+    and derive (a) the raw fired-criterion incidence across all rows, (b)
+    the PP3/BP4 raw-firing + union suppression counts, and (c) the count of
+    rows successfully parsed. All are measured fresh from the immutable
+    BIAS rows -- never read from any stats file. A parse-contract failure
+    (`UnmappedStrengthError`/`UnknownCriterionDirectionError`) propagates
+    immediately (fail loud), so `parser_records` only ever counts rows that
+    reached this point without error."""
     criterion_incidence: Counter[str] = Counter()
     raw_pp3 = 0
     raw_bp4 = 0
     affected_union = 0
+    parser_records = 0
     for row in bias_rows:
         calls = parse_rationale(row.criteria, STRENGTH_MAP)
+        parser_records += 1
         fired = {call.criterion for call in calls}
         for criterion in fired:
             criterion_incidence[criterion] += 1
@@ -148,15 +154,62 @@ def _criterion_incidence_and_suppression(
             raw_bp4 += 1
         if has_pp3 or has_bp4:
             affected_union += 1
-    return dict(criterion_incidence), {
-        "raw_pp3": raw_pp3,
-        "raw_bp4": raw_bp4,
-        "affected_union": affected_union,
-        # Neither PP3 nor BP4 is in `eval_config.automatable_criteria` under
-        # the approved disabled/manual policy -- this is a structural
-        # invariant of the run, not a data-derived probe value.
-        "scored_calls": 0,
-    }
+    return (
+        dict(criterion_incidence),
+        {
+            "raw_pp3": raw_pp3,
+            "raw_bp4": raw_bp4,
+            "affected_union": affected_union,
+            # Neither PP3 nor BP4 is in `eval_config.automatable_criteria` under
+            # the approved disabled/manual policy -- this is a structural
+            # invariant of the run, not a data-derived probe value.
+            "scored_calls": 0,
+        },
+        parser_records,
+    )
+
+
+def _validate_historical_directions(historical_stats: Mapping[str, Any]) -> Mapping[str, int]:
+    """Require `historical_stats['raptor_current_policy_internal_direction']`
+    to carry EXACTLY the four recorded direction keys, each a nonnegative
+    `int` -- never a silent `.get(..., 0)` default that would mask a
+    missing/blank/malformed historical count."""
+    historical_direction = historical_stats.get("raptor_current_policy_internal_direction")
+    if not isinstance(historical_direction, Mapping):
+        raise ValueError(
+            "historical_stats['raptor_current_policy_internal_direction'] is missing or "
+            f"not an object; got {historical_direction!r}"
+        )
+    actual_keys = set(historical_direction.keys())
+    expected_keys = set(_DIRECTION_KEYS)
+    if actual_keys != expected_keys:
+        missing = expected_keys - actual_keys
+        extra = actual_keys - expected_keys
+        raise ValueError(
+            "historical_stats['raptor_current_policy_internal_direction'] must carry exactly "
+            f"{sorted(expected_keys)!r}; missing={sorted(missing)!r}, extra={sorted(extra)!r}"
+        )
+    for key in _DIRECTION_KEYS:
+        value = historical_direction[key]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(
+                f"historical_stats direction {key!r} must be a nonnegative int; got {value!r}"
+            )
+    return historical_direction
+
+
+def _validate_automatable_criteria(automatable_criteria: Iterable[str]) -> tuple[str, ...]:
+    """Normalize `automatable_criteria` and fail closed if PP3 or BP4 is
+    present -- under the approved disabled/manual policy neither criterion
+    may ever be automatable (ADR-0012)."""
+    normalized = tuple(str(c).strip().upper() for c in automatable_criteria)
+    forbidden = {"PP3", "BP4"} & set(normalized)
+    if forbidden:
+        raise ValueError(
+            f"automatable_criteria must not contain {sorted(forbidden)!r} under the "
+            "disabled/manual policy (PP3/BP4 automated emission is disabled)"
+        )
+    return normalized
 
 
 def build_census_record(
@@ -167,18 +220,26 @@ def build_census_record(
     run_pins: Any,
     bound_hashes: Mapping[str, str],
     historical_stats: Mapping[str, Any],
+    automatable_criteria: Iterable[str],
 ) -> dict[str, Any]:
     """Build the non-identifying `raptor.tsc.vus_census.disabled_manual.v1`
     aggregate record from `strata` + `bias_rows` + `manifest` + `run_pins`
     (duck-typed: `.input_sha256`, `.output_sha256`, `.manifest_sha256`,
-    `.source_snapshot`, `.code_commit`) + `bound_hashes` + `historical_stats`.
+    `.source_snapshot`, `.code_commit`) + `bound_hashes` + `historical_stats`
+    + the run's `automatable_criteria` (the same set used to reproduce
+    `strata`, e.g. `eval_config.automatable_criteria`).
 
     Every count is DERIVED here; no expected-count literal is read from this
-    module. `historical_stats` is read only to compute the reported delta.
+    module. `historical_stats` is read only to compute the reported delta,
+    and its four direction counts are strictly validated (see
+    `_validate_historical_directions`) rather than defaulted. Fails closed
+    if `automatable_criteria` carries PP3 or BP4 (never automatable under
+    the approved disabled/manual policy).
     """
     manifest = tuple(manifest)
     bias_rows = tuple(bias_rows)
     strata = tuple(strata)
+    automatable_normalized = _validate_automatable_criteria(automatable_criteria)
 
     manifest_by_vcf_key = {entry.vcf_key: entry for entry in manifest}
     strata_by_variant_id = {entry.variant_id: entry for entry in strata}
@@ -197,16 +258,32 @@ def build_census_record(
     corpus.update(gene_counts)
     corpus.update(consequence_counts)
 
+    # --- raw gene|transcript incidence (derived from bias_rows) ---
+    bias_gene_transcript = Counter(f"{row.gene_name}|{row.transcript}" for row in bias_rows)
+
     # --- run integrity ---
-    run_integrity = {
-        "bias_rows": len(bias_rows),
-        "unique_raw_keys": len({row.variant_id for row in bias_rows}),
-        "manifest_identities": len(manifest),
-    }
+    bias_key_counts = Counter(row.variant_id for row in bias_rows)
+    duplicate_bias_keys = sum(count - 1 for count in bias_key_counts.values() if count > 1)
+    manifest_id_counts = Counter(entry.variant_id for entry in manifest)
+    manifest_key_counts = Counter(entry.vcf_key for entry in manifest)
+    duplicate_manifest_ids = sum(count - 1 for count in manifest_id_counts.values() if count > 1)
+    duplicate_manifest_keys = sum(count - 1 for count in manifest_key_counts.values() if count > 1)
+    exact_join = (
+        duplicate_bias_keys == 0
+        and duplicate_manifest_ids == 0
+        and duplicate_manifest_keys == 0
+        and len(bias_rows) == len(manifest) == len(strata)
+        and set(bias_key_counts) == set(manifest_key_counts)
+    )
 
     # --- aggregate direction counts (derived strictly from stratum labels) ---
     direction_counter: Counter[str] = Counter(_direction_label(entry.stratum) for entry in strata)
     directions = {key: direction_counter.get(key, 0) for key in _DIRECTION_KEYS}
+    total_directions = sum(directions.values())
+    direction_shares = {
+        key: (directions[key] / total_directions if total_directions else 0.0)
+        for key in _DIRECTION_KEYS
+    }
 
     # --- pattern compression ---
     lp_strata = [entry for entry in strata if entry.stratum == "candidate_LP_review"]
@@ -217,8 +294,35 @@ def build_census_record(
     }
 
     # --- raw criterion incidence + PP3/BP4 suppression (from bias_rows) ---
-    raw_bias_criterion_incidence, pp3bp4_suppression = _criterion_incidence_and_suppression(bias_rows)
-    consumed_automated_criterion_incidence = {"PP3": 0, "BP4": 0}
+    raw_bias_criterion_incidence, pp3bp4_suppression, parser_records = _criterion_incidence_and_suppression(
+        bias_rows
+    )
+    # Every automatable criterion's consumed incidence is derived from the
+    # SAME raw fired-criterion counts above (never re-parsed/re-guessed);
+    # PP3/BP4 are always recorded as explicit zeros -- structurally true
+    # under the disabled/manual policy (validated by
+    # `_validate_automatable_criteria` above), never a data-derived probe.
+    consumed_automated_criterion_incidence = {
+        criterion: raw_bias_criterion_incidence.get(criterion, 0) for criterion in automatable_normalized
+    }
+    consumed_automated_criterion_incidence["PP3"] = 0
+    consumed_automated_criterion_incidence["BP4"] = 0
+
+    run_integrity = {
+        "bias_rows": len(bias_rows),
+        "unique_raw_keys": len(bias_key_counts),
+        "manifest_identities": len(manifest),
+        "parser_records": parser_records,
+        # A parse-contract error propagates immediately (fail loud) rather
+        # than being accumulated here, so this is 0 for every record this
+        # function ever returns -- a structural invariant of a completed
+        # run, not a data-derived probe value.
+        "parser_contract_errors": 0,
+        "exact_join": exact_join,
+        "duplicate_manifest_ids": duplicate_manifest_ids,
+        "duplicate_manifest_keys": duplicate_manifest_keys,
+        "duplicate_bias_keys": duplicate_bias_keys,
+    }
 
     # --- point distribution (all strata, one band per signed_points value) ---
     points_counter: Counter[int] = Counter(entry.signed_points for entry in strata)
@@ -240,12 +344,12 @@ def build_census_record(
         direction_by_consequence.setdefault(conseq_class, Counter())[direction] += 1
 
     # --- historical comparison delta (read historical_stats only for this) ---
-    historical_direction = historical_stats.get("raptor_current_policy_internal_direction", {})
+    historical_direction = _validate_historical_directions(historical_stats)
     historical_comparison_superseded = {
         key: {
-            "historical": historical_direction.get(key, 0),
+            "historical": historical_direction[key],
             "disabled_manual": directions[key],
-            "delta": directions[key] - historical_direction.get(key, 0),
+            "delta": directions[key] - historical_direction[key],
         }
         for key in _DIRECTION_KEYS
     }
@@ -265,7 +369,9 @@ def build_census_record(
         "bound_config_hashes": dict(bound_hashes),
         "run_integrity": run_integrity,
         "corpus": corpus,
+        "bias_gene_transcript": dict(bias_gene_transcript),
         "raptor_current_policy_internal_direction": directions,
+        "raptor_current_policy_internal_direction_shares": direction_shares,
         "candidate_pattern_compression": candidate_pattern_compression,
         "raw_bias_criterion_incidence": raw_bias_criterion_incidence,
         "consumed_automated_criterion_incidence": consumed_automated_criterion_incidence,

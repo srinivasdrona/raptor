@@ -76,17 +76,30 @@ python scripts/build_masked_holdout_gate_aggregate.py \
 `tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json` (ADR-0012) is the
 packet-free, non-identifying binding census aggregate over the same
 6,618-VUS TSC1/TSC2 run under the PP3/BP4-disabled-automated-emission /
-manual policy: candidate LP/LB directions, pattern compression, raw and
-consumed-automated criterion incidence, PP3/BP4 suppression counts, the
-signed-points distribution, per-gene/per-consequence corpus and direction
-breakdowns, and a superseded-historical-comparison delta against
-`tsc_vus_clinvar_2026-07-07_stats.json`. It is produced by the packet-free
-`raptor.census` package (`raptor.census.strata` + `raptor.census.aggregate`)
-and is a DOER RUNTIME OUTPUT, never hand-authored or committed by an
-implementation change. `non_authoritative_boundary` is recorded on every
-emitted record: this aggregate is an internal, eval-only triage signal, not
-a validated classification, an expert-reviewed VUS worklist, or a clinical
-report.
+manual policy: candidate LP/LB directions and their derived shares,
+pattern compression, raw and consumed-automated criterion incidence (PP3/BP4
+always recorded as explicit zeros), PP3/BP4 suppression counts, raw
+gene|transcript incidence, the signed-points distribution, per-gene/per-
+consequence corpus and direction breakdowns, run-integrity conservation
+counters (row/manifest/key cardinalities, exact-join, duplicate counts,
+parser record/error counts), and a superseded-historical-comparison delta
+against `tsc_vus_clinvar_2026-07-07_stats.json`. It is produced by the
+packet-free `raptor.census` package (`raptor.census.strata` +
+`raptor.census.aggregate`) and is a DOER RUNTIME OUTPUT, never hand-authored
+or committed by an implementation change. `non_authoritative_boundary` is
+recorded on every emitted record: this aggregate is an internal, eval-only
+triage signal, not a validated classification, an expert-reviewed VUS
+worklist, or a clinical report.
+
+The CLI fails closed, before any processing or output, on: an unapproved/
+drifted predictor policy or bound config hash; a `--historical-stats` path
+that is not exactly the immutable, committed
+`data/census/tsc_vus_clinvar_2026-07-07_stats.json`, or whose canonical
+LF-normalized sha256 does not match the pinned `HISTORICAL_CENSUS_SHA256`
+constant (`raptor.census.cli`); a malformed/missing provenance `vcf_hash`
+(lowercase- or uppercase-hex sha256) or blank `source_snapshot`; and an
+unresolvable current git commit (a git-invocation failure, blank, or
+non-hex `rev-parse` result never falls back to an `unknown` sentinel).
 
 Reproduce it (byte-identical, never overwriting an existing artifact) with:
 

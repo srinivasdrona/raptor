@@ -1,10 +1,12 @@
 """raptor.census.cli — deterministic ADR-0012 VUS census CLI (D5, D6, output boundary).
 
 Verifies the approved disabled/manual predictor policy + bound config hashes
-BEFORE any processing, loads the immutable manifest + BIAS TSV, conserves the
-exact identity/row/join invariants (via `reproduce_census_strata`), derives
-the non-identifying aggregate (`build_census_record`), and writes it ONLY to
-the single hard-pinned `data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json`
+BEFORE any processing, validates the immutable historical-stats source and
+provenance (vcf_hash/source_snapshot) fail closed, loads the immutable
+manifest + BIAS TSV, conserves the exact identity/row/join invariants (via
+`reproduce_census_strata`), derives the non-identifying aggregate
+(`build_census_record`), and writes it ONLY to the single hard-pinned
+`data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json`
 path as canonical UTF-8/LF bytes -- never overwriting an existing artifact.
 
 Imports only `raptor.census` (packet-free), `raptor.scorer`, and
@@ -15,6 +17,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -35,6 +38,20 @@ REPO_ROOT: Path = Path(__file__).resolve().parents[3]
 
 #: The ONLY permitted census output filename (output_schema.only_permitted_output_path).
 CANONICAL_CENSUS_FILENAME = "tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json"
+
+#: The ONLY permitted `--historical-stats` filename/source (immutable, committed data artifact).
+_HISTORICAL_STATS_FILENAME = "tsc_vus_clinvar_2026-07-07_stats.json"
+
+#: Canonical LF/Git-blob sha256 of `data/census/tsc_vus_clinvar_2026-07-07_stats.json`
+#: (i.e. `git hash-object`'s content hash, NOT the raw CRLF-checkout bytes on
+#: Windows): the committed historical-stats data artifact's identity is
+#: pinned here so a mutated/substituted/CRLF-mangled source fails closed
+#: before any processing or output (never applied to raw config hashes).
+HISTORICAL_CENSUS_SHA256 = "389e93d5b37f686b8d5e1115e2ebbfcdee6a060417300e5ed38d46304abac6e7"
+
+_VCF_HASH_LOWER_RE = re.compile(r"^[0-9a-f]{64}$")
+_VCF_HASH_UPPER_RE = re.compile(r"^[0-9A-F]{64}$")
+_CODE_COMMIT_RE = re.compile(r"^[0-9a-f]+$")
 
 #: Approved predictor-policy contract (hash_contract.inputs.approved_predictor_policy).
 _PREDICTOR_POLICY_SCHEMA = "bp4pp3-predictor-policy/2"
@@ -69,8 +86,28 @@ class OutputBoundaryError(RuntimeError):
     target, or that target already exists -- raised before any write."""
 
 
+class CodeCommitResolutionError(RuntimeError):
+    """`_resolve_code_commit` could not resolve a valid git commit -- a git
+    invocation failure, blank stdout, or non-hex output. Fails loud rather
+    than falling back to an `unknown` sentinel (provenance must never be
+    silently unresolvable)."""
+
+
 def _sha256_bytes(path: str | Path) -> str:
+    """Raw-byte sha256 -- used for every bound config surface (scorer/eval/
+    lineage/packet-direction/predictor-policy configs) and the manifest/BIAS
+    TSV. NEVER LF-normalized: only the committed historical-stats data
+    artifact gets that treatment (see `_historical_stats_lf_sha256`)."""
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _historical_stats_lf_sha256(path: str | Path) -> str:
+    """Hash the committed historical-stats data artifact using its
+    canonical LF bytes: a Windows CRLF checkout is normalized ONLY for this
+    committed-data-artifact identity check, never for any raw config hash
+    computed by `_sha256_bytes` above."""
+    raw = Path(path).read_bytes()
+    return hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest()
 
 
 def _validate_predictor_policy(policy: Mapping[str, Any]) -> None:
@@ -131,7 +168,51 @@ def _assert_output_boundary(path: str | Path) -> Path:
     return resolved
 
 
+def _validate_historical_stats_source(path: str | Path) -> str:
+    """Require `--historical-stats` to resolve EXACTLY to the single
+    immutable, committed `data/census/tsc_vus_clinvar_2026-07-07_stats.json`
+    data artifact, and its canonical LF-normalized sha256 to match
+    `HISTORICAL_CENSUS_SHA256` -- fails closed (before any processing or
+    output) on any alternate path, substitution, or one-byte tamper.
+    Returns the verified canonical hash for recording in bound provenance.
+    """
+    canonical_path = (REPO_ROOT / "data" / "census" / _HISTORICAL_STATS_FILENAME).resolve()
+    resolved = Path(path).resolve()
+    if resolved != canonical_path:
+        raise ValueError(f"--historical-stats must be exactly {canonical_path}; got {resolved}")
+    current_hash = _historical_stats_lf_sha256(resolved)
+    if current_hash != HISTORICAL_CENSUS_SHA256:
+        raise ValueError(
+            "historical-stats content drift: canonical LF sha256 does not match "
+            f"HISTORICAL_CENSUS_SHA256 (expected {HISTORICAL_CENSUS_SHA256!r}, got {current_hash!r})"
+        )
+    return current_hash
+
+
+def _validate_provenance(provenance: Mapping[str, Any]) -> None:
+    """Fail closed on a missing/malformed/non-hex `vcf_hash` (a lowercase-
+    OR uppercase-hex sha256, 64 hex chars; never a mixed-case or short
+    value) or a blank/missing `source_snapshot`."""
+    vcf_hash = provenance.get("vcf_hash")
+    is_valid_hex64 = isinstance(vcf_hash, str) and bool(
+        _VCF_HASH_LOWER_RE.fullmatch(vcf_hash) or _VCF_HASH_UPPER_RE.fullmatch(vcf_hash)
+    )
+    if not is_valid_hex64:
+        raise ValueError(
+            f"provenance vcf_hash must be a lowercase- or uppercase-hex sha256 (64 hex "
+            f"chars); got {vcf_hash!r}"
+        )
+    source_snapshot = provenance.get("source_snapshot")
+    if not isinstance(source_snapshot, str) or not source_snapshot.strip():
+        raise ValueError(f"provenance source_snapshot must be non-blank; got {source_snapshot!r}")
+
+
 def _resolve_code_commit() -> str:
+    """Resolve the current git commit (short hex SHA). Fails closed with
+    `CodeCommitResolutionError` on a git invocation failure, blank stdout,
+    or non-hex output -- never a broad catch that falls back to an
+    `unknown` sentinel (provenance must always be a real, verifiable
+    commit or the run must refuse to proceed)."""
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
@@ -140,10 +221,14 @@ def _resolve_code_commit() -> str:
             check=True,
             cwd=REPO_ROOT,
         )
-    except (OSError, subprocess.CalledProcessError):
-        return "unknown"
+    except (OSError, subprocess.CalledProcessError) as err:
+        raise CodeCommitResolutionError(f"failed to resolve the current git commit: {err}") from err
     commit = result.stdout.strip()
-    return commit if commit else "unknown"
+    if not commit or not _CODE_COMMIT_RE.fullmatch(commit):
+        raise CodeCommitResolutionError(
+            f"git rev-parse returned a blank or non-hex commit: {commit!r}"
+        )
+    return commit
 
 
 def _canonical_json_bytes(record: Mapping[str, Any]) -> bytes:
@@ -185,6 +270,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             "packet_candidate_direction": Path(args.packet_candidate_direction),
         },
     )
+    bound_hashes["historical_stats"] = _validate_historical_stats_source(args.historical_stats)
+
+    provenance = json.loads(Path(args.provenance).read_text(encoding="utf-8"))
+    _validate_provenance(provenance)
 
     write_target: Path | None = None
     if args.emit_census_record:
@@ -194,7 +283,6 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     manifest = load_manifest(args.manifest)
     bias_rows = tuple(BiasTsvSource(args.bias_tsv).records())
-    provenance = json.loads(Path(args.provenance).read_text(encoding="utf-8"))
     historical_stats = json.loads(Path(args.historical_stats).read_text(encoding="utf-8"))
 
     scorer_config = load_scorer_config(args.scorer_config)
@@ -218,6 +306,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         run_pins=run_pins,
         bound_hashes=bound_hashes,
         historical_stats=historical_stats,
+        automatable_criteria=eval_config.automatable_criteria,
     )
 
     if args.dry_run or args.summary:

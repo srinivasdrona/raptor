@@ -12,7 +12,12 @@ authoritative.
 manifest<->BIAS-row join in both directions: a BIAS row with no manifest
 entry fails loud (as before), and a manifest entry with no matching BIAS
 row now ALSO fails loud (tightened invalid-input conservation -- both
-missing and extra manifest/BIAS keys fail closed).
+missing and extra manifest/BIAS keys fail closed). A duplicate BIAS row
+`variant_id` (the same raw locus key supplied twice) is rejected the
+moment the second occurrence is seen -- never silently deduplicated or
+double-counted -- and, once every row is joined, the final raw-key /
+stratum / manifest cardinalities are cross-checked to conserve an exact
+one-to-one row count end to end.
 """
 from __future__ import annotations
 
@@ -175,8 +180,11 @@ def reproduce_census_strata(
     `manual_review` and never scored (never enter LP/LB).
 
     Conserves an EXACT one-to-one join: a BIAS row with no manifest entry,
-    or a manifest entry with no matching BIAS row, both fail loud with
-    `ConservationError` before any stratum is returned.
+    a manifest entry with no matching BIAS row, or a duplicate BIAS row
+    `variant_id` (the same raw locus supplied twice), all fail loud with
+    `ConservationError` before any stratum is returned. The final raw-key /
+    stratum / manifest cardinalities are cross-checked once every row has
+    been joined, so no conservation drift can slip through undetected.
     """
     if dict(scorer_config.strength_map) != dict(STRENGTH_MAP):
         raise ConservationError(
@@ -190,6 +198,12 @@ def reproduce_census_strata(
     entries: list[StratumEntry] = []
     consumed_vcf_keys: set[str] = set()
     for row in bias_rows:
+        if row.variant_id in consumed_vcf_keys:
+            raise ConservationError(
+                f"duplicate BIAS row for {row.variant_id!r}: the same raw locus key was "
+                "supplied more than once (conservation requires an exact one-to-one join, "
+                "never a silently-deduplicated or double-counted row)"
+            )
         manifest_entry = manifest_by_vcf_key.get(row.variant_id)
         if manifest_entry is None:
             raise ConservationError(
@@ -252,6 +266,25 @@ def reproduce_census_strata(
         raise ConservationError(
             f"manifest has {len(extra_vcf_keys)} extra entry/entries with no matching BIAS row "
             f"(exact one-to-one locus join failed): {sample!r}"
+        )
+
+    # Final conservation check: the raw-key, stratum, and manifest
+    # cardinalities must all agree exactly -- one BIAS row, one manifest
+    # entry, one reproduced stratum, per locus. A duplicate `variant_id`
+    # smuggled into the manifest mapping's own values (bypassing
+    # `load_manifest`'s own dedup, e.g. a hand-built mapping in a test or
+    # caller) would otherwise silently collapse two distinct strata onto
+    # one reported identity, so it is caught here too.
+    if not (len(bias_rows) == len(consumed_vcf_keys) == len(manifest_by_vcf_key) == len(entries)):
+        raise ConservationError(
+            "raw-key/strata/manifest cardinality mismatch: "
+            f"bias_rows={len(bias_rows)}, unique_raw_keys={len(consumed_vcf_keys)}, "
+            f"manifest_identities={len(manifest_by_vcf_key)}, strata={len(entries)}"
+        )
+    stratum_variant_ids = [entry.variant_id for entry in entries]
+    if len(set(stratum_variant_ids)) != len(stratum_variant_ids):
+        raise ConservationError(
+            "reproduced strata carry a duplicate variant_id (manifest identity conflict)"
         )
 
     return tuple(entries)
