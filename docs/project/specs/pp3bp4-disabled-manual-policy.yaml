@@ -1,4 +1,4 @@
-# RAPTOR PP3/BP4 disabled/manual policy — Opus planner contract (rev 6).
+# RAPTOR PP3/BP4 disabled/manual policy — Opus planner contract (rev 7).
 #
 # Purpose: an implementation-ready, hash-bound plan for a FIRST-CLASS
 # disabled/manual PP3/BP4 policy mode. It permits the production-faithful
@@ -48,6 +48,16 @@
 # 2,577-row PROCEED to the formal masked rerun after owner approval. Scope stays
 # 10 files (seams live in the existing Sonnet runner file); state/hash/lineage
 # semantics, neutral gate and no-x64 preserved.
+#
+# Rev 7 supersedes commit 977eea5 (planner rev 6; Gemini test commits interleave
+# on the shared branch) with a documentation-only consistency pass: D7 now lists
+# all four owner-verified hashes (production/eval/lineage config + runtime_bundle),
+# clarifies that main() always verifies AND consumes the canonical
+# configs/eval/bias_lineage.yaml path (the byte-identical alternate-path support
+# in verify_disabled_config_hashes is helper/unit coverage only -- never verify
+# one lineage file and consume another), and corrects brittle fixed-ancestry
+# assertions in the verification block. No behavioral/scope/test change; the pure
+# seams and 10-file contract are preserved.
 #
 # This file is the planner PLAN. It performs NO implementation, NO tests, NO
 # runner/config/code edits, NO owner approval and NO held-out run. It names the
@@ -179,6 +189,17 @@ revision_log:
       - gpt_probes P13; owner_decision_gate; validation_scope; acceptance; beat4_self_audit
     preserved:
       - 'ALL other closed behavior incl. rev-1..5 decisions: threat_model; neutral gate; no x64; runtime_bundle_hash; actual-path CHECK-BEFORE-LOAD; owner status-only approval; corrected_enabled + v1 blocked; D12 deferred + lineage_policy_hash; two Gemini files; 10-file branch'
+  - rev: 7
+    supersedes_commit: 977eea5c4e0ad85e4647b3da4906c5e407996453
+    stacked_after: 'Gemini test commits (314703f RED tests, cc96bbd align-to-rev6) interleave on the shared branch; this rev-7 commit is stacked on the current branch head, NOT a fixed planner parent.'
+    trigger: planner-only documentation consistency pass (no behavioral/scope/test change)
+    corrections_in:
+      - 'D7: owner verifies production_config_hash + eval_config_hash + lineage_policy_hash + runtime_bundle_hash (was "the two config hashes")'
+      - 'lineage path invariant: main() always verifies AND consumes the canonical configs/eval/bias_lineage.yaml (_LINEAGE_POLICY_PATH); verify_disabled_config_hashes byte-identical alternate lineage paths are helper/unit coverage only -- never verify-one-consume-another (hash_contract runtime_invariant + runner guards + G-DM12 note)'
+      - 'verification: removed brittle HEAD~1==<sha> ancestry; state supersession + stacked-after-Gemini instead (also beat4 planner_scope_inversions)'
+      - 'rejected_alternatives: drop the stale "two" config-hash count'
+    preserved:
+      - 'rev-6 pure seams (resolve_policy_state/build_policy_evidence_source/build_disabled_policy_pins); 10-file contract; state/hash/lineage semantics; neutral gate; no x64; owner status-only approval; corrected_enabled + v1 blocked'
 
 planner:
   model: claude-opus-4.8
@@ -432,8 +453,10 @@ decision_ledger:
   - id: D7
     decision: >-
       Owner approval is a SEPARATE human step: an ADR plus a distinct owner
-      commit flipping status proposed->approved after verifying the two config
-      hashes. The doer leaves status=proposed.
+      commit flipping status proposed->approved after independently verifying
+      production_config_hash, eval_config_hash, lineage_policy_hash AND
+      runtime_bundle_hash (all four) against the actual configs + runtime code
+      bundle. The doer leaves status=proposed.
     rationale: >-
       Kills beat4 #7 (owner approval embedded by the doer). Self-approval by the
       planner or doer is structurally impossible.
@@ -546,7 +569,7 @@ rejected_alternatives:
     rejected_because: >-
       The runner could then LOAD a different --scorer-config/--eval-config than
       the one hashed. Hash the ACTUAL loaded bytes before load (D10).
-  - option: 'Bind only the two config hashes and not the runtime code bundle.'
+  - option: 'Bind only the config hashes and not the runtime code bundle.'
     rejected_because: >-
       Suppression lives in the loader/wrapper/runner code; an ACCIDENTAL code
       change could alter behavior while configs match. A runtime_bundle_hash
@@ -692,6 +715,7 @@ hash_contract:
     - name: lineage_policy_hash
       target: 'the ACTUAL bias-lineage bytes (configs/eval/bias_lineage.yaml, loaded via lineage_policy._LINEAGE_POLICY_PATH), verified BEFORE load'
       meaning: 'binds the disabled decision to the exact lineage policy with PP3/BP4 deferred; a lineage file that re-allows PP3/BP4 or drops the deferral is a different byte string => BLOCKED'
+      runtime_invariant: 'in main() the lineage path passed to verify_disabled_config_hashes MUST be the same canonical configs/eval/bias_lineage.yaml path that BiasEvidenceSource/load_lineage_policy then CONSUMES (_LINEAGE_POLICY_PATH) -- verify exactly the file you consume, never verify one lineage file and consume another. verify_disabled_config_hashes accepting an alternate byte-identical path is helper/unit coverage (G-DM12), not a runtime capability.'
     - name: runtime_bundle_hash
       target: '[src/raptor/eval/predictor_policy.py, src/raptor/eval/terminal_source.py, scripts/run_masked_holdout_eval.py] bundle'
       meaning: 'detects ACCIDENTAL byte drift of the runtime code (loader/wrapper/runner) between approval and a run; a byte change the verifier still sees => BLOCKED_POLICY. NOT tamper-proof (threat_model): a malicious verifier removal is out of scope this phase'
@@ -811,7 +835,7 @@ runner_behavior:
       - 'DO NOT construct PredictorCorrectedEvidenceSource in this branch (no correction applied)'
     guards_before_load:
       - 'verify_runtime_bundle_hash(policy, [predictor_policy.py, terminal_source.py, run_masked_holdout_eval.py]) or BLOCKED_POLICY  # accidental-drift detection, not tamper-proof'
-      - 'verify_disabled_config_hashes(policy, args.scorer_config, args.eval_config, lineage_policy_path=configs/eval/bias_lineage.yaml) -- CHECK-BEFORE-LOAD path-byte verification of ALL THREE configs: hash the bytes at each path immediately before load and require a match, or BLOCKED_POLICY. This does NOT prove the loader later consumes the same in-memory bytes; concurrent adversarial mutation between check and load is out of scope (threat_model).'
+      - 'verify_disabled_config_hashes(policy, args.scorer_config, args.eval_config, lineage_policy_path=configs/eval/bias_lineage.yaml) -- CHECK-BEFORE-LOAD path-byte verification of ALL THREE configs: hash the bytes at each path immediately before load and require a match, or BLOCKED_POLICY. The lineage_policy_path passed here is the CANONICAL configs/eval/bias_lineage.yaml (lineage_policy._LINEAGE_POLICY_PATH) that BiasEvidenceSource then CONSUMES -- main() verifies exactly the file it consumes, never a different one (byte-identical alternate paths are only exercised in the G-DM12 unit). This does NOT prove the loader consumes the same in-memory bytes; concurrent adversarial mutation between check and load is out of scope (threat_model).'
     guards_after_load_defense_in_depth:
       - 'assert {PP3,BP4} disjoint from scorer_config.included_criteria and eval_config.automatable_criteria or BLOCKED_POLICY (kept as belt-and-suspenders on top of the hash)'
       - 'assert scorer_config.included_criteria == eval_config.automatable_criteria (parity; live_source.py:243 also enforces this)'
@@ -1077,8 +1101,11 @@ test_matrix:
         byte-identical alternate scorer/eval/lineage paths (same bytes, different
         path) PASS; a changed byte in any of the three (a config that removes
         PP3/BP4 but changes a threshold/scope/auth byte) raises PredictorPolicyError,
-        proving absence alone is insufficient. Models an accidental/incorrect path,
-        not concurrent mutation between check and load (threat_model).
+        proving absence alone is insufficient. This alternate-path flexibility is
+        HELPER/UNIT coverage only -- main() always verifies AND consumes the
+        canonical configs/eval/bias_lineage.yaml (_LINEAGE_POLICY_PATH). Models an
+        accidental/incorrect path, not concurrent mutation between check and load
+        (threat_model).
     - id: G-DM13
       target: 'authorization neutrality (unit via existing decide_gate/decide_scope_gate/compute_report_scope_gate)'
       asserts: >-
@@ -1272,7 +1299,7 @@ beat4_self_audit:
   planner_scope_inversions:
     - 'Editing code/config/tests instead of only the YAML: this planner commit modifies exactly one file (verified in VERIFICATION).'
     - 'Wrong or missing commit trailers: the corrected trailer Copilot-Session 7c146921-... is pinned in planner.required_trailers and verified post-commit; rev 1 (878bff8) used 90703341 and, per the no-amend rule, is left as-is with the spec corrected.'
-    - 'Committing on the wrong branch/base: worktree/branch pinned; rev-6 parent is cd49e1e and is verified before/after commit.'
+    - 'Committing on the wrong branch/base: worktree/branch pinned; this rev-7 commit supersedes rev-6 (977eea5) and stacks on the current branch head. Planner and Gemini commits interleave, so no fixed HEAD~1 SHA is asserted -- verify only that HEAD is a descendant of 977eea5, exactly the spec changed, and both trailers present.'
   empty_beat4_allowed: false
 
 # ---------------------------------------------------------------------------
@@ -1304,9 +1331,9 @@ acceptance_mapping:
 # VERIFICATION (slot 1) — filled by the planner after the commit.
 # ---------------------------------------------------------------------------
 verification:
-  expected: 'one follow-up (rev-6) commit on track/pp3bp4-resolution-2026-07 modifying exactly docs/project/specs/pp3bp4-disabled-manual-policy.yaml; parent cd49e1e; both trailers; no amend; no push.'
+  expected: 'one follow-up (rev-7) planner commit on track/pp3bp4-resolution-2026-07 modifying exactly docs/project/specs/pp3bp4-disabled-manual-policy.yaml; both trailers; no amend; no push. This rev supersedes prior planner content (rev 6 = 977eea5) and is STACKED on the current branch head -- Gemini/other agent commits interleave on the shared branch, so NO fixed HEAD~1 ancestry is asserted.'
   checks:
-    - 'git show --stat HEAD => 1 file changed (this file only).'
+    - 'git show --stat HEAD => exactly 1 file changed (this spec only); a pre-existing uncommitted Gemini test edit, if any, is NOT included.'
     - 'git log -1 shows Co-authored-by Copilot AND Copilot-Session: 7c146921-f3dd-4a1e-8cf0-8f574de49204.'
-    - 'HEAD~1 == cd49e1e82766713908a76d5612e510d31a38f199 (no amend); git status clean; branch unchanged; no remote update.'
+    - 'HEAD is a descendant of 977eea5 (rev 6); the parent is whatever the branch head is at commit time (may be a Gemini test commit), NOT a fixed planner SHA. no amend; no push; branch unchanged.'
   verdict: recorded_in_final_response
