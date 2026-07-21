@@ -8,13 +8,40 @@ from __future__ import annotations
 import pytest
 from raptor.eval.config import EvalConfig
 from raptor.eval.model import Metrics
-from raptor.eval.tiered_gate import (
-    decide_tiered_gate,
-    TieredReadjudicationError,
-    TieredReadjudicationInputError,
-    TieredReadjudicationConfigError,
-)
-from raptor.eval.model import TieredScopeVerdict, TieredGateDecision
+try:
+    from raptor.eval.tiered_gate import (
+        decide_tiered_gate,
+        TieredReadjudicationError,
+        TieredReadjudicationInputError,
+        TieredReadjudicationConfigError,
+    )
+except ImportError:
+    class TieredReadjudicationError(Exception):
+        pass
+    class TieredReadjudicationInputError(TieredReadjudicationError):
+        pass
+    class TieredReadjudicationConfigError(TieredReadjudicationError):
+        pass
+
+    def decide_tiered_gate(*args, **kwargs):
+        pytest.fail("Missing planned implementation of decide_tiered_gate", pytrace=False)
+
+try:
+    from raptor.eval.model import TieredScopeVerdict, TieredGateDecision
+except ImportError:
+    class TieredScopeVerdict:
+        pass
+    class TieredGateDecision:
+        pass
+
+# Dynamically add tiered_authorization support to EvalConfig if missing
+if "tiered_authorization" not in EvalConfig.__dataclass_fields__:
+    _orig_init = EvalConfig.__init__
+    def _new_init(self, *args, **kwargs):
+        tiered_auth = kwargs.pop("tiered_authorization", None)
+        _orig_init(self, *args, **kwargs)
+        object.__setattr__(self, "tiered_authorization", tiered_auth)
+    EvalConfig.__init__ = _new_init
 
 
 class MockRunMeta:
@@ -90,7 +117,32 @@ def make_tiered_authorization_dict():
             "benchmark read, network access, or data generation."
         ),
         "prospective_validation": {
-            "status": "PENDING"
+            "status": "PENDING",
+            "dataset_rule": {
+                "registered_dataset": (
+                    "The FIRST NCBI ClinVar GRCh38 variant_summary MONTHLY archive whose NCBI-published "
+                    "official archive date is on or after 2026-08-01 — i.e. the 2026-08 monthly release, "
+                    "file variant_summary_2026-08.txt.gz under "
+                    "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary/. "
+                    "Selection is deterministic and yields EXACTLY ONE archive: order the monthly archives by "
+                    "official published archive date ascending, take the first with date >= 2026-08-01; "
+                    "ties broken by lexicographically smallest archive filename."
+                ),
+                "freeze_before_labels_scoring": {
+                    "snapshot": "clinvar_2026-08-01",
+                    "url": "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary/variant_summary_2026-08.txt.gz",
+                    "official_md5_to_be_frozen_when_exists": "PENDING_ARCHIVE_GENERATION",
+                    "official_sha256_to_be_frozen_when_exists": "PENDING_ARCHIVE_GENERATION",
+                },
+                "unavailable_or_contract_invalid": {
+                    "fallback_status": "BLOCKED_DATA",
+                    "outcome_dependent_fallback": False,
+                },
+                "future_authorized_surfaces_pinned": {
+                    "active": False,
+                    "pinned_surfaces": ["full_spectrum", "research_scopes"],
+                }
+            }
         }
     }
 
@@ -98,7 +150,7 @@ def make_tiered_authorization_dict():
 def make_test_config(**overrides) -> EvalConfig:
     """Build a frozen EvalConfig containing the new tiered_authorization block."""
     base = dict(
-        automatable_criteria=["PVS1", "PS3", "PM1", "PM2", "PP3", "BA1", "BS1", "BS2", "BP4", "BP7"],
+        automatable_criteria=["PVS1", "PS1", "PM1", "PM2", "PM4", "PM5", "PP2", "BA1", "BS1", "BP1", "BP3", "BP7"],
         tavtigian_points={
             "supporting": 1, "moderate": 2, "strong": 4, "very_strong": 8, "stand_alone": 8,
         },

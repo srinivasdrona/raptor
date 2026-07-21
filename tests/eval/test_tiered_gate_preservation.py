@@ -25,7 +25,8 @@ from conftest import make_eval_config
 
 
 def test_v1_v2_code_and_records_unmodified_in_git():
-    """Assert that v1/v2 gate files and historical records are completely untouched."""
+    """Assert that v1/v2 gate files and historical records are completely untouched relative to BASE."""
+    base_commit = "037701e0ca702d3ded7d7757faca6f6a772c9bb5"
     files_to_check = [
         "src/raptor/eval/gate.py",
         "src/raptor/eval/scope_gate.py",
@@ -36,36 +37,46 @@ def test_v1_v2_code_and_records_unmodified_in_git():
         path = Path(file_path)
         assert path.exists(), f"Expected file {file_path} to exist"
         
-        # Run git diff --exit-code to verify there are absolutely no modified/staged changes
-        res = subprocess.run(["git", "diff", "--exit-code", file_path], capture_output=True)
-        assert res.returncode == 0, f"File {file_path} has been modified relative to git HEAD!"
+        # Run git diff BASE..HEAD to verify absolutely no changes relative to BASE
+        res = subprocess.run(
+            ["git", "diff", "--exit-code", base_commit + "..HEAD", "--", file_path.replace("\\", "/")],
+            capture_output=True,
+            text=True
+        )
+        assert res.returncode == 0, f"File {file_path} has been modified relative to BASE!\nDiff:\n{res.stdout}"
 
 
 def test_v1_v2_model_classes_preserved():
-    """Assert that existing model.py v1/v2 dataclasses remain unchanged.
+    """Assert that existing model.py v1/v2 dataclasses remain unchanged relative to BASE.
 
     New models should only be appended, never altering existing definitions.
     """
     model_path = "src/raptor/eval/model.py"
-    # Ensure no deletions/modifications are made to existing lines in model.py.
-    # We can check that 'git diff' contains only additions ('+') and no deletions ('-').
-    res = subprocess.run(["git", "diff", model_path], capture_output=True, text=True)
+    res = subprocess.run(
+        ["git", "diff", "--unified=0", "037701e0ca702d3ded7d7757faca6f6a772c9bb5..HEAD", "--", model_path.replace("\\", "/")],
+        capture_output=True,
+        text=True
+    )
+    assert res.returncode == 0, f"git diff failed for {model_path}"
     diff_output = res.stdout
     for line in diff_output.splitlines():
         if line.startswith("-") and not line.startswith("---"):
-            raise AssertionError(f"Deletions or modifications detected in model.py: {line}")
+            raise AssertionError(f"Deletions or modifications detected in model.py relative to BASE: {line}")
 
 
 def test_tsc2_yaml_changes_are_additive_only():
-    """Assert that configs/eval/tsc2.yaml only contains the additive tiered_authorization block."""
+    """Assert that configs/eval/tsc2.yaml only contains the additive tiered_authorization block relative to BASE."""
     config_path = "configs/eval/tsc2.yaml"
-    # Verify that there are no deletions of existing thresholds, splits, or configurations
-    res = subprocess.run(["git", "diff", config_path], capture_output=True, text=True)
+    res = subprocess.run(
+        ["git", "diff", "--unified=0", "037701e0ca702d3ded7d7757faca6f6a772c9bb5..HEAD", "--", config_path.replace("\\", "/")],
+        capture_output=True,
+        text=True
+    )
+    assert res.returncode == 0, f"git diff failed for {config_path}"
     diff_output = res.stdout
     for line in diff_output.splitlines():
         if line.startswith("-") and not line.startswith("---"):
-            # Check if this deletion belongs to some other key or is an actual modification of a threshold
-            raise AssertionError(f"Deletions/modifications detected in tsc2.yaml: {line}")
+            raise AssertionError(f"Deletions/modifications detected in tsc2.yaml relative to BASE: {line}")
 
 
 def test_legacy_gate_decisions_behavior():
