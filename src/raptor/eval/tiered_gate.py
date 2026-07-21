@@ -190,6 +190,15 @@ def _validate_oracle_pins(oracle_thresholds: Any) -> None:
 
     strata_cfg = thresholds.get("strata")
     strata_cfg = strata_cfg if isinstance(strata_cfg, Mapping) else {}
+    pinned_stratum_keys = frozenset(_PINNED_STRATUM_THRESHOLDS.keys())
+    extra_strata = frozenset(strata_cfg.keys()) - pinned_stratum_keys
+    if extra_strata:
+        raise TieredReadjudicationConfigError(
+            "`oracle_thresholds.strata` contains stratum/strata not in the exact "
+            f"registered pin set {sorted(pinned_stratum_keys)!r} -- got extra "
+            f"{sorted(extra_strata)!r} (e.g. a descriptive-only `other` stratum with no "
+            "registered threshold must never be included here)"
+        )
     for name, pinned_metrics in _PINNED_STRATUM_THRESHOLDS.items():
         spec = strata_cfg.get(name)
         if not isinstance(spec, Mapping):

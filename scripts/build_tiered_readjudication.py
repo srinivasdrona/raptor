@@ -35,8 +35,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 _SCRIPT_PATH = Path(__file__).resolve()
 _SRC = _SCRIPT_PATH.parents[1] / "src"
 if str(_SRC) not in sys.path:
@@ -267,15 +265,11 @@ def main(argv: Any = None) -> int:
         raise InputError(f"eval config failed to load/validate: {exc}") from exc
 
     # The standalone v3 tiered-authorization block is loaded SEPARATELY from
-    # tsc2.yaml (rev 3) -- `tiered_config_raw_mapping` is the RAW top-level
-    # YAML mapping (as-is, INCLUDING the `schema` tag) used ONLY to derive
-    # `tiered_config_canonical_sha256`; `tiered_authorization` is the
-    # validated block (schema tag stripped, checked against the locked pin)
-    # passed explicitly to `decide_tiered_gate`.
-    try:
-        tiered_config_raw_mapping = yaml.safe_load(tiered_config_path.read_text(encoding="utf-8"))
-    except yaml.YAMLError as exc:
-        raise InputError(f"tiered-authorization config is not valid YAML: {exc}") from exc
+    # tsc2.yaml (rev 3) via `load_tiered_authorization`, which returns the
+    # VALIDATED, schema-tag-STRIPPED mapping -- this same validated mapping
+    # is both passed explicitly to `decide_tiered_gate` AND used to derive
+    # `tiered_config_canonical_sha256` (never the raw YAML wrapper, which
+    # still carries the top-level `schema` tag).
     try:
         tiered_authorization = load_tiered_authorization(tiered_config_path)
     except ConfigError as exc:
@@ -302,7 +296,7 @@ def main(argv: Any = None) -> int:
     implementation_commit = _git_head_commit()
     module_sha256 = _sha256_lf((_SRC / "raptor" / "eval" / "tiered_gate.py").read_bytes())
     tiered_config_canonical_sha256 = hashlib.sha256(
-        json.dumps(tiered_config_raw_mapping, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        json.dumps(tiered_authorization, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
 
     old_semantic_outcome = _build_old_semantic_outcome(payload)
