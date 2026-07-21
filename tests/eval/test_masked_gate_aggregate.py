@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from scripts.build_masked_holdout_gate_aggregate import build_aggregate, build_aggregate_v2
+import pytest
+from scripts.build_masked_holdout_gate_aggregate import build_aggregate, build_aggregate_v2, build_aggregate_for_envelope
 
 # NOTE: these two imports must stay at module level (not deferred inside a
 # test function body). `conftest` and `test_scope_gate_final_blocker` are
@@ -2959,8 +2960,330 @@ def test_v1_historical_limitations_remain_unchanged():
     assert "PM1 was excluded from this fixed evaluation after both published and reproduced resources had zero held-out-reachable rows; production PM1 remains unvalidated." in agg_skip["limitations"]
 
 
+def _make_g_ag_envelope(pins_overrides=None, policy_overrides=None, with_scope_gate=False) -> dict:
+    _scopes = {
+        "missense:pathogenic": _get_consistent_scope("missense:pathogenic", "VALIDATED"),
+        "missense:benign": _get_consistent_scope("missense:benign", "VALIDATED"),
+        "truncating:pathogenic": _get_consistent_scope("truncating:pathogenic", "VALIDATED"),
+        "truncating:benign": _get_consistent_scope("truncating:benign", "DESCRIPTIVE"),
+    }
+    
+    pins = {
+        "bias_tsv_sha256": "bias",
+        "manifest_sha256": "manifest",
+        "mask_ledger_sha256": "ledger",
+        "remask_audit_sha256": "remask",
+        "return_manifest_sha256": "return",
+        "policy_mode": "disabled_manual",
+        "pp3bp4_automation_disabled": True,
+        "predictor_correction_applied": False,
+        "pp3bp4_suppressed_counts": {"PP3": 1, "BP4": 2},
+        "pp3bp4_suppressed_variant_count": 1,
+        "pp3bp4_scored_calls": 0,
+        "operational_skipped_criteria": ["PM1", "PS4"],
+        "evaluation_skipped_criteria": [] if with_scope_gate else ["PM1"],
+        "oracle_thresholds": make_oracle_thresholds(),
+    }
+    if pins_overrides:
+        pins.update(pins_overrides)
+        
+    policy = {
+        "schema": "bp4pp3-predictor-policy/2",
+        "status": "approved",
+        "mode": "disabled_manual",
+        "predictor_source_hash": "a" * 64,
+        "correction_hash": "b" * 64,
+        "production_config_hash": "c" * 64,
+        "eval_config_hash": "d" * 64,
+        "lineage_policy_hash": "e" * 64,
+        "packet_policy_hash": "f" * 64,
+        "runtime_bundle_hash": "0" * 64,
+        "decision_reference": "ADR-0012",
+    }
+    if policy_overrides:
+        policy.update(policy_overrides)
+        
+    report = {
+        "labels_snapshot": "snapshot",
+        "benchmark_size": 3,
+        "train_dev_size": 1,
+        "holdout_size": 2,
+        "holdout_label_counts": {"P": 1, "B": 1},
+        "holdout_class_counts": {"missense": 2},
+        "metrics": _metrics_from_scopes(_scopes) if with_scope_gate else {"missense": {"precision": 0.5}},
+        "gate": {
+            "status": "FAIL",
+            "stratum": "missense",
+            "reason": "below threshold",
+            "vus_authorized": False,
+            "per_stratum": {},
+        },
+        "config_pins": pins,
+    }
+    
+    if with_scope_gate:
+        report["scope_gate"] = {
+            "schema_version": "2",
+            "full_spectrum_status": "PASS",
+            "full_spectrum_vus_authorized": True,
+            "research_scope_flags": {"truncating_pathogenic_research_scope_validated": True},
+            "governance_state": "FULL_SPECTRUM",
+            "governance_statement": 'All pre-registered research scopes are validated for research-evidence use only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.',
+            "research_use_disclaimer": 'Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.',
+            "reason": "reason",
+            "scopes": _scopes,
+        }
+        
+    envelope = {
+        "content_hash": "content",
+        "predictor_policy": policy,
+        "mask_attestation": {
+            "removed_count": 2,
+            "zero_survivors": True,
+        },
+        "lineage_audit": {"effective_blocking_criteria": []},
+        "verified_return_artifacts": {"a": "hash", "b": "hash"},
+        "report": report,
+    }
+    return envelope
 
 
+def test_g_ag1_v1_build_aggregate_disabled_envelope() -> None:
+    """G-AG1: build_aggregate (v1) builds aggregate from production-shaped disabled envelope."""
+    envelope = _make_g_ag_envelope()
+    
+    aggregate = build_aggregate(
+        envelope,
+        date="2026-07-13",
+        terminal_json_hash="json",
+        terminal_report_hash="text",
+        published_pm1_scope={"reachable_pm1_rows": 0},
+        reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="approved",
+    )
+    assert aggregate["status"] == "FAIL"
+    policy_block = aggregate["policy"]
+    assert policy_block["policy_mode"] == "disabled_manual"
+    assert policy_block["pp3bp4_automation_disabled"] is True
+    assert policy_block["predictor_correction_applied"] is False
+    assert policy_block["pp3bp4_suppressed_counts"] == {"PP3": 1, "BP4": 2}
+    assert policy_block["pp3bp4_suppressed_variant_count"] == 1
+    assert policy_block["pp3bp4_scored_calls"] == 0
+    assert "predictor_correction_counts" not in policy_block
 
 
+def test_g_ag2_v2_build_aggregate_disabled_envelope() -> None:
+    """G-AG2: build_aggregate_for_envelope handles disabled envelope and yields v2 schema."""
+    envelope = _make_g_ag_envelope(with_scope_gate=True)
 
+    aggregate = build_aggregate_for_envelope(
+        envelope,
+        date="2026-07-14",
+        terminal_json_hash="json",
+        terminal_report_hash="text",
+        published_pm1_scope={"reachable_pm1_rows": 0},
+        reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="approved",
+    )
+
+    assert aggregate["schema"] == "raptor.tsc.masked_holdout_gate.v2"
+    assert aggregate["full_spectrum_status"] == "PASS"
+    assert aggregate["vus_authorized"] is True
+    
+    policy_block = aggregate["policy"]
+    assert policy_block["policy_mode"] == "disabled_manual"
+    assert policy_block["pp3bp4_automation_disabled"] is True
+    assert policy_block["predictor_correction_applied"] is False
+    assert policy_block["pp3bp4_suppressed_counts"] == {"PP3": 1, "BP4": 2}
+    assert policy_block["pp3bp4_suppressed_variant_count"] == 1
+    assert policy_block["pp3bp4_scored_calls"] == 0
+    assert "predictor_correction_counts" not in policy_block
+
+
+def test_g_ag3_legacy_corrected_envelope_compatibility() -> None:
+    """G-AG3: legacy corrected/enabled aggregate requires and emits counts; raises KeyError if missing."""
+    pins = {
+        "predictor_correction_counts": {"PP3": 1, "BP4": 2},
+    }
+    envelope = _make_g_ag_envelope(pins_overrides=pins)
+    envelope["predictor_policy"] = {"status": "approved"}
+    for pin in ("policy_mode", "pp3bp4_automation_disabled", "predictor_correction_applied", "pp3bp4_suppressed_counts", "pp3bp4_suppressed_variant_count", "pp3bp4_scored_calls"):
+        del envelope["report"]["config_pins"][pin]
+        
+    aggregate = build_aggregate(
+        envelope,
+        date="2026-07-13",
+        terminal_json_hash="json",
+        terminal_report_hash="text",
+        published_pm1_scope={"reachable_pm1_rows": 0},
+        reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="approved",
+    )
+    assert aggregate["policy"]["predictor_correction_counts"] == {"PP3": 1, "BP4": 2}
+
+    del envelope["report"]["config_pins"]["predictor_correction_counts"]
+    with pytest.raises(KeyError):
+        build_aggregate(
+            envelope,
+            date="2026-07-13",
+            terminal_json_hash="json",
+            terminal_report_hash="text",
+            published_pm1_scope={"reachable_pm1_rows": 0},
+            reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="approved",
+        )
+
+
+@pytest.mark.parametrize("missing_pin", [
+    "policy_mode",
+    "pp3bp4_automation_disabled",
+    "predictor_correction_applied",
+    "pp3bp4_suppressed_counts",
+    "pp3bp4_suppressed_variant_count",
+    "pp3bp4_scored_calls"
+])
+def test_g_ag4_malformed_disabled_envelope_missing_pins(missing_pin) -> None:
+    """G-AG4: malformed disabled envelopes missing required pins raise ValueError."""
+    envelope = _make_g_ag_envelope()
+    del envelope["report"]["config_pins"][missing_pin]
+    with pytest.raises(ValueError):
+        build_aggregate(
+            envelope,
+            date="2026-07-13",
+            terminal_json_hash="json",
+            terminal_report_hash="text",
+            published_pm1_scope={"reachable_pm1_rows": 0},
+            reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="approved",
+        )
+
+
+@pytest.mark.parametrize("bad_pin_value", [
+    ("pp3bp4_scored_calls", 1),
+    ("pp3bp4_automation_disabled", False),
+    ("predictor_correction_applied", True),
+    ("policy_mode", "corrected_enabled")
+])
+def test_g_ag4_malformed_disabled_envelope_invalid_pin_values(bad_pin_value) -> None:
+    """G-AG4: malformed disabled envelopes with invalid/inconsistent pin values raise ValueError."""
+    pin_name, value = bad_pin_value
+    envelope = _make_g_ag_envelope(pins_overrides={pin_name: value})
+    with pytest.raises(ValueError):
+        build_aggregate(
+            envelope,
+            date="2026-07-13",
+            terminal_json_hash="json",
+            terminal_report_hash="text",
+            published_pm1_scope={"reachable_pm1_rows": 0},
+            reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="approved",
+        )
+
+
+def test_g_ag4_malformed_disabled_envelope_mixed_shape() -> None:
+    """G-AG4: disabled envelopes with mixed shape (counts + suppression pins) raise ValueError."""
+    envelope = _make_g_ag_envelope(pins_overrides={"predictor_correction_counts": {"PP3": 1}})
+    with pytest.raises(ValueError):
+        build_aggregate(
+            envelope,
+            date="2026-07-13",
+            terminal_json_hash="json",
+            terminal_report_hash="text",
+            published_pm1_scope={"reachable_pm1_rows": 0},
+            reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="approved",
+        )
+
+
+@pytest.mark.parametrize("invalid_suppressed_counts", [
+    # Missing PP3
+    {"BP4": 2},
+    # Missing BP4
+    {"PP3": 1},
+    # Extra key
+    {"PP3": 1, "BP4": 2, "extra": 3},
+    # Lowercase key pp3
+    {"pp3": 1, "BP4": 2},
+    # Lowercase key bp4
+    {"PP3": 1, "bp4": 2},
+    # Lowercase keys pp3 and bp4
+    {"pp3": 1, "bp4": 2},
+    # Negative value for PP3
+    {"PP3": -1, "BP4": 2},
+    # Negative value for BP4
+    {"PP3": 1, "BP4": -2},
+    # String value for PP3
+    {"PP3": "1", "BP4": 2},
+    # String value for BP4
+    {"PP3": 1, "BP4": "2"},
+    # Bool value True for PP3
+    {"PP3": True, "BP4": 2},
+    # Bool value False for BP4
+    {"PP3": 1, "BP4": False},
+    # Float value for PP3
+    {"PP3": 1.5, "BP4": 2},
+    # Float value for BP4
+    {"PP3": 1, "BP4": 2.5},
+    # None value for PP3
+    {"PP3": None, "BP4": 2},
+    # Wrong type (already raises ValueError)
+    "not-a-mapping"
+])
+def test_g_ag4_malformed_suppressed_counts_schema(invalid_suppressed_counts) -> None:
+    """G-AG4: build_aggregate raises ValueError for invalid/malformed suppressed counts schemas."""
+    envelope = _make_g_ag_envelope(pins_overrides={"pp3bp4_suppressed_counts": invalid_suppressed_counts})
+    with pytest.raises(ValueError):
+        build_aggregate(
+            envelope,
+            date="2026-07-13",
+            terminal_json_hash="json",
+            terminal_report_hash="text",
+            published_pm1_scope={"reachable_pm1_rows": 0},
+            reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="approved",
+        )
+
+
+@pytest.mark.parametrize("counts,variant_count", [
+    # total calls = 0 (0+0), but variant count = 1 -> inconsistent
+    ({"PP3": 0, "BP4": 0}, 1),
+    # total calls = 3 (1+2), but variant count = 0 -> inconsistent
+    ({"PP3": 1, "BP4": 2}, 0),
+    # variant count exceeds total calls: total calls = 2 (1+1), variant count = 3 -> inconsistent
+    ({"PP3": 1, "BP4": 1}, 3),
+])
+def test_g_ag4_suppressed_variant_consistency(counts, variant_count) -> None:
+    """G-AG4: build_aggregate raises ValueError for inconsistent suppressed count and variant count."""
+    envelope = _make_g_ag_envelope(pins_overrides={
+        "pp3bp4_suppressed_counts": counts,
+        "pp3bp4_suppressed_variant_count": variant_count
+    })
+    with pytest.raises(ValueError):
+        build_aggregate(
+            envelope,
+            date="2026-07-13",
+            terminal_json_hash="json",
+            terminal_report_hash="text",
+            published_pm1_scope={"reachable_pm1_rows": 0},
+            reproduced_pm1_scope={"reachable_pm1_rows": 0},
+            production_policy_status="approved",
+        )
+
+
+def test_g_ag4_suppressed_both_zero_is_valid() -> None:
+    """G-AG4: Both zero together is valid and builds aggregate successfully."""
+    envelope = _make_g_ag_envelope(pins_overrides={
+        "pp3bp4_suppressed_counts": {"PP3": 0, "BP4": 0},
+        "pp3bp4_suppressed_variant_count": 0
+    })
+    aggregate = build_aggregate(
+        envelope,
+        date="2026-07-13",
+        terminal_json_hash="json",
+        terminal_report_hash="text",
+        published_pm1_scope={"reachable_pm1_rows": 0},
+        reproduced_pm1_scope={"reachable_pm1_rows": 0},
+        production_policy_status="approved",
+    )
+    assert aggregate["policy"]["pp3bp4_suppressed_counts"] == {"PP3": 0, "BP4": 0}
+    assert aggregate["policy"]["pp3bp4_suppressed_variant_count"] == 0

@@ -48,6 +48,31 @@ python scripts/build_masked_holdout_gate_aggregate.py \
   --output data/census/tsc_masked_holdout_gate_2026-07-13.json
 ```
 
+`tsc_masked_holdout_gate_disabled_manual_2026-07-21.json` records the
+owner-approved ADR-0012 rerun with automated PP3/BP4 disabled. The immutable
+2,577-row BIAS evidence and mask artifacts were reused; 2,043 variants had
+2,063 predictor calls suppressed (BP4 1,929; PP3 134), and zero PP3/BP4 calls
+were scored. The binding missense gate returned **FAIL** and the v2
+full-spectrum gate returned **BLOCKED_POLICY** because PM1 remains an
+evaluation exclusion. `vus_authorized` is false. Although
+`truncating:pathogenic` independently met its registered 0.95/0.95 thresholds,
+the parity blocker prevents any research-scope authorization.
+
+The 2026-07-13 corrected-predictor artifact remains historical comparison
+evidence; it is not the current approved policy. Neither result is a clinical
+classification or an expert-reviewed VUS worklist.
+
+Rebuild the current aggregate from the external R2 terminal envelope:
+
+```text
+python scripts/build_masked_holdout_gate_aggregate.py \
+  --terminal-json <MASKED_EVAL_REPORT.disabled-manual-2026-07-21-r2.json> \
+  --terminal-report <MASKED_EVAL_REPORT.disabled-manual-2026-07-21-r2.txt> \
+  --return-dir <x64-return-directory> \
+  --date 2026-07-21 \
+  --output data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json
+```
+
 `tsc2_mave_clipe_orthogonal_2026-07-13.json` records the first orthogonal,
 non-gating MAVE (multiplexed assay of variant effect) validation track for
 TSC2, sourced from the public MaveDB cliPE prime-editing scoreset
@@ -79,4 +104,3 @@ PYTHONPATH=src RAPTOR_MAVE_EXTERNAL_ROOT=<external/mavedb root> \
   python scripts/build_mave_orthogonal_report.py \
   --output data/census/tsc2_mave_clipe_orthogonal_2026-07-13.json
 ```
-

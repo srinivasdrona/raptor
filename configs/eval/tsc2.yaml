@@ -33,13 +33,19 @@ automatable_criteria:
   - PM4
   - PM5
   - PP2
-  - PP3
   - BA1
   - BS1
   - BP1
   - BP3
-  - BP4
   - BP7
+  # PP3/BP4 removed 2026-07 (docs/DECISIONS.md#adr-0012-pp3bp4-disabled-manual-policy):
+  # mirrors the configs/acmg/tsc.yaml `included_criteria` removal in the SAME
+  # commit so eval never drifts from production (live_source.py:243
+  # ConfigConsistencyError). The approved disabled/manual policy
+  # (configs/eval/bp4pp3_predictor_policy.json) suppresses automated PP3/BP4
+  # pending a future activation decision (decision_dependency
+  # `bp4pp3-predictor-policy`); see configs/eval/bias_lineage.yaml (PP3/BP4
+  # validation/production_disposition -> deferred).
 
 # Tavtigian-2018 point system (an INDEPENDENT published rule set, not
 # self-derived -- AC1 tests reproduce it exactly, sec 10.5).

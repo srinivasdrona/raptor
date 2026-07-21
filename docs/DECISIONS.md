@@ -9,6 +9,7 @@
 
 | ID | Title | Status | Date |
 |----|-------|--------|------|
+| [ADR-0012](#adr-0012--pp3bp4-automated-emission-disabled-for-the-current-masked-rerun) | PP3/BP4 automated emission disabled for the current masked rerun | Accepted | 2026-07-21 |
 | [ADR-0011](#adr-0011--scope-specific-research-authorization-gate-v2-truncating-pathogenic-research-scope-preregistered-separately-from-full-spectrum-vus) | Scope-specific research authorization gate (v2): truncating-pathogenic research scope preregistered separately from full-spectrum VUS | Accepted | 2026-07-14 |
 | [ADR-0010](#adr-0010--generic-platform-uniqueness-premise-falsified-vertical-tscmtor-research-evidence-strategy) | Generic-platform uniqueness premise falsified; vertical TSC/mTOR research-evidence strategy | Accepted | 2026-07-10 |
 | [ADR-0009](#adr-0009--clinvar-derived-acmg-criteria-direct-copy-banned-pp5bp6ps4-transitive-deferred-to-audit) | ClinVar-derived ACMG criteria: direct-copy banned (PP5/BP6/PS4), transitive deferred to audit | Accepted | 2026-07-10 |
@@ -20,6 +21,74 @@
 | [ADR-0003](#adr-0003--loop-operating-model-planner--doer--checker-across-three-model-families) | Loop operating model: planner / doer / checker across three model families | Accepted | 2026-07-08 |
 | [ADR-0002](#adr-0002--vision--strategy-doc-format-pichler-vision-board--rumelt-kernel) | Vision & strategy doc format: Pichler Vision Board + Rumelt Kernel | Accepted | 2026-07-08 |
 | [ADR-0001](#adr-0001--strategic-framing-narrow-buildable-claim-with-broad-north-star) | Strategic framing: narrow-buildable claim with broad north-star | Accepted | 2026-07-08 |
+
+---
+
+## ADR-0012 — PP3/BP4 automated emission disabled for the current masked rerun
+
+- **Status:** Accepted
+- **Date:** 2026-07-21
+- **Deciders:** @dronasrinivas (operator, acting domain owner)
+- **Track:** `track/pp3bp4-resolution-2026-07`
+- **Supersedes:** none. Additive alongside ADR-0009 and preserves ADR-0011 unchanged.
+
+### Context
+
+RAPTOR has verified published REVEL score intervals for PP3/BP4, but the current activation artifact
+does not yet identify the exact predictor and dbNSFP releases: both remain `confirm-pending`.
+Training overlap with the TSC benchmark is `UNKNOWN`, transportability is `BLOCKED_DATA`, and
+permitted use remains pending. These are recorded in
+`configs/eval/pp3bp4_candidate_policy.json`; the candidate policy remains proposed and shadow-only.
+
+Counting those predictor calls automatically in the masked rerun would therefore let an unresolved
+implementation mapping and unresolved leakage risk change classifications and gate metrics. Blocking
+the entire rerun until every activation prerequisite is resolved would protect against that risk but
+would continue delaying the critical-path census and packet work. PP3/BP4 must remain represented for
+manual review and future activation rather than being deleted from the evidence model.
+
+### Considered options
+
+1. **Approve explicit `disabled_manual` mode for this rerun.** Suppress automated PP3/BP4 calls,
+   preserve and count the suppressed evidence, and retain both criteria in the vocabulary and lineage
+   for manual review.
+2. **Enable corrected REVEL-backed PP3/BP4 now.** Rejected: exact release compatibility, permitted
+   use, training overlap, and transportability have not met the recorded activation checklist.
+3. **Keep the policy proposed and block the rerun.** Rejected: PP3/BP4 can be removed from automated
+   scoring without changing the immutable upstream evidence, so blocking unrelated downstream work
+   is unnecessary.
+
+### Decision
+
+Adopt **option 1** for the current masked rerun. Approve
+`configs/eval/bp4pp3_predictor_policy.json` with `mode: disabled_manual` in a separate, status-only
+commit after verifying its production, evaluation, lineage, packet, and runtime-bundle hashes.
+
+In this mode:
+
+- PP3/BP4 are absent from production `included_criteria`, evaluation `automatable_criteria`, and
+  packet candidate-direction points.
+- PP3/BP4 remain in the ACMG vocabulary and BIAS can-fire lineage with `deferred` dispositions for
+  manual review.
+- Every automated PP3/BP4 call is suppressed and reported; the run must record zero scored PP3/BP4
+  calls.
+- Approval authorizes only use of this disabled/manual evidence mode. It does **not** authorize VUS
+  classification, a research scope, a clinical claim, a worklist, or a ClinVar submission.
+- ADR-0011's metric-driven gate and scope gate remain authoritative and unchanged.
+
+Corrected or REVEL-enabled PP3/BP4 remains `BLOCKED_POLICY`. Activation requires a new owner decision
+after the exact predictor/data releases, permitted use, leakage status, and transportability evidence
+meet the activation checklist, followed by new hash pins and a fresh masked rerun.
+
+### Consequences
+
+- The existing immutable 2,577-row masked BIAS evidence can be reused with downstream suppression on
+  the ARM machine; this decision does not require x64 reannotation.
+- The rerun is intentionally conservative and may undercall missense computational evidence. Its
+  result describes the approved disabled/manual policy, not a future PP3/BP4-enabled system.
+- Suppression counts and affected variant counts remain auditable in the terminal envelope and gate
+  aggregate; malformed or mixed envelope shapes fail closed.
+- A future activation restores automated PP3/BP4 and packet candidate-direction points only through a
+  separately approved, hash-bound policy revision.
 
 ---
 

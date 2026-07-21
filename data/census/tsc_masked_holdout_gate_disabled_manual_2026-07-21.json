@@ -1,0 +1,349 @@
+{
+  "authorization_blockers": [
+    "evaluation_skipped_criteria:PM1"
+  ],
+  "benchmark": {
+    "benchmark_size": 3681,
+    "holdout_classes": {
+      "missense": 154,
+      "other": 2212,
+      "truncating": 211
+    },
+    "holdout_labels": {
+      "B": 1410,
+      "LB": 789,
+      "LP": 17,
+      "P": 361
+    },
+    "holdout_size": 2577,
+    "snapshot": "clinvar_2026-07-07",
+    "train_dev_size": 1104
+  },
+  "content_hash": "2ead589d2f129f988d9932bb01153891902f0d675000554887a1524e567413b2",
+  "date": "2026-07-21",
+  "external_report_hashes": {
+    "MASKED_EVAL_REPORT.json": "ef160916e4d7ebe4b77b994722b4f3d58ca4a28e2d340ddd942674c74bfba559",
+    "MASKED_EVAL_REPORT.txt": "f3f5f6a299a0529c39076f6a45f637128bbfc6182a84f1d79cdcc3f5439116d4"
+  },
+  "full_spectrum_status": "BLOCKED_POLICY",
+  "governance_state": "NONE_VALIDATED",
+  "governance_statement": "Full-spectrum VUS automation is not authorized; no pre-registered research scope is currently validated.",
+  "integrity": {
+    "bias_rows": 2577,
+    "bias_tsv_sha256": "7eece438a880e0c6a591df62e231bc93848eeb42277a2f4360983914298fc512",
+    "canonical_join_rows": 2577,
+    "effective_lineage_blockers": [],
+    "manifest_sha256": "9e588cdf8ebaea2e3793e0ea74721ab5283b57c2abf045dbf3070cb6e81ec9e4",
+    "mask_ledger_sha256": "0f55e5cff0903c94baad896c23b7675526dfcd78513580f41c88b45f5c310fd0",
+    "mask_removed_identities": 2577,
+    "remask_audit_sha256": "b58ee687cb554659efe5434434e383536198c5b99b09c1f0793368b4fea03fec",
+    "remask_survivors": 0,
+    "return_manifest_sha256": "5efdccdc57f7d2bdf774486dfbde106ab173bf87412c6db103aaba9958d9ac91",
+    "returned_artifacts_verified": 28
+  },
+  "legacy_v1_gate": {
+    "per_stratum": {
+      "missense": {
+        "gating": true,
+        "met": false,
+        "powered": true,
+        "precision_lb": 0.0,
+        "recall_lb": 0.0,
+        "threshold": {
+          "directions": [
+            "pathogenic",
+            "benign"
+          ],
+          "gating": true,
+          "precision": 0.9,
+          "recall": 0.85
+        }
+      }
+    },
+    "reason": "missense metric(s) below Oracle threshold (95% CI lower bound): precision_lb=0.0<0.9; recall_lb=0.0<0.85; benign_precision_lb=0.6637328831200572<0.9; benign_recall_lb=0.6637328831200572<0.85",
+    "status": "FAIL",
+    "stratum": "missense",
+    "vus_authorized": false
+  },
+  "limitations": [
+    "PM1 was excluded from this fixed evaluation after both published and reproduced resources had zero held-out-reachable rows; production PM1 remains unvalidated.",
+    "The evaluation-only BP4/PP3 approval does not approve production candidate policy or variant classifications.",
+    "No VUS worklist, clinical classification, or ClinVar submission is authorized."
+  ],
+  "metrics": {
+    "missense": {
+      "benign_precision": 1.0,
+      "benign_precision_lb": 0.6637328831200572,
+      "benign_recall": 1.0,
+      "benign_recall_lb": 0.6637328831200572,
+      "concordance": 1.0,
+      "counts": {
+        "abstain": 145,
+        "benign_actual": 103,
+        "benign_called": 9,
+        "fn": 0,
+        "fp": 0,
+        "path_actual": 51,
+        "path_called": 0,
+        "tn": 9,
+        "total": 154,
+        "total_called": 9,
+        "tp": 0
+      },
+      "gating": false,
+      "precision": 0.0,
+      "precision_lb": 0.0,
+      "recall": 0.0,
+      "recall_lb": 0.0,
+      "stratum": "missense"
+    },
+    "other": {
+      "benign_precision": 1.0,
+      "benign_precision_lb": 0.9676000740686401,
+      "benign_recall": 0.9911504424778761,
+      "benign_recall_lb": 0.9516793514358977,
+      "concordance": 0.995049504950495,
+      "counts": {
+        "abstain": 2010,
+        "benign_actual": 2095,
+        "benign_called": 113,
+        "fn": 0,
+        "fp": 1,
+        "path_actual": 117,
+        "path_called": 89,
+        "tn": 112,
+        "total": 2212,
+        "total_called": 202,
+        "tp": 89
+      },
+      "gating": true,
+      "precision": 0.9888888888888889,
+      "precision_lb": 0.9396425194252681,
+      "recall": 1.0,
+      "recall_lb": 0.9593991424503682,
+      "stratum": "other"
+    },
+    "overall": {
+      "benign_precision": 1.0,
+      "benign_precision_lb": 0.9699734227772422,
+      "benign_recall": 0.9918032786885246,
+      "benign_recall_lb": 0.9551773425669071,
+      "concordance": 0.9975,
+      "counts": {
+        "abstain": 2177,
+        "benign_actual": 2199,
+        "benign_called": 122,
+        "fn": 0,
+        "fp": 1,
+        "path_actual": 378,
+        "path_called": 278,
+        "tn": 121,
+        "total": 2577,
+        "total_called": 400,
+        "tp": 278
+      },
+      "gating": true,
+      "precision": 0.996415770609319,
+      "precision_lb": 0.9801927990066106,
+      "recall": 1.0,
+      "recall_lb": 0.9868182991644381,
+      "stratum": "overall"
+    },
+    "truncating": {
+      "benign_precision": 0.0,
+      "benign_precision_lb": 0.0,
+      "benign_recall": 0.0,
+      "benign_recall_lb": 0.0,
+      "concordance": 1.0,
+      "counts": {
+        "abstain": 22,
+        "benign_actual": 1,
+        "benign_called": 0,
+        "fn": 0,
+        "fp": 0,
+        "path_actual": 210,
+        "path_called": 189,
+        "tn": 0,
+        "total": 211,
+        "total_called": 189,
+        "tp": 189
+      },
+      "gating": false,
+      "precision": 1.0,
+      "precision_lb": 0.9806713599320976,
+      "recall": 1.0,
+      "recall_lb": 0.9806713599320976,
+      "stratum": "truncating"
+    }
+  },
+  "policy": {
+    "bp4pp3": {
+      "approved": true,
+      "correction_hash": "4bbdd1ddaeb45a7182126a70a5bb7eebb672f57de6e97e449b5b69584987d34f",
+      "decision_reference": "docs/DECISIONS.md#adr-0012--pp3bp4-automated-emission-disabled-for-the-current-masked-rerun",
+      "eval_config_hash": "ea4ff684bdc2ae6b079f352816b3993ac813af0e2654b851c30c1f4ef577a293",
+      "lineage_policy_hash": "d2312b2c74f125204ababe9731fc4e37a8e0f30d1608b75f8457aae6591689df",
+      "mode": "disabled_manual",
+      "packet_policy_hash": "778882c500adc43bfca8e6311d3d2038f96e32f05faff7dcda50560ee3448d67",
+      "predictor_source_hash": "2c89bb17dea68fc9ed294eee2108bdd528e551eb4882b47cc4a400d683aca2ae",
+      "production_config_hash": "1ba8066accd8eda16e20518abbeaedb61247fea372675f519f02a8574ff9350e",
+      "runtime_bundle_hash": "9b785e35ed143e90ee72a5ca2dc0f4293ae44e2554703fd44ef31e8564b2be65",
+      "schema": "bp4pp3-predictor-policy/2",
+      "status": "approved"
+    },
+    "evaluation_skipped": [
+      "PM1"
+    ],
+    "operationally_skipped": [
+      "BP6",
+      "PM1",
+      "PP5",
+      "PS4"
+    ],
+    "pm1_published_reachable_rows": 0,
+    "pm1_reproduced_reachable_rows": 0,
+    "pm1_status": "SKIPPED_ZERO_SUPPORT_BASELINE_MISMATCH",
+    "policy_mode": "disabled_manual",
+    "pp3bp4_automation_disabled": true,
+    "pp3bp4_scored_calls": 0,
+    "pp3bp4_suppressed_counts": {
+      "BP4": 1929,
+      "PP3": 134
+    },
+    "pp3bp4_suppressed_variant_count": 2043,
+    "predictor_correction_applied": false,
+    "production_candidate_policy_status": "unapproved"
+  },
+  "research_scope_flags": {
+    "truncating_pathogenic_research_scope_validated": false
+  },
+  "research_use_disclaimer": "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+  "schema": "raptor.tsc.masked_holdout_gate.v2",
+  "scope": "evaluation_only_non_authoritative",
+  "scope_gate_reason": "BLOCKED_POLICY: evaluation_skipped_criteria:PM1 | missense:benign=FAIL; missense:pathogenic=FAIL; other:benign=DESCRIPTIVE; other:pathogenic=DESCRIPTIVE; truncating:benign=DESCRIPTIVE; truncating:pathogenic=VALIDATED",
+  "scopes": {
+    "missense:benign": {
+      "actual_count": 103,
+      "called_count": 9,
+      "coverage_adequate": false,
+      "direction": "benign",
+      "metric_status": "UNMET",
+      "min_count": 36,
+      "precision_lb": 0.6637328831200572,
+      "precision_threshold": 0.9,
+      "reasons": [
+        "benign_precision_lb=0.6637328831200572<0.9",
+        "benign_recall_lb=0.6637328831200572<0.85",
+        "coverage inadequate: min(103, 9) < 36"
+      ],
+      "recall_lb": 0.6637328831200572,
+      "recall_threshold": 0.85,
+      "scope_status": "FAIL",
+      "stratum": "missense"
+    },
+    "missense:pathogenic": {
+      "actual_count": 51,
+      "called_count": 0,
+      "coverage_adequate": false,
+      "direction": "pathogenic",
+      "metric_status": "UNMET",
+      "min_count": 36,
+      "precision_lb": 0.0,
+      "precision_threshold": 0.9,
+      "reasons": [
+        "precision_lb=0.0<0.9",
+        "recall_lb=0.0<0.85",
+        "coverage inadequate: min(51, 0) < 36"
+      ],
+      "recall_lb": 0.0,
+      "recall_threshold": 0.85,
+      "scope_status": "FAIL",
+      "stratum": "missense"
+    },
+    "other:benign": {
+      "actual_count": 2095,
+      "called_count": 113,
+      "coverage_adequate": true,
+      "direction": "benign",
+      "metric_status": "NO_THRESHOLD",
+      "min_count": 36,
+      "precision_lb": 0.9676000740686401,
+      "precision_threshold": null,
+      "reasons": [],
+      "recall_lb": 0.9516793514358977,
+      "recall_threshold": null,
+      "scope_status": "DESCRIPTIVE",
+      "stratum": "other"
+    },
+    "other:pathogenic": {
+      "actual_count": 117,
+      "called_count": 89,
+      "coverage_adequate": true,
+      "direction": "pathogenic",
+      "metric_status": "NO_THRESHOLD",
+      "min_count": 36,
+      "precision_lb": 0.9396425194252681,
+      "precision_threshold": null,
+      "reasons": [],
+      "recall_lb": 0.9593991424503682,
+      "recall_threshold": null,
+      "scope_status": "DESCRIPTIVE",
+      "stratum": "other"
+    },
+    "truncating:benign": {
+      "actual_count": 1,
+      "called_count": 0,
+      "coverage_adequate": false,
+      "direction": "benign",
+      "metric_status": "NO_THRESHOLD",
+      "min_count": 36,
+      "precision_lb": 0.0,
+      "precision_threshold": null,
+      "reasons": [
+        "coverage inadequate: min(1, 0) < 36"
+      ],
+      "recall_lb": 0.0,
+      "recall_threshold": null,
+      "scope_status": "DESCRIPTIVE",
+      "stratum": "truncating"
+    },
+    "truncating:pathogenic": {
+      "actual_count": 210,
+      "called_count": 189,
+      "coverage_adequate": true,
+      "direction": "pathogenic",
+      "metric_status": "MET",
+      "min_count": 36,
+      "precision_lb": 0.9806713599320976,
+      "precision_threshold": 0.95,
+      "reasons": [],
+      "recall_lb": 0.9806713599320976,
+      "recall_threshold": 0.95,
+      "scope_status": "VALIDATED",
+      "stratum": "truncating"
+    }
+  },
+  "thresholds": {
+    "confidence": 0.95,
+    "strata": {
+      "missense": {
+        "directions": [
+          "pathogenic",
+          "benign"
+        ],
+        "gating": true,
+        "precision": 0.9,
+        "recall": 0.85
+      },
+      "truncating": {
+        "directions": [
+          "pathogenic"
+        ],
+        "gating": true,
+        "precision": 0.95,
+        "recall": 0.95
+      }
+    }
+  },
+  "vus_authorized": false
+}

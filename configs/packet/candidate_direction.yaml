@@ -6,11 +6,18 @@
 # now populated over the derived candidate_set = eval automatable_criteria
 # (post-lineage-correction) minus deferred BS2 (B) minus FORBIDDEN_CRITERIA
 # minus unruled-transitive requires_heldout_mask criteria (PS1/PM1/PM5/PP2/
-# BP1) -- i.e. {PVS1, PM2, PM4, PP3, BA1, BS1, BP3, BP4, BP7}. PP3/BP4
-# strength->point rows use A's CORRECTED predictor-aggregation strengths
-# (`eval.predictor_aggregation.recompute_strength`), never BIAS's emitted
-# buggy strength. TSC1/TSC2 MANE .5 / SPDI scope (C) and NTHL1 exclusion are
-# enforced upstream (ingest/scorer), not by an extra schema key here.
+# BP1) -- i.e. {PVS1, PM2, PM4, BA1, BS1, BP3, BP7}. PP3/BP4 were removed
+# 2026-07 (docs/DECISIONS.md#adr-0012-pp3bp4-disabled-manual-policy): the
+# approved disabled/manual policy (configs/eval/bp4pp3_predictor_policy.json,
+# docs/project/specs/pp3bp4-disabled-manual-policy.yaml, decision D13) defers
+# PP3/BP4 in the BIAS lineage (configs/eval/bias_lineage.yaml), so they leave
+# eval automatable_criteria and therefore this derived candidate_set;
+# candidate-direction scoring must not use disabled criteria.
+# resolve_packet_policy_disposition (src/raptor/packet/model.py) maps their
+# deferred/deferred lineage disposition to DEFERRED (manual context, never
+# scored) with no packet source-code change. TSC1/TSC2 MANE .5 / SPDI scope
+# (C) and NTHL1 exclusion are enforced upstream (ingest/scorer), not by an
+# extra schema key here.
 #
 # The policy is still UNAPPROVED: no candidate-direction review
 # recommendation may be released before expert sign-off. An unapproved
@@ -40,10 +47,6 @@ criterion_strength_points:
     supporting: 1
     moderate: 2
     strong: 4
-  PP3:
-    supporting: 1
-    moderate: 2
-    strong: 4
   BA1:
     stand_alone: -8
   BS1:
@@ -52,11 +55,6 @@ criterion_strength_points:
     supporting: -1
     moderate: -2
     strong: -4
-  BP4:
-    supporting: -1
-    moderate: -2
-    strong: -4
-    very_strong: -8
   BP7:
     supporting: -1
 candidate_lp_min: null

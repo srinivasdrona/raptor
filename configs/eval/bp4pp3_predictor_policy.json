@@ -1,7 +1,13 @@
 {
-  "schema": "bp4pp3-predictor-policy",
-  "status": "pending",
+  "schema": "bp4pp3-predictor-policy/2",
+  "status": "approved",
+  "mode": "disabled_manual",
+  "production_config_hash": "1ba8066accd8eda16e20518abbeaedb61247fea372675f519f02a8574ff9350e",
+  "eval_config_hash": "ea4ff684bdc2ae6b079f352816b3993ac813af0e2654b851c30c1f4ef577a293",
+  "lineage_policy_hash": "d2312b2c74f125204ababe9731fc4e37a8e0f30d1608b75f8457aae6591689df",
+  "packet_policy_hash": "778882c500adc43bfca8e6311d3d2038f96e32f05faff7dcda50560ee3448d67",
   "predictor_source_hash": "2c89bb17dea68fc9ed294eee2108bdd528e551eb4882b47cc4a400d683aca2ae",
-  "correction_hash": "4df24b704a06a13131884c3831e3fac82c1af7a9b7d483a511a161f14c91ce3d",
-  "decision_reference": "docs/DECISIONS.md#evaluation-only-bp4pp3-correction-approval-2026-07-13 (REAPPROVAL REQUIRED: correction_hash re-pinned 2026-07 for the production-vocabulary-parity ProductionVocabEvidenceSource addition to terminal_source.py; the prior 2026-07-13 approval covered only the pre-parity bundle and does not authorize this bundle)"
+  "correction_hash": "4bbdd1ddaeb45a7182126a70a5bb7eebb672f57de6e97e449b5b69584987d34f",
+  "runtime_bundle_hash": "9b785e35ed143e90ee72a5ca2dc0f4293ae44e2554703fd44ef31e8564b2be65",
+  "decision_reference": "docs/DECISIONS.md#adr-0012--pp3bp4-automated-emission-disabled-for-the-current-masked-rerun"
 }

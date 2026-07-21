@@ -277,11 +277,20 @@ records:
       transitive: []
     bias_anchors: ["pathogenic_classifiers.get_pp3 (L845-966)"]
     data_artifacts: ["gene_data_loader.py"]
-    validation_disposition: allowed
-    production_disposition: allowed
+    validation_disposition: deferred
+    production_disposition: deferred
     rationale_markers: []
-    notes: "Computational-predictor consensus, no ClinVar dependency."
-    decision_dependency: ""
+    notes: "Computational-predictor consensus, no ClinVar dependency. Automated PP3/BP4 disabled/manual pending a future activation decision (docs/DECISIONS.md#adr-0012-pp3bp4-disabled-manual-policy)."
+    decision_dependency: "bp4pp3-predictor-policy"
+    decision_rationale: >-
+      Automated PP3 emission is disabled under the approved disabled/manual
+      policy (configs/eval/bp4pp3_predictor_policy.json,
+      docs/project/specs/pp3bp4-disabled-manual-policy.yaml) pending a future,
+      separately hash-bound owner activation decision for the computational
+      predictor correction (bp4pp3-predictor-policy). can_fire, lineage_class,
+      and source_dependencies are unchanged -- only the automated
+      emission/production disposition is deferred; PP3 remains available for
+      manual review.
   PP5:
     lineage_class: same_variant_clinvar
     source_dependencies:
@@ -376,11 +385,20 @@ records:
       transitive: []
     bias_anchors: ["benign_classifiers.get_bp4 (L353-516)"]
     data_artifacts: ["gene_data_loader.py"]
-    validation_disposition: allowed
-    production_disposition: allowed
+    validation_disposition: deferred
+    production_disposition: deferred
     rationale_markers: []
-    notes: "Computational-predictor consensus (benign direction), no ClinVar dependency."
-    decision_dependency: ""
+    notes: "Computational-predictor consensus (benign direction), no ClinVar dependency. Automated PP3/BP4 disabled/manual pending a future activation decision (docs/DECISIONS.md#adr-0012-pp3bp4-disabled-manual-policy)."
+    decision_dependency: "bp4pp3-predictor-policy"
+    decision_rationale: >-
+      Automated BP4 emission is disabled under the approved disabled/manual
+      policy (configs/eval/bp4pp3_predictor_policy.json,
+      docs/project/specs/pp3bp4-disabled-manual-policy.yaml) pending a future,
+      separately hash-bound owner activation decision for the computational
+      predictor correction (bp4pp3-predictor-policy). can_fire, lineage_class,
+      and source_dependencies are unchanged -- only the automated
+      emission/production disposition is deferred; BP4 remains available for
+      manual review.
   BP6:
     lineage_class: same_variant_clinvar
     source_dependencies:
