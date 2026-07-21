@@ -102,7 +102,8 @@ def cli_args_dict(tmp_path: Path):
         encoding="utf-8"
     )
 
-    historical_stats = tmp_path / "tsc_vus_clinvar_2026-07-07_stats.json"
+    historical_stats = tmp_path / "data" / "census" / "tsc_vus_clinvar_2026-07-07_stats.json"
+    historical_stats.parent.mkdir(parents=True, exist_ok=True)
     historical_stats.write_text(
         json.dumps({
             "corpus": {"total_vus": 1},
@@ -145,6 +146,9 @@ def test_g_vc11_output_boundary(cli_args_dict, tmp_path: Path, monkeypatch) -> N
     if HAS_CLI:
         import raptor.census.cli as census_cli
         monkeypatch.setattr(census_cli, "REPO_ROOT", tmp_path)
+        monkeypatch.setattr(census_cli, "_resolve_code_commit", lambda: "ade13f206f3e2c2efe3ec92715d974645fc8da8f")
+        synthetic_hash = _get_sha256(Path(cli_args_dict["--historical-stats"]))
+        monkeypatch.setattr(census_cli, "HISTORICAL_CENSUS_SHA256", synthetic_hash, raising=False)
 
     census_dir = tmp_path / "data" / "census"
     census_dir.mkdir(parents=True, exist_ok=True)
@@ -190,6 +194,9 @@ def test_g_vc12_dry_run_summary(cli_args_dict, tmp_path: Path, monkeypatch) -> N
     if HAS_CLI:
         import raptor.census.cli as census_cli
         monkeypatch.setattr(census_cli, "REPO_ROOT", tmp_path)
+        monkeypatch.setattr(census_cli, "_resolve_code_commit", lambda: "ade13f206f3e2c2efe3ec92715d974645fc8da8f")
+        synthetic_hash = _get_sha256(Path(cli_args_dict["--historical-stats"]))
+        monkeypatch.setattr(census_cli, "HISTORICAL_CENSUS_SHA256", synthetic_hash, raising=False)
 
     census_dir = tmp_path / "data" / "census"
     census_dir.mkdir(parents=True, exist_ok=True)
@@ -210,6 +217,9 @@ def test_g_vc13_canonical_json_bytes(cli_args_dict, tmp_path: Path, monkeypatch)
     if HAS_CLI:
         import raptor.census.cli as census_cli
         monkeypatch.setattr(census_cli, "REPO_ROOT", tmp_path)
+        monkeypatch.setattr(census_cli, "_resolve_code_commit", lambda: "ade13f206f3e2c2efe3ec92715d974645fc8da8f")
+        synthetic_hash = _get_sha256(Path(cli_args_dict["--historical-stats"]))
+        monkeypatch.setattr(census_cli, "HISTORICAL_CENSUS_SHA256", synthetic_hash, raising=False)
 
     census_dir = tmp_path / "data" / "census"
     census_dir.mkdir(parents=True, exist_ok=True)
@@ -239,9 +249,16 @@ def test_g_vc13_canonical_json_bytes(cli_args_dict, tmp_path: Path, monkeypatch)
     assert content_bytes == re_serialized
 
 
-def test_g_vc14_policy_hash_verification(cli_args_dict, tmp_path: Path) -> None:
+def test_g_vc14_policy_hash_verification(cli_args_dict, tmp_path: Path, monkeypatch) -> None:
     """G-VC14 policy/hash verification fails closed on invalid/unapproved predictor policy, or drifted config hash."""
     check_cli_implemented()
+
+    if HAS_CLI:
+        import raptor.census.cli as census_cli
+        monkeypatch.setattr(census_cli, "REPO_ROOT", tmp_path)
+        monkeypatch.setattr(census_cli, "_resolve_code_commit", lambda: "ade13f206f3e2c2efe3ec92715d974645fc8da8f")
+        synthetic_hash = _get_sha256(Path(cli_args_dict["--historical-stats"]))
+        monkeypatch.setattr(census_cli, "HISTORICAL_CENSUS_SHA256", synthetic_hash, raising=False)
 
     # 1. Non-approved status fails closed
     bad_policy_status = tmp_path / "bad_policy_status.json"
@@ -300,4 +317,161 @@ def test_g_vc14_policy_hash_verification(cli_args_dict, tmp_path: Path) -> None:
         args = _make_args(drifted_args_dict, ["--dry-run"])
         with pytest.raises((ValueError, SystemExit)):
             main(args)
+
+
+def test_historical_census_sha256_constant() -> None:
+    """Historical source integrity must expose and require a testable module constant."""
+    import raptor.census.cli as census_cli
+    assert hasattr(census_cli, "HISTORICAL_CENSUS_SHA256")
+    assert census_cli.HISTORICAL_CENSUS_SHA256 == "6ad96909637118aab415ec24d7ea63992eea99df03590508a223c6742621200d"
+
+
+def test_invalid_vcf_hash_fails(cli_args_dict, tmp_path: Path, monkeypatch) -> None:
+    """Fail closed on invalid/non-hex/short provenance `vcf_hash`."""
+    check_cli_implemented()
+    import raptor.census.cli as census_cli
+    monkeypatch.setattr(census_cli, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(census_cli, "_resolve_code_commit", lambda: "ade13f206f3e2c2efe3ec92715d974645fc8da8f")
+    synthetic_hash = _get_sha256(Path(cli_args_dict["--historical-stats"]))
+    monkeypatch.setattr(census_cli, "HISTORICAL_CENSUS_SHA256", synthetic_hash, raising=False)
+
+    # Short/non-hex hash
+    provenance_file = Path(cli_args_dict["--provenance"])
+    provenance_file.write_text(
+        json.dumps({
+            "vcf_hash": "short_non_hex",
+            "source_snapshot": "clinvar_2026-07-07"
+        }),
+        encoding="utf-8"
+    )
+
+    census_dir = tmp_path / "data" / "census"
+    census_dir.mkdir(parents=True, exist_ok=True)
+    canonical_path = census_dir / "tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json"
+
+    args = _make_args(cli_args_dict, ["--emit-census-record", str(canonical_path)])
+    with pytest.raises(ValueError):
+        main(args)
+
+    assert not canonical_path.exists()
+
+
+def test_blank_missing_source_snapshot_fails(cli_args_dict, tmp_path: Path, monkeypatch) -> None:
+    """Fail closed on blank or missing `source_snapshot`."""
+    check_cli_implemented()
+    import raptor.census.cli as census_cli
+    monkeypatch.setattr(census_cli, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(census_cli, "_resolve_code_commit", lambda: "ade13f206f3e2c2efe3ec92715d974645fc8da8f")
+    synthetic_hash = _get_sha256(Path(cli_args_dict["--historical-stats"]))
+    monkeypatch.setattr(census_cli, "HISTORICAL_CENSUS_SHA256", synthetic_hash, raising=False)
+
+    census_dir = tmp_path / "data" / "census"
+    census_dir.mkdir(parents=True, exist_ok=True)
+    canonical_path = census_dir / "tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json"
+
+    # Case 1: blank
+    provenance_file = Path(cli_args_dict["--provenance"])
+    provenance_file.write_text(
+        json.dumps({
+            "vcf_hash": "3fff6de7ae9b2b202642e498c4c49532cf1aaf5c2734f0e8341d5ace88fa3a09",
+            "source_snapshot": "   "
+        }),
+        encoding="utf-8"
+    )
+
+    args = _make_args(cli_args_dict, ["--emit-census-record", str(canonical_path)])
+    with pytest.raises(ValueError):
+        main(args)
+
+    assert not canonical_path.exists()
+
+    # Case 2: missing
+    provenance_file.write_text(
+        json.dumps({
+            "vcf_hash": "3fff6de7ae9b2b202642e498c4c49532cf1aaf5c2734f0e8341d5ace88fa3a09"
+        }),
+        encoding="utf-8"
+    )
+
+    args = _make_args(cli_args_dict, ["--emit-census-record", str(canonical_path)])
+    with pytest.raises(ValueError):
+        main(args)
+
+    assert not canonical_path.exists()
+
+
+def test_git_failure_fails_closed(cli_args_dict, tmp_path: Path, monkeypatch) -> None:
+    """Fail closed when git resolution / _resolve_code_commit fails."""
+    check_cli_implemented()
+    import raptor.census.cli as census_cli
+    monkeypatch.setattr(census_cli, "REPO_ROOT", tmp_path)
+    synthetic_hash = _get_sha256(Path(cli_args_dict["--historical-stats"]))
+    monkeypatch.setattr(census_cli, "HISTORICAL_CENSUS_SHA256", synthetic_hash, raising=False)
+
+    import subprocess
+    def mock_run(*args, **kwargs):
+        raise subprocess.CalledProcessError(1, "git rev-parse")
+    monkeypatch.setattr(subprocess, "run", mock_run)
+
+    census_dir = tmp_path / "data" / "census"
+    census_dir.mkdir(parents=True, exist_ok=True)
+    canonical_path = census_dir / "tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json"
+
+    args = _make_args(cli_args_dict, ["--emit-census-record", str(canonical_path)])
+    with pytest.raises((subprocess.CalledProcessError, RuntimeError, OSError)):
+        main(args)
+
+    assert not canonical_path.exists()
+
+
+def test_historical_stats_path_rejection(cli_args_dict, tmp_path: Path, monkeypatch) -> None:
+    """Fail closed when `--historical-stats` path is an arbitrary alternate path."""
+    check_cli_implemented()
+    import raptor.census.cli as census_cli
+    monkeypatch.setattr(census_cli, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(census_cli, "_resolve_code_commit", lambda: "ade13f206f3e2c2efe3ec92715d974645fc8da8f")
+    synthetic_hash = _get_sha256(Path(cli_args_dict["--historical-stats"]))
+    monkeypatch.setattr(census_cli, "HISTORICAL_CENSUS_SHA256", synthetic_hash, raising=False)
+
+    alternate_path = tmp_path / "alternate_stats.json"
+    alternate_path.write_text("{}", encoding="utf-8")
+
+    args_dict_alt = dict(cli_args_dict)
+    args_dict_alt["--historical-stats"] = str(alternate_path)
+    args_alt = _make_args(args_dict_alt, ["--dry-run"])
+
+    with pytest.raises(ValueError):
+        main(args_alt)
+
+
+def test_historical_stats_one_byte_tamper_fails(cli_args_dict, tmp_path: Path, monkeypatch) -> None:
+    """Fail closed on one-byte tamper of historical stats file."""
+    check_cli_implemented()
+    import raptor.census.cli as census_cli
+    monkeypatch.setattr(census_cli, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(census_cli, "_resolve_code_commit", lambda: "ade13f206f3e2c2efe3ec92715d974645fc8da8f")
+
+    # Set historical expected SHA to some synthetic value
+    synthetic_content = b'{"some_key": "some_value"}\n'
+    synthetic_sha = hashlib.sha256(synthetic_content).hexdigest()
+    monkeypatch.setattr(census_cli, "HISTORICAL_CENSUS_SHA256", synthetic_sha, raising=False)
+
+    # Write synthetic content to the canonical path
+    canonical_hist_path = tmp_path / "data" / "census" / "tsc_vus_clinvar_2026-07-07_stats.json"
+    canonical_hist_path.parent.mkdir(parents=True, exist_ok=True)
+    canonical_hist_path.write_bytes(synthetic_content)
+
+    # Now tamper with it by one byte
+    tampered_content = synthetic_content + b"\n"
+    canonical_hist_path.write_bytes(tampered_content)
+
+    census_dir = tmp_path / "data" / "census"
+    census_dir.mkdir(parents=True, exist_ok=True)
+    canonical_path = census_dir / "tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json"
+
+    args = _make_args(cli_args_dict, ["--emit-census-record", str(canonical_path)])
+    with pytest.raises(ValueError):
+        main(args)
+
+    assert not canonical_path.exists()
 

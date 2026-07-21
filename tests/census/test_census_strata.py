@@ -173,6 +173,18 @@ def test_g_vc4_exact_one_to_one_join(scorer_config, eval_config) -> None:
     assert "extra" in str(exc_info.value).lower() or "conservation" in str(exc_info.value).lower() or "manifest" in str(exc_info.value).lower() or "locus" in str(exc_info.value).lower()
 
 
+def test_g_vc4_duplicate_bias_rows(scorer_config, eval_config) -> None:
+    """G-VC4 duplicate BIAS rows: with one valid manifest entry and the same BiasRecord supplied twice, reproduce_census_strata must raise ConservationError before returning."""
+    check_strata_implemented()
+    row = _row(3, {"pm2": (1, "supporting")})
+    manifest = {
+        row.variant_id: ManifestEntry(variant_id="NC_000016.10:1003:A:G", vcf_key=row.variant_id)
+    }
+    with pytest.raises(ConservationError) as exc_info:
+        reproduce_census_strata([row, row], manifest, scorer_config, eval_config)
+    assert "duplicate" in str(exc_info.value).lower() or "conservation" in str(exc_info.value).lower()
+
+
 def test_g_vc5_strength_map_drift(scorer_config, eval_config) -> None:
     """G-VC5 strength_map drift raises ConservationError (no silent re-label)."""
     check_strata_implemented()

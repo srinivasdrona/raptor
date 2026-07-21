@@ -136,7 +136,28 @@ def test_g_vc15_real_data_integration() -> None:
         run_pins=run_pins,
         bound_hashes=bound_hashes,
         historical_stats=historical_stats,
+        automatable_criteria=eval_config.automatable_criteria,
     )
+
+    # 1.1 Assert additional schema/integrity metrics
+    consumed_inc = record["consumed_automated_criterion_incidence"]
+    for crit in eval_config.automatable_criteria:
+        assert crit in consumed_inc
+    assert consumed_inc["PP3"] == 0
+    assert consumed_inc["BP4"] == 0
+
+    assert sum(record["bias_gene_transcript"].values()) == 6618
+
+    shares = record["raptor_current_policy_internal_direction_shares"]
+    assert sum(shares.values()) == pytest.approx(1.0)
+
+    run_integrity = record["run_integrity"]
+    assert run_integrity["parser_records"] == 6618
+    assert run_integrity["parser_contract_errors"] == 0
+    assert run_integrity["exact_join"] is True
+    assert run_integrity["duplicate_manifest_ids"] == 0
+    assert run_integrity["duplicate_manifest_keys"] == 0
+    assert run_integrity["duplicate_bias_keys"] == 0
 
     # 2. Assert direction totals (157 / 7 / 6424 / 30)
     directions = record["raptor_current_policy_internal_direction"]

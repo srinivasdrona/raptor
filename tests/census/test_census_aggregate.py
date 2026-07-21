@@ -104,6 +104,7 @@ def test_g_vc7_all_counts_derived(base_inputs) -> None:
         run_pins=run_pins,
         bound_hashes=bound_hashes,
         historical_stats=historical_stats,
+        automatable_criteria=["PVS1", "PS1", "PM1", "PM2", "PM4", "PM5", "PP2", "BA1", "BS1", "BP1", "BP3", "BP7"],
     )
 
     # Now change/double the inputs with valid identities
@@ -138,6 +139,7 @@ def test_g_vc7_all_counts_derived(base_inputs) -> None:
         run_pins=run_pins,
         bound_hashes=bound_hashes,
         historical_stats=historical_stats,
+        automatable_criteria=["PVS1", "PS1", "PM1", "PM2", "PM4", "PM5", "PP2", "BA1", "BS1", "BP1", "BP3", "BP7"],
     )
 
     # Asserts that the corpus totals or row counts actually changed
@@ -184,6 +186,7 @@ def test_g_vc8_suppression_union(base_inputs) -> None:
         run_pins=run_pins,
         bound_hashes=bound_hashes,
         historical_stats=historical_stats,
+        automatable_criteria=["PVS1", "PS1", "PM1", "PM2", "PM4", "PM5", "PP2", "BA1", "BS1", "BP1", "BP3", "BP7"],
     )
 
     # raw_pp3 should be 2, raw_bp4 should be 2, union size should be 3, scored should be 0
@@ -221,6 +224,7 @@ def test_g_vc9_emitted_record_privacy(base_inputs) -> None:
         run_pins=run_pins,
         bound_hashes=bound_hashes,
         historical_stats=historical_stats,
+        automatable_criteria=["PVS1", "PS1", "PM1", "PM2", "PM4", "PM5", "PP2", "BA1", "BS1", "BP1", "BP3", "BP7"],
     )
 
     # Recursively check the record to ensure no leak of identifiers or raw rationale
@@ -310,6 +314,7 @@ def test_g_vc10_historical_comparison_and_point_distribution(base_inputs) -> Non
         run_pins=run_pins,
         bound_hashes=bound_hashes,
         historical_stats=historical_stats,
+        automatable_criteria=["PVS1", "PS1", "PM1", "PM2", "PM4", "PM5", "PP2", "BA1", "BS1", "BP1", "BP3", "BP7"],
     )
 
     # Point distribution assertions
@@ -355,4 +360,176 @@ def test_g_vc10_historical_comparison_and_point_distribution(base_inputs) -> Non
     assert comp["no_deterministic_resolution"]["disabled_manual"] == sum(1 for s in strata if s.stratum == "no_deterministic_resolution")
     assert comp["annotation_manual_review"]["disabled_manual"] == sum(1 for s in strata if s.stratum == "manual_review")
     assert sum(dist.values()) == len(strata)
+
+
+def test_complete_aggregate_schema(base_inputs) -> None:
+    """Complete aggregate schema validations including extended inputs and derived fields."""
+    check_aggregate_implemented()
+    run_pins, bound_hashes, historical_stats = base_inputs
+
+    # Setup 4 distinct rows with PM2, PVS1, PP3, BP4
+    rows = [
+        _row(1, {"pm2": (1, "supporting")}),
+        _row(2, {"pvs1": (4, "very_strong")}),
+        _row(3, {"pp3": (2, "moderate")}),
+        _row(4, {"bp4": (1, "supporting")}),
+    ]
+    manifest = [ManifestEntry(variant_id=f"NC_000016.10:100{i}:A:G", vcf_key=r.variant_id) for i, r in enumerate(rows, start=1)]
+    strata = [
+        StratumEntry(
+            variant_id=manifest[0].variant_id,
+            stratum="candidate_LP_review",
+            pattern_id="PM2 Supporting",
+            pattern_signature=("PM2 Supporting",),
+            signed_points=1,
+            basis="eval_only_census_selection_metadata",
+        ),
+        StratumEntry(
+            variant_id=manifest[1].variant_id,
+            stratum="candidate_LP_review",
+            pattern_id="PVS1 Very Strong",
+            pattern_signature=("PVS1 Very Strong",),
+            signed_points=4,
+            basis="eval_only_census_selection_metadata",
+        ),
+        # PP3 unresolved (deferred)
+        StratumEntry(
+            variant_id=manifest[2].variant_id,
+            stratum="no_deterministic_resolution",
+            pattern_id="",
+            pattern_signature=(),
+            signed_points=0,
+            basis="eval_only_census_selection_metadata",
+        ),
+        # BP4 unresolved (deferred)
+        StratumEntry(
+            variant_id=manifest[3].variant_id,
+            stratum="no_deterministic_resolution",
+            pattern_id="",
+            pattern_signature=(),
+            signed_points=0,
+            basis="eval_only_census_selection_metadata",
+        ),
+    ]
+
+    # Explicitly test build_census_record with the extended automatable_criteria input
+    automatable = ["PVS1", "PM2"]
+    record = build_census_record(
+        strata=strata,
+        bias_rows=rows,
+        manifest=manifest,
+        run_pins=run_pins,
+        bound_hashes=bound_hashes,
+        historical_stats=historical_stats,
+        automatable_criteria=automatable,
+    )
+
+    # 1. Assert consumed_automated_criterion_incidence
+    consumed_inc = record["consumed_automated_criterion_incidence"]
+    assert "PVS1" in consumed_inc
+    assert "PM2" in consumed_inc
+    assert consumed_inc["PVS1"] == 1
+    assert consumed_inc["PM2"] == 1
+    assert "PP3" in consumed_inc
+    assert "BP4" in consumed_inc
+    assert consumed_inc["PP3"] == 0
+    assert consumed_inc["BP4"] == 0
+
+    # 2. Assert run_integrity fields
+    run_integrity = record["run_integrity"]
+    assert run_integrity["parser_records"] == 4
+    assert run_integrity["parser_contract_errors"] == 0
+    assert run_integrity["exact_join"] is True
+    assert run_integrity["duplicate_manifest_ids"] == 0
+    assert run_integrity["duplicate_manifest_keys"] == 0
+    assert run_integrity["duplicate_bias_keys"] == 0
+
+    # 3. Assert raw bias_gene_transcript aggregate is derived
+    assert "bias_gene_transcript" in record
+    assert record["bias_gene_transcript"]["TSC2|NM_000548.4"] == 4
+
+    # 4. Assert direction shares are derived from stratum counts/total and sum to 1.0;
+    # manual/unresolved remain distinct despite shared point 0.
+    shares = record["raptor_current_policy_internal_direction_shares"]
+    assert sum(shares.values()) == pytest.approx(1.0)
+    assert "candidate_LP_review" in shares
+    assert "candidate_LB_review" in shares
+    assert "no_deterministic_resolution" in shares
+    assert "annotation_manual_review" in shares
+    assert shares["candidate_LP_review"] == 0.5  # 2 of 4
+    assert shares["candidate_LB_review"] == 0.0  # 0 of 4
+    assert shares["no_deterministic_resolution"] == 0.5  # 2 of 4
+    assert shares["annotation_manual_review"] == 0.0  # 0 of 4
+
+
+def test_build_census_record_invalid_historical_directions(base_inputs) -> None:
+    """ValueError is raised if historical stats have missing or invalid direction counts."""
+    check_aggregate_implemented()
+    run_pins, bound_hashes, _ = base_inputs
+
+    row = _row(1, {"pm2": (1, "supporting")})
+    manifest = [ManifestEntry(variant_id="NC_000016.10:1001:A:G", vcf_key=row.variant_id)]
+    stratum = [
+        StratumEntry(
+            variant_id="NC_000016.10:1001:A:G",
+            stratum="no_deterministic_resolution",
+            pattern_id="",
+            pattern_signature=(),
+            signed_points=1,
+            basis="eval_only_census_selection_metadata",
+        )
+    ]
+
+    # Case 1: missing entirely
+    bad_stats_1 = {}
+    with pytest.raises(ValueError):
+        build_census_record(
+            strata=stratum,
+            bias_rows=[row],
+            manifest=manifest,
+            run_pins=run_pins,
+            bound_hashes=bound_hashes,
+            historical_stats=bad_stats_1,
+            automatable_criteria=["PVS1", "PM2"],
+        )
+
+    # Case 2: missing one key
+    bad_stats_2 = {
+        "raptor_current_policy_internal_direction": {
+            "candidate_LP_review": 10,
+            "candidate_LB_review": 20,
+            "no_deterministic_resolution": 30,
+            # missing "annotation_manual_review"
+        }
+    }
+    with pytest.raises(ValueError):
+        build_census_record(
+            strata=stratum,
+            bias_rows=[row],
+            manifest=manifest,
+            run_pins=run_pins,
+            bound_hashes=bound_hashes,
+            historical_stats=bad_stats_2,
+            automatable_criteria=["PVS1", "PM2"],
+        )
+
+    # Case 3: negative count
+    bad_stats_3 = {
+        "raptor_current_policy_internal_direction": {
+            "candidate_LP_review": 10,
+            "candidate_LB_review": 20,
+            "no_deterministic_resolution": -1,
+            "annotation_manual_review": 5,
+        }
+    }
+    with pytest.raises(ValueError):
+        build_census_record(
+            strata=stratum,
+            bias_rows=[row],
+            manifest=manifest,
+            run_pins=run_pins,
+            bound_hashes=bound_hashes,
+            historical_stats=bad_stats_3,
+            automatable_criteria=["PVS1", "PM2"],
+        )
 
