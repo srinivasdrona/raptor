@@ -148,7 +148,8 @@ def make_tiered_authorization_dict():
 
 def test_frozen_r2_re_adjudication():
     """Test loading and re-adjudicating the canonical-LF-verified R2 record."""
-    r2_path = Path("data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json")
+    ROOT = Path(__file__).resolve().parents[2]
+    r2_path = ROOT / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
     assert r2_path.exists(), f"Could not find R2 record at {r2_path}"
 
     raw_bytes = r2_path.read_bytes()
@@ -328,94 +329,129 @@ def test_cli_wrong_hash_input_failure(tmp_path, monkeypatch):
     and asserts that a modified/wrong-hash/one-byte input causes a typed InputError,
     writing neither the output nor the external manifest.
     """
-    canonical_r2_rel = Path("data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json")
-    canonical_config_rel = Path("configs/eval/tsc2.yaml")
+    ROOT = Path(__file__).resolve().parents[2]
     
-    tmp_r2_dir = tmp_path / canonical_r2_rel.parent
-    tmp_r2_dir.mkdir(parents=True, exist_ok=True)
-    tmp_config_dir = tmp_path / canonical_config_rel.parent
-    tmp_config_dir.mkdir(parents=True, exist_ok=True)
+    canonical_source = tmp_path / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
+    canonical_config = tmp_path / "configs/eval/tsc2.yaml"
+    canonical_output = tmp_path / "data/census/tsc_tiered_readjudication_2026-07-21.json"
+    canonical_manifest = tmp_path / "data/census/tsc_tiered_readjudication_2026-07-21.sha256"
     
-    real_r2_path = Path("data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json")
-    real_config_path = Path("configs/eval/tsc2.yaml")
+    canonical_source.parent.mkdir(parents=True, exist_ok=True)
+    canonical_config.parent.mkdir(parents=True, exist_ok=True)
     
-    if real_r2_path.exists():
-        (tmp_path / canonical_r2_rel).write_bytes(real_r2_path.read_bytes())
+    real_r2_path = ROOT / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
+    real_config_path = ROOT / "configs/eval/tsc2.yaml"
+    
+    assert real_r2_path.exists(), f"Could not find R2 record at {real_r2_path}"
+    canonical_source.write_bytes(real_r2_path.read_bytes())
+    
+    # Change one byte in that canonical file
+    content = bytearray(canonical_source.read_bytes())
+    if content:
+        content[0] = (content[0] + 1) % 256
     else:
-        (tmp_path / canonical_r2_rel).write_text("{}")
-        
+        content = bytearray(b"X")
+    canonical_source.write_bytes(content)
+    
     if real_config_path.exists():
-        (tmp_path / canonical_config_rel).write_bytes(real_config_path.read_bytes())
+        canonical_config.write_bytes(real_config_path.read_bytes())
     else:
-        (tmp_path / canonical_config_rel).write_text("{}")
+        canonical_config.write_text("{}")
         
+    # Ensure neither output nor manifest pre-exists
+    assert not canonical_output.exists()
+    assert not canonical_manifest.exists()
+    
     try:
+        import sys
+        this_mod = sys.modules[__name__]
         import scripts.build_tiered_readjudication as cli_mod
         monkeypatch.setattr(cli_mod, "REPO_ROOT", str(tmp_path))
+        monkeypatch.setattr(this_mod, "REPO_ROOT", str(tmp_path))
     except ImportError:
-        pass
+        import sys
+        this_mod = sys.modules[__name__]
+        monkeypatch.setattr(this_mod, "REPO_ROOT", str(tmp_path))
         
-    output_path = tmp_path / "output.json"
-    manifest_path = tmp_path / "manifest.json"
-    
-    bad_source_record = tmp_path / "bad_source.json"
-    bad_source_record.write_text("X")  # one byte!
-    
     argv = [
-        "--source-record", str(bad_source_record),
-        "--eval-config", str(tmp_path / canonical_config_rel),
-        "--output", str(output_path),
-        "--external-manifest", str(manifest_path),
+        "--source-record", str(canonical_source),
+        "--eval-config", str(canonical_config),
+        "--output", str(canonical_output),
+        "--external-manifest", str(canonical_manifest),
     ]
     
     try:
         with pytest.raises(InputError):
             main(argv)
     finally:
-        assert not output_path.exists()
-        assert not manifest_path.exists()
+        assert not canonical_output.exists()
+        assert not canonical_manifest.exists()
 
 
 def test_cli_happy_path(tmp_path, monkeypatch):
     """Test the planned scripts.build_tiered_readjudication CLI contract for happy path."""
-    canonical_r2_rel = Path("data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json")
-    canonical_config_rel = Path("configs/eval/tsc2.yaml")
+    ROOT = Path(__file__).resolve().parents[2]
     
-    tmp_r2_dir = tmp_path / canonical_r2_rel.parent
-    tmp_r2_dir.mkdir(parents=True, exist_ok=True)
-    tmp_config_dir = tmp_path / canonical_config_rel.parent
-    tmp_config_dir.mkdir(parents=True, exist_ok=True)
+    canonical_source = tmp_path / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
+    canonical_config = tmp_path / "configs/eval/tsc2.yaml"
+    canonical_output = tmp_path / "data/census/tsc_tiered_readjudication_2026-07-21.json"
+    canonical_manifest = tmp_path / "data/census/tsc_tiered_readjudication_2026-07-21.sha256"
     
-    real_r2_path = Path("data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json")
-    real_config_path = Path("configs/eval/tsc2.yaml")
+    canonical_source.parent.mkdir(parents=True, exist_ok=True)
+    canonical_config.parent.mkdir(parents=True, exist_ok=True)
     
-    if real_r2_path.exists():
-        (tmp_path / canonical_r2_rel).write_bytes(real_r2_path.read_bytes())
-    else:
-        (tmp_path / canonical_r2_rel).write_text("{}")
-        
+    real_r2_path = ROOT / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
+    real_config_path = ROOT / "configs/eval/tsc2.yaml"
+    
+    assert real_r2_path.exists(), f"Could not find R2 record at {real_r2_path}"
+    canonical_source.write_bytes(real_r2_path.read_bytes())
+    
     if real_config_path.exists():
-        (tmp_path / canonical_config_rel).write_bytes(real_config_path.read_bytes())
+        canonical_config.write_bytes(real_config_path.read_bytes())
     else:
-        (tmp_path / canonical_config_rel).write_text("{}")
+        canonical_config.write_text("{}")
         
+    # Ensure neither output nor manifest pre-exists
+    assert not canonical_output.exists()
+    assert not canonical_manifest.exists()
+    
     try:
+        import sys
+        this_mod = sys.modules[__name__]
         import scripts.build_tiered_readjudication as cli_mod
         monkeypatch.setattr(cli_mod, "REPO_ROOT", str(tmp_path))
+        monkeypatch.setattr(this_mod, "REPO_ROOT", str(tmp_path))
     except ImportError:
-        pass
+        import sys
+        this_mod = sys.modules[__name__]
+        monkeypatch.setattr(this_mod, "REPO_ROOT", str(tmp_path))
         
-    output_path = tmp_path / "output.json"
-    manifest_path = tmp_path / "manifest.json"
-    
     argv = [
-        "--source-record", str(tmp_path / canonical_r2_rel),
-        "--eval-config", str(tmp_path / canonical_config_rel),
-        "--output", str(output_path),
-        "--external-manifest", str(manifest_path),
+        "--source-record", str(canonical_source),
+        "--eval-config", str(canonical_config),
+        "--output", str(canonical_output),
+        "--external-manifest", str(canonical_manifest),
     ]
     
     main(argv)
     
-    assert output_path.exists()
-    assert manifest_path.exists()
+    # Assert both outputs now exist
+    assert canonical_output.exists()
+    assert canonical_manifest.exists()
+    
+    # Assert canonical LF JSON
+    output_bytes = canonical_output.read_bytes()
+    assert b"\r\n" not in output_bytes
+    output_data = json.loads(output_bytes.decode("utf-8"))
+    
+    # Assert source hash/content hash, post_hoc=true, internal content_hash
+    assert output_data["source_canonical_lf_sha256"] == "7c55cd4e3059713d1d53886d8893a3819153375b62ce9d37187d731132c6a77f"
+    assert output_data["source_content_hash"] == "2ead589d2f129f988d9932bb01153891902f0d675000554887a1524e567413b2"
+    assert output_data["post_hoc"] is True
+    assert "content_hash" in output_data
+    
+    # Assert manifest line/hash agreement
+    manifest_text = canonical_manifest.read_text(encoding="utf-8").strip()
+    calculated_sha256 = hashlib.sha256(output_bytes).hexdigest()
+    assert calculated_sha256 in manifest_text
+    assert canonical_output.name in manifest_text
