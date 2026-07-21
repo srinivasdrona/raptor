@@ -497,6 +497,77 @@ def test_oracle_pin_drift_raises_config_error(override_config_kwargs):
         decide_tiered_gate(metrics, config, run_meta, make_tiered_authorization_dict())
 
 
+@pytest.mark.parametrize(
+    "invalid_oracle_thresholds",
+    [
+        # confidence as numeric string
+        {"confidence": "0.95", "strata": {"missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]}, "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]}}},
+        # confidence as boolean
+        {"confidence": True, "strata": {"missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]}, "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]}}},
+        # missense precision as numeric string
+        {"confidence": 0.95, "strata": {"missense": {"precision": "0.90", "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]}, "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]}}},
+        # missense precision as boolean
+        {"confidence": 0.95, "strata": {"missense": {"precision": True, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]}, "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]}}},
+        # missense recall as numeric string
+        {"confidence": 0.95, "strata": {"missense": {"precision": 0.90, "recall": "0.85", "gating": True, "directions": ["pathogenic", "benign"]}, "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]}}},
+        # missense recall as boolean
+        {"confidence": 0.95, "strata": {"missense": {"precision": 0.90, "recall": False, "gating": True, "directions": ["pathogenic", "benign"]}, "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]}}},
+        # truncating precision as numeric string
+        {"confidence": 0.95, "strata": {"missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]}, "truncating": {"precision": "0.95", "recall": 0.95, "gating": True, "directions": ["pathogenic"]}}},
+        # truncating precision as boolean
+        {"confidence": 0.95, "strata": {"missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]}, "truncating": {"precision": True, "recall": 0.95, "gating": True, "directions": ["pathogenic"]}}},
+        # truncating recall as numeric string
+        {"confidence": 0.95, "strata": {"missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]}, "truncating": {"precision": 0.95, "recall": "0.95", "gating": True, "directions": ["pathogenic"]}}},
+        # truncating recall as boolean
+        {"confidence": 0.95, "strata": {"missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]}, "truncating": {"precision": 0.95, "recall": False, "gating": True, "directions": ["pathogenic"]}}},
+    ]
+)
+def test_oracle_pin_drift_numeric_strings_and_booleans(invalid_oracle_thresholds):
+    """Assert that numeric strings or booleans for thresholds raise TieredReadjudicationConfigError
+    instead of being accepted or raising TypeError.
+    """
+    config = make_test_config(oracle_thresholds=invalid_oracle_thresholds)
+    run_meta = MockRunMeta()
+    m = Metrics(
+        precision=1.0, recall=1.0, concordance=1.0,
+        counts={"total": 50, "total_called": 40, "abstain": 10, "path_actual": 50, "path_called": 40, "benign_actual": 0, "benign_called": 0, "tp": 40, "tn": 0, "fp": 0, "fn": 0},
+        stratum="missense", gating=True
+    )
+    metrics = {"missense": m}
+    with pytest.raises(TieredReadjudicationConfigError):
+        decide_tiered_gate(metrics, config, run_meta, make_tiered_authorization_dict())
+
+
+def test_oracle_pin_drift_keeps_valid_numeric_types():
+    """Assert that valid int and float threshold behaviors are accepted and do not raise errors."""
+    valid_oracle_thresholds = {
+        "confidence": 0.95,
+        "strata": {
+            "missense": {
+                "precision": 0.9,  # 0.9 instead of 0.90, valid float/int comparison
+                "recall": 0.85,
+                "gating": True,
+                "directions": ["pathogenic", "benign"],
+            },
+            "truncating": {
+                "precision": 0.95,
+                "recall": 0.95,
+                "gating": True,
+                "directions": ["pathogenic"],
+            },
+        },
+    }
+    config = make_test_config(oracle_thresholds=valid_oracle_thresholds)
+    run_meta = MockRunMeta()
+    m = Metrics(
+        precision=1.0, recall=1.0, concordance=1.0,
+        counts={"total": 50, "total_called": 40, "abstain": 10, "path_actual": 50, "path_called": 40, "benign_actual": 0, "benign_called": 0, "tp": 40, "tn": 0, "fp": 0, "fn": 0},
+        stratum="missense", gating=True
+    )
+    metrics = {"missense": m}
+    decide_tiered_gate(metrics, config, run_meta, make_tiered_authorization_dict())
+
+
 def test_synthetic_full_spectrum_requires():
     """Test 9: full_spectrum authorization requires ALL three requires-scopes VALIDATED_PROSPECTIVE.
 

@@ -737,3 +737,108 @@ def test_cli_drifted_tiered_config_failure(tmp_path, monkeypatch):
         
     assert not canonical_output.exists()
     assert not canonical_manifest.exists()
+
+
+def test_cli_concurrent_publication_fail_closed(tmp_path, monkeypatch):
+    """Test concurrent-publication fail-closed behavior:
+    - canonical happy setup;
+    - simulate another process atomically creating the final output after initial preflight but before publication
+      (monkeypatch Path.replace / os.replace or os.link seam);
+    - main must raise typed InputError, preserve the competing file's sentinel bytes unchanged,
+      create no manifest, and leave no temp files.
+    - Also assert staged temp names are per-invocation unique (no shared fixed name).
+    """
+    ROOT = Path(__file__).resolve().parents[2]
+
+    canonical_source = tmp_path / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
+    canonical_config = tmp_path / "configs/eval/tsc2.yaml"
+    canonical_tiered_config = tmp_path / "configs/eval/tiered_gate_v3.yaml"
+    canonical_output = tmp_path / "data/census/tsc_tiered_readjudication_2026-07-21.json"
+    canonical_manifest = tmp_path / "data/census/tsc_tiered_readjudication_2026-07-21.sha256"
+
+    canonical_source.parent.mkdir(parents=True, exist_ok=True)
+    canonical_config.parent.mkdir(parents=True, exist_ok=True)
+
+    real_r2_path = ROOT / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
+    real_config_path = ROOT / "configs/eval/tsc2.yaml"
+    real_tiered_config_path = ROOT / "configs/eval/tiered_gate_v3.yaml"
+
+    assert real_r2_path.exists()
+    canonical_source.write_bytes(real_r2_path.read_bytes())
+    if real_config_path.exists():
+        canonical_config.write_bytes(real_config_path.read_bytes())
+    else:
+        canonical_config.write_text("{}")
+
+    if real_tiered_config_path.exists():
+        canonical_tiered_config.write_bytes(real_tiered_config_path.read_bytes())
+    else:
+        canonical_tiered_config.write_text("{}")
+
+    try:
+        import sys
+        this_mod = sys.modules[__name__]
+        import scripts.build_tiered_readjudication as cli_mod
+        monkeypatch.setattr(cli_mod, "REPO_ROOT", str(tmp_path))
+        monkeypatch.setattr(this_mod, "REPO_ROOT", str(tmp_path))
+    except ImportError:
+        import sys
+        this_mod = sys.modules[__name__]
+        monkeypatch.setattr(this_mod, "REPO_ROOT", str(tmp_path))
+
+    argv = [
+        "--source-record", str(canonical_source),
+        "--eval-config", str(canonical_config),
+        "--tiered-config", str(canonical_tiered_config),
+        "--output", str(canonical_output),
+        "--external-manifest", str(canonical_manifest),
+    ]
+
+    sentinel_bytes = b"COMPETING_PROCESS_SENTINEL_BYTES"
+
+    # We spy on all write_bytes calls to inspect staged temp file names
+    staged_paths = []
+    orig_write_bytes = Path.write_bytes
+
+    def custom_write_bytes(self, data, *args, **kwargs):
+        if ".tmp" in self.name:
+            staged_paths.append(self)
+        return orig_write_bytes(self, data, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_bytes", custom_write_bytes)
+
+    # We intercept replace to simulate atomic concurrent file creation
+    orig_replace = Path.replace
+
+    def custom_replace(self, target, *args, **kwargs):
+        # Atomic simulation: Another process writes the target file right before we try to replace/link it!
+        target.write_bytes(sentinel_bytes)
+        return orig_replace(self, target, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "replace", custom_replace)
+
+    # Assert output and manifest do not exist beforehand
+    assert not canonical_output.exists()
+    assert not canonical_manifest.exists()
+
+    # Calling main must raise typed InputError because we fail-closed on concurrent publication
+    with pytest.raises(InputError):
+        main(argv)
+
+    # Assert competing file's sentinel bytes are preserved unchanged
+    assert canonical_output.exists()
+    assert canonical_output.read_bytes() == sentinel_bytes
+
+    # Assert no manifest was created
+    assert not canonical_manifest.exists()
+
+    # Assert no temp files were left behind in the folder
+    tmp_files_left = list(canonical_output.parent.glob(".tmp-*"))
+    assert not tmp_files_left, f"Found leaked temp files: {tmp_files_left}"
+
+    # Also assert staged temp names are per-invocation unique (no shared fixed name)
+    assert len(staged_paths) >= 2, "Expected at least 2 staged write calls"
+    for path in staged_paths:
+        assert path.name != ".tmp-tsc_tiered_readjudication_2026-07-21.json"
+        assert path.name != ".tmp-tsc_tiered_readjudication_2026-07-21.sha256"
+
