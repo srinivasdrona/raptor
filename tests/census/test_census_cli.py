@@ -323,7 +323,7 @@ def test_historical_census_sha256_constant() -> None:
     """Historical source integrity must expose and require a testable module constant."""
     import raptor.census.cli as census_cli
     assert hasattr(census_cli, "HISTORICAL_CENSUS_SHA256")
-    assert census_cli.HISTORICAL_CENSUS_SHA256 == "6ad96909637118aab415ec24d7ea63992eea99df03590508a223c6742621200d"
+    assert census_cli.HISTORICAL_CENSUS_SHA256 == "389e93d5b37f686b8d5e1115e2ebbfcdee6a060417300e5ed38d46304abac6e7"
 
 
 def test_invalid_vcf_hash_fails(cli_args_dict, tmp_path: Path, monkeypatch) -> None:
