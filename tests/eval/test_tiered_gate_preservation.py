@@ -66,19 +66,28 @@ def test_v1_v2_model_classes_preserved():
             raise AssertionError(f"Deletions or modifications detected in model.py relative to BASE: {line}")
 
 
-def test_tsc2_yaml_changes_are_additive_only():
-    """Assert that configs/eval/tsc2.yaml only contains the additive tiered_authorization block relative to BASE."""
+def test_tsc2_yaml_is_byte_identical_to_base():
+    """Assert that configs/eval/tsc2.yaml is byte-identical to BASE 037701e (not additions-only)."""
+    base_commit = "037701e0ca702d3ded7d7757faca6f6a772c9bb5"
     config_path = "configs/eval/tsc2.yaml"
     res = subprocess.run(
-        ["git", "diff", "--unified=0", "037701e0ca702d3ded7d7757faca6f6a772c9bb5..HEAD", "--", config_path.replace("\\", "/")],
+        ["git", "diff", "--exit-code", base_commit + "..HEAD", "--", config_path.replace("\\", "/")],
         capture_output=True,
         text=True
     )
-    assert res.returncode == 0, f"git diff failed for {config_path}"
-    diff_output = res.stdout
-    for line in diff_output.splitlines():
-        if line.startswith("-") and not line.startswith("---"):
-            raise AssertionError(f"Deletions/modifications detected in tsc2.yaml relative to BASE: {line}")
+    assert res.returncode == 0, f"File {config_path} has been modified relative to BASE!\nDiff:\n{res.stdout}"
+
+
+def test_standalone_tiered_config_exposes_load_and_validator():
+    """Assert config module exposes load_tiered_authorization and loads the new standalone config."""
+    from raptor.eval.config import load_tiered_authorization
+    standalone_path = Path("configs/eval/tiered_gate_v3.yaml")
+    assert standalone_path.exists(), f"Expected standalone config at {standalone_path}"
+    
+    # This should load successfully and return a dict
+    tiered_auth = load_tiered_authorization(standalone_path)
+    assert isinstance(tiered_auth, dict)
+    assert tiered_auth.get("schema_version") == 3
 
 
 def test_legacy_gate_decisions_behavior():

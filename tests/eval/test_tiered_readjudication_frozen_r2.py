@@ -9,6 +9,7 @@ import hashlib
 from pathlib import Path
 import pytest
 import sys
+import yaml
 _REPO_ROOT = str(Path(__file__).resolve().parents[2])
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
@@ -45,15 +46,6 @@ except ImportError:
         pass
     def main(argv=None):
         pytest.fail("Missing planned implementation of build_tiered_readjudication.main", pytrace=False)
-
-# Dynamically add tiered_authorization support to EvalConfig if missing
-if "tiered_authorization" not in EvalConfig.__dataclass_fields__:
-    _orig_init = EvalConfig.__init__
-    def _new_init(self, *args, **kwargs):
-        tiered_auth = kwargs.pop("tiered_authorization", None)
-        _orig_init(self, *args, **kwargs)
-        object.__setattr__(self, "tiered_authorization", tiered_auth)
-    EvalConfig.__init__ = _new_init
 
 
 class MockRunMeta:
@@ -192,7 +184,7 @@ def test_frozen_r2_re_adjudication():
         )
         metrics_map[stratum_name] = m
 
-    # Construct EvalConfig with versioned tiered_authorization and actual automatable criteria list
+    # Construct EvalConfig
     config = EvalConfig(
         automatable_criteria=["PVS1", "PS1", "PM1", "PM2", "PM4", "PM5", "PP2", "BA1", "BS1", "BP1", "BP3", "BP7"],
         tavtigian_points={
@@ -207,14 +199,13 @@ def test_frozen_r2_re_adjudication():
         split={"seed": 42, "holdout_fraction": 0.3},
         oracle_thresholds=payload["thresholds"],
         labels_snapshot=payload["benchmark"]["snapshot"],
-        tiered_authorization=make_tiered_authorization_dict(),
     )
 
     # Construct RunMeta from integrity and policy
     run_meta = MockRunMeta(payload["integrity"], payload["policy"])
 
-    # 3. Call decide_tiered_gate
-    decision = decide_tiered_gate(metrics_map, config, run_meta)
+    # 3. Call decide_tiered_gate with explicit 4th argument
+    decision = decide_tiered_gate(metrics_map, config, run_meta, make_tiered_authorization_dict())
 
     # 4. Verify outcomes for ALL SIX SCOPES across ALL AXES (Section 5 outcome pins)
     
@@ -228,6 +219,14 @@ def test_frozen_r2_re_adjudication():
     assert v_mp.recall_lb is None
     assert v_mp.scope_evidence_status == "NO_CALLS"
     assert v_mp.authorization_status == "NOT_AUTHORIZED"
+    
+    # Assert exact blocked reason is present
+    assert "policy_parity=BLOCKED: PM1 evaluation_skipped applies_to missense:pathogenic" in v_mp.reasons
+    
+    # Other scopes must not contain it
+    for scope_key, other_v in decision.scopes.items():
+        if scope_key != "missense:pathogenic":
+            assert "policy_parity=BLOCKED: PM1 evaluation_skipped applies_to missense:pathogenic" not in other_v.reasons
 
     # (b) missense:benign -> UNDERPOWERED/NOT_ESTIMABLE/CLEAR/9-of-103/null/UNDERPOWERED/NOT_AUTHORIZED
     v_mb = decision.scopes["missense:benign"]
@@ -329,7 +328,7 @@ def test_frozen_r2_re_adjudication():
 def test_cli_wrong_hash_input_failure(tmp_path, monkeypatch):
     """Test the planned scripts.build_tiered_readjudication CLI contract for wrong hash input.
 
-    Monkeypatches REPO_ROOT to a temporary path, copies R2 and config to their canonical relative paths,
+    Monkeypatches REPO_ROOT to a temporary path, copies R2 and configs to their canonical relative paths,
     and asserts that a modified/wrong-hash/one-byte input causes a typed InputError,
     writing neither the output nor the external manifest.
     """
@@ -337,6 +336,7 @@ def test_cli_wrong_hash_input_failure(tmp_path, monkeypatch):
     
     canonical_source = tmp_path / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
     canonical_config = tmp_path / "configs/eval/tsc2.yaml"
+    canonical_tiered_config = tmp_path / "configs/eval/tiered_gate_v3.yaml"
     canonical_output = tmp_path / "data/census/tsc_tiered_readjudication_2026-07-21.json"
     canonical_manifest = tmp_path / "data/census/tsc_tiered_readjudication_2026-07-21.sha256"
     
@@ -345,6 +345,7 @@ def test_cli_wrong_hash_input_failure(tmp_path, monkeypatch):
     
     real_r2_path = ROOT / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
     real_config_path = ROOT / "configs/eval/tsc2.yaml"
+    real_tiered_config_path = ROOT / "configs/eval/tiered_gate_v3.yaml"
     
     assert real_r2_path.exists(), f"Could not find R2 record at {real_r2_path}"
     canonical_source.write_bytes(real_r2_path.read_bytes())
@@ -361,6 +362,11 @@ def test_cli_wrong_hash_input_failure(tmp_path, monkeypatch):
         canonical_config.write_bytes(real_config_path.read_bytes())
     else:
         canonical_config.write_text("{}")
+        
+    if real_tiered_config_path.exists():
+        canonical_tiered_config.write_bytes(real_tiered_config_path.read_bytes())
+    else:
+        canonical_tiered_config.write_text("{}")
         
     # Ensure neither output nor manifest pre-exists
     assert not canonical_output.exists()
@@ -380,6 +386,7 @@ def test_cli_wrong_hash_input_failure(tmp_path, monkeypatch):
     argv = [
         "--source-record", str(canonical_source),
         "--eval-config", str(canonical_config),
+        "--tiered-config", str(canonical_tiered_config),
         "--output", str(canonical_output),
         "--external-manifest", str(canonical_manifest),
     ]
@@ -398,6 +405,7 @@ def test_cli_happy_path(tmp_path, monkeypatch):
     
     canonical_source = tmp_path / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
     canonical_config = tmp_path / "configs/eval/tsc2.yaml"
+    canonical_tiered_config = tmp_path / "configs/eval/tiered_gate_v3.yaml"
     canonical_output = tmp_path / "data/census/tsc_tiered_readjudication_2026-07-21.json"
     canonical_manifest = tmp_path / "data/census/tsc_tiered_readjudication_2026-07-21.sha256"
     
@@ -406,6 +414,7 @@ def test_cli_happy_path(tmp_path, monkeypatch):
     
     real_r2_path = ROOT / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
     real_config_path = ROOT / "configs/eval/tsc2.yaml"
+    real_tiered_config_path = ROOT / "configs/eval/tiered_gate_v3.yaml"
     
     assert real_r2_path.exists(), f"Could not find R2 record at {real_r2_path}"
     canonical_source.write_bytes(real_r2_path.read_bytes())
@@ -414,6 +423,11 @@ def test_cli_happy_path(tmp_path, monkeypatch):
         canonical_config.write_bytes(real_config_path.read_bytes())
     else:
         canonical_config.write_text("{}")
+        
+    if real_tiered_config_path.exists():
+        canonical_tiered_config.write_bytes(real_tiered_config_path.read_bytes())
+    else:
+        canonical_tiered_config.write_text("{}")
         
     # Ensure neither output nor manifest pre-exists
     assert not canonical_output.exists()
@@ -433,6 +447,7 @@ def test_cli_happy_path(tmp_path, monkeypatch):
     argv = [
         "--source-record", str(canonical_source),
         "--eval-config", str(canonical_config),
+        "--tiered-config", str(canonical_tiered_config),
         "--output", str(canonical_output),
         "--external-manifest", str(canonical_manifest),
     ]
@@ -461,7 +476,6 @@ def test_cli_happy_path(tmp_path, monkeypatch):
     assert canonical_output.name in manifest_text
 
     # Finding 2: Canonical provenance/hash schema assertions
-    # 1. schema, date, post_hoc fields
     assert output_data.get("schema") == "raptor.tsc.tiered_readjudication.v3"
     assert output_data.get("date") == "2026-07-21"
     assert output_data.get("post_hoc") is True
@@ -471,15 +485,16 @@ def test_cli_happy_path(tmp_path, monkeypatch):
     assert "new_tiered_outcome" in output_data
     assert isinstance(output_data["old_semantic_outcome"], dict)
     assert isinstance(output_data["new_tiered_outcome"], dict)
-    # Old semantic outcome checks:
     assert output_data["old_semantic_outcome"].get("legacy_v1_missense_gate") == "FAIL"
     assert output_data["old_semantic_outcome"].get("full_spectrum_status") == "BLOCKED_POLICY"
     assert output_data["old_semantic_outcome"].get("vus_authorized") is False
 
     # 3. tiered_config_canonical_sha256 equals SHA-256 of loaded config's block (compact JSON, sort_keys=True)
-    from raptor.eval.config import load_config
-    loaded_cfg = load_config(real_config_path)
-    compact_auth = json.dumps(loaded_cfg.tiered_authorization, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    if real_tiered_config_path.exists():
+        loaded_block = yaml.safe_load(real_tiered_config_path.read_text(encoding="utf-8"))
+    else:
+        loaded_block = {}
+    compact_auth = json.dumps(loaded_block, sort_keys=True, separators=(",", ":")).encode("utf-8")
     expected_config_sha = hashlib.sha256(compact_auth).hexdigest()
     assert output_data.get("tiered_config_canonical_sha256") == expected_config_sha
 
@@ -522,6 +537,7 @@ def test_cli_partial_write_cleanup(tmp_path, monkeypatch):
 
     canonical_source = tmp_path / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
     canonical_config = tmp_path / "configs/eval/tsc2.yaml"
+    canonical_tiered_config = tmp_path / "configs/eval/tiered_gate_v3.yaml"
     canonical_output = tmp_path / "data/census/tsc_tiered_readjudication_2026-07-21.json"
     canonical_manifest = tmp_path / "data/census/tsc_tiered_readjudication_2026-07-21.sha256"
 
@@ -530,6 +546,7 @@ def test_cli_partial_write_cleanup(tmp_path, monkeypatch):
 
     real_r2_path = ROOT / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
     real_config_path = ROOT / "configs/eval/tsc2.yaml"
+    real_tiered_config_path = ROOT / "configs/eval/tiered_gate_v3.yaml"
 
     assert real_r2_path.exists()
     canonical_source.write_bytes(real_r2_path.read_bytes())
@@ -537,6 +554,11 @@ def test_cli_partial_write_cleanup(tmp_path, monkeypatch):
         canonical_config.write_bytes(real_config_path.read_bytes())
     else:
         canonical_config.write_text("{}")
+
+    if real_tiered_config_path.exists():
+        canonical_tiered_config.write_bytes(real_tiered_config_path.read_bytes())
+    else:
+        canonical_tiered_config.write_text("{}")
 
     try:
         import sys
@@ -552,6 +574,7 @@ def test_cli_partial_write_cleanup(tmp_path, monkeypatch):
     argv = [
         "--source-record", str(canonical_source),
         "--eval-config", str(canonical_config),
+        "--tiered-config", str(canonical_tiered_config),
         "--output", str(canonical_output),
         "--external-manifest", str(canonical_manifest),
     ]
@@ -584,6 +607,7 @@ def test_cli_post_write_reverify_failure(tmp_path, monkeypatch):
 
     canonical_source = tmp_path / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
     canonical_config = tmp_path / "configs/eval/tsc2.yaml"
+    canonical_tiered_config = tmp_path / "configs/eval/tiered_gate_v3.yaml"
     canonical_output = tmp_path / "data/census/tsc_tiered_readjudication_2026-07-21.json"
     canonical_manifest = tmp_path / "data/census/tsc_tiered_readjudication_2026-07-21.sha256"
 
@@ -592,6 +616,7 @@ def test_cli_post_write_reverify_failure(tmp_path, monkeypatch):
 
     real_r2_path = ROOT / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
     real_config_path = ROOT / "configs/eval/tsc2.yaml"
+    real_tiered_config_path = ROOT / "configs/eval/tiered_gate_v3.yaml"
 
     assert real_r2_path.exists()
     canonical_source.write_bytes(real_r2_path.read_bytes())
@@ -599,6 +624,11 @@ def test_cli_post_write_reverify_failure(tmp_path, monkeypatch):
         canonical_config.write_bytes(real_config_path.read_bytes())
     else:
         canonical_config.write_text("{}")
+
+    if real_tiered_config_path.exists():
+        canonical_tiered_config.write_bytes(real_tiered_config_path.read_bytes())
+    else:
+        canonical_tiered_config.write_text("{}")
 
     try:
         import sys
@@ -614,6 +644,7 @@ def test_cli_post_write_reverify_failure(tmp_path, monkeypatch):
     argv = [
         "--source-record", str(canonical_source),
         "--eval-config", str(canonical_config),
+        "--tiered-config", str(canonical_tiered_config),
         "--output", str(canonical_output),
         "--external-manifest", str(canonical_manifest),
     ]
@@ -636,5 +667,66 @@ def test_cli_post_write_reverify_failure(tmp_path, monkeypatch):
 
     # On the current implementation, this assertion will FAIL because canonical_output and canonical_manifest
     # were written but not deleted when the InputError was raised! This is a RED regression.
+    assert not canonical_output.exists()
+    assert not canonical_manifest.exists()
+
+
+def test_cli_drifted_tiered_config_failure(tmp_path, monkeypatch):
+    """Assert that passing an alternate/drifted tiered config path, hash, or schema fails with no output/artifact."""
+    ROOT = Path(__file__).resolve().parents[2]
+    
+    canonical_source = tmp_path / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
+    canonical_config = tmp_path / "configs/eval/tsc2.yaml"
+    canonical_tiered_config = tmp_path / "configs/eval/tiered_gate_v3.yaml"
+    canonical_output = tmp_path / "data/census/tsc_tiered_readjudication_2026-07-21.json"
+    canonical_manifest = tmp_path / "data/census/tsc_tiered_readjudication_2026-07-21.sha256"
+    
+    canonical_source.parent.mkdir(parents=True, exist_ok=True)
+    canonical_config.parent.mkdir(parents=True, exist_ok=True)
+    
+    real_r2_path = ROOT / "data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json"
+    real_config_path = ROOT / "configs/eval/tsc2.yaml"
+    real_tiered_config_path = ROOT / "configs/eval/tiered_gate_v3.yaml"
+    
+    assert real_r2_path.exists()
+    canonical_source.write_bytes(real_r2_path.read_bytes())
+    if real_config_path.exists():
+        canonical_config.write_bytes(real_config_path.read_bytes())
+    else:
+        canonical_config.write_text("{}")
+        
+    # Write a DRIFTED/alternate tiered config to canonical_tiered_config
+    if real_tiered_config_path.exists():
+        data = yaml.safe_load(real_tiered_config_path.read_text(encoding="utf-8"))
+        data["full_spectrum"]["requires"] = ["truncating:pathogenic"]  # Drifted requires
+        canonical_tiered_config.write_text(yaml.safe_dump(data), encoding="utf-8")
+    else:
+        canonical_tiered_config.write_text("schema_version: 3\nfull_spectrum:\n  requires: []")
+        
+    assert not canonical_output.exists()
+    assert not canonical_manifest.exists()
+    
+    try:
+        import sys
+        this_mod = sys.modules[__name__]
+        import scripts.build_tiered_readjudication as cli_mod
+        monkeypatch.setattr(cli_mod, "REPO_ROOT", str(tmp_path))
+        monkeypatch.setattr(this_mod, "REPO_ROOT", str(tmp_path))
+    except ImportError:
+        import sys
+        this_mod = sys.modules[__name__]
+        monkeypatch.setattr(this_mod, "REPO_ROOT", str(tmp_path))
+        
+    argv = [
+        "--source-record", str(canonical_source),
+        "--eval-config", str(canonical_config),
+        "--tiered-config", str(canonical_tiered_config),
+        "--output", str(canonical_output),
+        "--external-manifest", str(canonical_manifest),
+    ]
+    
+    with pytest.raises(Exception):
+        main(argv)
+        
     assert not canonical_output.exists()
     assert not canonical_manifest.exists()

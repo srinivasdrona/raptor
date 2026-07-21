@@ -7,7 +7,9 @@ Verified and preserved under GPT-5.4 regressions audit on 2026-07-22.
 """
 from __future__ import annotations
 
+from pathlib import Path
 import pytest
+import yaml
 from raptor.eval.config import EvalConfig
 try:
     from raptor.eval.tiered_gate import (
@@ -22,15 +24,6 @@ except ImportError:
 
     def decide_tiered_gate(*args, **kwargs):
         pytest.fail("Missing planned implementation of decide_tiered_gate", pytrace=False)
-
-# Dynamically add tiered_authorization support to EvalConfig if missing
-if "tiered_authorization" not in EvalConfig.__dataclass_fields__:
-    _orig_init = EvalConfig.__init__
-    def _new_init(self, *args, **kwargs):
-        tiered_auth = kwargs.pop("tiered_authorization", None)
-        _orig_init(self, *args, **kwargs)
-        object.__setattr__(self, "tiered_authorization", tiered_auth)
-    EvalConfig.__init__ = _new_init
 
 
 def make_tiered_authorization_dict():
@@ -118,7 +111,7 @@ def make_tiered_authorization_dict():
 
 
 def make_test_config(**overrides) -> EvalConfig:
-    """Build a frozen EvalConfig containing the new tiered_authorization block."""
+    """Build a frozen EvalConfig."""
     base = dict(
         automatable_criteria=["PVS1", "PS1", "PM1", "PM2", "PM4", "PM5", "PP2", "BA1", "BS1", "BP1", "BP3", "BP7"],
         tavtigian_points={
@@ -149,24 +142,29 @@ def make_test_config(**overrides) -> EvalConfig:
             },
         },
         labels_snapshot="clinvar_2026-07-07",
-        tiered_authorization=make_tiered_authorization_dict(),
     )
     base.update(overrides)
     return EvalConfig(**base)
 
 
 def test_prospective_contract_exists_and_pending():
-    """Assert that the locked prospective contract exists and has PENDING status."""
-    config = make_test_config()
-    tiered_auth = config.tiered_authorization
+    """Assert that the standalone prospective contract exists, loads, and has PENDING status."""
+    from raptor.eval.config import load_tiered_authorization
+    standalone_path = Path("configs/eval/tiered_gate_v3.yaml")
+    assert standalone_path.exists(), f"Missing required standalone config file at {standalone_path}"
+    
+    tiered_auth = load_tiered_authorization(standalone_path)
     assert tiered_auth is not None
     assert tiered_auth["prospective_validation"]["status"] == "PENDING"
 
 
 def test_prospective_rule_is_deterministic_and_singular():
     """Assert that the dataset rule is deterministic, singular, and specifies variant_summary_2026-08.txt.gz."""
-    config = make_test_config()
-    tiered_auth = config.tiered_authorization
+    from raptor.eval.config import load_tiered_authorization
+    standalone_path = Path("configs/eval/tiered_gate_v3.yaml")
+    assert standalone_path.exists()
+    
+    tiered_auth = load_tiered_authorization(standalone_path)
     assert tiered_auth["prospective_validation"]["status"] == "PENDING"
     
     rule = tiered_auth["prospective_validation"]["dataset_rule"]
@@ -199,7 +197,6 @@ def test_prospective_rule_is_deterministic_and_singular():
 def test_contract_edits_rejected_post_lock():
     """Assert that any modification to states, thresholds, scope map, or dataset-rule is rejected post-lock."""
     # 1. Modifying a threshold
-    bad_tiered_auth = make_tiered_authorization_dict()
     bad_config_threshold = make_test_config(min_count_per_class=35)
     
     from raptor.eval.model import Metrics
@@ -224,18 +221,18 @@ def test_contract_edits_rejected_post_lock():
     run_meta = SimpleRunMeta()
 
     with pytest.raises(TieredReadjudicationConfigError):
-        decide_tiered_gate(metrics, bad_config_threshold, run_meta)
+        decide_tiered_gate(metrics, bad_config_threshold, run_meta, make_tiered_authorization_dict())
 
     # 2. Modifying the scope map
     bad_tiered_auth_map = make_tiered_authorization_dict()
     bad_tiered_auth_map["criterion_scope_applicability"]["PM1"] = ["missense:pathogenic", "truncating:pathogenic"]
-    bad_config_map = make_test_config(tiered_authorization=bad_tiered_auth_map)
+    bad_config_map = make_test_config()
     with pytest.raises(TieredReadjudicationConfigError):
-        decide_tiered_gate(metrics, bad_config_map, run_meta)
+        decide_tiered_gate(metrics, bad_config_map, run_meta, bad_tiered_auth_map)
 
     # 3. Modifying the dataset rule
     bad_tiered_auth_rule = make_tiered_authorization_dict()
     bad_tiered_auth_rule["prospective_validation"]["dataset_rule"]["registered_dataset"] = "Some other dataset OR variant_summary_2026-08"
-    bad_config_rule = make_test_config(tiered_authorization=bad_tiered_auth_rule)
+    bad_config_rule = make_test_config()
     with pytest.raises(TieredReadjudicationConfigError):
-        decide_tiered_gate(metrics, bad_config_rule, run_meta)
+        decide_tiered_gate(metrics, bad_config_rule, run_meta, bad_tiered_auth_rule)

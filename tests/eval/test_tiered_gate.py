@@ -34,15 +34,6 @@ except ImportError:
     class TieredGateDecision:
         pass
 
-# Dynamically add tiered_authorization support to EvalConfig if missing
-if "tiered_authorization" not in EvalConfig.__dataclass_fields__:
-    _orig_init = EvalConfig.__init__
-    def _new_init(self, *args, **kwargs):
-        tiered_auth = kwargs.pop("tiered_authorization", None)
-        _orig_init(self, *args, **kwargs)
-        object.__setattr__(self, "tiered_authorization", tiered_auth)
-    EvalConfig.__init__ = _new_init
-
 
 class MockRunMeta:
     """Mock whole-run integrity metadata for A0_run_integrity testing."""
@@ -148,7 +139,7 @@ def make_tiered_authorization_dict():
 
 
 def make_test_config(**overrides) -> EvalConfig:
-    """Build a frozen EvalConfig containing the new tiered_authorization block."""
+    """Build a frozen EvalConfig."""
     base = dict(
         automatable_criteria=["PVS1", "PS1", "PM1", "PM2", "PM4", "PM5", "PP2", "BA1", "BS1", "BP1", "BP3", "BP7"],
         tavtigian_points={
@@ -179,7 +170,6 @@ def make_test_config(**overrides) -> EvalConfig:
             },
         },
         labels_snapshot="clinvar_2026-07-07",
-        tiered_authorization=make_tiered_authorization_dict(),
     )
     base.update(overrides)
     return EvalConfig(**base)
@@ -203,7 +193,7 @@ def test_synthetic_no_calls():
     m_missense.recall_lb = 0.0
 
     metrics = {"missense": m_missense}
-    decision = decide_tiered_gate(metrics, config, run_meta)
+    decision = decide_tiered_gate(metrics, config, run_meta, make_tiered_authorization_dict())
 
     verdict = decision.scopes["missense:pathogenic"]
     assert verdict.data_sufficiency == "NO_CALLS"
@@ -236,7 +226,7 @@ def test_synthetic_underpowered():
     m_missense.benign_recall_lb = 0.6637
 
     metrics = {"missense": m_missense}
-    decision = decide_tiered_gate(metrics, config, run_meta)
+    decision = decide_tiered_gate(metrics, config, run_meta, make_tiered_authorization_dict())
 
     verdict = decision.scopes["missense:benign"]
     assert verdict.data_sufficiency == "UNDERPOWERED"
@@ -263,7 +253,7 @@ def test_synthetic_adequate_met():
     m_truncating.recall_lb = 0.9806
 
     metrics = {"truncating": m_truncating}
-    decision = decide_tiered_gate(metrics, config, run_meta)
+    decision = decide_tiered_gate(metrics, config, run_meta, make_tiered_authorization_dict())
 
     verdict = decision.scopes["truncating:pathogenic"]
     assert verdict.data_sufficiency == "ADEQUATE"
@@ -293,7 +283,7 @@ def test_synthetic_adequate_unmet():
     m_truncating.recall_lb = 0.88
 
     metrics = {"truncating": m_truncating}
-    decision = decide_tiered_gate(metrics, config, run_meta)
+    decision = decide_tiered_gate(metrics, config, run_meta, make_tiered_authorization_dict())
 
     verdict = decision.scopes["truncating:pathogenic"]
     assert verdict.data_sufficiency == "ADEQUATE"
@@ -320,7 +310,7 @@ def test_synthetic_no_threshold():
     m_other.recall_lb = 0.9593
 
     metrics = {"other": m_other}
-    decision = decide_tiered_gate(metrics, config, run_meta)
+    decision = decide_tiered_gate(metrics, config, run_meta, make_tiered_authorization_dict())
 
     verdict = decision.scopes["other:pathogenic"]
     assert verdict.data_sufficiency == "ADEQUATE"
@@ -334,7 +324,9 @@ def test_synthetic_no_threshold():
 def test_synthetic_pm1_excluded_blocking():
     """Test 6: PM1 excluded -> BLOCKS only missense:pathogenic.
 
-    Asserts that truncating:pathogenic and every benign scope stay CLEAR (global-blocker leakage guard).
+    Asserts that truncating:pathogenic and every benign scope stay CLEAR (global-blocker leakage guard),
+    and asserts the exact reason "policy_parity=BLOCKED: PM1 evaluation_skipped applies_to missense:pathogenic"
+    is present.
     """
     config = make_test_config()
     # PM1 is skipped/excluded
@@ -365,13 +357,21 @@ def test_synthetic_pm1_excluded_blocking():
     m_truncating.recall_lb = 0.9806
 
     metrics = {"missense": m_missense, "truncating": m_truncating}
-    decision = decide_tiered_gate(metrics, config, run_meta)
+    decision = decide_tiered_gate(metrics, config, run_meta, make_tiered_authorization_dict())
 
     # missense:pathogenic is blocked by PM1
     assert decision.scopes["missense:pathogenic"].policy_parity == "BLOCKED"
     
+    # Assert exact reason is present
+    assert "policy_parity=BLOCKED: PM1 evaluation_skipped applies_to missense:pathogenic" in decision.scopes["missense:pathogenic"].reasons
+    
     # truncating:pathogenic and benign scopes stay CLEAR
     assert decision.scopes["truncating:pathogenic"].policy_parity == "CLEAR"
+
+    # Other scopes must not contain it
+    for scope_key, other_v in decision.scopes.items():
+        if scope_key != "missense:pathogenic":
+            assert "policy_parity=BLOCKED: PM1 evaluation_skipped applies_to missense:pathogenic" not in other_v.reasons
 
 
 def test_synthetic_correct_call_coverage():
@@ -395,7 +395,7 @@ def test_synthetic_correct_call_coverage():
     m_other.recall_lb = 0.9593
 
     metrics = {"other": m_other}
-    decision = decide_tiered_gate(metrics, config, run_meta)
+    decision = decide_tiered_gate(metrics, config, run_meta, make_tiered_authorization_dict())
 
     verdict = decision.scopes["other:benign"]
     assert verdict.end_to_end_correct_call_coverage == "112/2095"
@@ -413,7 +413,6 @@ def test_synthetic_typed_fail_closed_errors():
     - non-int/bool/negative counts
     - unknown excluded criterion
     - criterion-map applies_to drift
-    - config drift
     """
     config = make_test_config()
 
@@ -430,7 +429,7 @@ def test_synthetic_typed_fail_closed_errors():
     metrics_bad = {"missense": m_bad}
     run_meta = MockRunMeta()
     with pytest.raises(TieredReadjudicationInputError):
-        decide_tiered_gate(metrics_bad, config, run_meta)
+        decide_tiered_gate(metrics_bad, config, run_meta, make_tiered_authorization_dict())
 
     # Case B: Unknown skipped criterion (not in criterion_scope_applicability map)
     run_meta_unknown = MockRunMeta(evaluation_skipped=["UNKNOWN_CRITERION"])
@@ -445,14 +444,53 @@ def test_synthetic_typed_fail_closed_errors():
     )
     metrics_normal = {"missense": m_normal}
     with pytest.raises(TieredReadjudicationConfigError):
-        decide_tiered_gate(metrics_normal, config, run_meta_unknown)
+        decide_tiered_gate(metrics_normal, config, run_meta_unknown, make_tiered_authorization_dict())
 
     # Case C: Config drift in criterion_scope_applicability mapping
     bad_applicability = make_tiered_authorization_dict()
     bad_applicability["criterion_scope_applicability"]["PM1"] = ["missense:pathogenic", "truncating:pathogenic"]
-    config_drift = make_test_config(tiered_authorization=bad_applicability)
     with pytest.raises(TieredReadjudicationConfigError):
-        decide_tiered_gate(metrics_normal, config_drift, run_meta)
+        decide_tiered_gate(metrics_normal, config, run_meta, bad_applicability)
+
+
+@pytest.mark.parametrize(
+    "override_config_kwargs",
+    [
+        # drift in confidence
+        {"oracle_thresholds": {"confidence": 0.90, "strata": {"missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]}, "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]}}}},
+        # drift in missense precision
+        {"oracle_thresholds": {"confidence": 0.95, "strata": {"missense": {"precision": 0.89, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]}, "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]}}}},
+        # drift in missense recall
+        {"oracle_thresholds": {"confidence": 0.95, "strata": {"missense": {"precision": 0.90, "recall": 0.84, "gating": True, "directions": ["pathogenic", "benign"]}, "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]}}}},
+        # drift in missense directions
+        {"oracle_thresholds": {"confidence": 0.95, "strata": {"missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic"]}, "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]}}}},
+        # drift in missense gating
+        {"oracle_thresholds": {"confidence": 0.95, "strata": {"missense": {"precision": 0.90, "recall": 0.85, "gating": False, "directions": ["pathogenic", "benign"]}, "truncating": {"precision": 0.95, "recall": 0.95, "gating": True, "directions": ["pathogenic"]}}}},
+        # drift in truncating precision
+        {"oracle_thresholds": {"confidence": 0.95, "strata": {"missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]}, "truncating": {"precision": 0.90, "recall": 0.95, "gating": True, "directions": ["pathogenic"]}}}},
+        # drift in truncating recall
+        {"oracle_thresholds": {"confidence": 0.95, "strata": {"missense": {"precision": 0.90, "recall": 0.85, "gating": True, "directions": ["pathogenic", "benign"]}, "truncating": {"precision": 0.95, "recall": 0.90, "gating": True, "directions": ["pathogenic"]}}}},
+        # drift in min_count_per_class (below pre-registered floor)
+        {"min_count_per_class": 35},
+        # drift in min_count_per_class (above pre-registered floor)
+        {"min_count_per_class": 37},
+    ]
+)
+def test_oracle_pin_drift_raises_config_error(override_config_kwargs):
+    """Assert that hand-built EvalConfig drift in confidence, thresholds, directions, gating, or min_count
+    raises TieredReadjudicationConfigError before decision despite an otherwise valid tiered block.
+    """
+    config = make_test_config(**override_config_kwargs)
+    run_meta = MockRunMeta()
+    m = Metrics(
+        precision=1.0, recall=1.0, concordance=1.0,
+        counts={"total": 50, "total_called": 40, "abstain": 10, "path_actual": 50, "path_called": 40, "benign_actual": 0, "benign_called": 0, "tp": 40, "tn": 0, "fp": 0, "fn": 0},
+        stratum="missense", gating=True
+    )
+    metrics = {"missense": m}
+    
+    with pytest.raises(TieredReadjudicationConfigError):
+        decide_tiered_gate(metrics, config, run_meta, make_tiered_authorization_dict())
 
 
 def test_synthetic_full_spectrum_requires():
@@ -489,7 +527,7 @@ def test_synthetic_full_spectrum_requires():
     m_missense_under.benign_recall_lb = 0.6637
 
     metrics = {"truncating": m_truncating, "missense": m_missense_under}
-    decision = decide_tiered_gate(metrics, config, run_meta)
+    decision = decide_tiered_gate(metrics, config, run_meta, make_tiered_authorization_dict())
 
     assert decision.full_spectrum_status == "NOT_VALIDATED"
     assert decision.full_spectrum_authorization == "NOT_AUTHORIZED"
@@ -497,9 +535,8 @@ def test_synthetic_full_spectrum_requires():
     # 2. Config drift error when dropping a required scope
     bad_spectrum = make_tiered_authorization_dict()
     bad_spectrum["full_spectrum"]["requires"] = ["truncating:pathogenic"]
-    config_drift = make_test_config(tiered_authorization=bad_spectrum)
     with pytest.raises(TieredReadjudicationConfigError):
-        decide_tiered_gate(metrics, config_drift, run_meta)
+        decide_tiered_gate(metrics, config, run_meta, bad_spectrum)
 
 
 def test_synthetic_invalid_run_integrity():
@@ -524,7 +561,7 @@ def test_synthetic_invalid_run_integrity():
     m_truncating.recall_lb = 0.9806
 
     metrics = {"truncating": m_truncating}
-    decision = decide_tiered_gate(metrics, config, run_meta_invalid)
+    decision = decide_tiered_gate(metrics, config, run_meta_invalid, make_tiered_authorization_dict())
 
     assert decision.run_integrity == "INVALID"
     for scope_key, verdict in decision.scopes.items():
@@ -555,7 +592,7 @@ def test_synthetic_post_hoc_never_authorizes():
     m_truncating.recall_lb = 0.9806
 
     metrics = {"truncating": m_truncating}
-    decision = decide_tiered_gate(metrics, config, run_meta)
+    decision = decide_tiered_gate(metrics, config, run_meta, make_tiered_authorization_dict())
 
     # Research scope should be SUPPORTED_POSTHOC but authorization remains PENDING_PROSPECTIVE
     assert decision.research_scope_evidence_status == "SUPPORTED_POSTHOC"
@@ -614,4 +651,4 @@ def test_synthetic_missing_counts_fail_closed(missing_key):
     metrics_bad = {"missense": m_bad}
 
     with pytest.raises(TieredReadjudicationInputError):
-        decide_tiered_gate(metrics_bad, config, run_meta)
+        decide_tiered_gate(metrics_bad, config, run_meta, make_tiered_authorization_dict())
