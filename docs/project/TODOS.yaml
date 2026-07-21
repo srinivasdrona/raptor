@@ -156,6 +156,26 @@ todos:
   status: pending
   depends_on: []
   created: '2026-07-21'
+- id: revise-tiered-gate-semantics
+  title: Revising tiered gate semantics
+  description: Completed additive ADR-0013 v3 post-hoc re-adjudication without rerunning
+    evidence. Full spectrum remains not validated/not authorized; truncating-pathogenic is
+    SUPPORTED_POSTHOC with PENDING_PROSPECTIVE authorization. Artifact SHA-256
+    1e36b2d07767fdd8e32fbf07dd42f60a2b4cae2ff9b21c7dfb9430d741c5bc5f.
+  status: done
+  depends_on:
+  - rerun-masked-gate
+  created: '2026-07-22'
+- id: validate-tiered-gate-prospectively
+  title: Validating tiered gate prospectively
+  description: Freeze and evaluate the first NCBI ClinVar GRCh38 variant_summary monthly
+    archive dated on or after 2026-08-01 under the locked ADR-0013 axes, thresholds, scope
+    lattice and criterion map. Freeze URL/date/MD5/SHA-256 before labels or scoring; if
+    unavailable or invalid, record BLOCKED_DATA with no outcome-dependent fallback.
+  status: pending
+  depends_on:
+  - revise-tiered-gate-semantics
+  created: '2026-07-22'
 - id: reconcile-strength-policy
   title: Reconciling criterion strength policy
   description: For BP4, PM2, PM4, PS1, BP3, and PM5, trace BIAS behavior, current ClinGen

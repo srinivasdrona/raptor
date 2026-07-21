@@ -9,6 +9,7 @@
 
 | ID | Title | Status | Date |
 |----|-------|--------|------|
+| [ADR-0013](#adr-0013--tiered-gate-v3-post-hoc-re-adjudication-and-prospective-validation-lock) | Tiered gate v3: post-hoc re-adjudication and prospective validation lock | Accepted | 2026-07-22 |
 | [ADR-0012](#adr-0012--pp3bp4-automated-emission-disabled-for-the-current-masked-rerun) | PP3/BP4 automated emission disabled for the current masked rerun | Accepted | 2026-07-21 |
 | [ADR-0011](#adr-0011--scope-specific-research-authorization-gate-v2-truncating-pathogenic-research-scope-preregistered-separately-from-full-spectrum-vus) | Scope-specific research authorization gate (v2): truncating-pathogenic research scope preregistered separately from full-spectrum VUS | Accepted | 2026-07-14 |
 | [ADR-0010](#adr-0010--generic-platform-uniqueness-premise-falsified-vertical-tscmtor-research-evidence-strategy) | Generic-platform uniqueness premise falsified; vertical TSC/mTOR research-evidence strategy | Accepted | 2026-07-10 |
@@ -21,6 +22,75 @@
 | [ADR-0003](#adr-0003--loop-operating-model-planner--doer--checker-across-three-model-families) | Loop operating model: planner / doer / checker across three model families | Accepted | 2026-07-08 |
 | [ADR-0002](#adr-0002--vision--strategy-doc-format-pichler-vision-board--rumelt-kernel) | Vision & strategy doc format: Pichler Vision Board + Rumelt Kernel | Accepted | 2026-07-08 |
 | [ADR-0001](#adr-0001--strategic-framing-narrow-buildable-claim-with-broad-north-star) | Strategic framing: narrow-buildable claim with broad north-star | Accepted | 2026-07-08 |
+
+---
+
+## ADR-0013 — Tiered gate v3 post-hoc re-adjudication and prospective validation lock
+
+- **Status:** Accepted
+- **Date:** 2026-07-22
+- **Deciders:** @dronasrinivas (operator, acting domain owner)
+- **Track:** `track/tiered-gate-v3-2026-07`
+- **Supersedes:** v2's overloaded interpretation for future reporting; v1/v2 code and frozen artifacts remain immutable.
+
+### Context
+
+R2 completed successfully under ADR-0012, but the v1/v2 summaries conflated
+insufficient called data, conditional performance and policy exclusions. Missense
+pathogenic had 51 actual examples but zero calls; missense benign had 103 actual
+examples but only nine calls, all correct. Calling both scopes simply `FAIL`
+overstated what could be estimated. The global PM1 exclusion also blocked the
+unrelated truncating-pathogenic scope despite that scope clearing its registered
+0.95/0.95 thresholds at adequate coverage.
+
+Rerunning unchanged scoring on the same data would add no evidence and would not
+remove post-hoc bias. R2 must remain unchanged while any corrected interpretation
+is explicitly versioned and labeled post-hoc.
+
+### Considered options
+
+1. Preserve the coarse v2 interpretation and continue. Rejected because it hides
+   data insufficiency and leaks a missense criterion blocker into truncating.
+2. Rerun identical scoring and issue a different decision. Rejected because
+   identical inputs and scoring produce no new information.
+3. Add an independent tiered v3 re-adjudication over frozen aggregate counts,
+   with prospective authorization locked to unseen data.
+
+### Decision
+
+Adopt **option 3**. Tiered gate v3 reports independent axes for run integrity,
+data sufficiency, conditional performance, policy parity, correct-call coverage,
+scope evidence and authorization. Undefined conditional metrics remain null;
+they are never coerced to zero.
+
+PM1 applies only to `missense:pathogenic`. The frozen R2 interpretation becomes:
+
+- missense pathogenic: `NO_CALLS` / `NOT_ESTIMABLE`, PM1 blocked;
+- missense benign: `UNDERPOWERED` / `NOT_ESTIMABLE`;
+- truncating pathogenic: `ADEQUATE` + `MET`, evidence `SUPPORTED_POSTHOC`;
+- full spectrum: `NOT_VALIDATED` and `NOT_AUTHORIZED`;
+- truncating-pathogenic authorization: `PENDING_PROSPECTIVE`;
+- canonical research-scope validated flag remains false.
+
+This is a post-hoc semantic correction only. It generates no evidence and
+authorizes no clinical classification, VUS worklist, ClinVar submission or
+research scope.
+
+Prospective validation is locked to the first NCBI ClinVar GRCh38
+`variant_summary` monthly archive dated on or after 2026-08-01. Its URL,
+official date, MD5 and SHA-256 must be frozen before labels or scoring. If that
+archive is unavailable or invalid, status is `BLOCKED_DATA`; no
+outcome-dependent substitute is allowed.
+
+### Consequences
+
+- R2 and all v1/v2 code and records remain byte-identical.
+- `data/census/tsc_tiered_readjudication_2026-07-21.json` is the versioned
+  post-hoc interpretation; its prospective status is `PENDING`.
+- Truncating-pathogenic evidence is described more accurately but is not
+  authorized until a future unseen-data run and new owner decision.
+- Packet generation may continue as non-authoritative review preparation; it
+  cannot cite v3 as prospective validation.
 
 ---
 

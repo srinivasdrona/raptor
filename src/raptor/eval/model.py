@@ -187,3 +187,87 @@ class ScopeGateDecision:
     #: are withheld, and the reason is surfaced explicitly here instead of
     #: silently.
     authorization_blockers: list = field(default_factory=list)
+
+
+@dataclass
+class TieredScopeVerdict:
+    """v3 tiered post-hoc re-adjudication -- one `(stratum, direction)` scope
+    verdict (ADDITIVE, `docs/project/specs/tiered-gate-v3-posthoc.yaml`).
+
+    Six independent per-scope axes (`data_sufficiency`, `conditional_performance`,
+    `policy_parity`, plus the summary `scope_evidence_status`/`authorization_status`)
+    are ALWAYS emitted -- never a single overloaded status. `precision_lb`/
+    `recall_lb`/`precision_threshold`/`recall_threshold` are `None` (never a
+    fabricated `0.0`) whenever no threshold is registered for this scope OR the
+    scope is not `data_sufficiency == "ADEQUATE"`. `tp`/`tn`/`fp`/`fn` are the
+    RAW shared per-stratum confusion-matrix counts (identical on both the
+    pathogenic and benign scope of the same stratum) -- `end_to_end_correct_call_coverage`
+    is the `"{correct}/{actual}"` string using the CORRECT count for this
+    direction (`tp` for pathogenic, `tn` for benign), never `called_count`
+    substituted for the correct count (e.g. `other:benign` is `112/2095`, not
+    `113/2095`).
+    """
+
+    stratum: str
+    direction: str  # "pathogenic" | "benign"
+    data_sufficiency: str  # "ADEQUATE" | "UNDERPOWERED" | "NO_CALLS"
+    conditional_performance: str  # "MET" | "UNMET" | "NOT_ESTIMABLE" | "NOT_APPLICABLE"
+    policy_parity: str  # "CLEAR" | "BLOCKED"
+    precision_lb: float | None
+    recall_lb: float | None
+    precision_threshold: float | None
+    recall_threshold: float | None
+    actual_count: int
+    called_count: int
+    tp: int
+    tn: int
+    fp: int
+    fn: int
+    min_count: int
+    end_to_end_correct_call_coverage: str  # "{correct}/{actual}" -- correct = tp (pathogenic) / tn (benign)
+    abstain_count: int
+    scope_evidence_status: str
+    authorization_status: str  # "NOT_AUTHORIZED" | "PENDING_PROSPECTIVE" | "AUTHORIZED_RESEARCH_ONLY"
+    reasons: list = field(default_factory=list)
+
+
+@dataclass
+class TieredGateDecision:
+    """v3 tiered post-hoc re-adjudication decision (schema
+    `raptor.tsc.tiered_readjudication.v3`, ADDITIVE) --
+    `raptor.eval.tiered_gate.decide_tiered_gate`'s return value.
+
+    Additive alongside the frozen v1 `GateDecision` and v2 `ScopeGateDecision`
+    -- `decide_tiered_gate` never dispatches from or replaces either. A
+    post-hoc re-adjudication NEVER emits `"AUTHORIZED_RESEARCH_ONLY"` or
+    `"VALIDATED_PROSPECTIVE"` anywhere in this decision, and
+    `research_scope_flags[...]` stays `False` -- `post_hoc` is always `True`
+    here. `implementation_commit`/`implementation_module_sha256`/
+    `tiered_config_canonical_sha256`/`content_hash` are `None` until the
+    orchestrator CLI (`scripts/build_tiered_readjudication.py`) fills them in
+    when writing the committed record -- `decide_tiered_gate` itself never
+    touches the filesystem or git.
+    """
+
+    schema_version: str = "3"
+    run_integrity: str = "PASS"  # "PASS" | "INVALID"
+    scopes: dict = field(default_factory=dict)  # "{stratum}:{direction}" -> TieredScopeVerdict
+    full_spectrum_status: str = "NOT_VALIDATED"  # "NOT_VALIDATED" | "VALIDATED_PROSPECTIVE"
+    full_spectrum_authorization: str = "NOT_AUTHORIZED"
+    research_scope_evidence_status: str = "NOT_SUPPORTED"  # "NOT_SUPPORTED" | "SUPPORTED_POSTHOC" | "VALIDATED_PROSPECTIVE"
+    research_scope_authorization: str = "NOT_AUTHORIZED"
+    research_scope_flags: dict = field(default_factory=dict)  # canonical key -> bool
+    governance_state: str = "RESEARCH_ONLY_NO_CLINICAL_USE"
+    governance_statement: str = ""
+    research_use_disclaimer: str = ""
+    prospective_validation_status: str = "PENDING"
+    source_record: str = ""
+    source_canonical_lf_sha256: str = ""
+    source_content_hash: str = ""
+    tiered_config_canonical_sha256: str | None = None
+    implementation_commit: str | None = None
+    implementation_module_sha256: str | None = None
+    content_hash: str | None = None
+    post_hoc: bool = True
+    no_new_evidence_statement: str = ""
+    reason: str = ""

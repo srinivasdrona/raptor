@@ -1,0 +1,1275 @@
+# RAPTOR tiered gate v3 — post-hoc re-adjudication of the frozen ADR-0012
+# masked-holdout gate (R2). Claude Opus planner contract (rev 3).
+#
+# rev 2 applies every GPT-5.4 planner finding consistently: (1) reuse the exact
+# canonical ADR-0011/v2 research key truncating_pathogenic_research_scope_validated
+# everywhere (no alias); (2) explicit aggregate enums + precedence + pinned
+# verbatim safety strings (full-spectrum status, narrow-scope evidence status,
+# authorization status, governance state/statement, research disclaimer,
+# no-new-evidence statement) with current post-hoc AND future
+# prospective-authorized branches; (3) a typed fail-closed input/config error
+# that writes NO artifact (A3/A5/A6 run only after valid input/config); (4) a
+# single locked prospective dataset rule (no OR) with BLOCKED_DATA + no
+# outcome-dependent fallback; (5) frozen-R2 tests over all six scopes and all
+# axes incl. other:benign 112/2095 (called 113) and other:pathogenic 89/117
+# (correct/actual, never called/actual); (6) config/impl/source/self content
+# hashes over compact JSON PLUS the written artifact's canonical-LF file SHA-256
+# recorded as an EXTERNAL manifest identity (a file cannot embed its own final
+# hash without self-reference); (7) consistent test/Beat-4/migration/
+# expected-R2/count updates, additive architecture, R2/v1/v2 immutable.
+#
+# rev 3 corrects a policy-hash regression in rev 2's config PLACEMENT: rev 2
+# commanded APPENDING the tiered_authorization block to the policy-bound,
+# census/ADR-0012-verified configs/eval/tsc2.yaml, which changed that file's
+# APPROVED raw SHA-256 from ea4ff… to 38f729… and broke ADR-0012 / census
+# policy verification (the approved scoring config was re-signed for an additive
+# block it should never have carried). rev 3 relocates the ENTIRE v3 rule into a
+# NEW STANDALONE configs/eval/tiered_gate_v3.yaml (its own schema
+# raptor.eval.tiered_authorization.v3 + its own canonical hash), preserves
+# tsc2.yaml BYTE-IDENTICAL at approved ea4ff…, adds a dedicated
+# load_tiered_authorization(path) loader + typed validation while
+# load_config(tsc2.yaml) and every v1/v2 policy-bound flow stay byte/behaviour
+# compatible, a CLI arg --tiered-config configs/eval/tiered_gate_v3.yaml whose
+# separately-loaded block drives tiered_config_canonical_sha256, DEFENSIVE
+# Oracle-constant runtime validation inside decide_tiered_gate (confidence /
+# thresholds / directions / gating / min_count must match the pinned v2
+# constants; drift raises TieredReadjudicationConfigError before any decision),
+# and an A3 policy-parity reason that stays visible INDEPENDENTLY of the A5
+# precedence label (PM1 recorded for missense:pathogenic even when A5 is
+# NO_CALLS/UNDERPOWERED). No tsc2 mutation and no policy-hash change: the
+# standalone config is purely additive, and v1/v2/R2/census plus the approved
+# tsc2 policy stay immutable and byte-identical.
+#
+# Purpose: an implementation-ready, hash-bound, additive plan that RE-ADJUDICATES
+# the FROZEN R2 masked-holdout aggregate under a new, multi-axis tiered gate
+# ("v3"), WITHOUT rerunning annotation/scoring/BIAS/Nirvana/x64, WITHOUT touching
+# any locked threshold, and WITHOUT overwriting R2. It corrects two specific
+# misleading v2 semantics — (a) undefined missense precision/recall coerced to a
+# numeric 0.0 and presented as a hard performance FAIL, and (b) an overbroad
+# GLOBAL PM1 authorization blocker that leaked into and suppressed the
+# independently-valid truncating-pathogenic research scope — while REFUSING to
+# manufacture a more favorable headline: truncating-pathogenic is at most
+# SUPPORTED_POSTHOC, never authorized, with prospective validation PENDING.
+#
+# This file is the planner PLAN ONLY. It writes NO code, NO tests, NO config,
+# NO data record, NO ADR, and performs NO gate run and NO push. It names the
+# exact downstream implementation scope, axis enums + arithmetic, criterion→scope
+# applicability map, post-hoc/authorization boundary, additive schemas/config/CLI,
+# the Gemini RED / Sonnet build / GPT-5.4 check matrix, the prospective-validation
+# registration, migration/backout, and the Beat-4 self-audit.
+#
+# Schema: raptor-tiered-gate-v3-posthoc-planning-v1 (planner). The emitted
+# re-adjudication record uses schema raptor.tsc.tiered_readjudication.v3
+# (defined in output_schema).
+
+schema: raptor-tiered-gate-v3-posthoc-planning-v1
+status: planner_contract_ready_for_implementation
+task_id: tiered-gate-v3-posthoc-readjudication
+title: >-
+  Versioned tiered gate (v3) and post-hoc re-adjudication of the frozen ADR-0012
+  masked-holdout gate — additive, hash-bound, research-only, non-authoritative
+
+worktree: 'D:\AIProjects\raptor-worktrees\tiered-gate'
+branch: track/tiered-gate-v3-2026-07
+base_commit: 037701e0ca702d3ded7d7757faca6f6a772c9bb5
+planner_output: docs/project/specs/tiered-gate-v3-posthoc.yaml
+planner_model: claude-opus-4.8
+
+roles:
+  planner: Claude Opus (this contract)
+  test_author: Gemini 3.5 Flash (owns every new RED test before the doer)
+  doer: Claude Sonnet 5 (implementation only, scoped additive surfaces)
+  checker: GPT-5.4 (post-hoc-laundering / undefined-metric / cherry-pick /
+    global-blocker-leakage / authorization-overclaim probes)
+
+# ---------------------------------------------------------------------------
+# 1. Decision context — what is misleading, and the post-hoc risk (slot 2 §1)
+# ---------------------------------------------------------------------------
+
+decision_context:
+  operator_directive:
+    - Preserve R2 unchanged (byte-identical).
+    - Create a NEW versioned tiered gate that separates technical run validity,
+      data sufficiency, conditional performance, policy parity, scope evidence,
+      and authorization onto independent axes.
+    - Recompute ONLY the final gate interpretation from frozen R2 counts.
+    - Label the result POST-HOC re-adjudication, never new independent validation.
+    - Preregister prospective validation on future/independent unseen data.
+    - No x64, BIAS, Nirvana, annotation, or scorer rerun.
+  misleading_v2_semantics_corrected:
+    undefined_metric_coercion:
+      symptom: >-
+        R2 reports missense:pathogenic precision_lb=0.0, recall_lb=0.0 on
+        path_called=0, and missense:benign precision_lb=recall_lb=0.6637 on only
+        benign_called=9. The v2 gate reads these as metric_status=UNMET →
+        scope_status=FAIL, i.e. a PERFORMANCE failure.
+      correction: >-
+        Undefined/underpowered conditional metrics are NOT_ESTIMABLE, never
+        numeric zero and never a performance FAIL. The 0.0 in the frozen record
+        is a fixture/coercion artifact (see model.Metrics default 0.0); the
+        tiered gate MUST derive its axes from called/actual counts and treat the
+        stored lower bounds as valid ONLY when data_sufficiency == ADEQUATE.
+    overbroad_global_pm1_blocker:
+      symptom: >-
+        R2 carries authorization_blockers=["evaluation_skipped_criteria:PM1"],
+        which forces EVERY authorization surface closed
+        (full_spectrum_status=BLOCKED_POLICY, governance_state=NONE_VALIDATED,
+        research_scope_flags.truncating_pathogenic_research_scope_validated=false)
+        even though the per-scope verdict truncating:pathogenic=VALIDATED. PM1 is
+        pathogenic-direction, missense-hotspot evidence and is irrelevant to the
+        PVS1-driven truncating scope and to every benign scope.
+      correction: >-
+        Map each excluded criterion to ONLY the scopes it can affect (see
+        criterion_scope_applicability). PM1 blocks missense:pathogenic alone; it
+        must not leak into truncating or benign scopes.
+  post_hoc_risk_named:
+    statement: >-
+      This tiered interpretation was designed AFTER seeing R2. Re-adjudicating
+      the same frozen counts under a new rule cannot become independent
+      validation. truncating:pathogenic clearing 0.95/0.95 was already visible
+      (ADR-0011 §non-blind acknowledgment) before this rule was written, so
+      adopting it as research support is post-hoc rule-making.
+    controls:
+      - No threshold, direction, gating flag, confidence, min_count, split, or
+        Tavtigian value changes (all inherited locked from tsc2.yaml, which stays
+        BYTE-IDENTICAL at approved SHA-256 ea4ff… — no additive block).
+      - The versioned tiered rule (axis enums, criterion→scope map, governance
+        statements, prospective registration) lives ENTIRELY in the new
+        standalone configs/eval/tiered_gate_v3.yaml; the policy-bound scoring
+        config tsc2.yaml is never mutated or re-signed.
+      - The rule only NARROWS what a pass can mean (research-evidence, post-hoc,
+        non-clinical); it grants no new capability.
+      - Full-spectrum authorization still hard-requires the missense scopes and
+        cannot be narrowed to drop them.
+      - Real authorization requires a PROSPECTIVE run on unseen data; that is
+        registered PENDING and is never claimed here.
+
+# ---------------------------------------------------------------------------
+# 2. Frozen source of record — R2 aggregate + hash contract
+# ---------------------------------------------------------------------------
+
+frozen_source_of_record:
+  record: data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json
+  schema: raptor.tsc.masked_holdout_gate.v2
+  canonical_lf_blob_sha256: 7c55cd4e3059713d1d53886d8893a3819153375b62ce9d37187d731132c6a77f
+  sha256_provenance: committed_git_lf_blob
+  crlf_checkout_sha256_do_not_pin: e914f65231c8004b1c7a96d2fe80bd49bac591433112699ff91cc5b027e55207
+  internal_content_hash: 2ead589d2f129f988d9932bb01153891902f0d675000554887a1524e567413b2
+  hash_rule: >-
+    The canonical committed identity is the Git/LF blob SHA-256 (7c55…). The
+    Windows autocrlf CRLF checkout SHA-256 (e914…) is a local-filesystem
+    artifact and MUST NEVER be pinned. The re-adjudication CLI verifies the
+    frozen record against its canonical LF blob bytes on every platform before
+    reading a single field, and fails closed on mismatch.
+  r2_policy: ADR-0012 disabled_manual
+  r2_frozen_fields_used:
+    integrity:
+      effective_lineage_blockers: []
+      remask_survivors: 0
+      canonical_join_rows: 2577
+      bias_rows: 2577
+      returned_artifacts_verified: 28
+    authorization_blockers: ["evaluation_skipped_criteria:PM1"]
+    policy_evaluation_skipped: ["PM1"]
+    policy_operationally_skipped: ["BP6", "PM1", "PP5", "PS4"]
+    pp3bp4_automation_disabled: true
+    scope_counts:
+      # Derived from R2 metrics[stratum].counts: for a (stratum,direction) scope
+      # the CORRECT count is tp for pathogenic and tn for benign. A4 coverage is
+      # correct/actual (NOT called/actual): benign called != benign correct when
+      # fp>0 (see other:benign 113 called vs 112 correct).
+      missense:pathogenic: { actual: 51, called: 0, tp: 0, tn: 0, fp: 0, fn: 0 }
+      missense:benign: { actual: 103, called: 9, tp: 0, tn: 9, fp: 0, fn: 0 }
+      truncating:pathogenic: { actual: 210, called: 189, tp: 189, tn: 0, fp: 0, fn: 0 }
+      truncating:benign: { actual: 1, called: 0, tp: 0, tn: 0, fp: 0, fn: 0 }
+      other:pathogenic: { actual: 117, called: 89, tp: 89, tn: 0, fp: 0, fn: 0 }
+      other:benign: { actual: 2095, called: 113, tp: 0, tn: 112, fp: 1, fn: 0 }
+  r2_old_semantic_outcome:
+    legacy_v1_missense_gate: FAIL
+    full_spectrum_status: BLOCKED_POLICY
+    vus_authorized: false
+    governance_state: NONE_VALIDATED
+    global_blocker: evaluation_skipped_criteria:PM1
+    scope_gate_reason: >-
+      BLOCKED_POLICY: evaluation_skipped_criteria:PM1 | missense:benign=FAIL;
+      missense:pathogenic=FAIL; other:benign=DESCRIPTIVE;
+      other:pathogenic=DESCRIPTIVE; truncating:benign=DESCRIPTIVE;
+      truncating:pathogenic=VALIDATED
+    note: >-
+      Scope-level truncating:pathogenic already read VALIDATED, but the global
+      PM1 blocker forced every authorization surface closed AND coerced undefined
+      missense metrics to a 0.0 FAIL — the two defects v3 corrects.
+  immutability: >-
+    R2 is immutable. It is never overwritten, relabeled, or re-keyed. The v3
+    record REFERENCES its canonical LF hash and re-states old-vs-new outcomes.
+
+# ---------------------------------------------------------------------------
+# 3. Binding decision ledger
+# ---------------------------------------------------------------------------
+
+decision_ledger:
+  D1_additive_module_never_dispatch:
+    decision: >-
+      Add a NEW module src/raptor/eval/tiered_gate.py (`decide_tiered_gate`) and
+      NEW models TieredScopeVerdict / TieredGateDecision. gate.py (decide_gate),
+      scope_gate.py (decide_scope_gate), StratumVerdict, DirectionVerdict,
+      ScopeGateDecision, GateDecision stay byte-identical. decide_tiered_gate
+      never dispatches from, replaces, or is called by v1/v2 code.
+    rationale: >-
+      Mirrors ADR-0011's additive discipline (v2 alongside frozen v1). A
+      dispatch or shared mutation would risk silently relabeling R2/v1 semantics.
+  D2_reuse_locked_thresholds_verbatim:
+    decision: >-
+      The tiered gate REUSES the existing locked oracle_thresholds (missense
+      0.90/0.85, truncating 0.95/0.95, confidence 0.95, gating/directions) and
+      min_count_per_class=36 from configs/eval/tsc2.yaml via the UNCHANGED
+      load_config(tsc2.yaml) path. The versioned v3 rule (axis enums, the
+      criterion→scope applicability map, governance statements, and the
+      prospective registration) lives in the NEW standalone
+      configs/eval/tiered_gate_v3.yaml — NOT appended to tsc2.yaml. It introduces
+      NO new numeric threshold and changes NO existing pinned value.
+    rationale: >-
+      Post-hoc defensibility (ADR-0011 §non-blind control 1) rests on no
+      threshold moving. tsc2.yaml is policy-bound (census/ADR-0012 verifies its
+      approved raw SHA-256 ea4ff…): a `git diff` of tsc2.yaml MUST be EMPTY. The
+      only new config surface is the additive standalone tiered_gate_v3.yaml.
+  D3_derive_axes_from_counts_never_crib:
+    decision: >-
+      Every axis is derived from the frozen called/actual/tp/tn/fp/fn counts and
+      the criterion map. Stored precision_lb/recall_lb are consumed ONLY when
+      data_sufficiency == ADEQUATE; otherwise conditional performance is
+      NOT_ESTIMABLE and the lower bounds are reported as null, never 0.0. No axis
+      value is copied from R2's own scope_status / full_spectrum_status /
+      authorization_blockers strings — those are re-derived and cross-checked.
+    rationale: Avoids laundering the very v2 verdicts v3 exists to correct.
+  D4_posthoc_never_authorizes:
+    decision: >-
+      A SUPPORTED_POSTHOC scope-evidence status is research-evidence support of
+      the frozen data only. It sets authorization_status = PENDING_PROSPECTIVE,
+      never AUTHORIZED_RESEARCH_ONLY. full_spectrum and clinical/production
+      authorization stay NOT_AUTHORIZED. No VUS worklist, classification, or
+      ClinVar submission.
+    rationale: The operator directive and slot-2/§10 anti-success-ladder rule.
+  D5_pure_readjudication_cli:
+    decision: >-
+      A new scripts/build_tiered_readjudication.py reads the frozen R2 record
+      (verified by canonical LF hash), calls decide_tiered_gate, and writes a
+      NEW non-identifying record data/census/tsc_tiered_readjudication_2026-07-21.json
+      (schema raptor.tsc.tiered_readjudication.v3). It performs no annotation,
+      no scoring, no network, no benchmark read; it is a pure function of the
+      frozen aggregate + versioned config.
+    rationale: Slot-3 "prefer additive tiered_gate.py + versioned config + pure
+      re-adjudication CLI"; keeps the transform auditable and deterministic.
+  D6_standalone_tiered_config_preserves_policy_hash:
+    decision: >-
+      The ENTIRE tiered_authorization rule is a NEW standalone file
+      configs/eval/tiered_gate_v3.yaml (top-level schema
+      raptor.eval.tiered_authorization.v3, its own schema_version: 3, its own
+      canonical hash). configs/eval/tsc2.yaml carries NO tiered_authorization
+      block and stays byte-identical at approved SHA-256 ea4ff…. config.py adds
+      load_tiered_authorization(path) with typed validation; load_config(tsc2.yaml)
+      is untouched and never reads a tiered block. The production CLI loads BOTH
+      exact files (tsc2 via load_config, tiered_gate_v3 via
+      load_tiered_authorization) and combines them WITHOUT changing tsc2 bytes;
+      decide_tiered_gate consumes the separately-loaded tiered block (passed
+      explicitly, or as a test-injected EvalConfig optional field) alongside the
+      locked v2 Oracle constants.
+    rationale: >-
+      rev 2 appended the block to tsc2.yaml, changing its raw SHA-256 from
+      approved ea4ff… to 38f729… and breaking ADR-0012 / census policy
+      verification. Splitting the tiered rule into a standalone additive config
+      re-approves NO unchanged scoring config, keeps the policy hash stable, and
+      still gives the v3 rule its own independent schema and hash.
+  rejected_alternatives:
+    - id: R1_relabel_r2_in_place
+      rejected: >-
+        Editing R2 to fix the PM1 leak / 0.0 coercion. Rejected: R2 is the
+        immutable evidentiary record of the disabled_manual run; correcting the
+        INTERPRETATION is a new versioned decision, not a data edit.
+    - id: R2_dispatch_from_scope_gate
+      rejected: >-
+        Making decide_scope_gate schema-dispatch into tiered logic. Rejected
+        (same reasoning ADR-0011 gave for not touching decide_gate): it would
+        change the meaning of the frozen v2 path.
+    - id: R3_authorize_truncating_now
+      rejected: >-
+        Promoting truncating:pathogenic to AUTHORIZED_RESEARCH_ONLY because it is MET+ADEQUATE.
+        Rejected: post-hoc support is not prospective authorization; a favorable
+        headline is exactly the failure mode slot 2 §10 forbids.
+    - id: R4_drop_missense_from_full_spectrum
+      rejected: >-
+        Narrowing full_spectrum.requires to exclude the unvalidated missense
+        scopes. Rejected: semantics-locked anti-cherry-pick (ADR-0011).
+    - id: R5_append_tiered_block_to_tsc2
+      rejected: >-
+        Appending the tiered_authorization block to configs/eval/tsc2.yaml (the
+        rev-2 placement). Rejected: tsc2.yaml is the policy-bound scoring config
+        whose approved raw SHA-256 (ea4ff…) is verified by census/ADR-0012;
+        appending re-signed it to 38f729… and broke that policy verification. The
+        tiered rule MUST be a standalone additive file (tiered_gate_v3.yaml) so
+        no approved, unchanged scoring config is re-hashed (D6).
+
+# ---------------------------------------------------------------------------
+# 4. Tiered model — independent axes, enums, and arithmetic
+# ---------------------------------------------------------------------------
+
+tiered_model:
+  principle: >-
+    Six independent per-scope axes plus one whole-run axis. No single overloaded
+    state; no axis silently overwrites another; every axis is always emitted.
+  axes:
+    A0_run_integrity:
+      scope: whole-run (not per-scope)
+      enum: [PASS, INVALID]
+      arithmetic: >-
+        PASS iff integrity.effective_lineage_blockers == [] AND
+        integrity.remask_survivors == 0 AND integrity.canonical_join_rows ==
+        integrity.bias_rows AND integrity.returned_artifacts_verified >= 1;
+        else INVALID. If INVALID, every scope_evidence_status is INVALID and no
+        authorization is possible.
+    A1_data_sufficiency:
+      enum: [ADEQUATE, UNDERPOWERED, NO_CALLS]
+      arithmetic: >-
+        Let called = called_count(scope), actual = actual_count(scope). NO_CALLS
+        iff called == 0. UNDERPOWERED iff 0 < min(actual, called) <
+        min_count_per_class (36). ADEQUATE iff min(actual, called) >= 36. Counts
+        that are not non-bool non-negative ints (or are otherwise malformed)
+        ABORT generation with the typed fail-closed error BEFORE any axis is
+        computed (see fail_closed_input_config_error); they never produce an
+        "INVALID-config" scope record — there is no partial per-scope output.
+    A2_conditional_performance:
+      enum: [MET, UNMET, NOT_ESTIMABLE, NOT_APPLICABLE]
+      arithmetic: >-
+        NOT_APPLICABLE iff no Oracle threshold is registered for (stratum,
+        direction). Else if data_sufficiency != ADEQUATE → NOT_ESTIMABLE
+        (precision_lb/recall_lb reported as null — never 0.0, never compared).
+        Else (ADEQUATE): MET iff precision_lb >= precision_threshold AND
+        recall_lb >= recall_threshold (both valid finite [0,1]); else UNMET.
+      note: >-
+        This is the single deviation from v2, which computed MET/UNMET before
+        checking power and thus produced a spurious FAIL on undefined metrics.
+    A3_policy_parity:
+      enum: [CLEAR, BLOCKED]
+      precondition: >-
+        Applies ONLY after input/config validation has passed (see
+        fail_closed_input_config_error). An excluded criterion absent from
+        criterion_scope_applicability is config/input drift and ABORTS
+        generation with the typed fail-closed error BEFORE any axis — it NEVER
+        yields a per-scope BLOCKED record, and all authorization stays closed
+        because no artifact is produced.
+      arithmetic: >-
+        For each scope, BLOCKED iff any criterion in
+        policy.evaluation_skipped maps (via criterion_scope_applicability) to
+        this scope; else CLEAR. Every criterion in policy.evaluation_skipped is
+        guaranteed (by validation) to have a map entry, so BLOCKED is only ever
+        a mapped, per-scope effect. pp3/bp4 disabled_manual suppression is NOT
+        an evaluation_skipped blocker — it is a declared ADR-0012 policy
+        condition recorded on the run, not a scope blocker.
+      reason_visibility: >-
+        A3 is recorded in TieredScopeVerdict.reasons INDEPENDENTLY of the A5
+        precedence summary. Whenever A3 == BLOCKED, one reason entry is appended
+        PER applicable evaluation_skipped criterion (sorted ascending by
+        criterion id), even when A5 resolves to a higher-precedence label such as
+        NO_CALLS or UNDERPOWERED that "hides" BLOCKED from the summary. So
+        missense:pathogenic — whose A5 is NO_CALLS by precedence — STILL carries
+        the PM1 policy-block reason. The reason entry has the pinned exact shape
+        (semantics-locked, asserted verbatim by tests):
+          "policy_parity=BLOCKED: <CRITERION> evaluation_skipped applies_to <stratum:direction>"
+        e.g. for missense:pathogenic under PM1 the exact string is
+          "policy_parity=BLOCKED: PM1 evaluation_skipped applies_to missense:pathogenic"
+        A CLEAR scope appends NO policy_parity reason. Reasons are an ordered
+        list; policy-parity reasons precede A2/coverage narrative reasons.
+    A4_end_to_end_coverage:
+      kind: reported metric (not an enum gate)
+      arithmetic: >-
+        CORRECT-call coverage/sensitivity INCLUDING abstentions as uncovered,
+        computed from CORRECT calls (never merely "called"):
+        pathogenic = tp / path_actual; benign = tn / benign_actual. tp/tn are
+        the per-direction CORRECT counts (from R2 metrics[stratum].counts), so
+        called/actual can NEVER be substituted for correct/actual — e.g.
+        other:benign is 112/2095 (tn=112) even though called=113 (fp=1), and
+        other:pathogenic is 89/117 (tp=89). Reported as an exact fraction
+        distinct from conditional precision/recall (which are on the called
+        subset only). Abstentions are a first-class, separately reported
+        quantity.
+    A5_scope_evidence_status:
+      enum: [INVALID, NOT_APPLICABLE, NO_CALLS, UNDERPOWERED, BLOCKED_POLICY,
+             NOT_SUPPORTED, SUPPORTED_POSTHOC, VALIDATED_PROSPECTIVE]
+      precedence: >-
+        Deterministic summary label (all lower axes still emitted verbatim):
+        1) INVALID if A0 == INVALID;
+        2) NOT_APPLICABLE if A2 == NOT_APPLICABLE (no threshold);
+        3) NO_CALLS if A1 == NO_CALLS;
+        4) UNDERPOWERED if A1 == UNDERPOWERED;
+        5) BLOCKED_POLICY if A1 == ADEQUATE and A3 == BLOCKED;
+        6) NOT_SUPPORTED if A1 == ADEQUATE, A3 == CLEAR, A2 == UNMET;
+        7) SUPPORTED_POSTHOC if A1 == ADEQUATE, A3 == CLEAR, A2 == MET.
+      future_branch: >-
+        VALIDATED_PROSPECTIVE is the ONLY post-SUPPORTED_POSTHOC state and is
+        set EXCLUSIVELY by a prospective run under the locked contract (§8) on
+        the registered unseen dataset via a NEW owner decision; this post-hoc
+        re-adjudication can NEVER emit VALIDATED_PROSPECTIVE.
+      rationale: >-
+        Data-first precedence keeps a no-calls/underpowered scope from being
+        mislabeled a policy or performance failure, while A3=BLOCKED is ALWAYS
+        still recorded in reasons independently of this summary label (see
+        A3_policy_parity.reason_visibility — PM1 stays visible on
+        missense:pathogenic even though its A5 summary is NO_CALLS).
+        SUPPORTED_POSTHOC requires all of adequate data, clear policy parity, and
+        a met conditional threshold.
+    A6_authorization_status:
+      enum: [NOT_AUTHORIZED, PENDING_PROSPECTIVE, AUTHORIZED_RESEARCH_ONLY]
+      arithmetic: >-
+        Post-hoc re-adjudication NEVER emits AUTHORIZED_RESEARCH_ONLY. A scope
+        whose A5 == SUPPORTED_POSTHOC gets PENDING_PROSPECTIVE (research-evidence
+        support recorded; authorization withheld pending a prospective run).
+        Every other scope gets NOT_AUTHORIZED. Full-spectrum authorization is
+        NOT_AUTHORIZED unless every full_spectrum.requires scope is
+        VALIDATED_PROSPECTIVE AND its policy_parity is CLEAR AND a prospective
+        validation has actually executed under the locked contract (never true
+        in a re-adjudication); SUPPORTED_POSTHOC can NEVER by itself satisfy
+        future authorization — so full-spectrum is always NOT_AUTHORIZED here.
+  criterion_scope_applicability:
+    schema_note: >-
+      Versioned, derived from ACMG/AMP evidence semantics + existing config
+      (configs/acmg/tsc.yaml automatable set, tsc2.yaml automatable_criteria,
+      ADR-0009), NOT from the favorable result. An excluded/evaluation_skipped
+      criterion NOT present in this map is fail-closed: it raises the typed
+      input/config error and ABORTS generation (no artifact) — it does NOT
+      "block all scopes" as a per-scope BLOCKED verdict.
+    map:
+      PM1:
+        applies_to: [missense:pathogenic]
+        rationale: >-
+          PM1 = pathogenic moderate, missense mutational-hotspot / functional-
+          domain evidence. Not applicable to truncating (PVS1-driven) or to any
+          benign-direction scope.
+      PP3:
+        applies_to: [missense:pathogenic, other:pathogenic]
+        note: computational pathogenic; disabled_manual under ADR-0012 (declared,
+          not an evaluation_skipped blocker here).
+      BP4:
+        applies_to: [missense:benign, other:benign]
+        note: computational benign; disabled_manual under ADR-0012.
+      PP5:
+        applies_to: [missense:pathogenic, truncating:pathogenic, other:pathogenic]
+        note: direct-copy ClinVar pathogenic assertion; banned ADR-0009.
+      BP6:
+        applies_to: [missense:benign, truncating:benign, other:benign]
+        note: direct-copy ClinVar benign assertion; banned ADR-0009.
+      PS4:
+        applies_to: [missense:pathogenic, truncating:pathogenic, other:pathogenic]
+        note: case-control strong; excluded per Oracle (ClinVar-submitter derived).
+    r2_active_blocker_resolution:
+      evaluation_skipped: ["PM1"]
+      effect: >-
+        Under the map, PM1 BLOCKS only missense:pathogenic. It does NOT touch
+        missense:benign, truncating:pathogenic, truncating:benign, or other:*.
+        This is the exact global-blocker-leakage fix.
+
+  # -------------------------------------------------------------------------
+  # 4a. Aggregate authorization surfaces — explicit enums, precedence, and the
+  # EXACT pinned verbatim safety strings (post-hoc AND future prospective
+  # branches). Pinned NOW so the doer invents no wording (checker finding 2).
+  # -------------------------------------------------------------------------
+  aggregate_authorization_axes:
+    full_spectrum_status:
+      enum: [NOT_VALIDATED, VALIDATED_PROSPECTIVE]
+      arithmetic: >-
+        VALIDATED_PROSPECTIVE iff EVERY full_spectrum.requires scope
+        (missense:pathogenic, missense:benign, truncating:pathogenic) has
+        scope_evidence_status == VALIDATED_PROSPECTIVE AND a prospective
+        validation has actually executed under the locked contract (§8); else
+        NOT_VALIDATED. A post-hoc re-adjudication ALWAYS yields NOT_VALIDATED.
+      authorization:
+        enum: [NOT_AUTHORIZED, PENDING_PROSPECTIVE, AUTHORIZED_RESEARCH_ONLY]
+        rule: >-
+          AUTHORIZED_RESEARCH_ONLY only when full_spectrum_status ==
+          VALIDATED_PROSPECTIVE (i.e. every full_spectrum.requires scope is
+          VALIDATED_PROSPECTIVE with CLEAR policy_parity under an executed
+          prospective run); SUPPORTED_POSTHOC alone can NEVER authorize.
+          Post-hoc ALWAYS NOT_AUTHORIZED.
+    research_scope_evidence_status:
+      key: truncating_pathogenic_research_scope_validated   # canonical ADR-0011/v2 key
+      enum: [NOT_SUPPORTED, SUPPORTED_POSTHOC, VALIDATED_PROSPECTIVE]
+      arithmetic: >-
+        Post-hoc branch: SUPPORTED_POSTHOC iff the single required scope
+        truncating:pathogenic has A5 == SUPPORTED_POSTHOC; else NOT_SUPPORTED.
+        Future branch: VALIDATED_PROSPECTIVE ONLY after a prospective run under
+        the locked contract clears the same scope on the registered unseen
+        dataset. A re-adjudication NEVER emits VALIDATED_PROSPECTIVE.
+      boolean_flag_rule: >-
+        The record's canonical boolean
+        research_scope_flags.truncating_pathogenic_research_scope_validated is
+        TRUE iff research_scope_evidence_status == VALIDATED_PROSPECTIVE; it is
+        FALSE for NOT_SUPPORTED and for SUPPORTED_POSTHOC. Post-hoc it stays
+        false — SUPPORTED_POSTHOC evidence does NOT set the "_validated" boolean.
+    authorization_status:
+      enum: [NOT_AUTHORIZED, PENDING_PROSPECTIVE, AUTHORIZED_RESEARCH_ONLY]
+      arithmetic: >-
+        The SINGLE tri-state authorization contract shared by per-scope A6 and
+        EVERY aggregate authorization surface (full_spectrum, research_scope).
+        Post-hoc: SUPPORTED_POSTHOC → PENDING_PROSPECTIVE; all else
+        NOT_AUTHORIZED; never AUTHORIZED_RESEARCH_ONLY. Future:
+        AUTHORIZED_RESEARCH_ONLY only after a prospective run graduates every
+        required scope to VALIDATED_PROSPECTIVE with CLEAR policy_parity, via a
+        new owner decision + fresh hashes; SUPPORTED_POSTHOC can NEVER by itself
+        satisfy future authorization.
+    governance_state:
+      enum: [RESEARCH_ONLY_NO_CLINICAL_USE, TRUNCATING_PATHOGENIC_PROSPECTIVE_AUTHORIZED]
+      arithmetic: >-
+        Post-hoc re-adjudication ALWAYS emits RESEARCH_ONLY_NO_CLINICAL_USE.
+        TRUNCATING_PATHOGENIC_PROSPECTIVE_AUTHORIZED is reachable ONLY after a
+        prospective run under the locked contract graduates truncating:pathogenic
+        to VALIDATED_PROSPECTIVE. Each state maps to its pinned verbatim
+        statement (pinned_safety_strings.governance_statements).
+  pinned_safety_strings:
+    provenance: >-
+      research_use_disclaimer and the v2 scope-gate governance statements are
+      reused VERBATIM from ADR-0011 / configs/eval/tsc2.yaml /
+      config._PINNED_* (never re-authored; read-only reuse, tsc2.yaml is not
+      edited). The v3-specific governance statements and no_new_evidence_statement
+      are pinned HERE, in full, and are carried by the NEW standalone
+      configs/eval/tiered_gate_v3.yaml (validated against config.py pins), so the
+      implementation invents no wording (checker finding 2).
+    research_use_disclaimer: "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission."
+    governance_statements:
+      RESEARCH_ONLY_NO_CLINICAL_USE: "This is a post-hoc re-adjudication of the frozen ADR-0012 masked-holdout counts for research evidence only; no scope is authorized, and this authorizes no clinical classification, VUS worklist, or ClinVar submission pending a prospective validation on unseen data."
+      TRUNCATING_PATHOGENIC_PROSPECTIVE_AUTHORIZED: "Prospective validation on unseen data has authorized the truncating-pathogenic research scope for research-evidence use only; full-spectrum VUS automation remains not authorized while missense is unvalidated, and this authorizes no clinical classification, VUS worklist, or ClinVar submission."
+    no_new_evidence_statement: "No new evidence was generated: this record re-interprets the frozen R2 aggregate (source_canonical_lf_sha256 7c55cd4e3059713d1d53886d8893a3819153375b62ce9d37187d731132c6a77f) under the versioned tiered rule and performs no new run, scoring, annotation, benchmark read, network access, or data generation."
+  # -------------------------------------------------------------------------
+  # 4b. Typed fail-closed input/config error — resolves the invalid/config
+  # contradiction (checker finding 3). Produces NO v3 artifact; A3/A5/A6 run
+  # ONLY after this validation passes.
+  # -------------------------------------------------------------------------
+  fail_closed_input_config_error:
+    type: >-
+      A single typed TieredReadjudicationError with two subclasses:
+      TieredReadjudicationInputError (raised inside decide_tiered_gate on
+      malformed counts / source hash drift) and TieredReadjudicationConfigError
+      (raised by load_tiered_authorization / _validate_tiered_authorization on
+      standalone-config drift, AND defensively re-raised inside decide_tiered_gate
+      when a hand-built EvalConfig's Oracle constants drift from the pinned v2
+      values — see tiered_config_oracle_constants_runtime_validation).
+    semantics: >-
+      Raised BEFORE any axis (A1..A6) is computed. When raised, decide_tiered_gate
+      returns NO TieredGateDecision and the CLI writes NO v3 artifact and exits
+      non-zero. There is NO partial or per-scope record: an unknown criterion
+      does not create a partial scope record, and ALL authorization remains
+      closed because generation aborts. A3/A5/A6 apply ONLY after valid
+      input/config.
+    triggers:
+      - non-int / bool / negative / otherwise malformed scope counts
+        (actual/called/tp/tn/fp/fn).
+      - an evaluation_skipped/excluded criterion with NO entry in
+        criterion_scope_applicability (unknown criterion — never a per-scope
+        BLOCKED verdict).
+      - criterion_scope_applicability mapping drift (any applies_to differs from
+        the pinned map).
+      - frozen source-record hash drift (R2 canonical LF blob sha256 != 7c55…,
+        or the CRLF e914… hash supplied as an input pin).
+      - standalone tiered-config drift in configs/eval/tiered_gate_v3.yaml (any
+        altered axis enum / criterion map / full_spectrum.requires /
+        research-scope requires / governance statement / research_use_disclaimer /
+        no_new_evidence_statement / prospective dataset rule vs the config.py
+        pins; raised by load_tiered_authorization / _validate_tiered_authorization).
+      - Oracle-constant drift in a hand-built EvalConfig that bypasses load_config
+        (oracle confidence not 0.95, any stratum precision/recall not the pinned
+        missense 0.90/0.85 or truncating 0.95/0.95, drifted directions/gating, or
+        min_count_per_class not 36 — re-checked inside decide_tiered_gate and
+        raised as TieredReadjudicationConfigError BEFORE any decision; see
+        tiered_config_oracle_constants_runtime_validation).
+    tiered_config_oracle_constants_runtime_validation: >-
+      decide_tiered_gate reuses the locked v2 Oracle constants (oracle_thresholds
+      confidence + per-stratum precision/recall/gating/directions and
+      min_count_per_class) from the EvalConfig it is handed. load_config(tsc2.yaml)
+      already value-locks these, but a TEST-INJECTED / hand-built EvalConfig can
+      bypass the loader, so decide_tiered_gate DEFENSIVELY re-validates them
+      against config.py's pinned v2 constants (_PINNED_ORACLE_CONFIDENCE=0.95,
+      _PINNED_STRATUM_THRESHOLDS missense 0.90/0.85 + truncating 0.95/0.95 with
+      their pinned gating/directions, _PINNED_MIN_COUNT_PER_CLASS=36) and raises
+      TieredReadjudicationConfigError on ANY drift BEFORE computing A1..A6. This
+      guarantees the tiered rule can never silently score against a moved
+      threshold even when tsc2.yaml is not the config source.
+    boundary_vs_A0_invalid: >-
+      A0 == INVALID is a DISTINCT failure mode: input+config are VALID but the
+      run's integrity meta failed — that DOES emit an artifact with every scope
+      A5 == INVALID. The typed error is malformed input / config drift and emits
+      NOTHING.
+
+# ---------------------------------------------------------------------------
+# 5. Expected R2 tiered outcome (to be COMPUTED, cross-checked, never hardcoded)
+# ---------------------------------------------------------------------------
+
+expected_r2_tiered_outcome:
+  derivation_rule: >-
+    These are the planner's PREDICTED results for the frozen-R2 re-adjudication
+    test. The implementation MUST derive them from frozen counts + the map, and
+    the test asserts the derived values equal these — the numbers are not to be
+    written into production code.
+  run_integrity: PASS
+  scopes:
+    missense:pathogenic:
+      data_sufficiency: NO_CALLS
+      conditional_performance: NOT_ESTIMABLE
+      policy_parity: BLOCKED          # PM1 applies; reasons carry "policy_parity=BLOCKED: PM1 evaluation_skipped applies_to missense:pathogenic" even though A5=NO_CALLS
+      end_to_end_correct_call_coverage: 0/51
+      conditional_lower_bounds: null   # NOT 0.0
+      scope_evidence_status: NO_CALLS
+      authorization_status: NOT_AUTHORIZED
+    missense:benign:
+      data_sufficiency: UNDERPOWERED   # min(103, 9)=9 < 36
+      conditional_performance: NOT_ESTIMABLE
+      policy_parity: CLEAR             # PM1 not applicable to benign
+      end_to_end_correct_call_coverage: 9/103
+      conditional_lower_bounds: null   # stored 0.6637 ignored — underpowered
+      scope_evidence_status: UNDERPOWERED
+      authorization_status: NOT_AUTHORIZED
+    truncating:pathogenic:
+      data_sufficiency: ADEQUATE       # min(210, 189)=189 >= 36
+      conditional_performance: MET     # 0.9807 >= 0.95 both
+      policy_parity: CLEAR             # PM1 not applicable to truncating
+      end_to_end_correct_call_coverage: 189/210
+      conditional_lower_bounds: { precision_lb: 0.9806713599320976, recall_lb: 0.9806713599320976 }
+      scope_evidence_status: SUPPORTED_POSTHOC
+      authorization_status: PENDING_PROSPECTIVE
+    truncating:benign:
+      data_sufficiency: NO_CALLS       # called=0
+      conditional_performance: NOT_APPLICABLE   # no registered threshold (n=1)
+      policy_parity: CLEAR
+      end_to_end_correct_call_coverage: 0/1     # tn=0 / benign_actual=1
+      conditional_lower_bounds: null
+      scope_evidence_status: NOT_APPLICABLE     # A2 NOT_APPLICABLE wins precedence
+      authorization_status: NOT_AUTHORIZED
+    other:pathogenic:
+      data_sufficiency: ADEQUATE       # min(117, 89)=89 >= 36
+      conditional_performance: NOT_APPLICABLE   # no registered threshold for "other"
+      policy_parity: CLEAR             # PM1 not applicable to other:pathogenic
+      end_to_end_correct_call_coverage: 89/117  # tp=89 / path_actual=117
+      conditional_lower_bounds: null
+      scope_evidence_status: NOT_APPLICABLE
+      authorization_status: NOT_AUTHORIZED
+    other:benign:
+      data_sufficiency: ADEQUATE       # min(2095, 113)=113 >= 36
+      conditional_performance: NOT_APPLICABLE   # no registered threshold for "other"
+      policy_parity: CLEAR             # PM1 not applicable to benign
+      end_to_end_correct_call_coverage: 112/2095  # tn=112 / benign_actual=2095 (called 113, fp=1)
+      conditional_lower_bounds: null
+      scope_evidence_status: NOT_APPLICABLE
+      authorization_status: NOT_AUTHORIZED
+  full_spectrum:
+    status: NOT_VALIDATED
+    reason: >-
+      full_spectrum.requires = {missense:pathogenic, missense:benign,
+      truncating:pathogenic}; the two missense scopes are NO_CALLS /
+      UNDERPOWERED (not SUPPORTED_POSTHOC / VALIDATED_PROSPECTIVE), so
+      full-spectrum cannot validate. Note this is a DATA-sufficiency
+      non-validation, not the fabricated 0.0 performance FAIL of v2.
+    authorization: NOT_AUTHORIZED
+  research_scope:
+    truncating_pathogenic_research_scope_validated:   # canonical ADR-0011/v2 key
+      boolean_flag: false              # NOT prospectively validated (post-hoc)
+      research_scope_evidence_status: SUPPORTED_POSTHOC
+      authorization_status: PENDING_PROSPECTIVE
+      note: >-
+        The single semantic change vs R2's headline: truncating:pathogenic
+        research EVIDENCE is now visible and SUPPORTED_POSTHOC, no longer
+        suppressed by the overbroad PM1 global blocker — but the canonical
+        boolean truncating_pathogenic_research_scope_validated stays FALSE and
+        authorization is PENDING_PROSPECTIVE. Post-hoc support is not validation.
+  governance_state: RESEARCH_ONLY_NO_CLINICAL_USE
+  governance_statement: "This is a post-hoc re-adjudication of the frozen ADR-0012 masked-holdout counts for research evidence only; no scope is authorized, and this authorizes no clinical classification, VUS worklist, or ClinVar submission pending a prospective validation on unseen data."
+  old_vs_new_summary:
+    old_v2:
+      full_spectrum_status: BLOCKED_POLICY
+      truncating_pathogenic_research_scope_validated: false
+      missense_reading: performance FAIL (precision_lb/recall_lb = 0.0)
+    new_v3:
+      full_spectrum_status: NOT_VALIDATED (data-insufficiency, missense)
+      truncating_pathogenic_research_scope_validated: false   # still not prospectively validated
+      research_scope_evidence_status: SUPPORTED_POSTHOC (authorization PENDING_PROSPECTIVE)  # canonical key truncating_pathogenic_research_scope_validated
+      missense_reading: NO_CALLS / UNDERPOWERED, conditional NOT_ESTIMABLE
+
+# ---------------------------------------------------------------------------
+# 6. Additive interfaces, schemas, config, and CLI
+# ---------------------------------------------------------------------------
+
+interfaces_and_schemas:
+  new_module:
+    path: src/raptor/eval/tiered_gate.py
+    entrypoint: >-
+      decide_tiered_gate(metrics, config, run_meta, tiered_authorization=None) ->
+      TieredGateDecision
+    contract: >-
+      Pure function of (per-scope counts from Metrics, the locked v2 EvalConfig,
+      whole-run integrity meta, and the SEPARATELY-loaded tiered_authorization
+      block). No I/O, no network. The tiered block is supplied EXPLICITLY (the
+      production CLI passes the block returned by load_tiered_authorization) OR
+      via a test-injected EvalConfig.tiered_authorization optional field; it is
+      NEVER read from tsc2.yaml. BEFORE any axis, decide_tiered_gate raises the
+      typed fail-closed error (fail_closed_input_config_error) on malformed
+      counts / unknown excluded criterion / mapping drift / tiered-config drift /
+      source-hash drift AND on Oracle-constant drift in a hand-built EvalConfig
+      (confidence != 0.95, stratum precision/recall != pinned missense 0.90/0.85
+      or truncating 0.95/0.95, drifted directions/gating, min_count_per_class !=
+      36 — see tiered_config_oracle_constants_runtime_validation) — returning NO
+      decision (no partial record). Otherwise emits every axis for every scope;
+      records A3=BLOCKED in reasons independently of the A5 summary label
+      (A3_policy_parity.reason_visibility); never coerces undefined metrics to
+      0.0; A4 coverage is correct/actual (tp/tn), never called/actual.
+  new_models:
+    path: src/raptor/eval/model.py  (additive dataclasses ONLY)
+    TieredScopeVerdict:
+      fields: [stratum, direction, data_sufficiency, conditional_performance,
+        policy_parity, precision_lb (nullable), recall_lb (nullable),
+        precision_threshold (nullable), recall_threshold (nullable),
+        actual_count, called_count, tp, tn, fp, fn, min_count,
+        end_to_end_correct_call_coverage (fraction str + correct numerator (tp
+        for pathogenic / tn for benign) + actual denominator),
+        abstain_count, scope_evidence_status, authorization_status, reasons]
+    TieredGateDecision:
+      fields: [schema_version="3", run_integrity, scopes (key->TieredScopeVerdict),
+        full_spectrum_status, full_spectrum_authorization,
+        research_scope_evidence_status (canonical key
+        truncating_pathogenic_research_scope_validated -> status),
+        research_scope_authorization (canonical key -> status),
+        research_scope_flags (canonical boolean
+        truncating_pathogenic_research_scope_validated=false post-hoc),
+        governance_state, governance_statement,
+        research_use_disclaimer, prospective_validation_status="PENDING",
+        source_record, source_canonical_lf_sha256, source_content_hash,
+        tiered_config_canonical_sha256, implementation_commit,
+        implementation_module_sha256, content_hash, post_hoc: true,
+        no_new_evidence_statement, reason]
+  new_standalone_config:
+    path: configs/eval/tiered_gate_v3.yaml   # NEW standalone file (unless a better explicit name is chosen)
+    schema: raptor.eval.tiered_authorization.v3
+    top_level_key: tiered_authorization      # single root block; own schema + own hash
+    schema_version: 3
+    rationale: >-
+      The ENTIRE v3 rule is a NEW standalone additive config so that the
+      policy-bound configs/eval/tsc2.yaml is NOT appended to, NOT re-signed, and
+      stays byte-identical at approved SHA-256 ea4ff… (rev-2 appended it and
+      broke the census/ADR-0012 policy hash → 38f729…). This file has its OWN
+      schema and its OWN canonical hash (tiered_config_canonical_sha256).
+    contents:
+      - "reuse_reference: oracle_thresholds + min_count_per_class are referenced
+        from the SEPARATELY-loaded tsc2.yaml EvalConfig, NOT redefined here"
+      - "axis_enums: the six per-scope axis enum vocabularies + the aggregate
+        surface enums (§4/§4a) (frozen, semantics-locked)"
+      - "criterion_scope_applicability: the map in section 4 (semantics-locked;
+        unknown excluded criterion → typed fail-closed error, NOT per-scope BLOCK)"
+      - "full_spectrum.requires: reuse the pinned set (missense:pathogenic,
+        missense:benign, truncating:pathogenic) identical to scope_authorization;
+        must not diverge"
+      - "research_scopes.truncating_pathogenic_research_scope_validated.requires:
+        [truncating:pathogenic]  (canonical ADR-0011/v2 key, no alias)"
+      - "governance_statements: RESEARCH_ONLY_NO_CLINICAL_USE and
+        TRUNCATING_PATHOGENIC_PROSPECTIVE_AUTHORIZED, both pinned VERBATIM to
+        pinned_safety_strings.governance_statements (§4a)"
+      - "research_use_disclaimer: verbatim reuse of the pinned v2 disclaimer"
+      - "no_new_evidence_statement: pinned verbatim (§4a)"
+      - "prospective_validation: the locked registration in section 8, status PENDING"
+    invariant: >-
+      configs/eval/tsc2.yaml has an EMPTY git diff (byte-identical at approved
+      ea4ff…) and carries NO tiered_authorization block. tiered_gate_v3.yaml is a
+      brand-new file (git add only). No existing tsc2 key, threshold, direction,
+      gating flag, min_count, split, or Tavtigian value is altered; load_config
+      value-lock and the census/ADR-0012 policy-hash check still pass unchanged.
+  new_config_pins:
+    path: src/raptor/eval/config.py  (additive pins + standalone loader ONLY)
+    additions:
+      - _PINNED_CRITERION_SCOPE_APPLICABILITY (semantics-locked map)
+      - _PINNED_TIERED_GOVERNANCE_STATEMENTS (RESEARCH_ONLY_NO_CLINICAL_USE +
+        TRUNCATING_PATHOGENIC_PROSPECTIVE_AUTHORIZED, verbatim)
+      - _PINNED_NO_NEW_EVIDENCE_STATEMENT (verbatim)
+      - _PINNED_PROSPECTIVE_VALIDATION (locked single-dataset contract)
+      - "_PINNED_TIERED_AUTHORIZATION (the full standalone block, verbatim) — the
+        equality target for the tiered-config validator"
+      - "TieredReadjudicationError / TieredReadjudicationConfigError /
+        TieredReadjudicationInputError (typed fail-closed exceptions)"
+      - "load_tiered_authorization(path) -> Mapping: reads
+        configs/eval/tiered_gate_v3.yaml, checks schema ==
+        raptor.eval.tiered_authorization.v3, extracts the tiered_authorization
+        block, calls _validate_tiered_authorization, and returns the validated
+        block. It NEVER reads or mutates tsc2.yaml."
+      - "_validate_tiered_authorization (raises the typed config error on unknown
+        criterion, drifted applies_to, altered governance/disclaimer/
+        no_new_evidence_statement, changed full_spectrum.requires or
+        research-scope requires — by strict equality vs _PINNED_TIERED_AUTHORIZATION)"
+      - "an OPTIONAL EvalConfig.tiered_authorization field used ONLY for
+        test-injection (a hand-built EvalConfig); load_config(tsc2.yaml) leaves it
+        None and NEVER populates it from tsc2 — tsc2 has no tiered block."
+    constraint: >-
+      no edit to existing v1/v2 pins or validators; load_config(tsc2.yaml) is
+      byte/behaviour compatible and does not read, require, or forbid a tiered
+      block — the tiered rule enters ONLY through load_tiered_authorization or
+      explicit test injection.
+  new_cli:
+    path: scripts/build_tiered_readjudication.py
+    args:
+      - "--tiered-config configs/eval/tiered_gate_v3.yaml (exact canonical
+        default; the standalone v3 rule file loaded via load_tiered_authorization)"
+      - "the existing tsc2.yaml EvalConfig is loaded via the UNCHANGED
+        load_config for the locked Oracle constants; both exact files are loaded
+        and combined WITHOUT mutating tsc2 bytes."
+    behavior: >-
+      (1) read frozen R2 record; (2) verify its canonical LF blob SHA-256 ==
+      7c55… (typed fail-closed InputError on mismatch, and reject the CRLF
+      e914… hash as an input pin); (3) load configs/eval/tsc2.yaml via load_config
+      (byte-unchanged) AND configs/eval/tiered_gate_v3.yaml via
+      load_tiered_authorization (typed ConfigError on drift), combining them
+      without touching tsc2 bytes; (4) reconstruct per-scope Metrics + run_meta
+      from frozen fields (tp/tn/fp/fn per direction); (5) call
+      decide_tiered_gate(metrics, config, run_meta,
+      tiered_authorization=<loaded block>) (which re-validates config/input/Oracle
+      constants, else raises the typed error and writes NOTHING); (6)
+      independently re-derive the axis summary and cross-check it equals the
+      decision (integrity boundary, mirrors build_aggregate_v2's cross-check); (7)
+      compute tiered_config_canonical_sha256 over the LOADED standalone block,
+      capture the full implementation_commit + implementation_module_sha256, embed
+      source_content_hash (2ead…) and source_canonical_lf_sha256 (7c55…),
+      compute the record's own content_hash (over compact JSON, excluding
+      content_hash), and write the NEW record; then (8) compute the written
+      file's canonical-LF SHA-256 and record it in an EXTERNAL manifest
+      alongside the artifact (the record never embeds its OWN file SHA) and
+      re-verify the on-disk file against that manifest hash. Deterministic,
+      offline, idempotent. tsc2.yaml is never written.
+  hash_payload:
+    content_hash: >-
+      SHA-256 (hex) over
+      json.dumps(record_without_content_hash, sort_keys=True, separators=(",", ":"))
+      .encode("utf-8") — compact canonical JSON with the content_hash field
+      itself excluded, mirroring report.py content_hash().
+    canonical_lf_file_sha256_external: >-
+      The committed file is json.dumps(record, indent=2, sort_keys=True) + "\n"
+      written UTF-8 with LF newlines; its Git/LF blob SHA-256 is the artifact's
+      canonical FILE identity. This hash is EXTERNAL: a file cannot embed its own
+      final hash without self-reference, so the record does NOT contain (pin) its
+      OWN canonical-LF file SHA. Instead the orchestrator computes this SHA AFTER
+      writing the file and records it in an external manifest alongside the
+      artifact, then re-verifies the on-disk file against that manifest hash on
+      every read; fail-closed on mismatch. Only the SOURCE R2 record's
+      already-committed canonical-LF SHA (7c55…) is embedded in this record, as
+      source provenance — never this record's own. A Windows CRLF checkout hash
+      is a local-filesystem artifact and is NEVER recorded as the canonical
+      identity (exactly as R2's 7c55… vs e914…).
+    tiered_config_canonical_sha256: >-
+      SHA-256 over
+      json.dumps(loaded_tiered_authorization_block, sort_keys=True, separators=(",", ":"))
+      .encode("utf-8") — the standalone configs/eval/tiered_gate_v3.yaml
+      tiered_authorization block AFTER load_tiered_authorization/validation, so
+      any drift in the standalone config changes the hash. It is derived from the
+      separately loaded standalone config, NOT from tsc2.yaml (whose approved
+      policy hash ea4ff… is unaffected).
+    implementation_commit: full 40-hex git HEAD commit that built the record.
+    implementation_module_sha256: Git/LF blob SHA-256 of src/raptor/eval/tiered_gate.py.
+  output_schema:
+    record: data/census/tsc_tiered_readjudication_2026-07-21.json
+    schema: raptor.tsc.tiered_readjudication.v3
+    non_identifying: true   # aggregate counts only, no per-variant identity
+    required_fields:
+      - schema, date, post_hoc: true
+      - source_record + source_canonical_lf_sha256 (7c55…) + source_content_hash (2ead…)
+      - tiered_config_canonical_sha256 (canonical hash of the standalone configs/eval/tiered_gate_v3.yaml tiered_authorization block)
+      - implementation_commit (full 40-hex) + implementation_module_sha256 (tiered_gate.py LF blob)
+      - content_hash (this record's own deterministic hash; see hash_payload)
+      - old_semantic_outcome (from R2) and new_tiered_outcome (per-scope axes incl. A4 correct/actual)
+      - research_scope_flags.truncating_pathogenic_research_scope_validated: false
+        + research_scope_evidence_status: SUPPORTED_POSTHOC (canonical key)
+      - no_new_evidence_statement (verbatim)
+      - prospective_validation_status: PENDING (+ locked contract ref)
+      - research_use_disclaimer (verbatim) + governance_state
+        RESEARCH_ONLY_NO_CLINICAL_USE + governance_statement (verbatim)
+    external_artifact_identity: >-
+      The written file's canonical-LF SHA-256 is recorded and verified by the
+      orchestrator in an EXTERNAL manifest alongside the artifact — it is NOT a
+      field of the record (a file cannot embed its own final hash without
+      self-reference). Only the SOURCE R2 canonical-LF SHA (7c55…) appears inside
+      the record, as provenance.
+    never: overwrite/relabel R2; write any per-variant row; assert
+      AUTHORIZED_RESEARCH_ONLY or set the
+      truncating_pathogenic_research_scope_validated boolean true; embed/pin this
+      record's OWN canonical-LF file SHA inside the record.
+
+# ---------------------------------------------------------------------------
+# 7. Test matrix — Gemini RED first, then Sonnet build, then GPT-5.4 check
+# ---------------------------------------------------------------------------
+
+test_matrix:
+  authoring_rule: >-
+    Gemini 3.5 Flash writes every test RED before Sonnet implements. Synthetic
+    tests use hand-built Metrics ONLY (no real R2 numbers). The single frozen-R2
+    test loads the byte-frozen record via its canonical LF hash and asserts the
+    derived axes; it never hardcodes an axis value into production code.
+  synthetic_axis_tests:
+    file: tests/eval/test_tiered_gate.py
+    cases:
+      - NO_CALLS (called=0) → data NO_CALLS, conditional NOT_ESTIMABLE, lower
+        bounds null (NEVER 0.0), scope NO_CALLS.
+      - UNDERPOWERED (0<min<36) → NOT_ESTIMABLE, scope UNDERPOWERED; a nonzero
+        stored precision_lb on <36 calls is NOT read as MET.
+      - ADEQUATE+MET → SUPPORTED_POSTHOC + authorization PENDING_PROSPECTIVE,
+        never AUTHORIZED_RESEARCH_ONLY.
+      - ADEQUATE+UNMET (clear policy) → NOT_SUPPORTED.
+      - No registered threshold → NOT_APPLICABLE (never fabricated threshold).
+      - PM1 excluded → BLOCKS only missense:pathogenic; truncating:pathogenic and
+        every benign scope stay CLEAR (global-blocker-leakage guard).
+      - A3 reason visibility → when PM1 is excluded, missense:pathogenic (whose A5
+        summary is NO_CALLS/UNDERPOWERED by precedence) STILL carries the exact
+        pinned PM1 policy-block reason (the verbatim
+        A3_policy_parity.reason_visibility string, tokens policy_parity=BLOCKED /
+        PM1 / evaluation_skipped / applies_to / missense:pathogenic) in its
+        reasons list; a CLEAR scope carries NO policy_parity reason; multiple
+        applicable criteria append one sorted entry each.
+      - A4 correct-call coverage uses CORRECT counts (tp/tn) — benign with fp>0
+        yields tn/actual < called/actual (called/actual can NEVER be substituted
+        for correct/actual).
+      - Oracle-constant runtime validation → a hand-built EvalConfig whose
+        oracle confidence != 0.95, whose missense/truncating precision-recall !=
+        pinned 0.90/0.85 or 0.95/0.95, whose gating/directions drift, or whose
+        min_count_per_class != 36 raises TieredReadjudicationConfigError from
+        decide_tiered_gate BEFORE any axis and yields NO decision/artifact; a
+        matching pinned EvalConfig proceeds.
+      - Standalone tiered-config loading → load_tiered_authorization reads
+        configs/eval/tiered_gate_v3.yaml, validates it, and returns the block;
+        drift in that file (criterion map / requires / governance / disclaimer /
+        no_new_evidence_statement / dataset rule) raises
+        TieredReadjudicationConfigError; load_config(tsc2.yaml) is unaffected and
+        never yields a tiered block.
+      - Typed fail-closed error (no decision / no artifact) — triggers are
+        non-int/bool/negative counts; unknown excluded criterion;
+        criterion-map applies_to drift; source-hash drift; standalone
+        tiered-config drift; Oracle-constant drift — each
+        raises TieredReadjudication* and
+        produces NO scope record (an unknown criterion never yields a per-scope
+        BLOCKED).
+      - full_spectrum authorization requires ALL three requires-scopes
+        VALIDATED_PROSPECTIVE (SUPPORTED_POSTHOC alone never authorizes);
+        dropping a missense scope never authorizes full-spectrum (anti-cherry-pick).
+      - INVALID run integrity (A0) → every scope A5 INVALID, no authorization,
+        BUT an artifact is still emitted (distinct from the typed abort).
+      - Post-hoc path NEVER emits AUTHORIZED_RESEARCH_ONLY, VALIDATED_PROSPECTIVE, or a true
+        truncating_pathogenic_research_scope_validated boolean.
+  frozen_r2_readjudication_test:
+    file: tests/eval/test_tiered_readjudication_frozen_r2.py
+    asserts: >-
+      Loading the canonical-LF-verified R2 record yields EXACTLY the §5 outcome
+      for ALL SIX scopes across ALL axes (data_sufficiency, conditional_
+      performance, policy_parity, A4 correct-call coverage, conditional_lower_
+      bounds, scope_evidence_status, authorization_status):
+      missense:pathogenic NO_CALLS/NOT_ESTIMABLE/BLOCKED/0-of-51/null/NO_CALLS
+      (with reasons containing the exact pinned "policy_parity=BLOCKED: PM1
+      evaluation_skipped applies_to missense:pathogenic" even though the A5
+      summary is NO_CALLS);
+      missense:benign UNDERPOWERED/NOT_ESTIMABLE/CLEAR/9-of-103/null/UNDERPOWERED;
+      truncating:pathogenic ADEQUATE/MET/CLEAR/189-of-210/SUPPORTED_POSTHOC/
+      PENDING_PROSPECTIVE; truncating:benign NO_CALLS/NOT_APPLICABLE/CLEAR/0-of-1/
+      NOT_APPLICABLE; other:pathogenic ADEQUATE/NOT_APPLICABLE/CLEAR/89-of-117/
+      NOT_APPLICABLE; other:benign ADEQUATE/NOT_APPLICABLE/CLEAR/112-of-2095
+      (called 113, fp=1)/NOT_APPLICABLE — asserting other:benign is 112/2095 NOT
+      113/2095 and other:pathogenic is 89/117, so correct/actual is never the
+      called/actual substitute. Also asserts full_spectrum NOT_VALIDATED +
+      NOT_AUTHORIZED; canonical boolean
+      truncating_pathogenic_research_scope_validated == false with
+      research_scope_evidence_status == SUPPORTED_POSTHOC; governance
+      RESEARCH_ONLY_NO_CLINICAL_USE with its pinned verbatim statement;
+      no_new_evidence_statement + research_use_disclaimer verbatim; prospective
+      PENDING; the source_content_hash (2ead…) and source_canonical_lf_sha256
+      (7c55…) are recorded; the emitted record contains NO field pinning its OWN
+      canonical-LF file SHA, while the orchestrator records/verifies that file
+      SHA in an external manifest alongside the artifact; and the wrong-hash
+      (e914…) input is rejected with the typed error and NO artifact.
+  preservation_regression_test:
+    file: tests/eval/test_tiered_gate_preservation.py
+    asserts: >-
+      gate.py / scope_gate.py / model v1+v2 classes / R2 record
+      (tsc_masked_holdout_gate_disabled_manual_2026-07-21.json) / the 2026-07-13
+      v1 record are byte-identical to base 037701e; decide_gate + decide_scope_gate
+      outputs unchanged on the existing fixtures; configs/eval/tsc2.yaml is
+      BYTE-IDENTICAL (empty git diff, approved SHA-256 ea4ff… unchanged, NO
+      tiered_authorization block, census/ADR-0012 policy-hash check still passes);
+      and configs/eval/tiered_gate_v3.yaml is a NEW standalone additive file
+      (present, git-added) that load_config never reads.
+  prospective_registration_test:
+    file: tests/eval/test_tiered_prospective_registration.py
+    asserts: >-
+      The locked prospective contract (carried by the standalone
+      configs/eval/tiered_gate_v3.yaml, loaded via load_tiered_authorization)
+      exists with status PENDING and matches the
+      tiered axis enums, thresholds, scope lattice, and criterion map; the
+      dataset rule resolves to EXACTLY ONE registered archive (single rule, not
+      an OR); the BLOCKED_DATA path chooses NO outcome-dependent fallback; and
+      any edit to states/thresholds/scope/map/dataset-rule after the contract is
+      locked is rejected (TieredReadjudicationConfigError). tsc2.yaml carries no
+      part of this contract.
+
+# ---------------------------------------------------------------------------
+# 8. Prospective validation — registered now, PENDING
+# ---------------------------------------------------------------------------
+
+prospective_validation:
+  status: PENDING
+  config_location: >-
+    The locked prospective contract is registered in the NEW standalone
+    configs/eval/tiered_gate_v3.yaml (tiered_authorization.prospective_validation),
+    loaded via load_tiered_authorization — NOT in tsc2.yaml. tsc2.yaml stays
+    byte-identical at approved ea4ff… and carries no part of this contract.
+  claim: >-
+    No prospective validation has occurred. This re-adjudication is post-hoc on
+    frozen R2 and cannot and does not claim otherwise.
+  locked_contract:
+    same_as_posthoc:
+      - tiered axis states and precedence (§4)
+      - locked thresholds (missense 0.90/0.85, truncating 0.95/0.95, conf 0.95)
+      - min_count_per_class = 36
+      - scope lattice {missense, truncating, other} x {pathogenic, benign}
+      - criterion_scope_applicability map (§4)
+      - full_spectrum.requires (missense:pathogenic, missense:benign,
+        truncating:pathogenic)
+    dataset_rule:   # SINGLE locked rule — never an OR
+      registered_dataset: >-
+        The FIRST NCBI ClinVar GRCh38 variant_summary MONTHLY archive whose
+        NCBI-published official archive date is on or after 2026-08-01 — i.e. the
+        2026-08 monthly release, file variant_summary_2026-08.txt.gz under
+        https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary/.
+        Selection is deterministic and yields EXACTLY ONE archive: order the
+        monthly archives by official published archive date ascending, take the
+        first with date >= 2026-08-01; ties broken by lexicographically smallest
+        archive filename.
+      freeze_before_labels_scoring: >-
+        Freeze that archive's URL, official archive date, NCBI-published md5, and
+        sha256 into the locked contract BEFORE deriving any label, mask, score,
+        or tiered label — mirroring the R2 benchmark freeze (tsc2.yaml
+        labels_snapshot clinvar_2026-07-07, md5 bd3720834b62733a6a1c81d7e1eef941,
+        sha256 5fe4fe10783391d01dc414dc5583a3e63487b67f8cd3c8429d59227cd5f4f37f).
+      unavailable_or_contract_invalid: >-
+        If that archive is unavailable, withdrawn, or its published md5/sha256
+        contract cannot be verified, the prospective status is BLOCKED_DATA and
+        NO alternative dataset is substituted based on observed outcomes — there
+        is no outcome-dependent fallback chain.
+      independent_data: >-
+        A genuinely independent, non-overlapping benchmark MAY be recorded as
+        SECONDARY corroborating evidence only; it can NEVER substitute for the
+        registered authorization dataset above.
+    procedure:   # pinned NOW, not invented at run time
+      freeze: pin URL + official archive date + md5 + sha256 before labels/scoring.
+      hash: verify the raw archive sha256 == the frozen pin (fail-closed
+        BLOCKED_DATA on any drift) before deriving the GRCh38/TSC benchmark.
+      mask: apply the identical mask/remask lineage discipline as R2
+        (effective_lineage_blockers == [] AND remask_survivors == 0).
+      benchmark: derive the GRCh38/TSC benchmark by the same frozen procedure as
+        scripts/build_tsc_benchmark.py (raw-snapshot sha256 verified first).
+      score_and_gate: run decide_tiered_gate under the SAME locked axes /
+        thresholds / criterion map / min_count_per_class as the post-hoc rule.
+    future_authorization_and_governance_outcomes:   # pinned NOW
+      pass: >-
+        If truncating:pathogenic clears its locked 0.95/0.95 at ADEQUATE power
+        with CLEAR policy_parity on the registered dataset, a NEW owner decision
+        may graduate it to research_scope_evidence_status VALIDATED_PROSPECTIVE,
+        authorization_status AUTHORIZED_RESEARCH_ONLY, governance_state
+        TRUNCATING_PATHOGENIC_PROSPECTIVE_AUTHORIZED
+        (pinned verbatim statement, §4a), and set the canonical boolean
+        truncating_pathogenic_research_scope_validated true — via a FRESH record
+        + fresh hashes, never by editing this post-hoc record. SUPPORTED_POSTHOC
+        alone can NEVER satisfy this future authorization.
+      fail_or_blocked: >-
+        Otherwise governance_state stays RESEARCH_ONLY_NO_CLINICAL_USE,
+        authorization_status stays PENDING_PROSPECTIVE/NOT_AUTHORIZED, and the
+        canonical boolean truncating_pathogenic_research_scope_validated stays
+        false.
+      full_spectrum: >-
+        Remains NOT_VALIDATED / NOT_AUTHORIZED until the missense scopes
+        independently validate prospectively (never from truncating alone).
+    no_post_dataset_edits: >-
+      No threshold, scope, axis-enum, criterion-map, or dataset-rule edit is
+      permitted after that dataset is seen; any such edit voids the prospective
+      claim.
+    graduation: >-
+      Only a run under this locked contract on the registered unseen dataset may
+      move a scope from PENDING_PROSPECTIVE to AUTHORIZED_RESEARCH_ONLY (via
+      VALIDATED_PROSPECTIVE evidence with CLEAR policy parity), via a new owner
+      decision + fresh hashes.
+
+# ---------------------------------------------------------------------------
+# 9. Preservation, migration, backout
+# ---------------------------------------------------------------------------
+
+preservation_and_migration:
+  byte_identical:
+    - src/raptor/eval/gate.py (decide_gate, GateDecision, StratumVerdict)
+    - src/raptor/eval/scope_gate.py (decide_scope_gate)
+    - existing model.py v1/v2 dataclasses (only NEW dataclasses appended)
+    - configs/eval/tsc2.yaml (approved SHA-256 ea4ff…; NO tiered_authorization
+      block; empty git diff; census/ADR-0012 policy-hash check unchanged)
+    - data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json (R2)
+    - data/census/tsc_masked_holdout_gate_2026-07-13.json (v1)
+    - the VUS census records
+  additive_only_edits:
+    - src/raptor/eval/tiered_gate.py (new; decide_tiered_gate + TieredReadjudication* errors)
+    - src/raptor/eval/model.py (append TieredScopeVerdict, TieredGateDecision)
+    - src/raptor/eval/config.py (append pins + load_tiered_authorization +
+      _validate_tiered_authorization + typed config error + OPTIONAL
+      test-injection EvalConfig.tiered_authorization field; load_config unchanged)
+    - configs/eval/tiered_gate_v3.yaml (NEW standalone file — the entire v3 rule;
+      own schema raptor.eval.tiered_authorization.v3 + own canonical hash)
+    - scripts/build_tiered_readjudication.py (new; --tiered-config arg)
+    - tests/eval/test_tiered_*.py (new)
+  additive_architecture: >-
+    Every edit is purely additive; the architecture adds a NEW axis module,
+    NEW dataclasses, a NEW standalone config file, a NEW CLI, and a NEW v3
+    record. configs/eval/tsc2.yaml is NOT touched (no appended block, no policy
+    re-hash). R2 and all v1/v2 code, records, and hashes remain immutable and
+    byte-identical.
+  backout: >-
+    Delete the new module/CLI/tests, the new standalone
+    configs/eval/tiered_gate_v3.yaml, and the additive config.py pins/loader;
+    nothing in v1/v2 depends on them and tsc2.yaml was never edited, so removal
+    restores base 037701e behavior exactly. No data record needs reverting (the
+    v3 record is new) and no tsc2/policy-hash revert is required.
+  handoff: >-
+    MADR/ADR handoff — after checker CLEAN and the re-adjudication record is
+    produced, draft ADR-0013 "Tiered gate v3 post-hoc re-adjudication" recording
+    the two corrected v2 semantics, the criterion map, the post-hoc boundary,
+    and the PENDING prospective contract. README/PROGRAM status is updated ONLY
+    after a real prospective run, never from this post-hoc record.
+
+# ---------------------------------------------------------------------------
+# 10. Validation selector (implementation phase)
+# ---------------------------------------------------------------------------
+
+validation:
+  targeted_selector: >-
+    python -m pytest tests/eval/test_tiered_gate.py
+    tests/eval/test_tiered_readjudication_frozen_r2.py
+    tests/eval/test_tiered_gate_preservation.py
+    tests/eval/test_tiered_prospective_registration.py -q
+  escalation: >-
+    Only if the preservation test surfaces a v1/v2 interaction, widen to
+    tests/eval/test_scope_gate*.py tests/eval/test_masked_gate_aggregate.py
+    tests/eval/test_ac5_gate.py.
+  planner_spec_self_validation: this YAML parses and round-trips (yaml.safe_load).
+
+# ---------------------------------------------------------------------------
+# 11. Beat-4 self-audit (invert: how could this pass yet still be wrong?)
+# ---------------------------------------------------------------------------
+
+beat4_self_audit:
+  empty_beat4: false
+  findings:
+  - id: policy_hash_regression
+    risk: >-
+      Appending the tiered rule to the policy-bound configs/eval/tsc2.yaml (the
+      rev-2 defect) changes its approved raw SHA-256 (ea4ff… → 38f729…) and
+      breaks ADR-0012 / census policy verification even though scoring is
+      unchanged.
+    control: the ENTIRE v3 rule lives in the NEW standalone
+      configs/eval/tiered_gate_v3.yaml (own schema + own hash); tsc2.yaml is
+      byte-identical (empty git diff, ea4ff… unchanged, no tiered block); the
+      preservation test asserts the empty tsc2 diff and that the census/ADR-0012
+      policy-hash check still passes; tiered_config_canonical_sha256 derives from
+      the standalone file, not tsc2.
+  - id: oracle_constant_bypass
+    risk: >-
+      A hand-built / test-injected EvalConfig bypasses load_config's value-lock
+      and scores the tiered rule against a moved threshold, confidence, gating,
+      direction, or min_count.
+    control: decide_tiered_gate DEFENSIVELY re-validates the Oracle constants
+      against config.py pins (_PINNED_ORACLE_CONFIDENCE=0.95, _PINNED_STRATUM_
+      THRESHOLDS 0.90/0.85 + 0.95/0.95, pinned gating/directions,
+      _PINNED_MIN_COUNT_PER_CLASS=36) and raises TieredReadjudicationConfigError
+      BEFORE any axis; synthetic test asserts drift yields NO decision/artifact.
+  - id: a3_reason_hidden_by_precedence
+    risk: >-
+      The A5 precedence summary (NO_CALLS/UNDERPOWERED) masks a real A3=BLOCKED,
+      so the PM1 policy block on missense:pathogenic silently disappears from the
+      record.
+    control: >-
+      A3=BLOCKED is appended to reasons INDEPENDENTLY of A5 with the exact
+      pinned string "policy_parity=BLOCKED: PM1 evaluation_skipped applies_to
+      missense:pathogenic"; the synthetic and frozen-R2 tests assert it is
+      present even though missense:pathogenic's A5 is NO_CALLS.
+  - id: posthoc_laundering
+    risk: >-
+      SUPPORTED_POSTHOC quietly read as authorization downstream.
+    control: A6 never emits AUTHORIZED_RESEARCH_ONLY in a re-adjudication; record
+      carries post_hoc=true + no_new_evidence_statement + PENDING prospective;
+      checker probe asserts no AUTHORIZED_RESEARCH_ONLY (and no ambiguous bare
+      AUTHORIZED) anywhere.
+  - id: undefined_metric_coercion
+    risk: >-
+      Consuming R2's stored 0.0 / 0.6637 lower bounds as real, reproducing the
+      spurious missense FAIL.
+    control: A2 gates on data_sufficiency FIRST; lower bounds read only when
+      ADEQUATE, else null; synthetic test asserts a nonzero underpowered LB is
+      not MET and a null is never 0.0.
+  - id: scope_cherry_pick
+    risk: >-
+      Narrowing full_spectrum to drop missense to manufacture a pass.
+    control: full_spectrum.requires reuses the pinned locked set; validator
+      rejects drift; anti-cherry-pick test.
+  - id: global_blocker_leakage
+    risk: >-
+      Re-introducing an overbroad PM1 (or unknown-criterion) blocker onto
+      truncating/benign scopes.
+    control: criterion_scope_applicability maps PM1→missense:pathogenic only;
+      an unknown criterion raises the typed fail-closed error (no artifact),
+      never a per-scope BLOCK; leakage test on the frozen and synthetic paths.
+  - id: authorization_overclaim
+    risk: >-
+      Emitting a favorable full_spectrum/governance headline from a MET
+      truncating scope.
+    control: full_spectrum stays NOT_VALIDATED/NOT_AUTHORIZED while missense is
+      unvalidated; governance fixed to RESEARCH_ONLY_NO_CLINICAL_USE.
+  - id: frozen_record_mutation
+    risk: >-
+      A refactor or CLI writes back into R2 or relabels it.
+    control: R2 verified read-only by canonical LF hash; preservation test
+      asserts byte-identity vs base 037701e; CLI writes only the new record.
+  - id: research_key_drift
+    risk: >-
+      A drifted identifier/alias (research_flag, research_evidence,
+      truncating_pathogenic_research_scope) silently forks the ADR-0011/v2
+      research surface so the canonical validated boolean is bypassed.
+    control: the canonical key truncating_pathogenic_research_scope_validated is
+      reused EVERYWHERE (config requires, record flag, evidence status, tests);
+      _PINNED_RESEARCH_SCOPE_REQUIRES / _validate_tiered_authorization reject any
+      renamed/aliased research-scope key.
+  - id: invalid_config_partial_record
+    risk: >-
+      A malformed count or unknown/ drifted criterion yields a PARTIAL v3
+      artifact (some scopes BLOCKED, some scored) that leaks a favorable
+      truncating verdict despite invalid input.
+    control: the typed fail-closed error (fail_closed_input_config_error) raises
+      BEFORE any axis and writes NO artifact; A3/A5/A6 run only after valid
+      input/config; synthetic tests assert no decision object is returned and no
+      file is written on each trigger.
+  - id: called_for_correct_substitution
+    risk: >-
+      A4 coverage silently uses called/actual (e.g. other:benign 113/2095)
+      instead of correct/actual (112/2095), inflating benign sensitivity.
+    control: A4 numerators are tp (pathogenic) / tn (benign) from
+      metrics[stratum].counts; frozen-R2 test asserts other:benign 112/2095
+      (called 113, fp=1) and other:pathogenic 89/117 across all six scopes.
+  - id: prospective_dataset_ambiguity
+    risk: >-
+      An OR-dataset rule lets an implementer pick, post-outcome, whichever
+      snapshot passes (outcome-dependent dataset selection).
+    control: a SINGLE deterministic rule (first ClinVar GRCh38 monthly archive
+      with official date >= 2026-08-01) selects exactly one dataset, frozen by
+      URL/date/md5/sha256 before labels/scoring; unavailable → BLOCKED_DATA with
+      NO outcome-dependent fallback; independent data is secondary only.
+  - id: hash_provenance_gap
+    risk: >-
+      The v3 record omits config/impl/source/self hashes so drift is
+      unverifiable, a CRLF hash is recorded as canonical, or the record is
+      claimed to pin its OWN canonical-LF file hash (an impossible
+      self-reference).
+    control: the record embeds tiered_config_canonical_sha256,
+      implementation_commit + implementation_module_sha256,
+      source_canonical_lf_sha256 (7c55…) + source_content_hash (2ead…), and its
+      own content_hash computed over the COMPACT JSON payload (excluding
+      content_hash) — never over the canonical-LF file. The written file's
+      canonical-LF SHA-256 is an EXTERNAL manifest identity recorded/verified by
+      the orchestrator alongside the artifact (a file cannot embed its own final
+      hash); the CRLF e914… hash is never recorded as canonical.

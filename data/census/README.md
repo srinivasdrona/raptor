@@ -73,6 +73,22 @@ python scripts/build_masked_holdout_gate_aggregate.py \
   --output data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json
 ```
 
+`tsc_tiered_readjudication_2026-07-21.json` is ADR-0013's additive,
+non-identifying post-hoc interpretation of that frozen R2 aggregate. It
+performs no scoring or evidence rerun. The v3 axes report missense pathogenic
+as `NO_CALLS`/`NOT_ESTIMABLE`, missense benign as
+`UNDERPOWERED`/`NOT_ESTIMABLE`, and truncating pathogenic as
+`ADEQUATE`+`MET` with evidence `SUPPORTED_POSTHOC`. Full spectrum remains
+`NOT_VALIDATED`/`NOT_AUTHORIZED`; truncating-pathogenic authorization remains
+`PENDING_PROSPECTIVE`, and the canonical validated flag is false.
+
+The record SHA-256 is
+`1e36b2d07767fdd8e32fbf07dd42f60a2b4cae2ff9b21c7dfb9430d741c5bc5f`.
+Its external manifest is
+`tsc_tiered_readjudication_2026-07-21.sha256`. Prospective validation is
+registered—but not completed—against the first eligible NCBI ClinVar GRCh38
+monthly archive dated on or after 2026-08-01.
+
 `tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json` (ADR-0012) is the
 packet-free, non-identifying binding census aggregate over the same
 6,618-VUS TSC1/TSC2 run under the PP3/BP4-disabled-automated-emission /

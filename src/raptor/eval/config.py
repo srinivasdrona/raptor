@@ -11,6 +11,7 @@ an empty *labels_snapshot* is a provenance breach, not a policy choice.
 """
 from __future__ import annotations
 
+import json
 import math
 from dataclasses import dataclass
 from pathlib import Path
@@ -207,6 +208,196 @@ VALID_CRITERIA: frozenset[str] = frozenset({
 
 class ConfigError(ValueError):
     """Raised on a missing/blank/malformed required eval-config pin (FR9)."""
+
+
+# ---------------------------------------------------------------------------
+# v3 tiered post-hoc re-adjudication (ADDITIVE,
+# `docs/project/specs/tiered-gate-v3-posthoc.yaml`) -- the typed fail-closed
+# error hierarchy + the locked `tiered_authorization` config-block pin.
+# Defined here (not in `raptor.eval.tiered_gate`) so `tiered_gate.py` can
+# import the pinned constants from this module without a circular import;
+# `tiered_gate.py` re-exports these three names so
+# `from raptor.eval.tiered_gate import TieredReadjudicationError, ...` (the
+# import path used by every protected test) still resolves.
+# ---------------------------------------------------------------------------
+class TieredReadjudicationError(Exception):
+    """Base typed fail-closed error for the v3 tiered post-hoc re-adjudication
+    (`fail_closed_input_config_error`, spec §4b). Raised BEFORE any axis
+    (A1..A6) is computed -- `decide_tiered_gate` returns NO decision and no
+    v3 artifact is ever written."""
+
+
+class TieredReadjudicationInputError(TieredReadjudicationError):
+    """Malformed per-scope input counts (non-int / bool / negative / other
+    malformed `Metrics.counts` values) -- raised inside `decide_tiered_gate`
+    BEFORE any axis is computed."""
+
+
+class TieredReadjudicationConfigError(TieredReadjudicationError, ConfigError):
+    """Locked `tiered_authorization` config-block drift (any altered
+    threshold / `min_count_per_class` / `criterion_scope_applicability` /
+    `full_spectrum.requires` / research-scope requires / governance
+    statement / disclaimer / `no_new_evidence_statement` / prospective
+    dataset rule vs the pinned §4a/§8 contract) OR an
+    `evaluation_skipped`/excluded criterion absent from
+    `criterion_scope_applicability` (unknown criterion -- config/input
+    drift, never a per-scope BLOCKED verdict). Inherits from both
+    `TieredReadjudicationError` (protected-test `except` clause) and
+    `ConfigError` (existing `load_config`-style `except` clause)."""
+
+
+#: The locked v3 `tiered_authorization` config block (spec §4a/§8, rev 3),
+#: pinned verbatim -- embedded as a raw JSON string (never hand re-typed, to
+#: guarantee byte-exact preservation of the pinned safety strings, including
+#: the U+2014 em dash in `prospective_validation.dataset_rule.registered_dataset`)
+#: and parsed once at import time. `load_tiered_authorization`/`decide_tiered_gate`
+#: both validate a loaded/passed `tiered_authorization` mapping against
+#: `_PINNED_TIERED_AUTHORIZATION` by strict recursive equality -- ANY drift (a
+#: modified criterion map, a modified `full_spectrum.requires`, a modified
+#: dataset-rule sentence, ...) fails equality and raises
+#: `TieredReadjudicationConfigError` fail-closed. This block is NEVER read
+#: from or stored on `configs/eval/tsc2.yaml`/`EvalConfig` -- it lives ONLY in
+#: the standalone `configs/eval/tiered_gate_v3.yaml` (schema
+#: `raptor.eval.tiered_authorization.v3`), loaded via `load_tiered_authorization`.
+_PINNED_TIERED_AUTHORIZATION_JSON = '''
+{
+  "schema_version": 3,
+  "axis_enums": {
+    "A0_run_integrity": ["PASS", "INVALID"],
+    "A1_data_sufficiency": ["ADEQUATE", "UNDERPOWERED", "NO_CALLS"],
+    "A2_conditional_performance": ["MET", "UNMET", "NOT_ESTIMABLE", "NOT_APPLICABLE"],
+    "A3_policy_parity": ["CLEAR", "BLOCKED"],
+    "A5_scope_evidence_status": [
+      "INVALID", "NOT_APPLICABLE", "NO_CALLS", "UNDERPOWERED",
+      "BLOCKED_POLICY", "NOT_SUPPORTED", "SUPPORTED_POSTHOC", "VALIDATED_PROSPECTIVE"
+    ],
+    "A6_authorization_status": ["NOT_AUTHORIZED", "PENDING_PROSPECTIVE", "AUTHORIZED_RESEARCH_ONLY"]
+  },
+  "criterion_scope_applicability": {
+    "PM1": ["missense:pathogenic"],
+    "PP3": ["missense:pathogenic", "other:pathogenic"],
+    "BP4": ["missense:benign", "other:benign"],
+    "PP5": ["missense:pathogenic", "truncating:pathogenic", "other:pathogenic"],
+    "BP6": ["missense:benign", "truncating:benign", "other:benign"],
+    "PS4": ["missense:pathogenic", "truncating:pathogenic", "other:pathogenic"]
+  },
+  "full_spectrum": {
+    "requires": ["missense:pathogenic", "missense:benign", "truncating:pathogenic"]
+  },
+  "research_scopes": {
+    "truncating_pathogenic_research_scope_validated": {
+      "requires": ["truncating:pathogenic"]
+    }
+  },
+  "governance_statements": {
+    "RESEARCH_ONLY_NO_CLINICAL_USE": "This is a post-hoc re-adjudication of the frozen ADR-0012 masked-holdout counts for research evidence only; no scope is authorized, and this authorizes no clinical classification, VUS worklist, or ClinVar submission pending a prospective validation on unseen data.",
+    "TRUNCATING_PATHOGENIC_PROSPECTIVE_AUTHORIZED": "Prospective validation on unseen data has authorized the truncating-pathogenic research scope for research-evidence use only; full-spectrum VUS automation remains not authorized while missense is unvalidated, and this authorizes no clinical classification, VUS worklist, or ClinVar submission."
+  },
+  "research_use_disclaimer": "Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.",
+  "no_new_evidence_statement": "No new evidence was generated: this record re-interprets the frozen R2 aggregate (source_canonical_lf_sha256 7c55cd4e3059713d1d53886d8893a3819153375b62ce9d37187d731132c6a77f) under the versioned tiered rule and performs no new run, scoring, annotation, benchmark read, network access, or data generation.",
+  "prospective_validation": {
+    "status": "PENDING",
+    "dataset_rule": {
+      "registered_dataset": "The FIRST NCBI ClinVar GRCh38 variant_summary MONTHLY archive whose NCBI-published official archive date is on or after 2026-08-01 — i.e. the 2026-08 monthly release, file variant_summary_2026-08.txt.gz under https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary/. Selection is deterministic and yields EXACTLY ONE archive: order the monthly archives by official published archive date ascending, take the first with date >= 2026-08-01; ties broken by lexicographically smallest archive filename.",
+      "freeze_before_labels_scoring": {
+        "snapshot": "clinvar_2026-08-01",
+        "url": "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary/variant_summary_2026-08.txt.gz",
+        "official_md5_to_be_frozen_when_exists": "PENDING_ARCHIVE_GENERATION",
+        "official_sha256_to_be_frozen_when_exists": "PENDING_ARCHIVE_GENERATION"
+      },
+      "unavailable_or_contract_invalid": {
+        "fallback_status": "BLOCKED_DATA",
+        "outcome_dependent_fallback": false
+      },
+      "future_authorized_surfaces_pinned": {
+        "active": false,
+        "pinned_surfaces": ["full_spectrum", "research_scopes"]
+      }
+    }
+  }
+}
+'''
+_PINNED_TIERED_AUTHORIZATION: Mapping[str, Any] = json.loads(_PINNED_TIERED_AUTHORIZATION_JSON)
+
+
+def _validate_tiered_authorization(value: Any) -> None:
+    """Validate a config-supplied `tiered_authorization` block against the
+    locked pin by strict recursive equality (spec §4b config-drift trigger).
+
+    A single pin-equality check is sufficient and correct here: EVERY
+    protected "drift" fixture (modified criterion map, modified
+    `full_spectrum.requires`, modified research-scope requires, modified
+    governance statement/disclaimer/no-new-evidence statement, modified
+    prospective dataset rule) mutates some part of this dict, so equality
+    against `_PINNED_TIERED_AUTHORIZATION` catches all of them without a
+    bespoke per-field schema walk.
+    """
+    if value != _PINNED_TIERED_AUTHORIZATION:
+        raise TieredReadjudicationConfigError(
+            "`tiered_authorization` does not match the locked pinned v3 config block "
+            "(docs/project/specs/tiered-gate-v3-posthoc.yaml §4a/§8) -- any drift in "
+            "the criterion-scope map, full_spectrum/research-scope requires, governance "
+            "statements, disclaimer, no-new-evidence statement, or prospective dataset "
+            "rule is rejected fail-closed."
+        )
+
+
+#: The schema tag every standalone v3 tiered-authorization config
+#: (`configs/eval/tiered_gate_v3.yaml`) must declare at its `schema:` key --
+#: this file is standalone/additive and is NEVER merged into or read from
+#: `configs/eval/tsc2.yaml` (rev 3: relocated OUT of tsc2.yaml so the
+#: policy-bound, census/ADR-0012-verified tsc2.yaml stays byte-identical at
+#: its approved SHA-256).
+SCHEMA_TIERED_AUTHORIZATION_V3 = "raptor.eval.tiered_authorization.v3"
+
+
+def load_tiered_authorization(path: str | Path) -> Mapping[str, Any]:
+    """Load + strictly validate the STANDALONE v3 tiered-authorization config
+    (`configs/eval/tiered_gate_v3.yaml`) -- entirely separate from
+    `load_config`/`configs/eval/tsc2.yaml`, which stays byte/behaviour
+    compatible and never reads, requires, or stores a tiered block.
+
+    The file's top level carries a `schema:` tag (must equal
+    `SCHEMA_TIERED_AUTHORIZATION_V3` exactly) alongside every
+    `tiered_authorization` field (`schema_version`, `axis_enums`,
+    `criterion_scope_applicability`, `full_spectrum`, `research_scopes`,
+    `governance_statements`, `research_use_disclaimer`,
+    `no_new_evidence_statement`, `prospective_validation`) as SIBLING keys
+    (no nested `tiered_authorization:` wrapper). Returns every key EXCEPT
+    `schema` -- the resulting mapping is validated by strict recursive
+    equality against `_PINNED_TIERED_AUTHORIZATION` and returned only on an
+    exact match.
+
+    Raises `TieredReadjudicationConfigError` (a `ConfigError` subclass, so
+    existing `except ConfigError` call sites still catch it) fail-closed on
+    a missing file, invalid/non-mapping YAML, a missing/mismatched `schema`
+    tag, or ANY drift from the locked pin.
+    """
+    file_path = Path(path)
+    if not file_path.exists():
+        raise TieredReadjudicationConfigError(
+            f"standalone tiered-authorization config not found: {file_path}"
+        )
+    try:
+        raw = yaml.safe_load(file_path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise TieredReadjudicationConfigError(
+            f"standalone tiered-authorization config {file_path} is not valid YAML: {exc}"
+        ) from exc
+    if not isinstance(raw, dict):
+        raise TieredReadjudicationConfigError(
+            f"standalone tiered-authorization config {file_path} root must be a mapping, "
+            f"got {type(raw).__name__}"
+        )
+    schema = raw.get("schema")
+    if schema != SCHEMA_TIERED_AUTHORIZATION_V3:
+        raise TieredReadjudicationConfigError(
+            f"standalone tiered-authorization config {file_path} `schema` must equal "
+            f"{SCHEMA_TIERED_AUTHORIZATION_V3!r} -- got {schema!r}"
+        )
+    tiered_authorization = {k: v for k, v in raw.items() if k != "schema"}
+    _validate_tiered_authorization(tiered_authorization)
+    return tiered_authorization
 
 
 def _require(mapping: Mapping[str, Any], key: str, *, ctx: str = "") -> Any:
