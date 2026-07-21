@@ -2981,7 +2981,7 @@ def _make_g_ag_envelope(pins_overrides=None, policy_overrides=None, with_scope_g
         "pp3bp4_suppressed_variant_count": 1,
         "pp3bp4_scored_calls": 0,
         "operational_skipped_criteria": ["PM1", "PS4"],
-        "evaluation_skipped_criteria": ["PM1"],
+        "evaluation_skipped_criteria": [] if with_scope_gate else ["PM1"],
         "oracle_thresholds": make_oracle_thresholds(),
     }
     if pins_overrides:
@@ -3028,8 +3028,8 @@ def _make_g_ag_envelope(pins_overrides=None, policy_overrides=None, with_scope_g
             "full_spectrum_vus_authorized": True,
             "research_scope_flags": {"truncating_pathogenic_research_scope_validated": True},
             "governance_state": "FULL_SPECTRUM",
-            "governance_statement": "statement",
-            "research_use_disclaimer": "disclaimer",
+            "governance_statement": 'All pre-registered research scopes are validated for research-evidence use only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.',
+            "research_use_disclaimer": 'Research-evidence validation only; this authorizes no clinical classification, VUS worklist, or ClinVar submission.',
             "reason": "reason",
             "scopes": _scopes,
         }
