@@ -1,0 +1,197 @@
+{
+  "bias_gene_transcript": {
+    "NTHL1|NM_002528.6": 30,
+    "TSC1|NM_000368.4": 2249,
+    "TSC2|NM_000548.4": 4339
+  },
+  "bound_config_hashes": {
+    "acmg_scorer_policy": "1ba8066accd8eda16e20518abbeaedb61247fea372675f519f02a8574ff9350e",
+    "approved_predictor_policy": "85e9e92fa9f4c221c02af30e787315a88ed2bef51f6f58d25c5dc267eb55a34a",
+    "bias_lineage_policy": "d2312b2c74f125204ababe9731fc4e37a8e0f30d1608b75f8457aae6591689df",
+    "eval_config": "ea4ff684bdc2ae6b079f352816b3993ac813af0e2654b851c30c1f4ef577a293",
+    "historical_stats": "389e93d5b37f686b8d5e1115e2ebbfcdee6a060417300e5ed38d46304abac6e7",
+    "packet_candidate_direction": "778882c500adc43bfca8e6311d3d2038f96e32f05faff7dcda50560ee3448d67"
+  },
+  "candidate_pattern_compression": {
+    "candidate_LB_review": {
+      "exact_strength_patterns": 2,
+      "largest_pattern": {
+        "criteria": [
+          "BP3 Strong",
+          "PM2 Supporting"
+        ],
+        "points": -3,
+        "variants": 6
+      },
+      "patterns_covering_90_percent": 2,
+      "variants": 7
+    },
+    "candidate_LP_review": {
+      "exact_strength_patterns": 7,
+      "largest_pattern": {
+        "criteria": [
+          "PM2 Supporting",
+          "PVS1 Very Strong"
+        ],
+        "points": 9,
+        "variants": 143
+      },
+      "patterns_covering_90_percent": 1,
+      "variants": 157
+    }
+  },
+  "code_commit": "b1e96d0ef6041ca3093528057bb21d1dcf827e39",
+  "consumed_automated_criterion_incidence": {
+    "BA1": 1,
+    "BP1": 0,
+    "BP3": 7,
+    "BP4": 0,
+    "BP7": 127,
+    "BS1": 0,
+    "PM1": 0,
+    "PM2": 6609,
+    "PM4": 176,
+    "PM5": 147,
+    "PP2": 0,
+    "PP3": 0,
+    "PS1": 110,
+    "PVS1": 150
+  },
+  "corpus": {
+    "TSC1": 2249,
+    "TSC2": 4369,
+    "missense": 5645,
+    "other": 893,
+    "total_vus": 6618,
+    "truncating": 80
+  },
+  "direction_by_consequence": {
+    "missense": {
+      "candidate_LP_review": 4,
+      "no_deterministic_resolution": 5653
+    },
+    "other": {
+      "candidate_LB_review": 7,
+      "candidate_LP_review": 6,
+      "manual_review": 30,
+      "no_deterministic_resolution": 769
+    },
+    "truncating": {
+      "candidate_LP_review": 147,
+      "no_deterministic_resolution": 2
+    }
+  },
+  "direction_by_gene": {
+    "NTHL1": {
+      "manual_review": 30
+    },
+    "TSC1": {
+      "candidate_LB_review": 7,
+      "candidate_LP_review": 45,
+      "no_deterministic_resolution": 2197
+    },
+    "TSC2": {
+      "candidate_LP_review": 112,
+      "no_deterministic_resolution": 4227
+    }
+  },
+  "historical_comparison_superseded": {
+    "annotation_manual_review": {
+      "delta": 0,
+      "disabled_manual": 30,
+      "historical": 30
+    },
+    "candidate_LB_review": {
+      "delta": -1326,
+      "disabled_manual": 7,
+      "historical": 1333
+    },
+    "candidate_LP_review": {
+      "delta": -81,
+      "disabled_manual": 157,
+      "historical": 238
+    },
+    "no_deterministic_resolution": {
+      "delta": 1407,
+      "disabled_manual": 6424,
+      "historical": 5017
+    }
+  },
+  "limitations": [
+    "negative certified masked gate (legacy FAIL, v2 BLOCKED_POLICY, vus_authorized=false)",
+    "PM1 evaluation parity blocker (authorization_blockers: evaluation_skipped_criteria:PM1)",
+    "TSC2-region inputs annotated as NTHL1 require manual resolution",
+    "BIAS emits .4 transcripts while production config pins .5 (transcript drift)",
+    "PS1/PM5 use ClinVar-derived comparator resources pending held-out masking",
+    "no expert approval; candidate directions are eval-only, non-authoritative"
+  ],
+  "non_authoritative_boundary": "A census organizes internal, eval-only review directions. It creates no public worklist, classification, research authorization, or clinical claim. Candidate LP/LB directions are non-authoritative review metadata only.",
+  "point_distribution": {
+    "-3": 6,
+    "-8": 1,
+    "0": 149,
+    "1": 5651,
+    "11": 1,
+    "12": 6,
+    "2": 61,
+    "3": 172,
+    "4": 395,
+    "5": 26,
+    "6": 2,
+    "7": 5,
+    "9": 143
+  },
+  "policy_mode": "disabled_manual",
+  "pp3bp4_suppression": {
+    "affected_union": 5474,
+    "raw_bp4": 3696,
+    "raw_pp3": 2226,
+    "scored_calls": 0
+  },
+  "raptor_current_policy_internal_direction": {
+    "annotation_manual_review": 30,
+    "candidate_LB_review": 7,
+    "candidate_LP_review": 157,
+    "no_deterministic_resolution": 6424
+  },
+  "raptor_current_policy_internal_direction_shares": {
+    "annotation_manual_review": 0.004533091568449683,
+    "candidate_LB_review": 0.0010577213659715926,
+    "candidate_LP_review": 0.023723179208220008,
+    "no_deterministic_resolution": 0.9706860078573587
+  },
+  "raw_bias_criterion_incidence": {
+    "BA1": 1,
+    "BP3": 7,
+    "BP4": 3696,
+    "BP7": 127,
+    "BS2": 34,
+    "PM2": 6609,
+    "PM4": 176,
+    "PM5": 147,
+    "PP3": 2226,
+    "PP5": 3,
+    "PS1": 110,
+    "PS3": 46,
+    "PVS1": 150
+  },
+  "run_integrity": {
+    "bias_rows": 6618,
+    "duplicate_bias_keys": 0,
+    "duplicate_manifest_ids": 0,
+    "duplicate_manifest_keys": 0,
+    "exact_join": true,
+    "manifest_identities": 6618,
+    "parser_contract_errors": 0,
+    "parser_records": 6618,
+    "unique_raw_keys": 6618
+  },
+  "schema": "raptor.tsc.vus_census.disabled_manual.v1",
+  "snapshot": "clinvar_2026-07-07",
+  "source_hashes": {
+    "bias_tsv": "0a55cab470d3de93f06cd87ba30957fd1674c0ae2098ec86350f5aaac1a1162e",
+    "input_vcf": "3fff6de7ae9b2b202642e498c4c49532cf1aaf5c2734f0e8341d5ace88fa3a09",
+    "manifest": "7f9937521a425e73b31422fa9191c90e67fa80cc58f351517ac732b1d32fcbba"
+  },
+  "status": "internal_non_authoritative_evidence_census"
+}

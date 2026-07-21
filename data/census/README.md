@@ -91,6 +91,20 @@ recorded on every emitted record: this aggregate is an internal, eval-only
 triage signal, not a validated classification, an expert-reviewed VUS
 worklist, or a clinical report.
 
+The certified 2026-07-21 aggregate has SHA-256
+`45ff9f9abada7d5369c131bf7ffde28d0786eea41ff9bf7905f51da0cabd59ac`.
+It records 157 candidate-LP review directions, 7 candidate-LB review
+directions, 6,424 unresolved variants and 30 annotation/manual-review cases.
+PP3/BP4 suppression affected 5,474 variants (PP3 2,226; BP4 3,696), with zero
+PP3/BP4 calls consumed. The negative masked gate remains authoritative:
+neither these aggregate directions nor their shares authorize a VUS worklist.
+
+`corpus` consequence buckets reuse the conservative source-corpus HGVS
+grouping used by the historical census. `direction_by_consequence` instead
+groups the raw BIAS SO consequence terms through the shared census helper.
+They are intentionally different descriptive projections and must not be
+compared as if they were the same partition.
+
 The CLI fails closed, before any processing or output, on: an unapproved/
 drifted predictor policy or bound config hash; a `--historical-stats` path
 that is not exactly the immutable, committed

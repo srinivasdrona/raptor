@@ -51,7 +51,8 @@ progress_as_of_2026_07_21:
     - sources-pin-core-annotation-bundle
     - resolve-pp3-bp4-activation
     - rerun-masked-gate
-  current: recompute-vus-census
+    - recompute-vus-census
+  current: core-generate-review-packets
   rerun_result:
     policy_mode: disabled_manual
     legacy_v1_status: FAIL
@@ -63,6 +64,16 @@ progress_as_of_2026_07_21:
     pp3bp4_suppressed_variant_count: 2043
     aggregate_sha256: 7c55cd4e3059713d1d53886d8893a3819153375b62ce9d37187d731132c6a77f
     checker_verdict: CLEAN
+  census_result:
+    total_vus: 6618
+    candidate_lp_review: 157
+    candidate_lb_review: 7
+    no_deterministic_resolution: 6424
+    annotation_manual_review: 30
+    pp3bp4_suppressed_variant_count: 5474
+    pp3bp4_scored_calls: 0
+    aggregate_sha256: 45ff9f9abada7d5369c131bf7ffde28d0786eea41ff9bf7905f51da0cabd59ac
+    checker_verdict: CLEAN_WITH_NONBLOCKING_NOTES
 
 policy_resolution_rule: >-
   PP3/BP4 activation is resolved when a hash-bound decision is recorded.
