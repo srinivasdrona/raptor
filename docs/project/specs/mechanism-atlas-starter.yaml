@@ -28,9 +28,17 @@
 # ObservedClaim references its source via source_ref and never duplicates the
 # span. A verified claim cannot hash or validate against any locator/quote other
 # than the one carried by its source reference.
+#
+# Dual path (rev 5): RAPTOR is the SOLE source of truth (canonical SPDI admission,
+# Atlas schemas, source role/type validation, EntryRef.span ownership, citation
+# resolver, hashes, leakage guards, and the accepted profiles). Microsoft
+# Discovery is an ACTIVE but bounded Phase-2 research lane (Bookshelf, research
+# agents, Discovery Engine) that only PROPOSES untrusted candidates; RAPTOR
+# deterministically validates and promotes them. Discovery is runtime-optional and
+# never sits on the accept/hash/guard path.
 
 schema: raptor-mechanism-atlas-starter-v1
-status: planner_contract_rev4_gpt54_findings_applied
+status: planner_contract_rev5_dual_path_discovery_lane
 task_id: build-mechanism-atlas-starter
 title: Bounded RAPTOR Mechanism Atlas starter — TSC2-only internal module contract
 
@@ -86,6 +94,25 @@ revision_log:
           single canonical span; ObservedClaim references source_ref and carries
           no span of its own.
     corrections_in: [observed_claim, schemas.hashing, source_register.entry_ref_schema,
+      workflow, stop_go, deliberate_action]
+  - rev: 5
+    head: 20a9a99dc4c83b21bb9b53b33e9791379b022041
+    trigger: operator scope clarification; plan-only follow-up commit (no amend/push).
+    attribution:
+      prompt_commanded_scope:
+        - >-
+          Slot 3 originally scoped Discovery as an OPTIONAL retrieval/orchestration
+          sidecar and adapter seam only ("do not contribute an agent yet / adapter
+          seam only"). The operator has now clarified that Discovery's Bookshelf/
+          library, research agents and Discovery Engine SHOULD be used for the
+          bounded Mechanism Atlas research workflow where they add value. This is
+          prompt-commanded scope, NOT a planner miss.
+    change: >-
+      Discovery elevated from a future adapter seam to an ACTIVE but bounded
+      Phase-2 research-execution lane under a dual-path architecture; RAPTOR
+      remains the sole source of truth and the only writer of accepted profiles.
+    corrections_in: [dual_path_architecture, schemas.atlas_candidate_import,
+      module_api, leakage_guards, discovery_boundary, packet_dependency_split,
       workflow, stop_go, deliberate_action]
 
 worktree: 'D:\AIProjects\raptor-worktrees\mechanism-atlas'
@@ -143,6 +170,63 @@ authority_and_scope:
       approved evidence policy (currently unapproved).
     - No cross-disease / cross-gene expansion in this track.
     - Every substantive claim resolves to a primary source + exact span, else UNVERIFIED.
+
+# ---------------------------------------------------------------------------
+# 0.5 Dual-path architecture (RAPTOR source of truth + Discovery research lane)
+# ---------------------------------------------------------------------------
+# Operator clarification (rev 5): Discovery's Bookshelf/library, research agents
+# and Discovery Engine MAY be used for the bounded Mechanism Atlas research
+# workflow where they add value. Discovery moves from a future adapter seam to an
+# ACTIVE but bounded Phase-2 research-execution lane. RAPTOR remains the sole
+# source of truth and the only writer of accepted profiles.
+dual_path_architecture:
+  raptor_source_of_truth:
+    owns:
+      - Canonical GRCh38 SPDI identity admission (identity.py).
+      - All Atlas schemas, frozen dataclasses, and typed errors.
+      - Source role/type validation and the direct_evidence_leaf grounding rule.
+      - EntryRef.span ownership (single canonical grounding span).
+      - Deterministic citation/source resolver and canonical-JSON hashes.
+      - Leakage guards and the final ACCEPTED MechanismProfile records.
+    rule: >
+      Only RAPTOR admits, validates, grounds, hashes, and accepts. No external
+      system writes an accepted claim or profile; Discovery output stays untrusted
+      until RAPTOR validates and promotes it.
+  discovery_research_lane:
+    posture: >
+      ACTIVE but bounded Phase-2 retrieval/orchestration lane and evaluation
+      surface. It PROPOSES candidate evidence; it never accepts, grounds, scores,
+      or gates. Runtime-optional: failure or unavailability MUST NOT block the
+      RAPTOR Atlas or change any accepted profile.
+    uses:
+      - Bookshelf/library of PUBLIC, appropriately-licensed primary papers.
+      - "Catalog agents: pubmed, bookshelf-researcher, online-researcher; optionally pdb-search / pdb-insights and stat-agent where they add value."
+      - Discovery Engine tasks/dependencies/validation for identity confirmation,
+        literature retrieval, claim/span extraction, contradiction search,
+        assay-context normalization, and evidence-gap mapping.
+    prototype_agent:
+      name: tsc-mechanism-evidence-mapper
+      scope: PRIVATE project-level prompt-agent prototype ONLY.
+      not_now: NOT contributed to microsoft/discovery in this track.
+      output: >-
+        Untrusted staging JSON conforming to schemas.atlas_candidate_import; it
+        CANNOT write accepted claims or profiles directly.
+  promotion_contract:
+    rule: >
+      Every Discovery-produced AtlasCandidateImport is UNTRUSTED and enters RAPTOR
+      only through deterministic validation: source type/role, citation resolution,
+      exact EntryRef.span, canonical SPDI identity, context enums, duplicate/
+      conflict rules, and no-classification leakage. A named human/oracle
+      source-span review remains required for Phase-2 GO. Failing candidates are
+      REJECTED (never silently downgraded into an accepted profile).
+  boundaries:
+    - Public, appropriately-licensed sources ONLY; no direct cloud/private/patient data; no PHI.
+    - No migration of scoring, gates, packet source of truth, or the build loop into Discovery.
+    - Discovery setup lives as CONFIG/TEMPLATES outside src/raptor/atlas; the core
+      atlas package MUST NOT import any Discovery SDK/agent (out-of-process only).
+    - A catalog contribution (tsc-mechanism-evidence-mapper or a generic
+      mechanism-evidence auditor) may be considered SEPARATELY only after a clean
+      5-10-case evaluation; it is out of scope for this track.
 
 # ---------------------------------------------------------------------------
 # 1. Ontology seeds (candidate mechanism classes + explicit states)
@@ -356,6 +440,54 @@ schemas:
         provenance.source_pins, provenance.version_pins]
       excludes: [run_metadata, provenance.content_hashes]
       note: excludes ONLY run_metadata and the self-referential content_hashes block.
+  atlas_candidate_import:
+    id: atlas.candidate_import.v1
+    trust: >-
+      UNTRUSTED staging payload emitted by the Discovery research lane; it is NOT
+      an accepted record and grounds nothing until RAPTOR validates and promotes.
+    purpose: carry Discovery-proposed evidence into RAPTOR's deterministic gate.
+    fields:
+      candidate_variant:
+        spdi_proposed: str
+        hgvs_aliases: list
+        note: >-
+          Identity is a PROPOSAL only; RAPTOR re-admits via canonical GRCh38 SPDI
+          and never trusts the proposed identity.
+      proposed_claims:
+        type: list
+        of: [claim_text, claim_kind, directionality, source_ref_proposed,
+          span_proposed, context_proposed]
+        note: >-
+          Proposals only; source refs and spans are re-resolved by RAPTOR and are
+          not grounded on import.
+      proposed_sources:
+        type: list
+        of: [entry_id, source_type, role, bib]
+        note: >-
+          Bibliographic proposals; source_type and role are re-validated against
+          the direct_evidence_leaf rule by RAPTOR.
+      retrieval_provenance:
+        agents: list
+        queries: list
+        run_id: str
+        retrieved_at: str
+        note: Discovery run trace retained for audit and native-vs-Discovery eval.
+    invariants:
+      - No field of this schema is trusted; promotion runs the full RAPTOR gate.
+      - verification/accepted state is NEVER set by the importer; RAPTOR assigns it.
+      - A candidate that fails identity / source-type / role / span / context /
+        leakage validation is REJECTED (AtlasSchemaError / AtlasProvenanceError),
+        never silently admitted.
+  candidate_promotion:
+    id: atlas.promotion.v1
+    gate_order: [canonical_spdi_readmission, source_type_role_validation,
+      citation_resolution, exact_span_resolution, context_enum_validation,
+      duplicate_conflict_rules, no_classification_leakage, human_oracle_span_review]
+    rule: >
+      promote_candidate(import) yields accepted claims ONLY if every gate passes;
+      the importer never writes accepted state. Human/oracle span review is
+      mandatory before Phase-2 GO. Discovery is optional: a missing or failed
+      candidate never blocks RAPTOR and never mutates an accepted profile.
 
 # ---------------------------------------------------------------------------
 # 3. Module API (src/raptor/atlas/)
@@ -369,6 +501,7 @@ module_api:
     - hashing.py          # canonical-JSON sha256 (mirrors packet/hashing.py)
     - registry.py         # source register loader + fail-closed verification
     - profile.py          # build_mechanism_profile(...) assembly
+    - promote.py          # deterministic AtlasCandidateImport validation + promotion gate
     - export.py           # one-way DisMech-compatible export (post-validation only)
     - guards.py           # leakage/scoring-import prohibition enforcement
     - README.md           # module charter (non-authority, boundaries, prohibitions)
@@ -381,6 +514,8 @@ module_api:
     - AtlasExportError
   public_functions:
     - build_mechanism_profile(identity, claims, contexts, edges, sources) -> MechanismProfile
+    - validate_candidate_import(candidate) -> None  # deterministic; raises on any gate failure
+    - promote_candidate(candidate) -> tuple  # accepted claims only after full gate + human/oracle review
     - verify_source(entry) -> None  # raises AtlasSourceVerificationError on drift
     - evidence_core_hash(profile) -> str
     - profile_envelope_hash(profile) -> str
@@ -389,6 +524,9 @@ module_api:
     - The Atlas API takes only canonical identity + evidence inputs; it never imports
       raptor.scorer, raptor.eval, raptor.packet, or a ClinVar-derived criterion value.
     - No RAPTOR scoring/gate/packet module may import raptor.atlas (enforced by guards + tests).
+    - The core atlas package imports NO Discovery SDK/agent; the Discovery lane
+      runs OUT-OF-PROCESS and reaches atlas only as an untrusted AtlasCandidateImport
+      payload validated by promote.py.
 
 # ---------------------------------------------------------------------------
 # 4. Panel selection contract (bounded TSC2 pilot)
@@ -603,9 +741,17 @@ leakage_guards:
       - raptor.eval.knowns
     forbidden_criteria: [PP3, BP4, PP5, BP6, PS4, PS3, BS3]
     forbidden_inputs_as_mechanism_truth: [classifier_score, clinvar_derived_criterion]
+  discovery_import_boundary:
+    rule: >
+      The core raptor.atlas package MUST NOT import any Discovery SDK, client, or
+      agent. The Discovery research lane runs OUT-OF-PROCESS (config/templates
+      only) and reaches atlas solely as an untrusted AtlasCandidateImport payload
+      validated by promote.py. Discovery is runtime-optional and never on the
+      accept/hash/guard path.
+    forbidden_atlas_imports_extra: [microsoft_discovery_sdk, discovery_agent_client]
   enforcement: guards.py + Gemini RED tests assert import-direction (incl. no
-    raptor.packet/scorer/eval import from atlas), the criterion bans, and the
-    direct_evidence_leaf grounding rule.
+    raptor.packet/scorer/eval and no Discovery SDK/agent import from atlas), the
+    criterion bans, and the direct_evidence_leaf grounding rule.
 
 # ---------------------------------------------------------------------------
 # 7. One-way DisMech-compatible export
@@ -622,28 +768,51 @@ dismech_export:
     it drops nothing silently and never fabricates a claim.
 
 # ---------------------------------------------------------------------------
-# 8. Discovery experiment boundary (optional sidecar only)
+# 8. Discovery research lane (active, bounded Phase-2) + evaluation
 # ---------------------------------------------------------------------------
 discovery_boundary:
   posture: >
-    Microsoft Discovery is an OPTIONAL retrieval/orchestration sidecar and
-    evaluation surface, NEVER the Atlas source of truth or an implementation
-    dependency of the deterministic scorer, gates, or packet source of truth.
-  may_host_later:
-    - Bookshelf literature retrieval
-    - a mechanism-evidence mapper prompt agent
-    - packet / Atlas audit investigations (variant-evidence-packet-auditor)
+    Per dual_path_architecture: Microsoft Discovery is an ACTIVE but bounded
+    Phase-2 research/orchestration lane and evaluation surface. It PROPOSES
+    untrusted candidates only; RAPTOR remains the source of truth and the sole
+    writer of accepted profiles. Runtime-optional: failure/unavailability MUST NOT
+    block the RAPTOR Atlas or change any accepted profile.
+  engine_tasks:
+    - identity_confirmation           # candidate identity proposal; RAPTOR re-admits via SPDI
+    - literature_retrieval            # Bookshelf + pubmed/online-researcher public papers
+    - claim_span_extraction           # propose claim + exact span; RAPTOR re-resolves
+    - contradiction_search            # surface opposing evidence
+    - assay_context_normalization     # normalize assay/model/context toward enums
+    - evidence_gap_mapping            # name missing assays / unknowns
+  validation_requirements: >
+    Every task output is an AtlasCandidateImport validated by promote.py (identity,
+    source type/role, citation resolution, exact span, context enums, duplicate/
+    conflict rules, no-classification leakage) before any promotion; human/oracle
+    span review is required before Phase-2 GO.
+  native_vs_discovery_evaluation:
+    scope: SAME bounded 5-10-case TSC2 panel, native RAPTOR vs Discovery-assisted.
+    axes:
+      - retrieval_recall
+      - valid_claim_span_yield
+      - contradiction_detection
+      - hallucination_unsupported_claim_rate
+      - context_completeness
+      - reproducibility
+      - latency_cost
+    rule: >
+      Discovery is optional at runtime; a failed/absent lane scores as unavailable
+      and never blocks RAPTOR or mutates accepted profiles.
+  contribution_gate:
+    after_clean_eval: >
+      Only after a clean 5-10-case evaluation MAY a catalog contribution
+      (tsc-mechanism-evidence-mapper or a generic mechanism-evidence auditor) be
+      considered SEPARATELY. It is OUT OF SCOPE for this track and requires owner
+      approval.
   this_track_forbids:
-    - Migrating RAPTOR scoring, gates, packet source of truth, or the software build
-      loop into Discovery.
-    - Contributing a prompt agent to microsoft/discovery now.
-  this_track_delivers:
-    - An OPTIONAL adapter/evaluation SEAM specification only (interface shape, inputs,
-      pass/fail evaluation axes), not an agent and not an integration.
-  evaluation_axes: [omission_detection, circularity_detection, citation_grounding,
-    contradiction_capture, reproducibility, non_classification_boundary]
-  dependency: The Discovery packet-auditor evaluation is packet-dependent and
-    non-critical (TODO evaluate-discovery-packet-auditor); it never blocks the module.
+    - Migrating RAPTOR scoring, gates, packet source of truth, or the build loop into Discovery.
+    - Contributing the prompt agent to microsoft/discovery in this track.
+    - Any direct cloud/private/patient data; only public, appropriately-licensed sources.
+    - The core atlas package importing any Discovery SDK/agent (out-of-process only).
 
 # ---------------------------------------------------------------------------
 # 9. Packet dependency split (what proceeds now vs. waits for frozen packets)
@@ -654,12 +823,17 @@ packet_dependency_split:
     - module_api skeleton (src/raptor/atlas/) + typed errors + hashing + guards.
     - source_register structure + verified pins (MaveDB) + fail-closed verification.
     - synthetic RED-test fixtures (ID-independent) + panel selection CONTRACT (strata rules).
-    - Discovery adapter/eval seam spec; one-way DisMech export contract.
+    - AtlasCandidateImport schema + deterministic promotion gate (promote.py).
+    - Discovery Bookshelf/query/task TEMPLATES (config, out-of-process) + PUBLIC
+      appropriately-licensed source collection + Discovery tool smoke tests.
+    - one-way DisMech export contract.
   waits_for_frozen_corrected_packets:
     - Exact current-policy VUS IDs admitted into the live pilot panel.
     - R611Q admission (additionally gated on primary-source re-grounding).
     - Real leaf source enumeration (PMIDs/DOIs) + exact spans + any verified claim.
     - Any pilot CONTENT (real per-variant mechanism profiles).
+    - Discovery-proposed real mechanism claims/profiles (candidates must pass the
+      promotion gate + named human/oracle span review; nothing accepted in Phase 1).
   rule: Schema/module/skeleton design MUST NOT depend on unfrozen packet IDs; only
     concrete pilot ID admission and real source grounding (Phase 2) wait. Corrected
     packets are generated independently.
@@ -674,13 +848,20 @@ workflow:
     phase1_skeleton:
       does: schema + guards + synthetic fixtures + unresolved-source behavior; MAY pin
         and verify real source-register bibliographic METADATA (PMID/PMCID/DOI/
-        accession/license) as metadata only.
+        accession/license) as metadata only; MAY prepare Discovery Bookshelf/query/
+        task TEMPLATES (config, out-of-process), collect PUBLIC appropriately-
+        licensed sources, and run Discovery tool smoke tests.
       forbids: real grounding spans, real verified observed claims, R611Q evidence,
-        pilot claims/profiles, and mechanistic conclusions.
+        pilot claims/profiles, mechanistic conclusions, and ANY accepted Discovery
+        candidate (native or Discovery real mechanism claims/profiles are Phase 2).
     phase2_grounding:
-      does: real leaf enumeration + exact grounding spans + verified claims + pilot content.
+      does: real leaf enumeration + exact grounding spans + verified claims + pilot
+        content; runs the bounded Discovery research lane, RAPTOR validates and
+        promotes candidates through the deterministic gate, and executes the
+        native-vs-Discovery evaluation.
       requires: deterministic citation/source resolver AND a named human/oracle
-        source-span review AND frozen corrected packets AND checker CLEAN.
+        source-span review AND frozen corrected packets AND checker CLEAN AND every
+        Discovery candidate passing the promotion gate (nothing accepted otherwise).
   gemini_tests:
     role: author FAILING (RED) schema/contract tests BEFORE any implementation.
     scope:
@@ -700,6 +881,10 @@ workflow:
       - "hash coherence: evidence_core/profile_envelope payloads over the DEFINED include/exclude fields only; claim_id refs resolve into profile.claims; canonical order/dedup deterministic; run_metadata excluded."
       - fixtures are synthetic and ID-independent (no unfrozen VUS ID dependency).
       - "unresolved-source behavior: unverified/confirm_pending entries never ground a verified claim."
+      - "candidate import is UNTRUSTED: a proposed claim/source/identity never becomes accepted without passing the full promotion gate (AtlasSchemaError/AtlasProvenanceError on failure)."
+      - "promotion gate order enforced: identity re-admission, source type/role, citation resolution, exact span, context enums, duplicate/conflict, no-classification leakage; any failure REJECTS the candidate."
+      - "Discovery optionality: with the research lane unavailable/failing, RAPTOR Atlas still builds and accepted profiles are UNCHANGED (no dependency, no import)."
+      - "Discovery import boundary: core atlas imports no Discovery SDK/agent (out-of-process only)."
     must_not: assert any real verified observed claim, any real grounding span, any
       R611Q/pilot content, any mechanistic conclusion, or any classifier value
       (real bibliographic metadata pins are permitted).
@@ -715,11 +900,14 @@ workflow:
         canonical order/dedup, run_metadata excluded).
       - Fail-closed source verification; atlas_import_boundary (no packet/scorer/eval import).
       - "provide the citation/source resolver INTERFACE keyed on source_ref (EntryRef): it resolves/validates the canonical EntryRef.span only, never a claim-local span (no real span resolution, no verified-claim output in Phase 1)."
+      - "promote.py: deterministic AtlasCandidateImport validation + promotion gate (no acceptance without the full gate; importer never writes accepted state)."
+      - "Discovery Bookshelf/query/task TEMPLATES as CONFIG/TEMPLATES outside src/raptor/atlas; core package imports no Discovery SDK/agent."
     out_of_scope:
       - No real grounding spans, no real verified observed claims, no mechanistic conclusions (Phase 2 only).
       - No R611Q evidence; no pilot CONTENT; no real VUS admission; no external fetch of held data.
       - No scorer/eval/packet/config/data edits; no PP3/BP4 or ACMG coupling.
-      - No DisMech contribution; no Discovery agent.
+      - No accepted Discovery candidate; no real Discovery mechanism claim/profile (Phase 2 + human/oracle review).
+      - No DisMech contribution; no agent contributed to microsoft/discovery; no private/cloud/patient data.
   gpt54_probes:
     role: independent checker; adversarial schema/guard/leakage review (Phase 1),
       source-span review deferred to Phase 2.
@@ -731,6 +919,9 @@ workflow:
       - "Source-type binding: is direct_evidence_leaf accepted ONLY for PRIMARY-LIT/DATASET, and does verified-claim/EntryRef admission check BOTH role AND source_type (not role alone)? (must hold)"
       - "Leaf grounding: can only a direct_evidence_leaf + allowed source_type + verified entry ground a verified claim? (must hold)"
       - "Span ownership: is the grounding span owned SOLELY by source_ref (EntryRef.span), with NO duplicate span on ObservedClaim, so a verified claim can never hash/validate against a different locator/quote than its source reference? (must hold)"
+      - "Source of truth: does RAPTOR alone admit/validate/ground/hash/accept, with all Discovery output untrusted until promoted through the deterministic gate? (must hold)"
+      - "Discovery optionality: does Discovery failure/unavailability leave RAPTOR Atlas and every accepted profile unchanged? (must hold)"
+      - "Discovery import boundary: does the core atlas package import any Discovery SDK/agent? (must be NO)"
       - "Hash coherence: are payloads over defined fields with claim_id refs resolving into profile.claims, run_metadata excluded? (must hold)"
       - Contrast: does the ontology preserve unknown/conflicting/context across strata?
       - "Skeleton purity: are there ANY real verified claim/grounding span, R611Q/pilot content, or mechanistic conclusion in Phase 1? (must be NONE; real bibliographic metadata pins are allowed)"
@@ -747,6 +938,7 @@ stop_go:
     - "Guards CLEAN: raptor.atlas imports none of raptor.packet/scorer/eval; no banned criterion/input; no consumer imports atlas."
     - Synthetic fixtures + unresolved-source behavior pass the RED tests.
     - "NO real verified claim/grounding span, NO R611Q evidence, NO pilot curation, NO mechanistic conclusion (real bibliographic metadata pins ARE allowed)."
+    - "Discovery is config/templates + public-source collection + smoke tests only: core atlas imports no Discovery SDK/agent; NO accepted Discovery candidate."
   pilot_phase_passes_only_if:         # Phase 2, gated
     - The ontology handles contrasting cases (all five strata) without collapse.
     - Context, contradictions, and unknowns are preserved (not coerced to a call).
@@ -756,11 +948,23 @@ stop_go:
       duplicate claim span).
     - Passes a deterministic citation/source resolver AND a named human/oracle
       source-span review.
+    - Every Discovery candidate promoted ONLY through the deterministic gate
+      (identity, source type/role, citation, exact span, context enums, duplicate/
+      conflict, no-classification leakage) + human/oracle span review.
+    - Native-vs-Discovery evaluation on the SAME panel reports retrieval recall,
+      valid claim/span yield, contradiction detection, hallucination/unsupported-
+      claim rate, context completeness, reproducibility, and latency/cost.
+    - "Discovery is optional at runtime: its failure/unavailability does NOT block RAPTOR or change any accepted profile."
   otherwise: REVISE or STOP. No cross-gene / cross-disease expansion.
   go_signal_phase2: >
     schema + leakage guards CLEAN (checker) AND corrected packets frozen AND a
     deterministic citation/source resolver plus a named human/oracle source-span
     reviewer are available.
+  post_eval_options: >
+    After a clean 5-10-case native-vs-Discovery evaluation, a SEPARATE catalog
+    contribution (tsc-mechanism-evidence-mapper or a generic mechanism-evidence
+    auditor) MAY be considered under owner approval; it is out of scope for this
+    track and never migrates scoring/gates/packet source of truth/build loop.
 
 # ---------------------------------------------------------------------------
 # 12. Extraction gate (repository extraction is later + evidence-gated)
@@ -792,12 +996,18 @@ deliberate_action:
     - "R611Q's handoff mechanism is silently treated as fact -> mitigated: r611q_gate BLOCKED + no-hardcode prohibition + GPT-5.4 probe + Phase-2 grounding gate."
     - "Pilot fixtures depend on unfrozen VUS IDs, coupling skeleton to packet freeze -> mitigated: synthetic_fixtures independence + packet_dependency_split."
     - "A classifier/ClinVar score leaks in as confidence/mechanism truth (R-A2 circularity) -> mitigated: forbidden_inputs_as_mechanism_truth + ADR-0009 binding."
+    - "Discovery becomes a de-facto source of truth by writing accepted claims/profiles directly -> mitigated: AtlasCandidateImport is UNTRUSTED, promote.py runs the full deterministic gate + human/oracle review, only RAPTOR writes accepted profiles."
+    - "The core atlas package imports a Discovery SDK/agent, coupling acceptance to an external service -> mitigated: discovery_import_boundary (out-of-process, config/templates only) + RED import guard + GPT probe."
+    - "Discovery unavailability or failure silently blocks RAPTOR or mutates accepted profiles -> mitigated: runtime-optional posture + RED optionality test (RAPTOR builds unchanged with the lane down) + GPT optionality probe."
+    - "Discovery pulls private/cloud/patient data or improperly-licensed sources -> mitigated: public appropriately-licensed sources only boundary + no-PHI rule + retrieval_provenance audit."
+    - "The bounded evaluation quietly expands into a microsoft/discovery catalog contribution mid-track -> mitigated: prototype is PRIVATE; contribution deferred to a SEPARATE track after a clean 5-10-case eval (contribution_gate / post_eval_options)."
     - "The commit accidentally includes a code/config/data file -> mitigated: commit only this spec; verify with git show --stat."
   verification_contract:
     - Slot hashes verified MATCH (all three) at rev 1; composition unchanged.
     - rev 2 is a plan-only follow-up commit on head a840347 (no amend, no push).
     - rev 3 is a plan-only follow-up commit on head 29a330e (no amend, no push).
     - rev 4 is a plan-only follow-up commit on head 70091c8 (no amend, no push).
+    - rev 5 is a plan-only follow-up commit on head 20a9a99 (no amend, no push).
     - Only docs/project/specs/mechanism-atlas-starter.yaml staged and committed.
     - Both required trailers present on the commit; YAML validated.
 
