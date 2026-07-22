@@ -126,7 +126,7 @@ def make_schema_valid_disease_pack(model_mod):
         schema="atlas.disease_pack.v1",
         pack_id="synthpack",
         pack_version="1.0.0",
-        pack_content_hash="9fa7643161ea0d8741ce8ffe0169f1f0109300a93c61cb5037cb86ca5abd7377",
+        pack_content_hash="bf7369f8faa24a6f746956ee1122281e798185f320b012a844ffbc683f2e7b21",
         allowed_genes=("SYNGENE1",),
         assembly_pins=("GRCh38",),
         transcript_pins=(

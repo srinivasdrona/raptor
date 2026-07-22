@@ -153,7 +153,7 @@ def make_schema_valid_disease_pack(model_mod):
         schema="atlas.disease_pack.v1",
         pack_id="synthpack",
         pack_version="1.0.0",
-        pack_content_hash="9fa7643161ea0d8741ce8ffe0169f1f0109300a93c61cb5037cb86ca5abd7377",
+        pack_content_hash="bf7369f8faa24a6f746956ee1122281e798185f320b012a844ffbc683f2e7b21",
         allowed_genes=("SYNGENE1",),
         assembly_pins=("GRCh38",),
         transcript_pins=(
@@ -227,23 +227,27 @@ def test_discovery_optionality_and_isolation():
     h1 = evidence_core_hash(profile)
 
     # 2. Drive an unavailable/rejected synthetic candidate import through specified public rejection seam:
-    # Build candidate with off-pack gene -> Gate 1 validation fails and raises AtlasIdentityError
+    # Build candidate with off-pack gene -> Gate 1 validation fails and raises AtlasIdentityError (using list types per Finding 2)
     rejected_cand = model_mod.AtlasCandidateImport(
         candidate_variant={
             "spdi_proposed": "NC_000000.0:1000:A:T",
             "gene_proposed": "OFF_PACK_GENE",  # off-pack!
-            "hgvs_aliases": ()
+            "hgvs_aliases": []
         },
-        proposed_claims=(),
-        proposed_sources=(),
+        proposed_claims=[],
+        proposed_sources=[],
         retrieval_provenance={
-            "agents": (), "queries": (), "run_id": "r1", "retrieved_at": "now",
+            "agents": [],
+            "queries": [],
+            "run_id": "r1",
+            "retrieved_at": "now",
             "pack_binding": {
                 "pack_id": "synthpack",
                 "pack_version": "1.0.0",
-                "pack_content_hash": "9fa7643161ea0d8741ce8ffe0169f1f0109300a93c61cb5037cb86ca5abd7377"
+                "pack_content_hash": "bf7369f8faa24a6f746956ee1122281e798185f320b012a844ffbc683f2e7b21"
             },
-            "prompt_hash": "PLACEHOLDER_PHASE2", "bookshelf_version": "v2.1"
+            "prompt_hash": "PLACEHOLDER_PHASE2",
+            "bookshelf_version": "v2.1"
         }
     )
 
