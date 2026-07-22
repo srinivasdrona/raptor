@@ -120,7 +120,7 @@ def test_current_policy_conservation_guard() -> None:
 
 
 def test_full_vus_universe_conservation() -> None:
-    """Finding 4 / Defect 1: Exercise planned full conserve_current_policy and build_full_vus_universe with real contract fixtures."""
+    """Finding 4 / Defect 1 & 2 & 3: Exercise planned full conserve_current_policy and build_full_vus_universe with real contract fixtures."""
     api = _api()
     build_full_vus_universe = api["build_full_vus_universe"]
     conserve_current_policy = api["conserve_current_policy"]
@@ -138,7 +138,9 @@ def test_full_vus_universe_conservation() -> None:
         ManifestEntry(variant_id="NC_000016.10:400:C:G", vcf_key="chr16:400:C:G"),
     ]
     
-    # Criteria must be real BIAS (fired_int, explanation) tuples
+    # Defect 2: Criteria must produce LP (>=6) and LB (<=-1) under exact current eval config (configs/eval/tsc2.yaml).
+    # pvs1 very_strong (Tavtigian points: 8) -> LP
+    # bp1 supporting (Tavtigian points: -1) -> LB
     bias_records = [
         BiasRecord(
             chromosome="chr9",
@@ -151,8 +153,8 @@ def test_full_vus_universe_conservation() -> None:
             acmg_classification="uncertain",
             gene_name="TSC1",
             transcript="NM_000368.4",
-            criteria={"pvs1": (1, "supporting")},
-            provenance={"raw_row": "chr9\t100\tA\tG\tTSC1\t{'pvs1': (1, 'supporting')}"},
+            criteria={"pvs1": (4, "very strong")},
+            provenance={"raw_row": "chr9\t100\tA\tG\tTSC1\t{'pvs1': (4, 'very strong')}"},
         ),
         BiasRecord(
             chromosome="chr16",
@@ -165,8 +167,8 @@ def test_full_vus_universe_conservation() -> None:
             acmg_classification="uncertain",
             gene_name="TSC2",
             transcript="NM_000548.4",
-            criteria={"bp4": (1, "supporting")},
-            provenance={"raw_row": "chr16\t200\tG\tC\tTSC2\t{'bp4': (1, 'supporting')}"},
+            criteria={"bp1": (1, "supporting")},
+            provenance={"raw_row": "chr16\t200\tG\tC\tTSC2\t{'bp1': (1, 'supporting')}"},
         ),
         BiasRecord(
             chromosome="chr16",
@@ -225,9 +227,14 @@ def test_full_vus_universe_conservation() -> None:
     
     assert len(packets) == 4
     
-    # Assert conservation of three source_hashes (input_vcf, bias_tsv, manifest)
+    # Defect 3: Assert source pins on packet.source_snapshot: clinvar_sha256/input VCF, bias_output_sha256, and manifest_sha256
     for p in packets:
-        assert p.run_metadata.packet_config_sha256 == run_pins.manifest_sha256 # mapped to source_hashes
+        assert p.source_snapshot.clinvar_sha256 == run_pins.input_sha256
+        assert p.source_snapshot.bias_output_sha256 == run_pins.output_sha256
+        assert p.source_snapshot.manifest_sha256 == run_pins.manifest_sha256
+        
+        # Separately assert packet_config_sha256 is the packet config fingerprint
+        assert len(p.run_metadata.packet_config_sha256) == 64
         
     # Assert run_integrity.exact_join & identity equality & 4 strata & unresolved/manual are pattern_ref None
     for p in packets:

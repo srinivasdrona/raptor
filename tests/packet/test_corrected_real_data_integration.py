@@ -77,13 +77,26 @@ def test_real_data_integration_recomputation(tmp_path: Path) -> None:
     lp_patterns = len(set(s.pattern_id for s in independent_strata if s.stratum == "candidate_LP_review" and s.pattern_id))
     lb_patterns = len(set(s.pattern_id for s in independent_strata if s.stratum == "candidate_LB_review" and s.pattern_id))
     
-    # 3. PP3-BP4 incidence recomputation
-    raw_pp3_firings = sum(1 for row in independent_bias_rows if "pp3" in {k.lower() for k in row.criteria.keys()})
-    raw_bp4_firings = sum(1 for row in independent_bias_rows if "bp4" in {k.lower() for k in row.criteria.keys()})
-    pp3_or_bp4_union_variants = sum(
-        1 for row in independent_bias_rows 
-        if any(c in {k.lower() for k in row.criteria.keys()} for c in ("pp3", "bp4"))
-    )
+    # 3. PP3-BP4 incidence recomputation (Defect 1)
+    # Count PP3/BP4 only among parsed fired calls with non-zero strength, reusing parse_rationale
+    from raptor.scorer.parse import parse_rationale
+    from raptor.census.strata import STRENGTH_MAP
+    
+    raw_pp3_firings = 0
+    raw_bp4_firings = 0
+    pp3_or_bp4_union_variants = 0
+    
+    for row in independent_bias_rows:
+        calls = parse_rationale(row.criteria, STRENGTH_MAP)
+        fired = {call.criterion for call in calls}
+        has_pp3 = "PP3" in fired
+        has_bp4 = "BP4" in fired
+        if has_pp3:
+            raw_pp3_firings += 1
+        if has_bp4:
+            raw_bp4_firings += 1
+        if has_pp3 or has_bp4:
+            pp3_or_bp4_union_variants += 1
     
     # 4. Point distribution recomputation
     point_dist = Counter(str(s.signed_points) for s in independent_strata)
