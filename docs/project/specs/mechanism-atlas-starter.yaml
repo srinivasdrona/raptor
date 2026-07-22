@@ -1,0 +1,517 @@
+# RAPTOR Mechanism Atlas starter — binding planner design/implementation spec.
+#
+# Planner: Claude Opus (this document). Test author: Gemini 3.5 Flash. Doer:
+# Claude Sonnet 5. Checker: GPT-5.4. Loop order is fixed: Opus PLAN -> Gemini RED
+# tests -> Sonnet skeleton -> GPT-5.4 checker. Pilot CONTENT follows only after
+# schema + leakage guards are CLEAN and corrected packets are frozen.
+#
+# This file is the PLAN. It performs no annotation, no extraction, no pilot
+# content, and it is NOT an implementation. It authorizes no classification,
+# assay, phenotype, intervention, or treatment claim. It defines the strict
+# internal module contract for `src/raptor/atlas/` and the controls that bound
+# it. Every substantive downstream claim must resolve to a primary source and an
+# exact span, or be labeled UNVERIFIED.
+#
+# Authority order (slot 3): current STRATEGY.md / DECISIONS.md (ADRs) are
+# authoritative; docs/project/atlas/MECHANISM_ATLAS_HANDOFF.md is PRELIMINARY
+# design input, never factual authority.
+
+schema: raptor-mechanism-atlas-starter-v1
+status: planner_contract_ready_for_red_tests
+task_id: build-mechanism-atlas-starter
+title: Bounded RAPTOR Mechanism Atlas starter — TSC2-only internal module contract
+
+worktree: 'D:\AIProjects\raptor-worktrees\mechanism-atlas'
+branch: track/mechanism-atlas-2026-07
+base_commit: ce42208690aeac23838e5b2fe4a5c378a5a98eb0
+output: docs/project/specs/mechanism-atlas-starter.yaml
+
+composition:
+  schema: raptor-three-slot-planning-prompt-v1
+  slots_verified:
+    - slot: 1
+      name: slot1-DELIBERATE_ACTION_PREFIX_v2.md
+      sha256: a0f94762e69b78f7db70398e20e1ccc6293708eff52de1e886174c2d4f7ea58f
+      status: MATCH
+    - slot: 2
+      name: slot2-ATLAS_PLANNING_TEMPLATE.md
+      sha256: 24f8aa25cd9c66e9d3828dd33e3e91297747b47fe880eeb0fdcc99ac6d4cc817
+      status: MATCH
+    - slot: 3
+      name: slot3-ATLAS_TASK.md
+      sha256: 4dcdc35711fa9ea2b05869319b309d2365cecf12df4cd8ee6feace11539b8a2f
+      status: MATCH
+  composition_order: [slot1, slot2, slot3]
+
+# ---------------------------------------------------------------------------
+# 0. Authority, scope, and non-authority
+# ---------------------------------------------------------------------------
+authority_and_scope:
+  authoritative_inputs:
+    - docs/STRATEGY.md            # vertical TSC/mTOR research-evidence program (ADR-0010)
+    - docs/DECISIONS.md           # ADRs; binding on intent/mechanism boundaries
+  preliminary_only:
+    - path: docs/project/atlas/MECHANISM_ATLAS_HANDOFF.md
+      role: PRELIMINARY / UNAPPROVED / UNVERIFIED design input; never factual authority
+  binding_adrs:
+    - id: ADR-0009
+      why: ClinVar-derived criteria direct-copy banned (R-A2 circularity). The Atlas
+        must never re-import a classifier/ClinVar-derived criterion as mechanism truth.
+    - id: ADR-0012
+      why: PP3/BP4 automated emission disabled for the masked rerun. Mechanism
+        evidence must not become a scoring predictor by any back-channel.
+    - id: ADR-0010
+      why: RAPTOR is a vertical TSC/mTOR research-evidence product, not a generic
+        platform. No cross-gene/cross-disease expansion for optics.
+  program_position: Phase 1 (design + case-card contract) per the handoff phased build.
+    Phase 2 pilot content is gated by this spec passing checker CLEAN and packet freeze.
+  hard_prohibitions:
+    - No patient-specific clinical interpretation.
+    - No treatment or rescue recommendation; rescue-class hypotheses require a direct
+      published experiment for the exact relationship and remain hypotheses, never advice.
+    - No mechanism claim inferred from amino-acid substitution alone.
+    - No deterministic phenotype prediction from molecular effect alone.
+    - No classifier score imported as mechanism truth.
+    - No mechanism profile imported back into ACMG scoring without a separately
+      approved evidence policy (currently unapproved).
+    - No cross-disease / cross-gene expansion in this track.
+    - Every substantive claim resolves to a primary source + exact span, else UNVERIFIED.
+
+# ---------------------------------------------------------------------------
+# 1. Ontology seeds (candidate mechanism classes + explicit states)
+# ---------------------------------------------------------------------------
+# These are ontology SEEDS, not established facts. Mechanisms are multi-label and
+# context-dependent; `unknown` and `conflicting` are first-class VALID outcomes.
+ontology_seeds:
+  mechanism_classes:
+    - id: rna_splicing_defect
+      label: RNA / splicing defect presenting as a missense annotation
+    - id: reduced_abundance_instability
+      label: Reduced protein abundance or instability
+    - id: misfolding_residual_function
+      label: Misfolding with residual function
+    - id: complex_formation_defect
+      label: TSC1-TSC2(-TBC1D7) complex-formation defect
+    - id: mislocalization
+      label: Mislocalization
+    - id: catalytic_site_impairment
+      label: Catalytic / functional-site (e.g. GAP domain) impairment
+    - id: dominant_negative
+      label: Dominant-negative / interference mechanism
+    - id: hypomorphic_partial_loss
+      label: Hypomorphic partial loss of function
+  mechanism_states:
+    - supported            # >=1 resolvable primary source + span, direction consistent
+    - contradicted         # >=1 resolvable primary source opposes the class
+    - conflicting          # supporting AND contradicting resolvable sources coexist
+    - unknown              # no resolvable primary evidence either way
+    - unverified           # claim asserted but no resolvable primary source/span yet
+  labeling_rules:
+    - Multi-label allowed: a profile may carry several classes simultaneously.
+    - Context-dependent: a class assignment is scoped to its assay/model/tissue record.
+    - "`unknown` / `conflicting` must be representable and must not be coerced to a call."
+    - No class may be asserted from substitution identity alone.
+
+# ---------------------------------------------------------------------------
+# 2. Schemas (stable, frozen, hash-bound)
+# ---------------------------------------------------------------------------
+# Convention mirrors src/raptor/packet (frozen dataclasses, tuples for ordered
+# collections, typed errors, canonical-JSON sha256 content hashing:
+# sort_keys=True, separators=(",", ":"), UTF-8; enums -> .value).
+schemas:
+  variant_identity:
+    id: atlas.identity.v1
+    purpose: canonical variant/transcript input contract; the ONLY admission key.
+    fields:
+      gene: {type: enum, values: [TSC2], note: TSC2-only in this track}
+      transcript: {type: str, pin: NM_000548.5, requires: MANE-Select-verification}
+      hgvs_c: {type: str, note: exact bare c. HGVS, e.g. c.1832G>A}
+      hgvs_p: {type: str, optional: true}
+      hgvs_g: {type: str, optional: true, note: NC_000016.10 genomic anchor when resolved}
+      spdi: {type: str, optional: true}
+      assembly: {type: enum, values: [GRCh38], default: GRCh38}
+      identity_state: {type: enum, values: [resolved, unresolved]}
+    invariants:
+      - Admission requires identity_state == resolved with a verified transcript pin.
+      - No cDNA->genomic projection is fabricated; unresolved projections stay unresolved.
+    transcript_caveat:
+      note: >
+        Existing MAVE register (docs/reference/mave-tsc2-source-register-2026-07.md)
+        pins NM_000548.5 but BIAS on-disk outputs carry NM_000548.4; equal bare c.
+        strings across .4/.5 are NOT proven to share identical CDS numbering. The
+        Atlas must carry this as an explicit open risk and must NOT silently equate
+        transcript versions.
+  observed_claim:
+    id: atlas.claim.v1
+    purpose: one observed claim bound to an exact source span; never a summary.
+    fields:
+      claim_text: {type: str}
+      claim_kind: {type: enum, values: [rna, splicing, abundance, stability,
+        complex, localization, pathway_mtorc1, phenotype, other]}
+      source_ref: {type: ref, to: source_register.entry}
+      span: {type: obj, fields: {locator: str, exact_quote: str,
+        page_or_figure: str}, note: exact span is mandatory}
+      verification: {type: enum, values: [verified, unverified]}
+      directionality: {type: enum, values: [increase, decrease, none, unknown]}
+    invariants:
+      - A claim with no resolvable source_ref + span is verification=unverified.
+      - phenotype claims are observations only; no deterministic inference permitted.
+  context_record:
+    id: atlas.context.v1
+    purpose: assay / model / cell / tissue / condition context for every claim.
+    fields:
+      assay: {type: str, note: e.g. VAMP-seq, SGE, co-IP, immunoblot, luciferase-mTORC1}
+      model_system: {type: str, note: e.g. HAP1, HEK293, patient fibroblast, mouse}
+      cell_type: {type: str, optional: true}
+      tissue: {type: str, optional: true}
+      zygosity_context: {type: enum, values: [germline, somatic, mosaic, inferred, unknown]}
+      assay_limitations: {type: list, note: known caveats/power limits}
+  mechanism_edge:
+    id: atlas.edge.v1
+    purpose: >
+      DNA -> RNA -> protein(abundance/stability/complex/localization) -> mTORC1 ->
+      phenotype edge representation. Each edge is evidence-bound and context-scoped.
+    node_layers: [dna, rna, protein_abundance, protein_stability, complex,
+      localization, mtorc1_state, phenotype]
+    edge_fields:
+      from_layer: {type: enum, ref: node_layers}
+      to_layer: {type: enum, ref: node_layers}
+      effect: {type: enum, values: [increase, decrease, disrupt, none, unknown]}
+      supporting_claims: {type: list, of: observed_claim}
+      contradicting_claims: {type: list, of: observed_claim}
+      context: {type: ref, to: context_record}
+      edge_state: {type: enum, ref: ontology_seeds.mechanism_states}
+    invariants:
+      - An edge with support AND contradiction is edge_state=conflicting, never resolved to one.
+      - phenotype edges never assert deterministic causation.
+  evidence_assessment:
+    id: atlas.evidence.v1
+    fields:
+      supporting: {type: list, of: observed_claim}
+      contradicting: {type: list, of: observed_claim}
+      missing_evidence: {type: list, note: named assay gaps preventing discrimination}
+      unknowns: {type: list, note: explicit unknown/conflicting statements}
+  mechanism_profile:
+    id: atlas.profile.v1
+    purpose: the top-level per-variant record composed of the above.
+    fields:
+      identity: {ref: variant_identity}
+      candidate_classes: {type: list, of: {class: ontology_seeds.mechanism_classes,
+        state: ontology_seeds.mechanism_states, confidence: 'enum[low, moderate, high, na]'}}
+      edges: {type: list, of: mechanism_edge}
+      evidence: {ref: evidence_assessment}
+      provenance: {ref: provenance}
+    invariants:
+      - candidate_classes may be empty or all-unknown; that is a valid profile.
+      - No confidence value is derived from any classifier or ClinVar score.
+  provenance:
+    id: atlas.provenance.v1
+    fields:
+      source_pins: {type: list, of: source_register.entry_ref}
+      content_hashes:
+        evidence_core_hash: {algo: sha256, over: canonical-JSON of identity+claims+edges+evidence}
+        profile_envelope_hash: {algo: sha256, over: whole profile excluding run metadata}
+      version_pins: {type: list, note: transcript, source, and dataset versions}
+      generated_at: {type: str, excluded_from: evidence_core_hash}
+    canonical_hash_rule: UTF-8 json.dumps(sort_keys=True, separators=(",", ":")); enums -> .value; tuples -> lists.
+
+# ---------------------------------------------------------------------------
+# 3. Module API (src/raptor/atlas/)
+# ---------------------------------------------------------------------------
+module_api:
+  package: src/raptor/atlas/
+  layout:
+    - __init__.py
+    - model.py            # frozen dataclasses for all schemas above + typed errors
+    - identity.py         # canonical variant/transcript admission contract
+    - hashing.py          # canonical-JSON sha256 (mirrors packet/hashing.py)
+    - registry.py         # source register loader + fail-closed verification
+    - profile.py          # build_mechanism_profile(...) assembly
+    - export.py           # one-way DisMech-compatible export (post-validation only)
+    - guards.py           # leakage/scoring-import prohibition enforcement
+    - README.md           # module charter (non-authority, boundaries, prohibitions)
+  typed_errors:
+    - AtlasSchemaError
+    - AtlasIdentityError
+    - AtlasProvenanceError
+    - AtlasSourceVerificationError
+    - AtlasLeakageError
+    - AtlasExportError
+  public_functions:
+    - build_mechanism_profile(identity, claims, contexts, edges, sources) -> MechanismProfile
+    - verify_source(entry) -> None  # raises AtlasSourceVerificationError on drift
+    - evidence_core_hash(profile) -> str
+    - profile_envelope_hash(profile) -> str
+    - export_dismech(profile) -> DisMechRecord  # one-way, post-internal-validation only
+  api_independence:
+    - The Atlas API takes only canonical identity + evidence inputs; it never imports
+      raptor.scorer, raptor.eval.gate, or a ClinVar-derived criterion value.
+    - No RAPTOR scoring/gate module may import raptor.atlas (enforced by guards + tests).
+
+# ---------------------------------------------------------------------------
+# 4. Panel selection contract (bounded TSC2 pilot)
+# ---------------------------------------------------------------------------
+panel_selection_contract:
+  size: {min: 5, max: 10}
+  gene: TSC2
+  required_strata:
+    - known_pathogenic
+    - known_benign
+    - conflicting
+    - vus_with_functional_evidence
+    - vus_without_functional_evidence
+  selection_rules:
+    - Strata are chosen to CONTRAST the ontology (avoid single-case overfitting).
+    - Panel must exercise unknown, conflicting, and context-dependent representations.
+    - Every admitted record needs resolved identity + independent source-span review.
+  r611q_gate:
+    variant: TSC2 p.Arg611Gln (R611Q)
+    admission: BLOCKED until exact identity + primary-source re-grounding complete.
+    prohibition: Do NOT hardcode the handoff's proposed R611Q mechanism, zygosity,
+      stability, complex, localization, mTOR, or rescue statements as fact.
+    on_admission: represent every unsupported handoff mechanism as a hypothesis/unknown.
+  synthetic_fixtures:
+    independence: >
+      Module skeleton + synthetic RED-test fixtures MUST NOT depend on any real
+      unfrozen VUS ID. Fixtures are synthetic/illustrative identity shapes only.
+    rule: Exact current-policy VUS IDs may be selected only after corrected packets
+      freeze; schema/module/skeleton design must not wait on them.
+
+# ---------------------------------------------------------------------------
+# 5. Source register (prior art; fail-closed, source-typed)
+# ---------------------------------------------------------------------------
+# Convention mirrors configs/external/mave_sources.yaml + the reference registers.
+# verification in {verified, confirm_pending, unverified}; access-not-held allowed.
+source_register:
+  reading_rule: >
+    Every entry is EVIDENCE provenance, never ACMG criteria, never raptor.scorer
+    input, never ClinVar-derived criterion. No score/class here may gate a call.
+  source_types: [PRIMARY-OFFICIAL, PRIMARY-DOC, PRIMARY-LIT, SECONDARY-SYNTH, DATASET, CROSSWALK, UNVERIFIED]
+  categories:
+    primary_functional_literature:
+      - id: nellist-hoogeveen-westerveld
+        type: PRIMARY-LIT
+        scope: Dutch/European TSC1-TSC2 functional-assay program (abundance, complex
+          formation, mTOR readouts) for TSC2 missense variants.
+        verification: unverified
+        note: enumerate exact PMIDs/DOIs + spans during Sonnet source-grounding; each
+          claim resolves to a primary span or stays UNVERIFIED.
+      - id: later-tsc2-missense-functional-maps
+        type: PRIMARY-LIT
+        scope: subsequent large-scale TSC2 missense functional maps.
+        verification: unverified
+    mave_functional_datasets:
+      - urn: urn:mavedb:00001201-a-1
+        type: DATASET
+        scope: TSC2 cliPE prime-editing MAVE (HAP1); NM_000548.5; CC0-1.0; 208 variants.
+        publication_pmcid: PMC11185720
+        doi: 10.1101/2024.06.07.597916
+        sha256: 74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717
+        verification: verified
+        reuse_note: reuse the existing verified pin in configs/external/mave_sources.yaml;
+          do not re-fetch or re-pin here.
+      - urn: 'IGVF:analysis-set:IGVFDS5595BTYJ'
+        type: DATASET
+        scope: IGVF VAMP-seq TSC2 protein abundance.
+        publication_pmcid: PMC12871146
+        verification: confirm_pending
+        note: access-not-held; do not fetch/claim until portal access + terms review.
+      - urn: 'IGVF:analysis-set:IGVFDS1782FCXW'
+        type: DATASET
+        scope: IGVF Saturation Genome Editing (SGE) TSC2 functional score.
+        publication_pmcid: PMC12871146
+        verification: confirm_pending
+        note: access-not-held.
+      - urn: 'CAGI7:TSC2-stability-challenge'
+        type: DATASET
+        scope: CAGI7 TSC2 protein-stability community challenge.
+        verification: confirm_pending
+        note: access-not-held; distribution terms not reviewed.
+    clinvar_provenance:
+      - id: clinvar-tsc2-provenance
+        type: PRIMARY-OFFICIAL
+        scope: ClinVar records for identity/label provenance ONLY.
+        verification: verified
+        circularity_note: >
+          ClinVar labels are provenance/context, NEVER mechanism truth. Direct-copy
+          criteria (PP5/BP6/PS4) and any classifier score are banned as mechanism
+          evidence per ADR-0009. Held-out independence rules from ADR-0009 apply.
+    crosswalks:
+      - id: monarch-dismech-tsc2
+        type: CROSSWALK
+        scope: Monarch / DisMech TSC mechanism synthesis crosswalk.
+        verification: unverified
+        note: one-way, DisMech-compatible export target ONLY (see dismech_export);
+          never an Atlas source of truth or an implementation dependency.
+  register_invariants:
+    - verify_source fails closed (AtlasSourceVerificationError) on transcript/license/
+      sha256/count drift for any locally re-fetched copy.
+    - confirm_pending entries raise if any path treats them as verified.
+    - Raw external data (MaveDB CSV, IGVF files) is NEVER committed; only pins + aggregates.
+
+# ---------------------------------------------------------------------------
+# 6. Leakage guards (bidirectional scoring-import prohibition)
+# ---------------------------------------------------------------------------
+leakage_guards:
+  scoring_import_prohibition:
+    - No raptor.scorer / raptor.eval scoring or gate module may import raptor.atlas.
+    - raptor.atlas may not import a classifier/ClinVar-derived criterion value as
+      mechanism truth (ADR-0009), nor emit anything consumed by PP3/BP4 (ADR-0012).
+    - A mechanism profile may re-enter ACMG scoring ONLY under a separately approved
+      evidence policy; no such policy exists, so the path is closed.
+  circularity_guard:
+    forbidden_consumers:
+      - raptor.scorer
+      - raptor.eval.benchmark
+      - raptor.eval.gate
+      - raptor.eval.harness
+      - raptor.eval.knowns
+    forbidden_criteria: [PP3, BP4, PP5, BP6, PS4, PS3, BS3]
+    forbidden_inputs_as_mechanism_truth: [classifier_score, clinvar_derived_criterion]
+  enforcement: guards.py + Gemini RED tests assert import-direction and criterion bans.
+
+# ---------------------------------------------------------------------------
+# 7. One-way DisMech-compatible export
+# ---------------------------------------------------------------------------
+dismech_export:
+  direction: one-way (Atlas -> DisMech-compatible record) ONLY.
+  precondition: export runs ONLY after internal validation (schema + guards CLEAN).
+  prohibitions:
+    - DisMech/Monarch is never the Atlas source of truth.
+    - No DisMech schema becomes an implementation dependency of the internal module.
+    - No external contact / contribution initiated in this track (owner approval required;
+      tracked separately as grant-anthropic-dismech-integration-path).
+  export_contract: export_dismech(profile) emits provenance-bound, span-carrying records;
+    it drops nothing silently and never fabricates a claim.
+
+# ---------------------------------------------------------------------------
+# 8. Discovery experiment boundary (optional sidecar only)
+# ---------------------------------------------------------------------------
+discovery_boundary:
+  posture: >
+    Microsoft Discovery is an OPTIONAL retrieval/orchestration sidecar and
+    evaluation surface, NEVER the Atlas source of truth or an implementation
+    dependency of the deterministic scorer, gates, or packet source of truth.
+  may_host_later:
+    - Bookshelf literature retrieval
+    - a mechanism-evidence mapper prompt agent
+    - packet / Atlas audit investigations (variant-evidence-packet-auditor)
+  this_track_forbids:
+    - Migrating RAPTOR scoring, gates, packet source of truth, or the software build
+      loop into Discovery.
+    - Contributing a prompt agent to microsoft/discovery now.
+  this_track_delivers:
+    - An OPTIONAL adapter/evaluation SEAM specification only (interface shape, inputs,
+      pass/fail evaluation axes), not an agent and not an integration.
+  evaluation_axes: [omission_detection, circularity_detection, citation_grounding,
+    contradiction_capture, reproducibility, non_classification_boundary]
+  dependency: The Discovery packet-auditor evaluation is packet-dependent and
+    non-critical (TODO evaluate-discovery-packet-auditor); it never blocks the module.
+
+# ---------------------------------------------------------------------------
+# 9. Packet dependency split (what proceeds now vs. waits for frozen packets)
+# ---------------------------------------------------------------------------
+packet_dependency_split:
+  proceed_now_independent_of_packets:
+    - All schemas (identity, claim, context, edge, evidence, profile, provenance).
+    - module_api skeleton (src/raptor/atlas/) + typed errors + hashing + guards.
+    - source_register structure + verified pins (MaveDB) + fail-closed verification.
+    - synthetic RED-test fixtures (ID-independent) + panel selection CONTRACT (strata rules).
+    - Discovery adapter/eval seam spec; one-way DisMech export contract.
+  waits_for_frozen_corrected_packets:
+    - Exact current-policy VUS IDs admitted into the live pilot panel.
+    - R611Q admission (additionally gated on primary-source re-grounding).
+    - Any pilot CONTENT (real per-variant mechanism profiles).
+  rule: Schema/module/skeleton design MUST NOT depend on unfrozen packet IDs; only
+    concrete pilot ID admission waits. Corrected packets are generated independently.
+
+# ---------------------------------------------------------------------------
+# 10. Workflow + per-model scopes (ADR-0003 / ADR-0005 loop)
+# ---------------------------------------------------------------------------
+workflow:
+  order: Opus PLAN -> Gemini 3.5 Flash RED tests -> Claude Sonnet 5 skeleton -> GPT-5.4 checker
+  gate: pilot content follows ONLY after checker CLEAN AND corrected packet availability.
+  gemini_tests:
+    role: author FAILING (RED) schema/contract tests BEFORE any implementation.
+    scope:
+      - Schema shape + frozen/immutability + typed-error discrimination for every schema.
+      - identity admission: reject unresolved identity / unverified transcript pin.
+      - unknown & conflicting states are representable and NOT coerced to a call.
+      - context-dependence: same variant, different context -> distinct records.
+      - leakage guards: assert forbidden import direction + forbidden criteria/inputs.
+      - "source register fail-closed: sha256/transcript/license/count drift raises; confirm_pending treated-as-verified raises."
+      - provenance: canonical-JSON sha256 determinism + exclusion of run metadata.
+      - fixtures are synthetic and ID-independent (no unfrozen VUS ID dependency).
+    must_not: assert any real mechanism claim, any classifier value, or any pilot content.
+  sonnet_scope:
+    role: implement ONLY the internal module skeleton to turn RED tests GREEN.
+    in_scope:
+      - src/raptor/atlas/ model/identity/hashing/registry/profile/export/guards + README.
+      - Frozen dataclasses, tuples for ordered collections, typed errors.
+      - Fail-closed source verification; canonical-JSON hashing; import-direction guards.
+      - Ground source_register primary-literature entries to exact PMIDs/DOIs + spans, or
+        leave them UNVERIFIED (never fabricate a citation or a span).
+    out_of_scope:
+      - No scorer/eval/config/data edits; no PP3/BP4 or ACMG coupling.
+      - No pilot CONTENT; no real VUS/R611Q admission; no external fetch of held data.
+      - No DisMech contribution; no Discovery agent.
+  gpt54_probes:
+    role: independent checker; adversarial source-span + leakage review.
+    probes:
+      - Leakage: can any mechanism value reach the scorer/gate or a banned criterion? (must be NO)
+      - Circularity: is any confidence/class derived from a classifier/ClinVar score? (must be NO)
+      - "Source-span: does every substantive claim resolve to a primary source + exact span, else UNVERIFIED? Independent re-check of a sample."
+      - Contrast: does the ontology preserve unknown/conflicting/context across strata?
+      - R611Q: is the handoff mechanism absent from admitted fact? (must be absent)
+      - Fixture independence: no dependency on unfrozen packet IDs? (must hold)
+    verdict: CLEAN / REVISE / DO-NOT-MERGE.
+
+# ---------------------------------------------------------------------------
+# 11. Stop/go
+# ---------------------------------------------------------------------------
+stop_go:
+  pilot_passes_only_if:
+    - The ontology handles contrasting cases (all five strata) without collapse.
+    - Context, contradictions, and unknowns are preserved (not coerced to a call).
+    - Zero classification/scoring leakage (guards + checker CLEAN).
+    - Passes independent source-span review (GPT-5.4 + human where required).
+  otherwise: REVISE or STOP. No cross-gene / cross-disease expansion.
+  go_signal: schema + leakage guards CLEAN (checker) AND corrected packets frozen.
+
+# ---------------------------------------------------------------------------
+# 12. Extraction gate (repository extraction is later + evidence-gated)
+# ---------------------------------------------------------------------------
+extraction_gate:
+  default: build INSIDE RAPTOR as src/raptor/atlas/; do NOT extract now.
+  extraction_evidence_required_any:
+    - the ontology survives multiple contrasting TSC2 variants;
+    - it works for another gene;
+    - the API is independent of RAPTOR;
+    - another concrete consumer exists;
+    - independent release / team / licensing needs emerge.
+  seam: export.py + api_independence keep extraction cheap without doing it now.
+
+# ---------------------------------------------------------------------------
+# 13. Beat-4 inversion (how this spec could pass yet be wrong) + verification
+# ---------------------------------------------------------------------------
+deliberate_action:
+  beat4_inversions:
+    - "The spec names leakage guards but leaves a back-channel where mechanism evidence becomes a PP3/BP4 predictor -> mitigated: forbidden_criteria + forbidden_consumers + closed re-entry policy, asserted by RED tests."
+    - "R611Q's handoff mechanism is silently treated as fact -> mitigated: r611q_gate BLOCKED + explicit no-hardcode prohibition + GPT-5.4 probe."
+    - "Pilot fixtures depend on unfrozen VUS IDs, coupling skeleton to packet freeze -> mitigated: synthetic_fixtures independence + packet_dependency_split."
+    - "A classifier/ClinVar score leaks in as confidence/mechanism truth (R-A2 circularity) -> mitigated: forbidden_inputs_as_mechanism_truth + ADR-0009 binding."
+    - "The commit accidentally includes a code/config/data file -> mitigated: commit only this spec; verify with git show --stat."
+  verification_contract:
+    - Slot hashes verified MATCH (all three) before composition.
+    - Working tree clean at base ce42208 on track/mechanism-atlas-2026-07 before edit.
+    - Only docs/project/specs/mechanism-atlas-starter.yaml staged and committed.
+    - Both required trailers present on the commit.
+
+# ---------------------------------------------------------------------------
+# 14. Commit trailers (both required)
+# ---------------------------------------------------------------------------
+commit:
+  scope: commit ONLY this spec file; no code/tests/config/data changes; no push.
+  required_trailers:
+    - 'Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>'
+    - 'Copilot-Session: 7c146921-f3dd-4a1e-8cf0-8f574de49204'
