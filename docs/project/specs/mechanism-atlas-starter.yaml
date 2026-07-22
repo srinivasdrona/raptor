@@ -353,7 +353,7 @@ generic_core_disease_pack:
       pack_content_hash:
         type: str
         algo: sha256
-        note: "SELF-EXCLUDED canonical hash (see pack_content_hash below); the loader recomputes and MUST match"
+        note: "SELF-EXCLUDED canonical hash (see pack_content_hash_algorithm below); the loader recomputes and MUST match"
       created_at:
         type: str
         optional: true
@@ -397,25 +397,102 @@ generic_core_disease_pack:
     functions:
       - load_disease_pack(path_or_pack_id) -> DiseasePack   # loads + fully validates; AtlasPackError on any failure
       - validate_disease_pack(pack) -> None                 # structural + hash + namespacing validation; raises AtlasPackError
-      - pack_content_hash(pack) -> str                      # canonical sha256 over the pack manifest EXCLUDING pack_content_hash
+      - pack_content_hash(pack) -> str                      # canonical sha256 per pack_content_hash_algorithm below
     rule: >
       load_disease_pack is the ONLY way disease specifics enter the core. The core's
       admission, ontology validation, candidate promotion, and hashing all take a
       DiseasePack argument (dependency injection); none reads a disease literal.
+  pack_content_hash_algorithm:
+    id: atlas.pack_content_hash.v1
+    choice: parsed_semantic_canonical_json
+    rationale: >
+      Hash the PARSED SEMANTIC content of the pack, NOT the raw YAML bytes. Once the
+      manifest is parsed into a mapping, YAML comments, key order, quoting style,
+      indentation, and line endings are NON-SEMANTIC and do not affect the hash; only
+      the declared data does. (If raw-YAML bytes had been chosen instead, every
+      reformat would break the hash — explicitly rejected.)
+    steps:
+      - step: 1_parse
+        detail: >
+          Parse pack.yaml with a safe YAML loader (yaml.safe_load) into a Python
+          mapping M (the pack manifest). A YAML parse error, or a top-level value that
+          is not a mapping, is AtlasPackError (fail closed) BEFORE any hashing.
+      - step: 2_validate_first
+        detail: >
+          validate_disease_pack(M) runs FIRST — structural/schema/type + namespaced-
+          ontology + required-field validation — and raises AtlasPackError on failure.
+          pack_content_hash is computed ONLY over an already schema-valid manifest, so
+          the hash is never taken over malformed input.
+      - step: 3_strip_self
+        detail: >
+          Build P = M with ONLY the top-level key `pack_content_hash` removed. EVERY
+          other key participates: schema, pack_id, pack_version, and all `declares`
+          content. Optional metadata (e.g. created_at) PARTICIPATES in the hash IF
+          PRESENT; if omitted it is simply absent from P (so its presence/absence and
+          value are themselves hash-significant). No other key is ever stripped.
+      - step: 4_normalize
+        detail: >
+          Recursively normalize P for serialization: (a) every mapping is emitted with
+          keys sorted lexicographically by UTF-8 code point (json.dumps sort_keys);
+          (b) scalars keep their parsed JSON type (str / int / float / bool / null);
+          (c) every sequence (list) PRESERVES DECLARED AUTHOR ORDER — allowed_genes,
+          assembly_pins, transcript_pins, source_register_pins, prohibitions lists and
+          ontology-extension lists are all ORDER-SIGNIFICANT and are NEVER reordered;
+          (d) there are NO set-like collections in the pack manifest, so nothing is
+          deduped or reordered as a set. Any FUTURE pack field declared set-like MUST
+          register an explicit deterministic sort key in THIS block before use;
+          until then, unknown sequences are treated as ordered lists.
+      - step: 5_serialize
+        detail: >
+          canonical_bytes = json.dumps(P, sort_keys=True, separators=(",", ":"),
+          ensure_ascii=False).encode("utf-8"). Exact choices: sort_keys=True
+          (re-sorts at EVERY depth; authoritative over 4a), separators=(",", ":")
+          (no insignificant whitespace), ensure_ascii=False (emit real UTF-8 code
+          points, NOT \uXXXX escapes), UTF-8 encoding.
+      - step: 6_digest
+        detail: >
+          pack_content_hash = hashlib.sha256(canonical_bytes).hexdigest()
+          — LOWERCASE hex, 64 characters.
+    verification_order:
+      - Parse pack.yaml -> mapping M (AtlasPackError on YAML error / non-mapping).
+      - validate_disease_pack(M) structural/schema/namespacing (AtlasPackError on failure).
+      - recomputed = sha256 over canonical(M minus top-level pack_content_hash), per steps 3-6.
+      - Compare recomputed to the declared M["pack_content_hash"]; ANY mismatch is
+        AtlasPackError (fail closed). load_disease_pack returns a DiseasePack ONLY when
+        all four steps pass.
+    positive_fixture:
+      description: >
+        Illustrative MINIMAL schema-valid manifest AFTER stripping pack_content_hash
+        and canonical serialization. Phase-1 test asserts sha256(canonical_bytes)
+        equals this value; a one-byte change to any included field changes the digest.
+        The payload is ASCII-only, so ensure_ascii True/False produce identical bytes.
+      canonical_bytes: '{"assembly_pins":["GRCh38"],"pack_id":"synthpack","pack_version":"1.0.0","schema":"atlas.disease_pack.v1"}'
+      byte_length: 106
+      sha256: 5eaf3b476a0ee8f059491683cd05c1bd96fa436300791d409ab9a817ab3e2c6f
   pack_binding:
     id: atlas.pack_binding.v1
     fields: {pack_id: str, pack_version: str, pack_content_hash: str}
+    canonical_location: >
+      The SOLE authoritative, hash-bound pack_binding is the TOP-LEVEL
+      MechanismProfile.pack_binding. It is the ONLY pack_binding object included in
+      the hash payloads. Provenance does NOT carry a pack_binding field (removed, to
+      avoid a duplicated authoritative value). Every other appearance is a NON-hashed
+      derived COPY that MUST equal MechanismProfile.pack_binding.
     carried_in:
-      - provenance.pack_binding (PROFILE ENVELOPE payload; bound into the envelope hash)
-      - evidence_core_payload (bound into the evidence-core hash)
-      - run_metadata (audit copy only; run_metadata is EXCLUDED from hashes)
+      - MechanismProfile.pack_binding (AUTHORITATIVE; bound into BOTH the evidence-core AND the profile-envelope hash)
+      - run_metadata.pack_binding_audit (NON-hashed human audit copy; MUST equal profile.pack_binding)
+      - DisMechRecord.pack_binding (NON-hashed export copy; MUST equal profile.pack_binding)
+    equality_invariant: >
+      Any pack_binding copy (run_metadata audit, DisMech export, a candidate's
+      retrieval_provenance.pack_binding after promotion) MUST equal
+      MechanismProfile.pack_binding; a divergent copy is AtlasSchemaError.
     rule: >
-      The pack_binding (id + version + content hash) is bound into BOTH the
-      evidence_core_hash and the profile_envelope_hash. A profile therefore cannot
-      be reinterpreted under a different pack without changing its hashes: swapping
-      the pack changes both hashes, so wrong-pack interpretation is detectable and
-      fails a hash-coherence check. The audit copy in run_metadata never
-      participates in hashing.
+      The single MechanismProfile.pack_binding (id + version + content hash) is bound
+      into BOTH the evidence_core_hash and the profile_envelope_hash. A profile
+      therefore cannot be reinterpreted under a different pack without changing its
+      hashes: swapping the pack changes both hashes, so wrong-pack interpretation is
+      detectable and fails a hash-coherence check. Non-hashed copies never
+      participate in hashing.
   typed_errors:
     core_errors: [AtlasSchemaError, AtlasIdentityError, AtlasProvenanceError,
       AtlasSourceVerificationError, AtlasLeakageError, AtlasExportError]
@@ -666,25 +743,30 @@ schemas:
       identity: {ref: variant_identity}
       pack_binding:
         ref: generic_core_disease_pack.pack_binding
-        note: "{pack_id, pack_version, pack_content_hash} of the pack this profile was built under; bound into BOTH content hashes so wrong-pack reinterpretation is detectable"
+        note: "the SOLE authoritative, hash-bound {pack_id, pack_version, pack_content_hash}; bound into BOTH content hashes so wrong-pack reinterpretation is detectable. Provenance carries NO pack_binding; run_metadata/DisMech copies are non-hashed and MUST equal this."
       claims:
         type: tuple
         of: observed_claim
         note: "immutable canonical claim table; the SINGLE source of claim identity; edges/evidence reference members by claim_id"
       candidate_classes:
         type: list
-        of: {class: ontology_seeds.mechanism_classes, state: ontology_seeds.mechanism_states, confidence: 'enum[low, moderate, high, na]'}
+        of: {class_id: ontology_seeds.mechanism_classes, state: ontology_seeds.mechanism_states, confidence: 'enum[low, moderate, high, na]'}
       edges: {type: list, of: mechanism_edge}
       evidence: {ref: evidence_assessment}
       provenance: {ref: provenance}
       run_metadata: {ref: run_metadata}
     invariants:
       - candidate_classes may be empty or all-unknown; that is a valid profile.
+      - Each CandidateClass uses field name `class_id` (NOT bare `class`); the
+        canonical order key is (class_id, state).
       - No confidence value is derived from any classifier or ClinVar score.
       - Every claim_id referenced by edges/evidence resolves INTO profile.claims;
         no claim exists outside the claims tuple (single source of truth for hashing).
       - pack_binding is REQUIRED and non-empty; a profile with an empty/missing
         pack_binding is AtlasSchemaError (a profile is always built under one pack).
+      - MechanismProfile.pack_binding is the ONLY hash-bound pack_binding; Provenance
+        carries none. run_metadata.pack_binding_audit and DisMechRecord.pack_binding
+        are non-hashed copies that MUST equal it (divergence -> AtlasSchemaError).
   run_metadata:
     id: atlas.run_metadata.v1
     purpose: non-content run fields, isolated so hashing is field-coherent.
@@ -695,7 +777,7 @@ schemas:
       pack_binding_audit:
         type: obj
         optional: true
-        note: "audit COPY of pack_binding for humans; NEVER hashed (run_metadata is excluded); the hash-bound copy is profile.pack_binding"
+        note: "audit COPY of pack_binding for humans; NEVER hashed (run_metadata is excluded); the hash-bound copy is MechanismProfile.pack_binding and this copy MUST equal it (AtlasSchemaError on divergence)."
     note: run_metadata is EXCLUDED from both content hashes by definition.
   provenance:
     id: atlas.provenance.v1
@@ -704,19 +786,20 @@ schemas:
       version_pins:
         type: tuple
         note: "transcript, source, and dataset versions"
-      pack_binding:
-        ref: generic_core_disease_pack.pack_binding
-        note: "same {pack_id, pack_version, pack_content_hash}; in the ENVELOPE payload"
       content_hashes:
         evidence_core_hash: {algo: sha256, over: evidence_core_payload}
         profile_envelope_hash: {algo: sha256, over: profile_envelope_payload}
+    note: >-
+      Provenance carries NO pack_binding field (removed in rev 6.1): the sole
+      authoritative pack_binding is MechanismProfile.pack_binding, which is bound into
+      both content hashes. This avoids a duplicated authoritative value.
   hashing:
     id: atlas.hashing.v1
-    canonical_hash_rule: 'UTF-8 json.dumps(sort_keys=True, separators=(",", ":")); enums -> .value; tuples -> lists.'
+    canonical_hash_rule: 'canonical_bytes = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8"); enums -> .value; tuples -> lists; sha256(canonical_bytes).hexdigest() lowercase. SAME canonical-JSON discipline as pack_content_hash_algorithm.'
     ordering: >
       Deterministic pre-serialization ordering: claims by (claim_kind,
       source_ref.entry_id, source_ref.span.locator, claim_text); edges by
-      (from_layer, to_layer, effect); candidate_classes by (class, state);
+      (from_layer, to_layer, effect); candidate_classes by (class_id, state);
       source_pins by entry_id. The claim sort/hash key reads the span from
       source_ref.span (canonical) — never a claim-local span field, which does not
       exist. Ordering is applied before hashing.
@@ -727,8 +810,9 @@ schemas:
       excludes: [provenance, run_metadata, identity.transcript_pin, identity.hgvs_c,
         identity.hgvs_p, identity.hgvs_g]
       note: >
-        The evidence core is defined ONLY over listed `includes` fields; pack_binding
-        (pack_id + pack_version + pack_content_hash) is bound in FIRST so the same
+        The evidence core is defined ONLY over listed `includes` fields. `pack_binding`
+        here IS MechanismProfile.pack_binding (the sole pack_binding; Provenance has
+        none) — {pack_id, pack_version, pack_content_hash} bound in FIRST so the same
         evidence under a different pack yields a different core hash. edges/evidence
         serialize claim references as claim_id into the same ordered claims tuple, so
         the payload is internally coherent (no dangling/undefined field).
@@ -738,13 +822,15 @@ schemas:
       excludes: [run_metadata, provenance.content_hashes]
       note: >
         Excludes ONLY run_metadata and the self-referential content_hashes block.
-        pack_binding is included so the envelope hash also fails closed under a
-        wrong/altered pack.
+        `pack_binding` here IS MechanismProfile.pack_binding (the sole pack_binding;
+        Provenance carries none), included so the envelope hash also fails closed
+        under a wrong/altered pack.
     pack_binding_rule: >
-      Both hashes bind pack_binding. A hash-coherence check that recomputes both
-      hashes under the profile's declared pack MUST match; recomputing under any
-      other pack MUST differ. This makes reinterpretation of a profile under the
-      wrong pack a detectable, fail-closed condition (AtlasSchemaError on mismatch).
+      Both hashes bind the single MechanismProfile.pack_binding. A hash-coherence
+      check that recomputes both hashes under the profile's declared pack MUST match;
+      recomputing under any other pack MUST differ. This makes reinterpretation of a
+      profile under the wrong pack a detectable, fail-closed condition (AtlasSchemaError
+      on mismatch).
   atlas_candidate_import:
     id: atlas.candidate_import.v1
     trust: >-
@@ -953,7 +1039,7 @@ dataclass_contracts:
       context: ContextRecord, edge_state: str}
   CandidateClass:
     frozen: true
-    fields: {class_id: str, state: str, confidence: str}   # confidence: low|moderate|high|na
+    fields: {class_id: str, state: str, confidence: str}   # field is class_id (NOT bare class); confidence: low|moderate|high|na; order key (class_id, state)
   EvidenceAssessment:
     frozen: true
     fields: {supporting: tuple, contradicting: tuple, missing_evidence: tuple, unknowns: tuple}
@@ -962,14 +1048,14 @@ dataclass_contracts:
     fields: {run_id: str, generated_at: str, tool_versions: tuple, pack_binding_audit: 'obj | None'}
   Provenance:
     frozen: true
-    fields: {source_pins: tuple, version_pins: tuple, pack_binding: PackBinding, content_hashes: obj}
+    fields: {source_pins: tuple, version_pins: tuple, content_hashes: obj}   # NO pack_binding (sole copy is MechanismProfile.pack_binding)
   MechanismProfile:
     frozen: true
     fields:
       identity: AtlasIdentity
-      pack_binding: PackBinding       # REQUIRED, non-empty
+      pack_binding: PackBinding       # REQUIRED, non-empty; the SOLE hash-bound pack_binding
       claims: tuple                   # tuple[ObservedClaim, ...]
-      candidate_classes: tuple        # tuple[CandidateClass, ...]
+      candidate_classes: tuple        # tuple[CandidateClass, ...] (field class_id)
       edges: tuple                    # tuple[MechanismEdge, ...]
       evidence: EvidenceAssessment
       provenance: Provenance
@@ -991,7 +1077,7 @@ dataclass_contracts:
     frozen: true
     fields: {spdi_canonical: str, pack_binding: PackBinding, claims: tuple,
       provenance: obj}
-    note: export target carries spdi_canonical (identity key) + pack_binding; no `variant_id`.
+    note: export target carries spdi_canonical (identity key) + a pack_binding COPY that MUST equal MechanismProfile.pack_binding; no `variant_id`.
 
 # ---------------------------------------------------------------------------
 module_api:
@@ -1708,7 +1794,11 @@ gemini_test_contract:
         load_disease_pack/validate_disease_pack/pack_content_hash; schema/pack_id/
         pack_version present; hash-drift -> AtlasPackError; mis-namespaced/parentless
         ontology extension -> AtlasPackError; core-vs-pack error typing; exactly one
-        pack per run; a clean core + tsc2 pack implies NO second disease.
+        pack per run; a clean core + tsc2 pack implies NO second disease. A positive
+        pack_content_hash test recomputes the digest per pack_content_hash_algorithm
+        (parse -> validate -> strip top-level pack_content_hash -> canonical JSON ->
+        sha256) and asserts it equals the block's positive_fixture.sha256
+        (5eaf3b47...); a one-byte change to any included field changes the digest.
     - file: tests/atlas/test_source_registry_claims.py
       covers: >
         SourceRegisterEntry/EntryRef/ObservedClaim exact fields (ObservedClaim has
