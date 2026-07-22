@@ -333,7 +333,7 @@ These lines are delivered by the underlying **engine tiers** (mechanism, not pro
 
 | Dimension | Metric | Target posture |
 |---|---|---|
-| **Validated accuracy (Line 1 engine)** | Missense-stratified precision / recall vs the frozen held-out benchmark | Pre-registered thresholds; **PASS gates** any candidate-packet release or VUS run. |
+| **Validated accuracy (Line 1 engine)** | Missense-stratified precision / recall vs the frozen held-out benchmark | Pre-registered thresholds; **PASS gates** externally usable packet/worklist release and VUS authorization. Internal non-authoritative expert-review packets may be prepared before PASS. |
 | **Expert review yield** | Candidate packets **reviewed and accepted/rejected by an expert**; expert-agreement rate | The unit of success is an *expert-reviewed* packet, **not** a variant scored. |
 | **Curator / research adoption** | Named TSC curators/researchers actually **using** packets or the atlas | Named wedge (VCEP / lab / researcher), not "published on GitHub." |
 | **Research acted on** | Experiments / hypotheses the atlas or hypothesis packets **cause** (assays run, contradictions resolved, VUS re-examined) | Success = research *moved*, not artifacts *emitted*. |
