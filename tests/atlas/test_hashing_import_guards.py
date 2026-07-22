@@ -525,7 +525,7 @@ def test_build_mechanism_profile_positional_contract():
         schema="atlas.disease_pack.v1",
         pack_id="synthpack",
         pack_version="1.0.0",
-        pack_content_hash="bf7369f8faa24a6f746956ee1122281e798185f320b012a844ffbc683f2e7b21",
+        pack_content_hash="1fb2ecbfddbd461ec8cddcafd495e31a95f8024bbebd5d757dd27a0b96c4cb0d",
         allowed_genes=("SYNGENE1",),
         assembly_pins=("GRCh38",),
         transcript_pins=({"transcript": "NM_900001.1", "requires": "MANE-Select-verification"},),
@@ -879,5 +879,43 @@ def test_one_way_dismech_export():
     assert record.spdi_canonical == "NC_000000.0:1000:A:T"
     assert record.pack_binding == pack_binding
     assert_no_cribbing(record.__dict__)
+
+
+def test_pure_preimplementation_fake_pack_568_audit():
+    """Verify raw inline fake_pack mapping has exact 568 bytes canonical payload and expected hash per Finding 4."""
+    fake_pack_payload = {
+        "schema": "atlas.disease_pack.v1",
+        "pack_id": "synthpack",
+        "pack_version": "1.0.0",
+        "allowed_genes": ["SYNGENE1"],
+        "assembly_pins": ["GRCh38"],
+        "transcript_pins": [
+            {"transcript": "NM_900001.1", "requires": "MANE-Select-verification"}
+        ],
+        "reconciliation_policy": {},
+        "ontology_extensions": {},
+        "source_register_pins": [
+            {
+                "entry_id": "synthsrc-0001",
+                "source_type": "DATASET",
+                "role": "provenance_only",
+                "urn_or_ids": {"accession": "SYNTHDB-0001"},
+                "transcript": None,
+                "license": "CC0-1.0",
+                "sha256": None,
+                "variant_count": None,
+                "verification": "confirm_pending"
+            }
+        ],
+        "prohibitions": {},
+        "pilot_eval_metadata": {}
+    }
+    
+    canonical_bytes = json.dumps(fake_pack_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    assert len(canonical_bytes) == 568, f"Expected 568 bytes, got {len(canonical_bytes)}"
+    computed_hash = hashlib.sha256(canonical_bytes).hexdigest().lower()
+    expected_hash = "1fb2ecbfddbd461ec8cddcafd495e31a95f8024bbebd5d757dd27a0b96c4cb0d"
+    assert computed_hash == expected_hash, f"Hash mismatch: computed {computed_hash}, expected {expected_hash}"
+
 
 
