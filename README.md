@@ -79,7 +79,8 @@ policy.
 ## Repository guide
 
 - [`docs/PROGRAM.md`](docs/PROGRAM.md) — live program status and priorities
-- [`docs/STRATEGY.md`](docs/STRATEGY.md) — vertical TSC/mTOR strategy
+- [`docs/STRATEGY.md`](docs/STRATEGY.md) — strategy + operating-model authority
+- [`docs/EVALUATION.md`](docs/EVALUATION.md) — evaluation protocol + acceptance-rubric authority
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — architecture and policy decisions
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — system architecture
 - [`docs/RISK_REGISTER.md`](docs/RISK_REGISTER.md) — failure modes and controls

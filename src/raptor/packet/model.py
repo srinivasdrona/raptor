@@ -382,13 +382,45 @@ class PatternRef:
         for name in ("census_snapshot_id", "pattern_id", "census_selection_stratum"):
             if not _non_blank(getattr(self, name)):
                 raise PacketValidationError(f"PatternRef.{name} must be non-blank")
+        if not isinstance(self.pattern_signature, (tuple, list)):
+            raise PacketValidationError(
+                "PatternRef.pattern_signature must be a tuple or list of strings, "
+                f"never a bare string; got {self.pattern_signature!r}"
+            )
         object.__setattr__(self, "pattern_signature", tuple(self.pattern_signature))
         if (
             isinstance(self.member_count, bool)
             or not isinstance(self.member_count, int)
-            or self.member_count < 0
+            or self.member_count <= 0
         ):
-            raise PacketValidationError("PatternRef.member_count must be a non-negative int")
+            raise PacketValidationError("PatternRef.member_count must be a positive int")
+
+
+#: Exact four-value census-selection-stratum enum (corrected all-VUS
+#: expert-review packet track, D13). Never a production direction.
+_CENSUS_SELECTION_STRATA = frozenset({
+    "candidate_LP_review",
+    "candidate_LB_review",
+    "no_deterministic_resolution",
+    "manual_review",
+})
+
+
+@dataclass(frozen=True)
+class CensusSelectionMetadata:
+    """Frozen, exact-four-value census selection-stratum marker (corrected
+    all-VUS expert-review packet track). Purely provenance/selection
+    bookkeeping -- never a production classification, direction, or
+    candidate-direction substitute."""
+
+    census_selection_stratum: str
+
+    def __post_init__(self) -> None:
+        if self.census_selection_stratum not in _CENSUS_SELECTION_STRATA:
+            raise PacketValidationError(
+                "CensusSelectionMetadata.census_selection_stratum must be one of "
+                f"{sorted(_CENSUS_SELECTION_STRATA)!r}; got {self.census_selection_stratum!r}"
+            )
 
 
 @dataclass(frozen=True)
@@ -438,6 +470,7 @@ class PacketInput:
     external_comparators: Tuple[ExternalComparator, ...]
     predecessor_packet_id: Optional[str]
     predecessor_envelope_hash: Optional[str]
+    census_selection_stratum: Optional[CensusSelectionMetadata] = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.identity, CanonicalVariantIdentity):
@@ -472,6 +505,12 @@ class PacketInput:
                 raise PacketValidationError(
                     "PacketInput.external_comparators must contain only ExternalComparator"
                 )
+        if self.census_selection_stratum is not None and not isinstance(
+            self.census_selection_stratum, CensusSelectionMetadata
+        ):
+            raise PacketValidationError(
+                "PacketInput.census_selection_stratum must be a CensusSelectionMetadata or None"
+            )
 
 
 @dataclass(frozen=True)
@@ -709,6 +748,12 @@ class CandidateEvidencePacket:
     source_snapshot: SourceSnapshotPins
     predecessor_packet_id: Optional[str]
     predecessor_envelope_hash: Optional[str]
+    # Corrected-track census selection metadata (frozen four-value object).
+    # A real, declared field -- not an ad-hoc post-construction attachment --
+    # so it participates in normal `dataclasses.fields()` schema introspection
+    # and in the generic dataclass JSON serializer. Defaults to `None` so
+    # every pre-existing (non-corrected) caller remains valid unchanged.
+    census_selection_stratum: Optional[CensusSelectionMetadata] = None
 
 
 @dataclass(frozen=True)
@@ -735,7 +780,10 @@ def redact_for_first_pass(packet: CandidateEvidencePacket) -> FirstPassPacketVie
     """Pure projection (PRD-04 FR14.1, AC20) that strips `candidate_direction`,
     `external_comparators`, `pattern_ref`, `run_metadata`, `source_snapshot`,
     predecessor linkage, and hash/version fields not part of the first-pass
-    schema, retaining only the fields blinded reviewers are permitted to see."""
+    schema, retaining only the fields blinded reviewers are permitted to see.
+    A corrected-track packet's `census_selection_stratum` field is likewise
+    never copied onto the projection -- `FirstPassPacketView` has no such
+    field at all."""
     return FirstPassPacketView(
         packet_id=packet.packet_id,
         evidence_core_hash=packet.evidence_core_hash,
