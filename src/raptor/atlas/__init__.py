@@ -1,0 +1,91 @@
+"""RAPTOR Mechanism Atlas -- condition-agnostic mechanism profile core.
+
+Public API re-export surface. See ``src/raptor/atlas/README.md`` for the
+module charter and boundaries. This package must never import from
+``raptor.packet``, ``raptor.scorer``, ``raptor.eval``, or any Discovery
+SDK (enforced by :func:`raptor.atlas.guards.assert_atlas_import_boundary`).
+"""
+
+from raptor.atlas.model import (
+    AtlasCandidateImport,
+    AtlasError,
+    AtlasExportError,
+    AtlasIdentity,
+    AtlasIdentityError,
+    AtlasLeakageError,
+    AtlasPackError,
+    AtlasProvenanceError,
+    AtlasSchemaError,
+    AtlasSourceVerificationError,
+    CandidateClass,
+    ContextRecord,
+    DisMechRecord,
+    DiseasePack,
+    EntryRef,
+    EvidenceAssessment,
+    MechanismEdge,
+    MechanismProfile,
+    ObservedClaim,
+    PackBinding,
+    Provenance,
+    PromotionContext,
+    RunMetadata,
+    SourceRegisterEntry,
+    Span,
+)
+from raptor.atlas.identity import admit_identity, reconcile_transcript
+from raptor.atlas.pack import load_disease_pack, pack_content_hash, validate_disease_pack
+from raptor.atlas.hashing import evidence_core_hash, profile_envelope_hash
+from raptor.atlas.registry import validate_claim_grounding, verify_source
+from raptor.atlas.profile import build_mechanism_profile
+from raptor.atlas.promote import promote_candidate, validate_candidate_import
+from raptor.atlas.export import export_dismech
+from raptor.atlas.guards import (
+    assert_atlas_import_boundary,
+    assert_no_consumer_import,
+    scan_for_classification_leakage,
+)
+
+__all__ = [
+    "AtlasCandidateImport",
+    "AtlasError",
+    "AtlasExportError",
+    "AtlasIdentity",
+    "AtlasIdentityError",
+    "AtlasLeakageError",
+    "AtlasPackError",
+    "AtlasProvenanceError",
+    "AtlasSchemaError",
+    "AtlasSourceVerificationError",
+    "CandidateClass",
+    "ContextRecord",
+    "DisMechRecord",
+    "DiseasePack",
+    "EntryRef",
+    "EvidenceAssessment",
+    "MechanismEdge",
+    "MechanismProfile",
+    "ObservedClaim",
+    "PackBinding",
+    "Provenance",
+    "PromotionContext",
+    "RunMetadata",
+    "SourceRegisterEntry",
+    "Span",
+    "admit_identity",
+    "reconcile_transcript",
+    "load_disease_pack",
+    "pack_content_hash",
+    "validate_disease_pack",
+    "evidence_core_hash",
+    "profile_envelope_hash",
+    "validate_claim_grounding",
+    "verify_source",
+    "build_mechanism_profile",
+    "promote_candidate",
+    "validate_candidate_import",
+    "export_dismech",
+    "assert_atlas_import_boundary",
+    "assert_no_consumer_import",
+    "scan_for_classification_leakage",
+]

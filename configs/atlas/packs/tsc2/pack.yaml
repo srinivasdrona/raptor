@@ -1,0 +1,86 @@
+schema: atlas.disease_pack.v1
+pack_id: tsc2
+pack_version: 1.0.0-phase1
+pack_content_hash: 59f46c652cdcf09093d593e2c98d470aa0ce14a4d36659d211f173970155b2d1
+allowed_genes:
+  - TSC2
+assembly_pins:
+  - GRCh38
+transcript_pins:
+  - transcript: NM_000548.5
+    requires: MANE-Select-verification
+reconciliation_policy:
+  alias_to_canonical_spdi_only: true
+  no_fabrication: true
+ontology_extensions:
+  claim_kinds:
+    - id: tsc2:pathway_mtorc1_state
+      parent: pathway
+  node_layers: []
+  mechanism_classes: []
+  context_vocabularies:
+    zygosity_context:
+      - germline
+      - somatic
+      - mosaic
+      - inferred
+      - unknown
+    model_system:
+      - cell_line
+      - patient_fibroblast
+      - in_vitro_biochemical
+      - mouse_model
+source_register_pins:
+  - entry_id: bioRxiv-2024.06.07.597916
+    source_type: PRIMARY-LIT
+    role: provenance_only
+    urn_or_ids:
+      pmcid: PMC11185720
+      doi: 10.1101/2024.06.07.597916
+    license: CC-BY-4.0
+    verification: confirm_pending
+  - entry_id: clinvar-VCV000012397
+    source_type: DATASET
+    role: provenance_only
+    urn_or_ids:
+      clinvar_variation_id: VCV000012397
+      clinvar_rcv_id: RCV000491426
+    license: public-domain-us-gov
+    verification: confirm_pending
+  - entry_id: mavedb-tsc2-pilot-dataset
+    source_type: DATASET
+    role: provenance_only
+    urn_or_ids:
+      dataset_registry: MaveDB
+      source_publication_doi: 10.1101/2024.06.07.597916
+    license: CC0-1.0
+    verification: confirm_pending
+prohibitions:
+  no_hardcode_handoff_mechanism: true
+  no_classifier_score_as_mechanism_truth: true
+  no_clinvar_criterion_as_mechanism_truth: true
+  no_amino_acid_substitution_only_inference: true
+  no_phenotype_prediction_from_molecular_effect_alone: true
+  no_cross_disease_expansion_without_stop_go: true
+  r611q_gate:
+    status: prohibited_until_independently_regrounded
+    case_card: TSC2 p.Arg611Gln (R611Q), NM_000548.5:c.1832G>A
+    note: >-
+      Admission of any mechanism claim for this variant is blocked until
+      identity, zygosity, and each supporting claim's span are
+      independently re-grounded per the ATLAS_RUNBOOK Phase 2 gate. No
+      claim or span for this variant is admitted by Phase 1 fixtures.
+pilot_eval_metadata:
+  panel_strata:
+    - pathogenic
+    - benign
+    - conflicting
+    - vus
+  native_vs_discovery_axes:
+    - retrieval_recall
+    - valid_claim_span_yield
+    - contradiction_detection
+    - hallucination_unsupported_claim_rate
+    - context_completeness
+    - reproducibility
+    - latency_cost
