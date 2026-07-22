@@ -112,10 +112,14 @@ Adopt **option 3**.
   metadata pins, disease-specific prohibitions, and pilot/evaluation metadata. It is
   configuration (GP-6), never code, and never a source of scoring truth. Phase 1 ships
   exactly one `tsc2` pack.
-- **Pack binding.** The pack `{pack_id, pack_version, pack_content_hash}` is carried in
-  profile provenance and run metadata and bound into **both** the evidence-core hash
-  and the profile-envelope hash, so a profile cannot be silently reinterpreted under
-  the wrong pack (wrong-pack recompute changes the hash; fail-closed).
+- **Pack binding.** The sole authoritative, hash-bound binding is the top-level
+  `MechanismProfile.pack_binding` `{pack_id, pack_version, pack_content_hash}`, bound
+  into **both** the evidence-core hash and the profile-envelope hash, so a profile
+  cannot be silently reinterpreted under the wrong pack (wrong-pack recompute changes
+  both hashes; fail-closed). `Provenance` carries **no** `pack_binding`.
+  `RunMetadata.pack_binding_audit`, `DisMechRecord.pack_binding`, and candidate
+  retrieval-provenance copies are non-authoritative, non-hashed audit copies that MUST
+  equal the profile binding or fail (`AtlasSchemaError`).
 - **Typed, fail-closed errors.** Core domain errors (`AtlasSchemaError`,
   `AtlasIdentityError`, `AtlasProvenanceError`, `AtlasSourceVerificationError`,
   `AtlasLeakageError`, `AtlasExportError`) are distinct from pack-validation errors

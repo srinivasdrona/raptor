@@ -377,8 +377,8 @@ generic_core_disease_pack:
         type: list
         note: "disease-specific SourceRegisterEntry metadata pins (the concrete TSC2/MaveDB/IGVF/ClinVar/Monarch entries live HERE, not in core; see source_register)"
       prohibitions:
-        type: list
-        note: "disease-specific prohibitions, e.g. the r611q_gate block and no-hardcode-handoff-mechanism rules"
+        type: obj
+        note: "disease-specific prohibitions keyed by name (a mapping, matching DiseasePack.prohibitions: obj), e.g. the r611q_gate block and no-hardcode-handoff-mechanism rules"
       pilot_eval_metadata:
         type: obj
         note: "panel strata, native-vs-Discovery eval axes, and pilot bookkeeping for THIS disease"
@@ -436,8 +436,11 @@ generic_core_disease_pack:
           keys sorted lexicographically by UTF-8 code point (json.dumps sort_keys);
           (b) scalars keep their parsed JSON type (str / int / float / bool / null);
           (c) every sequence (list) PRESERVES DECLARED AUTHOR ORDER — allowed_genes,
-          assembly_pins, transcript_pins, source_register_pins, prohibitions lists and
-          ontology-extension lists are all ORDER-SIGNIFICANT and are NEVER reordered;
+          assembly_pins, transcript_pins, source_register_pins and ontology-extension
+          lists (claim_kinds/node_layers/mechanism_classes) are all ORDER-SIGNIFICANT
+          and are NEVER reordered; mapping-valued fields (reconciliation_policy,
+          ontology_extensions, prohibitions, pilot_eval_metadata, context_vocabularies)
+          are key-sorted like any mapping;
           (d) there are NO set-like collections in the pack manifest, so nothing is
           deduped or reordered as a set. Any FUTURE pack field declared set-like MUST
           register an explicit deterministic sort key in THIS block before use;
@@ -462,13 +465,65 @@ generic_core_disease_pack:
         all four steps pass.
     positive_fixture:
       description: >
-        Illustrative MINIMAL schema-valid manifest AFTER stripping pack_content_hash
-        and canonical serialization. Phase-1 test asserts sha256(canonical_bytes)
-        equals this value; a one-byte change to any included field changes the digest.
-        The payload is ASCII-only, so ensure_ascii True/False produce identical bytes.
-      canonical_bytes: '{"assembly_pins":["GRCh38"],"pack_id":"synthpack","pack_version":"1.0.0","schema":"atlas.disease_pack.v1"}'
-      byte_length: 106
-      sha256: 5eaf3b476a0ee8f059491683cd05c1bd96fa436300791d409ab9a817ab3e2c6f
+        FULL schema-valid minimal SYNTHETIC disease pack. It passes required-field +
+        namespacing + source-pairing validation (validate_disease_pack) BEFORE hashing.
+        A Phase-1 test copies full_fixture_yaml verbatim as a fixture pack, strips ONLY
+        the top-level pack_content_hash, canonically serializes the remaining mapping,
+        and asserts sha256 == the value below (and that the stored pack_content_hash
+        equals it). All values are clearly synthetic (synthpack / SYNGENE1 /
+        NM_900001.1 / synthsrc-0001 / SYNTHDB-0001); NO TSC/mTOR/R611Q. Payload is
+        ASCII-only so ensure_ascii True/False produce identical bytes.
+      full_fixture_yaml: |
+        schema: atlas.disease_pack.v1
+        pack_id: synthpack
+        pack_version: 1.0.0
+        pack_content_hash: 9fa7643161ea0d8741ce8ffe0169f1f0109300a93c61cb5037cb86ca5abd7377
+        allowed_genes: [SYNGENE1]
+        assembly_pins: [GRCh38]
+        transcript_pins:
+          - transcript: NM_900001.1
+            requires: MANE-Select-verification
+        reconciliation_policy:
+          alias_to_canonical_spdi_only: true
+          no_fabrication: true
+        ontology_extensions:
+          claim_kinds:
+            - id: synthpack:pathway_synthpath
+              parent: pathway
+          node_layers: []
+          mechanism_classes: []
+          context_vocabularies:
+            tissue: [synth_tissue_a]
+        source_register_pins:
+          - entry_id: synthsrc-0001
+            source_type: DATASET
+            role: provenance_only
+            urn_or_ids:
+              accession: SYNTHDB-0001
+            license: CC0-1.0
+            verification: confirm_pending
+        prohibitions:
+          no_hardcode_handoff_mechanism: true
+        pilot_eval_metadata:
+          panel_strata: [synthetic_stratum_a]
+          native_vs_discovery_axes: [reuse_percentage]
+      payload_after_stripping_pack_content_hash: >
+        The full_fixture_yaml mapping MINUS the top-level pack_content_hash key; EVERY
+        other field (incl. all nested values) participates. created_at is absent here
+        (optional) — if a pack declares it, it participates too.
+      canonical_json_bytes: '{"allowed_genes":["SYNGENE1"],"assembly_pins":["GRCh38"],"ontology_extensions":{"claim_kinds":[{"id":"synthpack:pathway_synthpath","parent":"pathway"}],"context_vocabularies":{"tissue":["synth_tissue_a"]},"mechanism_classes":[],"node_layers":[]},"pack_id":"synthpack","pack_version":"1.0.0","pilot_eval_metadata":{"native_vs_discovery_axes":["reuse_percentage"],"panel_strata":["synthetic_stratum_a"]},"prohibitions":{"no_hardcode_handoff_mechanism":true},"reconciliation_policy":{"alias_to_canonical_spdi_only":true,"no_fabrication":true},"schema":"atlas.disease_pack.v1","source_register_pins":[{"entry_id":"synthsrc-0001","license":"CC0-1.0","role":"provenance_only","source_type":"DATASET","urn_or_ids":{"accession":"SYNTHDB-0001"},"verification":"confirm_pending"}],"transcript_pins":[{"requires":"MANE-Select-verification","transcript":"NM_900001.1"}]}'
+      byte_length: 858
+      sha256: 9fa7643161ea0d8741ce8ffe0169f1f0109300a93c61cb5037cb86ca5abd7377
+      validation_note: >
+        Independently computed by running pack_content_hash_algorithm steps 1-6 on
+        full_fixture_yaml with Python (json.dumps(sort_keys=True,
+        separators=(",", ":"), ensure_ascii=False) then hashlib.sha256().hexdigest()).
+        validate_disease_pack passes FIRST: all 11 required fields present (schema,
+        pack_id, pack_version, allowed_genes, assembly_pins, transcript_pins,
+        reconciliation_policy, ontology_extensions, source_register_pins, prohibitions,
+        pilot_eval_metadata); the one ontology extension is namespaced `synthpack:` with
+        parent core seed `pathway`; the DATASET source pin is role=provenance_only (not a
+        grounding leaf), so no synthetic grounding is implied.
   pack_binding:
     id: atlas.pack_binding.v1
     fields: {pack_id: str, pack_version: str, pack_content_hash: str}
@@ -1796,9 +1851,10 @@ gemini_test_contract:
         ontology extension -> AtlasPackError; core-vs-pack error typing; exactly one
         pack per run; a clean core + tsc2 pack implies NO second disease. A positive
         pack_content_hash test recomputes the digest per pack_content_hash_algorithm
-        (parse -> validate -> strip top-level pack_content_hash -> canonical JSON ->
-        sha256) and asserts it equals the block's positive_fixture.sha256
-        (5eaf3b47...); a one-byte change to any included field changes the digest.
+        (parse -> validate_disease_pack -> strip top-level pack_content_hash -> canonical
+        JSON -> sha256) over positive_fixture.full_fixture_yaml and asserts it equals
+        the block's positive_fixture.sha256 (9fa76431...) and byte_length 858; a
+        one-byte change to any included field changes the digest.
     - file: tests/atlas/test_source_registry_claims.py
       covers: >
         SourceRegisterEntry/EntryRef/ObservedClaim exact fields (ObservedClaim has

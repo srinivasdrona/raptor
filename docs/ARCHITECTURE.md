@@ -173,10 +173,14 @@ disease into reusable machinery (ADR-0014). Component relationships:
   configuration (GP-6), never code. **Phase 1 ships exactly one `tsc2` pack.** The core
   reads it via `load_disease_pack(...) -> DiseasePack`, injected into
   `admit_identity(record, *, pack)` and the promotion `PromotionContext`.
-- **Pack binding (provenance).** `{pack_id, pack_version, pack_content_hash}` is carried
-  in profile provenance/run metadata and bound into **both** the evidence-core and
-  profile-envelope hashes, so a profile cannot be reinterpreted under the wrong pack
-  (fail-closed on hash mismatch).
+- **Pack binding (profile-level, single source of truth).** The sole authoritative,
+  hash-bound binding is the top-level `MechanismProfile.pack_binding`
+  `{pack_id, pack_version, pack_content_hash}`, bound into **both** the evidence-core
+  and profile-envelope hashes, so a profile cannot be reinterpreted under the wrong
+  pack (fail-closed on hash mismatch). `Provenance` carries **no** `pack_binding`;
+  `RunMetadata.pack_binding_audit`, `DisMechRecord.pack_binding`, and candidate
+  retrieval-provenance copies are non-authoritative, non-hashed audit copies that MUST
+  equal the profile binding or fail (`AtlasSchemaError`).
 - **Discovery research lane (optional, out-of-process).** The Bookshelf/agents/tasks
   research lane (§8 / the spec `discovery_boundary`) may take disease-pack context and
   emits **untrusted** `AtlasCandidateImport` payloads. Those reach the core only through
