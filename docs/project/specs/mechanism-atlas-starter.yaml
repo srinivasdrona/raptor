@@ -22,9 +22,15 @@
 # source-register bibliographic METADATA (PMID/PMCID/DOI/accession/license); it
 # MUST NOT produce real verified observed claims, real grounding spans, R611Q or
 # pilot claims/profiles, or mechanistic conclusions.
+#
+# Span ownership (rev 4): the exact grounding span (locator + exact_quote +
+# page_or_figure) is owned SOLELY by the source reference (EntryRef.span).
+# ObservedClaim references its source via source_ref and never duplicates the
+# span. A verified claim cannot hash or validate against any locator/quote other
+# than the one carried by its source reference.
 
 schema: raptor-mechanism-atlas-starter-v1
-status: planner_contract_rev3_gpt54_findings_applied
+status: planner_contract_rev4_gpt54_findings_applied
 task_id: build-mechanism-atlas-starter
 title: Bounded RAPTOR Mechanism Atlas starter — TSC2-only internal module contract
 
@@ -67,6 +73,20 @@ revision_log:
           metadata; real grounding spans, verified observed claims, R611Q/pilot
           content and mechanistic conclusions are Phase 2 only.
     corrections_in: [source_register, observed_claim, workflow, stop_go, deliberate_action]
+  - rev: 4
+    head: 70091c89047ea03f018a01e75892e2b943296ce6
+    trigger: GPT-5.4 findings; plan-only follow-up commit (no amend/push).
+    attribution:
+      prompt_or_spec_gap:
+        - >-
+          Exact-span representation was required but canonical span OWNERSHIP was
+          left unspecified: span appeared on BOTH ObservedClaim and EntryRef,
+          allowing a verified claim to hash/validate against a locator/quote
+          divergent from its source reference. Fixed by making EntryRef.span the
+          single canonical span; ObservedClaim references source_ref and carries
+          no span of its own.
+    corrections_in: [observed_claim, schemas.hashing, source_register.entry_ref_schema,
+      workflow, stop_go, deliberate_action]
 
 worktree: 'D:\AIProjects\raptor-worktrees\mechanism-atlas'
 branch: track/mechanism-atlas-2026-07
@@ -214,22 +234,30 @@ schemas:
       claim_text: {type: str}
       claim_kind: {type: enum, values: [rna, splicing, abundance, stability,
         complex, localization, pathway_mtorc1, phenotype, other]}
-      source_ref: {type: ref, to: source_register.EntryRef}
-      span: {type: obj, fields: {locator: str, exact_quote: str,
-        page_or_figure: str}, note: exact span is mandatory for verified}
+      source_ref: {type: ref, to: source_register.EntryRef,
+        note: the SINGLE source of truth for grounding; source_ref.span is the
+          canonical exact span. ObservedClaim carries NO span field of its own.}
       verification: {type: enum, values: [verified, unverified]}
       directionality: {type: enum, values: [increase, decrease, none, unknown]}
+    span_ownership:
+      rule: >
+        The exact grounding span (locator + exact_quote + page_or_figure) is owned
+        SOLELY by EntryRef.span at source_ref. ObservedClaim MUST NOT declare or
+        duplicate a span field; a duplicate span field is AtlasSchemaError. A
+        verified claim's effective span IS source_ref.span, so a claim can never
+        hash or validate against a locator/quote different from its source reference.
     invariants:
       - verification=verified REQUIRES source_ref -> a source_register entry whose
         role == direct_evidence_leaf AND source_type in
         allowed_direct_evidence_leaf_source_types (PRIMARY-LIT / DATASET) AND
-        verification == verified, PLUS a non-empty exact span. BOTH role and
-        source_type are checked, never role alone.
+        verification == verified, PLUS a non-empty source_ref.span (canonical exact
+        span). BOTH role and source_type are checked, never role alone.
       - A claim grounded only in a provenance_only/context/crosswalk entry, OR in a
         disallowed source_type (PRIMARY-OFFICIAL / PRIMARY-DOC / SECONDARY-SYNTH /
         CROSSWALK / a grouping bucket), CANNOT be verified; it stays
         verification=unverified (AtlasProvenanceError / AtlasSchemaError if forced).
-      - A claim with no resolvable source_ref + span is verification=unverified.
+      - A claim whose source_ref does not resolve, or whose source_ref.span is empty,
+        is verification=unverified.
       - phenotype claims are observations only; no deterministic inference permitted.
   context_record:
     id: atlas.context.v1
@@ -309,9 +337,11 @@ schemas:
     canonical_hash_rule: 'UTF-8 json.dumps(sort_keys=True, separators=(",", ":")); enums -> .value; tuples -> lists.'
     ordering: >
       Deterministic pre-serialization ordering: claims by (claim_kind,
-      source_ref.entry_id, span.locator, claim_text); edges by (from_layer,
-      to_layer, effect); candidate_classes by (class, state); source_pins by
-      entry_id. Ordering is applied before hashing.
+      source_ref.entry_id, source_ref.span.locator, claim_text); edges by
+      (from_layer, to_layer, effect); candidate_classes by (class, state);
+      source_pins by entry_id. The claim sort/hash key reads the span from
+      source_ref.span (canonical) — never a claim-local span field, which does not
+      exist. Ordering is applied before hashing.
     dedup: Exact-duplicate claims (identical after canonicalization) collapse to one.
     evidence_core_payload:
       includes: [identity.spdi_canonical, identity.gene, claims, candidate_classes, edges, evidence]
@@ -428,12 +458,23 @@ source_register:
     id: source_register.EntryRef.v1
     fields:
       entry_id: {type: str, note: FK into a SourceRegisterEntry}
-      span: {type: obj, optional: true, note: exact span carried at the reference site}
+      span:
+        type: obj
+        optional: true
+        fields: {locator: str, exact_quote: str, page_or_figure: str}
+        note: >-
+          The CANONICAL exact span and its sole owner; ObservedClaim never
+          duplicates this. Optional at schema level (e.g. a provenance-only
+          source_pin) but MANDATORY and non-empty when this EntryRef is a verified
+          claim's source_ref.
     invariants:
       - An EntryRef used to VERIFY an observed_claim MUST target an entry whose
         role == direct_evidence_leaf AND source_type in
         allowed_direct_evidence_leaf_source_types AND verification == verified, with
         a non-empty span. BOTH role AND source_type are checked, never role alone.
+      - EntryRef.span is the ONLY grounding span; no ObservedClaim carries its own
+        span, so a verified claim's locator/quote IS this span (never a divergent
+        duplicate).
   grounding_rule:
     direct_evidence_leaf: >
       Only primary/direct-evidence LEAF entries may ground a verified observed
@@ -649,6 +690,8 @@ workflow:
       - "leaf grounding: verified claim requires role==direct_evidence_leaf AND source_type in {PRIMARY-LIT, DATASET} AND verification==verified AND span;"
       - "negative: mis-tagging each disallowed source_type (PRIMARY-OFFICIAL, PRIMARY-DOC, SECONDARY-SYNTH, CROSSWALK) or a grouping bucket as direct_evidence_leaf raises AtlasSchemaError;"
       - "negative: EntryRef/verified-claim admission rejects role-only tagging when source_type is not allowed (AtlasProvenanceError/AtlasSchemaError)."
+      - "span ownership: an ObservedClaim declaring its own span field raises AtlasSchemaError; the ONLY grounding span is source_ref.span (EntryRef)."
+      - "span determinism: the claim ordering/hash key reads source_ref.span.locator; a verified claim cannot hash or validate against a locator/quote differing from its source_ref.span (mutating source_ref.span changes the claim hash; no claim-local override exists)."
       - "provenance_only/context/crosswalk/grouping-bucket grounding raises AtlasProvenanceError."
       - unknown & conflicting states are representable and NOT coerced to a call.
       - context-dependence: same variant, different context -> distinct records.
@@ -671,7 +714,7 @@ workflow:
       - Field-coherent evidence_core/profile_envelope hashing (defined include/exclude,
         canonical order/dedup, run_metadata excluded).
       - Fail-closed source verification; atlas_import_boundary (no packet/scorer/eval import).
-      - "provide the citation/source resolver INTERFACE (no real span resolution, no verified-claim output)."
+      - "provide the citation/source resolver INTERFACE keyed on source_ref (EntryRef): it resolves/validates the canonical EntryRef.span only, never a claim-local span (no real span resolution, no verified-claim output in Phase 1)."
     out_of_scope:
       - No real grounding spans, no real verified observed claims, no mechanistic conclusions (Phase 2 only).
       - No R611Q evidence; no pilot CONTENT; no real VUS admission; no external fetch of held data.
@@ -687,6 +730,7 @@ workflow:
       - "SPDI: is resolved admission gated on canonical GRCh38 SPDI, aliases provenance-only? (must hold)"
       - "Source-type binding: is direct_evidence_leaf accepted ONLY for PRIMARY-LIT/DATASET, and does verified-claim/EntryRef admission check BOTH role AND source_type (not role alone)? (must hold)"
       - "Leaf grounding: can only a direct_evidence_leaf + allowed source_type + verified entry ground a verified claim? (must hold)"
+      - "Span ownership: is the grounding span owned SOLELY by source_ref (EntryRef.span), with NO duplicate span on ObservedClaim, so a verified claim can never hash/validate against a different locator/quote than its source reference? (must hold)"
       - "Hash coherence: are payloads over defined fields with claim_id refs resolving into profile.claims, run_metadata excluded? (must hold)"
       - Contrast: does the ontology preserve unknown/conflicting/context across strata?
       - "Skeleton purity: are there ANY real verified claim/grounding span, R611Q/pilot content, or mechanistic conclusion in Phase 1? (must be NONE; real bibliographic metadata pins are allowed)"
@@ -707,7 +751,9 @@ stop_go:
     - The ontology handles contrasting cases (all five strata) without collapse.
     - Context, contradictions, and unknowns are preserved (not coerced to a call).
     - Zero classification/scoring leakage (guards + checker CLEAN).
-    - Every verified claim grounded in a direct_evidence_leaf + verified entry + exact span.
+    - Every verified claim grounded in a direct_evidence_leaf + verified entry + a
+      non-empty source_ref.span (canonical exact span owned by the EntryRef; no
+      duplicate claim span).
     - Passes a deterministic citation/source resolver AND a named human/oracle
       source-span review.
   otherwise: REVISE or STOP. No cross-gene / cross-disease expansion.
@@ -739,6 +785,7 @@ deliberate_action:
     - "Admission accepts an hgvs/transcript alias without a canonical SPDI, silently equating NM_000548.4/.5 variants -> mitigated: SPDI-keyed admission, aliases provenance-only, unresolved -> AtlasIdentityError."
     - "A verified mechanism claim is grounded in ClinVar / Monarch-DisMech / a review / a program grouping bucket -> mitigated: direct_evidence_leaf role gating on EntryRef + AtlasProvenanceError."
     - "A disallowed source_type is MIS-TAGGED role==direct_evidence_leaf and grounds a verified claim because only role (not type) was checked -> mitigated: allowed_direct_evidence_leaf_source_types binding (PRIMARY-LIT/DATASET), entry/EntryRef/claim admission check BOTH role AND source_type, AtlasSchemaError, negative Gemini cases + GPT source-type-binding probe."
+    - "An ObservedClaim carries its own span that DIVERGES from its source_ref (EntryRef) span, so a verified claim hashes/validates against a locator/quote the source never stated -> mitigated: single canonical span ownership on EntryRef.span, ObservedClaim carries no span field (AtlasSchemaError), ordering/hash key reads source_ref.span, Gemini span-ownership + determinism tests + GPT span-ownership probe."
     - "Phase-1 purity is read as banning even real bibliographic metadata pins, or conversely a real grounding span slips in disguised as metadata -> mitigated: explicit split — metadata pins (PMID/PMCID/DOI/accession/license) permitted and verified as metadata; grounding spans / verified claims / mechanistic conclusions are Phase 2 only."
     - "evidence_core_hash references a field the profile lacks (a top-level claims table) producing an undefined/unstable hash -> mitigated: top-level claims tuple + run_metadata + explicit include/exclude payloads + canonical order/dedup + claim_id refs into profile.claims."
     - "Real PMID/DOI/span grounding, R611Q evidence, or pilot curation sneaks into the skeleton phase, pre-empting frozen packets + human review -> mitigated: Phase-1 purity + Phase-2-only real grounding + go_signal_phase2 (resolver + named human/oracle review)."
@@ -750,6 +797,7 @@ deliberate_action:
     - Slot hashes verified MATCH (all three) at rev 1; composition unchanged.
     - rev 2 is a plan-only follow-up commit on head a840347 (no amend, no push).
     - rev 3 is a plan-only follow-up commit on head 29a330e (no amend, no push).
+    - rev 4 is a plan-only follow-up commit on head 70091c8 (no amend, no push).
     - Only docs/project/specs/mechanism-atlas-starter.yaml staged and committed.
     - Both required trailers present on the commit; YAML validated.
 
