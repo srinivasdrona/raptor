@@ -1,41 +1,64 @@
-# RAPTOR corrected ADR-0012 expert-review packets — Opus planner contract (rev 1).
+# RAPTOR corrected ADR-0012 expert-review packets — Opus planner contract (rev 2).
 #
 # Purpose: an implementation-ready, hash-bound, DRY plan to regenerate the
 # internal TSC candidate-evidence review packets for the `clinvar_2026-07-07`
 # VUS run under the APPROVED ADR-0012 disabled/manual PP3/BP4 policy and the
-# CURRENT (disabled_manual) census — building the COMPLETE 164-packet candidate
-# universe (157 candidate_LP_review + 7 candidate_LB_review selection strata),
-# a deterministic queue/index and aggregate manifest, first-pass blinded views,
-# explicit unresolved/manual exclusion counts, and a preregistered eight-case
-# Discovery evaluation sample — while preserving the historical 30-pattern
-# calibration-batch path byte-for-byte.
+# CURRENT (disabled_manual) census. Per PRD-04 (all-VUS evidence packets) and
+# slot-3, the corrected run produces reviewer-consumable packet records for ALL
+# 6,618 VUS across the four PRD-04 first-class strata (157 candidate_LP_review +
+# 7 candidate_LB_review + 6,424 no_deterministic_resolution + 30 manual_review),
+# a deterministic per-stratum queue/index and a 164-entry candidate-priority
+# queue (LP+LB), an aggregate manifest, first-pass blinded views for every
+# packet, explicit per-stratum summary counts, and a preregistered eight-case
+# Discovery evaluation sample drawn from the full packet universe. Every packet
+# keeps candidate_direction=null / POLICY_BLOCKED.
+#
+# rev 2 applies the GPT-5.4 findings against rev 1:
+#   F1 raw-vs-loaded config hash semantics — the ADR-0012 approved policy pins
+#      the RAW on-disk byte SHA-256 of the subordinate scorer/eval/lineage/packet
+#      configs; committed data artifacts use the canonical Git/LF blob. rev 1
+#      mislabeled the config pins as loaded/semantic. Corrected here.
+#   F2 candidate-only narrowing — PRD-04 requires packets for ALL 6,618 VUS and
+#      slot-3 requires an eight-case sample including unresolved/manual; rev 1
+#      built only the 164 candidate universe. Corrected: full-universe packets,
+#      164 candidate-priority queue, unresolved/manual packeted (not excluded).
+#   F3 historical calibration byte-identity — the 2026-07-11 1,571-universe
+#      (238 LP + 1,333 LB) / 30-pattern calibration artifact is IMMUTABLE
+#      historical PP3/BP4-active evidence built with the OLD lineage policy
+#      (743a…) and a SHORT commit (e52e855). rev 1 falsely claimed the current
+#      disabled_manual config reproduces it byte-identically. Corrected: it is
+#      frozen; the corrected run is NEW under NEW names/hashes.
+#   F4 real-data selector — G-CP15 (env-gated real-data integration) is now in
+#      the MANDATORY selector with an exact invocation.
+#   F5 stale lineage audit — tsc_bias_lineage_audit_2026-07-10.json is HISTORICAL
+#      pre-ADR-0012 static provenance (internal policy hash 743a…), NOT current.
+#      Packet decisions bind to the CURRENT d2312… lineage config; current firing
+#      /incidence is derived directly; no silent hash mixing.
 #
 # This file is the planner PLAN ONLY. It performs NO implementation, NO tests,
-# NO code/config/data edits, NO packet generation, NO gate/scope-gate/policy
-# change, NO x64 run, NO new annotation, and writes NO packet/queue/manifest
-# artifact. It names the exact downstream implementation scope, input/output
-# schemas and hash contracts, the reuse-vs-extend architecture decision, the
-# Gemini RED/unit/integration matrix, the Sonnet file boundaries, the GPT-5.4
-# anti-trace-cribbing/privacy/policy probes, the deterministic CLI + output
-# boundary, the migration/backout + Discovery handoff, and the Beat-4 self-audit.
+# NO code/config/data edits, NO packet/artifact generation, NO gate/scope-gate/
+# policy change, NO x64 run, and writes NO packet/queue/manifest artifact. The
+# emitted packet artifacts use the PRD-04 CandidateEvidencePacket schema and are
+# DOER RUNTIME OUTPUTS written OUTSIDE Git to the external RAPTOR data root; only
+# a non-identifying aggregate + the preregistered sample commitment may (later,
+# separately) be committed — NEVER by this planner commit.
 #
-# Schema: raptor-corrected-review-packets-planning-v1 (planner). The emitted
-# packet artifacts use the PRD-04 CandidateEvidencePacket schema and are DOER
-# RUNTIME OUTPUTS written OUTSIDE Git to the external RAPTOR data root; only a
-# non-identifying aggregate manifest + the preregistered sample commitment are
-# in-repo, and NEITHER is written by this planner commit.
+# Schema: raptor-corrected-review-packets-planning-v1 (planner).
 
 schema: raptor-corrected-review-packets-planning-v1
 status: planner_contract_ready_for_implementation
+revision: 2
 task_id: core-generate-review-packets
 title: >-
   Regenerate the corrected ADR-0012 internal expert-review packets for the
-  clinvar_2026-07-07 VUS run — complete 164-packet candidate universe +
-  preregistered eight-case Discovery sample, hash-bound, DRY, non-authoritative
+  clinvar_2026-07-07 VUS run — all-6,618 four-strata packet universe with a
+  164-entry candidate-priority queue + preregistered eight-case Discovery
+  sample, hash-bound, DRY, non-authoritative
 
 worktree: 'D:\AIProjects\raptor-worktrees\review-packets'
 branch: track/review-packets-2026-07
 base_commit: ce42208690aeac23838e5b2fe4a5c378a5a98eb0
+revision_head: 1928758af4b4e4e8c3381df1eea1a243e5776e92
 
 roles:
   planner: Claude Opus (this contract)
@@ -53,6 +76,47 @@ three_slot_provenance:
     slot2: 4eff1c6c5901a28cd60a1381028706af30611c4a3fe8952819eb02cde2e35139
     slot3: 6dc6e9a6ee1e11c3402d4f1b22fca4055b54451c30e9d8daa95306a8c6dffa56
   note: all three slot hashes verified MATCH before composition and planning.
+
+attribution_ledger:
+  note: >-
+    Records where rev-1 defects originated, per the revision directive. Fixes
+    align to PRD-04 and the ADR-0012 policy, not to blaming the planner beyond
+    the one genuine planner miss (F4).
+  A1_raw_vs_loaded_hash_semantics:
+    origin: prompt_gap
+    detail: >-
+      Slot 2 requested "policy/config hashes" but did not distinguish the
+      approved RAW-BYTE config pins from committed LF-blob artifact identities.
+      Resolved by measurement — the approved predictor policy pins raw on-disk
+      byte SHA-256 for the four subordinate configs.
+  A2_candidate_only_narrowing:
+    origin: planner_bug_corrected_to_prd_04
+    detail: >-
+      Slot 3 required "all 164 corrected candidate packets" AND an eight-case
+      sample including unresolved/manual; PRD-04 requires all-VUS packets. rev 1
+      narrowed the universe to 164 and marked unresolved/manual "excluded from
+      packets". Corrected by packeting all 6,618 and reframing 164 as the
+      candidate-priority queue.
+  A3_historical_calibration_ambiguity:
+    origin: prompt_induced
+    detail: >-
+      Slot 3 asked not to break historical calibration reproduction without
+      defining the old config bundle. The 2026-07-11 artifact used the OLD
+      lineage (743a…) + OLD candidate policy (990d3587…) + short commit
+      (e52e855). Corrected — the artifact is frozen; no current-config byte-repro
+      claim.
+  A4_realdata_selector_omission:
+    origin: genuine_planner_miss
+    detail: >-
+      Once G-CP15 was made a required scope, the binding selector had to execute
+      it. Corrected — the env-gated real-data test is now mandatory with an exact
+      invocation.
+  A5_stale_lineage_audit_labeling:
+    origin: prompt_gap
+    detail: >-
+      Current lineage policy (d2312…) changed after the 2026-07-10 audit (743a…).
+      Corrected — that audit is relabeled historical pre-ADR-0012; packet
+      decisions bind to the current lineage config.
 
 # --------------------------------------------------------------------------
 # 1. Binding decisions (ADR-0012 + PRD-04 + certified negative gate)
@@ -75,6 +139,9 @@ binding_decisions:
   prd_04:
     reference: docs/prd/PRD-04-candidate-evidence-packet.md
     invariants:
+      - A candidate-evidence packet is produced for EVERY VUS (all 6,618),
+        preserving the four first-class strata; packets are evidence records,
+        not classifications, and no packet or queue is an external worklist.
       - Packet facts are assembled deterministically from an injected
         `PacketInput` (BIAS rows + census strata + approved configs); NO LLM/KB/
         benchmark/label file is reachable from packet generation (FR-d falsifier).
@@ -86,9 +153,9 @@ binding_decisions:
         `pattern_ref.census_selection_stratum`; it MUST NEVER be serialized into
         the production `candidate_direction` field (FR5/FR16, AC4).
       - The redact_for_first_pass(packet) projection strips the entire
-        external_comparators envelope AND candidate_direction/signed points/policy id/census direction
-        labels; queue + reviewer delivery consume ONLY the FIRST_PASS projection
-        (FR14.1, AC4/AC17/AC20).
+        external_comparators envelope AND candidate_direction/signed points/policy
+        id/census direction labels; queue + reviewer delivery consume ONLY the
+        FIRST_PASS projection (FR14.1, AC4/AC17/AC20).
       - The four named packet hashes (§4.2 packet/core/envelope + decision-log)
         are deterministic; a state/reviewer action never mutates a prior hash.
       - AAVC is a reveal-only disagreement comparator (`external_comparators`),
@@ -115,10 +182,10 @@ binding_decisions:
   authority_boundary:
     statement: >-
       A packet organizes INTERNAL, eval-only review evidence. No packet or queue
-      is an external worklist, a classification, an expert decision, a ClinVar
-      submission, or a clinical claim. Candidate LP/LB directions are
-      non-authoritative selection metadata only; AAVC is a reveal-only
-      comparator, never a label or criterion source.
+      (including the 164-entry candidate-priority queue) is an external worklist,
+      a classification, an expert decision, a ClinVar submission, or a clinical
+      claim. Candidate LP/LB directions are non-authoritative selection metadata
+      only; AAVC is a reveal-only comparator, never a label or criterion source.
 
 # --------------------------------------------------------------------------
 # 2. Decision ledger + rejected alternatives (smallest DRY architecture)
@@ -133,111 +200,158 @@ decision_ledger:
       _variant_class_for) and the PRD-04 packet path
       (raptor.packet.build.build_packet, raptor.packet.queue.build_queue_index,
       raptor.packet.render.render_markdown, raptor.packet.model.redact_for_first_pass
-      / PacketView.FIRST_PASS). scripts/build_tsc_calibration_batch.py already
-      assembles the COMPLETE LP+LB universe in build_candidate_universe(); the
-      corrected run reuses that function verbatim.
+      / PacketView.FIRST_PASS). Reuse by import the pure packet-assembly helpers
+      already defined in scripts/build_tsc_calibration_batch.py (build_packet_input,
+      build_scorer_provenance, derive_quality_flags, _primary_consequence) WITHOUT
+      changing that script's behavior.
     rationale: >-
-      The complete-universe assembly, deterministic packet hashing, first-pass
-      blinding, and queue index already exist and are test-covered. The only
-      gaps are (a) a current-policy conservation guard, (b) a complete-universe
-      writer, (c) fail-closed full-commit provenance, and (d) the preregistered
-      Discovery sampler. Reusing the seams is the smallest DRY change.
-  D2_current_policy_conservation_not_historical:
+      The strata reproduction, deterministic packet hashing, first-pass blinding,
+      and queue index already exist and are test-covered. The only new work is a
+      full-universe (all-strata) assembler, a current-policy conservation guard,
+      fail-closed full-commit provenance, and the preregistered sampler.
+  D2_full_universe_all_strata:
     decision: >-
-      Add a current-policy conservation guard that reads the DISABLED_MANUAL
-      census schema (raptor_current_policy_internal_direction 157 LP / 7 LB,
-      candidate_pattern_compression 7/2 exact-strength patterns, source_hashes
-      {input_vcf, bias_tsv, manifest}, run_integrity {bias_rows, unique_raw_keys,
-      exact_join}). It conserves the policy-invariant identity/row/one-to-one
-      join/source-hash invariants (6,618 manifest identities, 6,618 BIAS rows,
-      exact vcf_key<->SPDI join) AND the CURRENT-policy direction/pattern counts
-      (157/7/7/2). It MUST NOT reuse assert_source_of_record_conservation, which
-      reads the HISTORICAL schema keys (census_stats["worker"]["bias"],
-      census_stats["run_integrity"]["input_vcf_sha256"]) and asserts the
-      PP3/BP4-ACTIVE totals (238 LP / 1,333 LB / 20 / 10) that do not exist in
-      the disabled_manual census and would KeyError or falsely fail.
+      Build a reviewer-consumable packet for EVERY manifest identity (6,618)
+      across the four first-class strata (157 candidate_LP_review, 7
+      candidate_LB_review, 6,424 no_deterministic_resolution, 30 manual_review).
+      Every packet has candidate_direction=null, null_reason=production_policy_unapproved,
+      review_state=POLICY_BLOCKED, and carries its stratum only in
+      pattern_ref.census_selection_stratum. The existing build_candidate_universe
+      (LP+LB only) is reused for the candidate subset; a NEW build_full_vus_universe
+      extends the same per-row assembly to the unresolved and manual strata.
     rationale: >-
-      slot-2/slot-3: replace historical direction/pattern conservation with
-      current-policy conservation while keeping the old calibration path
-      reproducible. The disabled_manual census legitimately carries different
-      totals and a different schema (no `worker` block); a separate guard keeps
-      the shared, calibration-critical guard untouched.
+      PRD-04 all-VUS packets + slot-3 unresolved/manual sample cases require every
+      stratum to be packeted; rev-1's candidate-only narrowing was the F2 bug.
   D3_derive_facts_never_crib:
     decision: >-
       Production code derives every packet fact from the immutable inputs +
       approved configs + reproduced strata. It contains NO expected-count literal
-      (164/157/7/6424/30/238/1333/2226/3696/5474/7/2/8) and never reads this
-      spec, the historical stats, or the masked gate as a scoring/fact input.
-      The disabled_manual census is read ONLY to conserve counts (fail-closed),
-      never to author packet contents.
+      (6618/164/157/7/6424/30/6454/238/1333/1571/2226/3696/5474/7/2/8) and never
+      reads this spec, the historical stats/artifact, or the masked gate as a
+      scoring/fact input. The disabled_manual census is read ONLY to conserve
+      counts (fail-closed), never to author packet contents.
     rationale: STRATEGY anti-trace-cribbing; slot-2 "LLMs may not add evidence".
-  D4_complete_universe_plus_calibration_reproducible:
+  D4_candidate_priority_queue_plus_stratum_queues:
     decision: >-
-      Add a NEW complete-universe writer that emits ALL 164 universe packets
-      (OPERATOR JSON), their FIRST_PASS blinded JSON+Markdown views, a
-      deterministic reviewer queue/index over the FIRST_PASS projection, an
-      aggregate manifest, and explicit unresolved/manual exclusion counts —
-      sorted by packet_id, byte-deterministic. The existing calibration-batch
-      writer (write_outputs, which emits ONLY the 30-pattern
-      select_calibration_batch selection) is left behavior-preserving so the
-      historical calibration reproduction stays byte-identical.
+      Emit a deterministic queue/index over the FIRST_PASS projection for EVERY
+      packet, partitioned by stratum, plus a 164-entry candidate-priority queue
+      (the candidate_LP_review + candidate_LB_review packets). The unresolved and
+      manual strata have their own packet records and queue/index entries and are
+      recorded in an explicit per-stratum summary; they are NOT excluded from
+      packets — they are excluded only from the candidate-PRIORITY queue.
     rationale: >-
-      slot-2 "distinguish the complete candidate universe from a
-      calibration/sample batch"; slot-3 "keep the old calibration path
-      reproducible". Complete-universe output != selected calibration batch.
-  D5_fail_closed_full_commit_provenance:
+      Reconciles slot-3's "explicit unresolved/manual exclusion counts" (now:
+      excluded from the candidate-priority queue) with PRD-04 all-VUS packet
+      coverage and the eight-case sample's unresolved/manual cases.
+  D5_current_policy_conservation_not_historical:
+    decision: >-
+      Add a current-policy conservation guard that reads the DISABLED_MANUAL
+      census schema (raptor_current_policy_internal_direction 157/7/6424/30,
+      candidate_pattern_compression 7/2, source_hashes {input_vcf, bias_tsv,
+      manifest}, run_integrity {bias_rows, unique_raw_keys, exact_join, total
+      6,618}). It conserves the policy-invariant identity/row/one-to-one join/
+      source-hash invariants AND the CURRENT-policy per-stratum counts across ALL
+      FOUR strata (157 + 7 + 6,424 + 30 == 6,618). It MUST NOT reuse
+      assert_source_of_record_conservation, which reads the HISTORICAL schema keys
+      (census_stats["worker"]["bias"], census_stats["run_integrity"]["input_vcf_sha256"])
+      and asserts the PP3/BP4-ACTIVE totals (238 LP / 1,333 LB / 20 / 10 patterns)
+      that do not exist in the disabled_manual census.
+    rationale: >-
+      slot-2/slot-3 current-policy conservation; the disabled_manual census has a
+      different schema (no `worker` block) and different totals; a separate guard
+      keeps the shared calibration guard untouched.
+  D6_fail_closed_full_commit_provenance:
     decision: >-
       The corrected run resolves code provenance to the FULL fixed-width 40-hex
       `git rev-parse HEAD` and FAILS CLOSED (raises, no output) when the tree is
-      dirty or the commit is unresolvable/abbreviated. It replaces the legacy
-      _resolve_code_commit() "unknown"/`--short` behavior for the corrected path
-      only, via a shared git-provenance helper with an explicit require_clean +
-      require_full_40hex mode. The legacy calibration path keeps its short/legacy
-      resolver so its recorded provenance bytes are unchanged.
+      dirty or the commit is unresolvable/abbreviated, via a NEW shared
+      git-provenance helper. The historical 2026-07-11 artifact's short commit
+      (e52e855) is exactly the defect this replaces.
     rationale: >-
-      slot-3: "the corrected packet run must fail closed on a
-      dirty/unresolvable full 40-hex commit"; harden artifact code provenance
-      before generating new artifacts.
-  D6_deferred_pp3bp4_lineage_packet_parity:
+      slot-3 "the corrected packet run must fail closed on a dirty/unresolvable
+      full 40-hex commit".
+  D7_current_lineage_binding_stale_audit_relabelled:
     decision: >-
-      Bind the CURRENT deferred PP3/BP4 lineage (configs/eval/bias_lineage.yaml
-      -> deferred) and packet candidate-direction policy
-      (configs/packet/candidate_direction.yaml) via the approved predictor
-      policy's recorded canonical hashes; every fired PP3/BP4 BIAS criterion
-      renders in the packet with lineage disposition `deferred` (manual review),
-      never a scored automated call, and never a `candidate_direction` point.
+      Bind every packet's PP3/BP4 lineage disposition to the CURRENT
+      configs/eval/bias_lineage.yaml (raw-byte pin d2312b2c…, PP3/BP4 -> deferred)
+      and the current packet candidate-direction policy
+      (configs/packet/candidate_direction.yaml, raw-byte pin 778882c5…). Current
+      firing/incidence is derived directly from the reproduced strata + census
+      (raw_bias_criterion_incidence). The 2026-07-10 lineage audit is NOT embedded
+      as current provenance; if a current lineage-audit artifact is genuinely
+      needed, plan a NEW, separately-named, separately-scoped current audit bound
+      to d2312… — never written by this planner.
     rationale: >-
-      slot-3: "current PP3/BP4 deferred lineage and packet policy parity";
-      PRD-04 FR4.1 fail-loud disposition precedence.
-  D7_current_lineage_audit_provenance:
-    decision: >-
-      The corrected run's aggregate manifest embeds the CURRENT lineage-audit
-      artifact (data/census/tsc_bias_lineage_audit_2026-07-10.json) and the
-      current predictor-leakage audit (data/census/tsc_predictor_leakage_audit_2026-07.json),
-      hash-pinned by canonical Git/LF blob, in place of any older static audit
-      artifact.
-    rationale: slot-3 "current lineage audit provenance versus older static audit artifacts".
-  D8_external_output_boundary_atomic_no_overwrite:
+      slot-3 "current PP3/BP4 deferred lineage and packet policy parity" +
+      "current lineage audit provenance versus older static audit artifacts";
+      F5 — the 2026-07-10 audit references the OLD lineage policy (743a…).
+  D8_external_output_boundary_new_names_atomic_no_overwrite:
     decision: >-
       Full packet/queue/first-pass/manifest artifacts are written ONLY under the
-      external RAPTOR data root (outside the repository tree), with canonical
-      bytes, no-overwrite, and atomic publication (write to a temp sibling +
-      atomic rename; refuse if the target run directory already exists). Only a
-      NON-IDENTIFYING aggregate manifest record and the preregistered sample
-      COMMITMENT (hashes only) may be committed in-repo, and ONLY if explicitly
-      scoped in a later commit — never by this planner commit.
+      external RAPTOR data root (outside the repository tree), to a NEW
+      run-scoped directory named for the corrected disabled_manual run (distinct
+      from any historical artifact), with canonical bytes, no-overwrite, and
+      atomic publication (write to a temp sibling + atomic rename; refuse if the
+      run directory already exists). Only a NON-IDENTIFYING aggregate manifest and
+      the preregistered sample COMMITMENT (hashes only) may be committed in-repo,
+      under NEW names, and ONLY if explicitly scoped in a later commit — never by
+      this planner commit.
     rationale: slot-2/slot-3 external-root output boundary + canonical/atomic publication.
-  D9_preregistered_eight_case_discovery_sample:
+  D9_historical_calibration_artifact_frozen:
     decision: >-
-      Deterministically preregister an eight-case Discovery evaluation sample
-      (2 candidate_LP_review, 2 candidate_LB_review, 2 no_deterministic_resolution,
-      2 annotation_manual_review) BEFORE any auditor result, with exact
-      stratification and hashes. LP/LB cases reference their OPERATOR packet ids +
-      packet hashes; unresolved/manual cases (which have NO packet) reference a
-      salted commitment hash of their canonical SPDI stratum entry. The sample is
-      an ecosystem experiment handoff, NOT packet authorization and NOT a
-      worklist.
-    rationale: slot-3 required output 5 + Discovery eight-case handoff.
+      Treat data/census/tsc_calibration_batch_2026-07-11.json (universe_size 1,571
+      == 238 LP + 1,333 LB, selected_batch_size 30, OLD lineage 743a…, OLD
+      candidate policy 990d3587…, short commit e52e855) as IMMUTABLE historical
+      PP3/BP4-active evidence. It is never regenerated, overwritten, or renamed,
+      and NO claim is made that the current disabled_manual config reproduces it
+      byte-identically. If a corrected calibration/sample is useful, produce a NEW
+      one over the corrected universe under a NEW name/hash. The existing
+      scripts/build_tsc_calibration_batch.py and its tests are left UNTOUCHED so
+      the historical code path and its tests remain valid.
+    rationale: >-
+      slot-3 "keep the old calibration path reproducible" is honored by freezing
+      the historical artifact + its byte-preserving code/tests; F3 — the current
+      config genuinely cannot reproduce the old PP3/BP4-active bytes.
+  D10_hash_semantics_raw_byte_vs_lf_blob:
+    decision: >-
+      Verify the four subordinate approved configs (scorer/eval/lineage/packet
+      candidate-direction) by RAW on-disk byte SHA-256 against the pins recorded
+      inside the approved predictor policy (production_config_hash 1ba8066a… /
+      eval_config_hash ea4ff684… / lineage_policy_hash d2312b2c… / packet_policy_hash
+      778882c5…) — these were empirically confirmed to equal the raw working-tree
+      (CRLF-checkout) bytes. Verify the packet render/selection/narrative/
+      comparator/schema configs by raw on-disk byte SHA-256 too. Verify committed
+      DATA-artifact identities (the approved predictor policy artifact itself, the
+      census, the certified gate, the historical calibration artifact, and the
+      audits) by canonical Git/LF blob SHA-256. Label every field precisely; never
+      mix raw and LF pins.
+    rationale: >-
+      F1 — slot-2 did not distinguish approved raw-byte config pins from committed
+      LF artifact identities; rev-1 mislabeled the config pins as canonical/loaded.
+  D11_manual_review_annotation_mapping:
+    decision: >-
+      reproduce_census_strata labels the 30 NTHL1 rows with StratumEntry.stratum
+      == "manual_review". The disabled_manual census aggregates the SAME 30 rows
+      under raptor_current_policy_internal_direction.annotation_manual_review
+      (== direction_by_gene.NTHL1.manual_review == direction_by_consequence.other.manual_review
+      == 30). The corrected run treats stratum "manual_review" and census direction
+      "annotation_manual_review" as ONE first-class stratum of 30 rows and never
+      double-counts; packets in this stratum record census_selection_stratum
+      "manual_review".
+    rationale: slot-3 "define exact manual_review <-> annotation_manual_review mapping".
+  D12_evidence_absent_packet_for_zero_fired_rows:
+    decision: >-
+      To guarantee exactly 6,618 packets, any manifest identity whose BIAS row
+      fires zero scorable criteria produces a deterministic EVIDENCE-ABSENT packet
+      (candidate_direction=null, POLICY_BLOCKED, empty scored-criterion set, a
+      MissingEvidence entry documenting "no fired BIAS criteria"), rather than
+      being dropped. build_packet/model is minimally extended to permit an
+      evidence-absent packet in the corrected assembler ONLY; the calibration
+      path is unchanged.
+    rationale: >-
+      PRD-04 all-VUS coverage — PM2 fires for 6,609 of 6,618 rows, so a small
+      number of rows may fire no scorable criterion and must still be packeted to
+      conserve 6,618.
 
 rejected_alternatives:
   - id: R1_reuse_historical_conservation
@@ -247,34 +361,58 @@ rejected_alternatives:
       (absent from the disabled_manual census) and asserts PP3/BP4-ACTIVE totals
       (238/1,333/20/10); it would KeyError or falsely fail (or invite an edit to
       a shared, calibration-critical guard).
-  - id: R2_overwrite_calibration_writer
-    option: Change write_outputs to emit the full universe.
+  - id: R2_candidate_only_universe
+    option: Build only the 164 candidate (LP+LB) packets and mark unresolved/manual excluded from packets.
     rejected_because: >-
-      Destroys the byte-identical historical 30-pattern calibration reproduction;
-      the complete universe is a distinct output, not a redefinition.
-  - id: R3_generate_packets_in_planner
+      F2 — PRD-04 requires all-VUS packets and slot-3's eight-case sample needs
+      unresolved/manual cases; all 6,618 must be packeted, with 164 as the
+      candidate-priority queue.
+  - id: R3_generate_artifacts_in_planner
     option: Emit packet/queue artifacts in this planner step.
     rejected_because: slot-3 "Do not generate artifacts in the planner step."
   - id: R4_emit_packets_into_repo
     option: Write full packet artifacts under docs/ or data/ in-repo.
     rejected_because: >-
-      slot-2/slot-3: full packet artifacts stay OUTSIDE Git; only non-identifying
+      slot-2/slot-3 — full packet artifacts stay OUTSIDE Git; only non-identifying
       aggregates may be committed if explicitly scoped.
   - id: R5_short_or_unknown_commit
-    option: Keep _resolve_code_commit()'s `--short`/"unknown" provenance.
+    option: Keep _resolve_code_commit()'s `--short`/"unknown" provenance for the corrected run.
     rejected_because: >-
-      slot-3 requires fail-closed full 40-hex provenance on a clean tree before
-      generating new artifacts.
+      slot-3 requires fail-closed full 40-hex provenance; the historical e52e855
+      short commit is the defect.
   - id: R6_serialize_selection_into_direction
-    option: Write the eval LP/LB stratum into candidate_direction to "show" a call.
+    option: Write the eval LP/LB stratum into candidate_direction.
     rejected_because: >-
-      PRD-04 FR5/FR16 AC4: eval-only selection metadata must never enter the
-      production candidate-direction field; policy is unapproved -> null/POLICY_BLOCKED.
+      PRD-04 FR5/FR16 AC4 — eval-only selection metadata must never enter the
+      production candidate-direction field; policy unapproved -> null/POLICY_BLOCKED.
   - id: R7_reveal_aavc_in_first_pass
     option: Include the AAVC comparator (or its direction) in the FIRST_PASS view.
     rejected_because: >-
-      PRD-04 FR14.1/FR27: first-pass reviewers are blinded to BOTH machine
+      PRD-04 FR14.1/FR27 — first-pass reviewers are blinded to BOTH machine
       directions; AAVC is reveal-only and stripped by redact_for_first_pass.
+  - id: R8_claim_current_config_reproduces_1571
+    option: Claim the current disabled_manual config reproduces the 2026-07-11 1,571-universe calibration byte-identically.
+    rejected_because: >-
+      F3 — the 2026-07-11 artifact used the OLD lineage (743a…), OLD candidate
+      policy (990d3587…), and a short commit (e52e855); the current
+      d2312…/778882c5… configs cannot reproduce those bytes. The artifact is
+      frozen; the corrected run is NEW.
+  - id: R9_embed_stale_audit_as_current
+    option: Embed tsc_bias_lineage_audit_2026-07-10.json as the corrected run's CURRENT lineage provenance.
+    rejected_because: >-
+      F5 — that audit references the OLD lineage policy (743a…), not the current
+      d2312…; embedding it would silently mix hashes.
+  - id: R10_label_config_pins_as_lf_or_loaded
+    option: Pin the four subordinate configs by LF blob (or as loaded/semantic hashes).
+    rejected_because: >-
+      F1 — the approved policy pins the RAW on-disk byte SHA-256; the LF-blob
+      values (e.g. tsc2.yaml 45358c2e…) do not equal the policy pins (ea4ff684…).
+  - id: R11_refactor_calibration_script
+    option: Refactor scripts/build_tsc_calibration_batch.py to route provenance or emit the full universe.
+    rejected_because: >-
+      Risks the historical code path / tests; the corrected run is a NEW,
+      self-contained script that reuses the calibration script's importable
+      helpers without changing its behavior.
 
 # --------------------------------------------------------------------------
 # 3. Immutable external inputs (identity + checksums) — arm's-length read-only
@@ -306,8 +444,9 @@ immutable_external_inputs:
     path: 'D:\AIProjects\raptor-data'
     role: >-
       The ONLY location for full packet/queue/first-pass/manifest artifacts.
-      Writes land under a run-scoped subdirectory outside the repository tree,
-      atomically, never overwriting an existing run directory.
+      Writes land under a NEW run-scoped subdirectory outside the repository
+      tree, atomically, never overwriting an existing run directory, and never
+      reusing a historical artifact name.
 
 # --------------------------------------------------------------------------
 # 4. Committed data-artifact inputs (canonical Git/LF blob identity)
@@ -315,10 +454,12 @@ immutable_external_inputs:
 
 committed_data_inputs:
   hash_rule: >-
-    Committed data-artifact identity is the canonical Git/LF blob SHA-256 on
+    Committed DATA-artifact identity is the canonical Git/LF blob SHA-256 on
     EVERY platform. The Windows autocrlf CRLF checkout SHA-256 is a
     local-filesystem artifact and is recorded ONLY as
-    `sha256_windows_crlf_checkout_do_not_pin`; it must never be the pinned value.
+    `sha256_windows_crlf_checkout_do_not_pin`; it is never the pinned value. This
+    is DISTINCT from the approved CONFIG pins in section 5, which are raw on-disk
+    bytes by policy design.
   current_disabled_manual_census:
     path: data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json
     sha256: 45ff9f9abada7d5369c131bf7ffde28d0786eea41ff9bf7905f51da0cabd59ac
@@ -328,42 +469,69 @@ committed_data_inputs:
     schema: raptor.tsc.vus_census.disabled_manual.v1
     reconciliation_note: >-
       slot-3 recorded the census SHA-256 as 45ff9f9… (the canonical Git/LF blob).
-      The Windows CRLF checkout hashes to 3b6d8bc…; `git ls-files --eol` reports
-      `i/lf w/crlf`. The census CONTENT matches slot-3 exactly (157 LP / 7 LB /
-      6,424 unresolved / 30 manual / 6,618 total; embedded source_hashes for
-      bias_tsv + manifest match). The slot-3 hash is CORRECT; the earlier
-      "mismatch" was purely the CRLF-vs-LF local-checkout artifact.
+      `git ls-files --eol` reports `i/lf w/crlf`; the Windows CRLF checkout hashes
+      to 3b6d8bc…. The content matches slot-3 exactly (157 LP / 7 LB / 6,424
+      unresolved / 30 manual / 6,618 total). The slot-3 hash is CORRECT.
   historical_census:
     path: data/census/tsc_vus_clinvar_2026-07-07_stats.json
     sha256: 389e93d5b37f686b8d5e1115e2ebbfcdee6a060417300e5ed38d46304abac6e7
     sha256_provenance: committed_git_lf_blob
     role: superseded_pp3bp4_active_reference_read_only
     note: >-
-      PP3/BP4-ACTIVE (238 LP / 1,333 LB, carries a `worker` block and
+      PP3/BP4-ACTIVE (238 LP / 1,333 LB; carries a `worker` block and
       run_integrity.input_vcf_sha256). Read ONLY to compute the historical
-      comparison delta and to drive the byte-preserving calibration path; never
-      overwritten and never the corrected-run conservation oracle.
-  certified_masked_gate:
-    path: data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json
-    sha256: 7c55cd4e3059713d1d53886d8893a3819153375b62ce9d37187d731132c6a77f
+      comparison delta; never the corrected-run conservation oracle; never
+      overwritten.
+  historical_calibration_artifact:
+    path: data/census/tsc_calibration_batch_2026-07-11.json
+    sha256: fb12cb7bce23da6ca6feb25280ae62398e2caf71fb281581241f44e7729216d7
     sha256_provenance: committed_git_lf_blob
-    sha256_windows_crlf_checkout_do_not_pin: e914f65231c8004b1c7a96d2fe80bd49bac591433112699ff91cc5b027e55207
-    role: negative_external_readiness_gate_read_only
-  current_bias_lineage_audit:
+    sha256_windows_crlf_checkout_do_not_pin: 2dcee8126a0f0c5633b6351274baf6f7a8f17ff8d379c61cf00f656968090f5c
+    role: immutable_historical_pp3bp4_active_calibration_read_only
+    facts:
+      universe_size: 1571
+      candidate_LP_review: 238
+      candidate_LB_review: 1333
+      lp_patterns: 20
+      lb_patterns: 10
+      selected_batch_size: 30
+      code_commit: e52e855
+      packet_config_lineage_policy_sha256: 743a0248c2415010b22c5e1c7f1a35924c8b4b26521f58be09e677ddbb58aeeb
+      packet_config_candidate_policy_sha256: 990d3587d375d484c2860a86f4610853008bfd3e113d22bc2fb82a92d5db8440
+    note: >-
+      Immutable historical evidence built with the OLD lineage policy (743a…) and
+      OLD candidate policy (990d3587…) under a short commit. NEVER regenerated,
+      overwritten, or renamed; the current disabled_manual config does NOT
+      reproduce it byte-identically.
+  historical_bias_lineage_audit:
     path: data/census/tsc_bias_lineage_audit_2026-07-10.json
     sha256: fd01321228f6a2e22ab81bf70967029b12a3db8827cef398a07fbd75075291ee
     sha256_provenance: committed_git_lf_blob
-    role: current_lineage_audit_provenance_embedded_in_manifest
-  current_predictor_leakage_audit:
+    role: historical_pre_adr_0012_static_lineage_audit_read_only
+    internal_policy_sha256: 743a0248c2415010b22c5e1c7f1a35924c8b4b26521f58be09e677ddbb58aeeb
+    status: static_lineage_gate_complete_dynamic_incidence_non_authoritative
+    audit_date: '2026-07-10'
+    note: >-
+      Its internal policy.sha256 (743a…) references the OLD bias_lineage.yaml, NOT
+      the current d2312…. This is HISTORICAL/pre-ADR-0012 provenance; it is NOT
+      embedded as the corrected run's current lineage provenance. Packet lineage
+      binds to the current d2312… config (section 5); current firing/incidence is
+      derived directly from the census/BIAS.
+  predictor_leakage_audit:
     path: data/census/tsc_predictor_leakage_audit_2026-07.json
     sha256: 1d92b9f3e819bdce37cd478a704b5877055b5e5bf6c300494b4c5f3b9d0a23b5
     sha256_provenance: committed_git_lf_blob
-    role: current_predictor_leakage_audit_provenance_embedded_in_manifest
+    role: read_only_leakage_context_not_a_scoring_input
+    status: UNKNOWN
+    report_date: '2026-07-18'
+    note: >-
+      Records "no PP3/BP4 activation; leakage status UNKNOWN". Read-only context
+      only; never a packet scoring/fact input.
   reused_packet_seam:
     strata: {module: raptor.census.strata, functions: [load_manifest, reproduce_census_strata]}
     packet: {module: raptor.packet, functions: [build.build_packet, queue.build_queue_index, render.render_markdown, model.redact_for_first_pass]}
-    universe: {module: scripts.build_tsc_calibration_batch, function: build_candidate_universe}
-    note: reused verbatim; behavior preserved.
+    calibration_helpers: {module: scripts.build_tsc_calibration_batch, functions: [build_candidate_universe, build_packet_input, build_scorer_provenance, derive_quality_flags], behavior: unchanged}
+    note: reused by import verbatim; no behavior change to the calibration script.
 
 # --------------------------------------------------------------------------
 # 5. Approved repository policy/config inputs + hash contract
@@ -371,38 +539,48 @@ committed_data_inputs:
 
 hash_contract:
   verification_rule: >-
-    The corrected run verifies the approved predictor policy by canonical
-    repository path plus canonical Git/LF blob SHA-256 and asserts
-    {schema, status, mode} BEFORE parsing. The four subordinate configs are then
-    verified against the CANONICAL loaded-config hashes recorded INSIDE that
-    approved policy (production_config_hash / eval_config_hash /
-    lineage_policy_hash / packet_policy_hash) — these are semantic
-    loaded-config fingerprints, not raw file bytes, and equal the census
-    `bound_config_hashes`. Any drift fails closed before any artifact is built.
+    The corrected run verifies the approved predictor POLICY ARTIFACT by
+    canonical repository path plus canonical Git/LF blob SHA-256 (85e9e92f…) and
+    asserts {schema, status, mode} BEFORE parsing. It then verifies the four
+    subordinate configs by RAW on-disk byte SHA-256 against the pins recorded
+    INSIDE that approved policy (production_config_hash / eval_config_hash /
+    lineage_policy_hash / packet_policy_hash) — empirically confirmed to equal the
+    raw working-tree (CRLF-checkout) bytes — and verifies the packet render/
+    selection/narrative/comparator/schema configs by raw on-disk byte SHA-256.
+    Committed data artifacts (section 4) use the Git/LF blob. Any drift fails
+    closed before any artifact is built. Raw-byte and LF-blob pins are labeled
+    distinctly and never mixed.
   inputs:
     approved_predictor_policy:
       path: configs/eval/bp4pp3_predictor_policy.json
-      sha256: 85e9e92fa9f4c221c02af30e787315a88ed2bef51f6f58d25c5dc267eb55a34a
-      sha256_provenance: committed_git_lf_blob
+      artifact_identity_sha256: 85e9e92fa9f4c221c02af30e787315a88ed2bef51f6f58d25c5dc267eb55a34a
+      artifact_identity_provenance: committed_git_lf_blob
+      sha256_windows_crlf_checkout_do_not_pin: ac9d361aa57686c736a527a9256ea7fd22c4292709f5e6b3482e1c3c4546c72b
       must_assert: {schema: 'bp4pp3-predictor-policy/2', status: approved, mode: disabled_manual}
     acmg_scorer_policy:
       path: configs/acmg/tsc.yaml
-      canonical_loaded_hash: 1ba8066accd8eda16e20518abbeaedb61247fea372675f519f02a8574ff9350e
+      raw_byte_sha256: 1ba8066accd8eda16e20518abbeaedb61247fea372675f519f02a8574ff9350e
+      raw_byte_provenance: approved_policy_raw_byte_pin_on_disk_bytes
       equals_policy_field: production_config_hash
       note: PP3/BP4 absent from included_criteria; retained in acmg_criteria vocabulary.
     eval_config:
       path: configs/eval/tsc2.yaml
-      canonical_loaded_hash: ea4ff684bdc2ae6b079f352816b3993ac813af0e2654b851c30c1f4ef577a293
+      raw_byte_sha256: ea4ff684bdc2ae6b079f352816b3993ac813af0e2654b851c30c1f4ef577a293
+      raw_byte_provenance: approved_policy_raw_byte_pin_on_disk_bytes
       equals_policy_field: eval_config_hash
       note: automatable_criteria excludes PP3/BP4 (removed 2026-07 per ADR-0012).
     bias_lineage_policy:
       path: configs/eval/bias_lineage.yaml
-      canonical_loaded_hash: d2312b2c74f125204ababe9731fc4e37a8e0f30d1608b75f8457aae6591689df
+      raw_byte_sha256: d2312b2c74f125204ababe9731fc4e37a8e0f30d1608b75f8457aae6591689df
+      raw_byte_provenance: approved_policy_raw_byte_pin_on_disk_bytes
       equals_policy_field: lineage_policy_hash
-      note: PP3/BP4 validation/production_disposition -> deferred (manual review).
+      note: >-
+        CURRENT lineage — PP3/BP4 validation/production_disposition -> deferred.
+        Supersedes the historical 743a… lineage referenced by the 2026-07-10 audit.
     packet_candidate_direction:
       path: configs/packet/candidate_direction.yaml
-      canonical_loaded_hash: 778882c500adc43bfca8e6311d3d2038f96e32f05faff7dcda50560ee3448d67
+      raw_byte_sha256: 778882c500adc43bfca8e6311d3d2038f96e32f05faff7dcda50560ee3448d67
+      raw_byte_provenance: approved_policy_raw_byte_pin_on_disk_bytes
       equals_policy_field: packet_policy_hash
       role: >-
         packet_config.candidate_policy_sha256; the production candidate-direction
@@ -410,14 +588,16 @@ hash_contract:
         candidate_direction stays null / POLICY_BLOCKED.
   packet_render_and_selection_configs:
     note: >-
-      Loaded config-byte SHA-256 (canonical Git/LF blob) of the packet
-      render/selection/narrative/comparator/schema configs the packet path
-      consumes; pinned for byte-stable reproduction and doer/test verification.
-    configs_packet_render_yaml: 4ced67e87dcd84cba4ce1ff56d2981018bfcb6067ab55283e788351501793006
-    configs_packet_selection_yaml: 9db981b7765726033d101bbe62ce3cb603bd32ffc4eb29205a427fd958d22885
-    configs_packet_narrative_templates_yaml: 427627fff0b05541dbff213dfc0efaf38599c02de06a17c5b3d9cec44ff0691f
-    configs_packet_comparator_yaml: d63d14a4367be77970c9b954a5bb456a29285f66cbb66fc93e9f1276aedb1f8e
-    configs_packet_schema_yaml: 2ecf1479e3451f7f4f152f28f08ae822cc8ca77fe010180b652dd10b1241efb9
+      RAW on-disk byte SHA-256 of the packet render/selection/narrative/comparator
+      /schema configs the packet path consumes; pinned for byte-stable
+      reproduction and doer/test verification. These are the CURRENT configs
+      (distinct from the OLD render/selection hashes recorded in the frozen
+      2026-07-11 artifact).
+    configs_packet_render_yaml_raw_byte: d9f7ef8fd90769fe671ee1b3d1f7dac42351a8045b50c2ec5535029366f4ba3a
+    configs_packet_selection_yaml_raw_byte: f7198b68e72e3bb27fe8a2c17eeb9365c31739fc6b218f50f7fda167955156ad
+    configs_packet_narrative_templates_yaml_raw_byte: 64359a533e430c670327e3b90a4ae89dd248e5fd3c76234904896e60ad67d0ed
+    configs_packet_comparator_yaml_raw_byte: e1703d7f14b1d87e012e3d98bc39fe6a839a520544a49ab43622f3c0e85c4eea
+    configs_packet_schema_yaml_raw_byte: 6d4e458cd54bce469cd16a93a2792529b6028e3d8e714954474fd9034bd1260a
   strength_map_pin:
     values: {'1': supporting, '2': moderate, '3': strong, '4': very_strong, '5': stand_alone}
     source: configs/acmg/tsc.yaml::strength_map
@@ -434,10 +614,12 @@ planning_probe:
   method: >-
     The planner read the CURRENT disabled_manual census
     (raptor_current_policy_internal_direction + candidate_pattern_compression +
-    corpus + run_integrity + pp3bp4_suppression + point_distribution) and
-    cross-checked it against the immutable manifest/BIAS/provenance source
-    hashes. These values are the conservation oracle and live in this spec + in
-    Gemini's tests ONLY; production code must derive them, never embed them.
+    corpus + run_integrity + pp3bp4_suppression + point_distribution), confirmed
+    the manual_review <-> annotation_manual_review mapping (D11), confirmed the
+    approved-policy config pins equal the raw on-disk bytes (D10), and identified
+    the frozen 2026-07-11 1,571-universe artifact (D9). These values are the
+    conservation oracle and live in this spec + Gemini's tests ONLY; production
+    code must derive them, never embed them.
   reproduced_from_current_census:
     total_vus: 6618
     manifest_identities: 6618
@@ -446,7 +628,7 @@ planning_probe:
     candidate_LP_review: 157
     candidate_LB_review: 7
     no_deterministic_resolution: 6424
-    annotation_manual_review: 30
+    manual_review_annotation_manual_review: 30
     lp_exact_strength_patterns: 7
     lb_exact_strength_patterns: 2
 
@@ -456,20 +638,32 @@ expected_counts:
     and per-gene breakdowns are pinned against whatever the REUSED grouping
     helper (_variant_class_for, split on ',') yields, never a planner-invented
     split.
-  complete_candidate_universe:
-    packets_total: 164
-    candidate_LP_review_packets: 157
-    candidate_LB_review_packets: 7
-    identity: 164 == 157 + 7 == every LP+LB stratum becomes exactly one packet.
-  excluded_from_packets:
+  full_packet_universe:
+    packets_total: 6618
+    by_stratum:
+      candidate_LP_review: 157
+      candidate_LB_review: 7
+      no_deterministic_resolution: 6424
+      manual_review: 30
+    identity: 157 + 7 + 6424 + 30 == 6618; every manifest identity becomes exactly one packet.
+    every_packet: candidate_direction=null, null_reason=production_policy_unapproved, review_state=POLICY_BLOCKED.
+  candidate_priority_queue:
+    entries: 164
+    composition: 157 candidate_LP_review + 7 candidate_LB_review.
+  excluded_from_candidate_priority_queue:
     no_deterministic_resolution: 6424
-    annotation_manual_review: 30
-    total_excluded: 6454
-    conservation: 6618 == 164 packeted + 6424 unresolved + 30 manual.
-    note: >-
-      NTHL1-gene rows (30) route to annotation_manual_review, disjoint from
-      LP/LB; no_deterministic_resolution rows (6,424) abstain. Neither class
-      receives a packet; both are recorded as explicit exclusion counts.
+    manual_review: 30
+    total: 6454
+    clarification: >-
+      These 6,454 are PACKETED (they have packet records + per-stratum queue/index
+      entries); they are excluded ONLY from the 164-entry candidate-PRIORITY
+      queue, and recorded as explicit per-stratum summary counts. 164 + 6,454 ==
+      6,618.
+  manual_review_mapping:
+    stratum_label: manual_review
+    census_direction_label: annotation_manual_review
+    count: 30
+    equivalences: direction_by_gene.NTHL1.manual_review == direction_by_consequence.other.manual_review == raptor_current_policy_internal_direction.annotation_manual_review == 30.
   pattern_compression:
     lp_exact_strength_patterns: 7
     lb_exact_strength_patterns: 2
@@ -481,8 +675,8 @@ expected_counts:
     note: >-
       Raw firings are policy-invariant (parsed from raw BIAS rationale across all
       6,618 rows); scored=0 because neither criterion is automatable. Every fired
-      PP3/BP4 renders in-packet with lineage disposition `deferred`, never a
-      scored call or a candidate-direction point.
+      PP3/BP4 renders in-packet with lineage disposition `deferred` (bound to the
+      current d2312… config), never a scored call or a candidate-direction point.
   point_distribution_expected:
     '-8': 1
     '-3': 6
@@ -501,55 +695,70 @@ expected_counts:
       - sum of every band == 6618 (all-strata coverage).
       - LP (points>=6) band sum == 157 == candidate_LP_review.
       - LB (points<=-1) band sum == 7 == candidate_LB_review.
-      - signed_points==0 band == 149 == 119 no_deterministic_resolution rows + 30 annotation_manual_review rows.
-      - Direction totals derive from STRATUM routing, never from point bands.
+      - signed_points==0 band == 149 == 119 no_deterministic_resolution rows + 30 manual_review rows.
+      - Direction/stratum totals derive from STRATUM routing, never from point bands.
   historical_comparison_superseded:
     source: data/census/tsc_vus_clinvar_2026-07-07_stats.json (PP3/BP4 ACTIVE)
     candidate_LP_review: {historical: 238, disabled_manual: 157, delta: -81}
     candidate_LB_review: {historical: 1333, disabled_manual: 7, delta: -1326}
     no_deterministic_resolution: {historical: 5017, disabled_manual: 6424, delta: 1407}
-    annotation_manual_review: {historical: 30, disabled_manual: 30, delta: 0}
-    interpretation: >-
-      Suppressing automated PP3/BP4 collapses most candidate directions into
-      no_deterministic_resolution. This result is scientifically disappointing
+    manual_review: {historical: 30, disabled_manual: 30, delta: 0}
+    historical_candidate_universe: >-
+      The PP3/BP4-active candidate universe was 1,571 (238 + 1,333), frozen in
+      tsc_calibration_batch_2026-07-11.json. Under disabled_manual the candidate
+      universe is 164 (157 + 7). This collapse is scientifically disappointing
       and MUST NOT be tuned.
 
 # --------------------------------------------------------------------------
-# 7. Complete-universe outputs + eight-case Discovery sample
+# 7. Full-universe outputs + eight-case Discovery sample
 # --------------------------------------------------------------------------
 
 outputs:
-  complete_universe:
-    location: external RAPTOR data root run directory (outside the repo tree)
+  full_universe:
+    location: NEW run-scoped directory under the external RAPTOR data root (outside the repo tree)
     artifacts:
       - name: operator_packets
         content: >-
-          All 164 CandidateEvidencePacket OPERATOR JSONs (candidate_direction=null,
-          null_reason=production_policy_unapproved, review_state=POLICY_BLOCKED),
-          canonical bytes, one file per packet_id, sorted by packet_id.
+          All 6,618 CandidateEvidencePacket OPERATOR JSONs across the four strata
+          (candidate_direction=null, null_reason=production_policy_unapproved,
+          review_state=POLICY_BLOCKED), canonical bytes, one file per packet_id,
+          sorted by packet_id; evidence-absent packets (D12) for any zero-fired
+          row.
       - name: first_pass_blinded_views
         content: >-
-          FIRST_PASS JSON (redact_for_first_pass projection) + FIRST_PASS
-          Markdown (render_markdown view=FIRST_PASS) for all 164 packets;
-          strips the entire external_comparators envelope AND candidate direction/
-          signed points/policy id/census direction labels (FR14.1).
-      - name: reviewer_queue_index
+          FIRST_PASS JSON (redact_for_first_pass projection) + FIRST_PASS Markdown
+          (render_markdown view=FIRST_PASS) for ALL 6,618 packets; strips the
+          entire external_comparators envelope AND candidate direction/signed
+          points/policy id/census direction labels (FR14.1).
+      - name: per_stratum_queue_index
         content: >-
           Deterministic queue/index (CSV + JSONL) built by build_queue_index over
-          the FIRST_PASS projection ONLY; ordered by packet_id. This is an
-          internal review queue, NOT an external worklist.
+          the FIRST_PASS projection ONLY, partitioned by stratum (LP/LB/unresolved
+          /manual), ordered by packet_id. Internal review queues, NOT external
+          worklists.
+      - name: candidate_priority_queue
+        content: >-
+          The 164-entry candidate-priority queue (157 LP + 7 LB) over the
+          FIRST_PASS projection; the primary internal review queue.
       - name: aggregate_manifest
         content: >-
-          Source/config hashes, full-40-hex code_commit, run pins, the
-          current-policy conservation record (164 universe / 157 LP / 7 LB / 7+2
-          patterns / 6,424 unresolved / 30 manual excluded), coverage summary,
-          embedded current lineage + predictor-leakage audit hashes, pinned
-          limitations, and the preregistered sample commitment (below).
-      - name: exclusion_report
+          Source/config hashes (raw-byte config pins + LF-blob artifact
+          identities, labeled distinctly), full-40-hex code_commit, run pins, the
+          current-policy conservation record (6,618 total / 157 / 7 / 6,424 / 30
+          / 7+2 patterns), per-stratum coverage summary, current lineage binding
+          (d2312…) with directly-derived firing/incidence, pinned limitations, and
+          the preregistered eight-case sample commitment.
+      - name: stratum_summary
         content: >-
-          Explicit non-identifying exclusion counts: 6,424 no_deterministic_resolution
-          + 30 annotation_manual_review (= 6,454) recorded as aggregate counts
-          with NO per-variant identity.
+          Explicit non-identifying per-stratum counts (157 / 7 / 6,424 / 30),
+          candidate-priority queue size (164), and excluded-from-priority total
+          (6,454); aggregate counts only, no per-variant identity.
+      - name: corrected_calibration_sample_optional
+        content: >-
+          OPTIONAL NEW corrected 30-pattern calibration/sample over the corrected
+          universe (select_calibration_batch), under a NEW name/hash distinct from
+          the frozen 2026-07-11 artifact; external-root only unless a later,
+          separately-scoped commit permits a non-identifying aggregate.
     determinism: >-
       All artifacts are byte-deterministic (canonical UTF-8, sorted keys, LF-only,
       one terminal newline) and packet ordering is by packet_id, so any
@@ -559,8 +768,8 @@ outputs:
     later_optional: >-
       If a subsequent commit is explicitly scoped, ONLY a non-identifying
       aggregate record and the preregistered sample commitment (hashes only) may
-      be committed under data/. Full packets/queues/first-pass views NEVER enter
-      Git.
+      be committed under data/, under NEW names. Full packets/queues/first-pass
+      views NEVER enter Git; the frozen historical artifacts are never touched.
 
 eight_case_discovery_sample:
   purpose: >-
@@ -571,17 +780,15 @@ eight_case_discovery_sample:
     candidate_LP_review: 2
     candidate_LB_review: 2
     no_deterministic_resolution: 2
-    annotation_manual_review: 2
+    manual_review: 2
     total: 8
   selection_rule: >-
-    Deterministic and preregistered BEFORE any auditor result: within each
-    stratum, sort the stratum's members by canonical SPDI (byte order) and take
-    the first two. LP/LB members map to their OPERATOR packet_id; unresolved and
-    manual members (which have NO packet) map to their canonical SPDI stratum
-    entry only.
+    Deterministic and preregistered BEFORE any auditor result: within each of the
+    four strata of the FULL packet universe, sort the stratum's packets by
+    canonical SPDI (byte order) and take the first two. All eight cases now
+    reference an existing packet (every stratum is packeted).
   commitment:
-    lp_lb_cases: reference {packet_id, packet_hash, evidence_core_hash} — no raw SPDI in-repo.
-    unresolved_manual_cases: reference a salted commitment sha256 over the canonical SPDI + stratum; the salt is recorded in the aggregate manifest so selection is verifiable-but-blinded.
+    all_cases: reference {packet_id, packet_hash, evidence_core_hash} — packet hashes only, NO raw SPDI in-repo.
     recorded_in: the aggregate manifest's `preregistered_discovery_sample` block, frozen before auditor results.
   boundary: >-
     An ecosystem experiment handoff only. Discovery comparison starts ONLY from
@@ -600,38 +807,42 @@ implementation_scope:
     files:
       - path: scripts/build_corrected_review_packets.py
         action: >-
-          create the corrected complete-universe CLI: verify approved policy
-          status/mode + config hashes; verify immutable input hashes; reproduce
-          strata via raptor.census.strata; build the full 164-packet universe via
-          the reused build_candidate_universe; run the NEW current-policy
-          conservation guard (157/7/7/2 + identity/row/join/source-hash) BEFORE
-          any write; write ALL 164 OPERATOR packets + FIRST_PASS JSON+Markdown +
-          deterministic queue + aggregate manifest + exclusion report + the
-          preregistered eight-case sample to the EXTERNAL data root, atomically,
-          no-overwrite; resolve full-40-hex fail-closed clean code_commit.
+          create the corrected full-universe CLI: verify the approved policy
+          artifact (LF blob) + status/mode; verify the four subordinate configs +
+          packet configs by RAW on-disk byte SHA-256; verify immutable input
+          hashes; reproduce strata via raptor.census.strata; build packets for ALL
+          6,618 identities across four strata via the reused build_candidate_universe
+          (LP+LB) + the new build_full_vus_universe (unresolved+manual, incl.
+          evidence-absent packets); run the current-policy conservation guard
+          BEFORE any write; write all 6,618 OPERATOR packets + FIRST_PASS views +
+          per-stratum queues + the 164 candidate-priority queue + aggregate
+          manifest + stratum summary + the preregistered eight-case sample to a
+          NEW external run directory, atomically, no-overwrite; resolve full-40-hex
+          fail-closed clean code_commit.
       - path: src/raptor/packet/corrected_universe.py
         action: >-
           create the pure current-policy conservation guard
-          (conserve_current_policy: 6,618 identities/rows, exact one-to-one join,
-          source_hashes, 157 LP / 7 LB / 7+2 patterns from the disabled_manual
-          census schema) and the deterministic eight-case Discovery sampler
-          (stratified, SPDI-sorted, salted commitment). No expected-count literal;
-          imports only raptor.census + raptor.packet.
+          (conserve_current_policy over the disabled_manual schema: 6,618
+          identities/rows, exact one-to-one join, source_hashes, 157/7/6,424/30 +
+          7/2 patterns), the all-strata assembler build_full_vus_universe (reusing
+          build_packet + the calibration helpers, incl. the D12 evidence-absent
+          packet and the D11 manual_review mapping), and the deterministic
+          eight-case Discovery sampler (SPDI-sorted first-two per stratum). No
+          expected-count literal; imports only raptor.census + raptor.packet +
+          the calibration helpers.
       - path: src/raptor/packet/git_provenance.py
         action: >-
-          create a shared git-provenance helper with a require_clean +
+          create a shared git-provenance helper with require_clean +
           require_full_40hex mode that fails closed on a dirty/unresolvable/
           abbreviated commit; the corrected CLI uses this mode.
-      - path: scripts/build_tsc_calibration_batch.py
-        action: >-
-          MINIMAL refactor ONLY to route its existing short/legacy provenance
-          through the shared helper's legacy mode (behavior byte-preserving); no
-          change to its conservation, universe, selection, or writers.
       - path: docs/reference/corrected-review-packets-runbook.md
-        action: document the corrected CLI, external output boundary, and non-authoritative boundary (documentation only).
-    count: 5
+        action: >-
+          document the corrected CLI, external output boundary, raw-vs-LF hash
+          rule, and non-authoritative boundary (documentation only).
+    count: 4
+    do_not_touch: scripts/build_tsc_calibration_batch.py is reused by import only; its behavior and tests are unchanged.
     generated_runtime_output_not_hand_authored:
-      - 'external RAPTOR data root: 164 OPERATOR packets + FIRST_PASS views + queue + aggregate manifest + exclusion report + preregistered sample.'
+      - 'external RAPTOR data root: 6,618 OPERATOR packets + FIRST_PASS views + per-stratum queues + 164 candidate-priority queue + aggregate manifest + stratum summary + preregistered sample (+ optional corrected calibration/sample).'
   gemini_test_author:
     files:
       - tests/packet/test_corrected_review_packets.py
@@ -641,13 +852,15 @@ implementation_scope:
     count: 4
     ordering: Gemini authors + RED-verifies these before Sonnet implements.
   preservation_scope_do_not_touch:
-    - data/census/** (historical stats, disabled_manual census, certified gate, audits — read-only, hash-bound)
+    - data/census/tsc_calibration_batch_2026-07-11.json (frozen historical 1,571-universe calibration)
+    - data/census/tsc_bias_lineage_audit_2026-07-10.json (historical pre-ADR-0012 static audit)
+    - data/census/** other stats/gate/audits (read-only, hash-bound)
     - configs/** (all policy/config; read-only, hash-bound)
-    - src/raptor/census/strata.py and src/raptor/packet/{build,queue,render,model,hashing,direction,decisions,state}.py (reused verbatim)
-    - scripts/build_tsc_calibration_batch.py conservation/universe/selection/writers (behavior-preserving)
+    - src/raptor/census/strata.py and src/raptor/packet/{build,queue,render,model,hashing,direction,decisions,state}.py (reused; only build/model minimally extended for the D12 evidence-absent packet, behavior-preserving for existing callers)
+    - scripts/build_tsc_calibration_batch.py and tests/packet/test_tsc_calibration_batch.py (reused by import; behavior + tests unchanged)
     - src/raptor/eval/gate.py, src/raptor/eval/scope_gate.py (authoritative gates)
     - the external raptor-data inputs (arm's-length, read-only)
-  branch_counts: {planner: 1, sonnet: 5, gemini: 4, total_branch: 10}
+  branch_counts: {planner: 1, sonnet: 4, gemini: 4, total_branch: 9}
 
 # --------------------------------------------------------------------------
 # 9. Gemini RED / unit / integration test matrix
@@ -660,30 +873,31 @@ test_matrix:
     - Synthetic unit tests exercise the algorithm; the real-data check recomputes
       from raw inputs through the reused seams.
   unit_universe:
-    - 'G-CP1 complete universe == every LP+LB stratum -> exactly one packet (164); NTHL1/manual + no_deterministic_resolution never enter the universe.'
-    - 'G-CP2 every packet has candidate_direction=null, null_reason=production_policy_unapproved, review_state=POLICY_BLOCKED.'
-    - 'G-CP3 the eval LP/LB selection stratum appears ONLY in pattern_ref.census_selection_stratum, NEVER in candidate_direction (AC4).'
-    - 'G-CP4 FIRST_PASS projection (redact_for_first_pass) strips the whole external_comparators envelope AND candidate direction/signed points/policy id/census direction labels; the queue index consumes only FIRST_PASS.'
-    - 'G-CP5 packets are byte-deterministic and ordered by packet_id; an input permutation re-renders byte-identically; the four §4.2 hashes are stable.'
-    - 'G-CP6 every fired PP3/BP4 renders with lineage disposition deferred; ZERO scored PP3/BP4 calls; no candidate-direction point.'
-    - 'G-CP7 AAVC (if a comparator is supplied) is reveal-only: excluded from evidence_core_hash and absent from FIRST_PASS.'
+    - 'G-CP1 full universe == every manifest identity -> exactly one packet (6,618) across four strata (157 LP + 7 LB + 6,424 unresolved + 30 manual); an input permutation re-renders byte-identically.'
+    - 'G-CP2 every packet has candidate_direction=null, null_reason=production_policy_unapproved, review_state=POLICY_BLOCKED, in every stratum.'
+    - 'G-CP3 the eval LP/LB (and unresolved/manual) stratum appears ONLY in pattern_ref.census_selection_stratum, NEVER in candidate_direction (AC4).'
+    - 'G-CP4 FIRST_PASS projection strips the whole external_comparators envelope AND candidate direction/signed points/policy id/census direction labels; per-stratum queues + the candidate-priority queue consume only FIRST_PASS.'
+    - 'G-CP5 the candidate-priority queue has exactly 164 entries (157 LP + 7 LB); the per-stratum summary records 6,424 + 30 excluded-from-priority; 164 + 6,454 == 6,618.'
+    - 'G-CP6 every fired PP3/BP4 renders with lineage disposition deferred bound to the current d2312… config; ZERO scored PP3/BP4; no candidate-direction point.'
+    - 'G-CP7 a zero-fired-criteria row produces a deterministic evidence-absent packet (empty scored set + MissingEvidence), conserving 6,618 (D12).'
+    - 'G-CP8 manual_review stratum == the 30 NTHL1 rows == census annotation_manual_review; no double-count (D11).'
   unit_conservation:
-    - 'G-CP8 current-policy conservation reads the disabled_manual schema (raptor_current_policy_internal_direction 157/7, candidate_pattern_compression 7/2, source_hashes, run_integrity) and fails closed on drift; it does NOT read worker/run_integrity.input_vcf_sha256 and does NOT assert 238/1,333.'
-    - 'G-CP9 identity/row/exact-join/source-hash invariants (6,618/6,618/one-to-one/3fff/0a55/7f99) conserved before any write.'
-    - 'G-CP10 exclusion counts derived (6,424 unresolved + 30 manual = 6,454); 164 + 6,454 == 6,618; no expected-count literal in production code.'
+    - 'G-CP9 current-policy conservation reads the disabled_manual schema (raptor_current_policy_internal_direction 157/7/6,424/30, candidate_pattern_compression 7/2, source_hashes, run_integrity) and fails closed on drift; it does NOT read worker/run_integrity.input_vcf_sha256 and does NOT assert 238/1,333.'
+    - 'G-CP10 identity/row/exact-join/source-hash invariants (6,618/6,618/one-to-one/3fff/0a55/7f99) conserved before any write; all counts derived, no expected-count literal in production code.'
+  unit_hash_semantics:
+    - 'G-CP11 the four subordinate configs verify by RAW on-disk byte SHA-256 against the approved-policy pins (1ba8066a/ea4ff684/d2312b2c/778882c5); the predictor policy ARTIFACT verifies by LF blob (85e9e92f); committed data artifacts verify by LF blob; a raw-vs-LF mismatch or a drifted config fails closed.'
   unit_provenance:
-    - 'G-CP11 git-provenance helper resolves the FULL 40-hex HEAD on a clean tree; fails closed (raises, no output) on a dirty tree or an abbreviated/unresolvable commit.'
+    - 'G-CP12 git-provenance helper resolves the FULL 40-hex HEAD on a clean tree; fails closed (raises, no output) on a dirty tree or an abbreviated/unresolvable commit.'
   unit_discovery_sample:
-    - 'G-CP12 eight-case sample is 2/2/2/2 across LP/LB/unresolved/manual, deterministic (SPDI-sorted first-two per stratum), reproduces identically across runs, and is committed as hashes (LP/LB packet hashes; unresolved/manual salted SPDI commitments) with NO raw identity.'
+    - 'G-CP13 eight-case sample is 2/2/2/2 across LP/LB/unresolved/manual from the full packet universe, deterministic (SPDI-sorted first-two per stratum), reproduces identically, committed as packet hashes with NO raw identity.'
   unit_output_boundary:
-    - 'G-CP13 full packet/queue/first-pass/manifest writes land ONLY under the external data root; any in-repo output path is refused; an existing run directory is never overwritten; publication is atomic (temp + rename).'
-    - 'G-CP14 canonical bytes: UTF-8, sorted keys, LF-only on every platform, one terminal newline, explicit binary write (never text-mode LF->CRLF); SHA tests hash canonical LF bytes.'
+    - 'G-CP14 full artifacts write ONLY under a NEW external run directory; any in-repo path is refused; an existing run directory (or any historical artifact name) is never overwritten; publication is atomic; canonical LF bytes.'
   integration_real_data:
     cases:
-      - 'G-CP15 opt-in (env-gated, e.g. RAPTOR_PACKET_REAL_DATA=1) run over the immutable manifest + BIAS TSV + provenance + current configs asserts the binding oracles: 6,618 identities/rows; 164-packet universe (157 LP / 7 LB); 6,424 unresolved + 30 manual excluded; 7/2 patterns; raw PP3 2,226 / BP4 3,696 / union 5,474 / scored 0; the all-strata point distribution summing to 6,618 (0 band==149); every packet null/POLICY_BLOCKED; the deterministic eight-case sample. Skipped cleanly when inputs/env absent; never reads a written artifact as its own oracle.'
-    boundary: >-
-      This is the ONLY test touching raptor-data; it recomputes through the
-      reused seams and writes only under a throwaway external temp root.
+      - 'G-CP15 opt-in (env-gated RAPTOR_PACKET_REAL_DATA=1) run over the immutable manifest + BIAS TSV + provenance + current configs asserts the binding oracles: 6,618 identities/rows -> 6,618 packets across four strata (157/7/6,424/30); candidate-priority queue 164; excluded-from-priority 6,454; 7/2 patterns; raw PP3 2,226 / BP4 3,696 / union 5,474 / scored 0; all-strata point distribution summing to 6,618 (0 band==149); every packet null/POLICY_BLOCKED; the deterministic eight-case sample. Writes only under a throwaway external temp root; never reads a written artifact as its own oracle; skipped cleanly when inputs/env absent.'
+    mandatory: >-
+      G-CP15 is a REQUIRED selector case (F4). Exact invocation (PowerShell):
+      $env:RAPTOR_PACKET_REAL_DATA="1"; python -m pytest tests/packet/test_corrected_real_data_integration.py -q
 
 # --------------------------------------------------------------------------
 # 10. Sonnet implementation contract
@@ -691,31 +905,34 @@ test_matrix:
 
 sonnet_contract:
   must:
-    - Make Gemini's RED tests pass by reusing build_candidate_universe + the
-      packet path verbatim and adding the current-policy conservation guard,
-      complete-universe writer, fail-closed full-commit provenance, and the
-      deterministic eight-case sampler exactly as scoped.
+    - Build a packet for EVERY VUS (6,618) across four strata by reusing
+      build_candidate_universe + build_full_vus_universe + the packet path; emit
+      per-stratum queues, the 164 candidate-priority queue, the stratum summary,
+      and the preregistered eight-case sample.
     - Derive every count from inputs; keep production code free of benchmark
       labels and expected-count literals.
-    - Verify approved policy status/mode + config hashes + immutable input hashes
-      before processing; fail closed on drift; run current-policy conservation
-      before any write.
-    - Keep every packet candidate_direction=null / POLICY_BLOCKED; carry the eval
-      LP/LB stratum ONLY in pattern_ref; deliver reviewers ONLY the FIRST_PASS
-      projection.
-    - Write full artifacts ONLY under the external data root, atomically,
+    - Verify the approved policy artifact by LF blob + the four subordinate/packet
+      configs by RAW on-disk byte SHA-256 + immutable input hashes before
+      processing; fail closed on drift; run current-policy conservation before any
+      write.
+    - Keep every packet candidate_direction=null / POLICY_BLOCKED; carry the
+      stratum ONLY in pattern_ref; deliver reviewers ONLY the FIRST_PASS
+      projection; bind PP3/BP4 lineage to the current d2312… config as deferred.
+    - Write full artifacts ONLY under a NEW external run directory, atomically,
       no-overwrite; resolve full-40-hex code_commit and fail closed on a dirty tree.
   must_not:
     - Generate any packet/queue/manifest artifact in the planner step, or write
       full packet artifacts into Git.
     - Reuse assert_source_of_record_conservation's historical direction assertions
-      (238/1,333) or its worker/run_integrity.input_vcf_sha256 reads for the
-      corrected run.
-    - Change the calibration-batch conservation/universe/selection/writers'
-      behavior, or edit gate.py, scope_gate.py, any config, or any census/audit
-      data file.
-    - Serialize the eval LP/LB selection stratum into candidate_direction, reveal
-      AAVC (or its direction) in FIRST_PASS, or let PP3/BP4 become a scored call.
+      (238/1,333) or its worker/run_integrity.input_vcf_sha256 reads.
+    - Change scripts/build_tsc_calibration_batch.py behavior or its tests; edit
+      gate.py, scope_gate.py, any config, or any census/audit/calibration data file.
+    - Overwrite, regenerate, or rename the frozen 2026-07-11 calibration artifact,
+      or claim the current config reproduces it byte-identically.
+    - Embed the 2026-07-10 (743a…) audit as current provenance, or mix raw-byte
+      and LF-blob pins.
+    - Serialize any stratum into candidate_direction, reveal AAVC (or its
+      direction) in FIRST_PASS, or let PP3/BP4 become a scored call.
     - Tune, round, or "fix" the disappointing disabled-mode counts.
 
 # --------------------------------------------------------------------------
@@ -724,16 +941,18 @@ sonnet_contract:
 
 gpt_probes:
   probes:
-    - 'P1 trace_cribbing — no expected-count literal (164/157/7/6424/30/6454/238/1333/2226/3696/5474/7/2/8) in src/raptor/packet/ or scripts/build_corrected_review_packets.py; counts derived; spec/historical/gate never scoring inputs.'
-    - 'P2 direction_leakage — no packet serializes the eval LP/LB stratum into candidate_direction; every packet is null / production_policy_unapproved / POLICY_BLOCKED.'
-    - 'P3 first_pass_blinding — the FIRST_PASS projection carries no candidate direction, signed points, policy id, census direction label, or AAVC comparator; queue delivery consumes only FIRST_PASS.'
-    - 'P4 stale_policy — verifies CURRENT approved/disabled_manual policy + config hashes + immutable input hashes before processing; fails closed on drift.'
-    - 'P5 pp3bp4_deferred — both PP3 and BP4 render as deferred lineage, scored 0, no candidate-direction point; both counted in suppression.'
-    - 'P6 provenance_fail_closed — full 40-hex code_commit on a clean tree; a dirty/abbreviated/unresolvable commit fails closed before any write.'
-    - 'P7 output_boundary — full artifacts only under the external data root, atomic + no-overwrite; identity never committed in-repo; only non-identifying aggregates + sample commitments may be (later) committed.'
-    - 'P8 identity_leakage — the in-repo aggregate manifest / sample commitment expose no variant_id/SPDI/HGVS/rationale/label/patient/packet raw identity (LP/LB use packet hashes; unresolved/manual use salted SPDI commitments).'
-    - 'P9 aavc_reveal_only — AAVC never enters criteria/combiner/grounding and is absent from FIRST_PASS and evidence_core_hash.'
-    - 'P10 calibration_preserved — the calibration-batch script behavior is byte-identical (existing tests green); the corrected run is a distinct complete-universe output.'
+    - 'P1 trace_cribbing — no expected-count literal (6618/164/157/7/6424/30/6454/238/1333/1571/2226/3696/5474/7/2/8) in src/raptor/packet/ or scripts/build_corrected_review_packets.py; counts derived; spec/historical/gate never scoring inputs.'
+    - 'P2 all_vus_coverage — a packet exists for every VUS (6,618) across four strata; unresolved/manual are packeted (not dropped); 164 is only the candidate-priority queue.'
+    - 'P3 direction_leakage — no packet serializes any stratum into candidate_direction; every packet is null / production_policy_unapproved / POLICY_BLOCKED.'
+    - 'P4 first_pass_blinding — the FIRST_PASS projection and every queue carry no candidate direction, signed points, policy id, census direction label, or AAVC comparator.'
+    - 'P5 hash_semantics — subordinate/packet configs verified by RAW on-disk byte SHA-256 against the approved-policy pins; predictor policy artifact + committed data artifacts by LF blob; no raw-vs-LF mixing; fails closed on drift.'
+    - 'P6 stale_audit — the 2026-07-10 (743a…) audit is NOT embedded as current; packet lineage binds to the current d2312… config; current firing/incidence derived directly.'
+    - 'P7 historical_frozen — the 2026-07-11 1,571-universe artifact is never overwritten/regenerated/renamed and no current-config byte-repro is claimed; the calibration script + tests are unchanged.'
+    - 'P8 pp3bp4_deferred — both PP3 and BP4 render as deferred, scored 0, no candidate-direction point; both counted in suppression.'
+    - 'P9 provenance_fail_closed — full 40-hex code_commit on a clean tree; a dirty/abbreviated/unresolvable commit fails closed before any write.'
+    - 'P10 output_boundary — full artifacts only under a NEW external run directory, atomic + no-overwrite; identity never committed in-repo; only non-identifying aggregates + packet-hash sample commitments may be (later) committed.'
+    - 'P11 manual_mapping — stratum manual_review == census annotation_manual_review == 30 NTHL1; no double-count.'
+    - 'P12 evidence_absent — zero-fired rows produce deterministic evidence-absent packets so the universe conserves 6,618.'
   posture: >-
     The measured result may be scientifically disappointing and must not be
     tuned; the checker verifies faithfulness, not favorable numbers.
@@ -744,10 +963,10 @@ gpt_probes:
 
 cli_and_output_boundary:
   cli:
-    args: [--manifest, --bias-tsv, --provenance, --census-stats, --lineage-audit,
-           --predictor-leakage-audit, --packet-config, --selection-config,
-           --render-config, --narrative-catalog, --scorer-config, --eval-config,
-           --predictor-policy, --output-root, --aavc-comparator, --dry-run, --summary]
+    args: [--manifest, --bias-tsv, --provenance, --census-stats, --packet-config,
+           --selection-config, --render-config, --narrative-catalog, --comparator-config,
+           --scorer-config, --eval-config, --predictor-policy, --output-root,
+           --run-name, --aavc-comparator, --dry-run, --summary]
     determinism: >-
       Canonical bytes: UTF-8, sort_keys=True, LF-only on every platform, exactly
       one terminal newline, explicit byte encode + binary write (never
@@ -756,12 +975,12 @@ cli_and_output_boundary:
       closed. Packet/queue ordering is by packet_id.
   output_boundary:
     accept: >-
-      A run-scoped directory UNDER the external RAPTOR data root (outside the
+      A NEW run-scoped directory UNDER the external RAPTOR data root (outside the
       repository tree), created atomically and only when it does not already
-      exist.
+      exist, with a name distinct from every historical artifact.
     refuse:
       - any path inside the repository tree (packets/queues/first-pass/manifest never enter Git)
-      - overwriting ANY existing run directory or artifact
+      - overwriting ANY existing run directory or artifact, or reusing a historical artifact name
       - any non-canonical/text-mode write
     enforcement: check-before-write; conservation + hash verification precede any bytes.
   dry_run: proves the full verify + conservation + universe + sample path runs and summarizes WITHOUT writing.
@@ -773,14 +992,17 @@ cli_and_output_boundary:
 migration_and_backout:
   migration:
     - Land planner spec (this commit) -> Gemini RED tests -> Sonnet
-      corrected-universe module + CLI + provenance helper + minimal calibration
-      re-route -> GPT-5.4 checker probes -> orchestrator runs the real 6,618-row
-      build to the external data root and freezes the non-identifying aggregate +
-      the preregistered eight-case sample.
+      corrected-universe module + CLI + provenance helper (+ minimal
+      evidence-absent build/model extension) -> GPT-5.4 checker probes ->
+      orchestrator runs the real 6,618-row build to a NEW external run directory
+      and freezes the non-identifying aggregate + the preregistered eight-case
+      sample. The frozen 2026-07-11 artifact and the calibration script/tests are
+      untouched throughout.
   backout:
-    - Revert the corrected module/CLI/helper; the calibration script, configs,
-      census, gates, and audits were never behavior-changed, and no in-repo data
-      artifact was written, so no data backout is needed.
+    - Revert the corrected module/CLI/helper (+ the minimal build/model
+      extension); the calibration script, its tests, configs, census, gates,
+      audits, and the frozen historical artifact were never behavior-changed, and
+      no in-repo data artifact was written, so no data backout is needed.
   discovery_handoff:
     - This track generates NO packets in the planner step and authorizes NO
       classification, worklist, submission, or clinical claim.
@@ -795,48 +1017,57 @@ migration_and_backout:
 
 beat4_self_audit:
   worst_ways_this_passes_while_wrong:
+    - candidate_only_narrowing: >-
+        The run packets only the 164 candidate universe and drops unresolved/
+        manual (the rev-1 F2 bug). MITIGATION: D2 + R2 + G-CP1/G-CP5 + P2 —
+        6,618 packets across four strata; 164 is only the candidate-priority queue.
+    - raw_vs_lf_hash_mislabel: >-
+        The four config pins are verified/labeled as LF blobs (or loaded/semantic),
+        which do not equal the approved-policy raw-byte pins. MITIGATION: D10 +
+        R10 + G-CP11 + P5 — raw on-disk byte SHA-256 for configs, LF blob for
+        committed artifacts, labeled distinctly.
+    - historical_byte_repro_claim: >-
+        The plan claims the current config reproduces the 2026-07-11 1,571-universe
+        artifact byte-identically, or overwrites it. MITIGATION: D9 + R8 + P7 —
+        frozen historical artifact; NEW corrected run; no byte-repro claim.
+    - stale_audit_as_current: >-
+        The 2026-07-10 (743a…) audit is embedded as current lineage provenance,
+        mixing hashes. MITIGATION: D7 + R9 + P6 — relabeled historical; lineage
+        binds to the current d2312… config; incidence derived directly.
+    - realdata_selector_omitted: >-
+        G-CP15 is scoped but not executed by the binding selector (the rev-1 F4
+        miss). MITIGATION: section 15 makes the env-gated real-data test mandatory
+        with an exact invocation.
     - historical_oracle_misuse: >-
         The corrected run reuses assert_source_of_record_conservation and either
-        KeyErrors on the disabled_manual census (no `worker` block) or the doer
-        edits that shared calibration guard / asserts 238/1,333. MITIGATION:
-        D2 + R1 + G-CP8 — a SEPARATE current-policy guard reads the
-        disabled_manual schema; the shared guard is untouched.
-    - checkout_hash_pinned: >-
-        The census/gate/audit is pinned to its Windows CRLF checkout SHA
-        (census 3b6d8bc…, gate e914…) instead of the canonical Git/LF blob.
-        MITIGATION: committed_data_inputs.hash_rule pins the LF blob (census
-        45ff9f9…, gate 7c55…) and records the CRLF hash as do_not_pin.
-    - stale_census_hash_accepted: >-
-        The planner blindly pins slot-3's census hash without verifying the file.
-        MITIGATION: verified the file; the slot-3 hash is the LF blob and the
-        content matches (157/7/6,424/30/6,618); reconciliation_note records it.
-    - direction_leak: >-
-        The eval LP/LB stratum is serialized into candidate_direction, turning a
-        selection signal into a fake production call. MITIGATION: R6 + G-CP3 + P2
-        keep it in pattern_ref only; every packet null / POLICY_BLOCKED.
-    - first_pass_unblinded: >-
-        The FIRST_PASS view or the queue leaks the candidate direction or the
-        AAVC comparator. MITIGATION: G-CP4 + P3 + P9 — queue consumes only the
-        redact_for_first_pass projection; AAVC reveal-only.
-    - calibration_regression: >-
-        Adding the complete-universe writer silently changes the calibration
-        batch bytes. MITIGATION: D4 + R2 + P10 — a NEW writer; calibration
-        conservation/universe/selection/writers behavior-preserving; existing
-        tests green.
+        KeyErrors on the disabled_manual census or asserts 238/1,333. MITIGATION:
+        D5 + R1 + G-CP9 — a separate current-policy guard on the disabled_manual
+        schema; the shared guard is untouched.
+    - checkout_hash_pinned_for_artifact: >-
+        A committed DATA artifact (census/gate/audit/historical calibration) is
+        pinned to its Windows CRLF checkout SHA instead of the LF blob.
+        MITIGATION: section 4 hash_rule pins LF blobs and records CRLF as
+        do_not_pin.
+    - direction_or_aavc_leak: >-
+        A stratum leaks into candidate_direction, or AAVC leaks into FIRST_PASS.
+        MITIGATION: R6/R7 + G-CP3/G-CP4 + P3/P4 — stratum in pattern_ref only;
+        AAVC reveal-only.
+    - manual_double_count: >-
+        The 30 manual rows are counted as both manual_review and
+        annotation_manual_review. MITIGATION: D11 + G-CP8 + P11 — one stratum, 30.
+    - evidence_absent_dropped: >-
+        Zero-fired rows are dropped, so the universe is < 6,618. MITIGATION: D12 +
+        G-CP7 + P12 — deterministic evidence-absent packet conserves 6,618.
     - short_commit_shipped: >-
-        Artifacts record a short/"unknown" commit or are generated from a dirty
-        tree. MITIGATION: D5 + G-CP11 + P6 — full 40-hex, fail-closed clean.
+        Artifacts record a short/"unknown" commit or come from a dirty tree.
+        MITIGATION: D6 + G-CP12 + P9 — full 40-hex, fail-closed clean.
     - identity_in_repo: >-
         A per-variant SPDI/packet leaks into a committed aggregate or the sample
-        commitment. MITIGATION: D8/D9 + P7/P8 — full artifacts external-only;
-        in-repo only packet hashes + salted SPDI commitments.
-    - one_sided_suppression: >-
-        Only PP3 (or only BP4) is deferred/suppressed. MITIGATION: G-CP6 + P5 —
-        both scored 0, both deferred, both counted in the union.
+        commitment. MITIGATION: D8 + P10 — external-only full artifacts; in-repo
+        only packet hashes + aggregate counts.
     - vacuous_real_test: >-
         The integration test loads a written packet/manifest and asserts its own
-        values. MITIGATION: G-CP15 recomputes through the reused seams; the
-        written artifact is never its own oracle.
+        values. MITIGATION: G-CP15 recomputes through the reused seams.
   empty_beats: none — every beat applied.
 
 # --------------------------------------------------------------------------
@@ -845,15 +1076,27 @@ beat4_self_audit:
 
 validation:
   planner_commit_this_track:
-    selector: python -c "import yaml,sys; yaml.safe_load(open(r'docs/project/specs/corrected-review-packets-2026-07.yaml',encoding='utf-8')); print('spec parses')"
+    selector: python -c "import yaml; yaml.safe_load(open(r'docs/project/specs/corrected-review-packets-2026-07.yaml',encoding='utf-8')); print('spec parses')"
     also: git diff --stat must show ONLY docs/project/specs/corrected-review-packets-2026-07.yaml.
-  downstream_doer_selector: >-
-    python -m pytest tests/packet/test_corrected_review_packets.py
-    tests/packet/test_corrected_universe_conservation.py
-    tests/packet/test_corrected_discovery_sample.py
-    tests/packet/test_tsc_calibration_batch.py
-    (the last preserves the byte-identical calibration path; the real-data
-    integration test is env-gated and opt-in).
+    arithmetic_checks:
+      - 157 + 7 + 6424 + 30 == 6618 (full packet universe).
+      - 157 + 7 == 164 (candidate-priority queue).
+      - 6424 + 30 == 6454 (excluded from candidate-priority queue).
+      - 164 + 6454 == 6618.
+      - eight-case sample 2 + 2 + 2 + 2 == 8.
+  downstream_doer_selector:
+    mandatory_unit_and_calibration: >-
+      python -m pytest tests/packet/test_corrected_review_packets.py
+      tests/packet/test_corrected_universe_conservation.py
+      tests/packet/test_corrected_discovery_sample.py
+      tests/packet/test_tsc_calibration_batch.py
+    mandatory_real_data_integration: >-
+      $env:RAPTOR_PACKET_REAL_DATA="1"; python -m pytest
+      tests/packet/test_corrected_real_data_integration.py -q
+    note: >-
+      BOTH commands are mandatory (F4). The last unit selector preserves the
+      byte-identical historical calibration path; the env-gated real-data command
+      executes G-CP15 and must pass when the immutable inputs are present.
 
 required_trailers:
   - 'Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>'
