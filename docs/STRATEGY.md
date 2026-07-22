@@ -1,6 +1,6 @@
 # RAPTOR — Vision & Strategy
 
-> **Status:** DRAFT v0.2 — *vertical TSC/mTOR reset* (see [ADR-0010](DECISIONS.md#adr-0010--generic-platform-uniqueness-premise-falsified-vertical-tscmtor-research-evidence-strategy)) · **Owner:** @dronasrinivas · **Last updated:** 2026-07-10 · **Review cadence:** monthly
+> **Status:** DRAFT v0.2 — *vertical TSC/mTOR reset* (see [ADR-0010](DECISIONS.md#adr-0010--generic-platform-uniqueness-premise-falsified-vertical-tscmtor-research-evidence-strategy)) · **Owner:** @dronasrinivas · **Last updated:** 2026-07-22 (post-ADR-0013 reconciliation) · **Review cadence:** monthly
 >
 > **Format:** This document follows two established, citable standards — Roman Pichler's
 > **Product Vision Board** (Vision · Target Group · Needs · Product · Business Goals) wrapped around
@@ -285,7 +285,7 @@ contribution is the **TSC-vertical evidence**, not new generic methodology (GP-4
 
 | # | Product line | What it delivers | **Validation ceiling (GP-1)** |
 |---|---|---|---|
-| **1** | **TSC deterministic evidence census + candidate packet** | The complete TSC1/TSC2 VUS census + per-variant **candidate evidence packet** (candidate LP/LB *direction* + full evidence trail) | **Eval-only, label-blind, non-authoritative** until the held-out gate PASSes and an expert signs off. *Never* a classification/reclassification (§8, PROGRAM.md). |
+| **1** | **TSC deterministic evidence census + candidate packet** | The complete TSC1/TSC2 VUS census + per-variant **candidate evidence packet** (candidate LP/LB *direction* + full evidence trail) | **Eval-only, label-blind, non-authoritative** until ADR-0013's locked prospective validation PASSes, the production candidate policy is approved, and an expert signs off. *Never* a classification/reclassification (§8, PROGRAM.md). |
 | **2** | **TSC evidence / functional-assay / contradiction atlas** | Where TSC evidence and PS3-grade functional assays exist, where they are missing, and which sources contradict each other | Premises citable/span-grounded; *coverage-completeness* is not guaranteed — ships as an **atlas of what exists**, not proof of what is true. |
 | **3** | **Selected mTOR-condition hypothesis packets (gated)** | Falsifiable, fully-cited research-hypothesis packets for **one** gated mTOR-condition question at a time (GP-13) | **Oracle-poor.** Premises citable; the *leap* and *set-completeness* are not — ships as *cited hypothesis only*, after the GP-13 gate + oracle. |
 
@@ -310,8 +310,8 @@ These lines are delivered by the underlying **engine tiers** (mechanism, not pro
 - **First complete deterministic TSC1/TSC2 evidence census done** (6,618 VUS; internal, non-authoritative — PROGRAM.md). The x64 Nirvana/BIAS worker exists (ADR-0008); no MVP pipeline/orchestration skeleton was built — PRD-05 was never built and is now frozen (ADR-0010).
 
 **Phase 1 — Held-out validation gate (measurable half; in progress).**
-- The **label-free held-out VCF** was already emitted and scored on the x64 worker (BIAS-2015 v3.0.0 + Nirvana; 2,577 parsed records; ADR-0008) using the **full** comparator resources; the remaining leakage-safe steps are to **regenerate the ClinVar-derived comparator resources (PS1/PM5/PM1/PP2/BP1) with the held-out variants masked**, **re-score** on the masked resources, and run the **ClinVar-derivation audit** + Oracle ruling (ADR-0009). *(Actual VUS production uses full comparator resources; held-out validation must use masked resources.)*
-- Report **missense-stratified** precision/recall vs the frozen benchmark — **not yet computed**; the **PRD-06 gate must PASS** (both directions) before any candidate direction is trusted or any externally usable VUS worklist is released.
+- The **label-free held-out VCF** was already emitted and scored on the x64 worker (BIAS-2015 v3.0.0 + Nirvana; 2,577 parsed records; ADR-0008) using the **full** comparator resources; the leakage-safe masked rerun (R2, [ADR-0012](DECISIONS.md#adr-0012--pp3bp4-automated-emission-disabled-for-the-current-masked-rerun)) has since **re-scored the masked resources** and run the ClinVar-derivation audit + PP3/BP4-disabled policy. *(Actual VUS production uses full comparator resources; held-out validation used masked resources.)*
+- **Missense-stratified precision/recall have now been computed and gated (FAIL/BLOCKED_POLICY) on R2** — the frozen result is not, by itself, sufficient: [ADR-0013](DECISIONS.md#adr-0013--tiered-gate-v3-post-hoc-re-adjudication-and-prospective-validation-lock)'s tiered v3 post-hoc re-adjudication corrects the *reporting* (missense `NO_CALLS`/`UNDERPOWERED` rather than a coarse FAIL; truncating-pathogenic `SUPPORTED_POSTHOC`) without generating new evidence. No candidate direction is trusted and no externally usable VUS worklist is released until the **prospective validation locked by ADR-0013** — the first NCBI ClinVar GRCh38 monthly archive dated on/after 2026-08-01, frozen before labels/scoring — PASSes, the production candidate policy is approved, and per-variant expert sign-off is complete.
 
 **Phase 2 — Candidate evidence packet + atlas (Lines 1–2).**
 - The **PRD-04 candidate evidence packet / output contract is active and unblocked now**; provisional representative/all-VUS packets may be built for internal review, but the full **externally usable** worklist ships **only after** the Phase-1 PASS + policy correction + expert approval (leakage-safe).
@@ -333,7 +333,7 @@ These lines are delivered by the underlying **engine tiers** (mechanism, not pro
 
 | Dimension | Metric | Target posture |
 |---|---|---|
-| **Validated accuracy (Line 1 engine)** | Missense-stratified precision / recall vs the frozen held-out benchmark | Pre-registered thresholds; **PASS gates** any candidate-packet release or VUS run. |
+| **Validated accuracy (Line 1 engine)** | Missense-stratified precision / recall vs the frozen held-out benchmark | Pre-registered thresholds; **PASS gates** externally usable packet/worklist release and VUS authorization. Internal non-authoritative expert-review packets may be prepared before PASS. |
 | **Expert review yield** | Candidate packets **reviewed and accepted/rejected by an expert**; expert-agreement rate | The unit of success is an *expert-reviewed* packet, **not** a variant scored. |
 | **Curator / research adoption** | Named TSC curators/researchers actually **using** packets or the atlas | Named wedge (VCEP / lab / researcher), not "published on GitHub." |
 | **Research acted on** | Experiments / hypotheses the atlas or hypothesis packets **cause** (assays run, contradictions resolved, VUS re-examined) | Success = research *moved*, not artifacts *emitted*. |
@@ -429,7 +429,7 @@ This doc is intentionally the *intent* layer. Mechanism and status live in sibli
 - **RISK_REGISTER.md** — exhaustive failure-mode analysis (detection + mitigation + contingency).
 - **docs/prd/** — **one PRD per feature** (PRD-01 …), each a specific vertical slice; index deferred until ≥3 exist.
 - **ARCHITECTURE.md** — fleet, LiteLLM/Prefect runtime, data model, model routing.
-- **OPERATING_MODEL.md** — the build loop: planner/doer/checker hand-off contracts + gates.
+- **OPERATING_MODEL.md** — the build loop: planner/test-author/doer/checker hand-off contracts + gates.
 - **DECISIONS.md** — ADR-style record of every strategy/scope change to this doc.
 - **EVAL_PLAN.md** — benchmark definition + metrics every PRD measures against; **BENCHMARK_RESULTS.md** *(planned)* — results.
 - **pre-build/** *(local-only, git-ignored)* — source research, session exports & adversarial framing this doc distils (FYTSC_1/2, raptor framing, infra & session notes).

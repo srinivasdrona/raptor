@@ -1,6 +1,6 @@
 # RAPTOR — Evaluation Plan
 
-> **Status:** DRAFT v0.1 · **Owner:** @dronasrinivas · **Last updated:** 2026-07-08 · **Review cadence:** per phase
+> **Status:** DRAFT v0.1 · **Owner:** @dronasrinivas · **Last updated:** 2026-07-22 (added §1.3 tiered v3 post-hoc/prospective registration, ADR-0013) · **Review cadence:** per phase
 >
 > **Scope now:** the **frozen benchmark** + **Tier-1/2** metrics (PRD-01). Extensible to Tier-3 and
 > cross-linkage (§6) — those sections are stubs until those tiers exist (GP-7: don't spec what isn't built).
@@ -64,6 +64,43 @@ is a category error worth stating explicitly:
 **Sequence:** TSC2-first end-to-end; extend the known set **only if** TSC2 power is insufficient
 (wide specificity CI), **never** to move an unacceptable number. If TSC2 metrics are genuinely poor,
 the fix is the **scorer/calibration**, not more genes.
+
+### 1.3 Tiered v3 post-hoc re-adjudication and prospective registration (ADR-0013)
+
+The R2 masked held-out run (ADR-0012) and its v1/v2 interpretation are **frozen and immutable**:
+v1's coarse missense `FAIL` and v2's `full_spectrum_status=BLOCKED_POLICY`/`vus_authorized=false`
+remain exactly as scored, and neither is ever relabeled or overwritten by a later result.
+
+**Tiered gate v3** (`data/census/tsc_tiered_readjudication_2026-07-21.json`, ADR-0013) is an
+**additive, post-hoc re-adjudication** of that same frozen aggregate — it performs no new run,
+scoring, annotation, benchmark read, network access, or data generation. It reports independent axes
+instead of one coarse pass/fail:
+
+| Axis | Purpose |
+|---|---|
+| Run integrity | Did the pinned pipeline execute cleanly (unchanged from R2)? |
+| Data sufficiency | Is `min(actual, called)` at/above the powered floor (`ADEQUATE`/`UNDERPOWERED`/`NO_CALLS`)? |
+| Conditional performance | Precision/recall lower bound *given* adequate data (`MET`/`NOT_ESTIMABLE`/`NOT_APPLICABLE`) |
+| Policy parity | Is the scope blocked by an unrelated policy exclusion, e.g. PM1 (`CLEAR`/`BLOCKED`) |
+| Correct-call coverage | `called/actual` ratio, reported even when not gating |
+| Scope evidence status | `SUPPORTED_POSTHOC` / `UNDERPOWERED` / `NOT_APPLICABLE` |
+| Authorization | `NOT_AUTHORIZED` / `PENDING_PROSPECTIVE` |
+
+Undefined conditional metrics remain `null` — they are **never coerced to zero**, which is what let
+v1/v2 conflate "zero calls" with "failed." PM1 applies only to `missense:pathogenic`; it must not
+leak into the unrelated `truncating:pathogenic` scope (the v1/v2 defect ADR-0013 corrects).
+
+**Post-hoc boundary (binding):** v3 is a semantic re-interpretation only. It generates no evidence,
+authorizes no clinical classification, VUS worklist, ClinVar submission, or research scope, and does
+not, by itself, satisfy the AC1b Oracle-threshold gate below — a scope's evidence being
+`SUPPORTED_POSTHOC` is not the same as that scope being validated.
+
+**Prospective registration (locked before any labels/scoring):** the next real validation of any v3
+scope must run on the first eligible NCBI ClinVar GRCh38 `variant_summary` monthly archive dated
+on/after 2026-08-01. Its URL, official date, MD5, and SHA-256 must be frozen *before* labels or
+scoring occur — this is a **pre-registration**, not a result. If that archive is unavailable or
+invalid, status is `BLOCKED_DATA`; no outcome-dependent substitute is permitted. Until that run
+completes, every v3 scope's authorization remains `PENDING_PROSPECTIVE` or `NOT_AUTHORIZED`.
 
 ## 2. The frozen benchmark (ground truth — honestly, *proxy* labels)
 

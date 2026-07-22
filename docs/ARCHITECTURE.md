@@ -1,6 +1,6 @@
 # RAPTOR — Architecture
 
-> **Status:** DRAFT v0.1 · **Owner:** @dronasrinivas · **Last updated:** 2026-07-08 · **Review cadence:** monthly
+> **Status:** DRAFT v0.1 · **Owner:** @dronasrinivas · **Last updated:** 2026-07-22 (added §6a as-built modules; deployment-status note in §7) · **Review cadence:** monthly
 >
 > **Format:** Structured to the **arc42** template ([arc42.org](https://arc42.org)) with **C4-model**
 > diagram levels (Context → Container → Component; Simon Brown, [c4model.com](https://c4model.com)).
@@ -69,8 +69,9 @@ reclassification (see STRATEGY.md §9).
 
 > **Two distinct loops — do not conflate:**
 > - **Runtime data pipeline** (this doc) — linear DAG, orchestrated by Prefect.
-> - **Build-time loop** — planner (Opus) → doer (Sonnet 5) → checker (GPT), a *development* process
->   (ADR-0003), orchestrated by the operator + Copilot CLI + delegation, **not** a runtime component.
+> - **Build-time loop** — planner (Opus) → test author (Gemini) → doer (Sonnet 5) → checker (GPT), a
+>   *development* process (ADR-0003/ADR-0005), orchestrated by the operator + Copilot CLI +
+>   delegation, **not** a runtime component.
 
 ## 5. Building block view (C4 — Level 2: Containers)
 
@@ -124,7 +125,38 @@ label **and flag any benchmark overlap** (avoid circular validation — §11); r
 evidence + recompute; new SVI guidance → re-weight criteria; preprint → provisional (low weight),
 auto-upgrade on publication.
 
+## 6a. As-built evidence/eval modules (additive to the runtime stack)
+
+> **Status:** DRAFT v0.1 · **Last updated:** 2026-07-22. The items below are implemented, committed
+> code — distinct from the accepted-but-undeployed runtime stack in §4-§7.
+
+- **`raptor.census`** (`raptor.census.strata` + `raptor.census.aggregate`, driven by
+  `raptor.census.cli`) — the packet-free census aggregation package. It emits the current
+  non-identifying, non-authoritative candidate-direction census
+  (`data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json`) under the PP3/BP4-disabled
+  `manual` policy (ADR-0012). The CLI fails closed on an unapproved/drifted predictor policy or bound
+  config hash, a non-pinned `--historical-stats` path, a malformed provenance hash, or an
+  unresolvable git commit, and never overwrites an existing artifact.
+- **Tiered gate v3** (`raptor.eval.tiered_gate.decide_tiered_gate`,
+  `raptor.eval.config.load_tiered_authorization`, config `configs/eval/tiered_gate_v3.yaml`, built via
+  `scripts/build_tiered_readjudication.py`) — an additive, standalone post-hoc re-adjudication layer
+  (ADR-0013) over the frozen R2 masked-holdout aggregate. It is deliberately kept separate from the
+  policy-bound `configs/eval/tsc2.yaml` (which stays byte-identical at its approved SHA-256 and never
+  gains a `tiered_authorization` block); the tiered config is semantics-locked and validated by strict
+  recursive equality against a pinned constant, so any drift in the criterion-scope map or thresholds
+  fails closed. It performs no new run, scoring, annotation, benchmark read, network access, or data
+  generation — see `no_new_evidence_statement` in `data/census/tsc_tiered_readjudication_2026-07-21.json`.
+
 ## 7. Deployment view (C4 — Level 3 boundary)
+
+> **Accepted architecture vs actual deployment status.** §4-§6 describe the **accepted** runtime
+> architecture (ADR-0004: LiteLLM + Prefect + SQLite + Ollama). As of this writing **no component in
+> §4-§6 has been deployed as a running service** — Prefect is not scheduling any flow, no Ollama
+> gateway is live, and `variants.db` does not yet exist. All work to date (census, R2 masked
+> held-out gate, tiered v3 re-adjudication, calibration packets) has been produced by
+> **operator-invoked CLI scripts and Python modules** (§6a) run directly, not by the Prefect runtime
+> pipeline. Do not read §4-§6 as evidence of a live weekly run; deployment remains a separate,
+> not-yet-scheduled milestone.
 
 - **Transport:** SSH port-forward of each worker's Ollama (`:11434` → Queen `:11435/:11436`); VS Code
   Tunnels as fallback. **No inbound ports exposed** (Azure VMs implied).

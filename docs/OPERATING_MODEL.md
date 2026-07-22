@@ -1,10 +1,10 @@
 # RAPTOR — Operating Model (the build loop)
 
-> **Status:** DRAFT v0.1 · **Owner:** @dronasrinivas · **Last updated:** 2026-07-08 · **Review cadence:** monthly + rule-graduation on any new failure class
+> **Status:** DRAFT v0.1 · **Owner:** @dronasrinivas · **Last updated:** 2026-07-22 (added §7 parallel git-worktree delegation note) · **Review cadence:** monthly + rule-graduation on any new failure class
 >
 > **Format:** recognized building blocks, not a bespoke invention — **RACI** (responsibility
 > assignment), Scrum **Definition of Ready / Definition of Done** (the hand-off gates), the
-> **design→build→review→eval** agentic loop, and the **three-slot prompt architecture** proven in the
+> **design→test-author→build→review→eval** agentic loop, and the **three-slot prompt architecture** proven in the
 > operator's OpenCell program (`srinivasdrona/opencell`, dev blog 2026-06-01).
 
 ---
@@ -12,7 +12,8 @@
 ## 0. Purpose & scope
 
 This doc governs **how RAPTOR is built** (development-time process). It is *not* how RAPTOR runs —
-that is `ARCHITECTURE.md`. It operationalizes **ADR-0003** (planner/doer/checker) and is the
+that is `ARCHITECTURE.md`. It operationalizes **ADR-0003** plus **ADR-0005**
+(planner/test-author/doer/checker) and is the
 mechanism behind the build-loop risks in `RISK_REGISTER.md` category H (H1, H3, H4, H9, H10, H11, H12).
 
 **Binding sections:** §2 (roles), §4 (gates). Changing either is a process change → log in
@@ -32,6 +33,12 @@ A **unit of work** = one task: a vertical slice, one bug-class fix, or one doc. 
    │ Task Spec + acceptance     │
    │ criteria (Definition of    │
    │ Ready)                     │
+   └──────────────┬─────────────┘
+                  ▼
+   ┌────── test authoring ──────┐
+   │ Test-author (Gemini) turns │
+   │ the spec into executable   │
+   │ RED acceptance tests       │
    └──────────────┬─────────────┘
                   ▼
    ┌────────── build ───────────┐
@@ -65,19 +72,20 @@ VERIFICATION block, and a verdict are all written and persisted).
 
 **RACI per stage** (R=responsible, A=accountable, C=consulted, I=informed):
 
-| Stage | Planner | Doer | Checker | Operator | Oracle |
-|---|---|---|---|---|---|
-| Design | **R** | C | C | **A** | C (domain tasks) |
-| Build | C | **R** | I | **A** | – |
-| Review/eval | I | C | **R** | **A** | C (domain tasks) |
-| Merge / external sign-off | I | I | C | **R** | **A** (external only) |
+| Stage | Planner | Test-author | Doer | Checker | Operator | Oracle |
+|---|---|---|---|---|---|---|
+| Design | **R** | C | C | C | **A** | C (domain tasks) |
+| Test authoring | C | **R** | I | C | **A** | – |
+| Build | C | I | **R** | I | **A** | – |
+| Review/eval | I | I | C | **R** | **A** | C (domain tasks) |
+| Merge / external sign-off | I | I | I | C | **R** | **A** (external only) |
 
 **Hard rules**
 1. **Checker family ≠ doer family** — adversarial review, not self-review (R-D1). GPT checks Sonnet's work; never Sonnet checks Sonnet.
 2. **Test-author family ≠ doer family** — the tests must not share the code's blind spots (H2/H4 confirmation bias). Sonnet builds; **Gemini writes the tests**; GPT checks. Four families (Opus/Gemini/Sonnet/GPT) = maximal independence.
 3. **The test-author writes from the spec only and never sees the doer's implementation** — tests encode the *requirement*, not the code.
 4. Model *roles* are fixed; specific *versions* are config (GP-6), not hardcoded.
-3. The **checker validates form, consistency, spec-conformance, and evidence — not domain truth.** Domain truth needs the Oracle (H11); acceptance criteria are typed accordingly (§3.1, §4 G4).
+5. The **checker validates form, consistency, spec-conformance, and evidence — not domain truth.** Domain truth needs the Oracle (H11); acceptance criteria are typed accordingly (§3.1, §4 G4).
 
 ### 2.1 Escalation & disagreement
 
@@ -227,6 +235,12 @@ or tests**, else the manifest records an explicit `slot3_na_reason`. Slot presen
 - **Disable slow PreToolUse hooks before delegating** — per-tool-call hook latency causes stream
   disconnects and zero-commit deaths.
 - **Detect and decompose:** a run with no persisted diff/verdict (or `finish_reason = token_cap`) is a **failure**, not a pass → split into narrower tasks and re-fire (H9).
+- **Independent modules get their own `git worktree`.** Tasks that touch a distinct module/spec (e.g.
+  `docs/project/specs/*.yaml`, `docs/prompts/*/manifest.json`) are assigned a dedicated worktree under
+  `D:\AIProjects\raptor-worktrees\<name>` on its own branch — this is how this very reconciliation task
+  runs (`raptor-worktrees\docs-reconcile`, branch `docs/reconcile-2026-07-22`). Parallel worktrees let
+  independent delegated tasks run concurrently without one task's uncommitted state blocking another's,
+  and keep each task's diff scoped and reviewable against a pinned base commit.
 
 ## 8. Rule-graduation loop (the core discipline)
 

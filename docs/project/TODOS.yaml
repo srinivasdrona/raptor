@@ -195,7 +195,7 @@ todos:
     aggregates, limitations and next priorities in one coherent checkpoint; mark earlier
     diagnostic status as historical/superseded without rewriting accepted ADRs. This is
     the factual source checkpoint for the public README, website and blog.
-  status: pending
+  status: done
   depends_on:
   - build-mave-validation
   - recompute-vus-census
@@ -560,7 +560,7 @@ todos:
     problem, research-only scope, what is built, current verified results, architecture,
     quick start, repository guide, Mechanism Atlas status, limitations, citation and contact.
     Never imply clinical classification, expert approval, production authorization or grant endorsement.'
-  status: pending
+  status: done
   depends_on:
   - refresh-program-docs
   created: '2026-07-21'
