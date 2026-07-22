@@ -6,6 +6,7 @@ import json
 import pytest
 import hashlib
 from pathlib import Path
+from types import SimpleNamespace
 
 # Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 # Copilot-Session: 7c146921-f3dd-4a1e-8cf0-8f574de49204
@@ -117,4 +118,85 @@ def test_current_policy_conservation_guard() -> None:
     drifted_patterns = dict(valid_synthetic, lp_patterns=8)
     with pytest.raises(ConservationError):
         conserve_current_policy(**drifted_patterns)
+
+
+def test_full_vus_universe_conservation() -> None:
+    """Finding 4: Exercise planned full conserve_current_policy and build_full_vus_universe with synthetic fixtures."""
+    api = _api()
+    build_full_vus_universe = api["build_full_vus_universe"]
+    conserve_current_policy = api["conserve_current_policy"]
+    ConservationError = api["ConservationError"]
+    
+    # Construct small synthetic manifest/strata/BIAS-like fixtures
+    # 4 items to represent all four strata: LP, LB, unresolved, manual_review
+    manifest = [
+        SimpleNamespace(vcf_key="chr1:100:A:T", gene="TSC1", annotation_manual_review=False),
+        SimpleNamespace(vcf_key="chr1:200:G:C", gene="TSC1", annotation_manual_review=False),
+        SimpleNamespace(vcf_key="chr1:300:T:A", gene="TSC1", annotation_manual_review=False),
+        SimpleNamespace(vcf_key="chr1:400:C:G", gene="NTHL1", annotation_manual_review=True), # manual review mapping
+    ]
+    
+    bias_records = [
+        SimpleNamespace(vcf_key="chr1:100:A:T", criteria={"PVS1": "supporting"}),
+        SimpleNamespace(vcf_key="chr1:200:G:C", criteria={"BP4": "supporting"}),
+        SimpleNamespace(vcf_key="chr1:300:T:A", criteria={}),
+        SimpleNamespace(vcf_key="chr1:400:C:G", criteria={}),
+    ]
+    
+    # 1. Test successful building with perfect join and exact manual mapping
+    # Conserve: 4 total VUS, 1 LP, 1 LB, 1 unresolved, 1 manual, 1 LP pattern, 1 LB pattern
+    packets = build_full_vus_universe(
+        manifest=manifest, 
+        bias_records=bias_records, 
+        source_hash="valid_hash",
+        expected_total=4,
+        expected_lp=1,
+        expected_lb=1,
+        expected_unresolved=1,
+        expected_manual=1,
+        expected_lp_patterns=1,
+        expected_lb_patterns=1
+    )
+    assert len(packets) == 4
+    
+    # Verify unresolved and manual assembled with pattern_ref None
+    for p in packets:
+        if p.census_selection_stratum.census_selection_stratum in ("no_deterministic_resolution", "manual_review"):
+            assert p.pattern_ref is None
+            
+    # Verify exact annotation_manual_review -> manual_review mapping
+    manual_packets = [p for p in packets if p.census_selection_stratum.census_selection_stratum == "manual_review"]
+    assert len(manual_packets) == 1
+    assert manual_packets[0].identity.canonical_spdi == "chr1:400:C:G"
+    
+    # 2. Duplicate join check
+    duplicate_bias = bias_records + [bias_records[0]]
+    with pytest.raises(ConservationError):
+        build_full_vus_universe(manifest, duplicate_bias, source_hash="valid_hash")
+        
+    # 3. Missing join check
+    with pytest.raises(ConservationError):
+        build_full_vus_universe(manifest, bias_records[:-1], source_hash="valid_hash")
+        
+    # 4. Extra join check
+    extra_manifest = manifest + [SimpleNamespace(vcf_key="chr1:500:A:T", gene="TSC1", annotation_manual_review=False)]
+    with pytest.raises(ConservationError):
+        build_full_vus_universe(extra_manifest, bias_records, source_hash="valid_hash")
+        
+    # 5. Source hash drift check
+    with pytest.raises(ConservationError):
+        build_full_vus_universe(manifest, bias_records, source_hash="drifted_hash")
+        
+    # 6. Stratum count drift check
+    with pytest.raises(ConservationError):
+        build_full_vus_universe(
+            manifest=manifest, 
+            bias_records=bias_records, 
+            source_hash="valid_hash",
+            expected_total=4,
+            expected_lp=2, # Drift!
+            expected_lb=1,
+            expected_unresolved=1,
+            expected_manual=1
+        )
 

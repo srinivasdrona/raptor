@@ -103,7 +103,7 @@ def test_eight_case_discovery_sample_selection() -> None:
     # 2. Call the sample selection
     selected = select_discovery_sample(packets)
     
-    # 3. Assert exact 8 packet IDs (first two SPDI byte-order in each stratum), 2/2/2/2
+    # 3. Assert exact 8 packet IDs (first two SPDI byte-order in each stratum), 2/2/2/2, exact ordered sequence
     # Sorted SPDIs per stratum:
     # LP: NC_000009.12:100000:G:A (lp-p4), NC_000009.12:100001:A:T (lp-p2)
     # LB: NC_000009.12:200001:A:T (lb-p1), NC_000009.12:200002:C:G (lb-p2)
@@ -111,14 +111,13 @@ def test_eight_case_discovery_sample_selection() -> None:
     # Man: NC_000009.12:400001:A:T (man-p2), NC_000009.12:400002:C:G (man-p1)
     
     assert len(selected) == 8
-    selected_ids = {p.packet_id for p in selected}
-    expected_ids = {"lp-p4", "lp-p2", "lb-p1", "lb-p2", "unres-p2", "unres-p3", "man-p2", "man-p1"}
-    assert selected_ids == expected_ids
+    expected_order = ["lp-p4", "lp-p2", "lb-p1", "lb-p2", "unres-p2", "unres-p3", "man-p2", "man-p1"]
+    assert [p.packet_id for p in selected] == expected_order
     
-    # 4. Permutation Invariance: shuffling input packets produces the exact same selected IDs
+    # 4. Permutation Invariance: shuffling input packets produces the exact same ordered sequence of packet IDs
     shuffled_packets = list(reversed(packets))
     selected_shuffled = select_discovery_sample(shuffled_packets)
-    assert {p.packet_id for p in selected_shuffled} == expected_ids
+    assert [p.packet_id for p in selected_shuffled] == expected_order
     
     # 5. Insufficient stratum fails closed: if we remove one manual packet so we only have 1 (less than 2 required), it fails
     insufficient_packets = [p for p in packets if p.packet_id != "man-p3" and p.packet_id != "man-p2"]
@@ -126,6 +125,9 @@ def test_eight_case_discovery_sample_selection() -> None:
         select_discovery_sample(insufficient_packets)
         
     # 6. Verify no candidate_direction or comparator is read/queried on the dummy packets
-    # (Since they are SimpleNamespace, trying to read candidate_direction would raise AttributeError if queried,
+    # (Since they are SimpleNamespace, trying to read candidate_direction or comparators would raise AttributeError if queried,
     # ensuring no machine classes or comparators leak during discovery sample selection).
+    for p in selected:
+        assert not hasattr(p, "candidate_direction")
+        assert not hasattr(p, "external_comparators")
 

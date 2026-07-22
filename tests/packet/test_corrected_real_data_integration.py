@@ -51,14 +51,15 @@ def test_real_data_integration_recomputation(tmp_path: Path) -> None:
     api = _api()
     main = api["main"]
     
-    # Invoke main with explicit immutable arguments defined by spec into tmp_path
-    output_dir = tmp_path / "throwaway_external_root"
+    # G-CP15: Invoke main with explicit immutable arguments defined by spec (output-root and run-name) into tmp_path
+    run_name = "throwaway_external_root"
     argv = [
         "--manifest", str(manifest_path),
         "--bias-tsv", str(bias_tsv_path),
         "--provenance", str(provenance_path),
         "--census-stats", "data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json",
-        "--output-dir", str(output_dir)
+        "--output-root", str(tmp_path),
+        "--run-name", run_name,
     ]
     
     # Invoke main program
@@ -67,15 +68,26 @@ def test_real_data_integration_recomputation(tmp_path: Path) -> None:
     # Assert return code is 0 (success)
     assert summary_result == 0
     
-    # Parse resulting in-memory or written manifest from the throwaway output directory
+    # Parse resulting written manifest from the throwaway output directory
+    output_dir = tmp_path / run_name
     manifest_file = output_dir / "aggregate_manifest.json"
     assert manifest_file.is_file()
     
     with open(manifest_file, "r", encoding="utf-8") as f:
         run_manifest = json.load(f)
         
-    # Check exact oracle counts
+    # Independent pure in-memory recomputation check (G-CP15)
+    # Prevent hardcoded manifest output from passing by verifying with actual file metrics:
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        manifest_lines = sum(1 for line in f if line.strip())
+    with open(bias_tsv_path, "r", encoding="utf-8") as f:
+        bias_lines = sum(1 for line in f if line.strip()) - 1 # excluding header
+        
+    assert run_manifest["universe_size"] == manifest_lines
+    assert run_manifest["universe_size"] == bias_lines
     assert run_manifest["universe_size"] == 6618
+    
+    # Check exact oracle counts
     cons = run_manifest["conservation"]
     assert cons["manifest_identities"] == 6618
     assert cons["bias_rows"] == 6618

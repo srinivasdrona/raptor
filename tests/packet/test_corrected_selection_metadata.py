@@ -62,11 +62,12 @@ def test_pattern_ref_and_stratum_invariants() -> None:
     
     # 1. LP stratum packet with matching, valid PatternRef must succeed
     lp_metadata = CensusSelectionMetadata(census_selection_stratum="candidate_LP_review")
+    # G-CP13/Finding 7: PatternRef.pattern_signature is tuple[str,...], never a string; member_count positive
     valid_lp_pattern = PatternRef(
         census_snapshot_id="clinvar_2026-07-07",
         pattern_id="LP-pattern-1",
         census_selection_stratum="candidate_LP_review",
-        pattern_signature="PVS1_supporting_PM2_strong",
+        pattern_signature=("PVS1_supporting", "PM2_strong"),
         member_count=5
     )
     lp_input = dataclasses.replace(
@@ -83,7 +84,7 @@ def test_pattern_ref_and_stratum_invariants() -> None:
         census_snapshot_id="clinvar_2026-07-07",
         pattern_id="LB-pattern-1",
         census_selection_stratum="candidate_LB_review",  # LB mismatch
-        pattern_signature="BP4_strong",
+        pattern_signature=("BP4_strong",),
         member_count=2
     )
     mismatched_input = dataclasses.replace(
@@ -113,6 +114,25 @@ def test_pattern_ref_and_stratum_invariants() -> None:
     with pytest.raises(api["PacketValidationError"]):
         build_packet(invalid_unresolved_input, config)
 
+    # 5. Finding 7: PatternRef rejects string pattern_signature or non-positive member_count
+    with pytest.raises(Exception):
+        PatternRef(
+            census_snapshot_id="clinvar_2026-07-07",
+            pattern_id="LP-pattern-1",
+            census_selection_stratum="candidate_LP_review",
+            pattern_signature="PVS1_supporting",  # rejected: must be tuple
+            member_count=5
+        )
+        
+    with pytest.raises(Exception):
+        PatternRef(
+            census_snapshot_id="clinvar_2026-07-07",
+            pattern_id="LP-pattern-1",
+            census_selection_stratum="candidate_LP_review",
+            pattern_signature=("PVS1_supporting",),
+            member_count=0  # rejected: must be positive (> 0)
+        )
+
 
 def test_selection_metadata_hashing_and_blinding() -> None:
     """G-CP16:
@@ -136,7 +156,7 @@ def test_selection_metadata_hashing_and_blinding() -> None:
         census_snapshot_id="clinvar_2026-07-07",
         pattern_id="LP-pattern-1",
         census_selection_stratum="candidate_LP_review",
-        pattern_signature="PVS1_supporting",
+        pattern_signature=("PVS1_supporting",),
         member_count=5
     )
     
@@ -151,7 +171,7 @@ def test_selection_metadata_hashing_and_blinding() -> None:
         census_snapshot_id="clinvar_2026-07-07",
         pattern_id="LB-pattern-1",
         census_selection_stratum="candidate_LB_review",
-        pattern_signature="BP4_supporting",
+        pattern_signature=("BP4_supporting",),
         member_count=3
     )
     packet_lb = build_packet(
