@@ -285,7 +285,7 @@ contribution is the **TSC-vertical evidence**, not new generic methodology (GP-4
 
 | # | Product line | What it delivers | **Validation ceiling (GP-1)** |
 |---|---|---|---|
-| **1** | **TSC deterministic evidence census + candidate packet** | The complete TSC1/TSC2 VUS census + per-variant **candidate evidence packet** (candidate LP/LB *direction* + full evidence trail) | **Eval-only, label-blind, non-authoritative** until the held-out gate PASSes and an expert signs off. *Never* a classification/reclassification (§8, PROGRAM.md). |
+| **1** | **TSC deterministic evidence census + candidate packet** | The complete TSC1/TSC2 VUS census + per-variant **candidate evidence packet** (candidate LP/LB *direction* + full evidence trail) | **Eval-only, label-blind, non-authoritative** until ADR-0013's locked prospective validation PASSes and an expert signs off. *Never* a classification/reclassification (§8, PROGRAM.md). |
 | **2** | **TSC evidence / functional-assay / contradiction atlas** | Where TSC evidence and PS3-grade functional assays exist, where they are missing, and which sources contradict each other | Premises citable/span-grounded; *coverage-completeness* is not guaranteed — ships as an **atlas of what exists**, not proof of what is true. |
 | **3** | **Selected mTOR-condition hypothesis packets (gated)** | Falsifiable, fully-cited research-hypothesis packets for **one** gated mTOR-condition question at a time (GP-13) | **Oracle-poor.** Premises citable; the *leap* and *set-completeness* are not — ships as *cited hypothesis only*, after the GP-13 gate + oracle. |
 
