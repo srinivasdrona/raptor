@@ -1,43 +1,93 @@
 """
-Gemini RED tests for Mechanism Atlas: Identity Model (Revised)
+Gemini RED tests for Mechanism Atlas: Identity and 17 Core Contracts
 Spec coverage:
 - Schema shape + frozen/immutability + typed-error discrimination.
-- Match exact spec fields: AtlasIdentity uses spdi_canonical, gene, transcript_pin, hgvs_c, hgvs_p, hgvs_g, identity_state (not status).
-- Resolved identity requires canonical GRCh38 spdi_canonical; unresolved/alias-only cannot admit.
+- Match exact spec fields: AtlasIdentity uses spdi_canonical, gene, transcript_pin, hgvs_c, hgvs_p, hgvs_g, identity_state.
+- No 'status' field.
+- Resolved identity requires canonical GRCh38 spdi_canonical; unresolved/alias-only cannot admit and raises AtlasIdentityError.
 - SPDI-keyed transcript reconciliation via injected resolver.
-- Unknown/conflicting/context-dependent profiles remain distinct.
+- Frozen dataclass checks for all 17 contracts where mapped (tuples for ordered collections, eq=True, frozen).
+- identity_state is ONLY resolved or unresolved; setting unknown/conflicting raises AtlasSchemaError.
 """
 
 import pytest
 from dataclasses import is_dataclass, fields
 
-# 1. Guard planned imports so all tests collect
+# 1. Guard planned imports so all tests collect cleanly
 try:
     from raptor.atlas.model import (
+        DiseasePack,
+        PackBinding,
         AtlasIdentity,
+        Span,
+        EntryRef,
+        SourceRegisterEntry,
+        ObservedClaim,
+        ContextRecord,
+        MechanismEdge,
+        CandidateClass,
+        EvidenceAssessment,
+        RunMetadata,
+        Provenance,
+        MechanismProfile,
+        AtlasCandidateImport,
+        PromotionContext,
+        DisMechRecord,
         AtlasSchemaError,
         AtlasIdentityError,
+        AtlasProvenanceError,
+        AtlasSourceVerificationError,
+        AtlasLeakageError,
+        AtlasExportError,
+        AtlasPackError,
     )
-    from raptor.atlas.identity import reconcile_transcript
+    from raptor.atlas.identity import admit_identity, reconcile_transcript
     IMPLEMENTED = True
 except (ImportError, ModuleNotFoundError):
-    # Fallbacks for metadata reflection only so tests collect
+    # Fallback to empty mocks so pytest collects cleanly
+    DiseasePack = None
+    PackBinding = None
     AtlasIdentity = None
+    Span = None
+    EntryRef = None
+    SourceRegisterEntry = None
+    ObservedClaim = None
+    ContextRecord = None
+    MechanismEdge = None
+    CandidateClass = None
+    EvidenceAssessment = None
+    RunMetadata = None
+    Provenance = None
+    MechanismProfile = None
+    AtlasCandidateImport = None
+    PromotionContext = None
+    DisMechRecord = None
     AtlasSchemaError = ValueError
-    AtlasIdentityError = RuntimeError
+    AtlasIdentityError = ValueError
+    AtlasProvenanceError = ValueError
+    AtlasSourceVerificationError = ValueError
+    AtlasLeakageError = ValueError
+    AtlasExportError = ValueError
+    AtlasPackError = ValueError
+    admit_identity = None
     reconcile_transcript = None
     IMPLEMENTED = False
 
 def check_implemented():
     if not IMPLEMENTED:
-        pytest.fail("RED test: raptor.atlas is not implemented yet", pytrace=False)
+        pytest.fail("RED test: raptor.atlas.identity/model implementation is missing", pytrace=False)
 
-# 2. Anti-cribbing check
+# 2. Anti-cribbing check: ban real-content phrases/IDs only, not legitimate terms.
 def assert_no_cribbing(obj):
-    forbidden = ["r611q", "arg611", "mtor", "rescue", "zygosity", "stability", "localization"]
+    forbidden_ids = [
+        "pmc11185720",
+        "10.1101/2024.06.07.597916",
+        "c.1832G>A",
+        "p.Arg611Gln"
+    ]
     if isinstance(obj, str):
-        for f in forbidden:
-            assert f not in obj.lower(), f"Anti-cribbing violation: found '{f}' in '{obj}'"
+        for f in forbidden_ids:
+            assert f not in obj.lower(), f"Anti-cribbing violation: found real-content phrase '{f}' in '{obj}'"
     elif isinstance(obj, dict):
         for k, v in obj.items():
             assert_no_cribbing(k)
@@ -46,125 +96,162 @@ def assert_no_cribbing(obj):
         for item in obj:
             assert_no_cribbing(item)
 
-def test_schema_shape_and_immutability():
+
+def test_frozen_contracts_17():
+    """Verify that all 17 contracts are defined as frozen, eq-comparable dataclasses."""
     check_implemented()
-    assert is_dataclass(AtlasIdentity)
+    contracts = [
+        DiseasePack, PackBinding, AtlasIdentity, Span, EntryRef,
+        SourceRegisterEntry, ObservedClaim, ContextRecord, MechanismEdge,
+        CandidateClass, EvidenceAssessment, RunMetadata, Provenance,
+        MechanismProfile, AtlasCandidateImport, PromotionContext, DisMechRecord
+    ]
     
-    # 3. Match exact spec fields: spdi_canonical, gene, transcript_pin, hgvs_c, hgvs_p, hgvs_g, identity_state
+    assert len(contracts) == 17, f"Expected exactly 17 mapped contracts, got {len(contracts)}"
+    
+    for contract in contracts:
+        assert is_dataclass(contract), f"{contract.__name__} must be a dataclass"
+        # Verify frozen is True
+        assert contract.__dataclass_params__.frozen, f"{contract.__name__} must be frozen"
+        # Verify eq is True
+        assert contract.__dataclass_params__.eq, f"{contract.__name__} must be eq-comparable"
+
+
+def test_identity_fields_and_no_status():
+    """Verify AtlasIdentity fields and make sure no status field exists."""
+    check_implemented()
     field_names = {f.name for f in fields(AtlasIdentity)}
-    expected_fields = {"spdi_canonical", "gene", "transcript_pin", "hgvs_c", "hgvs_p", "hgvs_g", "identity_state"}
-    assert expected_fields.issubset(field_names), f"Missing fields in AtlasIdentity: {expected_fields - field_names}"
+    expected_fields = {
+        "spdi_canonical", "gene", "assembly", "transcript_pin",
+        "hgvs_c", "hgvs_p", "hgvs_g", "identity_state"
+    }
+    assert expected_fields == field_names, f"Fields mismatch for AtlasIdentity: {field_names}"
     assert "status" not in field_names, "AtlasIdentity must use 'identity_state', not 'status'"
 
-    identity = AtlasIdentity(
-        spdi_canonical="NC_000016.10:11111:A:T",
-        gene="TSC2",
-        transcript_pin="NM_000548.5",
-        hgvs_c="c.100A>T",
-        hgvs_p="p.Lys34Met",
-        hgvs_g="g.11111A>T",
-        identity_state="resolved"
-    )
-    assert_no_cribbing(identity.__dict__)
-    
-    with pytest.raises(Exception):
-        identity.identity_state = "unresolved"  # type: ignore
 
-
-def test_resolved_identity_requires_canonical_spdi():
+def test_resolved_admission_rules():
+    """Verify admit_identity enforces SPDI-keyed admission and gene/transcript/assembly pack-constraints."""
     check_implemented()
-    # Resolved admission requires canonical GRCh38 spdi_canonical; aliases cannot admit
-    identity = AtlasIdentity(
-        spdi_canonical="NC_000016.10:11111:A:T",
-        gene="TSC2",
-        transcript_pin="NM_000548.5",
-        hgvs_c="c.100A>T",
-        hgvs_p="p.Lys34Met",
-        hgvs_g="g.11111A>T",
-        identity_state="resolved"
+    
+    # Setup synthetic disease pack using fake/mock
+    fake_pack = DiseasePack(
+        schema="atlas.disease_pack.v1",
+        pack_id="synthpack",
+        pack_version="1.0.0",
+        pack_content_hash="mock_hash",
+        allowed_genes=("SYNGENE1",),
+        assembly_pins=("GRCh38",),
+        transcript_pins=({"transcript": "NM_900001.1", "requires": "MANE-Select-verification"},),
+        reconciliation_policy={},
+        ontology_extensions={},
+        source_register_pins=(),
+        prohibitions={},
+        pilot_eval_metadata={}
     )
-    assert identity.spdi_canonical == "NC_000016.10:11111:A:T"
+
+    # 1. Valid record for admission
+    valid_record = {
+        "spdi_canonical": "NC_000000.0:1000:A:T",
+        "gene": "SYNGENE1",
+        "assembly": "GRCh38",
+        "transcript_pin": "NM_900001.1",
+        "hgvs_c": "c.100A>T",
+        "hgvs_p": "p.Lys34Met",
+        "hgvs_g": "g.1000A>T",
+        "identity_state": "resolved"
+    }
+    
+    identity = admit_identity(valid_record, pack=fake_pack)
+    assert identity.identity_state == "resolved"
+    assert identity.spdi_canonical == "NC_000000.0:1000:A:T"
     assert_no_cribbing(identity.__dict__)
 
-    # Unresolved/alias-only cannot admit (raises AtlasIdentityError)
+    # 2. Missing canonical SPDI raises AtlasIdentityError on resolved admission
+    invalid_record_no_spdi = dict(valid_record, spdi_canonical=None)
     with pytest.raises(AtlasIdentityError):
-        AtlasIdentity(
-            spdi_canonical=None,
-            gene="TSC2",
-            transcript_pin="NM_000548.5",
-            hgvs_c="c.100A>T",
-            hgvs_p="p.Lys34Met",
-            hgvs_g="g.11111A>T",
-            identity_state="resolved"
-        )
+        admit_identity(invalid_record_no_spdi, pack=fake_pack)
+
+    # 3. Off-pack gene raises AtlasIdentityError
+    invalid_record_bad_gene = dict(valid_record, gene="TSC2")  # 'TSC2' is not in allowed_genes of synthpack
+    with pytest.raises(AtlasIdentityError):
+        admit_identity(invalid_record_bad_gene, pack=fake_pack)
+
+    # 4. Off-pack assembly raises AtlasIdentityError
+    invalid_record_bad_assembly = dict(valid_record, assembly="GRCh37")
+    with pytest.raises(AtlasIdentityError):
+        admit_identity(invalid_record_bad_assembly, pack=fake_pack)
+
+
+def test_identity_state_validation():
+    """Verify that identity_state only allows resolved/unresolved, and unknown/conflicting raise AtlasSchemaError."""
+    check_implemented()
+    
+    # unknown and conflicting are mechanism states, never identity_state values
+    for invalid_state in ["unknown", "conflicting", "other"]:
+        with pytest.raises(AtlasSchemaError):
+            AtlasIdentity(
+                spdi_canonical="NC_000000.0:1000:A:T",
+                gene="SYNGENE1",
+                assembly="GRCh38",
+                transcript_pin="NM_900001.1",
+                hgvs_c="c.100A>T",
+                hgvs_p="p.Lys34Met",
+                hgvs_g="g.1000A>T",
+                identity_state=invalid_state
+            )
 
 
 def test_transcript_reconciliation_by_resolver():
+    """Verify transcript reconciliation uses injected resolver and pack, never bare c. equality."""
     check_implemented()
-    # Test transcript reconciliation keyed by injected resolver/SPDI, never assert bare c. equality.
-    def fake_resolver(spdi: str, transcript: str) -> bool:
-        assert_no_cribbing(spdi)
-        assert_no_cribbing(transcript)
-        return spdi == "NC_000016.10:11111:A:T" and transcript == "NM_000548.5"
+
+    fake_pack = DiseasePack(
+        schema="atlas.disease_pack.v1",
+        pack_id="synthpack",
+        pack_version="1.0.0",
+        pack_content_hash="mock_hash",
+        allowed_genes=("SYNGENE1",),
+        assembly_pins=("GRCh38",),
+        transcript_pins=({"transcript": "NM_900001.1", "requires": "MANE-Select-verification"},),
+        reconciliation_policy={"alias_to_canonical_spdi_only": True},
+        ontology_extensions={},
+        source_register_pins=(),
+        prohibitions={},
+        pilot_eval_metadata={}
+    )
 
     identity = AtlasIdentity(
-        spdi_canonical="NC_000016.10:11111:A:T",
-        gene="TSC2",
-        transcript_pin="NM_000548.5",
+        spdi_canonical="NC_000000.0:1000:A:T",
+        gene="SYNGENE1",
+        assembly="GRCh38",
+        transcript_pin="NM_900001.1",
         hgvs_c="c.100A>T",
         hgvs_p="p.Lys34Met",
-        hgvs_g="g.11111A>T",
+        hgvs_g="g.1000A>T",
         identity_state="resolved"
     )
-    assert_no_cribbing(identity.__dict__)
 
-    # Reconciling with matching transcript should succeed using fake_resolver
-    reconciled = reconcile_transcript(identity, "NM_000548.5", resolver=fake_resolver)
-    assert reconciled is True
+    def fake_resolver(spdi: str, transcript: str) -> bool:
+        return spdi == "NC_000000.0:1000:A:T" and transcript == "NM_900001.1"
 
-    # Reconciling with mismatching transcript should fail
+    # Reconciliation with valid resolver/pack mapping succeeds
+    assert reconcile_transcript(identity, "NM_900001.1", pack=fake_pack, resolver=fake_resolver) is True
+
+    # Reconciliation with unresolved/mismatching transcript returns False or raises AtlasIdentityError
     with pytest.raises(AtlasIdentityError):
-        reconcile_transcript(identity, "NM_999999.1", resolver=fake_resolver)
-
-
-def test_unknown_and_conflicting_states_remain_distinct():
-    check_implemented()
-    # Unknown/conflicting/context-dependent profiles remain distinct and do not coerce
-    id_unknown = AtlasIdentity(
-        spdi_canonical="NC_000016.10:11111:A:T",
-        gene="TSC2",
-        transcript_pin="NM_000548.5",
-        hgvs_c="c.100A>T",
-        hgvs_p="p.Lys34Met",
-        hgvs_g="g.11111A>T",
-        identity_state="unknown"
-    )
-    
-    id_conflict = AtlasIdentity(
-        spdi_canonical="NC_000016.10:11111:A:G",
-        gene="TSC2",
-        transcript_pin="NM_000548.5",
-        hgvs_c="c.100A>G",
-        hgvs_p="p.Lys34Arg",
-        hgvs_g="g.11111A>G",
-        identity_state="conflicting"
-    )
-    
-    assert id_unknown != id_conflict
-    assert id_unknown.identity_state == "unknown"
-    assert id_conflict.identity_state == "conflicting"
-    assert_no_cribbing(id_unknown.__dict__)
-    assert_no_cribbing(id_conflict.__dict__)
+        reconcile_transcript(identity, "NM_900002.1", pack=fake_pack, resolver=fake_resolver)
 
 
 def test_typed_error_discrimination():
+    """Verify that all core errors are distinct types and fail closed."""
     check_implemented()
-    # Verify typed errors exist and inherit correctly
-    with pytest.raises(AtlasIdentityError):
-        raise AtlasIdentityError("Identity error")
+    errors = [
+        AtlasSchemaError, AtlasIdentityError, AtlasProvenanceError,
+        AtlasSourceVerificationError, AtlasLeakageError, AtlasExportError,
+        AtlasPackError
+    ]
+    # Ensure they are all separate exception types
+    assert len(set(errors)) == len(errors)
+    for err in errors:
+        assert issubclass(err, Exception)
 
-    with pytest.raises(AtlasSchemaError):
-        raise AtlasSchemaError("Schema error")
-
-    assert issubclass(AtlasIdentityError, Exception)
-    assert issubclass(AtlasSchemaError, Exception)
