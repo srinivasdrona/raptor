@@ -53,10 +53,17 @@ only.
    approved policy (`raptor.census.cli._verify_bound_hashes`).
 3. The five packet render/selection/narrative/comparator/schema configs,
    RAW on-disk byte SHA-256, against this track's own pins.
-4. The current-policy census oracle, canonical Git/LF blob SHA-256.
+4. The current-policy census oracle, canonical Git/LF blob SHA-256 (its
+   JSON is loaded once and becomes the oracle step 5 cross-checks below).
 5. The provenance artifact's own `vcf_hash`/`source_snapshot`
    (`raptor.census.cli._validate_provenance`), then its recorded
-   `manifest_hash` (when present) against the actual `--manifest` bytes.
+   `manifest_hash` (when present) against the actual `--manifest` bytes,
+   then the raw `--manifest`/`--bias-tsv` bytes and the provenance
+   artifact's `vcf_hash`/`source_snapshot` against the verified census
+   oracle's **own** recorded `source_hashes.manifest`/
+   `source_hashes.bias_tsv`/`source_hashes.input_vcf`/`snapshot` (never a
+   hardcoded pin -- the census oracle is the single source of truth this
+   input bundle must agree with).
 6. A full 40-hex `git rev-parse HEAD` on a clean working tree
    (`raptor.packet.git_provenance.resolve_corrected_provenance`) -- a
    dirty tree or an abbreviated/unresolvable commit fails closed.
@@ -75,25 +82,48 @@ the deterministic eight-case discovery sample
 
 Unless `--dry-run` is set, `write_corrected_run_outputs` writes, under a
 brand-new `<output-root>/<run-name>/` directory (refuses any path inside
-the repository tree, and refuses an already-existing run directory):
+the repository tree; refuses a `run_name` that is empty, absolute,
+drive-qualified, rooted, contains a path separator, or is `.`/`..`/any
+other traversal shape -- `run_name` is a single safe directory-name
+component; refuses an already-existing run directory or one that resolves
+outside the external root):
 
-- `packets/<packet_id>.json` -- full operator packets
+- `packets/<packet_id>.json` -- full operator packets, each carrying a
+  top-level `census_selection_stratum` field
 - `first_pass/<packet_id>.json` (+ `.md` when a render config is supplied)
-  -- the blinded `FIRST_PASS` projection
-- `queues/<stratum>.json` -- one queue per census-selection stratum
-- `candidate_priority_queue.json` -- the LP+LB subset
+  -- the blinded `FIRST_PASS` projection (neither `census_selection_stratum`
+  nor `pattern_ref` is present)
+- `queues/<stratum>.csv` / `queues/<stratum>.jsonl` -- one queue per
+  census-selection stratum, requires `--render-config`
+- `candidate_priority_queue.csv` / `candidate_priority_queue.jsonl` -- the
+  LP+LB subset, requires `--render-config`
 - `review_queue.csv` / `review_queue.jsonl` -- the unchanged
   `build_queue_index` ordering (`gene, canonical_spdi, packet_id`)
-- `discovery_sample.json` -- the preregistered eight-case sample
+
+  All four queue artifacts above are DERIVED from `build_queue_index`'s own
+  rows by filtering alone (never resorted, never rebuilt from a bare
+  packet-id list), so every row carries only `build_queue_index`'s
+  FIRST_PASS-safe fields (`packet_id`, `evidence_core_hash`,
+  `canonical_spdi`, `gene`, `review_state`, `gate_status`, `quality_flags`,
+  `contradiction` -- no direction, selection, or comparator field).
+- `discovery_sample.json` -- the preregistered eight-case sample as a
+  **hash-only** commitment: `{packet_id, packet_hash, evidence_core_hash}`
+  per case, no raw SPDI/identity, no `census_selection_stratum`, no
+  direction
 - `aggregate_manifest.json` -- universe size, conservation counts,
   PP3/BP4 suppression summary, derived point distribution,
-  `POLICY_BLOCKED` count, and the preregistered sample
-- `summary.json` -- a short human-readable run summary
+  `POLICY_BLOCKED` count, and the preregistered sample (same hash-only
+  schema as `discovery_sample.json`); any packet-id list here is sorted
+  lexically and is manifest ordering, not queue ordering
+- `summary.json` -- a short human-readable run summary (counts only, no
+  per-variant identity)
 
 All bytes are canonical UTF-8, LF-only, exactly one terminal newline,
 written via binary writes; publication is atomic (a sibling staging
-directory is renamed onto the run directory only once every artifact has
-been written).
+directory -- asserted to resolve to a direct child of the external root,
+same as the final run directory -- is renamed onto the run directory only
+once every artifact, including the rename itself, has succeeded; any
+failure removes the staging directory).
 
 ## Known limitations
 

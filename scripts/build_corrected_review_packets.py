@@ -10,11 +10,15 @@ on-disk byte SHA-256 against the pins recorded INSIDE that approved policy
 (`raptor.census.cli._verify_bound_hashes`, reused unchanged); verifies the
 five packet render/selection/narrative/comparator/schema configs by RAW
 on-disk byte SHA-256 against this module's own pins; verifies the
-current-policy census oracle by canonical Git/LF blob; verifies the
-`--provenance` artifact's own recorded `vcf_hash`/`source_snapshot`
-(`raptor.census.cli._validate_provenance`, reused unchanged) and its
-recorded `manifest_hash` (when present) against the actual `--manifest`
-bytes. Every verification runs BEFORE any output is written.
+current-policy census oracle by canonical Git/LF blob (loading its JSON
+once); verifies the `--provenance` artifact's own recorded
+`vcf_hash`/`source_snapshot` (`raptor.census.cli._validate_provenance`,
+reused unchanged) and its recorded `manifest_hash` (when present) against
+the actual `--manifest` bytes; then cross-verifies the raw `--manifest`/
+`--bias-tsv` bytes and the provenance artifact's `vcf_hash`/
+`source_snapshot` against the verified census oracle's OWN recorded
+`source_hashes`/`snapshot` (never a hardcoded/test-side pin). Every
+verification runs BEFORE any output is written.
 
 Reproduces the exact-join current-policy census strata
 (`raptor.census.strata.reproduce_census_strata`, reused unchanged),
@@ -106,8 +110,7 @@ def _sha256_bytes(path: str | Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def _canonical_lf_sha256(path: str | Path) -> str:
-    raw = Path(path).read_bytes()
+def _canonical_lf_sha256_of_bytes(raw: bytes) -> str:
     return hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest()
 
 
@@ -120,14 +123,74 @@ def _verify_raw_byte_pin(label: str, path: str | Path, expected_sha256: str) -> 
     return actual
 
 
-def _verify_current_policy_census(path: str | Path) -> str:
-    actual = _canonical_lf_sha256(path)
+def _verify_current_policy_census(path: str | Path) -> tuple[str, Mapping[str, Any]]:
+    """Verify the committed current-policy census oracle's canonical-LF
+    sha256 against the fixed pin, then load and return its parsed JSON
+    (read once, alongside the verified hash). The parsed census becomes the
+    single oracle `_verify_input_bundle_against_census` cross-checks the
+    `--manifest`/`--bias-tsv`/`--provenance` input bundle against below."""
+    raw = Path(path).read_bytes()
+    actual = _canonical_lf_sha256_of_bytes(raw)
     if actual != _CURRENT_POLICY_CENSUS_SHA256:
         raise InputVerificationError(
             "current-policy census oracle content drift: canonical LF sha256 does not match "
             f"the committed pin (expected {_CURRENT_POLICY_CENSUS_SHA256!r}, got {actual!r})"
         )
-    return actual
+    census = json.loads(raw.decode("utf-8"))
+    return actual, census
+
+
+def _verify_input_bundle_against_census(
+    *,
+    manifest_sha256: str,
+    bias_tsv_sha256: str,
+    provenance: Mapping[str, Any],
+    census: Mapping[str, Any],
+) -> None:
+    """Cross-verify the raw `--manifest`/`--bias-tsv` bytes and the
+    ALREADY schema-validated `--provenance` artifact's own recorded
+    `vcf_hash`/`source_snapshot` against the verified current-policy census
+    oracle's OWN recorded `source_hashes`/`snapshot` -- fails closed with
+    `InputVerificationError` on any mismatch, BEFORE any manifest/BIAS
+    parsing or packet assembly. Every expected value comes from the
+    verified census oracle itself (never a hardcoded/test-side pin), so
+    this cross-check holds for any manifest/BIAS-TSV/provenance/census set,
+    not just the one pinned real dataset."""
+    source_hashes = census.get("source_hashes")
+    if not isinstance(source_hashes, Mapping):
+        raise InputVerificationError(
+            f"current-policy census oracle is missing a source_hashes object; got {source_hashes!r}"
+        )
+
+    expected_manifest = source_hashes.get("manifest")
+    if manifest_sha256 != expected_manifest:
+        raise InputVerificationError(
+            "--manifest sha256 does not match the current-policy census oracle's "
+            f"source_hashes.manifest: expected {expected_manifest!r}, got {manifest_sha256!r}"
+        )
+
+    expected_bias_tsv = source_hashes.get("bias_tsv")
+    if bias_tsv_sha256 != expected_bias_tsv:
+        raise InputVerificationError(
+            "--bias-tsv sha256 does not match the current-policy census oracle's "
+            f"source_hashes.bias_tsv: expected {expected_bias_tsv!r}, got {bias_tsv_sha256!r}"
+        )
+
+    expected_input_vcf = source_hashes.get("input_vcf")
+    provenance_vcf_hash = provenance.get("vcf_hash")
+    if provenance_vcf_hash != expected_input_vcf:
+        raise InputVerificationError(
+            "--provenance's vcf_hash does not match the current-policy census oracle's "
+            f"source_hashes.input_vcf: expected {expected_input_vcf!r}, got {provenance_vcf_hash!r}"
+        )
+
+    expected_snapshot = census.get("snapshot")
+    provenance_snapshot = provenance.get("source_snapshot")
+    if provenance_snapshot != expected_snapshot:
+        raise InputVerificationError(
+            "--provenance's source_snapshot does not match the current-policy census oracle's "
+            f"snapshot: expected {expected_snapshot!r}, got {provenance_snapshot!r}"
+        )
 
 
 def _verify_manifest_provenance_binding(manifest_path: str | Path, provenance: Mapping[str, Any]) -> str:
@@ -201,15 +264,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     _verify_raw_byte_pin("narrative catalog", args.narrative_catalog, _PACKET_NARRATIVE_CATALOG_SHA256)
     _verify_raw_byte_pin("comparator config", args.comparator_config, _PACKET_COMPARATOR_CONFIG_SHA256)
 
-    # 4. Committed current-policy census oracle, canonical Git/LF blob.
-    _verify_current_policy_census(args.census_stats)
+    # 4. Committed current-policy census oracle, canonical Git/LF blob --
+    # load its JSON once; it becomes the oracle step 5 cross-checks against.
+    _, census_stats = _verify_current_policy_census(args.census_stats)
 
     # 5. Provenance artifact's own vcf_hash/source_snapshot, then the
-    # manifest<->provenance hash binding, before any manifest/BIAS parsing.
+    # manifest<->provenance self-consistency hash binding, then the whole
+    # manifest/BIAS-TSV/provenance input bundle against the verified
+    # current-policy census oracle's OWN recorded hashes/snapshot -- all
+    # before any manifest/BIAS parsing or packet assembly.
     provenance = json.loads(Path(args.provenance).read_text(encoding="utf-8"))
     _validate_provenance(provenance)
     manifest_sha256 = _verify_manifest_provenance_binding(args.manifest, provenance)
     bias_tsv_sha256 = _sha256_bytes(args.bias_tsv)
+    _verify_input_bundle_against_census(
+        manifest_sha256=manifest_sha256,
+        bias_tsv_sha256=bias_tsv_sha256,
+        provenance=provenance,
+        census=census_stats,
+    )
 
     # 6. Load + schema-validate every config the packet path consumes.
     packet_config = load_packet_config(args.packet_config)
@@ -330,8 +403,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "preregistered_discovery_sample": [
             {
                 "packet_id": packet.packet_id,
-                "canonical_spdi": packet.identity.canonical_spdi,
-                "census_selection_stratum": packet.census_selection_stratum.census_selection_stratum,
+                "packet_hash": packet.packet_envelope_hash,
+                "evidence_core_hash": packet.evidence_core_hash,
             }
             for packet in discovery_sample
         ],

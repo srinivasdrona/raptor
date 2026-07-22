@@ -18,11 +18,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 import uuid
 from collections import defaultdict
 from dataclasses import replace
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, Mapping, Optional, Sequence
 
 from raptor.census.strata import (
@@ -49,7 +50,7 @@ from raptor.packet.model import (
     SourceSnapshotPins,
     redact_for_first_pass,
 )
-from raptor.packet.queue import build_queue_index
+from raptor.packet.queue import QueueIndex, build_queue_index
 from raptor.packet.render import render_markdown
 from raptor.scorer.config import load_config as load_scorer_config
 from raptor.scorer.model import BiasRecord
@@ -376,6 +377,12 @@ def build_full_vus_universe(
         other_packets.append(packet)
 
     all_packets = sorted(list(bound_candidates) + other_packets, key=lambda packet: packet.packet_id)
+    for packet in all_packets:
+        if packet.census_selection_stratum is None:
+            raise PacketValidationError(
+                "build_full_vus_universe: every corrected-track packet must carry a "
+                f"non-None census_selection_stratum; packet_id={packet.packet_id!r} has None"
+            )
     return tuple(all_packets)
 
 
@@ -426,6 +433,65 @@ def _assert_corrected_output_boundary(output_root: Path) -> Path:
     return resolved
 
 
+#: A single safe directory-name component: starts with an alphanumeric,
+#: then any run of alphanumerics/`_`/`.`/`-`. Excludes `/` and `\\`
+#: (no separators at all), so a leading `.` (hence `.`/`..`) is already
+#: impossible; the explicit `.`/`..` checks in `_validate_run_name` below
+#: are kept anyway as defense-in-depth documentation of intent.
+_RUN_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+
+
+def _validate_run_name(run_name: str) -> str:
+    """Strict allowlist for `run_name` (G-CP14 hardening): `run_name` is
+    treated as exactly ONE safe directory-name component, never a path.
+    Fails closed with `OutputBoundaryError` on an empty string, any `/` or
+    `\\` separator, `.`/`..`, any other traversal shape, or (via the
+    `PureWindowsPath` defense-in-depth check) any absolute, drive-qualified
+    (e.g. `D:\\x`), or rooted (e.g. `\\x`) form -- BEFORE any path is
+    resolved or any directory is created/written."""
+    if not isinstance(run_name, str) or not run_name:
+        raise OutputBoundaryError(f"run_name must be a non-empty string; got {run_name!r}")
+    if not _RUN_NAME_RE.fullmatch(run_name):
+        raise OutputBoundaryError(
+            "run_name must be a single safe directory-name component matching "
+            f"{_RUN_NAME_RE.pattern!r}; got {run_name!r}"
+        )
+    if run_name in (".", ".."):
+        raise OutputBoundaryError(f"run_name must not be '.' or '..'; got {run_name!r}")
+    candidate = PureWindowsPath(run_name)
+    if candidate.is_absolute() or candidate.drive or candidate.root or len(candidate.parts) != 1:
+        raise OutputBoundaryError(
+            f"run_name must be exactly one relative, non-rooted path component; got {run_name!r}"
+        )
+    return run_name
+
+
+def _assert_strict_child(resolved_root: Path, candidate: Path, *, label: str) -> Path:
+    """Resolve `candidate` (following any existing symlink/junction/reparse
+    point in its ancestry) and assert the result is a DIRECT child of
+    `resolved_root`. Re-checked AFTER `.resolve()` -- not just string
+    concatenation -- so a reparse point planted anywhere in the ancestry
+    cannot silently redirect the eventual write target outside the
+    external root, even though `_validate_run_name` already guarantees
+    `run_name` itself contributes no such escape."""
+    resolved_candidate = candidate.resolve()
+    if resolved_candidate.parent != resolved_root:
+        raise OutputBoundaryError(
+            f"{label} must resolve to a direct child of {resolved_root}; got {resolved_candidate}"
+        )
+    return resolved_candidate
+
+
+def _assert_no_preexisting_target(path: Path, *, label: str) -> None:
+    """Fails closed if `path` already exists in ANY form -- a real
+    file/directory or a symlink/junction/reparse point, including a
+    dangling one that plain `.exists()` alone would miss -- because a
+    pre-planted escape target must never be followed; it must simply not
+    exist before this writer creates it."""
+    if path.is_symlink() or path.exists():
+        raise OutputBoundaryError(f"{label} already exists, refusing to overwrite/follow it: {path}")
+
+
 def _write_canonical_bytes(path: Path, text: str) -> None:
     """Binary write of already-LF-only `text` -- never a text-mode write,
     which on Windows would translate `\\n` to `\\r\\n`."""
@@ -456,32 +522,45 @@ def write_corrected_run_outputs(
 ) -> Path:
     """Write every corrected-run artifact under a brand-new
     `output_root/run_name` directory: refuses an in-repo `output_root`
-    (`OutputBoundaryError`) and refuses an already-existing `run_dir`
-    (`OutputBoundaryError`, never overwritten). All bytes are canonical
-    UTF-8 JSON with LF-only line endings and exactly one terminal newline,
-    written via binary writes. Publication is atomic: every artifact is
-    first written under a sibling staging directory, which is renamed onto
-    `run_dir` only once every write has succeeded (any failure removes the
-    staging directory -- no partial/leftover `run_dir`, no `.tmp`/
-    `.staging` files survive under the published tree).
+    (`OutputBoundaryError`), refuses an unsafe `run_name`
+    (`_validate_run_name` -- empty, absolute, drive-qualified, rooted,
+    separator-containing, `.`/`..`, or any other traversal shape), and
+    refuses an already-existing `run_dir` or staging collision
+    (`OutputBoundaryError`, never overwritten and never followed if it is a
+    symlink/junction/reparse point). `run_dir`/`staging_dir` are asserted
+    to resolve to direct children of the resolved external root BEFORE any
+    `mkdir`/write. All bytes are canonical UTF-8 JSON with LF-only line
+    endings and exactly one terminal newline, written via binary writes.
+    Publication is atomic: every artifact is first written under a sibling
+    staging directory (same resolved root, hence guaranteed same
+    filesystem/volume as `run_dir`), which is renamed onto `run_dir` only
+    once every write -- including the rename itself -- has succeeded inside
+    the same protective `try`; any failure at any point removes the
+    staging directory (no partial/leftover `run_dir`, no `.tmp`/`.staging`
+    files survive under the published tree).
 
     `aggregate_manifest`, `render_config`, and `discovery_sample` are all
     optional: the minimal 3-kwarg call (`output_root`, `run_name`,
     `packets`) still produces a valid, non-empty, canonical
     `aggregate_manifest.json` even for packets that carry no
     `census_selection_stratum` at all (e.g. a pre-existing, non-corrected
-    packet)."""
+    packet). Per-stratum/candidate-priority queue artifacts additionally
+    require `render_config` (they are derived from `build_queue_index`,
+    which itself requires one) and are simply omitted without one -- never
+    substituted with a lexically-sorted packet-id stand-in."""
+    _validate_run_name(run_name)
     output_root = Path(output_root)
     resolved_root = _assert_corrected_output_boundary(output_root)
-    run_dir = resolved_root / run_name
-    if run_dir.exists():
-        raise OutputBoundaryError(f"run directory already exists, refusing to overwrite: {run_dir}")
+
+    run_dir = _assert_strict_child(resolved_root, resolved_root / run_name, label="run_dir")
+    _assert_no_preexisting_target(run_dir, label="run directory")
 
     packets = tuple(sorted(packets, key=lambda packet: packet.packet_id))
 
-    staging_dir = resolved_root / f".{run_name}.staging-{uuid.uuid4().hex}"
-    if staging_dir.exists():
-        shutil.rmtree(staging_dir)
+    staging_dir = _assert_strict_child(
+        resolved_root, resolved_root / f".{run_name}.staging-{uuid.uuid4().hex}", label="staging_dir"
+    )
+    _assert_no_preexisting_target(staging_dir, label="staging directory")
     staging_dir.mkdir(parents=True)
     try:
         packets_dir = staging_dir / "packets"
@@ -498,29 +577,58 @@ def write_corrected_run_outputs(
         for packet in packets:
             stratum = _stratum_of(packet) or "unclassified"
             strata_groups[stratum].append(packet.packet_id)
-        queues_dir = staging_dir / "queues"
-        for stratum, packet_ids in strata_groups.items():
-            _write_canonical_json(queues_dir / f"{stratum}.json", {"packet_ids": sorted(packet_ids)})
-
-        candidate_priority_ids = sorted(
-            packet.packet_id for packet in packets
-            if _stratum_of(packet) in ("candidate_LP_review", "candidate_LB_review")
-        )
-        _write_canonical_json(
-            staging_dir / "candidate_priority_queue.json", {"packet_ids": candidate_priority_ids}
-        )
 
         if render_config is not None:
+            # Reuses `build_queue_index` UNCHANGED; its rows are already in
+            # `(gene, canonical_spdi, packet_id)` order (queue.py). Every
+            # queue artifact below is DERIVED from those rows by filtering
+            # alone -- never resorted, never rebuilt from a bare packet-id
+            # list -- so the FIRST_PASS-safe per-row fields (no direction,
+            # no selection, no comparator) and the queue ordering both come
+            # straight from `queue.py`.
             queue_index = build_queue_index(list(packets), render_config)
             _write_canonical_bytes(staging_dir / "review_queue.csv", queue_index.to_csv())
             _write_canonical_bytes(staging_dir / "review_queue.jsonl", queue_index.to_jsonl())
 
+            packet_id_to_stratum = {
+                packet.packet_id: (_stratum_of(packet) or "unclassified") for packet in packets
+            }
+            queues_dir = staging_dir / "queues"
+            for stratum in sorted(strata_groups.keys()):
+                # Filtering an already `(gene, canonical_spdi, packet_id)`
+                # sorted sequence preserves that relative order;
+                # `QueueIndex.__post_init__` re-sorting the filtered subset
+                # by the identical key is therefore a no-op, not a resort.
+                stratum_rows = tuple(
+                    row for row in queue_index.rows
+                    if packet_id_to_stratum.get(row.packet_id) == stratum
+                )
+                stratum_index = QueueIndex(rows=stratum_rows)
+                _write_canonical_bytes(queues_dir / f"{stratum}.csv", stratum_index.to_csv())
+                _write_canonical_bytes(queues_dir / f"{stratum}.jsonl", stratum_index.to_jsonl())
+
+            candidate_priority_rows = tuple(
+                row for row in queue_index.rows
+                if packet_id_to_stratum.get(row.packet_id) in ("candidate_LP_review", "candidate_LB_review")
+            )
+            candidate_priority_index = QueueIndex(rows=candidate_priority_rows)
+            _write_canonical_bytes(
+                staging_dir / "candidate_priority_queue.csv", candidate_priority_index.to_csv()
+            )
+            _write_canonical_bytes(
+                staging_dir / "candidate_priority_queue.jsonl", candidate_priority_index.to_jsonl()
+            )
+
         if discovery_sample is not None:
+            # Hash-only commitment (spec `eight_case_discovery_sample.
+            # commitment.all_cases`): {packet_id, packet_hash,
+            # evidence_core_hash} ONLY -- no raw canonical_spdi/identity, no
+            # census_selection_stratum, no candidate_direction/comparator.
             sample_payload = [
                 {
                     "packet_id": packet.packet_id,
-                    "canonical_spdi": packet.identity.canonical_spdi,
-                    "census_selection_stratum": _stratum_of(packet),
+                    "packet_hash": packet.packet_envelope_hash,
+                    "evidence_core_hash": packet.evidence_core_hash,
                 }
                 for packet in discovery_sample
             ]
@@ -542,9 +650,15 @@ def write_corrected_run_outputs(
             "strata": {stratum: len(ids) for stratum, ids in sorted(strata_groups.items())},
         }
         _write_canonical_json(staging_dir / "summary.json", summary_payload)
+
+        # The rename is the final step of this same protected block, so a
+        # rename failure (e.g. a concurrent collision) is cleaned up by the
+        # `except` below exactly like any other write failure -- no
+        # unprotected step remains between "everything written" and
+        # "published".
+        staging_dir.rename(run_dir)
     except BaseException:
         shutil.rmtree(staging_dir, ignore_errors=True)
         raise
 
-    staging_dir.rename(run_dir)
     return run_dir

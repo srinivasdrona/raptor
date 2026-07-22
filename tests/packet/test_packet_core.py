@@ -222,6 +222,7 @@ def test_ac1_exact_frozen_core_schema_and_config_loader(tmp_path: Path) -> None:
         "missing_evidence", "narrative_plan", "external_comparators",
         "review_state", "gate_status", "pattern_ref", "run_metadata",
         "source_snapshot", "predecessor_packet_id", "predecessor_envelope_hash",
+        "census_selection_stratum",
     }
     assert {field.name for field in fields(api["CandidateEvidencePacket"])} == expected_packet_fields
     assert api["load_packet_config"]("configs/packet/schema.yaml").packet_schema_version == "1.0"

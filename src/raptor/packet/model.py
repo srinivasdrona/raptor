@@ -748,6 +748,12 @@ class CandidateEvidencePacket:
     source_snapshot: SourceSnapshotPins
     predecessor_packet_id: Optional[str]
     predecessor_envelope_hash: Optional[str]
+    # Corrected-track census selection metadata (frozen four-value object).
+    # A real, declared field -- not an ad-hoc post-construction attachment --
+    # so it participates in normal `dataclasses.fields()` schema introspection
+    # and in the generic dataclass JSON serializer. Defaults to `None` so
+    # every pre-existing (non-corrected) caller remains valid unchanged.
+    census_selection_stratum: Optional[CensusSelectionMetadata] = None
 
 
 @dataclass(frozen=True)
@@ -775,9 +781,9 @@ def redact_for_first_pass(packet: CandidateEvidencePacket) -> FirstPassPacketVie
     `external_comparators`, `pattern_ref`, `run_metadata`, `source_snapshot`,
     predecessor linkage, and hash/version fields not part of the first-pass
     schema, retaining only the fields blinded reviewers are permitted to see.
-    A corrected-track packet's ad-hoc `census_selection_stratum` attribute
-    (never a declared `CandidateEvidencePacket` field) is likewise never
-    copied onto the projection."""
+    A corrected-track packet's `census_selection_stratum` field is likewise
+    never copied onto the projection -- `FirstPassPacketView` has no such
+    field at all."""
     return FirstPassPacketView(
         packet_id=packet.packet_id,
         evidence_core_hash=packet.evidence_core_hash,

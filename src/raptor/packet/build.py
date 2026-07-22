@@ -107,6 +107,7 @@ def build_packet(
         source_snapshot=packet_input.source_snapshot,
         predecessor_packet_id=packet_input.predecessor_packet_id,
         predecessor_envelope_hash=packet_input.predecessor_envelope_hash,
+        census_selection_stratum=packet_input.census_selection_stratum,
     )
 
     core_hash = evidence_core_hash(draft)
@@ -115,10 +116,12 @@ def build_packet(
 
     envelope_hash = packet_envelope_hash(draft)
     final = replace(draft, packet_envelope_hash=envelope_hash, packet_id=envelope_hash)
-    # Metadata/pattern_ref invariant already validated above (against
-    # `packet_input`, which supplied `final.pattern_ref` verbatim) -- no
-    # need to re-validate here.
-    return _rebind_with_metadata(final, packet_input.census_selection_stratum)
+    # `census_selection_stratum` is a real, declared field supplied at
+    # construction above, so both hash domains already reflect it -- no
+    # post-hoc rebind/rehash needed on this path (unlike
+    # `bind_census_selection_metadata`, which attaches metadata onto an
+    # ALREADY-BUILT packet from a reused calibration helper).
+    return final
 
 
 _VALID_GENES = frozenset({"TSC1", "TSC2", "NTHL1"})
@@ -242,20 +245,17 @@ def _validate_selection_metadata(packet_input: PacketInput) -> None:
 def _rebind_with_metadata(
     packet: CandidateEvidencePacket, metadata: Optional[CensusSelectionMetadata]
 ) -> CandidateEvidencePacket:
-    """Attach `metadata` as the corrected track's ad-hoc (non-declared,
-    `object.__setattr__`-only) `census_selection_stratum` attribute and
-    recompute the two hash domains it is bound into. `dataclasses.replace`
-    drops non-field attributes, so the attribute is re-applied after each
-    `replace()` call. A `None` metadata is a no-op."""
+    """Bind `metadata` onto the real, declared `census_selection_stratum`
+    field (via `dataclasses.replace`, which preserves every other field
+    unchanged) and recompute the two hash domains it is bound into. A
+    `None` metadata is a no-op."""
     if metadata is None:
         return packet
-    object.__setattr__(packet, "census_selection_stratum", metadata)
+    packet = replace(packet, census_selection_stratum=metadata)
     core_hash = evidence_core_hash(packet)
     packet = replace(packet, evidence_core_hash=core_hash)
-    object.__setattr__(packet, "census_selection_stratum", metadata)
     envelope_hash = packet_envelope_hash(packet)
     packet = replace(packet, packet_envelope_hash=envelope_hash, packet_id=envelope_hash)
-    object.__setattr__(packet, "census_selection_stratum", metadata)
     return packet
 
 
