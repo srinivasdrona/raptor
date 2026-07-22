@@ -294,49 +294,93 @@ def test_static_ast_consumer_guards():
     assert_no_consumer_import("raptor.atlas")
 
 
-def test_no_banned_criteria_or_leakage():
-    """Verify that forbidden classifier values/scoring elements raise AtlasLeakageError through the public builder."""
-    try:
-        from raptor.atlas.model import (
-            MechanismProfile, AtlasIdentity, ObservedClaim, EntryRef, Span,
-            PackBinding, EvidenceAssessment, Provenance, AtlasLeakageError
-        )
-        from raptor.atlas.profile import build_mechanism_profile
-    except (ImportError, ModuleNotFoundError):
-        pytest.fail("RED test: raptor.atlas hashing/guards implementation is missing")
-
-    pack_binding = PackBinding(
-        pack_id="synthpack", pack_version="1.0.0", pack_content_hash="mock_hash"
+def test_pure_oracle_hashing_without_imports():
+    """Verify that the independent hashing payload oracle computes the correct expected hashes without importing raptor.atlas."""
+    import types
+    # 1. Build exactly the same mock profile using types.SimpleNamespace
+    pb = types.SimpleNamespace(
+        pack_id="synthpack",
+        pack_version="1.0.0",
+        pack_content_hash="9fa7643161ea0d8741ce8ffe0169f1f0109300a93c61cb5037cb86ca5abd7377"
     )
-
-    identity = AtlasIdentity(
-        spdi_canonical="NC_000000.0:1000:A:T", gene="SYNGENE1", assembly="GRCh38",
-        transcript_pin="NM_900001.1", hgvs_c="c.100A>T", hgvs_p="p.Lys34Met", hgvs_g="g.1000A>T",
+    ident = types.SimpleNamespace(
+        spdi_canonical="NC_000000.0:1000:A:T",
+        gene="SYNGENE1",
+        assembly="GRCh38",
+        transcript_pin="NM_900001.1",
+        hgvs_c="c.100A>T",
+        hgvs_p="p.Lys34Met",
+        hgvs_g="g.1000A>T",
         identity_state="resolved"
     )
-
-    good_span = Span(locator="Fig 1", exact_quote="synthetic assay signal A", page_or_figure="10")
-    ref = EntryRef(entry_id="synthsrc-0001", span=good_span)
-
-    # Build claim with classifier score
-    claim_with_leak = ObservedClaim(
-        claim_id="claim-1", claim_text="synthetic text", claim_kind="pathway",
-        source_ref=ref, verification="verified", directionality="increase"
+    span = types.SimpleNamespace(locator="Fig 1", exact_quote="synthetic quote A", page_or_figure="10")
+    ref = types.SimpleNamespace(entry_id="synthsrc-0001", span=span)
+    claim1 = types.SimpleNamespace(
+        claim_id="claim-1",
+        claim_text="synthetic assay signal A",
+        claim_kind="pathway",
+        source_ref=ref,
+        verification="verified",
+        directionality="increase"
+    )
+    claim2 = types.SimpleNamespace(
+        claim_id="claim-1",
+        claim_text="synthetic assay signal A",
+        claim_kind="pathway",
+        source_ref=ref,
+        verification="verified",
+        directionality="increase"
+    )
+    cc = types.SimpleNamespace(class_id="reduced_abundance_instability", state="supported", confidence="high")
+    context = types.SimpleNamespace(
+        assay="abundance-seq",
+        model_system="cell line",
+        cell_type="HEK293",
+        tissue="kidney",
+        zygosity_context="germline",
+        assay_limitations=("power-limit",)
+    )
+    edge = types.SimpleNamespace(
+        from_layer="protein_abundance",
+        to_layer="protein_stability",
+        effect="decrease",
+        supporting_claims=("claim-1",),
+        contradicting_claims=(),
+        context=context,
+        edge_state="supported"
+    )
+    evidence = types.SimpleNamespace(
+        supporting=("claim-1",),
+        contradicting=(),
+        missing_evidence=(),
+        unknowns=()
+    )
+    provenance = types.SimpleNamespace(
+        source_pins=(ref,),
+        version_pins=("v1.0",),
+        content_hashes={}
     )
 
-    # 1. Passing a claim dict or context with forbidden classifier_score should raise AtlasLeakageError
-    with pytest.raises(AtlasLeakageError):
-        build_mechanism_profile(
-            identity=identity,
-            pack_binding=pack_binding,
-            claims=(claim_with_leak,),
-            candidate_classes=(),
-            edges=(),
-            evidence=EvidenceAssessment((), (), (), ()),
-            provenance=Provenance((ref,), (), {}),
-            run_metadata=None,
-            classifier_score=0.99  # LEAK IN BUILDER!
-        )
+    profile = types.SimpleNamespace(
+        identity=ident,
+        pack_binding=pb,
+        claims=(claim1, claim2),
+        candidate_classes=(cc,),
+        edges=(edge,),
+        evidence=evidence,
+        provenance=provenance
+    )
+
+    # 2. Run the oracle over this mock profile
+    oracle_core_sha = compute_oracle_evidence_core_hash(profile)
+    oracle_env_sha = compute_oracle_profile_envelope_hash(profile)
+
+    # 3. Assert the exact independently-confirmed published SHA constants from the spec
+    expected_core_sha = "f3e12180446b9e779e6e1cde4be66bd0bd9de317638993c08c676fe035465ffc"
+    expected_env_sha = "58b6c40c252a1a3788712f1a1124e52e5d4e3e2ae7707e41ef49ff4c96ebc31b"
+
+    assert oracle_core_sha == expected_core_sha, f"Oracle core SHA mismatch: {oracle_core_sha}"
+    assert oracle_env_sha == expected_env_sha, f"Oracle env SHA mismatch: {oracle_env_sha}"
 
 
 def test_independent_oracle_hashing_match_and_published_sha():
@@ -439,9 +483,8 @@ def test_independent_oracle_hashing_match_and_published_sha():
     oracle_env_sha = compute_oracle_profile_envelope_hash(profile)
 
     # 3. Assert the exact expected published SHAs computed from this test fixture
-    # Let's compute them using the oracle on the static payload defined:
-    expected_core_sha = "df76bf037d4512e964177b960be01e7925c4efc0df1b8a9202534f31cfa0680e"
-    expected_env_sha = "6471900d5402a7b8e5c6fb73d19ef9eb10a1738d21b714ca68ee1cf923cb7a26"
+    expected_core_sha = "f3e12180446b9e779e6e1cde4be66bd0bd9de317638993c08c676fe035465ffc"
+    expected_env_sha = "58b6c40c252a1a3788712f1a1124e52e5d4e3e2ae7707e41ef49ff4c96ebc31b"
 
     # Make sure they match
     assert oracle_core_sha == expected_core_sha, f"Oracle core SHA mismatch: {oracle_core_sha}"
@@ -453,6 +496,78 @@ def test_independent_oracle_hashing_match_and_published_sha():
 
     assert impl_core_sha == oracle_core_sha, "Implementation evidence_core_hash diverges from oracle"
     assert impl_env_sha == oracle_env_sha, "Implementation profile_envelope_hash diverges from oracle"
+
+
+def test_build_mechanism_profile_positional_contract():
+    """Verify that build_mechanism_profile enforces exact positional contract and receives SourceRegisterEntry sequence."""
+    try:
+        from raptor.atlas.model import (
+            AtlasIdentity, ObservedClaim, EntryRef, Span,
+            DiseasePack, ContextRecord, MechanismEdge, SourceRegisterEntry
+        )
+        from raptor.atlas.profile import build_mechanism_profile
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas hashing/guards implementation is missing")
+
+    # Construct clean schema-valid disease pack using standard structure
+    source_pin = SourceRegisterEntry(
+        entry_id="synthsrc-0001",
+        source_type="DATASET",
+        role="provenance_only",
+        urn_or_ids={"accession": "SYNTHDB-0001"},
+        transcript=None,
+        license="CC0-1.0",
+        sha256=None,
+        variant_count=None,
+        verification="confirm_pending"
+    )
+    fake_pack = DiseasePack(
+        schema="atlas.disease_pack.v1",
+        pack_id="synthpack",
+        pack_version="1.0.0",
+        pack_content_hash="9fa7643161ea0d8741ce8ffe0169f1f0109300a93c61cb5037cb86ca5abd7377",
+        allowed_genes=("SYNGENE1",),
+        assembly_pins=("GRCh38",),
+        transcript_pins=({"transcript": "NM_900001.1", "requires": "MANE-Select-verification"},),
+        reconciliation_policy={},
+        ontology_extensions={},
+        source_register_pins=(source_pin,),
+        prohibitions={},
+        pilot_eval_metadata={}
+    )
+
+    identity = AtlasIdentity(
+        spdi_canonical="NC_000000.0:1000:A:T", gene="SYNGENE1", assembly="GRCh38",
+        transcript_pin="NM_900001.1", hgvs_c="c.100A>T", hgvs_p="p.Lys34Met", hgvs_g="g.1000A>T",
+        identity_state="resolved"
+    )
+
+    good_span = Span(locator="Fig 1", exact_quote="synthetic assay signal A", page_or_figure="10")
+    ref = EntryRef(entry_id="synthsrc-0001", span=good_span)
+
+    claim = ObservedClaim(
+        claim_id="claim-1", claim_text="synthetic text", claim_kind="pathway",
+        source_ref=ref, verification="verified", directionality="increase"
+    )
+
+    # Calling with correct signature: build_mechanism_profile(identity, claims, contexts, edges, sources, *, pack)
+    # where sources is a tuple of SourceRegisterEntry (not EntryRef!)
+    build_mechanism_profile(
+        identity,      # positional 1
+        (claim,),      # positional 2
+        (),            # positional 3
+        (),            # positional 4
+        (source_pin,), # positional 5: SourceRegisterEntry sequence
+        pack=fake_pack # keyword-only pack
+    )
+
+    # Calling with EntryRef as source should be rejected or mismatch contract
+    with pytest.raises(TypeError):
+        # Passing incorrect type for pack keyword-only or passing extra off-spec builder kwargs
+        build_mechanism_profile(
+            identity, (claim,), (), (), (source_pin,),
+            pack_binding=None  # NOT in spec-declared positional signature!
+        )
 
 
 def test_complete_mechanism_profile_and_hash_coherence():

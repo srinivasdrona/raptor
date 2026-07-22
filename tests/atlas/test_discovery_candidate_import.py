@@ -112,35 +112,64 @@ def test_promotion_context_fields():
         assert field in fields_list, f"PromotionContext is missing expected field: {field}"
 
 
+def make_schema_valid_disease_pack(model_mod):
+    # Returns a schema-valid synthetic DiseasePack matching the exact spec positive fixture
+    source_pin = model_mod.SourceRegisterEntry(
+        entry_id="synthsrc-0001",
+        source_type="DATASET",
+        role="provenance_only",
+        urn_or_ids={"accession": "SYNTHDB-0001"},
+        transcript=None,
+        license="CC0-1.0",
+        sha256=None,
+        variant_count=None,
+        verification="confirm_pending"
+    )
+    return model_mod.DiseasePack(
+        schema="atlas.disease_pack.v1",
+        pack_id="synthpack",
+        pack_version="1.0.0",
+        pack_content_hash="9fa7643161ea0d8741ce8ffe0169f1f0109300a93c61cb5037cb86ca5abd7377",
+        allowed_genes=("SYNGENE1",),
+        assembly_pins=("GRCh38",),
+        transcript_pins=(
+            {"transcript": "NM_900001.1", "requires": "MANE-Select-verification"},
+        ),
+        reconciliation_policy={
+            "alias_to_canonical_spdi_only": True,
+            "no_fabrication": True
+        },
+        ontology_extensions={
+            "claim_kinds": [
+                {"id": "synthpack:pathway_synthpath", "parent": "pathway"}
+            ],
+            "node_layers": [],
+            "mechanism_classes": [],
+            "context_vocabularies": {
+                "tissue": ["synth_tissue_a"]
+            }
+        },
+        source_register_pins=(source_pin,),
+        prohibitions={
+            "no_hardcode_handoff_mechanism": True
+        },
+        pilot_eval_metadata={
+            "panel_strata": ["synthetic_stratum_a"],
+            "native_vs_discovery_axes": ["reuse_percentage"]
+        }
+    )
+
+
 def test_eight_gates_ordered_execution_and_short_circuiting():
     """Verify that validate_candidate_import executes the 8 gates in strict order, instrumenting short-circuiting on failure."""
     try:
-        from raptor.atlas.model import (
-            AtlasCandidateImport, PromotionContext, DiseasePack, PackBinding,
-            AtlasSchemaError, AtlasIdentityError, AtlasProvenanceError, AtlasLeakageError
-        )
+        import raptor.atlas.model as model_mod
         from raptor.atlas.promote import validate_candidate_import
     except (ImportError, ModuleNotFoundError):
         pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
 
-    # 1. Mock disease pack
-    mock_pack = DiseasePack(
-        schema="atlas.disease_pack.v1",
-        pack_id="synthpack",
-        pack_version="1.0.0",
-        pack_content_hash="mock_hash",
-        allowed_genes=("SYNGENE1",),
-        assembly_pins=("GRCh38",),
-        transcript_pins=(),
-        reconciliation_policy={},
-        ontology_extensions={
-            "allowed_kinds": ("pathway", "localization"),
-            "allowed_contexts": ("cell-assay-A",)
-        },
-        source_register_pins=(),
-        prohibitions={},
-        pilot_eval_metadata={}
-    )
+    # 1. Mock disease pack (now schema-valid using helper)
+    mock_pack = make_schema_valid_disease_pack(model_mod)
 
     # 2. Instrumentation: we create wrappers for the DI callables to trace calls
     calls = []
@@ -361,20 +390,12 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
 def test_wrong_pack_mismatch_negative():
     """Verify that a mismatch between retrieval_provenance.pack_binding and context's disease pack raises AtlasSchemaError."""
     try:
-        from raptor.atlas.model import (
-            AtlasCandidateImport, PromotionContext, DiseasePack, PackBinding, AtlasSchemaError
-        )
+        import raptor.atlas.model as model_mod
         from raptor.atlas.promote import validate_candidate_import
     except (ImportError, ModuleNotFoundError):
         pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
 
-    mock_pack = DiseasePack(
-        schema="atlas.disease_pack.v1",
-        pack_id="synthpack", pack_version="1.0.0", pack_content_hash="mock_hash",
-        allowed_genes=("SYNGENE1",), assembly_pins=("GRCh38",), transcript_pins=(),
-        reconciliation_policy={}, ontology_extensions={}, source_register_pins=(),
-        prohibitions={}, pilot_eval_metadata={}
-    )
+    mock_pack = make_schema_valid_disease_pack(model_mod)
 
     # Retrieval pack_version mismatches (1.0.1 instead of 1.0.0)
     invalid_retrieval_pack = {
@@ -387,7 +408,7 @@ def test_wrong_pack_mismatch_negative():
         "prompt_hash": "h", "bookshelf_version": "v1"
     }
 
-    cand = AtlasCandidateImport(
+    cand = model_mod.AtlasCandidateImport(
         candidate_variant={
             "spdi_proposed": "NC_000000.0:1000:A:T",
             "gene_proposed": "SYNGENE1",
@@ -398,7 +419,7 @@ def test_wrong_pack_mismatch_negative():
         retrieval_provenance=invalid_retrieval_pack
     )
 
-    ctx = PromotionContext(
+    ctx = model_mod.PromotionContext(
         disease_pack=mock_pack,
         citation_resolver=lambda citation: True,
         context_validator=lambda kind, ctx: True,
@@ -406,39 +427,21 @@ def test_wrong_pack_mismatch_negative():
         duplicate_index={}
     )
 
-    with pytest.raises(AtlasSchemaError):
+    with pytest.raises(model_mod.AtlasSchemaError):
         validate_candidate_import(cand, ctx)
 
 
 def test_successful_synthetic_promotion():
     """Verify successful synthetic candidate promotion returns accepted tuple and importer cannot write state."""
     try:
-        from raptor.atlas.model import (
-            AtlasCandidateImport, PromotionContext, DiseasePack, PackBinding
-        )
+        import raptor.atlas.model as model_mod
         from raptor.atlas.promote import promote_candidate
     except (ImportError, ModuleNotFoundError):
         pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
 
-    mock_pack = DiseasePack(
-        schema="atlas.disease_pack.v1",
-        pack_id="synthpack",
-        pack_version="1.0.0",
-        pack_content_hash="mock_hash",
-        allowed_genes=("SYNGENE1",),
-        assembly_pins=("GRCh38",),
-        transcript_pins=(),
-        reconciliation_policy={},
-        ontology_extensions={
-            "allowed_kinds": ("pathway",),
-            "allowed_contexts": ("cell-assay-A",)
-        },
-        source_register_pins=(),
-        prohibitions={},
-        pilot_eval_metadata={}
-    )
+    mock_pack = make_schema_valid_disease_pack(model_mod)
 
-    ctx = PromotionContext(
+    ctx = model_mod.PromotionContext(
         disease_pack=mock_pack,
         citation_resolver=lambda citation: True,
         context_validator=lambda kind, ctx: True,
@@ -446,7 +449,7 @@ def test_successful_synthetic_promotion():
         duplicate_index={}
     )
 
-    cand_valid = AtlasCandidateImport(
+    cand_valid = model_mod.AtlasCandidateImport(
         candidate_variant={
             "spdi_proposed": "NC_000000.0:1000:A:T",
             "gene_proposed": "SYNGENE1",
@@ -466,7 +469,7 @@ def test_successful_synthetic_promotion():
             "pack_binding": {
                 "pack_id": "synthpack",
                 "pack_version": "1.0.0",
-                "pack_content_hash": "mock_hash"
+                "pack_content_hash": "9fa7643161ea0d8741ce8ffe0169f1f0109300a93c61cb5037cb86ca5abd7377"
             },
             "prompt_hash": "h", "bookshelf_version": "v1"
         }

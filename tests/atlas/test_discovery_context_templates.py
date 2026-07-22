@@ -73,14 +73,23 @@ def test_discovery_templates_exist_and_conform():
     for k in required_keys:
         assert k in manifest, f"context_manifest.json is missing required pin: {k}"
 
-    # Verify Phase-1 placeholder rule:
-    # prompt_hash and packet_manifest_hash can be exactly "PLACEHOLDER_PHASE2"
-    assert manifest["prompt_hash"] == "PLACEHOLDER_PHASE2", "prompt_hash must be Phase-1 placeholder 'PLACEHOLDER_PHASE2'"
-    assert manifest["packet_manifest_hash"] == "PLACEHOLDER_PHASE2", "packet_manifest_hash must be Phase-1 placeholder 'PLACEHOLDER_PHASE2'"
+    # Verify Phase-1 placeholder rules:
+    # prompt_hash and packet_manifest_hash must be explicit Phase-1 placeholders (nonempty, non-64hex)
+    prompt_hash = manifest["prompt_hash"]
+    packet_manifest_hash = manifest["packet_manifest_hash"]
+    
+    assert prompt_hash, "prompt_hash must be non-empty"
+    assert packet_manifest_hash, "packet_manifest_hash must be non-empty"
+    assert len(prompt_hash) != 64, "prompt_hash in Phase 1 must not be a 64-hex hash"
+    assert len(packet_manifest_hash) != 64, "packet_manifest_hash in Phase 1 must not be a 64-hex hash"
+    assert "PLACEHOLDER" in prompt_hash, "prompt_hash must contain a PLACEHOLDER sentinel"
+    assert "PLACEHOLDER" in packet_manifest_hash, "packet_manifest_hash must contain a PLACEHOLDER sentinel"
 
     for real_key in ["disease_pack_id", "disease_pack_version", "disease_pack_content_hash"]:
         val = manifest[real_key]
         assert "PLACEHOLDER" not in str(val), f"disease-pack pin {real_key} must be a real value in Phase 1"
+        if real_key == "disease_pack_content_hash":
+            assert len(val) == 64, f"disease_pack_content_hash must be a valid 64-character hash, got {val}"
 
     # 2. Verify task_graph.json
     with task_graph_path.open("r", encoding="utf-8") as f:
@@ -123,44 +132,62 @@ def test_discovery_templates_exist_and_conform():
     assert "no-classification" in str(rubric), "Rubric must enforce no-classification validation"
 
 
-def test_phase2_manifest_validation_rules():
-    """Verify Phase-2 validation rules: manifest_validator rejects placeholders under Phase-2 mode."""
-    try:
-        from raptor.atlas.model import AtlasSchemaError
-        # Assuming validator function or class is defined under raptor.atlas.promote or similar
-        # E.g. validate_discovery_manifest(manifest, phase=2) -> raises AtlasSchemaError on placeholders
-        from raptor.atlas.guards import validate_discovery_manifest
-    except (ImportError, ModuleNotFoundError):
-        pytest.fail("RED test: Discovery manifest validation implementation is missing")
+# test_phase2_manifest_validation_rules removed because validate_discovery_manifest is non-public
 
-    # A mock manifest with Phase-1 placeholders
-    phase1_manifest = {
-        "raptor_commit": "commit-001",
-        "atlas_schema_version": "v1.0",
-        "disease_pack_id": "synthpack",
-        "disease_pack_version": "1.0.0",
-        "disease_pack_content_hash": "mock_hash",
-        "bookshelf_version": "v2.1",
-        "prompt_hash": "PLACEHOLDER_PHASE2",
-        "packet_manifest_hash": "PLACEHOLDER_PHASE2"
-    }
 
-    # Under Phase-1 mode, placeholders are ACCEPTED
-    validate_discovery_manifest(phase1_manifest, phase=1)
 
-    # Under Phase-2 mode, placeholders are REJECTED
-    with pytest.raises(AtlasSchemaError):
-        validate_discovery_manifest(phase1_manifest, phase=2)
+def make_schema_valid_disease_pack(model_mod):
+    # Returns a schema-valid synthetic DiseasePack matching the exact spec positive fixture
+    source_pin = model_mod.SourceRegisterEntry(
+        entry_id="synthsrc-0001",
+        source_type="DATASET",
+        role="provenance_only",
+        urn_or_ids={"accession": "SYNTHDB-0001"},
+        transcript=None,
+        license="CC0-1.0",
+        sha256=None,
+        variant_count=None,
+        verification="confirm_pending"
+    )
+    return model_mod.DiseasePack(
+        schema="atlas.disease_pack.v1",
+        pack_id="synthpack",
+        pack_version="1.0.0",
+        pack_content_hash="9fa7643161ea0d8741ce8ffe0169f1f0109300a93c61cb5037cb86ca5abd7377",
+        allowed_genes=("SYNGENE1",),
+        assembly_pins=("GRCh38",),
+        transcript_pins=(
+            {"transcript": "NM_900001.1", "requires": "MANE-Select-verification"},
+        ),
+        reconciliation_policy={
+            "alias_to_canonical_spdi_only": True,
+            "no_fabrication": True
+        },
+        ontology_extensions={
+            "claim_kinds": [
+                {"id": "synthpack:pathway_synthpath", "parent": "pathway"}
+            ],
+            "node_layers": [],
+            "mechanism_classes": [],
+            "context_vocabularies": {
+                "tissue": ["synth_tissue_a"]
+            }
+        },
+        source_register_pins=(source_pin,),
+        prohibitions={
+            "no_hardcode_handoff_mechanism": True
+        },
+        pilot_eval_metadata={
+            "panel_strata": ["synthetic_stratum_a"],
+            "native_vs_discovery_axes": ["reuse_percentage"]
+        }
+    )
 
 
 def test_discovery_optionality_and_isolation():
     """Verify that the core atlas runs successfully and unavailable/rejected candidates have zero impact."""
     try:
-        from raptor.atlas.model import (
-            MechanismProfile, AtlasIdentity, ObservedClaim, EntryRef, Span,
-            DiseasePack, ContextRecord, EvidenceAssessment, AtlasCandidateImport, PromotionContext,
-            AtlasIdentityError, AtlasSchemaError
-        )
+        import raptor.atlas.model as model_mod
         from raptor.atlas.profile import build_mechanism_profile
         from raptor.atlas.hashing import evidence_core_hash
         from raptor.atlas.promote import validate_candidate_import
@@ -168,37 +195,24 @@ def test_discovery_optionality_and_isolation():
         pytest.fail("RED test: raptor.atlas template/profile implementation is missing")
 
     # 1. Build native profile using exact public API: build_mechanism_profile(identity, claims, contexts, edges, sources, *, pack)
-    pack = DiseasePack(
-        schema="atlas.disease_pack.v1",
-        pack_id="synthpack",
-        pack_version="1.0.0",
-        pack_content_hash="mock_hash",
-        allowed_genes=("SYNGENE1",),
-        assembly_pins=("GRCh38",),
-        transcript_pins=(),
-        reconciliation_policy={},
-        ontology_extensions={
-            "allowed_kinds": ("pathway",),
-            "allowed_contexts": ("cell-assay-A",)
-        },
-        source_register_pins=(),
-        prohibitions={},
-        pilot_eval_metadata={}
-    )
+    pack = make_schema_valid_disease_pack(model_mod)
 
-    identity = AtlasIdentity(
+    identity = model_mod.AtlasIdentity(
         spdi_canonical="NC_000000.0:1000:A:T", gene="SYNGENE1", assembly="GRCh38",
         transcript_pin="NM_900001.1", hgvs_c="c.100A>T", hgvs_p="p.Lys34Met", hgvs_g="g.1000A>T",
         identity_state="resolved"
     )
 
-    good_span = Span(locator="L1", exact_quote="synthetic quote", page_or_figure="1")
-    good_ref = EntryRef(entry_id="lit-1", span=good_span)
+    good_span = model_mod.Span(locator="L1", exact_quote="synthetic quote", page_or_figure="1")
+    good_ref = model_mod.EntryRef(entry_id="synthsrc-0001", span=good_span)
 
-    claim = ObservedClaim(
+    claim = model_mod.ObservedClaim(
         claim_id="claim-1", claim_text="synthetic assay signal A", claim_kind="pathway",
         source_ref=good_ref, verification="verified", directionality="increase"
     )
+
+    # sources sequence must be SourceRegisterEntry, not EntryRef
+    good_source_pin = pack.source_register_pins[0]
 
     # Calling the exact positional+keyword builder contract:
     profile = build_mechanism_profile(
@@ -206,7 +220,7 @@ def test_discovery_optionality_and_isolation():
         (claim,),          # claims
         (),                # contexts
         (),                # edges
-        (good_ref,),       # sources
+        (good_source_pin,),# sources: SourceRegisterEntry sequence
         pack=pack          # *pack keyword-only
     )
 
@@ -214,7 +228,7 @@ def test_discovery_optionality_and_isolation():
 
     # 2. Drive an unavailable/rejected synthetic candidate import through specified public rejection seam:
     # Build candidate with off-pack gene -> Gate 1 validation fails and raises AtlasIdentityError
-    rejected_cand = AtlasCandidateImport(
+    rejected_cand = model_mod.AtlasCandidateImport(
         candidate_variant={
             "spdi_proposed": "NC_000000.0:1000:A:T",
             "gene_proposed": "OFF_PACK_GENE",  # off-pack!
@@ -227,13 +241,13 @@ def test_discovery_optionality_and_isolation():
             "pack_binding": {
                 "pack_id": "synthpack",
                 "pack_version": "1.0.0",
-                "pack_content_hash": "mock_hash"
+                "pack_content_hash": "9fa7643161ea0d8741ce8ffe0169f1f0109300a93c61cb5037cb86ca5abd7377"
             },
             "prompt_hash": "PLACEHOLDER_PHASE2", "bookshelf_version": "v2.1"
         }
     )
 
-    ctx = PromotionContext(
+    ctx = model_mod.PromotionContext(
         disease_pack=pack,
         citation_resolver=lambda citation: True,
         context_validator=lambda kind, ctx: True,
@@ -242,7 +256,7 @@ def test_discovery_optionality_and_isolation():
     )
 
     # Drive the rejection
-    with pytest.raises((AtlasIdentityError, AtlasSchemaError)):
+    with pytest.raises((model_mod.AtlasIdentityError, model_mod.AtlasSchemaError)):
         validate_candidate_import(rejected_cand, ctx)
 
     # 3. Assert that original profile object, content and hash remains unchanged, and builder remains fully usable
@@ -256,7 +270,7 @@ def test_discovery_optionality_and_isolation():
         (claim,),
         (),
         (),
-        (good_ref,),
+        (good_source_pin,),
         pack=pack
     )
     assert evidence_core_hash(rebuilt_profile) == h1

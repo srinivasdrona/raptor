@@ -78,29 +78,64 @@ def test_identity_fields_and_no_status():
     assert "status" not in field_names, "AtlasIdentity must use 'identity_state', not 'status'"
 
 
+def make_schema_valid_disease_pack(model_mod):
+    # Returns a schema-valid synthetic DiseasePack matching the exact spec positive fixture
+    source_pin = model_mod.SourceRegisterEntry(
+        entry_id="synthsrc-0001",
+        source_type="DATASET",
+        role="provenance_only",
+        urn_or_ids={"accession": "SYNTHDB-0001"},
+        transcript=None,
+        license="CC0-1.0",
+        sha256=None,
+        variant_count=None,
+        verification="confirm_pending"
+    )
+    return model_mod.DiseasePack(
+        schema="atlas.disease_pack.v1",
+        pack_id="synthpack",
+        pack_version="1.0.0",
+        pack_content_hash="9fa7643161ea0d8741ce8ffe0169f1f0109300a93c61cb5037cb86ca5abd7377",
+        allowed_genes=("SYNGENE1",),
+        assembly_pins=("GRCh38",),
+        transcript_pins=(
+            {"transcript": "NM_900001.1", "requires": "MANE-Select-verification"},
+        ),
+        reconciliation_policy={
+            "alias_to_canonical_spdi_only": True,
+            "no_fabrication": True
+        },
+        ontology_extensions={
+            "claim_kinds": [
+                {"id": "synthpack:pathway_synthpath", "parent": "pathway"}
+            ],
+            "node_layers": [],
+            "mechanism_classes": [],
+            "context_vocabularies": {
+                "tissue": ["synth_tissue_a"]
+            }
+        },
+        source_register_pins=(source_pin,),
+        prohibitions={
+            "no_hardcode_handoff_mechanism": True
+        },
+        pilot_eval_metadata={
+            "panel_strata": ["synthetic_stratum_a"],
+            "native_vs_discovery_axes": ["reuse_percentage"]
+        }
+    )
+
+
 def test_resolved_admission_rules():
     """Verify admit_identity enforces SPDI-keyed admission and gene/transcript/assembly pack-constraints."""
     try:
-        from raptor.atlas.model import DiseasePack, AtlasIdentityError
+        import raptor.atlas.model as model_mod
         from raptor.atlas.identity import admit_identity
     except (ImportError, ModuleNotFoundError):
         pytest.fail("RED test: raptor.atlas.identity/model implementation is missing")
     
-    # Setup synthetic disease pack using fake/mock
-    fake_pack = DiseasePack(
-        schema="atlas.disease_pack.v1",
-        pack_id="synthpack",
-        pack_version="1.0.0",
-        pack_content_hash="mock_hash",
-        allowed_genes=("SYNGENE1",),
-        assembly_pins=("GRCh38",),
-        transcript_pins=({"transcript": "NM_900001.1", "requires": "MANE-Select-verification"},),
-        reconciliation_policy={},
-        ontology_extensions={},
-        source_register_pins=(),
-        prohibitions={},
-        pilot_eval_metadata={}
-    )
+    # Setup synthetic disease pack using helper
+    fake_pack = make_schema_valid_disease_pack(model_mod)
 
     # 1. Valid record for admission
     valid_record = {
@@ -121,17 +156,17 @@ def test_resolved_admission_rules():
 
     # 2. Missing canonical SPDI raises AtlasIdentityError on resolved admission
     invalid_record_no_spdi = dict(valid_record, spdi_canonical=None)
-    with pytest.raises(AtlasIdentityError):
+    with pytest.raises(model_mod.AtlasIdentityError):
         admit_identity(invalid_record_no_spdi, pack=fake_pack)
 
     # 3. Off-pack gene raises AtlasIdentityError
     invalid_record_bad_gene = dict(valid_record, gene="TSC2")  # 'TSC2' is not in allowed_genes of synthpack
-    with pytest.raises(AtlasIdentityError):
+    with pytest.raises(model_mod.AtlasIdentityError):
         admit_identity(invalid_record_bad_gene, pack=fake_pack)
 
     # 4. Off-pack assembly raises AtlasIdentityError
     invalid_record_bad_assembly = dict(valid_record, assembly="GRCh37")
-    with pytest.raises(AtlasIdentityError):
+    with pytest.raises(model_mod.AtlasIdentityError):
         admit_identity(invalid_record_bad_assembly, pack=fake_pack)
 
 
@@ -160,27 +195,14 @@ def test_identity_state_validation():
 def test_transcript_reconciliation_by_resolver():
     """Verify transcript reconciliation uses injected resolver and pack, never bare c. equality."""
     try:
-        from raptor.atlas.model import DiseasePack, AtlasIdentity, AtlasIdentityError
+        import raptor.atlas.model as model_mod
         from raptor.atlas.identity import reconcile_transcript
     except (ImportError, ModuleNotFoundError):
         pytest.fail("RED test: raptor.atlas.identity/model implementation is missing")
 
-    fake_pack = DiseasePack(
-        schema="atlas.disease_pack.v1",
-        pack_id="synthpack",
-        pack_version="1.0.0",
-        pack_content_hash="mock_hash",
-        allowed_genes=("SYNGENE1",),
-        assembly_pins=("GRCh38",),
-        transcript_pins=({"transcript": "NM_900001.1", "requires": "MANE-Select-verification"},),
-        reconciliation_policy={"alias_to_canonical_spdi_only": True},
-        ontology_extensions={},
-        source_register_pins=(),
-        prohibitions={},
-        pilot_eval_metadata={}
-    )
+    fake_pack = make_schema_valid_disease_pack(model_mod)
 
-    identity = AtlasIdentity(
+    identity = model_mod.AtlasIdentity(
         spdi_canonical="NC_000000.0:1000:A:T",
         gene="SYNGENE1",
         assembly="GRCh38",
@@ -198,7 +220,7 @@ def test_transcript_reconciliation_by_resolver():
     assert reconcile_transcript(identity, "NM_900001.1", pack=fake_pack, resolver=fake_resolver) is True
 
     # Reconciliation with unresolved/mismatching transcript returns False or raises AtlasIdentityError
-    with pytest.raises(AtlasIdentityError):
+    with pytest.raises(model_mod.AtlasIdentityError):
         reconcile_transcript(identity, "NM_900002.1", pack=fake_pack, resolver=fake_resolver)
 
 

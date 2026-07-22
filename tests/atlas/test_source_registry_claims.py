@@ -109,34 +109,66 @@ def test_source_register_pairing_rules():
             )
 
 
+def make_schema_valid_disease_pack(model_mod):
+    # Returns a schema-valid synthetic DiseasePack matching the exact spec positive fixture
+    source_pin = model_mod.SourceRegisterEntry(
+        entry_id="synthsrc-0001",
+        source_type="DATASET",
+        role="provenance_only",
+        urn_or_ids={"accession": "SYNTHDB-0001"},
+        transcript=None,
+        license="CC0-1.0",
+        sha256=None,
+        variant_count=None,
+        verification="confirm_pending"
+    )
+    return model_mod.DiseasePack(
+        schema="atlas.disease_pack.v1",
+        pack_id="synthpack",
+        pack_version="1.0.0",
+        pack_content_hash="9fa7643161ea0d8741ce8ffe0169f1f0109300a93c61cb5037cb86ca5abd7377",
+        allowed_genes=("SYNGENE1",),
+        assembly_pins=("GRCh38",),
+        transcript_pins=(
+            {"transcript": "NM_900001.1", "requires": "MANE-Select-verification"},
+        ),
+        reconciliation_policy={
+            "alias_to_canonical_spdi_only": True,
+            "no_fabrication": True
+        },
+        ontology_extensions={
+            "claim_kinds": [
+                {"id": "synthpack:pathway_synthpath", "parent": "pathway"}
+            ],
+            "node_layers": [],
+            "mechanism_classes": [],
+            "context_vocabularies": {
+                "tissue": ["synth_tissue_a"]
+            }
+        },
+        source_register_pins=(source_pin,),
+        prohibitions={
+            "no_hardcode_handoff_mechanism": True
+        },
+        pilot_eval_metadata={
+            "panel_strata": ["synthetic_stratum_a"],
+            "native_vs_discovery_axes": ["reuse_percentage"]
+        }
+    )
+
+
 def test_claim_grounding_validation_pipeline():
     """Verify that validate_claim_grounding strictly enforces citation resolution, leaf type, role, and non-empty span."""
     try:
-        from raptor.atlas.model import (
-            SourceRegisterEntry, EntryRef, Span, ObservedClaim, DiseasePack,
-            AtlasSchemaError, AtlasProvenanceError
-        )
+        import raptor.atlas.model as model_mod
         from raptor.atlas.registry import validate_claim_grounding
     except (ImportError, ModuleNotFoundError):
         pytest.fail("RED test: raptor.atlas.registry implementation is missing")
 
     # Setup fake disease pack
-    fake_pack = DiseasePack(
-        schema="atlas.disease_pack.v1",
-        pack_id="synthpack",
-        pack_version="1.0.0",
-        pack_content_hash="mock_hash",
-        allowed_genes=("SYNGENE1",),
-        assembly_pins=("GRCh38",),
-        transcript_pins=({"transcript": "NM_900001.1", "requires": "MANE-Select-verification"},),
-        reconciliation_policy={},
-        ontology_extensions={},
-        source_register_pins=(),
-        prohibitions={},
-        pilot_eval_metadata={}
-    )
+    fake_pack = make_schema_valid_disease_pack(model_mod)
 
-    good_entry = SourceRegisterEntry(
+    good_entry = model_mod.SourceRegisterEntry(
         entry_id="lit-1",
         source_type="PRIMARY-LIT",
         role="direct_evidence_leaf",
@@ -144,10 +176,10 @@ def test_claim_grounding_validation_pipeline():
         verification="verified"
     )
 
-    good_span = Span(locator="Fig 1", exact_quote="synthetic assay signal A", page_or_figure="3")
-    good_ref = EntryRef(entry_id="lit-1", span=good_span)
+    good_span = model_mod.Span(locator="Fig 1", exact_quote="synthetic assay signal A", page_or_figure="3")
+    good_ref = model_mod.EntryRef(entry_id="lit-1", span=good_span)
 
-    good_claim = ObservedClaim(
+    good_claim = model_mod.ObservedClaim(
         claim_id="claim-1",
         claim_text="synthetic assay signal A",
         claim_kind="pathway",
@@ -162,8 +194,8 @@ def test_claim_grounding_validation_pipeline():
     validate_claim_grounding(good_claim, registry, pack=fake_pack)
 
     # 2. Failure: missing span on EntryRef raises AtlasSchemaError/AtlasProvenanceError
-    bad_ref_no_span = EntryRef(entry_id="lit-1", span=None)
-    bad_claim_no_span = ObservedClaim(
+    bad_ref_no_span = model_mod.EntryRef(entry_id="lit-1", span=None)
+    bad_claim_no_span = model_mod.ObservedClaim(
         claim_id="claim-2",
         claim_text="synthetic assay signal A",
         claim_kind="pathway",
@@ -171,19 +203,19 @@ def test_claim_grounding_validation_pipeline():
         verification="verified",
         directionality="none"
     )
-    with pytest.raises((AtlasSchemaError, AtlasProvenanceError)):
+    with pytest.raises((model_mod.AtlasSchemaError, model_mod.AtlasProvenanceError)):
         validate_claim_grounding(bad_claim_no_span, registry, pack=fake_pack)
 
     # 3. Failure: non-grounding role (e.g. provenance_only) raises AtlasProvenanceError
-    bad_role_entry = SourceRegisterEntry(
+    bad_role_entry = model_mod.SourceRegisterEntry(
         entry_id="lit-2",
         source_type="PRIMARY-LIT",
         role="provenance_only",
         urn_or_ids={"pmid": "12346"},
         verification="verified"
     )
-    bad_role_ref = EntryRef(entry_id="lit-2", span=good_span)
-    bad_role_claim = ObservedClaim(
+    bad_role_ref = model_mod.EntryRef(entry_id="lit-2", span=good_span)
+    bad_role_claim = model_mod.ObservedClaim(
         claim_id="claim-3",
         claim_text="synthetic assay signal A",
         claim_kind="pathway",
@@ -192,19 +224,19 @@ def test_claim_grounding_validation_pipeline():
         directionality="none"
     )
     registry_bad_role = {bad_role_entry.entry_id: bad_role_entry}
-    with pytest.raises(AtlasProvenanceError):
+    with pytest.raises(model_mod.AtlasProvenanceError):
         validate_claim_grounding(bad_role_claim, registry_bad_role, pack=fake_pack)
 
     # 4. Failure: unverified or pending source entry raises AtlasProvenanceError
-    pending_entry = SourceRegisterEntry(
+    pending_entry = model_mod.SourceRegisterEntry(
         entry_id="lit-3",
         source_type="PRIMARY-LIT",
         role="direct_evidence_leaf",
         urn_or_ids={"pmid": "12347"},
         verification="confirm_pending"
     )
-    pending_ref = EntryRef(entry_id="lit-3", span=good_span)
-    pending_claim = ObservedClaim(
+    pending_ref = model_mod.EntryRef(entry_id="lit-3", span=good_span)
+    pending_claim = model_mod.ObservedClaim(
         claim_id="claim-4",
         claim_text="synthetic assay signal A",
         claim_kind="pathway",
@@ -213,26 +245,29 @@ def test_claim_grounding_validation_pipeline():
         directionality="none"
     )
     registry_pending = {pending_entry.entry_id: pending_entry}
-    with pytest.raises(AtlasProvenanceError):
+    with pytest.raises(model_mod.AtlasProvenanceError):
         validate_claim_grounding(pending_claim, registry_pending, pack=fake_pack)
 
 
 def test_source_verification_fails_closed():
     """Verify that verify_source fails closed on metadata pin drift or non-verified states."""
+    import hashlib
     try:
         from raptor.atlas.model import SourceRegisterEntry, AtlasSourceVerificationError
         from raptor.atlas.registry import verify_source
     except (ImportError, ModuleNotFoundError):
         pytest.fail("RED test: raptor.atlas.registry implementation is missing")
 
+    synth_sha = hashlib.sha256(b"synthetic source bytes").hexdigest()
+
     good_entry = SourceRegisterEntry(
-        entry_id="mave-001",
+        entry_id="synth-001",
         source_type="DATASET",
         role="direct_evidence_leaf",
-        urn_or_ids={"accession": "MAVEDB-001"},
+        urn_or_ids={"accession": "SYNTHACC-001"},
         transcript="NM_900001.1",
         license="CC0-1.0",
-        sha256="74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717",
+        sha256=synth_sha,
         variant_count=100,
         verification="verified"
     )
@@ -240,42 +275,42 @@ def test_source_verification_fails_closed():
     # Good entry verifies fine
     verify_source(good_entry)
 
-    # 1. SHA-256 metadata drift raises AtlasSourceVerificationError
+    # 1. SHA-256 metadata drift (malformed or wrong) raises AtlasSourceVerificationError
     drifted_sha = SourceRegisterEntry(
-        entry_id="mave-001",
+        entry_id="synth-001",
         source_type="DATASET",
         role="direct_evidence_leaf",
-        urn_or_ids={"accession": "MAVEDB-001"},
+        urn_or_ids={"accession": "SYNTHACC-001"},
         transcript="NM_900001.1",
         license="CC0-1.0",
-        sha256="wrong-drifted-sha",
+        sha256="wrong-drifted-sha",  # malformed / wrong SHA
         variant_count=100,
         verification="verified"
     )
     with pytest.raises(AtlasSourceVerificationError):
         verify_source(drifted_sha)
 
-    # 2. License drift raises AtlasSourceVerificationError
-    drifted_license = SourceRegisterEntry(
-        entry_id="mave-001",
+    # 2. Missing required verified metadata (e.g., license or count is None on a verified entry) raises AtlasSourceVerificationError
+    missing_metadata = SourceRegisterEntry(
+        entry_id="synth-001",
         source_type="DATASET",
         role="direct_evidence_leaf",
-        urn_or_ids={"accession": "MAVEDB-001"},
+        urn_or_ids={"accession": "SYNTHACC-001"},
         transcript="NM_900001.1",
-        license="CC-BY-4.0",  # changed
-        sha256="74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717",
+        license=None,  # missing required verified license
+        sha256=synth_sha,
         variant_count=100,
         verification="verified"
     )
     with pytest.raises(AtlasSourceVerificationError):
-        verify_source(drifted_license)
+        verify_source(missing_metadata)
 
-    # 3. confirm_pending status raises AtlasSourceVerificationError
+    # 3. confirm_pending status raises AtlasSourceVerificationError when treated/asserted as verified
     pending_entry = SourceRegisterEntry(
-        entry_id="mave-001",
+        entry_id="synth-001",
         source_type="DATASET",
         role="direct_evidence_leaf",
-        urn_or_ids={"accession": "MAVEDB-001"},
+        urn_or_ids={"accession": "SYNTHACC-001"},
         verification="confirm_pending"
     )
     with pytest.raises(AtlasSourceVerificationError):
