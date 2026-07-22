@@ -1,6 +1,6 @@
 # RAPTOR — Vision & Strategy
 
-> **Status:** DRAFT v0.2 — *vertical TSC/mTOR reset* (see [ADR-0010](DECISIONS.md#adr-0010--generic-platform-uniqueness-premise-falsified-vertical-tscmtor-research-evidence-strategy)) · **Owner:** @dronasrinivas · **Last updated:** 2026-07-10 · **Review cadence:** monthly
+> **Status:** DRAFT v0.2 — *vertical TSC/mTOR reset* (see [ADR-0010](DECISIONS.md#adr-0010--generic-platform-uniqueness-premise-falsified-vertical-tscmtor-research-evidence-strategy)) · **Owner:** @dronasrinivas · **Last updated:** 2026-07-22 (post-ADR-0013 reconciliation) · **Review cadence:** monthly
 >
 > **Format:** This document follows two established, citable standards — Roman Pichler's
 > **Product Vision Board** (Vision · Target Group · Needs · Product · Business Goals) wrapped around
@@ -310,8 +310,8 @@ These lines are delivered by the underlying **engine tiers** (mechanism, not pro
 - **First complete deterministic TSC1/TSC2 evidence census done** (6,618 VUS; internal, non-authoritative — PROGRAM.md). The x64 Nirvana/BIAS worker exists (ADR-0008); no MVP pipeline/orchestration skeleton was built — PRD-05 was never built and is now frozen (ADR-0010).
 
 **Phase 1 — Held-out validation gate (measurable half; in progress).**
-- The **label-free held-out VCF** was already emitted and scored on the x64 worker (BIAS-2015 v3.0.0 + Nirvana; 2,577 parsed records; ADR-0008) using the **full** comparator resources; the remaining leakage-safe steps are to **regenerate the ClinVar-derived comparator resources (PS1/PM5/PM1/PP2/BP1) with the held-out variants masked**, **re-score** on the masked resources, and run the **ClinVar-derivation audit** + Oracle ruling (ADR-0009). *(Actual VUS production uses full comparator resources; held-out validation must use masked resources.)*
-- Report **missense-stratified** precision/recall vs the frozen benchmark — **not yet computed**; the **PRD-06 gate must PASS** (both directions) before any candidate direction is trusted or any externally usable VUS worklist is released.
+- The **label-free held-out VCF** was already emitted and scored on the x64 worker (BIAS-2015 v3.0.0 + Nirvana; 2,577 parsed records; ADR-0008) using the **full** comparator resources; the leakage-safe masked rerun (R2, [ADR-0012](DECISIONS.md#adr-0012--pp3bp4-automated-emission-disabled-for-the-current-masked-rerun)) has since **re-scored the masked resources** and run the ClinVar-derivation audit + PP3/BP4-disabled policy. *(Actual VUS production uses full comparator resources; held-out validation used masked resources.)*
+- **Missense-stratified precision/recall have now been computed and gated (FAIL/BLOCKED_POLICY) on R2** — the frozen result is not, by itself, sufficient: [ADR-0013](DECISIONS.md#adr-0013--tiered-gate-v3-post-hoc-re-adjudication-and-prospective-validation-lock)'s tiered v3 post-hoc re-adjudication corrects the *reporting* (missense `NO_CALLS`/`UNDERPOWERED` rather than a coarse FAIL; truncating-pathogenic `SUPPORTED_POSTHOC`) without generating new evidence. No candidate direction is trusted and no externally usable VUS worklist is released until the **prospective validation locked by ADR-0013** — the first NCBI ClinVar GRCh38 monthly archive dated on/after 2026-08-01, frozen before labels/scoring — PASSes.
 
 **Phase 2 — Candidate evidence packet + atlas (Lines 1–2).**
 - The **PRD-04 candidate evidence packet / output contract is active and unblocked now**; provisional representative/all-VUS packets may be built for internal review, but the full **externally usable** worklist ships **only after** the Phase-1 PASS + policy correction + expert approval (leakage-safe).

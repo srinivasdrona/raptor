@@ -63,3 +63,16 @@ Because TSC is mostly caused by the *easy* (truncating) kind, nature simply hasn
 known-answer examples of the *hard* (missense) kind to test against. So RAPTOR is proven strongest on
 the common cases and holds the hard cases to the same evidence bar — flagging for human review anything
 it cannot prove. That candor is the point: an auditable engine tells you what it does and does not know.
+
+## Where things stand today
+
+RAPTOR has taken its first "exam" — the leakage-safe held-out test described above. As expected, it
+passed cleanly on the easy (truncating) typos and, on the hard (missense) ones, didn't yet have enough
+known-answer examples to statistically prove itself either way — which it honestly reported as "not
+enough evidence" rather than guessing. We've since gone back and re-described that same exam result
+more precisely, separating "not enough evidence yet" from "actively failed," so nothing gets
+mischaracterized either way. No new exam has been run and no new evidence has been produced by that
+re-description alone. The next real test — on a fresh, not-yet-published batch of known-answer
+typos — is scheduled but has not happened yet, and RAPTOR does not sort any real unknowns for outside
+use until it clears that next test.
+

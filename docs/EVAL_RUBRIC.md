@@ -1,6 +1,6 @@
 # RAPTOR Eval Rubric — Pre-Registration Thresholds (TSC1/TSC2)
 
-> **Status:** RECOMMENDATION for adoption · **Owner:** @dronasrinivas · **Last updated:** 2026-07-09
+> **Status:** RECOMMENDATION for adoption · **Owner:** @dronasrinivas · **Last updated:** 2026-07-22 (added §7 tiered v3 axes/prospective registration, ADR-0013)
 > **Basis:** cited evidence base in [`reference/eval-rubric-evidence-base.md`](reference/eval-rubric-evidence-base.md);
 > benchmark composition from the pinned ClinVar snapshot (§3). This document is the
 > **pre-registered** go/no-go rubric the eval gate (PRD-06) checks before any VUS run.
@@ -179,3 +179,37 @@ truncating B = 1, other P/LP = 171, other B/LB = 2,963.)
 - ✅ **Truncating-pathogenic hard gate implemented** at 0.95; truncating-benign remains report-only.
 - ✅ **Scope-specific v2 authorization preregistered** (§5b, ADR-0011) — before the corrected rerun,
   not after. Requires a corrected rerun before any real VALIDATED/authorization claim.
+
+## 7. Tiered v3 post-hoc axes and prospective registration (ADR-0013)
+
+The corrected rerun referenced in §5b/§6 (R2, ADR-0012) executed and is **frozen**: v1's coarse
+missense `FAIL` and v2's `full_spectrum_status=BLOCKED_POLICY`/`vus_authorized=false` are unchanged
+and immutable. **None of the thresholds in §1/§5 changed** — missense 0.90/0.85, truncating
+0.95/0.95, both at 95% confidence, `min_count_per_class: 36` remain exactly as pre-registered.
+
+What changed is *how the frozen result is reported*. v1/v2 collapsed insufficient-data, failed
+metrics, and policy exclusions into one `FAIL`/`BLOCKED_POLICY` value. **Tiered gate v3**
+(`raptor.eval.tiered_gate.decide_tiered_gate`, config `configs/eval/tiered_gate_v3.yaml`, record
+`data/census/tsc_tiered_readjudication_2026-07-21.json`) re-reports the same frozen numbers as
+independent axes — run integrity, data sufficiency, conditional performance, policy parity,
+correct-call coverage, scope evidence, and authorization — so that "51 pathogenic missense examples,
+zero calls" (`NO_CALLS`) is distinguishable from "103 benign missense examples, 9 calls all correct,
+below the powered floor" (`UNDERPOWERED`), and both are distinguishable from
+`truncating:pathogenic`'s 210 actual / 189 called clearing 0.9807/0.9807 against the pre-registered
+0.95/0.95 (`ADEQUATE`+`MET`, evidence `SUPPORTED_POSTHOC`). PM1 is scoped to apply only to
+`missense:pathogenic`, correcting the v1/v2 defect where a missense-only exclusion read as blocking
+the unrelated truncating scope.
+
+**This is not a new pass/fail bar and not a validation.** v3 performs no new run, scoring,
+annotation, benchmark read, network access, or data generation (see `no_new_evidence_statement` in
+the record above), and every scope's `authorization_status` is `NOT_AUTHORIZED` or
+`PENDING_PROSPECTIVE` — never `AUTHORIZED`.
+
+**Prospective registration (pre-registered here, before any result exists):** the next real
+evaluation of any v3 scope — including `truncating:pathogenic`, the only scope with
+`SUPPORTED_POSTHOC` evidence — must run against the first eligible NCBI ClinVar GRCh38
+`variant_summary` monthly archive dated on/after 2026-08-01, with its URL/official date/MD5/SHA-256
+frozen *before* labels or scoring. Unavailable/invalid data yields `BLOCKED_DATA`, not an
+outcome-dependent substitute. Until that run completes and clears the unchanged §1 thresholds on
+unseen data, `research_scope_flags.truncating_pathogenic_research_scope_validated` remains `false`
+and no scope is authorized.

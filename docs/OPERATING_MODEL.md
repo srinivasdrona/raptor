@@ -1,6 +1,6 @@
 # RAPTOR — Operating Model (the build loop)
 
-> **Status:** DRAFT v0.1 · **Owner:** @dronasrinivas · **Last updated:** 2026-07-08 · **Review cadence:** monthly + rule-graduation on any new failure class
+> **Status:** DRAFT v0.1 · **Owner:** @dronasrinivas · **Last updated:** 2026-07-22 (added §7 parallel git-worktree delegation note) · **Review cadence:** monthly + rule-graduation on any new failure class
 >
 > **Format:** recognized building blocks, not a bespoke invention — **RACI** (responsibility
 > assignment), Scrum **Definition of Ready / Definition of Done** (the hand-off gates), the
@@ -227,6 +227,12 @@ or tests**, else the manifest records an explicit `slot3_na_reason`. Slot presen
 - **Disable slow PreToolUse hooks before delegating** — per-tool-call hook latency causes stream
   disconnects and zero-commit deaths.
 - **Detect and decompose:** a run with no persisted diff/verdict (or `finish_reason = token_cap`) is a **failure**, not a pass → split into narrower tasks and re-fire (H9).
+- **Independent modules get their own `git worktree`.** Tasks that touch a distinct module/spec (e.g.
+  `docs/project/specs/*.yaml`, `docs/prompts/*/manifest.json`) are assigned a dedicated worktree under
+  `D:\AIProjects\raptor-worktrees\<name>` on its own branch — this is how this very reconciliation task
+  runs (`raptor-worktrees\docs-reconcile`, branch `docs/reconcile-2026-07-22`). Parallel worktrees let
+  independent delegated tasks run concurrently without one task's uncommitted state blocking another's,
+  and keep each task's diff scoped and reviewable against a pinned base commit.
 
 ## 8. Rule-graduation loop (the core discipline)
 
