@@ -3,6 +3,21 @@
 census-selection strata: `candidate_LP_review`, `candidate_LB_review`,
 `no_deterministic_resolution`, `manual_review`).
 
+Standalone entrypoint: runs both as
+`python <repo>/scripts/build_corrected_review_packets.py ...` from ANY
+current working directory, and as
+`python -m scripts.build_corrected_review_packets ...` (module form, which
+additionally requires the repository root to already be on
+`sys.path`/`PYTHONPATH` -- e.g. because it is the caller's own cwd -- so
+Python can locate the `scripts` package before running any of this
+module's code at all; that one precondition is the caller's, not this
+module's, to satisfy). Every repository-relative default path (the eight
+`--*-config`/`--predictor-policy` flags' defaults, and the two fixed
+subordinate lineage/candidate-direction config paths) is resolved against
+this file's own fixed on-disk location, never the caller's cwd; an
+explicit value for any of those flags is resolved normally (as given, or
+relative to the caller's own cwd, like any ordinary CLI path).
+
 Verifies the approved predictor-policy artifact (canonical Git/LF blob) and
 asserts `{schema, status, mode}` BEFORE parsing; verifies the four
 subordinate configs (scorer/eval/lineage/candidate-direction) by RAW
@@ -11,7 +26,9 @@ on-disk byte SHA-256 against the pins recorded INSIDE that approved policy
 five packet render/selection/narrative/comparator/schema configs by RAW
 on-disk byte SHA-256 against this module's own pins; verifies the
 current-policy census oracle by canonical Git/LF blob (loading its JSON
-once); verifies the `--provenance` artifact's own recorded
+once); verifies the `--provenance` artifact's own raw on-disk byte SHA-256
+(`immutable_external_inputs.provenance.sha256`, `raw_path_bytes_external`)
+BEFORE its JSON is ever parsed, then its recorded
 `vcf_hash`/`source_snapshot` (`raptor.census.cli._validate_provenance`,
 reused unchanged) and its recorded `manifest_hash` (when present) against
 the actual `--manifest` bytes; then cross-verifies the raw `--manifest`/
@@ -41,7 +58,26 @@ import json
 import sys
 from collections import Counter
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Optional, Sequence
+
+# --------------------------------------------------------------------------
+# Standalone-execution bootstrap -- MUST run before any `raptor.*`/
+# `scripts.*` import below. Resolved once from this file's own fixed
+# location (never the caller's cwd), so both `python <path-to-this-file>`
+# (direct execution from any cwd) and `python -m
+# scripts.build_corrected_review_packets` (module execution, from a cwd
+# that already has the repo root on `sys.path`) see an identical `raptor`
+# package under `src/` and the sibling `scripts` package (needed because
+# `raptor.packet.corrected_universe` itself imports
+# `scripts.build_tsc_calibration_batch` to reuse its calibration helpers
+# unchanged, per spec, rather than duplicating that behavior here).
+# No broad `try`/`except` is used around these imports: a genuine import
+# error in `raptor`/`scripts` code must still surface, not be masked.
+# --------------------------------------------------------------------------
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+for _bootstrap_path in (str(_REPO_ROOT), str(_REPO_ROOT / "src")):
+    if _bootstrap_path not in sys.path:
+        sys.path.insert(0, _bootstrap_path)
 
 from raptor.census.cli import (
     _validate_predictor_policy,
@@ -77,9 +113,28 @@ from scripts.build_tsc_calibration_batch import RunPins
 #: `--lineage-policy`/`--packet-candidate-direction` CLI flag (see the
 #: authoritative spec's `cli_and_output_boundary.cli.args`); both are
 #: verified via `raptor.census.cli._verify_bound_hashes` (policy-field-
-#: derived expected hash, never hardcoded here).
-_CANONICAL_LINEAGE_POLICY_PATH = "configs/eval/bias_lineage.yaml"
-_CANONICAL_PACKET_CANDIDATE_DIRECTION_PATH = "configs/packet/candidate_direction.yaml"
+#: derived expected hash, never hardcoded here). Fixed, never a CLI
+#: override, so always anchored against `_REPO_ROOT` -- never the caller's
+#: cwd.
+_CANONICAL_LINEAGE_POLICY_PATH = _REPO_ROOT / "configs" / "eval" / "bias_lineage.yaml"
+_CANONICAL_PACKET_CANDIDATE_DIRECTION_PATH = (
+    _REPO_ROOT / "configs" / "packet" / "candidate_direction.yaml"
+)
+
+#: Repository-relative defaults for the packet/scorer/eval/predictor-policy
+#: config flags below. `_resolve_repo_default` anchors these against
+#: `_REPO_ROOT` (never the caller's cwd) ONLY when the caller leaves the
+#: corresponding flag unset; an explicit `--*-config`/`--predictor-policy`
+#: value is always resolved normally (as given, or relative to the
+#: caller's own cwd, exactly like any ordinary CLI path).
+_DEFAULT_PACKET_CONFIG = "configs/packet/schema.yaml"
+_DEFAULT_SELECTION_CONFIG = "configs/packet/selection.yaml"
+_DEFAULT_RENDER_CONFIG = "configs/packet/render.yaml"
+_DEFAULT_NARRATIVE_CATALOG = "configs/packet/narrative_templates.yaml"
+_DEFAULT_COMPARATOR_CONFIG = "configs/packet/comparator.yaml"
+_DEFAULT_SCORER_CONFIG = "configs/acmg/tsc.yaml"
+_DEFAULT_EVAL_CONFIG = "configs/eval/tsc2.yaml"
+_DEFAULT_PREDICTOR_POLICY = "configs/eval/bp4pp3_predictor_policy.json"
 
 #: Fixed nirvana worker-version pin (there is no committed config source for
 #: this value -- see `bias_version`/`bias_commit`, which ARE derived from
@@ -99,6 +154,15 @@ _PACKET_SCHEMA_CONFIG_SHA256 = "6d4e458cd54bce469cd16a93a2792529b6028e3d8e714954
 #: Canonical Git/LF-blob SHA-256 of the single current-policy census oracle
 #: (`committed_data_inputs.current_disabled_manual_census`).
 _CURRENT_POLICY_CENSUS_SHA256 = "45ff9f9abada7d5369c131bf7ffde28d0786eea41ff9bf7905f51da0cabd59ac"
+
+#: RAW on-disk byte SHA-256 of the pinned `--provenance` artifact
+#: (`immutable_external_inputs.provenance.sha256`,
+#: `sha256_provenance: raw_path_bytes_external`). Verified BEFORE this
+#: input's own JSON is ever parsed -- the caller may point `--provenance`
+#: at any path; its raw bytes must match this pin. This is an immutable
+#: EXTERNAL INPUT identity hash, not a derived benchmark/expected-count
+#: literal -- P1 bans the latter, never a pinned input's own content hash.
+_PROVENANCE_ARTIFACT_RAW_BYTE_SHA256 = "7272529546ad43ac0196523ad83d66eab8388a66a08f589bf10fc296b2110f55"
 
 
 class InputVerificationError(RuntimeError):
@@ -210,6 +274,20 @@ def _verify_manifest_provenance_binding(manifest_path: str | Path, provenance: M
     return actual
 
 
+def _resolve_repo_default(value: Optional[str], relative_default: str) -> str:
+    """Resolve a config-flag value the caller may have left unset. An
+    explicit `value` (the caller passed `--packet-config`/etc.) is returned
+    completely unchanged -- resolved normally afterwards, exactly like any
+    ordinary CLI path (as given, or relative to the caller's own cwd). An
+    unset (`None`) value falls back to this script's OWN
+    repository-relative default, anchored against `_REPO_ROOT` -- never
+    the caller's cwd -- so the script's built-in defaults behave
+    identically regardless of where it is invoked from."""
+    if value is not None:
+        return value
+    return str(_REPO_ROOT / relative_default)
+
+
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Build the corrected all-VUS expert-review packet universe"
@@ -218,14 +296,14 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--bias-tsv", required=True)
     parser.add_argument("--provenance", required=True)
     parser.add_argument("--census-stats", required=True)
-    parser.add_argument("--packet-config", default="configs/packet/schema.yaml")
-    parser.add_argument("--selection-config", default="configs/packet/selection.yaml")
-    parser.add_argument("--render-config", default="configs/packet/render.yaml")
-    parser.add_argument("--narrative-catalog", default="configs/packet/narrative_templates.yaml")
-    parser.add_argument("--comparator-config", default="configs/packet/comparator.yaml")
-    parser.add_argument("--scorer-config", default="configs/acmg/tsc.yaml")
-    parser.add_argument("--eval-config", default="configs/eval/tsc2.yaml")
-    parser.add_argument("--predictor-policy", default="configs/eval/bp4pp3_predictor_policy.json")
+    parser.add_argument("--packet-config", default=None)
+    parser.add_argument("--selection-config", default=None)
+    parser.add_argument("--render-config", default=None)
+    parser.add_argument("--narrative-catalog", default=None)
+    parser.add_argument("--comparator-config", default=None)
+    parser.add_argument("--scorer-config", default=None)
+    parser.add_argument("--eval-config", default=None)
+    parser.add_argument("--predictor-policy", default=None)
     parser.add_argument("--output-root", required=True)
     parser.add_argument("--run-name", required=True)
     parser.add_argument("--aavc-comparator", default=None)
@@ -236,6 +314,19 @@ def _build_arg_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _build_arg_parser().parse_args(argv)
+
+    # 0. Every repository-default config flag the caller left unset is
+    # anchored against `_REPO_ROOT` here, ONCE, before any of it is used --
+    # never the caller's cwd. A flag the caller DID pass is left exactly as
+    # given (resolved normally, like any ordinary CLI path, below).
+    args.packet_config = _resolve_repo_default(args.packet_config, _DEFAULT_PACKET_CONFIG)
+    args.selection_config = _resolve_repo_default(args.selection_config, _DEFAULT_SELECTION_CONFIG)
+    args.render_config = _resolve_repo_default(args.render_config, _DEFAULT_RENDER_CONFIG)
+    args.narrative_catalog = _resolve_repo_default(args.narrative_catalog, _DEFAULT_NARRATIVE_CATALOG)
+    args.comparator_config = _resolve_repo_default(args.comparator_config, _DEFAULT_COMPARATOR_CONFIG)
+    args.scorer_config = _resolve_repo_default(args.scorer_config, _DEFAULT_SCORER_CONFIG)
+    args.eval_config = _resolve_repo_default(args.eval_config, _DEFAULT_EVAL_CONFIG)
+    args.predictor_policy = _resolve_repo_default(args.predictor_policy, _DEFAULT_PREDICTOR_POLICY)
 
     # 1. Predictor-policy ARTIFACT identity (canonical path + LF blob),
     # then its {schema, status, mode} contract -- before parsing anything
@@ -268,11 +359,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     # load its JSON once; it becomes the oracle step 5 cross-checks against.
     _, census_stats = _verify_current_policy_census(args.census_stats)
 
-    # 5. Provenance artifact's own vcf_hash/source_snapshot, then the
-    # manifest<->provenance self-consistency hash binding, then the whole
-    # manifest/BIAS-TSV/provenance input bundle against the verified
-    # current-policy census oracle's OWN recorded hashes/snapshot -- all
-    # before any manifest/BIAS parsing or packet assembly.
+    # 5. Provenance artifact's own raw on-disk byte identity
+    # (immutable_external_inputs.provenance, raw_path_bytes_external) --
+    # verified BEFORE this file's JSON is ever parsed -- then its
+    # vcf_hash/source_snapshot, then the manifest<->provenance
+    # self-consistency hash binding, then the whole manifest/BIAS-TSV/
+    # provenance input bundle against the verified current-policy census
+    # oracle's OWN recorded hashes/snapshot -- all before any manifest/BIAS
+    # parsing or packet assembly.
+    _verify_raw_byte_pin("provenance artifact", args.provenance, _PROVENANCE_ARTIFACT_RAW_BYTE_SHA256)
     provenance = json.loads(Path(args.provenance).read_text(encoding="utf-8"))
     _validate_provenance(provenance)
     manifest_sha256 = _verify_manifest_provenance_binding(args.manifest, provenance)

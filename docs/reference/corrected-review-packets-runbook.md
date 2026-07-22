@@ -28,17 +28,52 @@ only.
 - It never overwrites an existing run directory or the frozen
   `2026-07-11` historical calibration artifact.
 
+## Running this script
+
+`scripts/build_corrected_review_packets.py` is a standalone entrypoint.
+Both of the following are supported, from **any** current working
+directory, with **no** manual `PYTHONPATH`:
+
+```
+python D:\path\to\raptor\scripts\build_corrected_review_packets.py --manifest ... --bias-tsv ... --provenance ... --census-stats ... --output-root ... --run-name ...
+```
+
+The module form is also supported, but -- like any `python -m pkg.mod`
+invocation -- Python must already be able to locate the `scripts` package
+**before** running any of this module's code, so the repository root must
+already be on `sys.path`/`PYTHONPATH` (in practice: run it with the
+repository root as the current working directory, or with the repository
+root already on `PYTHONPATH`):
+
+```
+cd D:\path\to\raptor
+python -m scripts.build_corrected_review_packets --manifest ... --bias-tsv ... --provenance ... --census-stats ... --output-root ... --run-name ...
+```
+
+Every `--*-config`/`--predictor-policy` flag's built-in default (e.g.
+`configs/packet/schema.yaml`) and the two fixed, non-overridable
+`lineage_policy`/`packet_candidate_direction` paths are resolved against
+this script's own fixed on-disk location (`Path(__file__).resolve()`),
+**never** the caller's current working directory -- a `--dry-run` invoked
+from an unrelated directory, relying entirely on these built-in defaults,
+still resolves the correct in-repo config files. Passing any of those
+flags explicitly overrides the default and is then resolved normally (as
+given, or relative to the caller's own cwd), exactly like any other CLI
+path (`--manifest`, `--bias-tsv`, `--provenance`, `--census-stats`,
+`--output-root`, which have no built-in default and are always resolved
+this way).
+
 ## Inputs
 
 | Input | Role |
 | --- | --- |
 | `--manifest` | Immutable `raptor-data` manifest JSONL (canonical SPDI <-> `vcf_key`) |
 | `--bias-tsv` | Immutable BIAS worker output TSV |
-| `--provenance` | External run provenance (`vcf_hash`, `source_snapshot`, `manifest_hash`) |
+| `--provenance` | External run provenance (`vcf_hash`, `source_snapshot`, `manifest_hash`) -- its own raw on-disk bytes are also pinned by SHA-256 (`immutable_external_inputs.provenance.sha256`) and verified BEFORE this file's JSON is parsed; content hash is authority, so the file may be supplied from any path |
 | `--census-stats` | Committed current-policy census oracle (`data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json`) |
-| `--packet-config`, `--selection-config`, `--render-config`, `--narrative-catalog`, `--comparator-config` | Packet-path configs (`configs/packet/*`) |
-| `--scorer-config`, `--eval-config` | `configs/acmg/tsc.yaml`, `configs/eval/tsc2.yaml` |
-| `--predictor-policy` | The approved, `disabled_manual` BP4/PP3 predictor policy artifact |
+| `--packet-config`, `--selection-config`, `--render-config`, `--narrative-catalog`, `--comparator-config` | Packet-path configs (`configs/packet/*`); repo-root-anchored defaults when omitted |
+| `--scorer-config`, `--eval-config` | `configs/acmg/tsc.yaml`, `configs/eval/tsc2.yaml`; repo-root-anchored defaults when omitted |
+| `--predictor-policy` | The approved, `disabled_manual` BP4/PP3 predictor policy artifact; repo-root-anchored default when omitted |
 | `--output-root`, `--run-name` | The external RAPTOR data root and this run's directory name |
 | `--aavc-comparator` | Accepted, currently unused |
 | `--dry-run` | Run every verification/conservation/assembly step; write nothing |
@@ -55,7 +90,10 @@ only.
    RAW on-disk byte SHA-256, against this track's own pins.
 4. The current-policy census oracle, canonical Git/LF blob SHA-256 (its
    JSON is loaded once and becomes the oracle step 5 cross-checks below).
-5. The provenance artifact's own `vcf_hash`/`source_snapshot`
+5. The provenance artifact's own raw on-disk byte SHA-256
+   (`immutable_external_inputs.provenance.sha256`,
+   `raw_path_bytes_external`) -- verified BEFORE its JSON is ever parsed --
+   then its `vcf_hash`/`source_snapshot`
    (`raptor.census.cli._validate_provenance`), then its recorded
    `manifest_hash` (when present) against the actual `--manifest` bytes,
    then the raw `--manifest`/`--bias-tsv` bytes and the provenance
