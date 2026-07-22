@@ -19,7 +19,7 @@ def _api():
 
 
 def test_real_data_integration_recomputation(tmp_path: Path) -> None:
-    """G-CP15: Opt-in (gated by RAPTOR_PACKET_REAL_DATA=1) run over immutable inputs.
+    """G-CP15 / Defect 2 & 3: Opt-in (gated by RAPTOR_PACKET_REAL_DATA=1) run over immutable inputs.
     Asserts binding oracles:
       - 6,618 total packets
       - 157 LP / 7 LB / 6,424 unresolved / 30 manual review
@@ -29,7 +29,7 @@ def test_real_data_integration_recomputation(tmp_path: Path) -> None:
       - Point distribution sums to 6,618 (with 149 in '0' points band, representing 119 unresolved and 30 manual rows)
       - Every packet is candidate_direction=null / POLICY_BLOCKED
       - Writes only to a throwaway external temp root; never reads written artifacts as its own oracle
-      - Missing real inputs under env=1 is FAIL, not skip.
+      - Missing real inputs under env=1 is SKIP, not FAIL (Defect 2).
     """
     if os.environ.get("RAPTOR_PACKET_REAL_DATA") != "1":
         pytest.skip("Opt-in real-data integration test skipped (RAPTOR_PACKET_REAL_DATA != 1)")
@@ -39,19 +39,73 @@ def test_real_data_integration_recomputation(tmp_path: Path) -> None:
     bias_tsv_path = Path("D:/AIProjects/raptor-data/clinvar/vus-run/tsc-vus-2026-07-07/tsc_vus_input.bias_output.tsv")
     provenance_path = Path("D:/AIProjects/raptor-data/clinvar/vus-run/clinvar_2026-07-07/tsc_vus_input.provenance.json")
     
-    # Missing real inputs under env=1 is FAIL, not skip!
+    # Missing real inputs under env=1 is SKIP cleanly per spec line 999 (Defect 2)
     if not (manifest_path.is_file() and bias_tsv_path.is_file() and provenance_path.is_file()):
-        pytest.fail("External immutable real-data inputs are missing under RAPTOR_PACKET_REAL_DATA=1")
+        pytest.skip("External immutable real-data inputs are missing under RAPTOR_PACKET_REAL_DATA=1")
         
-    # Verify inputs' SHA-256 hashes against spec pins before reading
+    # Verify inputs' SHA-256 hashes against spec pins before reading - if exist but drift, we fail!
     assert hashlib.sha256(manifest_path.read_bytes()).hexdigest() == "7f9937521a425e73b31422fa9191c90e67fa80cc58f351517ac732b1d32fcbba"
     assert hashlib.sha256(bias_tsv_path.read_bytes()).hexdigest() == "0a55cab470d3de93f06cd87ba30957fd1674c0ae2098ec86350f5aaac1a1162e"
     assert hashlib.sha256(provenance_path.read_bytes()).hexdigest() == "7272529546ad43ac0196523ad83d66eab8388a66a08f589bf10fc296b2110f55"
     
+    # Defect 3: Independently recompute strata totals, pattern counts, PP3-BP4 incidence, point distribution, etc.
+    # using immutable inputs plus reused census/packet pure seams
+    from raptor.census.strata import load_manifest, reproduce_census_strata
+    from raptor.scorer.bias_source import BiasTsvSource
+    from raptor.scorer.config import load_config as load_scorer_config
+    from raptor.eval.config import load_config as load_eval_config
+    from collections import Counter
+    
+    independent_manifest = load_manifest(manifest_path)
+    independent_bias_rows = tuple(BiasTsvSource(str(bias_tsv_path)).records())
+    
+    scorer_config = load_scorer_config("configs/acmg/tsc.yaml")
+    eval_config = load_eval_config("configs/eval/tsc2.yaml")
+    
+    manifest_by_vcf_key = {entry.vcf_key: entry for entry in independent_manifest}
+    independent_strata = reproduce_census_strata(
+        independent_bias_rows, manifest_by_vcf_key, scorer_config, eval_config
+    )
+    
+    # 1. Strata totals recomputation
+    lp_count = sum(1 for s in independent_strata if s.stratum == "candidate_LP_review")
+    lb_count = sum(1 for s in independent_strata if s.stratum == "candidate_LB_review")
+    unresolved_count = sum(1 for s in independent_strata if s.stratum == "no_deterministic_resolution")
+    manual_count = sum(1 for s in independent_strata if s.stratum == "manual_review")
+    
+    # 2. Pattern counts recomputation
+    lp_patterns = len(set(s.pattern_id for s in independent_strata if s.stratum == "candidate_LP_review" and s.pattern_id))
+    lb_patterns = len(set(s.pattern_id for s in independent_strata if s.stratum == "candidate_LB_review" and s.pattern_id))
+    
+    # 3. PP3-BP4 incidence recomputation
+    raw_pp3_firings = sum(1 for row in independent_bias_rows if "pp3" in {k.lower() for k in row.criteria.keys()})
+    raw_bp4_firings = sum(1 for row in independent_bias_rows if "bp4" in {k.lower() for k in row.criteria.keys()})
+    pp3_or_bp4_union_variants = sum(
+        1 for row in independent_bias_rows 
+        if any(c in {k.lower() for k in row.criteria.keys()} for c in ("pp3", "bp4"))
+    )
+    
+    # 4. Point distribution recomputation
+    point_dist = Counter(str(s.signed_points) for s in independent_strata)
+    
+    # Assert expected bindings on the independently computed values
+    assert len(independent_manifest) == 6618
+    assert len(independent_bias_rows) == 6618
+    assert lp_count == 157
+    assert lb_count == 7
+    assert unresolved_count == 6424
+    assert manual_count == 30
+    assert lp_patterns == 7
+    assert lb_patterns == 2
+    assert raw_pp3_firings == 2226
+    assert raw_bp4_firings == 3696
+    assert pp3_or_bp4_union_variants == 5474
+    assert point_dist["0"] == 149
+    
     api = _api()
     main = api["main"]
     
-    # G-CP15: Invoke main with explicit immutable arguments defined by spec (output-root and run-name) into tmp_path
+    # G-CP15: Invoke main with explicit immutable arguments defined by spec into tmp_path
     run_name = "throwaway_external_root"
     argv = [
         "--manifest", str(manifest_path),
@@ -62,10 +116,7 @@ def test_real_data_integration_recomputation(tmp_path: Path) -> None:
         "--run-name", run_name,
     ]
     
-    # Invoke main program
     summary_result = main(argv)
-    
-    # Assert return code is 0 (success)
     assert summary_result == 0
     
     # Parse resulting written manifest from the throwaway output directory
@@ -76,44 +127,28 @@ def test_real_data_integration_recomputation(tmp_path: Path) -> None:
     with open(manifest_file, "r", encoding="utf-8") as f:
         run_manifest = json.load(f)
         
-    # Independent pure in-memory recomputation check (G-CP15)
-    # Prevent hardcoded manifest output from passing by verifying with actual file metrics:
-    with open(manifest_path, "r", encoding="utf-8") as f:
-        manifest_lines = sum(1 for line in f if line.strip())
-    with open(bias_tsv_path, "r", encoding="utf-8") as f:
-        bias_lines = sum(1 for line in f if line.strip()) - 1 # excluding header
-        
-    assert run_manifest["universe_size"] == manifest_lines
-    assert run_manifest["universe_size"] == bias_lines
-    assert run_manifest["universe_size"] == 6618
-    
-    # Check exact oracle counts
+    # Secondarily compare emitted manifest/artifacts to independently computed values (Defect 3)
+    assert run_manifest["universe_size"] == len(independent_manifest)
     cons = run_manifest["conservation"]
-    assert cons["manifest_identities"] == 6618
-    assert cons["bias_rows"] == 6618
-    assert cons["candidate_LP_review"] == 157
-    assert cons["candidate_LB_review"] == 7
-    assert cons["no_deterministic_resolution"] == 6424
-    assert cons["manual_review"] == 30
-    assert cons["lp_patterns"] == 7
-    assert cons["lb_patterns"] == 2
+    assert cons["manifest_identities"] == len(independent_manifest)
+    assert cons["bias_rows"] == len(independent_bias_rows)
+    assert cons["candidate_LP_review"] == lp_count
+    assert cons["candidate_LB_review"] == lb_count
+    assert cons["no_deterministic_resolution"] == unresolved_count
+    assert cons["manual_review"] == manual_count
+    assert cons["lp_patterns"] == lp_patterns
+    assert cons["lb_patterns"] == lb_patterns
     
-    # Check PP3/BP4 firings
     supp = run_manifest["pp3bp4_suppression_full_census"]
-    assert supp["raw_pp3_firings"] == 2226
-    assert supp["raw_bp4_firings"] == 3696
-    assert supp["pp3_or_bp4_union_variants"] == 5474
+    assert supp["raw_pp3_firings"] == raw_pp3_firings
+    assert supp["raw_bp4_firings"] == raw_bp4_firings
+    assert supp["pp3_or_bp4_union_variants"] == pp3_or_bp4_union_variants
     assert supp["scored_pp3bp4_calls"] == 0
     
-    # Check point distribution band sum == 6618
     dist = run_manifest["point_distribution_expected"]
-    total_band_sum = sum(dist.values())
-    assert total_band_sum == 6618
-    assert dist["0"] == 149  # 119 unresolved and 30 manual rows
-    
-    # Assert every packet null/POLICY_BLOCKED
-    assert run_manifest["policy_blocked_review_state_count"] == 6618
-    
-    # Assert 8 sample cases
+    for k, v in point_dist.items():
+        assert dist[k] == v
+        
+    assert run_manifest["policy_blocked_review_state_count"] == len(independent_manifest)
     assert len(run_manifest["preregistered_discovery_sample"]) == 8
 

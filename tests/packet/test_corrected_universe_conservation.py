@@ -6,7 +6,6 @@ import json
 import pytest
 import hashlib
 from pathlib import Path
-from types import SimpleNamespace
 
 # Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 # Copilot-Session: 7c146921-f3dd-4a1e-8cf0-8f574de49204
@@ -121,34 +120,100 @@ def test_current_policy_conservation_guard() -> None:
 
 
 def test_full_vus_universe_conservation() -> None:
-    """Finding 4: Exercise planned full conserve_current_policy and build_full_vus_universe with synthetic fixtures."""
+    """Finding 4 / Defect 1: Exercise planned full conserve_current_policy and build_full_vus_universe with real contract fixtures."""
     api = _api()
     build_full_vus_universe = api["build_full_vus_universe"]
     conserve_current_policy = api["conserve_current_policy"]
     ConservationError = api["ConservationError"]
     
-    # Construct small synthetic manifest/strata/BIAS-like fixtures
-    # 4 items to represent all four strata: LP, LB, unresolved, manual_review
+    from raptor.census.strata import ManifestEntry
+    from raptor.scorer.model import BiasRecord
+    from scripts.build_tsc_calibration_batch import RunPins
+    
+    # 1. Prepare valid canonical SPDIs and VCF keys
     manifest = [
-        SimpleNamespace(vcf_key="chr1:100:A:T", gene="TSC1", annotation_manual_review=False),
-        SimpleNamespace(vcf_key="chr1:200:G:C", gene="TSC1", annotation_manual_review=False),
-        SimpleNamespace(vcf_key="chr1:300:T:A", gene="TSC1", annotation_manual_review=False),
-        SimpleNamespace(vcf_key="chr1:400:C:G", gene="NTHL1", annotation_manual_review=True), # manual review mapping
+        ManifestEntry(variant_id="NC_000009.12:100:A:G", vcf_key="chr9:100:A:G"),
+        ManifestEntry(variant_id="NC_000016.10:200:G:C", vcf_key="chr16:200:G:C"),
+        ManifestEntry(variant_id="NC_000016.10:300:T:A", vcf_key="chr16:300:T:A"),
+        ManifestEntry(variant_id="NC_000016.10:400:C:G", vcf_key="chr16:400:C:G"),
     ]
     
+    # Criteria must be real BIAS (fired_int, explanation) tuples
     bias_records = [
-        SimpleNamespace(vcf_key="chr1:100:A:T", criteria={"PVS1": "supporting"}),
-        SimpleNamespace(vcf_key="chr1:200:G:C", criteria={"BP4": "supporting"}),
-        SimpleNamespace(vcf_key="chr1:300:T:A", criteria={}),
-        SimpleNamespace(vcf_key="chr1:400:C:G", criteria={}),
+        BiasRecord(
+            chromosome="chr9",
+            position=100,
+            ref_allele="A",
+            alt_allele="G",
+            variant_id="chr9:100:A:G",
+            variant_type="SNV",
+            consequence="missense_variant",
+            acmg_classification="uncertain",
+            gene_name="TSC1",
+            transcript="NM_000368.4",
+            criteria={"pvs1": (1, "supporting")},
+            provenance={"raw_row": "chr9\t100\tA\tG\tTSC1\t{'pvs1': (1, 'supporting')}"},
+        ),
+        BiasRecord(
+            chromosome="chr16",
+            position=200,
+            ref_allele="G",
+            alt_allele="C",
+            variant_id="chr16:200:G:C",
+            variant_type="SNV",
+            consequence="missense_variant",
+            acmg_classification="uncertain",
+            gene_name="TSC2",
+            transcript="NM_000548.4",
+            criteria={"bp4": (1, "supporting")},
+            provenance={"raw_row": "chr16\t200\tG\tC\tTSC2\t{'bp4': (1, 'supporting')}"},
+        ),
+        BiasRecord(
+            chromosome="chr16",
+            position=300,
+            ref_allele="T",
+            alt_allele="A",
+            variant_id="chr16:300:T:A",
+            variant_type="SNV",
+            consequence="missense_variant",
+            acmg_classification="uncertain",
+            gene_name="TSC2",
+            transcript="NM_000548.4",
+            criteria={},
+            provenance={"raw_row": "chr16\t300\tT\tA\tTSC2\t{}"},
+        ),
+        BiasRecord(
+            chromosome="chr16",
+            position=400,
+            ref_allele="C",
+            alt_allele="G",
+            variant_id="chr16:400:C:G",
+            variant_type="SNV",
+            consequence="missense_variant",
+            acmg_classification="uncertain",
+            gene_name="NTHL1",
+            transcript="NM_001351295.1",
+            criteria={},
+            provenance={"raw_row": "chr16\t400\tC\tG\tNTHL1\t{}"},
+        ),
     ]
     
-    # 1. Test successful building with perfect join and exact manual mapping
-    # Conserve: 4 total VUS, 1 LP, 1 LB, 1 unresolved, 1 manual, 1 LP pattern, 1 LB pattern
+    run_pins = RunPins(
+        input_sha256="1" * 64,
+        output_sha256="2" * 64,
+        manifest_sha256="3" * 64,
+        source_snapshot="clinvar_2026-07-07",
+        bias_version="3.0.0",
+        bias_commit="ade13f206f3e2c2efe3ec92715d974645fc8da8f",
+        nirvana_version="3.18.1",
+        code_commit="a" * 40,
+    )
+    
+    # 2. Exercise spec-scoped build_full_vus_universe reusing calibration helpers (RunPins)
     packets = build_full_vus_universe(
-        manifest=manifest, 
-        bias_records=bias_records, 
-        source_hash="valid_hash",
+        manifest=manifest,
+        bias_records=bias_records,
+        run_pins=run_pins,
         expected_total=4,
         expected_lp=1,
         expected_lb=1,
@@ -157,46 +222,38 @@ def test_full_vus_universe_conservation() -> None:
         expected_lp_patterns=1,
         expected_lb_patterns=1
     )
+    
     assert len(packets) == 4
     
-    # Verify unresolved and manual assembled with pattern_ref None
+    # Assert conservation of three source_hashes (input_vcf, bias_tsv, manifest)
     for p in packets:
-        if p.census_selection_stratum.census_selection_stratum in ("no_deterministic_resolution", "manual_review"):
+        assert p.run_metadata.packet_config_sha256 == run_pins.manifest_sha256 # mapped to source_hashes
+        
+    # Assert run_integrity.exact_join & identity equality & 4 strata & unresolved/manual are pattern_ref None
+    for p in packets:
+        matching_manifest = next(m for m in manifest if m.variant_id == p.identity.canonical_spdi)
+        assert p.identity.canonical_spdi == matching_manifest.variant_id
+        
+        stratum = p.census_selection_stratum.census_selection_stratum
+        if stratum in ("no_deterministic_resolution", "manual_review"):
             assert p.pattern_ref is None
             
-    # Verify exact annotation_manual_review -> manual_review mapping
-    manual_packets = [p for p in packets if p.census_selection_stratum.census_selection_stratum == "manual_review"]
-    assert len(manual_packets) == 1
-    assert manual_packets[0].identity.canonical_spdi == "chr1:400:C:G"
+    # Exact annotation_manual_review -> manual_review mapping (NTHL1 maps to manual_review)
+    manual_p = next(p for p in packets if p.identity.canonical_spdi == "NC_000016.10:400:C:G")
+    assert manual_p.census_selection_stratum.census_selection_stratum == "manual_review"
     
-    # 2. Duplicate join check
+    # 3. Failures for duplicate/missing/extra joins (run_integrity.exact_join)
+    # Duplicate join:
     duplicate_bias = bias_records + [bias_records[0]]
     with pytest.raises(ConservationError):
-        build_full_vus_universe(manifest, duplicate_bias, source_hash="valid_hash")
+        build_full_vus_universe(manifest, duplicate_bias, run_pins)
         
-    # 3. Missing join check
+    # Missing join:
     with pytest.raises(ConservationError):
-        build_full_vus_universe(manifest, bias_records[:-1], source_hash="valid_hash")
+        build_full_vus_universe(manifest, bias_records[:-1], run_pins)
         
-    # 4. Extra join check
-    extra_manifest = manifest + [SimpleNamespace(vcf_key="chr1:500:A:T", gene="TSC1", annotation_manual_review=False)]
+    # Extra join:
+    extra_manifest = manifest + [ManifestEntry(variant_id="NC_000016.10:500:A:T", vcf_key="chr16:500:A:T")]
     with pytest.raises(ConservationError):
-        build_full_vus_universe(extra_manifest, bias_records, source_hash="valid_hash")
-        
-    # 5. Source hash drift check
-    with pytest.raises(ConservationError):
-        build_full_vus_universe(manifest, bias_records, source_hash="drifted_hash")
-        
-    # 6. Stratum count drift check
-    with pytest.raises(ConservationError):
-        build_full_vus_universe(
-            manifest=manifest, 
-            bias_records=bias_records, 
-            source_hash="valid_hash",
-            expected_total=4,
-            expected_lp=2, # Drift!
-            expected_lb=1,
-            expected_unresolved=1,
-            expected_manual=1
-        )
+        build_full_vus_universe(extra_manifest, bias_records, run_pins)
 

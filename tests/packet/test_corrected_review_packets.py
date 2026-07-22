@@ -223,7 +223,7 @@ def test_external_output_boundary_atomic_no_overwrite(tmp_path: Path) -> None:
 
 
 def test_evidence_absent_packet_for_zero_fired_rows() -> None:
-    """G-CP7: Zero-fired-criteria row produces a deterministic evidence-absent packet (empty scored set + MissingEvidence), conserving 6,618."""
+    """G-CP7 / Defect 4: Zero-fired-criteria row produces a deterministic evidence-absent packet (empty scored set + MissingEvidence), conserving 6,618."""
     api = _api()
     build_evidence_absent_packet = api["build_evidence_absent_packet"]
     CensusSelectionMetadata = api["CensusSelectionMetadata"]
@@ -243,11 +243,16 @@ def test_evidence_absent_packet_for_zero_fired_rows() -> None:
     # 3. Build evidence absent packet
     packet = build_evidence_absent_packet(absent_input, api["_packet_config"](api))
     
-    # 4. Assertions: empty entries, deterministic MissingEvidence, metadata, pattern_ref None, null/POLICY_BLOCKED
+    # 4. Defect 4: Clear/replace any unrelated MissingEvidence and assert deterministic D12 payload explicitly
+    # Documents 'no fired BIAS criteria' (specific category, next_action, and supporting paths)
     assert len(packet.entries) == 0
-    assert len(packet.missing_evidence) > 0
-    for me in packet.missing_evidence:
-        assert hasattr(me, "reason") or hasattr(me, "next_action")
+    assert len(packet.missing_evidence) == 1
+    
+    me = packet.missing_evidence[0]
+    assert me.category == "criteria_absent"
+    assert me.next_action == "no fired BIAS criteria"
+    assert me.supporting_field_paths == ("criterion_inputs",)
+    
     assert packet.census_selection_stratum == metadata
     assert packet.pattern_ref is None
     assert packet.candidate_direction.direction is None
