@@ -148,7 +148,7 @@ These are **new work items** the register depends on; without them, many mitigat
 
 > Source: `srinivasdrona/opencell` dev blog (esp. 2026-06-01 "seven rules… rule eight",
 > 2026-06-14, 2026-06-24) + `plan.md` ("hollow green" hunts). These are the failures a
-> planner/doer/checker loop over an oracle actually hits. **H1 is the concrete mechanism behind the
+> planner/test-author/doer/checker loop over an oracle actually hits. **H1 is the concrete mechanism behind the
 > R-A2 existential.**
 >
 > **Applicability audit (GP-8 — not imported wholesale):** these were screened for RAPTOR-fit, not

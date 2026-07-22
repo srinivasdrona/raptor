@@ -429,7 +429,7 @@ This doc is intentionally the *intent* layer. Mechanism and status live in sibli
 - **RISK_REGISTER.md** — exhaustive failure-mode analysis (detection + mitigation + contingency).
 - **docs/prd/** — **one PRD per feature** (PRD-01 …), each a specific vertical slice; index deferred until ≥3 exist.
 - **ARCHITECTURE.md** — fleet, LiteLLM/Prefect runtime, data model, model routing.
-- **OPERATING_MODEL.md** — the build loop: planner/doer/checker hand-off contracts + gates.
+- **OPERATING_MODEL.md** — the build loop: planner/test-author/doer/checker hand-off contracts + gates.
 - **DECISIONS.md** — ADR-style record of every strategy/scope change to this doc.
 - **EVAL_PLAN.md** — benchmark definition + metrics every PRD measures against; **BENCHMARK_RESULTS.md** *(planned)* — results.
 - **pre-build/** *(local-only, git-ignored)* — source research, session exports & adversarial framing this doc distils (FYTSC_1/2, raptor framing, infra & session notes).
