@@ -1,8 +1,8 @@
 # What RAPTOR Actually Does (plain-English explainer)
 
 > A jargon-free explanation for non-biologists — useful for pitching. For the technical
-> validation rubric see `EVAL_RUBRIC.md`; for the evidence base see
-> `reference/eval-rubric-evidence-base.md`.
+> validation rubric see [EVALUATION.md Part II](EVALUATION.md#evaluation-part-ii); for the evidence
+> base see [reference/eval-rubric-evidence-base.md](reference/eval-rubric-evidence-base.md).
 
 ## The problem, in one picture
 

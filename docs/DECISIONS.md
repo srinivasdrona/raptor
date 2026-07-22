@@ -4,6 +4,10 @@
 > [adr.github.io](https://adr.github.io/madr/)). Newest at top. An ADR is **immutable once Accepted** —
 > to change a decision, add a new ADR that supersedes it. This log is the source of truth for *why*
 > RAPTOR is the way it is; `STRATEGY.md` §5/§9 must stay consistent with the Accepted ADRs here.
+>
+> **Authority note.** The maintained authority set now also includes `STRATEGY.md` Part II and
+> `EVALUATION.md`; preserved ADR bodies may retain split-era citations as historical text, with the
+> compatibility stubs and crosswalk below providing the current route.
 
 **Index**
 
@@ -22,6 +26,28 @@
 | [ADR-0003](#adr-0003--loop-operating-model-planner--doer--checker-across-three-model-families) | Loop operating model: planner / doer / checker across three model families | Accepted | 2026-07-08 |
 | [ADR-0002](#adr-0002--vision--strategy-doc-format-pichler-vision-board--rumelt-kernel) | Vision & strategy doc format: Pichler Vision Board + Rumelt Kernel | Accepted | 2026-07-08 |
 | [ADR-0001](#adr-0001--strategic-framing-narrow-buildable-claim-with-broad-north-star) | Strategic framing: narrow-buildable claim with broad north-star | Accepted | 2026-07-08 |
+
+## ADR ↔ risk crosswalk (maintained index)
+
+> **Authority note.** ADRs are immutable accepted-history records. [`RISK_REGISTER.md`](RISK_REGISTER.md)
+> is the living ISO-31000-style control record: likelihood, indicators, mitigation, contingency, and
+> residual status may change without rewriting historical ADR bodies.
+
+| ADR | Current risk linkage | Basis in current repo |
+|---|---|---|
+| **ADR-0013** | R-A13, R-A14, R-A15 | Explicit risk rows cite ADR-0013's post-hoc / prospective-lock consequences. |
+| **ADR-0012** | — | No standalone risk row names ADR-0012 today; current residue is tracked through the ADR-0013-linked rows above. |
+| **ADR-0011** | R-A15 | Scope-authorization wording and the research-use disclaimer in `EVALUATION.md` Part II §5b define the overclaim boundary. |
+| **ADR-0010** | R-A12, R-D7, R-E4, R-F4, R-F5, R-F6, R-G5 | Explicitly listed in ADR-0010 consequences and mirrored in the current register. |
+| **ADR-0009** | R-A2, H1 | ADR-0009 bans direct-copy ClinVar criteria and masks comparator-dependent criteria to prevent answer-key circularity. |
+| **ADR-0008** | R-B6 | Explicitly called out in ADR-0008 consequences and the current register. |
+| **ADR-0007** | R-B1, R-B2, R-B6 | ADR-0007 sets the arm's-length / licensing boundary and treats BIAS output as a source contract; R-B6 operationalizes that boundary. |
+| **ADR-0006** | R-A11 | Explicitly deferred to reproducibility work in ADR-0006 consequences. |
+| **ADR-0005** | H2, H4, R-A10 | ADR-0005 is the separated-authorship / property-testing response to hollow-green and representation-equivalence risks. |
+| **ADR-0004** | — | No direct current risk row cites ADR-0004; its consequences are architectural, not a named current risk mapping. |
+| **ADR-0003** | R-D1 | Explicitly cited in the checker rubber-stamp / skipped-loop risk row. |
+| **ADR-0002** | — | Document-format ADR only; no direct current risk row cites it. |
+| **ADR-0001** | — *(partially superseded by ADR-0010)* | Historical strategy framing record; current linked risks are carried by ADR-0010 instead. |
 
 ---
 

@@ -4,8 +4,9 @@
 >
 > **Format:** Structured to the **arc42** template ([arc42.org](https://arc42.org)) with **C4-model**
 > diagram levels (Context → Container → Component; Simon Brown, [c4model.com](https://c4model.com)).
-> Sections not yet relevant are marked *(deferred, GP-7)*. This doc describes *mechanism*; intent
-> lives in [STRATEGY.md](STRATEGY.md), decisions in [DECISIONS.md](DECISIONS.md), status in
+> Sections not yet relevant are marked *(deferred, GP-7)*. This doc describes *mechanism*; strategy +
+> build-governance intent lives in [STRATEGY.md](STRATEGY.md), evaluation authority lives in
+> [EVALUATION.md](EVALUATION.md), decisions in [DECISIONS.md](DECISIONS.md), and status in
 > [PROGRAM.md](PROGRAM.md).
 
 ---
@@ -20,7 +21,7 @@ hypotheses. Architecture must serve five quality goals (§10):
 2. **Freshness** — bounded lag between source updates and re-validation.
 3. **Cost discipline** — local models absorb volume; cloud touches only what passes screening (~$0 most weeks).
 4. **Explainability & configurability** — rules/thresholds/routing in config, not code (GP-6).
-5. **Human-in-the-loop safety** — no "final classification" without **qualified sign-off**: operator for internal records, molecular geneticist/VCEP for any external classification (STRATEGY §9, GP-11).
+5. **Human-in-the-loop safety** — no "final classification" without **qualified sign-off**: operator for internal records, molecular geneticist/VCEP for any external classification (STRATEGY Part I §9, GP-11).
 
 ## 2. Constraints
 
@@ -52,7 +53,7 @@ hypotheses. Architecture must serve five quality goals (§10):
 
 **In scope:** ingestion, deterministic scoring, LLM extraction, Bayesian integration, versioned KB,
 review queue, weekly diff. **Out of scope:** patient-facing UI, prescribing, autonomous
-reclassification (see STRATEGY.md §9).
+reclassification (see STRATEGY.md Part I §9).
 
 ## 4. Solution strategy — the runtime stack
 
@@ -203,7 +204,7 @@ auto-upgrade on publication.
 - **Human-in-the-loop (two levels):** any VUS → LP/LB crossing enters the review queue. The
   **operator** approves *internal* pipeline records; any **externally meaningful** proposed
   classification or ClinVar submission requires a **qualified molecular geneticist / VCEP**
-  (STRATEGY.md §9). Solo-operator approval never produces an external classification.
+  (STRATEGY.md Part I §9). Solo-operator approval never produces an external classification.
 - **Failure / rollback / idempotence:** every run has a run-ID; workers write to **run-scoped staging
   tables**; results **publish atomically** only after validation, into an **immutable evidence
   ledger**. A failed/partial run rolls back its staging without corrupting the KB.
