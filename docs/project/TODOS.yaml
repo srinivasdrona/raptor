@@ -405,8 +405,12 @@ todos:
   title: Generating corrected expert-review packets
   description: 'Track: CORE-CLASSIFICATION. After the production-faithful gate and VUS census,
     generate provenance-complete candidate packets and review queue with explicit unknowns,
-    contradictions, policy version and non-clinical status.'
-  status: in_progress
+    contradictions, policy version and non-clinical status. Completed 2026-07-22:
+    GPT-5.4-clean implementation merged at 071111e; external run
+    corrected-review-packets-2026-07-22-r1 contains 6,618 operator packets,
+    6,618 blinded first-pass views, the 164-row priority queue and the hash-only
+    eight-case Discovery sample.'
+  status: done
   depends_on:
   - recompute-vus-census
   - rerun-masked-gate
