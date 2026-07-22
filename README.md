@@ -12,6 +12,10 @@ The complete TSC evidence census, the leakage-safe masked held-out rerun
 run. R2 and its v1/v2 interpretation are frozen and unchanged; v3 re-reports
 the same frozen R2 counts on independent axes and generates no new evidence.
 
+Public progress posts:
+[*Before the First Score*](docs/blog/2026-07-10-before-the-first-score.md) ·
+[*After the First Rerun*](docs/blog/2026-07-23-after-the-first-rerun.md)
+
 | Milestone | Result |
 |---|---|
 | TSC VUS census (current, disabled_manual) | 6,618 variants; **157** candidate-LP review, **7** candidate-LB review, **6,424** unresolved, **30** annotation/manual — internal, non-authoritative review directions only |
