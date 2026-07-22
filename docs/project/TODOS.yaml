@@ -576,3 +576,17 @@ todos:
   - refresh-program-docs
   - refresh-repository-readme
   created: '2026-07-21'
+- id: evaluate-discovery-packet-auditor
+  title: Evaluating a Microsoft Discovery packet-auditor contribution
+  description: 'Track: ECOSYSTEM / NON-CRITICAL. Run a private 5-10-variant Microsoft
+    Discovery evaluation using only RAPTOR public artifacts. Compare a proposed
+    variant-evidence-packet-auditor against RAPTOR packet audits for omission detection,
+    circularity detection, citation grounding, contradiction capture, reproducibility and
+    non-classification boundaries. Contribute the prompt agent to microsoft/discovery only
+    if it demonstrably adds value without inventing classifications or weakening provenance.
+    Discovery remains an optional research sidecar, not a dependency of the deterministic
+    scorer, gates or packet source of truth.'
+  status: pending
+  depends_on:
+  - core-generate-review-packets
+  created: '2026-07-22'
