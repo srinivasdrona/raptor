@@ -24,48 +24,6 @@ import sys
 import dataclasses
 import pytest
 
-# 1. Guard planned imports so all tests collect cleanly
-try:
-    from raptor.atlas.model import (
-        AtlasCandidateImport,
-        PromotionContext,
-        DiseasePack,
-        AtlasIdentity,
-        ObservedClaim,
-        EntryRef,
-        Span,
-        PackBinding,
-        AtlasSchemaError,
-        AtlasIdentityError,
-        AtlasProvenanceError,
-        AtlasLeakageError,
-    )
-    from raptor.atlas.promote import (
-        validate_candidate_import,
-        promote_candidate,
-    )
-    IMPLEMENTED = True
-except (ImportError, ModuleNotFoundError):
-    AtlasCandidateImport = None
-    PromotionContext = None
-    DiseasePack = None
-    AtlasIdentity = None
-    ObservedClaim = None
-    EntryRef = None
-    Span = None
-    PackBinding = None
-    AtlasSchemaError = ValueError
-    AtlasIdentityError = ValueError
-    AtlasProvenanceError = ValueError
-    AtlasLeakageError = ValueError
-    validate_candidate_import = None
-    promote_candidate = None
-    IMPLEMENTED = False
-
-def check_implemented():
-    if not IMPLEMENTED:
-        pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing", pytrace=False)
-
 # 2. Anti-cribbing check
 def assert_no_cribbing(obj):
     forbidden_ids = [
@@ -88,7 +46,10 @@ def assert_no_cribbing(obj):
 
 def test_candidate_import_exact_schema():
     """Verify that AtlasCandidateImport matches the exact spec schema with nested fields and no top-level flat fields."""
-    check_implemented()
+    try:
+        from raptor.atlas.model import AtlasCandidateImport, AtlasSchemaError
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
 
     # Base valid structures
     candidate_variant = {
@@ -140,20 +101,31 @@ def test_candidate_import_exact_schema():
 
 def test_promotion_context_fields():
     """Verify PromotionContext fields strictly conform to the spec."""
-    check_implemented()
-    fields = [f.name for f in dataclasses.fields(PromotionContext)]
+    try:
+        from raptor.atlas.model import PromotionContext
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
+
+    fields_list = [f.name for f in dataclasses.fields(PromotionContext)]
     expected = ["disease_pack", "citation_resolver", "context_validator", "human_oracle_reviewer", "duplicate_index"]
     for field in expected:
-        assert field in fields, f"PromotionContext is missing expected field: {field}"
+        assert field in fields_list, f"PromotionContext is missing expected field: {field}"
 
 
 def test_eight_gates_ordered_execution_and_short_circuiting():
     """Verify that validate_candidate_import executes the 8 gates in strict order, instrumenting short-circuiting on failure."""
-    check_implemented()
+    try:
+        from raptor.atlas.model import (
+            AtlasCandidateImport, PromotionContext, DiseasePack, PackBinding,
+            AtlasSchemaError, AtlasIdentityError, AtlasProvenanceError, AtlasLeakageError
+        )
+        from raptor.atlas.promote import validate_candidate_import
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
 
     # 1. Mock disease pack
     mock_pack = DiseasePack(
-        schema="atlas-pack/v1.0",
+        schema="atlas.disease_pack.v1",
         pack_id="synthpack",
         pack_version="1.0.0",
         pack_content_hash="mock_hash",
@@ -200,9 +172,15 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
         "gene_proposed": "SYNGENE1",
         "hgvs_aliases": ()
     }
+    # retrieval_provenance.pack_binding must be a real matching binding copy
     valid_retrieval = {
         "agents": (), "queries": (), "run_id": "r1", "retrieved_at": "now",
-        "pack_binding": None, "prompt_hash": "h", "bookshelf_version": "v1"
+        "pack_binding": {
+            "pack_id": "synthpack",
+            "pack_version": "1.0.0",
+            "pack_content_hash": "mock_hash"
+        },
+        "prompt_hash": "h", "bookshelf_version": "v1"
     }
 
     # Gate 1 failed (canonical_spdi_readmission) -> should raise AtlasIdentityError and not call anything else
@@ -236,7 +214,8 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
         candidate_variant=valid_variant,
         proposed_claims=(),
         proposed_sources=({
-            "entry_id": "lit-1", "source_type": "PRIMARY-OFFICIAL", "role": "direct_evidence_leaf"
+            "entry_id": "lit-1", "source_type": "PRIMARY-OFFICIAL", "role": "direct_evidence_leaf",
+            "bib": {"pmid": "12345"}
         },),
         retrieval_provenance=valid_retrieval
     )
@@ -250,7 +229,8 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
         candidate_variant=valid_variant,
         proposed_claims=(),
         proposed_sources=({
-            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf", "pmid": "fail-citation"
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {"pmid": "fail-citation"}
         },),
         retrieval_provenance=valid_retrieval
     )
@@ -265,10 +245,12 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
     cand_g4_fail = AtlasCandidateImport(
         candidate_variant=valid_variant,
         proposed_claims=({
-            "claim_id": "c1", "claim_text": "text", "claim_kind": "pathway", "source_ref_entry": "lit-1", "span": None
+            "claim_text": "text", "claim_kind_proposed": "pathway", "directionality": "increase",
+            "source_ref_proposed": "lit-1", "span_proposed": None, "context_proposed": "cell-assay-A"
         },),
         proposed_sources=({
-            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf", "pmid": "resolved-pmid"
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {"pmid": "resolved-pmid"}
         },),
         retrieval_provenance=valid_retrieval
     )
@@ -284,11 +266,13 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
     cand_g5_fail = AtlasCandidateImport(
         candidate_variant=valid_variant,
         proposed_claims=({
-            "claim_id": "c1", "claim_text": "text", "claim_kind": "fail-kind", "source_ref_entry": "lit-1",
-            "span": {"locator": "L1", "exact_quote": "Q1", "page_or_figure": "1"}, "context": "cell-assay-A"
+            "claim_text": "text", "claim_kind_proposed": "fail-kind", "directionality": "increase",
+            "source_ref_proposed": "lit-1",
+            "span_proposed": {"locator": "L1", "exact_quote": "Q1", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
         },),
         proposed_sources=({
-            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf", "pmid": "resolved-pmid"
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {"pmid": "resolved-pmid"}
         },),
         retrieval_provenance=valid_retrieval
     )
@@ -306,11 +290,13 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
     cand_g6_fail = AtlasCandidateImport(
         candidate_variant=valid_variant,
         proposed_claims=({
-            "claim_id": "c1", "claim_text": "text", "claim_kind": "pathway", "source_ref_entry": "lit-1",
-            "span": {"locator": "L1", "exact_quote": "Q1", "page_or_figure": "1"}, "context": "cell-assay-A"
+            "claim_text": "text", "claim_kind_proposed": "pathway", "directionality": "increase",
+            "source_ref_proposed": "lit-1",
+            "span_proposed": {"locator": "L1", "exact_quote": "Q1", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
         },),
         proposed_sources=({
-            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf", "pmid": "resolved-pmid"
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {"pmid": "resolved-pmid"}
         },),
         retrieval_provenance=valid_retrieval
     )
@@ -329,23 +315,23 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
     assert "human_oracle_reviewer" not in calls
 
     # Gate 7 failed (no_classification_leakage) -> raises AtlasLeakageError / AtlasProvenanceError
-    # We include classifier_score on a claim or source
     cand_g7_fail = AtlasCandidateImport(
         candidate_variant=valid_variant,
         proposed_claims=({
-            "claim_id": "c1", "claim_text": "text", "claim_kind": "pathway", "source_ref_entry": "lit-1",
-            "span": {"locator": "L1", "exact_quote": "Q1", "page_or_figure": "1"}, "context": "cell-assay-A",
+            "claim_text": "text", "claim_kind_proposed": "pathway", "directionality": "increase",
+            "source_ref_proposed": "lit-1",
+            "span_proposed": {"locator": "L1", "exact_quote": "Q1", "page_or_figure": "1"}, "context_proposed": "cell-assay-A",
             "classifier_score": 0.95  # LEAKAGE!
         },),
         proposed_sources=({
-            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf", "pmid": "resolved-pmid"
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {"pmid": "resolved-pmid"}
         },),
         retrieval_provenance=valid_retrieval
     )
     calls.clear()
     with pytest.raises((AtlasLeakageError, AtlasProvenanceError)):
         validate_candidate_import(cand_g7_fail, ctx)
-    # Check that prior gates were executed before failure at Gate 7
     assert "citation_resolver" in calls
     assert "context_validator" in calls
     assert "human_oracle_reviewer" not in calls
@@ -354,11 +340,13 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
     cand_g8_fail = AtlasCandidateImport(
         candidate_variant=valid_variant,
         proposed_claims=({
-            "claim_id": "fail-human", "claim_text": "text", "claim_kind": "pathway", "source_ref_entry": "lit-1",
-            "span": {"locator": "L1", "exact_quote": "Q1", "page_or_figure": "1"}, "context": "cell-assay-A"
+            "claim_text": "text", "claim_kind_proposed": "pathway", "directionality": "increase",
+            "source_ref_proposed": "fail-human",
+            "span_proposed": {"locator": "L1", "exact_quote": "Q1", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
         },),
         proposed_sources=({
-            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf", "pmid": "resolved-pmid"
+            "entry_id": "fail-human", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {"pmid": "resolved-pmid"}
         },),
         retrieval_provenance=valid_retrieval
     )
@@ -370,12 +358,70 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
     assert "human_oracle_reviewer" in calls
 
 
-def test_successful_synthetic_promotion():
-    """Verify successful synthetic candidate promotion returns accepted tuple and importer cannot write state."""
-    check_implemented()
+def test_wrong_pack_mismatch_negative():
+    """Verify that a mismatch between retrieval_provenance.pack_binding and context's disease pack raises AtlasSchemaError."""
+    try:
+        from raptor.atlas.model import (
+            AtlasCandidateImport, PromotionContext, DiseasePack, PackBinding, AtlasSchemaError
+        )
+        from raptor.atlas.promote import validate_candidate_import
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
 
     mock_pack = DiseasePack(
-        schema="atlas-pack/v1.0",
+        schema="atlas.disease_pack.v1",
+        pack_id="synthpack", pack_version="1.0.0", pack_content_hash="mock_hash",
+        allowed_genes=("SYNGENE1",), assembly_pins=("GRCh38",), transcript_pins=(),
+        reconciliation_policy={}, ontology_extensions={}, source_register_pins=(),
+        prohibitions={}, pilot_eval_metadata={}
+    )
+
+    # Retrieval pack_version mismatches (1.0.1 instead of 1.0.0)
+    invalid_retrieval_pack = {
+        "agents": (), "queries": (), "run_id": "r1", "retrieved_at": "now",
+        "pack_binding": {
+            "pack_id": "synthpack",
+            "pack_version": "1.0.1",
+            "pack_content_hash": "mock_hash"
+        },
+        "prompt_hash": "h", "bookshelf_version": "v1"
+    }
+
+    cand = AtlasCandidateImport(
+        candidate_variant={
+            "spdi_proposed": "NC_000000.0:1000:A:T",
+            "gene_proposed": "SYNGENE1",
+            "hgvs_aliases": ()
+        },
+        proposed_claims=(),
+        proposed_sources=(),
+        retrieval_provenance=invalid_retrieval_pack
+    )
+
+    ctx = PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=lambda citation: True,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "oracle-signoff-001",
+        duplicate_index={}
+    )
+
+    with pytest.raises(AtlasSchemaError):
+        validate_candidate_import(cand, ctx)
+
+
+def test_successful_synthetic_promotion():
+    """Verify successful synthetic candidate promotion returns accepted tuple and importer cannot write state."""
+    try:
+        from raptor.atlas.model import (
+            AtlasCandidateImport, PromotionContext, DiseasePack, PackBinding
+        )
+        from raptor.atlas.promote import promote_candidate
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
+
+    mock_pack = DiseasePack(
+        schema="atlas.disease_pack.v1",
         pack_id="synthpack",
         pack_version="1.0.0",
         pack_content_hash="mock_hash",
@@ -407,15 +453,22 @@ def test_successful_synthetic_promotion():
             "hgvs_aliases": ()
         },
         proposed_claims=({
-            "claim_id": "claim-100", "claim_text": "synthetic assay signal C", "claim_kind": "pathway", "source_ref_entry": "lit-1",
-            "span": {"locator": "L1", "exact_quote": "synthetic quote C", "page_or_figure": "1"}, "context": "cell-assay-A"
+            "claim_text": "synthetic assay signal C", "claim_kind_proposed": "pathway", "directionality": "increase",
+            "source_ref_proposed": "lit-1",
+            "span_proposed": {"locator": "L1", "exact_quote": "synthetic quote C", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
         },),
         proposed_sources=({
-            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf", "pmid": "12345"
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {"pmid": "12345"}
         },),
         retrieval_provenance={
             "agents": (), "queries": (), "run_id": "r1", "retrieved_at": "now",
-            "pack_binding": None, "prompt_hash": "h", "bookshelf_version": "v1"
+            "pack_binding": {
+                "pack_id": "synthpack",
+                "pack_version": "1.0.0",
+                "pack_content_hash": "mock_hash"
+            },
+            "prompt_hash": "h", "bookshelf_version": "v1"
         }
     )
 
@@ -428,7 +481,7 @@ def test_successful_synthetic_promotion():
     assert len(accepted) == 1
     assert_no_cribbing(accepted)
 
-    # 2. Verify candidate object status is never modified by promote_candidate (untrusted importer cannot write accepted state)
-    # The fields should be completely unchanged
+    # 2. Verify candidate object is never modified (untrusted importer cannot write accepted state)
     assert cand_valid.candidate_variant["spdi_proposed"] == "NC_000000.0:1000:A:T"
+
 

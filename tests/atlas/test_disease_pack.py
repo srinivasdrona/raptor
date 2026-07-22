@@ -16,24 +16,6 @@ import yaml
 import pytest
 from pathlib import Path
 
-# 1. Guard planned imports so all tests collect cleanly
-try:
-    from raptor.atlas.pack import load_disease_pack, validate_disease_pack, pack_content_hash
-    from raptor.atlas.model import DiseasePack, PackBinding, AtlasPackError
-    IMPLEMENTED = True
-except (ImportError, ModuleNotFoundError):
-    load_disease_pack = None
-    validate_disease_pack = None
-    pack_content_hash = None
-    DiseasePack = None
-    PackBinding = None
-    AtlasPackError = ValueError
-    IMPLEMENTED = False
-
-def check_implemented():
-    if not IMPLEMENTED:
-        pytest.fail("RED test: raptor.atlas.pack implementation is missing", pytrace=False)
-
 # 2. Anti-cribbing rule: ban real-content phrases/IDs only, not ontology terms.
 def assert_no_cribbing(obj):
     # Only ban actual real-content phrases/IDs, never general vocabulary terms.
@@ -208,7 +190,11 @@ def test_hash_sensitivity():
 
 def test_load_and_validate_failures():
     """Verify load/validate disease pack failure and error typing."""
-    check_implemented()
+    try:
+        from raptor.atlas.pack import validate_disease_pack
+        from raptor.atlas.model import AtlasPackError
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas.pack implementation is missing")
 
     # validate_disease_pack on correct dict should pass
     manifest = yaml.safe_load(FULL_FIXTURE_YAML)
@@ -268,7 +254,11 @@ def test_tsc2_pack_existence():
     assert "allowed_genes" in pack_manifest
     assert "TSC2" in pack_manifest["allowed_genes"]
     # Verify exact structure and that load_disease_pack succeeds
-    check_implemented()
+    try:
+        from raptor.atlas.pack import load_disease_pack
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas.pack implementation is missing")
+
     pack = load_disease_pack(str(pack_path))
     assert pack.pack_id == "tsc2"
 

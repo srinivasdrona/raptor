@@ -13,39 +13,6 @@ Spec coverage:
 import pytest
 from dataclasses import is_dataclass, fields
 
-# 1. Guard planned imports so all tests collect cleanly
-try:
-    from raptor.atlas.model import (
-        SourceRegisterEntry,
-        EntryRef,
-        Span,
-        ObservedClaim,
-        DiseasePack,
-        AtlasSchemaError,
-        AtlasProvenanceError,
-        AtlasSourceVerificationError,
-    )
-    from raptor.atlas.registry import verify_source, validate_claim_grounding
-    from raptor.atlas.hashing import claim_hash
-    IMPLEMENTED = True
-except (ImportError, ModuleNotFoundError):
-    SourceRegisterEntry = None
-    EntryRef = None
-    Span = None
-    ObservedClaim = None
-    DiseasePack = None
-    AtlasSchemaError = ValueError
-    AtlasProvenanceError = ValueError
-    AtlasSourceVerificationError = ValueError
-    verify_source = None
-    validate_claim_grounding = None
-    claim_hash = None
-    IMPLEMENTED = False
-
-def check_implemented():
-    if not IMPLEMENTED:
-        pytest.fail("RED test: raptor.atlas.registry implementation is missing", pytrace=False)
-
 # 2. Anti-cribbing rule: ban real-content phrases/IDs only, not legitimate terms.
 def assert_no_cribbing(obj):
     forbidden_ids = [
@@ -68,7 +35,11 @@ def assert_no_cribbing(obj):
 
 def test_schema_shapes_and_span_ownership():
     """Verify exact fields for source register, EntryRef, Span, and ObservedClaim from spec."""
-    check_implemented()
+    try:
+        from raptor.atlas.model import SourceRegisterEntry, EntryRef, Span, ObservedClaim
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas.registry implementation is missing")
+
     assert is_dataclass(SourceRegisterEntry)
     assert is_dataclass(EntryRef)
     assert is_dataclass(Span)
@@ -107,7 +78,10 @@ def test_schema_shapes_and_span_ownership():
 
 def test_source_register_pairing_rules():
     """Verify that constructor enforces pairing rules of role and source_type."""
-    check_implemented()
+    try:
+        from raptor.atlas.model import SourceRegisterEntry, AtlasSchemaError
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas.registry implementation is missing")
 
     # Valid pairing: PRIMARY-LIT / DATASET can ground direct_evidence_leaf
     for valid_type in ["PRIMARY-LIT", "DATASET"]:
@@ -137,7 +111,14 @@ def test_source_register_pairing_rules():
 
 def test_claim_grounding_validation_pipeline():
     """Verify that validate_claim_grounding strictly enforces citation resolution, leaf type, role, and non-empty span."""
-    check_implemented()
+    try:
+        from raptor.atlas.model import (
+            SourceRegisterEntry, EntryRef, Span, ObservedClaim, DiseasePack,
+            AtlasSchemaError, AtlasProvenanceError
+        )
+        from raptor.atlas.registry import validate_claim_grounding
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas.registry implementation is missing")
 
     # Setup fake disease pack
     fake_pack = DiseasePack(
@@ -238,7 +219,11 @@ def test_claim_grounding_validation_pipeline():
 
 def test_source_verification_fails_closed():
     """Verify that verify_source fails closed on metadata pin drift or non-verified states."""
-    check_implemented()
+    try:
+        from raptor.atlas.model import SourceRegisterEntry, AtlasSourceVerificationError
+        from raptor.atlas.registry import verify_source
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas.registry implementation is missing")
 
     good_entry = SourceRegisterEntry(
         entry_id="mave-001",
@@ -298,8 +283,25 @@ def test_source_verification_fails_closed():
 
 
 def test_span_mutation_changes_hash():
-    """Verify that mutating EntryRef.span changes claims/profile hashes, and no claim-local override exists."""
-    check_implemented()
+    """Verify that mutating EntryRef.span changes the profile's hashes."""
+    try:
+        from raptor.atlas.model import (
+            MechanismProfile, AtlasIdentity, ObservedClaim, EntryRef, Span,
+            PackBinding, EvidenceAssessment, Provenance
+        )
+        from raptor.atlas.hashing import evidence_core_hash
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas hashing/model implementation is missing")
+
+    pack_binding = PackBinding(
+        pack_id="synthpack", pack_version="1.0.0", pack_content_hash="mock_hash"
+    )
+
+    identity = AtlasIdentity(
+        spdi_canonical="NC_000000.0:1000:A:T", gene="SYNGENE1", assembly="GRCh38",
+        transcript_pin="NM_900001.1", hgvs_c="c.100A>T", hgvs_p="p.Lys34Met", hgvs_g="g.1000A>T",
+        identity_state="resolved"
+    )
 
     good_span = Span(locator="Fig 1", exact_quote="synthetic assay signal A", page_or_figure="3")
     good_ref = EntryRef(entry_id="lit-1", span=good_span)
@@ -313,7 +315,18 @@ def test_span_mutation_changes_hash():
         directionality="none"
     )
 
-    h1 = claim_hash(claim)
+    profile1 = MechanismProfile(
+        identity=identity,
+        pack_binding=pack_binding,
+        claims=(claim,),
+        candidate_classes=(),
+        edges=(),
+        evidence=EvidenceAssessment((), (), (), ()),
+        provenance=Provenance((good_ref,), (), {}),
+        run_metadata=None
+    )
+
+    h1 = evidence_core_hash(profile1)
 
     # Mutate span
     mutated_span = Span(locator="Fig 1", exact_quote="synthetic assay signal A (mutated)", page_or_figure="3")
@@ -327,6 +340,18 @@ def test_span_mutation_changes_hash():
         directionality="none"
     )
 
-    h2 = claim_hash(mutated_claim)
-    assert h1 != h2, "Mutating EntryRef.span must change claim hash"
+    profile2 = MechanismProfile(
+        identity=identity,
+        pack_binding=pack_binding,
+        claims=(mutated_claim,),
+        candidate_classes=(),
+        edges=(),
+        evidence=EvidenceAssessment((), (), (), ()),
+        provenance=Provenance((mutated_ref,), (), {}),
+        run_metadata=None
+    )
+
+    h2 = evidence_core_hash(profile2)
+    assert h1 != h2, "Mutating EntryRef.span must change profile core hash"
+
 

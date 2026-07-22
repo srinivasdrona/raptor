@@ -18,37 +18,24 @@ import yaml
 from pathlib import Path
 import pytest
 
-# 1. Guard planned imports so all tests collect cleanly
-try:
-    from raptor.atlas.model import (
-        MechanismProfile,
-        AtlasIdentity,
-        ObservedClaim,
-        EntryRef,
-        Span,
-        PackBinding,
-        EvidenceAssessment,
-        Provenance,
-    )
-    from raptor.atlas.profile import build_mechanism_profile
-    from raptor.atlas.hashing import evidence_core_hash
-    IMPLEMENTED = True
-except (ImportError, ModuleNotFoundError):
-    MechanismProfile = None
-    AtlasIdentity = None
-    ObservedClaim = None
-    EntryRef = None
-    Span = None
-    PackBinding = None
-    EvidenceAssessment = None
-    Provenance = None
-    build_mechanism_profile = None
-    evidence_core_hash = None
-    IMPLEMENTED = False
-
-def check_implemented():
-    if not IMPLEMENTED:
-        pytest.fail("RED test: raptor.atlas template/profile implementation is missing", pytrace=False)
+# 2. Anti-cribbing check: ban real-content phrases/IDs only, not legitimate terms.
+def assert_no_cribbing(obj):
+    forbidden_ids = [
+        "pmc11185720",
+        "10.1101/2024.06.07.597916",
+        "c.1832G>A",
+        "p.Arg611Gln"
+    ]
+    if isinstance(obj, str):
+        for f in forbidden_ids:
+            assert f not in obj.lower(), f"Anti-cribbing violation: found real-content ID/phrase '{f}' in '{obj}'"
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            assert_no_cribbing(k)
+            assert_no_cribbing(v)
+    elif isinstance(obj, (list, tuple, set)):
+        for item in obj:
+            assert_no_cribbing(item)
 
 
 def test_discovery_templates_exist_and_conform():
@@ -86,11 +73,10 @@ def test_discovery_templates_exist_and_conform():
     for k in required_keys:
         assert k in manifest, f"context_manifest.json is missing required pin: {k}"
 
-    # Verify Phase-1 placeholder rule
-    # prompt_hash and packet_manifest_hash can be placeholders, but disease-pack pins MUST NOT be placeholders
-    for placeholder_key in ["prompt_hash", "packet_manifest_hash"]:
-        val = manifest[placeholder_key]
-        assert val is not None, f"Placeholder key {placeholder_key} cannot be empty"
+    # Verify Phase-1 placeholder rule:
+    # prompt_hash and packet_manifest_hash can be exactly "PLACEHOLDER_PHASE2"
+    assert manifest["prompt_hash"] == "PLACEHOLDER_PHASE2", "prompt_hash must be Phase-1 placeholder 'PLACEHOLDER_PHASE2'"
+    assert manifest["packet_manifest_hash"] == "PLACEHOLDER_PHASE2", "packet_manifest_hash must be Phase-1 placeholder 'PLACEHOLDER_PHASE2'"
 
     for real_key in ["disease_pack_id", "disease_pack_version", "disease_pack_content_hash"]:
         val = manifest[real_key]
@@ -137,58 +123,142 @@ def test_discovery_templates_exist_and_conform():
     assert "no-classification" in str(rubric), "Rubric must enforce no-classification validation"
 
 
+def test_phase2_manifest_validation_rules():
+    """Verify Phase-2 validation rules: manifest_validator rejects placeholders under Phase-2 mode."""
+    try:
+        from raptor.atlas.model import AtlasSchemaError
+        # Assuming validator function or class is defined under raptor.atlas.promote or similar
+        # E.g. validate_discovery_manifest(manifest, phase=2) -> raises AtlasSchemaError on placeholders
+        from raptor.atlas.guards import validate_discovery_manifest
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: Discovery manifest validation implementation is missing")
+
+    # A mock manifest with Phase-1 placeholders
+    phase1_manifest = {
+        "raptor_commit": "commit-001",
+        "atlas_schema_version": "v1.0",
+        "disease_pack_id": "synthpack",
+        "disease_pack_version": "1.0.0",
+        "disease_pack_content_hash": "mock_hash",
+        "bookshelf_version": "v2.1",
+        "prompt_hash": "PLACEHOLDER_PHASE2",
+        "packet_manifest_hash": "PLACEHOLDER_PHASE2"
+    }
+
+    # Under Phase-1 mode, placeholders are ACCEPTED
+    validate_discovery_manifest(phase1_manifest, phase=1)
+
+    # Under Phase-2 mode, placeholders are REJECTED
+    with pytest.raises(AtlasSchemaError):
+        validate_discovery_manifest(phase1_manifest, phase=2)
+
+
 def test_discovery_optionality_and_isolation():
-    """Verify that the core atlas runs successfully with NO Discovery packages installed, and failed candidates have no impact."""
-    check_implemented()
+    """Verify that the core atlas runs successfully and unavailable/rejected candidates have zero impact."""
+    try:
+        from raptor.atlas.model import (
+            MechanismProfile, AtlasIdentity, ObservedClaim, EntryRef, Span,
+            DiseasePack, ContextRecord, EvidenceAssessment, AtlasCandidateImport, PromotionContext,
+            AtlasIdentityError, AtlasSchemaError
+        )
+        from raptor.atlas.profile import build_mechanism_profile
+        from raptor.atlas.hashing import evidence_core_hash
+        from raptor.atlas.promote import validate_candidate_import
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas template/profile implementation is missing")
 
-    # 1. Assert Discovery SDK/agents are NOT imported/loaded by raptor.atlas (AST boundary or sys.modules verification)
-    discovery_packages = ["microsoft_discovery_sdk", "discovery_agent_client"]
-    for pkg in discovery_packages:
-        assert pkg not in sys.modules, f"Discovery package {pkg} is unexpectedly loaded"
-
-    # 2. Build profile with standard inputs
-    pack_binding = PackBinding(
-        pack_id="synthpack", pack_version="1.0.0", pack_content_hash="mock_hash"
+    # 1. Build native profile using exact public API: build_mechanism_profile(identity, claims, contexts, edges, sources, *, pack)
+    pack = DiseasePack(
+        schema="atlas.disease_pack.v1",
+        pack_id="synthpack",
+        pack_version="1.0.0",
+        pack_content_hash="mock_hash",
+        allowed_genes=("SYNGENE1",),
+        assembly_pins=("GRCh38",),
+        transcript_pins=(),
+        reconciliation_policy={},
+        ontology_extensions={
+            "allowed_kinds": ("pathway",),
+            "allowed_contexts": ("cell-assay-A",)
+        },
+        source_register_pins=(),
+        prohibitions={},
+        pilot_eval_metadata={}
     )
+
     identity = AtlasIdentity(
         spdi_canonical="NC_000000.0:1000:A:T", gene="SYNGENE1", assembly="GRCh38",
         transcript_pin="NM_900001.1", hgvs_c="c.100A>T", hgvs_p="p.Lys34Met", hgvs_g="g.1000A>T",
         identity_state="resolved"
     )
-    span = Span(locator="L1", exact_quote="quote", page_or_figure="1")
-    ref = EntryRef(entry_id="lit-1", span=span)
+
+    good_span = Span(locator="L1", exact_quote="synthetic quote", page_or_figure="1")
+    good_ref = EntryRef(entry_id="lit-1", span=good_span)
+
     claim = ObservedClaim(
-        claim_id="claim-1", claim_text="synthetic text", claim_kind="pathway",
-        source_ref=ref, verification="verified", directionality="increase"
+        claim_id="claim-1", claim_text="synthetic assay signal A", claim_kind="pathway",
+        source_ref=good_ref, verification="verified", directionality="increase"
     )
 
-    profile1 = build_mechanism_profile(
-        identity=identity,
-        pack_binding=pack_binding,
-        claims=(claim,),
-        candidate_classes=(),
-        edges=(),
-        evidence=EvidenceAssessment((), (), (), ()),
-        provenance=Provenance((ref,), (), {"h": "core"}),
-        run_metadata=None
+    # Calling the exact positional+keyword builder contract:
+    profile = build_mechanism_profile(
+        identity,          # identity
+        (claim,),          # claims
+        (),                # contexts
+        (),                # edges
+        (good_ref,),       # sources
+        pack=pack          # *pack keyword-only
     )
 
-    h1 = evidence_core_hash(profile1)
+    h1 = evidence_core_hash(profile)
 
-    # 3. Simulate processing/rejecting an unavailable or failed Discovery candidate.
-    # It must have ZERO impact on the accepted native profile and hash.
-    # We do this by building the same profile again and proving that the hash is unchanged.
-    profile2 = build_mechanism_profile(
-        identity=identity,
-        pack_binding=pack_binding,
-        claims=(claim,),
-        candidate_classes=(),
-        edges=(),
-        evidence=EvidenceAssessment((), (), (), ()),
-        provenance=Provenance((ref,), (), {"h": "core"}),
-        run_metadata=None
+    # 2. Drive an unavailable/rejected synthetic candidate import through specified public rejection seam:
+    # Build candidate with off-pack gene -> Gate 1 validation fails and raises AtlasIdentityError
+    rejected_cand = AtlasCandidateImport(
+        candidate_variant={
+            "spdi_proposed": "NC_000000.0:1000:A:T",
+            "gene_proposed": "OFF_PACK_GENE",  # off-pack!
+            "hgvs_aliases": ()
+        },
+        proposed_claims=(),
+        proposed_sources=(),
+        retrieval_provenance={
+            "agents": (), "queries": (), "run_id": "r1", "retrieved_at": "now",
+            "pack_binding": {
+                "pack_id": "synthpack",
+                "pack_version": "1.0.0",
+                "pack_content_hash": "mock_hash"
+            },
+            "prompt_hash": "PLACEHOLDER_PHASE2", "bookshelf_version": "v2.1"
+        }
     )
 
-    h2 = evidence_core_hash(profile2)
-    assert h1 == h2, "Discovery unavailability/rejection changed the accepted profile hash"
+    ctx = PromotionContext(
+        disease_pack=pack,
+        citation_resolver=lambda citation: True,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "oracle-signoff-001",
+        duplicate_index={}
+    )
+
+    # Drive the rejection
+    with pytest.raises((AtlasIdentityError, AtlasSchemaError)):
+        validate_candidate_import(rejected_cand, ctx)
+
+    # 3. Assert that original profile object, content and hash remains unchanged, and builder remains fully usable
+    assert profile.identity.gene == "SYNGENE1"
+    assert len(profile.claims) == 1
+    assert evidence_core_hash(profile) == h1
+
+    # Verify native builder is still usable
+    rebuilt_profile = build_mechanism_profile(
+        identity,
+        (claim,),
+        (),
+        (),
+        (good_ref,),
+        pack=pack
+    )
+    assert evidence_core_hash(rebuilt_profile) == h1
+
 

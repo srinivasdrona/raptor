@@ -13,70 +13,6 @@ Spec coverage:
 import pytest
 from dataclasses import is_dataclass, fields
 
-# 1. Guard planned imports so all tests collect cleanly
-try:
-    from raptor.atlas.model import (
-        DiseasePack,
-        PackBinding,
-        AtlasIdentity,
-        Span,
-        EntryRef,
-        SourceRegisterEntry,
-        ObservedClaim,
-        ContextRecord,
-        MechanismEdge,
-        CandidateClass,
-        EvidenceAssessment,
-        RunMetadata,
-        Provenance,
-        MechanismProfile,
-        AtlasCandidateImport,
-        PromotionContext,
-        DisMechRecord,
-        AtlasSchemaError,
-        AtlasIdentityError,
-        AtlasProvenanceError,
-        AtlasSourceVerificationError,
-        AtlasLeakageError,
-        AtlasExportError,
-        AtlasPackError,
-    )
-    from raptor.atlas.identity import admit_identity, reconcile_transcript
-    IMPLEMENTED = True
-except (ImportError, ModuleNotFoundError):
-    # Fallback to empty mocks so pytest collects cleanly
-    DiseasePack = None
-    PackBinding = None
-    AtlasIdentity = None
-    Span = None
-    EntryRef = None
-    SourceRegisterEntry = None
-    ObservedClaim = None
-    ContextRecord = None
-    MechanismEdge = None
-    CandidateClass = None
-    EvidenceAssessment = None
-    RunMetadata = None
-    Provenance = None
-    MechanismProfile = None
-    AtlasCandidateImport = None
-    PromotionContext = None
-    DisMechRecord = None
-    AtlasSchemaError = ValueError
-    AtlasIdentityError = ValueError
-    AtlasProvenanceError = ValueError
-    AtlasSourceVerificationError = ValueError
-    AtlasLeakageError = ValueError
-    AtlasExportError = ValueError
-    AtlasPackError = ValueError
-    admit_identity = None
-    reconcile_transcript = None
-    IMPLEMENTED = False
-
-def check_implemented():
-    if not IMPLEMENTED:
-        pytest.fail("RED test: raptor.atlas.identity/model implementation is missing", pytrace=False)
-
 # 2. Anti-cribbing check: ban real-content phrases/IDs only, not legitimate terms.
 def assert_no_cribbing(obj):
     forbidden_ids = [
@@ -99,7 +35,16 @@ def assert_no_cribbing(obj):
 
 def test_frozen_contracts_17():
     """Verify that all 17 contracts are defined as frozen, eq-comparable dataclasses."""
-    check_implemented()
+    try:
+        from raptor.atlas.model import (
+            DiseasePack, PackBinding, AtlasIdentity, Span, EntryRef,
+            SourceRegisterEntry, ObservedClaim, ContextRecord, MechanismEdge,
+            CandidateClass, EvidenceAssessment, RunMetadata, Provenance,
+            MechanismProfile, AtlasCandidateImport, PromotionContext, DisMechRecord
+        )
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas.model implementation is missing")
+
     contracts = [
         DiseasePack, PackBinding, AtlasIdentity, Span, EntryRef,
         SourceRegisterEntry, ObservedClaim, ContextRecord, MechanismEdge,
@@ -119,7 +64,11 @@ def test_frozen_contracts_17():
 
 def test_identity_fields_and_no_status():
     """Verify AtlasIdentity fields and make sure no status field exists."""
-    check_implemented()
+    try:
+        from raptor.atlas.model import AtlasIdentity
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas.identity/model implementation is missing")
+
     field_names = {f.name for f in fields(AtlasIdentity)}
     expected_fields = {
         "spdi_canonical", "gene", "assembly", "transcript_pin",
@@ -131,7 +80,11 @@ def test_identity_fields_and_no_status():
 
 def test_resolved_admission_rules():
     """Verify admit_identity enforces SPDI-keyed admission and gene/transcript/assembly pack-constraints."""
-    check_implemented()
+    try:
+        from raptor.atlas.model import DiseasePack, AtlasIdentityError
+        from raptor.atlas.identity import admit_identity
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas.identity/model implementation is missing")
     
     # Setup synthetic disease pack using fake/mock
     fake_pack = DiseasePack(
@@ -184,7 +137,10 @@ def test_resolved_admission_rules():
 
 def test_identity_state_validation():
     """Verify that identity_state only allows resolved/unresolved, and unknown/conflicting raise AtlasSchemaError."""
-    check_implemented()
+    try:
+        from raptor.atlas.model import AtlasIdentity, AtlasSchemaError
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas.identity/model implementation is missing")
     
     # unknown and conflicting are mechanism states, never identity_state values
     for invalid_state in ["unknown", "conflicting", "other"]:
@@ -203,7 +159,11 @@ def test_identity_state_validation():
 
 def test_transcript_reconciliation_by_resolver():
     """Verify transcript reconciliation uses injected resolver and pack, never bare c. equality."""
-    check_implemented()
+    try:
+        from raptor.atlas.model import DiseasePack, AtlasIdentity, AtlasIdentityError
+        from raptor.atlas.identity import reconcile_transcript
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas.identity/model implementation is missing")
 
     fake_pack = DiseasePack(
         schema="atlas.disease_pack.v1",
@@ -244,7 +204,15 @@ def test_transcript_reconciliation_by_resolver():
 
 def test_typed_error_discrimination():
     """Verify that all core errors are distinct types and fail closed."""
-    check_implemented()
+    try:
+        from raptor.atlas.model import (
+            AtlasSchemaError, AtlasIdentityError, AtlasProvenanceError,
+            AtlasSourceVerificationError, AtlasLeakageError, AtlasExportError,
+            AtlasPackError
+        )
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas.identity/model implementation is missing")
+
     errors = [
         AtlasSchemaError, AtlasIdentityError, AtlasProvenanceError,
         AtlasSourceVerificationError, AtlasLeakageError, AtlasExportError,
