@@ -7,6 +7,8 @@ import pytest
 import hashlib
 from pathlib import Path
 
+import test_packet_core as core
+
 # Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 # Copilot-Session: 7c146921-f3dd-4a1e-8cf0-8f574de49204
 
@@ -211,11 +213,16 @@ def test_full_vus_universe_conservation() -> None:
         code_commit="a" * 40,
     )
     
-    # 2. Exercise spec-scoped build_full_vus_universe reusing calibration helpers (RunPins)
+    # Obtain the packet config via the shared/reused test_packet_core helper (consistent with sibling tests)
+    core_api = core._api()
+    packet_config = core._packet_config(core_api)
+    
+    # 2. Exercise spec-scoped build_full_vus_universe reusing calibration helpers (RunPins) and config
     packets = build_full_vus_universe(
         manifest=manifest,
         bias_records=bias_records,
         run_pins=run_pins,
+        packet_config=packet_config,
         expected_total=4,
         expected_lp=1,
         expected_lb=1,
@@ -229,7 +236,6 @@ def test_full_vus_universe_conservation() -> None:
     
     # Expected fingerprint calculated using the calibration helper/fixture logic
     from scripts.build_tsc_calibration_batch import canonical_json
-    packet_config = api["_packet_config"](api)
     expected_fingerprint = hashlib.sha256(
         canonical_json({
             "packet_schema_version": packet_config.packet_schema_version,
@@ -269,14 +275,14 @@ def test_full_vus_universe_conservation() -> None:
     # Duplicate join:
     duplicate_bias = bias_records + [bias_records[0]]
     with pytest.raises(ConservationError):
-        build_full_vus_universe(manifest, duplicate_bias, run_pins)
+        build_full_vus_universe(manifest, duplicate_bias, run_pins, packet_config)
         
     # Missing join:
     with pytest.raises(ConservationError):
-        build_full_vus_universe(manifest, bias_records[:-1], run_pins)
+        build_full_vus_universe(manifest, bias_records[:-1], run_pins, packet_config)
         
     # Extra join:
     extra_manifest = manifest + [ManifestEntry(variant_id="NC_000016.10:500:A:T", vcf_key="chr16:500:A:T")]
     with pytest.raises(ConservationError):
-        build_full_vus_universe(extra_manifest, bias_records, run_pins)
+        build_full_vus_universe(extra_manifest, bias_records, run_pins, packet_config)
 
