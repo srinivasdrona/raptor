@@ -18,12 +18,13 @@
 #
 # Every substantive downstream mechanism claim must resolve to a primary
 # direct-evidence LEAF source and an exact span, or be labeled UNVERIFIED. Real
-# grounding is a Phase 2 deliverable; the skeleton (Phase 1) phase asserts ONLY
-# schema/guards/synthetic-fixture/unresolved-source behavior — no real PMID/DOI/
-# span, no R611Q evidence, no pilot curation.
+# grounding is a Phase 2 deliverable. Phase 1 (skeleton) MAY pin and verify real
+# source-register bibliographic METADATA (PMID/PMCID/DOI/accession/license); it
+# MUST NOT produce real verified observed claims, real grounding spans, R611Q or
+# pilot claims/profiles, or mechanistic conclusions.
 
 schema: raptor-mechanism-atlas-starter-v1
-status: planner_contract_rev2_gpt54_findings_applied
+status: planner_contract_rev3_gpt54_findings_applied
 task_id: build-mechanism-atlas-starter
 title: Bounded RAPTOR Mechanism Atlas starter — TSC2-only internal module contract
 
@@ -50,6 +51,22 @@ revision_log:
           rev 1 assigned real PMID/span grounding/review in the skeleton phase.
     corrections_in: [variant_identity, observed_claim, source_register, schemas.hashing,
       leakage_guards, workflow, stop_go, deliberate_action]
+  - rev: 3
+    head: 29a330ee622b97f2959f2a38fda8db002a903ee4
+    trigger: GPT-5.4 findings; plan-only follow-up commit (no amend/push).
+    attribution:
+      planner_miss:
+        - Instruction "only primary/direct-evidence leaf entries can ground verified
+          observed mechanism claims" was enforced by role but did NOT bind the allowed
+          source_type; role could be mis-tagged onto a disallowed type (source-type closure).
+      prompt_ambiguity:
+        - >-
+          Phase-1 'no real PMID/DOI/span' both forbade grounding AND appeared to
+          forbid pinning real bibliographic METADATA that a source register
+          legitimately needs. Real metadata pins are permitted and verified as
+          metadata; real grounding spans, verified observed claims, R611Q/pilot
+          content and mechanistic conclusions are Phase 2 only.
+    corrections_in: [source_register, observed_claim, workflow, stop_go, deliberate_action]
 
 worktree: 'D:\AIProjects\raptor-worktrees\mechanism-atlas'
 branch: track/mechanism-atlas-2026-07
@@ -204,11 +221,14 @@ schemas:
       directionality: {type: enum, values: [increase, decrease, none, unknown]}
     invariants:
       - verification=verified REQUIRES source_ref -> a source_register entry whose
-        role == direct_evidence_leaf AND verification == verified, PLUS a non-empty
-        exact span.
-      - A claim grounded only in a provenance_only/context/crosswalk entry (ClinVar,
-        Monarch/DisMech, reviews, grouping buckets, secondary syntheses) CANNOT be
-        verified; it stays verification=unverified (AtlasProvenanceError if forced).
+        role == direct_evidence_leaf AND source_type in
+        allowed_direct_evidence_leaf_source_types (PRIMARY-LIT / DATASET) AND
+        verification == verified, PLUS a non-empty exact span. BOTH role and
+        source_type are checked, never role alone.
+      - A claim grounded only in a provenance_only/context/crosswalk entry, OR in a
+        disallowed source_type (PRIMARY-OFFICIAL / PRIMARY-DOC / SECONDARY-SYNTH /
+        CROSSWALK / a grouping bucket), CANNOT be verified; it stays
+        verification=unverified (AtlasProvenanceError / AtlasSchemaError if forced).
       - A claim with no resolvable source_ref + span is verification=unverified.
       - phenotype claims are observations only; no deterministic inference permitted.
   context_record:
@@ -379,6 +399,10 @@ source_register:
     Every entry is EVIDENCE provenance, never ACMG criteria, never raptor.scorer
     input, never ClinVar-derived criterion. No score/class here may gate a call.
   source_types: [PRIMARY-OFFICIAL, PRIMARY-DOC, PRIMARY-LIT, SECONDARY-SYNTH, DATASET, CROSSWALK, UNVERIFIED]
+  # A direct_evidence_leaf is valid ONLY for these enumerated source_types:
+  # an individual primary functional-assay paper (PRIMARY-LIT) or a direct
+  # experimental functional dataset (DATASET). All other types are non-grounding.
+  allowed_direct_evidence_leaf_source_types: [PRIMARY-LIT, DATASET]
   entry_schema:
     id: source_register.SourceRegisterEntry.v1
     fields:
@@ -391,6 +415,15 @@ source_register:
       sha256: {type: str, optional: true}
       variant_count: {type: int, optional: true}
       verification: {type: enum, values: [verified, confirm_pending, unverified]}
+    invariants:
+      - role==direct_evidence_leaf is VALID ONLY when source_type is in
+        allowed_direct_evidence_leaf_source_types (PRIMARY-LIT individual paper, or
+        DATASET direct experimental dataset). Any other pairing raises AtlasSchemaError.
+      - source_type in {PRIMARY-OFFICIAL, PRIMARY-DOC, SECONDARY-SYNTH, CROSSWALK,
+        UNVERIFIED} MUST NOT carry role==direct_evidence_leaf (provenance_only /
+        context / crosswalk only).
+      - A PRIMARY-LIT program/grouping/aggregation BUCKET uses role==context, never
+        direct_evidence_leaf; only an individual primary paper may be a leaf.
   entry_ref_schema:
     id: source_register.EntryRef.v1
     fields:
@@ -398,17 +431,22 @@ source_register:
       span: {type: obj, optional: true, note: exact span carried at the reference site}
     invariants:
       - An EntryRef used to VERIFY an observed_claim MUST target an entry whose
-        role == direct_evidence_leaf AND verification == verified, with a non-empty span.
+        role == direct_evidence_leaf AND source_type in
+        allowed_direct_evidence_leaf_source_types AND verification == verified, with
+        a non-empty span. BOTH role AND source_type are checked, never role alone.
   grounding_rule:
     direct_evidence_leaf: >
-      Only primary/direct-evidence LEAF entries (an individual primary functional-
-      assay publication with an exact span, or a verified functional DATASET) may
-      ground a verified observed mechanism claim.
+      Only primary/direct-evidence LEAF entries may ground a verified observed
+      mechanism claim: an individual primary functional-assay publication
+      (source_type PRIMARY-LIT) with an exact span, or a verified direct
+      experimental functional dataset (source_type DATASET). role AND source_type
+      are both required and both checked.
     non_grounding: >
-      ClinVar (identity/label provenance), Monarch/DisMech (crosswalk), review/
-      secondary-synthesis articles, and program/grouping/aggregation BUCKETS are
-      provenance_only / context / crosswalk and CANNOT ground a verified mechanism
-      claim, regardless of verification state.
+      ClinVar (PRIMARY-OFFICIAL, provenance), Monarch/DisMech (CROSSWALK), review /
+      secondary-synthesis articles (SECONDARY-SYNTH), PRIMARY-DOC, and program /
+      grouping / aggregation BUCKETS (role context) are provenance_only / context /
+      crosswalk and CANNOT ground a verified mechanism claim, regardless of
+      verification state and regardless of any role mis-tagging.
   categories:
     primary_functional_literature:
       - entry_id: nellist-hoogeveen-westerveld-program
@@ -484,9 +522,11 @@ source_register:
     - verify_source fails closed (AtlasSourceVerificationError) on transcript/license/
       sha256/count drift for any locally re-fetched copy.
     - confirm_pending entries raise if any path treats them as verified.
-    - Only role==direct_evidence_leaf AND verification==verified entries may ground a
-      verified observed mechanism claim; provenance_only/context/crosswalk and
-      grouping buckets never can (AtlasProvenanceError if forced).
+    - Only role==direct_evidence_leaf AND source_type in
+      allowed_direct_evidence_leaf_source_types (PRIMARY-LIT / DATASET) AND
+      verification==verified entries may ground a verified observed mechanism claim;
+      provenance_only/context/crosswalk, disallowed source_types and grouping buckets
+      never can (AtlasProvenanceError / AtlasSchemaError if forced).
     - Raw external data (MaveDB CSV, IGVF files) is NEVER committed; only pins + aggregates.
 
 # ---------------------------------------------------------------------------
@@ -591,11 +631,13 @@ workflow:
   gate: pilot content follows ONLY after checker CLEAN AND corrected packet availability.
   phases:
     phase1_skeleton:
-      does: schema + guards + synthetic fixtures + unresolved-source behavior ONLY.
-      forbids: real PMID/DOI/span claims, R611Q evidence, pilot curation, any
-        verified observed mechanism claim.
+      does: schema + guards + synthetic fixtures + unresolved-source behavior; MAY pin
+        and verify real source-register bibliographic METADATA (PMID/PMCID/DOI/
+        accession/license) as metadata only.
+      forbids: real grounding spans, real verified observed claims, R611Q evidence,
+        pilot claims/profiles, and mechanistic conclusions.
     phase2_grounding:
-      does: real leaf enumeration + exact spans + verified claims + pilot content.
+      does: real leaf enumeration + exact grounding spans + verified claims + pilot content.
       requires: deterministic citation/source resolver AND a named human/oracle
         source-span review AND frozen corrected packets AND checker CLEAN.
   gemini_tests:
@@ -604,7 +646,9 @@ workflow:
       - Schema shape + frozen/immutability + typed-error discrimination for every schema.
       - "SPDI-keyed identity: resolved admission requires canonical GRCh38 spdi_canonical;"
       - "alias-only / missing-SPDI records are unresolved and admission raises AtlasIdentityError."
-      - "leaf grounding: verified claim requires a direct_evidence_leaf + verified entry + span;"
+      - "leaf grounding: verified claim requires role==direct_evidence_leaf AND source_type in {PRIMARY-LIT, DATASET} AND verification==verified AND span;"
+      - "negative: mis-tagging each disallowed source_type (PRIMARY-OFFICIAL, PRIMARY-DOC, SECONDARY-SYNTH, CROSSWALK) or a grouping bucket as direct_evidence_leaf raises AtlasSchemaError;"
+      - "negative: EntryRef/verified-claim admission rejects role-only tagging when source_type is not allowed (AtlasProvenanceError/AtlasSchemaError)."
       - "provenance_only/context/crosswalk/grouping-bucket grounding raises AtlasProvenanceError."
       - unknown & conflicting states are representable and NOT coerced to a call.
       - context-dependence: same variant, different context -> distinct records.
@@ -613,23 +657,24 @@ workflow:
       - "hash coherence: evidence_core/profile_envelope payloads over the DEFINED include/exclude fields only; claim_id refs resolve into profile.claims; canonical order/dedup deterministic; run_metadata excluded."
       - fixtures are synthetic and ID-independent (no unfrozen VUS ID dependency).
       - "unresolved-source behavior: unverified/confirm_pending entries never ground a verified claim."
-    must_not: assert any real mechanism claim, any real PMID/DOI/span, any classifier
-      value, or any pilot content.
+    must_not: assert any real verified observed claim, any real grounding span, any
+      R611Q/pilot content, any mechanistic conclusion, or any classifier value
+      (real bibliographic metadata pins are permitted).
   sonnet_scope:
     role: implement ONLY the Phase-1 internal module skeleton to turn RED tests GREEN.
     in_scope:
       - src/raptor/atlas/ model/identity/hashing/registry/profile/export/guards + README.
       - Frozen dataclasses, tuples for ordered collections, typed errors.
       - SPDI-keyed identity admission + reconciliation + unresolved failure.
-      - SourceRegisterEntry/EntryRef schemas + role gating (direct_evidence_leaf only grounds).
+      - "SourceRegisterEntry/EntryRef schemas + role AND source_type gating (only PRIMARY-LIT/DATASET leaves ground)."
+      - "May pin and verify real bibliographic METADATA (PMID/PMCID/DOI/accession/license) as metadata only; no grounding spans, no verified claims."
       - Field-coherent evidence_core/profile_envelope hashing (defined include/exclude,
         canonical order/dedup, run_metadata excluded).
       - Fail-closed source verification; atlas_import_boundary (no packet/scorer/eval import).
-      - "Unresolved-source behavior only: register entries stay unverified/confirm_pending;"
-      - "provide the citation/source resolver INTERFACE (no real resolution, no network)."
+      - "provide the citation/source resolver INTERFACE (no real span resolution, no verified-claim output)."
     out_of_scope:
-      - No real PMID/DOI/span grounding, no verified mechanism claims (Phase 2 only).
-      - No R611Q evidence; no pilot CONTENT; no real VUS admission; no external fetch.
+      - No real grounding spans, no real verified observed claims, no mechanistic conclusions (Phase 2 only).
+      - No R611Q evidence; no pilot CONTENT; no real VUS admission; no external fetch of held data.
       - No scorer/eval/packet/config/data edits; no PP3/BP4 or ACMG coupling.
       - No DisMech contribution; no Discovery agent.
   gpt54_probes:
@@ -640,10 +685,11 @@ workflow:
       - "Import boundary: does raptor.atlas import raptor.packet/scorer/eval? (must be NO)"
       - Circularity: is any confidence/class derived from a classifier/ClinVar score? (must be NO)
       - "SPDI: is resolved admission gated on canonical GRCh38 SPDI, aliases provenance-only? (must hold)"
-      - "Leaf grounding: can only a direct_evidence_leaf + verified entry ground a verified claim? (must hold)"
+      - "Source-type binding: is direct_evidence_leaf accepted ONLY for PRIMARY-LIT/DATASET, and does verified-claim/EntryRef admission check BOTH role AND source_type (not role alone)? (must hold)"
+      - "Leaf grounding: can only a direct_evidence_leaf + allowed source_type + verified entry ground a verified claim? (must hold)"
       - "Hash coherence: are payloads over defined fields with claim_id refs resolving into profile.claims, run_metadata excluded? (must hold)"
       - Contrast: does the ontology preserve unknown/conflicting/context across strata?
-      - "Skeleton purity: are there ANY real PMID/DOI/span, R611Q evidence, or pilot content in Phase 1? (must be NONE)"
+      - "Skeleton purity: are there ANY real verified claim/grounding span, R611Q/pilot content, or mechanistic conclusion in Phase 1? (must be NONE; real bibliographic metadata pins are allowed)"
       - Fixture independence: no dependency on unfrozen packet IDs? (must hold)
       - "Phase 2 (deferred): real source-span review by deterministic resolver + named human/oracle."
     verdict: CLEAN / REVISE / DO-NOT-MERGE.
@@ -653,10 +699,10 @@ workflow:
 # ---------------------------------------------------------------------------
 stop_go:
   skeleton_phase_passes_only_if:      # Phase 1
-    - "Schemas frozen: SPDI-keyed identity, leaf-typed source register, coherent hashes."
+    - "Schemas frozen: SPDI-keyed identity, leaf role+source_type-typed source register, coherent hashes."
     - "Guards CLEAN: raptor.atlas imports none of raptor.packet/scorer/eval; no banned criterion/input; no consumer imports atlas."
     - Synthetic fixtures + unresolved-source behavior pass the RED tests.
-    - NO real PMID/DOI/span, NO R611Q evidence, NO pilot curation, NO verified claim present.
+    - "NO real verified claim/grounding span, NO R611Q evidence, NO pilot curation, NO mechanistic conclusion (real bibliographic metadata pins ARE allowed)."
   pilot_phase_passes_only_if:         # Phase 2, gated
     - The ontology handles contrasting cases (all five strata) without collapse.
     - Context, contradictions, and unknowns are preserved (not coerced to a call).
@@ -692,6 +738,8 @@ deliberate_action:
     - "raptor.atlas imports raptor.packet/scorer/eval, coupling the module to scoring behind the behavioral independence claim -> mitigated: atlas_import_boundary (forbidden_atlas_imports) + RED import-direction guard tests."
     - "Admission accepts an hgvs/transcript alias without a canonical SPDI, silently equating NM_000548.4/.5 variants -> mitigated: SPDI-keyed admission, aliases provenance-only, unresolved -> AtlasIdentityError."
     - "A verified mechanism claim is grounded in ClinVar / Monarch-DisMech / a review / a program grouping bucket -> mitigated: direct_evidence_leaf role gating on EntryRef + AtlasProvenanceError."
+    - "A disallowed source_type is MIS-TAGGED role==direct_evidence_leaf and grounds a verified claim because only role (not type) was checked -> mitigated: allowed_direct_evidence_leaf_source_types binding (PRIMARY-LIT/DATASET), entry/EntryRef/claim admission check BOTH role AND source_type, AtlasSchemaError, negative Gemini cases + GPT source-type-binding probe."
+    - "Phase-1 purity is read as banning even real bibliographic metadata pins, or conversely a real grounding span slips in disguised as metadata -> mitigated: explicit split — metadata pins (PMID/PMCID/DOI/accession/license) permitted and verified as metadata; grounding spans / verified claims / mechanistic conclusions are Phase 2 only."
     - "evidence_core_hash references a field the profile lacks (a top-level claims table) producing an undefined/unstable hash -> mitigated: top-level claims tuple + run_metadata + explicit include/exclude payloads + canonical order/dedup + claim_id refs into profile.claims."
     - "Real PMID/DOI/span grounding, R611Q evidence, or pilot curation sneaks into the skeleton phase, pre-empting frozen packets + human review -> mitigated: Phase-1 purity + Phase-2-only real grounding + go_signal_phase2 (resolver + named human/oracle review)."
     - "R611Q's handoff mechanism is silently treated as fact -> mitigated: r611q_gate BLOCKED + no-hardcode prohibition + GPT-5.4 probe + Phase-2 grounding gate."
@@ -701,6 +749,7 @@ deliberate_action:
   verification_contract:
     - Slot hashes verified MATCH (all three) at rev 1; composition unchanged.
     - rev 2 is a plan-only follow-up commit on head a840347 (no amend, no push).
+    - rev 3 is a plan-only follow-up commit on head 29a330e (no amend, no push).
     - Only docs/project/specs/mechanism-atlas-starter.yaml staged and committed.
     - Both required trailers present on the commit; YAML validated.
 
