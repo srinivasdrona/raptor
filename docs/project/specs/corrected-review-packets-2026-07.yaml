@@ -35,6 +35,24 @@
 #      Packet decisions bind to the CURRENT d2312… lineage config; current firing
 #      /incidence is derived directly; no silent hash mixing.
 #
+# rev 3 resolves the two GPT blockers against rev 2:
+#   B1 census selection metadata — add an explicit, frozen top-level
+#      `census_selection_stratum` field (value object CensusSelectionMetadata,
+#      enum {candidate_LP_review, candidate_LB_review, no_deterministic_resolution,
+#      manual_review}) on PacketInput/CandidateEvidencePacket, present on ALL
+#      6,618 packets, INSTEAD of inventing pseudo-pattern IDs. PatternRef stays
+#      optional and present ONLY for LP/LB packets with real pattern data;
+#      unresolved/manual packets set pattern_ref=None. When both exist,
+#      PatternRef.census_selection_stratum == the packet field. The field enters
+#      the packet core/envelope hashes and is OMITTED (with pattern_ref) from the
+#      FIRST_PASS view. `annotation_manual_review` maps EXACTLY ONCE to packet
+#      `manual_review` (no other alias). (D13.)
+#   B2 queue ordering — preserve build_queue_index's existing
+#      `(gene, canonical_spdi, packet_id)` ordering everywhere; every
+#      packet_id-only queue-ordering promise is removed. Per-stratum queues reuse
+#      build_queue_index unchanged (no queue.py change); a manifest packet-id list
+#      is labeled manifest ordering, NOT queue ordering. (D4/R13.)
+#
 # This file is the planner PLAN ONLY. It performs NO implementation, NO tests,
 # NO code/config/data edits, NO packet/artifact generation, NO gate/scope-gate/
 # policy change, NO x64 run, and writes NO packet/queue/manifest artifact. The
@@ -47,7 +65,7 @@
 
 schema: raptor-corrected-review-packets-planning-v1
 status: planner_contract_ready_for_implementation
-revision: 2
+revision: 3
 task_id: core-generate-review-packets
 title: >-
   Regenerate the corrected ADR-0012 internal expert-review packets for the
@@ -58,7 +76,7 @@ title: >-
 worktree: 'D:\AIProjects\raptor-worktrees\review-packets'
 branch: track/review-packets-2026-07
 base_commit: ce42208690aeac23838e5b2fe4a5c378a5a98eb0
-revision_head: 1928758af4b4e4e8c3381df1eea1a243e5776e92
+revision_head: 90df95976abbd271900a072ec1abafc6451b1d8f
 
 roles:
   planner: Claude Opus (this contract)
@@ -149,13 +167,21 @@ binding_decisions:
         keeps `candidate_direction=null`, `null_reason=production_policy_unapproved`,
         and review state `POLICY_BLOCKED` (§4.5 T2). Direction-null packets stay
         first-pass EVIDENCE-reviewable via the direction-blinded FIRST_PASS view.
-      - The eval-only candidate LP/LB selection stratum is carried ONLY as
-        `pattern_ref.census_selection_stratum`; it MUST NEVER be serialized into
+      - Every packet carries its census selection stratum in an explicit
+        top-level packet field `census_selection_stratum` (frozen value object
+        CensusSelectionMetadata, exact enum {candidate_LP_review,
+        candidate_LB_review, no_deterministic_resolution, manual_review}) present
+        on ALL 6,618 packets. `pattern_ref` stays OPTIONAL and is present ONLY for
+        LP/LB packets carrying a real nonblank pattern_id/signature/member_count;
+        unresolved/manual packets have pattern_ref=None (NO invented pseudo-pattern
+        IDs). When both exist, PatternRef.census_selection_stratum MUST equal the
+        packet field. NEITHER the field NOR pattern_ref is ever serialized into
         the production `candidate_direction` field (FR5/FR16, AC4).
       - The redact_for_first_pass(packet) projection strips the entire
         external_comparators envelope AND candidate_direction/signed points/policy
-        id/census direction labels; queue + reviewer delivery consume ONLY the
-        FIRST_PASS projection (FR14.1, AC4/AC17/AC20).
+        id/census direction labels AND the top-level census_selection_stratum
+        field + pattern_ref (to preserve first-pass blinding); queue + reviewer
+        delivery consume ONLY the FIRST_PASS projection (FR14.1, AC4/AC17/AC20).
       - The four named packet hashes (§4.2 packet/core/envelope + decision-log)
         are deterministic; a state/reviewer action never mutates a prior hash.
       - AAVC is a reveal-only disagreement comparator (`external_comparators`),
@@ -215,8 +241,9 @@ decision_ledger:
       across the four first-class strata (157 candidate_LP_review, 7
       candidate_LB_review, 6,424 no_deterministic_resolution, 30 manual_review).
       Every packet has candidate_direction=null, null_reason=production_policy_unapproved,
-      review_state=POLICY_BLOCKED, and carries its stratum only in
-      pattern_ref.census_selection_stratum. The existing build_candidate_universe
+      review_state=POLICY_BLOCKED, and carries its stratum in the explicit
+      top-level census_selection_stratum packet field (D13), with pattern_ref
+      present only for LP/LB (None for unresolved/manual). The existing build_candidate_universe
       (LP+LB only) is reused for the candidate subset; a NEW build_full_vus_universe
       extends the same per-row assembly to the unresolved and manual strata.
     rationale: >-
@@ -234,8 +261,10 @@ decision_ledger:
   D4_candidate_priority_queue_plus_stratum_queues:
     decision: >-
       Emit a deterministic queue/index over the FIRST_PASS projection for EVERY
-      packet, partitioned by stratum, plus a 164-entry candidate-priority queue
-      (the candidate_LP_review + candidate_LB_review packets). The unresolved and
+      packet by REUSING build_queue_index UNCHANGED, preserving its existing
+      `(gene, canonical_spdi, packet_id)` ordering (never packet_id-only; no
+      queue.py change), partitioned by stratum, plus a 164-entry candidate-priority
+      queue (the candidate_LP_review + candidate_LB_review packets). The unresolved and
       manual strata have their own packet records and queue/index entries and are
       recorded in an explicit per-stratum summary; they are NOT excluded from
       packets — they are excluded only from the candidate-PRIORITY queue.
@@ -336,8 +365,10 @@ decision_ledger:
       (== direction_by_gene.NTHL1.manual_review == direction_by_consequence.other.manual_review
       == 30). The corrected run treats stratum "manual_review" and census direction
       "annotation_manual_review" as ONE first-class stratum of 30 rows and never
-      double-counts; packets in this stratum record census_selection_stratum
-      "manual_review".
+      double-counts; packets in this stratum record the top-level
+      census_selection_stratum field "manual_review". The census
+      `annotation_manual_review` key maps EXACTLY ONCE to packet stratum
+      "manual_review"; no other census alias maps to it.
     rationale: slot-3 "define exact manual_review <-> annotation_manual_review mapping".
   D12_evidence_absent_packet_for_zero_fired_rows:
     decision: >-
@@ -352,6 +383,27 @@ decision_ledger:
       PRD-04 all-VUS coverage — PM2 fires for 6,609 of 6,618 rows, so a small
       number of rows may fire no scorable criterion and must still be packeted to
       conserve 6,618.
+  D13_census_selection_metadata_field:
+    decision: >-
+      Add an explicit, frozen top-level census-selection value object
+      (CensusSelectionMetadata) exposing `census_selection_stratum` with the exact
+      enum {candidate_LP_review, candidate_LB_review, no_deterministic_resolution,
+      manual_review} on BOTH PacketInput and CandidateEvidencePacket, populated for
+      ALL 6,618 packets. PatternRef stays OPTIONAL, present ONLY for LP/LB packets
+      carrying real nonblank pattern_id/signature/member_count; unresolved/manual
+      packets set pattern_ref=None (NO invented pseudo-pattern IDs). A model
+      invariant requires that when pattern_ref is present,
+      PatternRef.census_selection_stratum == the packet-level
+      census_selection_stratum. The field enters evidence_core_hash AND
+      packet_envelope_hash consistently (hashing.py) so it is hash-bound for every
+      packet. redact_for_first_pass / FirstPassPacketView OMIT both the field and
+      pattern_ref to preserve first-pass blinding. The production candidate_direction
+      contract is unchanged (still null / POLICY_BLOCKED).
+    rationale: >-
+      GPT blocker B1 — the 6,454 unresolved/manual packets have no real pattern;
+      forcing a PatternRef would require inventing pattern IDs. A first-class
+      packet field gives every packet a stratum without fabricating pattern
+      identity, and keeps blinding + hashing well defined.
 
 rejected_alternatives:
   - id: R1_reuse_historical_conservation
@@ -413,6 +465,20 @@ rejected_alternatives:
       Risks the historical code path / tests; the corrected run is a NEW,
       self-contained script that reuses the calibration script's importable
       helpers without changing its behavior.
+  - id: R12_pseudo_pattern_ids_for_unresolved_manual
+    option: Attach a synthesized PatternRef (invented pattern_id/signature) to the 6,454 unresolved/manual packets so every packet has a pattern_ref.
+    rejected_because: >-
+      B1 — unresolved/manual rows have NO real pattern; inventing pattern IDs
+      fabricates identity and pollutes hashing/queues. D13 adds a first-class
+      top-level census_selection_stratum field instead; pattern_ref stays None for
+      those strata.
+  - id: R13_packet_id_only_queue_ordering
+    option: Re-sort queues by packet_id only (or otherwise change queue ordering) for the corrected run.
+    rejected_because: >-
+      B2 — build_queue_index already orders by `(gene, canonical_spdi, packet_id)`;
+      a packet_id-only promise diverges from the established, test-covered order.
+      The corrected run reuses build_queue_index unchanged (no queue.py edit); only
+      a manifest packet-id list may be lexical, and it is labeled manifest ordering.
 
 # --------------------------------------------------------------------------
 # 3. Immutable external inputs (identity + checksums) — arm's-length read-only
@@ -721,25 +787,30 @@ outputs:
         content: >-
           All 6,618 CandidateEvidencePacket OPERATOR JSONs across the four strata
           (candidate_direction=null, null_reason=production_policy_unapproved,
-          review_state=POLICY_BLOCKED), canonical bytes, one file per packet_id,
-          sorted by packet_id; evidence-absent packets (D12) for any zero-fired
-          row.
+          review_state=POLICY_BLOCKED), each carrying the top-level
+          census_selection_stratum field, canonical bytes, one file per packet_id
+          (filename/manifest ordering, NOT queue ordering); evidence-absent packets
+          (D12) for any zero-fired row.
       - name: first_pass_blinded_views
         content: >-
           FIRST_PASS JSON (redact_for_first_pass projection) + FIRST_PASS Markdown
           (render_markdown view=FIRST_PASS) for ALL 6,618 packets; strips the
           entire external_comparators envelope AND candidate direction/signed
-          points/policy id/census direction labels (FR14.1).
+          points/policy id/census direction labels AND the census_selection_stratum
+          field + pattern_ref (FR14.1).
       - name: per_stratum_queue_index
         content: >-
           Deterministic queue/index (CSV + JSONL) built by build_queue_index over
           the FIRST_PASS projection ONLY, partitioned by stratum (LP/LB/unresolved
-          /manual), ordered by packet_id. Internal review queues, NOT external
-          worklists.
+          /manual), ordered by build_queue_index's existing
+          `(gene, canonical_spdi, packet_id)` key (queue.py unchanged). Internal
+          review queues, NOT external worklists.
       - name: candidate_priority_queue
         content: >-
           The 164-entry candidate-priority queue (157 LP + 7 LB) over the
-          FIRST_PASS projection; the primary internal review queue.
+          FIRST_PASS projection, built by build_queue_index with the same
+          `(gene, canonical_spdi, packet_id)` ordering; the primary internal
+          review queue.
       - name: aggregate_manifest
         content: >-
           Source/config hashes (raw-byte config pins + LF-blob artifact
@@ -747,7 +818,9 @@ outputs:
           current-policy conservation record (6,618 total / 157 / 7 / 6,424 / 30
           / 7+2 patterns), per-stratum coverage summary, current lineage binding
           (d2312…) with directly-derived firing/incidence, pinned limitations, and
-          the preregistered eight-case sample commitment.
+          the preregistered eight-case sample commitment. Any packet-id list here
+          is sorted lexically and LABELED as manifest ordering, explicitly NOT
+          queue ordering.
       - name: stratum_summary
         content: >-
           Explicit non-identifying per-stratum counts (157 / 7 / 6,424 / 30),
@@ -761,8 +834,11 @@ outputs:
           separately-scoped commit permits a non-identifying aggregate.
     determinism: >-
       All artifacts are byte-deterministic (canonical UTF-8, sorted keys, LF-only,
-      one terminal newline) and packet ordering is by packet_id, so any
-      input-sequence permutation re-renders byte-identically.
+      one terminal newline). Queue ordering is build_queue_index's existing
+      `(gene, canonical_spdi, packet_id)` key (never packet_id-only); packet-file
+      naming and any manifest packet-id list are lexical file/manifest ordering,
+      NOT queue ordering. Any input-sequence permutation re-renders
+      byte-identically.
   in_repo_commit_scope:
     planner_commit: NONE beyond this spec file.
     later_optional: >-
@@ -839,8 +915,32 @@ implementation_scope:
         action: >-
           document the corrected CLI, external output boundary, raw-vs-LF hash
           rule, and non-authoritative boundary (documentation only).
-    count: 4
-    do_not_touch: scripts/build_tsc_calibration_batch.py is reused by import only; its behavior and tests are unchanged.
+      - path: src/raptor/packet/model.py
+        action: >-
+          add the frozen CensusSelectionMetadata value object + the top-level
+          `census_selection_stratum` field (exact enum) on PacketInput and
+          CandidateEvidencePacket; enforce the enum + the PatternRef-equals-field
+          invariant when pattern_ref is present; keep pattern_ref Optional (LP/LB
+          only, None for unresolved/manual — no pseudo-pattern IDs); extend
+          FirstPassPacketView + redact_for_first_pass to OMIT the field AND
+          pattern_ref; retain the D12 evidence-absent packet path. Existing callers
+          stay valid (behavior-preserving; field required only on the corrected
+          assembler path). No candidate_direction change.
+      - path: src/raptor/packet/build.py
+        action: >-
+          thread census_selection_stratum from PacketInput onto the built
+          CandidateEvidencePacket for every stratum (LP/LB pattern packets AND
+          unresolved/manual/evidence-absent packets); no candidate_direction change.
+      - path: src/raptor/packet/hashing.py
+        action: >-
+          include the top-level census_selection_stratum field in evidence_core_hash
+          AND packet_envelope_hash consistently (alongside the existing pattern_ref
+          normalization) so the selection stratum is hash-bound for every packet.
+    count: 7
+    do_not_touch: >-
+      scripts/build_tsc_calibration_batch.py is reused by import only (behavior +
+      tests unchanged); src/raptor/packet/queue.py is reused UNCHANGED, preserving
+      its `(gene, canonical_spdi, packet_id)` ordering.
     generated_runtime_output_not_hand_authored:
       - 'external RAPTOR data root: 6,618 OPERATOR packets + FIRST_PASS views + per-stratum queues + 164 candidate-priority queue + aggregate manifest + stratum summary + preregistered sample (+ optional corrected calibration/sample).'
   gemini_test_author:
@@ -849,18 +949,19 @@ implementation_scope:
       - tests/packet/test_corrected_universe_conservation.py
       - tests/packet/test_corrected_discovery_sample.py
       - tests/packet/test_corrected_real_data_integration.py
-    count: 4
+      - tests/packet/test_corrected_selection_metadata.py
+    count: 5
     ordering: Gemini authors + RED-verifies these before Sonnet implements.
   preservation_scope_do_not_touch:
     - data/census/tsc_calibration_batch_2026-07-11.json (frozen historical 1,571-universe calibration)
     - data/census/tsc_bias_lineage_audit_2026-07-10.json (historical pre-ADR-0012 static audit)
     - data/census/** other stats/gate/audits (read-only, hash-bound)
     - configs/** (all policy/config; read-only, hash-bound)
-    - src/raptor/census/strata.py and src/raptor/packet/{build,queue,render,model,hashing,direction,decisions,state}.py (reused; only build/model minimally extended for the D12 evidence-absent packet, behavior-preserving for existing callers)
+    - src/raptor/census/strata.py and src/raptor/packet/{queue,render,direction,decisions,state}.py (reused UNCHANGED; queue.py ordering `(gene, canonical_spdi, packet_id)` is preserved verbatim). src/raptor/packet/{model,build,hashing}.py are EDIT targets (Sonnet scope) for the census_selection_stratum field + the D12 evidence-absent packet, behavior-preserving for existing callers
     - scripts/build_tsc_calibration_batch.py and tests/packet/test_tsc_calibration_batch.py (reused by import; behavior + tests unchanged)
     - src/raptor/eval/gate.py, src/raptor/eval/scope_gate.py (authoritative gates)
     - the external raptor-data inputs (arm's-length, read-only)
-  branch_counts: {planner: 1, sonnet: 4, gemini: 4, total_branch: 9}
+  branch_counts: {planner: 1, sonnet: 7, gemini: 5, total_branch: 13}
 
 # --------------------------------------------------------------------------
 # 9. Gemini RED / unit / integration test matrix
@@ -875,12 +976,13 @@ test_matrix:
   unit_universe:
     - 'G-CP1 full universe == every manifest identity -> exactly one packet (6,618) across four strata (157 LP + 7 LB + 6,424 unresolved + 30 manual); an input permutation re-renders byte-identically.'
     - 'G-CP2 every packet has candidate_direction=null, null_reason=production_policy_unapproved, review_state=POLICY_BLOCKED, in every stratum.'
-    - 'G-CP3 the eval LP/LB (and unresolved/manual) stratum appears ONLY in pattern_ref.census_selection_stratum, NEVER in candidate_direction (AC4).'
+    - 'G-CP3 every packet exposes its stratum via the top-level census_selection_stratum field (enum), NEVER via candidate_direction (AC4); pattern_ref is present only for LP/LB and None for unresolved/manual.'
     - 'G-CP4 FIRST_PASS projection strips the whole external_comparators envelope AND candidate direction/signed points/policy id/census direction labels; per-stratum queues + the candidate-priority queue consume only FIRST_PASS.'
     - 'G-CP5 the candidate-priority queue has exactly 164 entries (157 LP + 7 LB); the per-stratum summary records 6,424 + 30 excluded-from-priority; 164 + 6,454 == 6,618.'
     - 'G-CP6 every fired PP3/BP4 renders with lineage disposition deferred bound to the current d2312… config; ZERO scored PP3/BP4; no candidate-direction point.'
     - 'G-CP7 a zero-fired-criteria row produces a deterministic evidence-absent packet (empty scored set + MissingEvidence), conserving 6,618 (D12).'
     - 'G-CP8 manual_review stratum == the 30 NTHL1 rows == census annotation_manual_review; no double-count (D11).'
+    - 'G-CP16 CensusSelectionMetadata enum accepts exactly {candidate_LP_review,candidate_LB_review,no_deterministic_resolution,manual_review}; every one of 6,618 packets carries the top-level field; LP/LB packets have a real nonblank PatternRef whose census_selection_stratum equals the packet field; unresolved/manual packets have pattern_ref=None (no pseudo IDs); the field is included in evidence_core_hash AND packet_envelope_hash; redact_for_first_pass omits BOTH the field and pattern_ref; a PatternRef/field mismatch, a pattern_ref on an unresolved/manual packet, or an out-of-enum value is rejected (backward-invalid inputs) (D13).'
   unit_conservation:
     - 'G-CP9 current-policy conservation reads the disabled_manual schema (raptor_current_policy_internal_direction 157/7/6,424/30, candidate_pattern_compression 7/2, source_hashes, run_integrity) and fails closed on drift; it does NOT read worker/run_integrity.input_vcf_sha256 and does NOT assert 238/1,333.'
     - 'G-CP10 identity/row/exact-join/source-hash invariants (6,618/6,618/one-to-one/3fff/0a55/7f99) conserved before any write; all counts derived, no expected-count literal in production code.'
@@ -916,8 +1018,12 @@ sonnet_contract:
       processing; fail closed on drift; run current-policy conservation before any
       write.
     - Keep every packet candidate_direction=null / POLICY_BLOCKED; carry the
-      stratum ONLY in pattern_ref; deliver reviewers ONLY the FIRST_PASS
-      projection; bind PP3/BP4 lineage to the current d2312… config as deferred.
+      stratum in the top-level census_selection_stratum field (pattern_ref only
+      for LP/LB, None for unresolved/manual); include the field in the packet
+      core+envelope hashes; omit the field + pattern_ref from the FIRST_PASS
+      projection; deliver reviewers ONLY the FIRST_PASS projection; reuse
+      build_queue_index UNCHANGED with its `(gene, canonical_spdi, packet_id)`
+      ordering; bind PP3/BP4 lineage to the current d2312… config as deferred.
     - Write full artifacts ONLY under a NEW external run directory, atomically,
       no-overwrite; resolve full-40-hex code_commit and fail closed on a dirty tree.
   must_not:
@@ -933,6 +1039,9 @@ sonnet_contract:
       and LF-blob pins.
     - Serialize any stratum into candidate_direction, reveal AAVC (or its
       direction) in FIRST_PASS, or let PP3/BP4 become a scored call.
+    - Invent pseudo-pattern IDs or attach a PatternRef to an unresolved/manual
+      packet; change the production candidate_direction contract; or change
+      queue.py or its `(gene, canonical_spdi, packet_id)` ordering.
     - Tune, round, or "fix" the disappointing disabled-mode counts.
 
 # --------------------------------------------------------------------------
@@ -953,6 +1062,7 @@ gpt_probes:
     - 'P10 output_boundary — full artifacts only under a NEW external run directory, atomic + no-overwrite; identity never committed in-repo; only non-identifying aggregates + packet-hash sample commitments may be (later) committed.'
     - 'P11 manual_mapping — stratum manual_review == census annotation_manual_review == 30 NTHL1; no double-count.'
     - 'P12 evidence_absent — zero-fired rows produce deterministic evidence-absent packets so the universe conserves 6,618.'
+    - 'P13 selection_metadata — every packet carries the top-level census_selection_stratum enum field; pattern_ref present only for LP/LB (None for unresolved/manual, no pseudo IDs); PatternRef.census_selection_stratum == the packet field when present; the field is hash-bound (core+envelope) and omitted from FIRST_PASS with pattern_ref; queue ordering stays (gene, canonical_spdi, packet_id) via the unchanged build_queue_index/queue.py.'
   posture: >-
     The measured result may be scientifically disappointing and must not be
     tuned; the checker verifies faithfulness, not favorable numbers.
@@ -972,7 +1082,10 @@ cli_and_output_boundary:
       one terminal newline, explicit byte encode + binary write (never
       Path.write_text / text-mode LF->CRLF). code_commit is the FULL 40-hex
       `git rev-parse HEAD`; a dirty tree or abbreviated/unresolvable commit fails
-      closed. Packet/queue ordering is by packet_id.
+      closed. Queue ordering is build_queue_index's existing
+      `(gene, canonical_spdi, packet_id)` key (queue.py unchanged); packet-file
+      naming and any manifest packet-id list are lexical file/manifest ordering,
+      NOT queue ordering.
   output_boundary:
     accept: >-
       A NEW run-scoped directory UNDER the external RAPTOR data root (outside the
@@ -992,15 +1105,16 @@ cli_and_output_boundary:
 migration_and_backout:
   migration:
     - Land planner spec (this commit) -> Gemini RED tests -> Sonnet
-      corrected-universe module + CLI + provenance helper (+ minimal
-      evidence-absent build/model extension) -> GPT-5.4 checker probes ->
+      corrected-universe module + CLI + provenance helper + the model/build/
+      hashing edits (census_selection_stratum field + D12 evidence-absent packet;
+      queue.py untouched) -> GPT-5.4 checker probes ->
       orchestrator runs the real 6,618-row build to a NEW external run directory
       and freezes the non-identifying aggregate + the preregistered eight-case
       sample. The frozen 2026-07-11 artifact and the calibration script/tests are
       untouched throughout.
   backout:
-    - Revert the corrected module/CLI/helper (+ the minimal build/model
-      extension); the calibration script, its tests, configs, census, gates,
+    - Revert the corrected module/CLI/helper + the model/build/hashing edits;
+      queue.py, the calibration script, its tests, configs, census, gates,
       audits, and the frozen historical artifact were never behavior-changed, and
       no in-repo data artifact was written, so no data backout is needed.
   discovery_handoff:
@@ -1049,9 +1163,10 @@ beat4_self_audit:
         MITIGATION: section 4 hash_rule pins LF blobs and records CRLF as
         do_not_pin.
     - direction_or_aavc_leak: >-
-        A stratum leaks into candidate_direction, or AAVC leaks into FIRST_PASS.
-        MITIGATION: R6/R7 + G-CP3/G-CP4 + P3/P4 — stratum in pattern_ref only;
-        AAVC reveal-only.
+        A stratum leaks into candidate_direction, or AAVC/selection metadata leaks
+        into FIRST_PASS. MITIGATION: R6/R7 + G-CP3/G-CP4/G-CP16 + P3/P4/P13 —
+        stratum in the top-level census_selection_stratum field (omitted from
+        FIRST_PASS with pattern_ref); AAVC reveal-only.
     - manual_double_count: >-
         The 30 manual rows are counted as both manual_review and
         annotation_manual_review. MITIGATION: D11 + G-CP8 + P11 — one stratum, 30.
@@ -1068,6 +1183,14 @@ beat4_self_audit:
     - vacuous_real_test: >-
         The integration test loads a written packet/manifest and asserts its own
         values. MITIGATION: G-CP15 recomputes through the reused seams.
+    - pseudo_pattern_id_invention: >-
+        Unresolved/manual packets are forced to carry an invented PatternRef.
+        MITIGATION: D13 + R12 + G-CP16 + P13 — explicit top-level
+        census_selection_stratum field; pattern_ref None for unresolved/manual.
+    - queue_ordering_regression: >-
+        Queues are re-sorted by packet_id only, diverging from the established
+        `(gene, canonical_spdi, packet_id)` order. MITIGATION: D4 + R13 + G-CP4 +
+        P13 — build_queue_index reused unchanged; queue.py never edited.
   empty_beats: none — every beat applied.
 
 # --------------------------------------------------------------------------
@@ -1089,6 +1212,7 @@ validation:
       python -m pytest tests/packet/test_corrected_review_packets.py
       tests/packet/test_corrected_universe_conservation.py
       tests/packet/test_corrected_discovery_sample.py
+      tests/packet/test_corrected_selection_metadata.py
       tests/packet/test_tsc_calibration_batch.py
     mandatory_real_data_integration: >-
       $env:RAPTOR_PACKET_REAL_DATA="1"; python -m pytest
