@@ -4,7 +4,8 @@
 > [adr.github.io](https://adr.github.io/madr/)). Newest at top. An ADR is **immutable once Accepted** —
 > to change a decision, add a new ADR that supersedes it. This log is the source of truth for *why*
 > RAPTOR is the way it is; `STRATEGY.md` Part I §5/§9, `STRATEGY.md` Part II §2/§4, and `EVALUATION.md`
-> where cited must stay consistent with the Accepted ADRs here.
+> where cited must stay consistent with the Accepted ADRs here. Preserved ADR bodies may retain split-era
+> citations as historical text; use the compatibility stubs/crosswalk above to reach current authority.
 
 **Index**
 
@@ -215,7 +216,7 @@ a narrower, non-clinical, research-only claim scoped to truncating-pathogenic al
 3. **Do nothing until the corrected rerun.** Rejected: the authorization *rule* itself (which scopes may
    independently authorize what) is a policy decision that must be preregistered **before** that rerun,
    not invented after seeing its numbers — exactly the discipline this program has followed for every
-   other threshold (EVALUATION.md Part II §5).
+   other threshold (EVAL_RUBRIC.md §5).
 
 ### Decision
 
@@ -368,7 +369,7 @@ Adopt **option 1**:
 
 ### Context
 
-The frozen benchmark (EVALUATION Part I §2) uses **ClinVar-derived labels**. The Tier-1/2 scorer is
+The frozen benchmark (EVAL_PLAN §2) uses **ClinVar-derived labels**. The Tier-1/2 scorer is
 **BIAS-2015 v3.0.0** (ADR-0007/0008). The first real x64-devbox BIAS output (2026-07) revealed which
 of BIAS's per-criterion rationales are **sourced from ClinVar's own classifications** — grading such a
 criterion against ClinVar labels reads the answer key (R-A2 circularity). Two distinct kinds surfaced:
@@ -627,7 +628,7 @@ defenses, and to keep the planner's context clear of operational test-writing.
    seed PRD-02 AC3, breaking the self-verification circularity), **`bitscopic/BIAS-2015` test suite**
    (how the 19/28 ACMG criteria are validated → PRD-01), **GA4GH normalization *concepts*** for
    representation equivalence (R-A10), and **ClinGen/ClinVar expert labels** as classification truth
-   (already the EVALUATION Part I label hierarchy).
+   (already the EVAL_PLAN label hierarchy).
 
 ### Consequences
 
@@ -727,7 +728,7 @@ Rules:
 - **Bad / cost:** three model families per iteration is more expensive and higher-latency than a
   single agent; requires orchestration (LiteLLM routing) and hand-off artifact plumbing.
 - **Open:** exact hand-off artifact schema (spec + verdict formats) and gate automation — to be
-  specified in `STRATEGY.md` / `ARCHITECTURE.md`.
+  specified in `OPERATING_MODEL.md` / `ARCHITECTURE.md`.
 
 ### Confirmation
 
