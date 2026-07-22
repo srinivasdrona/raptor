@@ -580,8 +580,10 @@ todos:
     reconciled, publish a source-linked article explaining what the production-faithful masked
     rerun showed, what changed from the pre-results post, where RAPTOR failed or abstained,
     what the corrected census/packets do and do not mean, and why the bounded TSC2 Mechanism
-    Atlas comes next. Use no projected results, clinical claims or grant-driven overstatement.'
-  status: in_progress
+    Atlas comes next. Use no projected results, clinical claims or grant-driven overstatement.
+    Published 2026-07-23 at docs/blog/2026-07-23-after-the-first-rerun.md and merged at
+    c8ec5ae after independent fact, link, privacy and overclaim review.'
+  status: done
   depends_on:
   - refresh-program-docs
   - refresh-repository-readme
