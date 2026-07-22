@@ -96,12 +96,14 @@
 
 ## Operating Model — build loop
 
-RAPTOR is built in a **design → build → review → eval → (back to design)** loop with a fixed
-model-role split (see **[ADR-0003](DECISIONS.md#adr-0003--loop-operating-model-planner--doer--checker-across-three-model-families)**):
+RAPTOR is built in a **design → test-author → build → review → eval → (back to design)** loop with a fixed
+model-role split (see **[ADR-0003](DECISIONS.md#adr-0003--loop-operating-model-planner--doer--checker-across-three-model-families)**
+and **[ADR-0005](DECISIONS.md#adr-0005--test-strategy-separated-authorship-model-diversity-frameworks--domain-truth-data)**):
 
 | Stage | Role | Model | Note |
 |---|---|---|---|
 | Design / plan | Planner | Claude Opus | writes task spec + acceptance criteria; no production code |
+| Test authoring | Test author | Gemini | writes RED acceptance tests from the spec before implementation |
 | Build | Doer | Claude Sonnet 5 | implements against the spec |
 | Review / eval | Checker | GPT (5.x) | adversarial review vs acceptance criteria; pass or send back |
 
@@ -293,9 +295,10 @@ gate, and full-output derivation audit are complete (ADR-0009).
   immutable 2,577-row BIAS evidence/mask artifacts were reused; 2,043 variants had 2,063 predictor
   calls suppressed (BP4 1,929; PP3 134); zero PP3/BP4 calls were scored. The binding missense gate
   returned `FAIL` and the v2 full-spectrum gate returned `BLOCKED_POLICY` (PM1 evaluation exclusion);
-  `vus_authorized=false`. `truncating:pathogenic` independently met its 0.95/0.95 thresholds, but the
-  PM1 parity blocker prevents any research-scope authorization. R2 is frozen and byte-identical going
-  forward.
+  `vus_authorized=false`. Under frozen v2 semantics PM1 was a global parity blocker. ADR-0013's
+  additive v3 re-adjudication scopes PM1 to `missense:pathogenic`; truncating-pathogenic is
+  `SUPPORTED_POSTHOC` with authorization `PENDING_PROSPECTIVE`, not PM1-blocked or authorized. R2 is
+  frozen and byte-identical going forward.
 - (Resolved 2026-07-21/22) **Corrected VUS census + tiered gate v3 post-hoc re-adjudication** —
   ADR-0012's `disabled_manual` census now reports **157**/**7**/**6,424**/**30** current candidate
   directions (superseding the earlier PP3/BP4-active **238**/**1,333**/**5,017**/**30** as a labeled

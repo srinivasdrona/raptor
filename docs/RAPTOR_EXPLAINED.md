@@ -66,13 +66,10 @@ it cannot prove. That candor is the point: an auditable engine tells you what it
 
 ## Where things stand today
 
-RAPTOR has taken its first "exam" — the leakage-safe held-out test described above. As expected, it
-passed cleanly on the easy (truncating) typos and, on the hard (missense) ones, didn't yet have enough
-known-answer examples to statistically prove itself either way — which it honestly reported as "not
-enough evidence" rather than guessing. We've since gone back and re-described that same exam result
-more precisely, separating "not enough evidence yet" from "actively failed," so nothing gets
-mischaracterized either way. No new exam has been run and no new evidence has been produced by that
-re-description alone. The next real test — on a fresh, not-yet-published batch of known-answer
-typos — is scheduled but has not happened yet, and RAPTOR does not sort any real unknowns for outside
-use until it clears that next test.
-
+RAPTOR has taken its first "exam" — the leakage-safe held-out test described above. The frozen counts
+provide supportive post-hoc evidence for the truncating-pathogenic scope, while the hard missense
+scopes did not have enough called examples to estimate performance. That truncating evidence is not
+yet prospectively validated or authorized. We've re-described the same exam result more precisely,
+separating "not enough evidence yet" from "actively failed," without generating new evidence. The
+next real test — on a fresh, not-yet-published batch of known-answer typos — is registered but has not
+happened yet, and RAPTOR does not sort any real unknowns for outside use until it clears that test.

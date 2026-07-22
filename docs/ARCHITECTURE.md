@@ -69,8 +69,9 @@ reclassification (see STRATEGY.md §9).
 
 > **Two distinct loops — do not conflate:**
 > - **Runtime data pipeline** (this doc) — linear DAG, orchestrated by Prefect.
-> - **Build-time loop** — planner (Opus) → doer (Sonnet 5) → checker (GPT), a *development* process
->   (ADR-0003), orchestrated by the operator + Copilot CLI + delegation, **not** a runtime component.
+> - **Build-time loop** — planner (Opus) → test author (Gemini) → doer (Sonnet 5) → checker (GPT), a
+>   *development* process (ADR-0003/ADR-0005), orchestrated by the operator + Copilot CLI +
+>   delegation, **not** a runtime component.
 
 ## 5. Building block view (C4 — Level 2: Containers)
 
