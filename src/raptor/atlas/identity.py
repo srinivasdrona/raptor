@@ -15,11 +15,17 @@ from typing import Any, Callable, Mapping
 
 from raptor.atlas.model import AtlasIdentity, AtlasIdentityError
 
-#: A canonical SPDI accession/version component is shaped like a RefSeq
-#: accession -- one to four letters, an underscore, digits, a dot, and a
-#: version number (e.g. ``NC_000000.0``). This is a SHAPE check only; it
-#: never hardcodes a specific real accession.
-_SPDI_ACCESSION_RE = re.compile(r"^[A-Za-z]{1,4}_[0-9]+\.[0-9]+$")
+#: A canonical SPDI accession/version component MUST be a genomic
+#: (chromosome-level) RefSeq accession -- the ``NC_`` prefix, an
+#: underscore, digits, a dot, and a version number (e.g.
+#: ``NC_000000.0``). Canonical SPDI is genome-anchored (GRCh38-shaped),
+#: so transcript (``NM_``/``NR_``), protein (``NP_``/``XP_``), genomic-
+#: contig/region (``NG_``), or any other RefSeq-like prefix is rejected
+#: here even though it may be a syntactically valid RefSeq accession
+#: shape -- only a chromosome-level genomic accession can anchor
+#: canonical identity. This is a SHAPE check only; it never hardcodes a
+#: specific real accession.
+_SPDI_ACCESSION_RE = re.compile(r"^NC_[0-9]+\.[0-9]+$")
 #: A deletion/insertion component is an uppercase nucleotide sequence
 #: (empty allowed, per canonical SPDI grammar, for pure insertions/
 #: deletions).
@@ -28,10 +34,15 @@ _SPDI_BASE_RE = re.compile(r"^[ACGTN]*$")
 
 def validate_canonical_spdi_shape(spdi: Any) -> str:
     """Validate that ``spdi`` is a syntactically well-formed canonical
-    (RefSeq-accession-shaped) SPDI string: exactly four colon-separated
-    components -- ``<accession>.<version>:<position>:<deletion>:<insertion>``
-    -- with a zero-based non-negative integer position and uppercase
-    nucleotide (A/C/G/T/N, empty allowed) deletion/insertion sequences.
+    (genomic RefSeq-accession-shaped) SPDI string: exactly four
+    colon-separated components --
+    ``<NC_accession>.<version>:<position>:<deletion>:<insertion>`` -- with
+    a zero-based non-negative integer position and uppercase nucleotide
+    (A/C/G/T/N, empty allowed) deletion/insertion sequences. The
+    accession component MUST be a chromosome-level genomic ``NC_``
+    RefSeq accession; transcript, protein, or other RefSeq-like
+    accession prefixes are rejected because canonical SPDI is genome-
+    anchored, not transcript- or protein-anchored.
 
     This is the SOLE shared shape validator for canonical SPDI admission;
     it is reused by both :func:`admit_identity` and the promotion pipeline's
@@ -39,7 +50,8 @@ def validate_canonical_spdi_shape(spdi: Any) -> str:
     presence-only or alias-equality check. Returns ``spdi`` unchanged on
     success; raises :class:`AtlasIdentityError` fail-closed on any
     malformed shape (whitespace, HGVS-style punctuation, wrong colon
-    count, negative/non-integer position, or non-nucleotide bases).
+    count, negative/non-integer position, non-genomic accession prefix,
+    or non-nucleotide bases).
     """
 
     if not isinstance(spdi, str) or not spdi:
@@ -57,7 +69,10 @@ def validate_canonical_spdi_shape(spdi: Any) -> str:
     accession, position, deletion, insertion = parts
     if not _SPDI_ACCESSION_RE.match(accession):
         raise AtlasIdentityError(
-            f"canonical SPDI {spdi!r} has a malformed accession.version component {accession!r}"
+            f"canonical SPDI {spdi!r} has a malformed accession.version component "
+            f"{accession!r}: canonical SPDI requires a chromosome-level genomic "
+            "NC_ RefSeq accession (transcript/protein/other RefSeq-like prefixes "
+            "are not genome-anchored and are not accepted)"
         )
     if not position.isdigit():
         raise AtlasIdentityError(
