@@ -37,6 +37,7 @@ def _api():
         from raptor.packet.model import (
             CandidateEvidencePacket,
             CanonicalVariantIdentity,
+            CensusSelectionMetadata,
             CriterionEntry,
             DirectionPolicyError,
             DispositionMappingError,
@@ -68,7 +69,9 @@ def _api():
         )
     except ImportError as exc:
         pytest.fail(f"PRD-04 packet core is not implemented: {exc}")
-    return locals()
+    api = locals()
+    api["_packet_config"] = _packet_config
+    return api
 
 
 def _provenance(api, *, key: str = "row-1"):

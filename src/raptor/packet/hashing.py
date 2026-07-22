@@ -48,7 +48,11 @@ def evidence_core_hash(packet: Any) -> str:
     lineage + disposition + strengths/directions + two-level provenance refs
     + direction/null_reason + signed points + exclusions/contradictions/
     missing-evidence. **Excludes** narrative, comparators, run metadata,
-    review state, decisions."""
+    review state, decisions. A corrected-track packet's ad-hoc
+    `census_selection_stratum` attribute (never a declared
+    `CandidateEvidencePacket` field, see `raptor.packet.model`) is bound in
+    only when present, so pre-existing (non-corrected) packets hash
+    byte-identically to before."""
     payload = {
         "identity": _normalize(packet.identity),
         "entries": _normalize(packet.entries),
@@ -58,6 +62,9 @@ def evidence_core_hash(packet: Any) -> str:
         "quality_flags": sorted(packet.quality_flags),
         "missing_evidence": _normalize(packet.missing_evidence),
     }
+    census_selection_stratum = getattr(packet, "census_selection_stratum", None)
+    if census_selection_stratum is not None:
+        payload["census_selection_stratum"] = _normalize(census_selection_stratum)
     return _canonical_hash(payload)
 
 
@@ -77,7 +84,9 @@ def packet_envelope_hash(packet: Any) -> str:
     run-metadata pins (schema version, config/policy versions, source
     snapshot). **Excludes** only `run_id` and `generated_at` -- comparator/
     pattern/state changes create a new immutable envelope while leaving the
-    evidence core unchanged."""
+    evidence core unchanged. A corrected-track packet's ad-hoc
+    `census_selection_stratum` attribute is bound in only when present (see
+    `evidence_core_hash`)."""
     payload = {
         "evidence_core_hash": packet.evidence_core_hash,
         "narrative_plan_hash": packet.narrative_plan_hash,
@@ -96,6 +105,9 @@ def packet_envelope_hash(packet: Any) -> str:
         "predecessor_packet_id": packet.predecessor_packet_id,
         "predecessor_envelope_hash": packet.predecessor_envelope_hash,
     }
+    census_selection_stratum = getattr(packet, "census_selection_stratum", None)
+    if census_selection_stratum is not None:
+        payload["census_selection_stratum"] = _normalize(census_selection_stratum)
     return _canonical_hash(payload)
 
 
