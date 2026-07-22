@@ -227,14 +227,30 @@ def test_full_vus_universe_conservation() -> None:
     
     assert len(packets) == 4
     
-    # Defect 3: Assert source pins on packet.source_snapshot: clinvar_sha256/input VCF, bias_output_sha256, and manifest_sha256
+    # Expected fingerprint calculated using the calibration helper/fixture logic
+    from scripts.build_tsc_calibration_batch import canonical_json
+    packet_config = api["_packet_config"](api)
+    expected_fingerprint = hashlib.sha256(
+        canonical_json({
+            "packet_schema_version": packet_config.packet_schema_version,
+            "config_version": packet_config.config_version,
+            "lineage_policy_sha256": packet_config.lineage_policy_sha256,
+            "candidate_policy_sha256": packet_config.candidate_policy_sha256,
+        }).encode("utf-8")
+    ).hexdigest()
+    
+    # Assert source pins on packet.source_snapshot: clinvar_sha256/input VCF, bias_output_sha256, and manifest_sha256
+    # Keep the three source-pin equality assertions and prove separation.
     for p in packets:
         assert p.source_snapshot.clinvar_sha256 == run_pins.input_sha256
         assert p.source_snapshot.bias_output_sha256 == run_pins.output_sha256
         assert p.source_snapshot.manifest_sha256 == run_pins.manifest_sha256
         
-        # Separately assert packet_config_sha256 is the packet config fingerprint
-        assert len(p.run_metadata.packet_config_sha256) == 64
+        # Replace length assertion with actual config fingerprint match and separation
+        assert p.run_metadata.packet_config_sha256 == expected_fingerprint
+        assert p.run_metadata.packet_config_sha256 != p.source_snapshot.clinvar_sha256
+        assert p.run_metadata.packet_config_sha256 != p.source_snapshot.bias_output_sha256
+        assert p.run_metadata.packet_config_sha256 != p.source_snapshot.manifest_sha256
         
     # Assert run_integrity.exact_join & identity equality & 4 strata & unresolved/manual are pattern_ref None
     for p in packets:
