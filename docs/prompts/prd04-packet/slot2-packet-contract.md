@@ -23,7 +23,7 @@ not a classification.
 
 ## Sources
 
-- `docs/STRATEGY.md` Part I §5 (GP-1/3/5/6/8/9/11/13) and Part I §9 (two sign-off levels)
+- `docs/STRATEGY.md` GP-1/3/5/6/8/9/11/13, §9 (two sign-off levels)
 - `docs/PROGRAM.md` census/priorities/PRD-04 sequencing (items 6/8/9), AAVC boundary
 - `docs/DECISIONS.md` ADR-0009 (ClinVar lineage) / ADR-0010 (vertical reset)
 - `data/census/tsc_vus_clinvar_2026-07-07_stats.json` (pattern/topology facts + provenance)

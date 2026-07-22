@@ -5,7 +5,7 @@
 - Do not modify code, tests, configs, PRDs, architecture, eval methodology, benchmark data, or prompt
   artifacts outside this new strategy-reset prompt directory.
 - Do not weaken STRATEGY GP-1/GP-3/GP-8/GP-9/GP-10/GP-11/GP-12, the two-level human sign-off, the
-  no-medical-device boundary, or EVALUATION Part II thresholds.
+  no-medical-device boundary, or EVAL_RUBRIC thresholds.
 - ADR-0001 remains immutable history; ADR-0010 explicitly supersedes only affected parts.
 
 ## Three failure modes

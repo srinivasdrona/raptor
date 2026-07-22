@@ -22,7 +22,7 @@
   },
   "source_pins": {
     "repo_head": "e52e855",
-    "eval_rubric": "docs/EVALUATION.md Part II §1 (thresholds) / §2 (Clopper-Pearson power table -- narrowly corrected to n>=36/72/368) / §3 (post-split held-out N) / §5-§6 (per-stratum + lower-bound follow-ups)",
+    "eval_rubric": "docs/EVAL_RUBRIC.md §1 (thresholds) / §2 (Clopper-Pearson power table -- narrowly corrected to n>=36/72/368) / §3 (post-split held-out N) / §5-§6 (per-stratum + lower-bound follow-ups)",
     "pre_registered_thresholds": {
       "missense": {"precision": 0.90, "recall": 0.85, "gating": true, "directions": ["pathogenic", "benign"]},
       "truncating": {"precision": 0.95, "recall": 0.95, "gating": true, "directions": ["pathogenic"]},
@@ -61,13 +61,13 @@
     "src/raptor/eval/predictor_policy.py",
     "configs/eval/tsc2.yaml",
     "pyproject.toml",
-    "docs/EVALUATION.md",
+    "docs/EVAL_RUBRIC.md",
     "tests/eval/test_clopper_pearson_gate.py",
     "tests/eval/test_predictor_policy_gate.py",
     "scripts/run_masked_holdout_eval.py"
   ],
   "reference_files": [
-    "docs/EVALUATION.md",
+    "docs/EVAL_RUBRIC.md",
     "src/raptor/eval/gate.py",
     "src/raptor/eval/metrics.py",
     "configs/eval/tsc2.yaml"
@@ -75,15 +75,15 @@
   "roles": {
     "tester": {
       "model_target": "gemini-3.1-pro-preview",
-      "responsibility": "Author executable AC tests (AC-G1..AC-G9) from slot 2 + slot-1 surfaces only, before the doer. Derive the Clopper-Pearson oracle from scipy.stats.beta.ppf + the CORRECTED EVALUATION Part II §2 anchor points (LB(36,36)>=0.90>LB(35,35); LB(72,72)>=0.95>LB(71,71); LB(368,368)>=0.99>LB(367,367)) and hand-computed confusion matrices, never the implementation. AC-G2 proves point-clears-but-LB-fails != PASS. AC-G4 proves below min_count_per_class=36 -> UNDERPOWERED. AC-G5 proves a config threshold differing from the pinned rubric value is rejected under the nested schema. AC-G8/G9 prove the terminal runner requires an approved bp4pp3-predictor-policy artifact and emits fail-closed BLOCKED_POLICY (no metrics) on missing/unapproved/malformed synthetic fixtures, never a default-allow."
+      "responsibility": "Author executable AC tests (AC-G1..AC-G9) from slot 2 + slot-1 surfaces only, before the doer. Derive the Clopper-Pearson oracle from scipy.stats.beta.ppf + the CORRECTED EVAL_RUBRIC §2 anchor points (LB(36,36)>=0.90>LB(35,35); LB(72,72)>=0.95>LB(71,71); LB(368,368)>=0.99>LB(367,367)) and hand-computed confusion matrices, never the implementation. AC-G2 proves point-clears-but-LB-fails != PASS. AC-G4 proves below min_count_per_class=36 -> UNDERPOWERED. AC-G5 proves a config threshold differing from the pinned rubric value is rejected under the nested schema. AC-G8/G9 prove the terminal runner requires an approved bp4pp3-predictor-policy artifact and emits fail-closed BLOCKED_POLICY (no metrics) on missing/unapproved/malformed synthetic fixtures, never a default-allow."
     },
     "doer": {
       "model_target": "claude-sonnet-5",
-      "responsibility": "Implement stats.py (exact Beta lower bound) + predictor_policy.py (bp4pp3-predictor-policy fail-closed loader); extend metrics/gate/report/model additively; MIGRATE config.py oracle_thresholds to the nested per-stratum schema (breaking) replacing the float(v)-per-key builder so no float(dict) path exists; migrate configs/eval/tsc2.yaml (value-preserving) and correct min_count_per_class 35->36; declare scipy>=1.10 in pyproject.toml; apply the narrow docs/EVALUATION.md Part II §2 anchor correction. Gate on the lower bound; preserve UNVERIFIED/UNDERPOWERED/PASS/FAIL honesty; wire BLOCKED_POLICY into scripts/run_masked_holdout_eval.py. Never fit or change a POLICY threshold value; never relabel BP4/PP3 lineage in bias_lineage.yaml; never modify run_eval or docs/PROGRAM.md / docs/STRATEGY.md. Honor slot 3."
+      "responsibility": "Implement stats.py (exact Beta lower bound) + predictor_policy.py (bp4pp3-predictor-policy fail-closed loader); extend metrics/gate/report/model additively; MIGRATE config.py oracle_thresholds to the nested per-stratum schema (breaking) replacing the float(v)-per-key builder so no float(dict) path exists; migrate configs/eval/tsc2.yaml (value-preserving) and correct min_count_per_class 35->36; declare scipy>=1.10 in pyproject.toml; apply the narrow docs/EVAL_RUBRIC.md §2 anchor correction. Gate on the lower bound; preserve UNVERIFIED/UNDERPOWERED/PASS/FAIL honesty; wire BLOCKED_POLICY into scripts/run_masked_holdout_eval.py. Never fit or change a POLICY threshold value; never relabel BP4/PP3 lineage in bias_lineage.yaml; never modify run_eval or docs/PROGRAM.md / docs/STRATEGY.md. Honor slot 3."
     },
     "checker": {
       "model_target": "gpt-5.6-sol",
-      "responsibility": "Re-verify all ACs pass; POLICY threshold values + run_eval + harness label-blindness + BP4/PP3 lineage records are unchanged; the min_count 35->36 change and EVALUATION Part II §2 correction are exact scipy-derived math (not tuning) and no float(dict) path survives; and none of the six slot-3 inversion failures are present (point-estimate green, threshold drift/fitting, underpowered pass, premature terminal PASS/default-allow policy, Wald approximation, retaining a wrong anchor)."
+      "responsibility": "Re-verify all ACs pass; POLICY threshold values + run_eval + harness label-blindness + BP4/PP3 lineage records are unchanged; the min_count 35->36 change and EVAL_RUBRIC §2 correction are exact scipy-derived math (not tuning) and no float(dict) path survives; and none of the six slot-3 inversion failures are present (point-estimate green, threshold drift/fitting, underpowered pass, premature terminal PASS/default-allow policy, Wald approximation, retaining a wrong anchor)."
     }
   },
   "dependencies": {

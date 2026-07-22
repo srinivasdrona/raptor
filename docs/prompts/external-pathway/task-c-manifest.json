@@ -35,7 +35,7 @@
       "model_role": "checker",
       "model_family": "GPT",
       "model_target": "gpt-5-class",
-      "verifies": "cross-family re-verification (STRATEGY Part II §4)",
+      "verifies": "cross-family re-verification (OPERATING_MODEL §4)",
       "order": 3,
       "mandate": "Re-verify SUBMISSION_AUTHORIZED unreachable-by-construction (all-True context still False), update requires SCV, delete rejected, withdrawal via top-level clinvarDeletion, checklist typing blocks 'ready' while institutional items open, Layer B default-off structural, 1-star preview only. Confirm no production-POST code path and no network."
     }

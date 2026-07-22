@@ -69,9 +69,9 @@ conditions before results exist.
 
 Read and link claims to these repository artifacts (do not merely list them at the end):
 
-- `docs/STRATEGY.md` Part I §§1, 5, 6, 7, 9
+- `docs/STRATEGY.md` §§1, 5, 6, 7, 9
 - `docs/PROGRAM.md`
-- `docs/EVALUATION.md` Part I §§1–7 and Part II §§1–6
+- `docs/EVAL_RUBRIC.md` §§1–6
 - `docs/DECISIONS.md` ADR-0007, ADR-0008, ADR-0009
 - `docs/prd/PRD-06-benchmark-eval-harness.md`
 - `docs/prd/PRD-08-live-eval-evidence-adapter.md`

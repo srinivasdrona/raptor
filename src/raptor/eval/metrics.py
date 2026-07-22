@@ -94,7 +94,7 @@ def _compute_stratum(
 
     # Gate-fidelity (Arm C): the 95%-CI Clopper-Pearson LOWER bound per
     # direction, alongside the point estimate above -- the gate compares
-    # THESE, never the point estimate (EVALUATION Part II §2/§6, corrected anchors
+    # THESE, never the point estimate (EVAL_RUBRIC §2/§6, corrected anchors
     # n>=36/72/368).
     confidence = _gate_confidence(config)
     precision_lb = _lower_bound(tp, tp + fp, confidence)

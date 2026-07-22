@@ -34,7 +34,7 @@ from .config import EvalConfig
 from .model import LabeledVariant
 
 #: The canonical ClinVar `ClinicalSignificance` -> scoreable-label map
-#: (EVALUATION Part I sec 2). ANY string not explicitly listed here (drug response,
+#: (EVAL_PLAN sec 2). ANY string not explicitly listed here (drug response,
 #: risk factor, not provided, association, other, multi-condition combos,
 #: ...) is deliberately NOT force-fit into a real class -- it maps to the
 #: `_NON_SCOREABLE` sentinel, which `benchmark.build_benchmark` excludes.
@@ -251,7 +251,7 @@ def _matched_target_gene(gene_symbol_field: str) -> str | None:
 
 def _source_for_review_status(review_status: str) -> str:
     """Map ClinVar `ReviewStatus` to a label-source-hierarchy key that is a
-    real key in `benchmark._SOURCE_RANK` (EVALUATION Part I sec 2)."""
+    real key in `benchmark._SOURCE_RANK` (EVAL_PLAN sec 2)."""
     rs = (review_status or "").strip().lower()
     if rs in ("reviewed by expert panel", "practice guideline"):
         return "clingen_vcep"

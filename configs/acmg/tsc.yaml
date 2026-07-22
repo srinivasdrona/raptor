@@ -14,7 +14,7 @@ bias_data_version: "confirm-pending-bias-data" # confirm: pin BIAS's own referen
 # FR7/AC7: which of BIAS's automatable criteria (of the 19-of-28, sec 1)
 # RAPTOR actually emits as KB evidence. Default = all automatable EXCEPT
 # PP5/BP6/PS4 (R-A2 circularity policy, sec 10.3): all are ClinVar-classification
-# -derived, and the frozen benchmark (EVALUATION Part I sec 2) uses ClinVar-derived
+# -derived, and the frozen benchmark (EVAL_PLAN sec 2) uses ClinVar-derived
 # labels -- emitting them as evidence risks grading against an answer key
 # RAPTOR partly copied. `parse.py` still parses PP5/BP6 faithfully (the
 # oracle fixture expects that); only this policy list decides emission.

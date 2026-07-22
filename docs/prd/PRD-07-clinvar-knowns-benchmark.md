@@ -86,7 +86,7 @@ rows for PRD-06 — keeping the scorer path structurally label-blind (H1).
   structurally barred from the combiner (PRD-06). PP5/BP6 circularity + label-blindness are the whole
   point — this loader must not create a back-door.
 
-## 5. Acceptance criteria *(→ STRATEGY Part II gates)*
+## 5. Acceptance criteria *(→ OPERATING_MODEL gates)*
 
 - **AC1 — Label mapping correctness (independent oracle):** a frozen fixture of
   `{ClinicalSignificance string → expected label}`, expected values taken from **ClinVar's published

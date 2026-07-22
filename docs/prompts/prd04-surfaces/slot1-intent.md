@@ -11,7 +11,7 @@ re-verifies. Do not rewrite the plan, weaken tests, or stop after analysis.
 Before editing, emit an `INTENT` block that:
 
 1. names the task contract (`prd04-packet-surfaces`) and motivating artifact
-   (PRD-04 §4.3/§4.4/§4.6 + FR7 narrative plan + FR17 coverage + STRATEGY Part I §9);
+   (PRD-04 §4.3/§4.4/§4.6 + FR7 narrative plan + FR17 coverage + STRATEGY §9);
 2. names the exact production + config surfaces you will create
    (`src/raptor/packet/{render,queue}.py`,
    `configs/packet/{render,selection,narrative_templates}.yaml`) and confirms you will touch nothing else

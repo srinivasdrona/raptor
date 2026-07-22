@@ -28,4 +28,4 @@ frozen benchmark, the train/held-out split, and `benchmark_stats.json`.
 | sha256 | `5fe4fe10783391d01dc414dc5583a3e63487b67f8cd3c8429d59227cd5f4f37f` |
 | labels_snapshot id | `clinvar_2026-07-07` |
 
-See [`docs/EVALUATION.md` Part II §3](../../docs/EVALUATION.md#evaluation-benchmark-composition) for the stratified counts and the power verdict.
+See `docs/EVAL_RUBRIC.md` §3 for the stratified counts and the power verdict.

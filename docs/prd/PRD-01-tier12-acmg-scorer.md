@@ -1,13 +1,13 @@
 # PRD-01 — Tier-1/2 Deterministic ACMG Scorer
 
-> **Status:** Ready (v1 increment — build contract §10) · **Owner:** @dronasrinivas · **Phase:** 1 (STRATEGY Part I §7) · **Last updated:** 2026-07-08
+> **Status:** Ready (v1 increment — build contract §10) · **Owner:** @dronasrinivas · **Phase:** 1 (STRATEGY §7) · **Last updated:** 2026-07-08
 >
 > **Format:** standard lean PRD (Context · Goals/Non-goals · Users · Functional · Non-functional ·
 > Acceptance · Dependencies · Risks · Open questions). One feature per PRD; acceptance criteria are
-> the source for the build-loop gates (STRATEGY Part II §4) and the eval targets (EVALUATION.md).
+> the source for the build-loop gates (OPERATING_MODEL §4) and the eval targets (EVAL_PLAN.md).
 >
-> **Links:** STRATEGY Part I §6 (Tier 1/2) · GP-1, GP-4, GP-5, GP-6, GP-9 · RISK_REGISTER R-A3/A9/A10/A11,
-> H1/H7, R-B2 · EVALUATION.md (benchmark + metrics).
+> **Links:** STRATEGY §6 (Tier 1/2) · GP-1, GP-4, GP-5, GP-6, GP-9 · RISK_REGISTER R-A3/A9/A10/A11,
+> H1/H7, R-B2 · EVAL_PLAN.md (benchmark + metrics).
 
 ## 1. Context / problem
 
@@ -17,7 +17,7 @@ TSC. This feature computes that **deterministic evidence layer** — the measura
 anchors the whole system: the baseline every later tier is measured against, and the substrate the
 VCEP triage worklist (PRD-04) is built from.
 
-**v1 scope: TSC2 only** (aligns with STRATEGY Part I §7 Phase-1 "Tier 1/2 on TSC2"); **TSC1 is a fast-follow**
+**v1 scope: TSC2 only** (aligns with STRATEGY §7 Phase-1 "Tier 1/2 on TSC2"); **TSC1 is a fast-follow**
 once TSC2 clears its gates. The v1 ACMG criterion set = the BIAS-2015-automated criteria, with the
 **exact included/deferred list pinned in `configs/acmg/` before build** (see §9).
 
@@ -28,13 +28,13 @@ deterministic, fully-provenanced evidence record, measurable against the frozen 
 
 **Non-goals (explicit):**
 - Tier-3 literature/PS3 evidence (separate PRD).
-- Any *final* classification or VUS→LP/LB decision (human/oracle gated — STRATEGY Part I §9).
+- Any *final* classification or VUS→LP/LB decision (human/oracle gated — STRATEGY §9).
 - Cross-linkage / gap-map.
-- The benchmark itself (EVALUATION.md) and ingestion/normalization (PRD-02) — consumed, not built here.
+- The benchmark itself (EVAL_PLAN.md) and ingestion/normalization (PRD-02) — consumed, not built here.
 
 > *"Tier-1/2-implied LP/LB" (used in AC1) is an **eval-only, non-authoritative** mapping from criterion
-> calls to an implied direction — defined in EVALUATION Part I §3.1. It is never shown as a classification and
-> never crosses an external threshold (STRATEGY Part I §9).*
+> calls to an implied direction — defined in EVAL_PLAN §3.1. It is never shown as a classification and
+> never crosses an external threshold (STRATEGY §9).*
 
 ## 3. Users & need
 
@@ -53,7 +53,7 @@ deterministic, fully-provenanced evidence record, measurable against the frozen 
 - **FR5 — Emit evidence records** into the KB (dep: PRD-03) with full provenance and a **resolvable `source_ref`** on every criterion call (GP-9).
 - **FR6 — Deterministic:** no LLM in this tier; same input → identical output.
 - **FR7 — Per-gene calibration in config** (GP-6): thresholds, haploinsufficiency, per-gene frequency cutoffs in `configs/acmg/*.yaml`; no hardcoded values.
-- **FR8 — Edge-case routing:** PVS1 terminal-exon, ambiguous/non-MANE transcript, **splice-region**, and mosaicism-flagged variants route to **manual review**, never silent scoring (R-A3). Each predicate is defined in `configs/acmg/edge_cases.yaml` and covered by named canary fixtures (EVALUATION Part I §4).
+- **FR8 — Edge-case routing:** PVS1 terminal-exon, ambiguous/non-MANE transcript, **splice-region**, and mosaicism-flagged variants route to **manual review**, never silent scoring (R-A3). Each predicate is defined in `configs/acmg/edge_cases.yaml` and covered by named canary fixtures (EVAL_PLAN §4).
 
 ## 5. Non-functional requirements
 
@@ -63,15 +63,15 @@ deterministic, fully-provenanced evidence record, measurable against the frozen 
 - **Config-driven (GP-6):** all rules/thresholds in versioned, schema-validated config.
 - **Reproducibility (R-A11):** record-for-record identical output on re-run of the same pinned inputs.
 
-## 6. Acceptance criteria *(→ EVALUATION.md; these become the STRATEGY Part II gates)*
+## 6. Acceptance criteria *(→ EVAL_PLAN.md; these become the OPERATING_MODEL gates)*
 
-- **AC1a — Metrics computed:** precision/recall/concordance are computed and reported on the frozen **held-out** set for Tier-1/2-implied LP/LB vs best-available labels (EVALUATION Part I §3), with the minimum-count rule (EVALUATION Part I §2) applied.
+- **AC1a — Metrics computed:** precision/recall/concordance are computed and reported on the frozen **held-out** set for Tier-1/2-implied LP/LB vs best-available labels (EVAL_PLAN §3), with the minimum-count rule (EVAL_PLAN §2) applied.
 - **AC1b — Trust gate (blocked on Oracle):** the accuracy gate passes **only** once the Oracle (GP-3) has pre-registered thresholds and held-out metrics meet them. Until then AC1b is `BLOCKED` — the feature is *buildable* but not *validated* (§7, R-E1). No target number is invented (GP-9/H13).
 - **AC2 — Grounding (GP-9):** 100% of emitted records carry a resolvable `source_ref`; **0** null/unresolvable refs.
 - **AC3 — Determinism (R-A11):** two runs on identical pinned inputs produce record-identical output.
 - **AC4 — No double-counting:** audit shows each ACMG criterion fires ≤ once per variant; verified on the canary set.
 - **AC5 — Edge-case safety (R-A3):** every predicate in `edge_cases.yaml` (terminal-exon, non-MANE transcript, splice-region, mosaicism) routes its named canary fixtures to manual review; **0** silent auto-scores in those classes.
-- **AC6 — No trace-cribbing (H1):** the scorer reads no benchmark/label/oracle file — verified by the G2 forbidden-path check (**checker-run manual audit until the G2 lint script exists**, STRATEGY Part II §10; that script is a dependency, §7).
+- **AC6 — No trace-cribbing (H1):** the scorer reads no benchmark/label/oracle file — verified by the G2 forbidden-path check (**checker-run manual audit until the G2 lint script exists**, OPERATING_MODEL §10; that script is a dependency, §7).
 - **AC7 — NFR checks:** config schema-validates with **no hardcoded thresholds** (GP-6); every predictor field carries a licensing tag (R-B2); every criterion call has complete provenance fields (GP-5); the integrated-scorer performance benchmark meets its stated wall-clock target.
 
 ## 7. Dependencies
@@ -80,7 +80,7 @@ deterministic, fully-provenanced evidence record, measurable against the frozen 
 |---|---|---|
 | PRD-02 · Variant ingestion & normalization | backlog | Yes (FR1) — or a minimal stub input schema + fixtures for scorer-only dev |
 | PRD-03 · Provenance ledger & KB schema | backlog | Yes (FR5) — or a minimal evidence-record schema stub |
-| Frozen benchmark + split (EVALUATION.md) | in progress | Yes (AC1a) |
+| Frozen benchmark + split (EVAL_PLAN.md) | in progress | Yes (AC1a) |
 | **Oracle-pre-registered thresholds** (GP-3) | not started | Yes (AC1b) — validation blocked until set |
 | G2 trace-cribbing lint script | planned | AC6 *mechanical* check (interim: manual audit) |
 | BIAS-2015 install; ClinGen Dosage BED; gnomAD/CADD/REVEL/SpliceAI | not started | Yes |
@@ -100,11 +100,11 @@ validation ceiling here (AC1), not trust-transfer.
 
 - **Enumerate the exact v1 ACMG criteria** (included vs deferred) in `configs/acmg/` — required before the PRD is Ready.
 - Per-gene thresholds + haploinsufficiency source: confirm ClinGen Dosage BED record for TSC2.
-- **Frozen benchmark snapshot + held-out split** (EVALUATION Part I §2) and **Oracle-set thresholds** (AC1b) — the two items that make the accuracy gate concrete. *(The label hierarchy itself is already defined in EVALUATION Part I §2.)*
+- **Frozen benchmark snapshot + held-out split** (EVAL_PLAN §2) and **Oracle-set thresholds** (AC1b) — the two items that make the accuracy gate concrete. *(The label hierarchy itself is already defined in EVAL_PLAN §2.)*
 
 ## 10. Build contract (v1 increment) — resolves §9; feeds the loop
 
-> Planner-authored (STRATEGY Part II §2). The test-author writes tests to this public surface; the doer
+> Planner-authored (OPERATING_MODEL §2). The test-author writes tests to this public surface; the doer
 > implements to pass them (3-slot); the GPT checker re-verifies. `confirm` pins are config keys to lock
 > before a real-corpus run (GP-9), not gating the offline build. Makes PRD-01 **Ready**.
 
@@ -197,7 +197,7 @@ store in tests — grounding verified against the real schema).
   those, not a `variant_id` column.
 - **R-A2 circularity policy (eval integrity):** BIAS's `PP5`/`BP6` are derived from ClinVar
   *classification assertions*, and `PS4` approximates evidence from ClinVar submitter counts. Since the
-  benchmark (EVALUATION Part I §2) uses ClinVar-derived labels, emitting these as evidence risks **circular
+  benchmark (EVAL_PLAN §2) uses ClinVar-derived labels, emitting these as evidence risks **circular
   validation** (R-A2 — grading against an answer key we partly copied). Therefore the default
   `included_criteria` **excludes `PP5` and `BP6`** (deprecated by ClinGen SVI anyway) and **flags
   `PS4`'s ClinVar-derived form** for the Oracle to rule on. `parse` still parses them faithfully (the

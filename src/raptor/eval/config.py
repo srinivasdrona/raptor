@@ -37,7 +37,7 @@ _REQUIRED_POINT_KEYS: tuple[str, ...] = ("supporting", "moderate", "strong", "ve
 
 #: Gate-fidelity (Arm C, BREAKING nested-schema migration): the two ACMG
 #: strata whose per-stratum threshold VALUES are Oracle-pre-registered
-#: (`docs/EVALUATION.md` Part II §1) and therefore LOCKED -- a config that pins a
+#: (`docs/EVAL_RUBRIC.md` §1) and therefore LOCKED -- a config that pins a
 #: different value for a metric these name is rejected at load (R-A2
 #: pre-registration; the `min_count_per_class` 35->36 power-floor correction
 #: is the sole sanctioned exception, and it is NOT part of this per-stratum

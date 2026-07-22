@@ -7,7 +7,7 @@ re-verifies. Do not rewrite the plan, weaken tests, or stop after analysis.
 Before editing, emit an `INTENT` block that:
 
 1. names the task contract (`prd04-packet-core`) and motivating artifact
-   (PRD-04 §4.1/§4.2/§4.10 + §4.5 states + ADR-0009 lineage + `bias_lineage.yaml` gate + STRATEGY Part I §9);
+   (PRD-04 §4.1/§4.2/§4.10 + §4.5 states + ADR-0009 lineage + `bias_lineage.yaml` gate + STRATEGY §9);
 2. names the exact production + config surfaces you will create
    (`src/raptor/packet/{model,build,direction,hashing,config}.py`,
    `configs/packet/{schema,candidate_direction}.yaml`) and confirms you will touch nothing else;

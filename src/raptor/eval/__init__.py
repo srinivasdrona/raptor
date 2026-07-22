@@ -1,7 +1,7 @@
 """PRD-06 — Benchmark & Evaluation Harness.
 
 This is RAPTOR's eval-integrity boundary (category H): it builds a frozen,
-best-available-labels benchmark (EVALUATION Part I sec 2), splits it without
+best-available-labels benchmark (EVAL_PLAN sec 2), splits it without
 leakage, combines the scorer's criterion calls into an eval-only implied
 direction (never authoritative -- STRATEGY sec 9), computes class-stratified
 metrics (missense reported separately, R-A2c), and gates any VUS run on the

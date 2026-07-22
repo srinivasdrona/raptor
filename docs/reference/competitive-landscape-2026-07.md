@@ -2,7 +2,7 @@
 
 **Purpose:** Ground the vertical TSC/mTOR strategy reset ([ADR-0010](../DECISIONS.md#adr-0010--generic-platform-uniqueness-premise-falsified-vertical-tscmtor-research-evidence-strategy))
 in primary sources. This note holds the *detailed* competitive evidence so
-[STRATEGY.md](../STRATEGY.md) stays lean; STRATEGY Part I §2/§3/§10 point here.
+[STRATEGY.md](../STRATEGY.md) stays lean; STRATEGY §2/§3/§10 point here.
 
 **Status:** Reference · **Owner:** @dronasrinivas · **Compiled:** 2026-07-10 · **Narrow-metric verification date:** 2026-06-16
 

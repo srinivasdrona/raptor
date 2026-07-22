@@ -19,7 +19,7 @@ would *fail* its own gate are all committed to the repository now, blind to any 
 When the score does arrive, you will be able to check it against what was written here, unedited.
 
 This is a direct application of RAPTOR's first guiding rule — *every layer declares its validation
-ceiling; no output ships without stating what would falsify it* ([STRATEGY.md Part I §5, GP-1](../STRATEGY.md#strategy-guiding-policy)).
+ceiling; no output ships without stating what would falsify it* ([STRATEGY.md §5, GP-1](../STRATEGY.md)).
 The point of publishing early is not to make retrospective storytelling impossible, but to make
 later drift **detectable, auditable, and harder** to disguise as principle.
 
@@ -28,12 +28,12 @@ later drift **detectable, auditable, and harder** to disguise as principle.
 RAPTOR turns public genetic and literature evidence into **auditable, cited evidence packets** for
 TSC1/TSC2 variants — the two genes behind Tuberous Sclerosis Complex — plus a VCEP-style triage
 worklist for human curators. It is explicitly **not** a diagnostic, a treatment-recommendation system,
-or a regulated medical device ([STRATEGY.md Part I §1](../STRATEGY.md#strategy-vision)). Every output is designed to *inform a
+or a regulated medical device ([STRATEGY.md §1](../STRATEGY.md)). Every output is designed to *inform a
 qualified human*, never to replace one.
 
 The scope boundary is binding, not a footnote. Medication recommendations, clinical decision support
 for individual patients, and — critically — **any "final classification" without human sign-off** are
-all out of scope ([STRATEGY.md Part I §9](../STRATEGY.md#strategy-scope)). An operator can approve internal pipeline records;
+all out of scope ([STRATEGY.md §9](../STRATEGY.md)). An operator can approve internal pipeline records;
 only a qualified molecular geneticist or VCEP can produce an externally meaningful classification. This
 post therefore claims *engineering artifacts built*, and nothing about biological correctness.
 
@@ -75,7 +75,7 @@ After exclusions (conflicting, single-submitter, and low-review labels are **exc
 scored benchmark before splitting**, to prevent leakage), it contains **3,681 scoreable knowns**,
 split into **2,577 held-out** and a **1,104 development reserve**. In the held-out exam, the gating stratum — **missense** — holds **51** pathogenic
 and 103 benign calls; the **truncating** stratum holds **210** pathogenic and just **1** benign
-([EVALUATION.md Part II §3](../EVALUATION.md#evaluation-benchmark-composition)).
+([EVAL_RUBRIC.md §3](../EVAL_RUBRIC.md)).
 
 A 70% held-out fraction looks aggressive until you remember what RAPTOR's Tier-1/2 engine is: a
 **deterministic rule engine**. It learns *nothing* from the benchmark — it has no parameters fit to
@@ -85,14 +85,14 @@ calls in the exam, which is exactly what powers the primary bar (see below — n
 gate checks point estimates rather than the rubric's Clopper-Pearson lower bound). There is **no
 model-training penalty** for this, because the Tier-1/2 engine learns no benchmark parameters; the
 explicit trade-off is only the smaller **1,104-variant development/sanity reserve**
-([tsc2.yaml `split`](../../configs/eval/tsc2.yaml); [EVALUATION.md Part II §3b](../EVALUATION.md#evaluation-governance-decision)).
+([tsc2.yaml `split`](../../configs/eval/tsc2.yaml); [EVAL_RUBRIC.md §3b](../EVAL_RUBRIC.md)).
 
 The pre-registered thresholds themselves are already committed, blind to any result: **precision ≥ 0.90
 and recall ≥ 0.85 on the missense stratum, in both directions**, with a minimum of **35 held-out calls
 per class** before a stratum may gate ([tsc2.yaml `oracle_thresholds`](../../configs/eval/tsc2.yaml)).
 The 0.90 bar is not arbitrary: ACMG/AMP 2015 *defines* Likely Pathogenic as >90% posterior, and a
 0.99 lower-bound claim would need ≥367 clean, zero-error calls per stratum — statistically
-indefensible on any realistic TSC benchmark ([EVALUATION.md Part II §§1–2](../EVALUATION.md#evaluation-thresholds)).
+indefensible on any realistic TSC benchmark ([EVAL_RUBRIC.md §§1–2](../EVAL_RUBRIC.md)).
 
 ## What nearly produced a hollow green
 
@@ -157,7 +157,7 @@ The durable lesson is mechanization: the kit-promotion machinery converts recurr
 enforced gates (for example, label-blindness and strict-whitelist invariants wired into modules, with
 a meta-test that fails the build if a promoted invariant is left unwired). But most of the operating
 controls are still **conventions or planned, not automated** — the honest-state ledger in
-[STRATEGY.md Part II §10](../STRATEGY.md#operating-model-honest-automation-status) says so plainly: only "checker ≠ doer family" is live
+[OPERATING_MODEL.md §10](../OPERATING_MODEL.md) says so plainly: only "checker ≠ doer family" is live
 today; the trace-cribbing lint, mutation testing, and post-merge audits are `planned`, and the prompt
 manifest itself is a convention not yet validated by tooling. For Task A specifically, the recorded
 evidence is: 21 targeted tests and 399 full-suite tests passing (1 skipped), the checker CLEAN, and the
@@ -172,17 +172,17 @@ Read this section as the counterweight to everything above.
   ([PROGRAM.md operations](../PROGRAM.md)).
 - **ClinVar is a best-available proxy, not TSC expert-panel ground truth.** There is no ClinGen 3★ TSC
   VCEP panel in the frozen set; the labels are a proxy, and the validation ceiling says so
-  ([STRATEGY.md Part I §6](../STRATEGY.md#strategy-product-solution); [EVALUATION.md Part I §7](../EVALUATION.md#evaluation-limitations)).
+  ([STRATEGY.md §6](../STRATEGY.md); [EVAL_RUBRIC.md §6](../EVAL_RUBRIC.md)).
 - **The class imbalance is real.** The truncating stratum has 210 pathogenic held-out calls against a
   single benign one; truncating-benign simply cannot be validated and is report-only, never gated
-  ([EVALUATION.md Part II §3a](../EVALUATION.md#evaluation-power-verdict)).
+  ([EVAL_RUBRIC.md §3a](../EVAL_RUBRIC.md)).
 - **The gate checks a point estimate, not the Clopper-Pearson lower bound** the rubric frames;
   `min_count_per_class: 35` is an approximating floor. Closing that gap is a tracked follow-up
-  ([EVALUATION.md Part II §6](../EVALUATION.md#evaluation-open-items)).
+  ([EVAL_RUBRIC.md §6](../EVAL_RUBRIC.md)).
 - **Full x64 scoring of all 2,577 variants is pending**, as is the PM1/PM5/PP2 transitive-ClinVar
   ruling ([DECISIONS.md ADR-0009](../DECISIONS.md)).
 - **No VUS run has occurred. No clinical claim is made. A qualified human remains required** for any
-  externally meaningful classification ([STRATEGY.md Part I §9](../STRATEGY.md#strategy-scope)).
+  externally meaningful classification ([STRATEGY.md §9](../STRATEGY.md)).
 
 Nothing in this post should be read as evidence that RAPTOR classifies variants correctly. It shows
 that specific artifacts were built, that tests and checks ran, and that the label-free export conserved
@@ -206,13 +206,13 @@ exists — so that the next post, whichever way it goes, has to be honest.
 
 ### Sources & reproducibility
 
-Strategy and scope: [STRATEGY.md Part I](../STRATEGY.md#strategy-part-i) (§§1, 5, 6, 7, 9). Live status:
-[PROGRAM.md](../PROGRAM.md). Pre-registered rubric: [EVALUATION.md Part II](../EVALUATION.md#evaluation-part-ii) (§§1–6).
+Strategy and scope: [STRATEGY.md](../STRATEGY.md) (§§1, 5, 6, 7, 9). Live status:
+[PROGRAM.md](../PROGRAM.md). Pre-registered rubric: [EVAL_RUBRIC.md](../EVAL_RUBRIC.md) (§§1–6).
 Decisions: [DECISIONS.md](../DECISIONS.md) (ADR-0007, ADR-0008, ADR-0009). Harness and adapter:
 [PRD-06](../prd/PRD-06-benchmark-eval-harness.md), [PRD-08](../prd/PRD-08-live-eval-evidence-adapter.md).
 Frozen benchmark stats: [tsc_clinvar_2026-07-07_stats.json](../../data/benchmark/tsc_clinvar_2026-07-07_stats.json).
 Config pins: [tsc2.yaml](../../configs/eval/tsc2.yaml), [export.yaml](../../configs/eval/export.yaml).
-Build-loop honesty ledger: [STRATEGY.md Part II §10](../STRATEGY.md#operating-model-honest-automation-status). Relevant commit history runs
+Build-loop honesty ledger: [OPERATING_MODEL.md §10](../OPERATING_MODEL.md). Relevant commit history runs
 through local `4965104` (Task A export, feature branch) and merged `2766e33` (ADR-0009). The full
 label-bearing benchmark and the large annotation artifacts are kept out of the repository by design;
 only aggregate statistics, pinned snapshot hashes, and reproducible scripts are committed.

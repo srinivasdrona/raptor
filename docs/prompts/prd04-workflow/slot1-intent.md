@@ -12,7 +12,7 @@ new workflow modules.
 Before editing, emit an `INTENT` block that:
 
 1. names the task contract (`prd04-packet-workflow`) and motivating artifact
-   (PRD-04 §4.4 FR14.1 + §4.5 FR15.1 + §4.7/§4.9 decision log + §4.11 comparator + STRATEGY Part I §9);
+   (PRD-04 §4.4 FR14.1 + §4.5 FR15.1 + §4.7/§4.9 decision log + §4.11 comparator + STRATEGY §9);
 2. names the exact production + config surfaces you will create
    (`src/raptor/packet/{state,decisions,comparator}.py`, `configs/packet/comparator.yaml`) and confirms
    you will touch nothing else (Task-A `model.py`/`hashing.py` are read-only dependencies);

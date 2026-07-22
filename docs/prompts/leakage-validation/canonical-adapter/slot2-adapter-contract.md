@@ -75,7 +75,7 @@ threshold touched.
 
 ---
 
-## 3. Acceptance criteria (→ STRATEGY Part II §4 gates; = PRD-08 AC-B1..B7 in leakage-safe framing)
+## 3. Acceptance criteria (→ OPERATING_MODEL §4 gates; = PRD-08 AC-B1..B7 in leakage-safe framing)
 
 - **AC-B1 (mechanical) — Evidence via `parse_rationale`, hand-computed.** `get_evidence(canonical_id)`
   returns the fired `(criterion, strength, direction)` set matching a **hand-computed** expected set on a

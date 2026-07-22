@@ -11,7 +11,7 @@
 > **Reading rule.** A ClinVar submission *schema* being satisfiable is **not** authority to submit.
 > Authority requires a registered organization, a qualified/expert-panel submitter, an approved
 > classification, and (for RAPTOR) PRD-06 gate `PASS` + per-variant qualified sign-off + a final approved
-> policy (STRATEGY Part I §9; GP-1). Every "field" claim below is *schema/mechanics*; every "authority" claim is
+> policy (STRATEGY §9; GP-1). Every "field" claim below is *schema/mechanics*; every "authority" claim is
 > flagged as such.
 
 ---
@@ -153,7 +153,7 @@ verified 2026-07-11) unless tagged otherwise. RAPTOR maps **into** these (PRD-09
 | 5.2 | Terminal packet state is `EXTERNAL_SUBMISSION_READY`, reachable only with an approved non-null policy + non-null direction + gate `PASS` + ADR-0009 mask ruling + two distinct QMG sign-offs + primary grounding. | `src/raptor/packet/state.py`, `docs/prd/PRD-04-candidate-evidence-packet.md` §4.5 | INTERNAL |
 | 5.3 | Decisions live in a variant-scoped append-only hash-chained log; `DecisionEventType ∈ {reviewer_decision, independent_decision, pattern_policy_approval, supersession, comparator_reveal, reconciliation}` — **no withdrawal event exists** (open dependency for PRD-09 withdrawal). `ActorRole ∈ {operator, qualified_molecular_geneticist, vcep_curator, system}`. | `src/raptor/packet/decisions.py` | INTERNAL |
 | 5.4 | AAVC is a **reveal-only external comparator**; `ScorerProvenance` resolves to a **BIAS raw row** and is never primary evidence. Neither may become a ClinVar `citation`/evidence. | `docs/reference/aavc-prior-art-audit-2026-07.md`, PRD-04 | INTERNAL |
-| 5.5 | Two sign-off levels: operator (internal only) vs qualified molecular geneticist / VCEP (any externally meaningful classification or ClinVar submission). | STRATEGY Part I §9 | INTERNAL |
+| 5.5 | Two sign-off levels: operator (internal only) vs qualified molecular geneticist / VCEP (any externally meaningful classification or ClinVar submission). | STRATEGY §9 | INTERNAL |
 
 ---
 

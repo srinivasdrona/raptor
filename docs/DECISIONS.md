@@ -3,9 +3,11 @@
 > Architecture/strategy decisions for RAPTOR, in **MADR** format (Markdown Any Decision Records,
 > [adr.github.io](https://adr.github.io/madr/)). Newest at top. An ADR is **immutable once Accepted** —
 > to change a decision, add a new ADR that supersedes it. This log is the source of truth for *why*
-> RAPTOR is the way it is; `STRATEGY.md` Part I §5/§9, `STRATEGY.md` Part II §2/§4, and `EVALUATION.md`
-> where cited must stay consistent with the Accepted ADRs here. Preserved ADR bodies may retain split-era
-> citations as historical text; use the compatibility stubs/crosswalk above to reach current authority.
+> RAPTOR is the way it is; `STRATEGY.md` §5/§9 must stay consistent with the Accepted ADRs here.
+>
+> **Authority note.** The maintained authority set now also includes `STRATEGY.md` Part II and
+> `EVALUATION.md`; preserved ADR bodies may retain split-era citations as historical text, with the
+> compatibility stubs and crosswalk below providing the current route.
 
 **Index**
 

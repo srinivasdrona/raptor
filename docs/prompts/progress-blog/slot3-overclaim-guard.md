@@ -16,7 +16,7 @@ data, or private credentials.
    and exact limitations.
 3. **Process marketing:** portraying the four-model loop or three-slot prompts as inherently reliable
    ignores the repeated misses. Describe observed failures, what became mechanically locked, and what
-   remains manual; cite `STRATEGY.md`'s admission that many controls are conventions/planned.
+   remains manual; cite `OPERATING_MODEL.md`'s admission that many controls are conventions/planned.
 
 The post may claim only that specific artifacts were built, tests/checks ran, and the label-free export
 conserved 2,577 identities. It may not infer biological correctness or clinical utility from those facts.

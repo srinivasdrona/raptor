@@ -42,8 +42,8 @@
     "scope_note": "Planning artifacts only. No production/config/test code, no commit, no shared PROGRAM/STRATEGY/DECISIONS/RISK docs touched."
   },
   "shared_program_docs_untouched": [
-    "docs/PROGRAM.md", "docs/STRATEGY.md", "docs/EVALUATION.md", "docs/DECISIONS.md",
-    "docs/RISK_REGISTER.md", "docs/ARCHITECTURE.md",
+    "docs/PROGRAM.md", "docs/STRATEGY.md", "docs/DECISIONS.md", "docs/RISK_REGISTER.md",
+    "docs/ARCHITECTURE.md", "docs/OPERATING_MODEL.md", "docs/EVAL_PLAN.md", "docs/EVAL_RUBRIC.md",
     "docs/prd/PRD-04-candidate-evidence-packet.md (untracked; neither modified nor deleted)"
   ],
   "cross_cutting_constraints": [

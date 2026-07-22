@@ -23,7 +23,7 @@ structure, links, numbers, and 1,400–2,200-word range. Apply these exact corre
 6. Change "pinned outputs" to **recorded local export outputs**. State the hashes are recorded here and
    in the out-of-repo provenance sidecar; they are reproducible only with the pinned external ClinVar
    snapshot/reference inputs, which are intentionally not committed.
-7. Change the misleading ``[commit 4965104](PRD link)`` construction to plain local commit text plus a
+7. Change the misleading `[commit 4965104](PRD link)` construction to plain local commit text plus a
    separate PRD-08 link.
 
 After editing, search for the old phrases and verify none remain. Do not add new performance,

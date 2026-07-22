@@ -6,7 +6,7 @@
 | Date | 2026-07-14 |
 | Track | `track/scope-specific-gate-2026-07` |
 | Decision record | [`docs/DECISIONS.md` § ADR-0011](../DECISIONS.md) |
-| Rubric cross-reference | [`docs/EVALUATION.md` Part II §5b](../EVALUATION.md#evaluation-v2-scope-authorization) |
+| Rubric cross-reference | [`docs/EVAL_RUBRIC.md` § 5b](../EVAL_RUBRIC.md) |
 | v1 gate (unchanged) | [`src/raptor/eval/gate.py`](../../src/raptor/eval/gate.py) — `decide_gate`, single binding stratum (`missense`), short-circuits |
 | v2 gate (new, additive) | [`src/raptor/eval/scope_gate.py`](../../src/raptor/eval/scope_gate.py) — `decide_scope_gate`, evaluates every scope, no short-circuit |
 | Config (additive block) | [`configs/eval/tsc2.yaml`](../../configs/eval/tsc2.yaml) → `scope_authorization` (`schema_version: 2`) |

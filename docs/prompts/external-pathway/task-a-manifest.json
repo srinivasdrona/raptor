@@ -35,7 +35,7 @@
       "model_role": "checker",
       "model_family": "GPT",
       "model_target": "gpt-5-class",
-      "verifies": "cross-family re-verification (STRATEGY Part II §4)",
+      "verifies": "cross-family re-verification (OPERATING_MODEL §4)",
       "order": 3,
       "mandate": "Re-verify determinism + fail-loud, direction!=classification, deny-list fail-loud, new-shape-only, non-authoritative stamping + 1-star preview. Confirm no candidate_direction-derived classification, no legacy/mixed container, no SCV, no network."
     }
