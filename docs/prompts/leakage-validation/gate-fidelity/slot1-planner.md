@@ -9,9 +9,9 @@ tests. The test-author writes the AC tests from your contract alone; the doer im
 checker re-verifies.
 
 Emit an `INTENT` block before editing that names: the **user** (the Oracle / GP-3, who pre-registered the
-95%-CI lower-bound thresholds in EVAL_RUBRIC §1; and the VUS gate that consumes the decision); the
+95%-CI lower-bound thresholds in EVALUATION Part II §1; and the VUS gate that consumes the decision); the
 **artifact** (a Clopper-Pearson lower-bound gate + per-stratum threshold map + the final masked-rerun
-report harness); the **validator** (an independent Clopper-Pearson oracle + the EVAL_RUBRIC §2 power
+report harness); the **validator** (an independent Clopper-Pearson oracle + the EVALUATION Part II §2 power
 table + hand-computed confusion matrices); the **falsifier** (gating on the point estimate, an invented
 threshold, an `UNDERPOWERED` stratum emitting `PASS`, or the final report running on the leaky/unmasked
 TSV or before the BP4/PP3 policy ruling); and **why** a generic product cannot supply this (the
@@ -43,7 +43,7 @@ policy-gated** split:
 
 ## The rubric (derive every number from these; cite)
 
-- `docs/EVAL_RUBRIC.md` §1 (the pre-registered 95%-CI lower-bound table: missense precision both ≥0.90,
+- `docs/EVALUATION.md` Part II §1 (the pre-registered 95%-CI lower-bound table: missense precision both ≥0.90,
   recall both ≥0.85; truncating precision/recall ≥0.95; min count per class **≥36**), §2 (the
   Clopper-Pearson power table — **corrected**: 0.90 needs **n≥36** at 0 errors, 0.95 needs n≥72, 0.99
   needs **n≥368** — via `scipy.stats.beta.ppf(0.025,k,n-k+1)`; the prior n≥35/n≥367 were off-by-one and
@@ -94,5 +94,5 @@ policy-gated** split:
 Finish with a `VERIFICATION` block and the exact diff scope. Do not modify the pre-registered threshold
 **values** (missense 0.90/0.85, truncating 0.95), `docs/PROGRAM.md`, `docs/STRATEGY.md`, the frozen
 preservation set, or the untracked `docs/prd/PRD-04-candidate-evidence-packet.md`. The narrow
-`docs/EVAL_RUBRIC.md` §2 power-table correction (slot 2 §6) is authorized; the BP4/PP3 lineage records in
+`docs/EVALUATION.md` Part II §2 power-table correction (slot 2 §6) is authorized; the BP4/PP3 lineage records in
 `configs/eval/bias_lineage.yaml` are **not** relabeled.

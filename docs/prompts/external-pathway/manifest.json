@@ -94,7 +94,7 @@
   "open_dependencies": [
     "PRD-06 gate PASS (masked rerun + ADR-0009 ruling)",
     "final approved production candidate-direction policy",
-    "per-variant qualified molecular geneticist / VCEP sign-off (STRATEGY §9)",
+    "per-variant qualified molecular geneticist / VCEP sign-off (STRATEGY Part I §9)",
     "ClinVar organization registration + Terms acceptance (institutional)",
     "service account + SP-API-KEY (out of repo)",
     "ClinGen VCEP approval / 3-star status or named qualified submitter",

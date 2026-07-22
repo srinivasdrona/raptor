@@ -1,6 +1,6 @@
 """`raptor.external.mave` — the orthogonal (non-gating) MAVE validation track.
 
-PRD/EVAL_PLAN orthogonal-validation scope: MaveDB (and, pending access, IGVF
+PRD/EVALUATION Part I orthogonal-validation scope: MaveDB (and, pending access, IGVF
 VAMP-seq/SGE and CAGI7) functional-assay scores are compared against RAPTOR's
 own TSC2 calls purely as an *independent, exploratory* check -- never as
 ACMG evidence. Nothing in this package may be imported by `raptor.scorer`,

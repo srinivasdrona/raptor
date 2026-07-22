@@ -1,18 +1,18 @@
 # PRD-06 — Benchmark & Evaluation Harness
 
-> **Status:** Ready (v1 increment — build contract §10) · **Owner:** @dronasrinivas · **Phase:** 1 (STRATEGY §7) · **Last updated:** 2026-07-09
+> **Status:** Ready (v1 increment — build contract §10) · **Owner:** @dronasrinivas · **Phase:** 1 (STRATEGY Part I §7) · **Last updated:** 2026-07-09
 >
-> **Format:** standard lean PRD; acceptance criteria feed the build-loop gates (OPERATING_MODEL §4) and
-> are the mechanical realization of EVAL_PLAN (this PRD *builds* what EVAL_PLAN specifies).
+> **Format:** standard lean PRD; acceptance criteria feed the build-loop gates (STRATEGY Part II §4) and
+> are the mechanical realization of EVALUATION Part I (this PRD *builds* what EVALUATION Part I specifies).
 >
-> **Links:** EVAL_PLAN §1.1/§2/§3/§4/§7 (the methodology this implements) · STRATEGY §9 (human/oracle
+> **Links:** EVALUATION Part I §1.1/§2/§3/§4/§7 (the methodology this implements) · STRATEGY Part I §9 (human/oracle
 > sign-off) · GP-2, GP-3, GP-7, GP-9 · RISK_REGISTER R-A2/R-A2c/R-E1, H1/H13 (eval-integrity) · PRD-01
 > (produces the criterion calls scored here) · PRD-03 (KB the evidence is read from).
 
 ## 1. Context / problem
 
 RAPTOR must **not** classify the ~6,700 TSC VUS until Tier-1/2 is shown to reproduce **known**
-classifications on a held-out set (EVAL_PLAN §1.1 — the binding validation gate). That measurement is a
+classifications on a held-out set (EVALUATION Part I §1.1 — the binding validation gate). That measurement is a
 buildable module: construct a frozen benchmark of known variants, combine the scorer's criterion calls
 into an eval-only implied direction, compute class-stratified metrics, and **gate** the VUS run on the
 result. Today there is no such harness, so "are we good enough to run?" has no auditable answer.
@@ -30,12 +30,12 @@ missense reported separately), and an **auditable gate decision** — computed r
 with full provenance.
 
 **Non-goals (explicit):**
-- Computing ACMG criteria (PRD-01) or *final* classifications (human/oracle only — STRATEGY §9).
+- Computing ACMG criteria (PRD-01) or *final* classifications (human/oracle only — STRATEGY Part I §9).
 - Setting the pass thresholds — those are **pre-registered by the Oracle** (GP-3); the harness consumes
   them, never fits them.
 - Running the live scoring pipeline (BIAS+Nirvana on the x64 worker — ADR-0008) or ingesting the real
   ClinVar snapshot — those are deferred deploy-time steps; the harness is built + validated offline.
-- Tier-3 / cross-linkage evaluation (EVAL_PLAN §6 stubs — GP-7).
+- Tier-3 / cross-linkage evaluation (EVALUATION Part I §6 stubs — GP-7).
 
 ## 3. Users & need
 
@@ -49,7 +49,7 @@ with full provenance.
 
 - **FR1 — Benchmark builder:** from a **labels source** (best-available: ClinGen VCEP/3★ → 2★
   multi-submitter concordant → curated-literature-with-citation → Oracle adjudication) build the benchmark
-  set, applying the **label hierarchy** (EVAL_PLAN §2) and **exclusions** (conflicting, single-submitter,
+  set, applying the **label hierarchy** (EVALUATION Part I §2) and **exclusions** (conflicting, single-submitter,
   and **any label RAPTOR influenced** → circular, R-A2). Freeze by **labels snapshot id + date**; every
   benchmark row carries source + snapshot + date (GP-9).
 - **FR2 — No-leakage split:** deterministic split into **train/dev** (threshold calibration) and a
@@ -60,12 +60,12 @@ with full provenance.
   Strong=4, Moderate=2, Supporting=1; pathogenic positive, benign negative; sum → category by
   pre-set point cutoffs). **Abstain (no-call) is first-class** — never a forced call. This call is
   **non-authoritative**: used only for metrics, never shown as a classification, never crosses an
-  external threshold (STRATEGY §9). The point values + cutoffs live in `configs/eval/*.yaml` (GP-6).
+  external threshold (STRATEGY Part I §9). The point values + cutoffs live in `configs/eval/*.yaml` (GP-6).
 - **FR4 — Metrics:** precision, recall, concordance (overall **and** separately for pathogenic-direction
   and benign-direction) on the **held-out** set; **class-stratified** — **missense reported separately**
   (R-A2c). No-calls are recorded as abstain, excluded from precision/recall denominators, and reported.
 - **FR5 — Min-count rule:** per-class held-out counts below a configured minimum are reported as
-  **descriptive only (non-gating), with confidence intervals** — not pass/fail (EVAL_PLAN §2). The gate
+  **descriptive only (non-gating), with confidence intervals** — not pass/fail (EVALUATION Part I §2). The gate
   never fires on an under-powered stratum.
 - **FR6 — Gate decision:** compare the **missense-stratified held-out** metric against **Oracle
   pre-registered thresholds**. Emit one of: `PASS` (meets thresholds, above min-count), `FAIL` (below),
@@ -82,7 +82,7 @@ with full provenance.
   carries provenance (labels snapshot, code version, config pins).
 - **FR10 — Reporting:** write a `BENCHMARK_RESULTS`-style report **versioned by benchmark snapshot + code
   version**, stating benchmark version, held-out size (per class), each metric, and **threshold status
-  (met / not-met / not-yet-set)**. A result is citable only if it states all four (EVAL_PLAN §5).
+  (met / not-met / not-yet-set)**. A result is citable only if it states all four (EVALUATION Part I §5).
 
 ## 5. Non-functional requirements
 
@@ -94,7 +94,7 @@ with full provenance.
 - **Eval integrity (category H):** no held-out tuning; no invented thresholds; no scorer access to
   labels; oracle-blind checks alongside label comparison.
 
-## 6. Acceptance criteria *(→ become OPERATING_MODEL gates; realize EVAL_PLAN §3/§4)*
+## 6. Acceptance criteria *(→ become STRATEGY Part II gates; realize EVALUATION Part I §3/§4)*
 
 - **AC1 — Combiner correctness (independent oracle):** a frozen fixture of `{criterion-call set →
   expected implied direction + points}`, with expected values from **Tavtigian-2018's published worked
@@ -106,7 +106,7 @@ with full provenance.
 - **AC3 — Metrics correctness:** precision/recall/concordance match a **hand-computed confusion matrix**
   on a frozen fixture; **missense stratum is reported separately**; no-calls are excluded from
   P/R denominators and counted as abstain.
-- **AC4 — Min-count rule (EVAL_PLAN §2):** a stratum below the configured minimum is reported
+- **AC4 — Min-count rule (EVALUATION Part I §2):** a stratum below the configured minimum is reported
   **descriptive + CI, non-gating**; the gate does **not** fire on it.
 - **AC5 — Gate honesty (GP-9/H13):** with thresholds **unset**, the gate returns **`UNVERIFIED`**, never
   `PASS`; with thresholds set, `PASS`/`FAIL` follow the **missense-stratified held-out** metric (R-A2c);

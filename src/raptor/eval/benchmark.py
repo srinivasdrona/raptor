@@ -3,7 +3,7 @@
 This is the ONLY place a label enters the eval harness (FR8/AC6/H1): reads
 `LabeledVariant` rows, applies the exclusions (conflicting, single-submitter,
 any label RAPTOR influenced -- R-A2 circularity) and the label-source
-hierarchy (EVAL_PLAN sec 2 -- when the same variant identity appears more
+hierarchy (EVALUATION Part I sec 2 -- when the same variant identity appears more
 than once, the highest-ranked source wins), and freezes the result as
 `BenchmarkRow`s. Nothing downstream of this module ever sees a
 `LabeledVariant` or a raw label file.
@@ -15,7 +15,7 @@ from typing import Iterable, List
 from .config import EvalConfig
 from .model import BenchmarkRow, LabeledVariant
 
-#: Label-source hierarchy, highest confidence first (EVAL_PLAN sec 2). Used
+#: Label-source hierarchy, highest confidence first (EVALUATION Part I sec 2). Used
 #: only to resolve a variant identity that appears more than once in the
 #: labels source -- never to change the label value itself. Lower rank number
 #: = higher priority: expert adjudication / ClinGen outrank curated literature,
@@ -37,7 +37,7 @@ _SOURCE_RANK: dict[str, int] = {
 _SCOREABLE_LABELS: frozenset[str] = frozenset({"P", "LP", "LB", "B"})
 
 #: The FINITE set of ClinVar review-status markers that indicate a
-#: low-confidence assertion unfit for a truth set (EVAL_PLAN sec 2). A label
+#: low-confidence assertion unfit for a truth set (EVALUATION Part I sec 2). A label
 #: whose `review_status` contains ANY of these (case-insensitive) is excluded:
 #: 1-star `single submitter`, any `conflicting` status, and 0-star
 #: `no assertion` / `no classification` records. The high-confidence remainder

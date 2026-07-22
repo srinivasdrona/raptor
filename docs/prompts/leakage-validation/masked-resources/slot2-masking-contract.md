@@ -102,7 +102,7 @@ Reuses `configs/ingest/tsc.yaml::reference_checksums` (via the injected normaliz
 
 ---
 
-## 3. Acceptance criteria (→ OPERATING_MODEL §4 gates)
+## 3. Acceptance criteria (→ STRATEGY Part II §4 gates)
 
 - **AC-M1 (mechanical) — Exact-set mask conservation.** After `mask_clinvar_source` on a synthetic
   ClinVar stream containing a known subset of held-out ids, every masked stream's canonical-SPDI id set

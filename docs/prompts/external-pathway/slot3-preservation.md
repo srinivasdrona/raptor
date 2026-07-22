@@ -5,7 +5,7 @@
 - **PRD-04 is the sole entry point.** Only an `EXTERNAL_SUBMISSION_READY` packet may be mapped; PRD-04's
   gates (approved non-null policy + non-null direction + gate `PASS` + ADR-0009 mask ruling + two distinct QMG
   sign-offs + primary grounding) are **not** re-litigated or weakened here.
-- **Two sign-off levels (STRATEGY §9) stand.** Operator approval is internal-only; any ClinVar submission or
+- **Two sign-off levels (STRATEGY Part I §9) stand.** Operator approval is internal-only; any ClinVar submission or
   externally meaningful classification requires a qualified molecular geneticist / VCEP. This PRD adds a
   boundary, not a shortcut.
 - **Candidate direction is a review direction, never a classification.** Mapping to

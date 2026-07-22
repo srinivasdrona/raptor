@@ -133,7 +133,7 @@ B (canonical-SPDI adapter over masked TSV) ────────────�
 - **Do not edit:** `docs/PROGRAM.md`, `docs/STRATEGY.md` (shared program/strategy — read-only here);
   the BP4/PP3 lineage records in `configs/eval/bias_lineage.yaml` (not relabeled — the block is a
   separate final-gate axis); the §frozen preservation sets each arm names; the untracked
-  `docs/prd/PRD-04-candidate-evidence-packet.md`. The narrow `docs/EVAL_RUBRIC.md` §2 power-table
+  `docs/prd/PRD-04-candidate-evidence-packet.md`. The narrow `docs/EVALUATION.md` Part II §2 power-table
   correction (`n≥36/72/368`, `min_count 36`) is authorized for integration (Arm C).
 
 ## Manifests
@@ -142,7 +142,7 @@ Three tester/doer/checker manifests, each with **≤4 reference files**:
 [`masked-resources/manifest.json`](masked-resources/manifest.json) ·
 [`canonical-adapter/manifest.json`](canonical-adapter/manifest.json) ·
 [`gate-fidelity/manifest.json`](gate-fidelity/manifest.json). Each manifest pins its slot sha256s at the
-Ready preflight (OPERATING_MODEL §3.1); the values are filled in this deliverable.
+Ready preflight (STRATEGY Part II §3.1); the values are filled in this deliverable.
 
 ## NO-GO closure note (rubber-duck review, 2026-07-12)
 
@@ -165,7 +165,7 @@ build + final join preserved).
    `pyproject.toml` (declare `scipy>=1.10` regardless — verified importable 1.18.0). Backward
    incompatibility, migration, and every affected test surface (`conftest.py`, `test_ac5_gate.py`,
    `test_eval_fixes*.py`, `tsc2.yaml`, new gate/policy tests) are enumerated in slot 2 §2. A narrow
-   `docs/EVAL_RUBRIC.md` §2 correction is authorized for integration (not shared PROGRAM).
+   `docs/EVALUATION.md` Part II §2 correction is authorized for integration (not shared PROGRAM).
 3. **Clopper-Pearson exact anchors corrected from `scipy.stats.beta.ppf`.** Zero-error 95%-CI lower
    bound: **0.90 needs n≥36** (`LB(35,35)=0.8999676<0.90`), **0.95 needs n≥72**, **0.99 needs n≥368**
    (`LB(367,367)=0.9899989<0.99`). `min_count_per_class` floor corrected **35 → 36** with an explicit

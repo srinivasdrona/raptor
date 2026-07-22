@@ -1,8 +1,8 @@
 """Arm C gate-fidelity — exact Clopper-Pearson (Beta-quantile) lower bound.
 
 The gate compares the 95% Clopper-Pearson LOWER bound (not the point estimate
-`k/n`) to each pre-registered per-stratum threshold (`docs/EVAL_RUBRIC.md`
-§1/§2, corrected anchors n>=36/72/368 -- gate-fidelity slot 2 §0.1/§6). The
+`k/n`) to each pre-registered per-stratum threshold (`docs/EVALUATION.md`
+Part II §1/§2, corrected anchors n>=36/72/368 -- gate-fidelity slot 2 §0.1/§6). The
 independent oracle is `scipy.stats.beta.ppf` itself (a distinct
 implementation from any hand-rolled incomplete-beta) -- this module IS that
 call, pinned once, so no self-rolled Beta/Wald approximation is ever

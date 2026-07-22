@@ -1,11 +1,11 @@
 # PRD-02 — Variant Ingestion & Normalization
 
-> **Status:** Ready (v1 increment — build contract §10) · **Owner:** @dronasrinivas · **Phase:** 0 (STRATEGY §7) · **Last updated:** 2026-07-08
+> **Status:** Ready (v1 increment — build contract §10) · **Owner:** @dronasrinivas · **Phase:** 0 (STRATEGY Part I §7) · **Last updated:** 2026-07-08
 >
-> **Format:** standard lean PRD; acceptance criteria feed the build-loop gates (OPERATING_MODEL §4)
-> and the eval mapping (EVAL_PLAN §3.2). One feature per PRD.
+> **Format:** standard lean PRD; acceptance criteria feed the build-loop gates (STRATEGY Part II §4)
+> and the eval mapping (EVALUATION Part I §3.2). One feature per PRD.
 >
-> **Links:** STRATEGY §6 (Tier 1/2 substrate) · GP-4, GP-5, GP-6, GP-9, GP-10 · RISK_REGISTER
+> **Links:** STRATEGY Part I §6 (Tier 1/2 substrate) · GP-4, GP-5, GP-6, GP-9, GP-10 · RISK_REGISTER
 > R-A10/R-B1/R-A9/R-A11/H7 · PRD-01 (consumer) · PRD-03 (KB schema, output target).
 
 ## 1. Context / problem
@@ -18,7 +18,7 @@ measurable half: one canonical identity per variant.
 
 **v1 ingestion scope: TSC1 + TSC2** (gene-agnostic engine, GP-6); the first **validation gate**
 (PRD-06) is **TSC2-first** — TSC1 is the rarer gene with fewer knowns, so its metric gate is a
-fast-follow once the methodology is proven on the better-powered TSC2 set (EVAL_PLAN §1.2).
+fast-follow once the methodology is proven on the better-powered TSC2 set (EVALUATION Part I §1.2).
 
 ## 2. Goal & non-goals
 
@@ -66,7 +66,7 @@ VCV/VariationID are **annotations + provenance**, never the key. Collision polic
 - **Reproducibility (R-A11):** a **local, version-pinned normalizer is the default** (pinned inputs → identical output); an external API is allowed **only** via a versioned, checksummed response cache with offline replay.
 - **Config-driven (GP-6).**
 
-## 6. Acceptance criteria *(→ EVAL_PLAN §3.3 mapping; become OPERATING_MODEL gates)*
+## 6. Acceptance criteria *(→ EVALUATION Part I §3.3 mapping; become STRATEGY Part II gates)*
 
 - **AC1 — No silent drops:** `|input| = |normalized| + |manual-queue|`; **0** dropped; manual-queue records conform to FR6.
 - **AC2 — Determinism (R-A11):** re-run on the pinned snapshot + versions → **deterministic-content-identical** (run metadata excluded, FR7).
@@ -105,7 +105,7 @@ H7 (config drift) · **GP-10/R-G4** (only public coordinates leave, if an extern
 
 ## 10. Build contract (v1 increment) — resolves §9; feeds the loop
 
-> Written by the planner (OPERATING_MODEL §2). The test-author writes tests to this public
+> Written by the planner (STRATEGY Part II §2). The test-author writes tests to this public
 > surface; the doer implements to pass them; nothing here is trace/oracle. Every pin marked
 > `confirm` is a **config key** to lock before a real-corpus run (GP-9 — not fabricated, not gating
 > the offline build). This section makes PRD-02 **Ready**.
@@ -213,7 +213,7 @@ trap that hid PRD-03's bugs):
 ### 10.6 v1 increment scope (what the loop builds now)
 
 **Gene scope: ingestion/normalization covers BOTH TSC1 + TSC2** (gene-agnostic, chr16 + chr9); the
-first **validation gate is TSC2-first** (PRD-06, EVAL_PLAN §1.2) — TSC1's gate is a fast-follow.
+first **validation gate is TSC2-first** (PRD-06, EVALUATION Part I §1.2) — TSC1's gate is a fast-follow.
 
 - **Built + validated offline now:** FR1, FR3, FR5–FR9; AC1, AC2, AC4, AC5, AC6, AC7.
 - **Built + validated on real data in this increment:** AC3 **genomic** `variant_id` (canonical SPDI)

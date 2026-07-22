@@ -16,7 +16,7 @@ todos:
   created: '2026-07-11'
 - id: c-slot1
   title: Revising gate-fidelity slot1
-  description: Anchors, min_count 36, predictor-policy prereq, EVAL_RUBRIC correction.
+  description: Anchors, min_count 36, predictor-policy prereq, EVALUATION Part II correction.
   status: done
   depends_on: []
   created: '2026-07-11'
@@ -191,7 +191,7 @@ todos:
 - id: refresh-program-docs
   title: Refreshing final program documentation
   description: After corrected census and masked gate are complete, reconcile PROGRAM,
-    STRATEGY, DECISIONS, ARCHITECTURE, RISK_REGISTER, EVAL_PLAN/EVAL_RUBRIC, census
+    STRATEGY, DECISIONS, ARCHITECTURE, RISK_REGISTER, EVALUATION Part I/EVALUATION Part II, census
     aggregates, limitations and next priorities in one coherent checkpoint; mark earlier
     diagnostic status as historical/superseded without rewriting accepted ADRs. This is
     the factual source checkpoint for the public README, website and blog.

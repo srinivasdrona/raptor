@@ -43,7 +43,7 @@ def test_ac7_determinism():
 
 def test_ac9_report_states_required_fields():
     """AC9/GP-9: a result is citable only if it states benchmark version, per-class
-    held-out size, metrics, and threshold status (EVAL_PLAN §5)."""
+    held-out size, metrics, and threshold status (EVALUATION Part I §5)."""
     variants = _scenario()
     report = run_eval(make_eval_config(), variants, evidence_for(variants))
     text = report.render()

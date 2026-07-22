@@ -2,11 +2,11 @@
 
 > **Status:** Ready (v1 increment — planner spec + build contract §10; Gemini writes the AC contract next,
 > from this spec only, before the Sonnet doer). **Ready caveat:** the §11 `prompt_manifest` placeholders
-> are NOT yet filled — they still require the OPERATING_MODEL §3.1 preflight fill (real slot{1,2}
-> ids+hashes, concrete slot-3). · **Owner:** @dronasrinivas · **Phase:** 1 (STRATEGY §7) · **Updated:**
+> are NOT yet filled — they still require the STRATEGY Part II §3.1 preflight fill (real slot{1,2}
+> ids+hashes, concrete slot-3). · **Owner:** @dronasrinivas · **Phase:** 1 (STRATEGY Part I §7) · **Updated:**
 > 2026-07-10
 >
-> **Links:** STRATEGY §5 GP-1/2/6/8/9, §7, §9 · OPERATING_MODEL §3.1, §4 G1–G7 · PRD-06 FR3/FR8, AC5/AC6,
+> **Links:** STRATEGY Part I §5 GP-1/2/6/8/9, §7, §9 · STRATEGY Part II §3.1, §4 G1–G7 · PRD-06 FR3/FR8, AC5/AC6,
 > §10.6 · PRD-07 (label side / frozen benchmark) · PRD-02 (`ingest.normalizer` canonical GRCh38 SPDI) ·
 > ADR-0007 (BIAS arm's-length), ADR-0008 (x64 worker), ADR-0009 (ClinVar-derived: direct-copy banned,
 > transitive deferred to audit) · RISK_REGISTER R-A2/R-A2c/R-A10/R-A11/H1 · configs/{eval/tsc2,acmg/tsc,
@@ -22,7 +22,7 @@
 ## 1. Context / problem
 
 PRD-06 built the eval harness (`run_eval`); PRD-07 froze the real known-variant benchmark. The first
-**real** held-out measurement — the gate authorizing the ~6,700 VUS run (STRATEGY §7) — needs a bridge
+**real** held-out measurement — the gate authorizing the ~6,700 VUS run (STRATEGY Part I §7) — needs a bridge
 that does not exist:
 
 1. **VCF vs canonical SPDI, neither may see a label.** BIAS-2015 + Nirvana run at arm's length on an x64
@@ -230,7 +230,7 @@ class/tier or threshold re-derivation (BIAS owns thresholds).
 - **Least complexity (GP-7):** reuse `BiasTsvSource`/`parse_rationale`/`implied_direction`/the ingest
   normalizer; smallest coherent new surface (§10.3).
 
-## 5. Acceptance criteria *(→ OPERATING_MODEL §4 gates; Gemini authors these as executable tests)*
+## 5. Acceptance criteria *(→ STRATEGY Part II §4 gates; Gemini authors these as executable tests)*
 
 > Types: **mechanical** (checker re-runs a test) · **evidence-form** (checker inspects an artifact) ·
 > **domain-truth** (not CLEAN without Oracle sign-off — G4/H11). The real 2,577 figure is a **real-run** CLI
@@ -518,9 +518,9 @@ Evidence flows to `run_eval` only as `variant_id`-keyed `(criterion, strength, d
 
 ---
 
-## 11. Definition-of-Ready Task Specs (OPERATING_MODEL §3.1)
+## 11. Definition-of-Ready Task Specs (STRATEGY Part II §3.1)
 
-> **Decomposition (OPERATING_MODEL §7 — one hypothesis per task, ≤4 reference files).** Fired as **three
+> **Decomposition (STRATEGY Part II §7 — one hypothesis per task, ≤4 reference files).** Fired as **three
 > sequenced doer tasks in dependency order A → C → B** (export → audit → integrating adapter), sharing
 > this PRD, each with its own ≤4 reference files, preservation directive (slot 3), and inverted failure
 > modes. The section labels remain A/B/C by product surface; they are not execution order.
@@ -529,7 +529,7 @@ Evidence flows to `run_eval` only as `variant_id`-keyed `(criterion, strength, d
 ```yaml
 task_id: live-eval-holdout-export
 goal: Emit a deterministic label-free GRCh38 VCF 4.2 + bijective identity manifest for all 2,577 held-out SPDI ids.
-motivating_reference: ADR-0009 (follow-up bridge) + PRD-08 §3.A + STRATEGY §7
+motivating_reference: ADR-0009 (follow-up bridge) + PRD-08 §3.A + STRATEGY Part I §7
 context_surface:
   - src/raptor/eval/export.py                 # NEW: spdi_to_vcf, export_holdout, ExportResult
   - scripts/export_holdout_vcf.py             # NEW: CLI (reads held-out row["variant_id"] only)
@@ -645,7 +645,7 @@ prompt_manifest:                              # placeholders — MUST be filled 
   intent_block_present: true
 ```
 
-> **Ready preflight (OPERATING_MODEL §3.1).** Before each doer runs, the operator/checker verifies the spec
+> **Ready preflight (STRATEGY Part II §3.1).** Before each doer runs, the operator/checker verifies the spec
 > is complete **and** the `prompt_manifest` is persisted with real `slot{1,2}` ids+hashes + a concrete slot-3
 > directive. The placeholders above are **not yet filled** — a spec with an unexplained missing slot is
 > **not Ready** (H10).

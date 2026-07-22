@@ -33,7 +33,7 @@ per-variant qualified sign-off + a final approved policy + registered org + VCEP
   `localID`/`localKey`, `clinvarAccession`, `recordStatus` (`novel`/`update` only), top-level
   `clinvarDeletion.accessionSet`), Submission Portal registration, review-status
   stars, ClinGen VCEP Protocol (v12).
-- `docs/STRATEGY.md` **§9** (two sign-off levels; no ClinVar submission without a qualified molecular
+- `docs/STRATEGY.md` **Part I §9** (two sign-off levels; no ClinVar submission without a qualified molecular
   geneticist / VCEP), GP-1/3/5/6/8/11/13.
 - `docs/DECISIONS.md` **ADR-0009** (ClinVar-derived criterion lineage / masking), **ADR-0010** (vertical reset).
 - `docs/prd/PRD-04-candidate-evidence-packet.md` + `src/raptor/packet/{model,state,decisions}.py`

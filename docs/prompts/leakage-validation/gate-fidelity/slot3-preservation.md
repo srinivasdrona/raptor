@@ -22,18 +22,18 @@
   estimate, counts, `abstain`, `gating`, and `content_hash()` semantics are preserved; frozen dataclasses
   stay frozen.
 - **Independent oracles only.** Clopper-Pearson via `scipy.stats.beta.ppf` + the **corrected**
-  EVAL_RUBRIC §2 table (`n≥36 / 72 / 368`) + hand-computed confusion matrices + the synthetic
+  EVALUATION Part II §2 table (`n≥36 / 72 / 368`) + hand-computed confusion matrices + the synthetic
   `bp4pp3-predictor-policy` approved/unapproved/malformed fixtures — never the implementation's own output.
 
 ## Reconciliations the doer MAY make (not weakening)
 
 - Replacing the **point-estimate comparison at the gate boundary** with the **lower-bound comparison**
-  (this is the tracked fidelity fix, EVAL_RUBRIC §6 / PROGRAM §Active Decisions) while keeping the point
+  (this is the tracked fidelity fix, EVALUATION Part II §6 / PROGRAM §Active Decisions) while keeping the point
   estimate reported.
 - Migrating the flat `oracle_thresholds {precision, recall}` to the per-stratum map **at equal values**
   (a breaking `config.py` schema change, not additive), and hard-gating truncating-pathogenic at 0.95
   where powered (§5) while keeping truncating-benign (n=1) report-only.
-- Correcting `min_count_per_class` 35 → 36 and the EVAL_RUBRIC §2 anchors (`n≥36 / 72 / 368`) from
+- Correcting `min_count_per_class` 35 → 36 and the EVALUATION Part II §2 anchors (`n≥36 / 72 / 368`) from
   `scipy.stats.beta.ppf` — a **mathematical correction**, not a threshold tune. Declaring `scipy` in
   `pyproject.toml` even though it is already importable locally.
 - Requiring an approved `bp4pp3-predictor-policy` artifact at the terminal runner and emitting
@@ -65,7 +65,7 @@
 ## Highest-risk inversion failures
 
 1. **Point-estimate green.** Gating on `k/n` so a tiny stratum with a lucky perfect point estimate passes
-   though its lower bound is far below 0.90 — a statistically indefensible `PASS` (EVAL_RUBRIC §2).
+   though its lower bound is far below 0.90 — a statistically indefensible `PASS` (EVALUATION Part II §2).
    **Guard:** AC-G2 point-clears-but-LB-fails → not `PASS`.
 2. **Threshold drift / fitting.** Lowering missense to 0.85 or reading the held-out result to set the bar
    — breaks pre-registration. **Guard:** AC-G5 schema rejects any deviation from the pinned value;
@@ -84,5 +84,5 @@
 
 No production code, tests, *policy* threshold values, `docs/PROGRAM.md`, `docs/STRATEGY.md`, `run_eval`,
 the BP4/PP3 `bias_lineage.yaml` lineage records, or the frozen preservation set is modified by this
-planning task. The narrow `docs/EVAL_RUBRIC.md` §2 power-table correction is authorized for integration.
+planning task. The narrow `docs/EVALUATION.md` Part II §2 power-table correction is authorized for integration.
 The untracked `docs/prd/PRD-04-candidate-evidence-packet.md` is neither modified nor deleted.

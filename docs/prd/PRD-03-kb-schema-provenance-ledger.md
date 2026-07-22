@@ -1,9 +1,9 @@
 # PRD-03 — KB Schema & Provenance Ledger
 
-> **Status:** Draft · **Owner:** @dronasrinivas · **Phase:** 0 (STRATEGY §7) · **Last updated:** 2026-07-08
+> **Status:** Draft · **Owner:** @dronasrinivas · **Phase:** 0 (STRATEGY Part I §7) · **Last updated:** 2026-07-08
 >
-> **Format:** standard lean PRD; acceptance criteria feed the build-loop gates (OPERATING_MODEL §4)
-> and the eval mapping (EVAL_PLAN §3.4). One feature per PRD.
+> **Format:** standard lean PRD; acceptance criteria feed the build-loop gates (STRATEGY Part II §4)
+> and the eval mapping (EVALUATION Part I §3.4). One feature per PRD.
 >
 > **Links:** ARCHITECTURE §8 (provenance/ledger, event-sourcing, run-scoped staging, atomic publish) ·
 > GP-5 (provenance first-class), GP-6 (config-as-truth), GP-9 (grounded execution) · RISK_REGISTER
@@ -90,7 +90,7 @@ publish in a single `BEGIN IMMEDIATE` transaction; **checkpoint before** computi
 hash. Immutability via `BEFORE UPDATE/DELETE` triggers (`RAISE(ABORT,…)`) on published tables. The
 migration runner **verifies** all of these at startup — they are correctness settings, not tuning.
 
-## 6. Acceptance criteria *(→ EVAL_PLAN §3.4; become OPERATING_MODEL gates)*
+## 6. Acceptance criteria *(→ EVALUATION Part I §3.4; become STRATEGY Part II gates)*
 
 - **AC1 — Grounding constraint (GP-9):** inserting a groundable row (`variants`/`evidence`/`manual_queue`) **without a valid FK to a complete `source_refs` row fails** — both a NULL ref and a malformed/incomplete `source_refs` row are rejected; test proves both.
 - **AC2 — Immutability (H4/H5):** `UPDATE`/`DELETE` on **every history table** (`ledger`, `variants`, `source_refs`, `variant_source_refs`, `evidence`, `evidence_snapshots`, `classification_versions`, `knowledge_assertions`) fails; a correction/retraction is representable **only** as a new ledger event; test proves both **per table**. (`manual_queue` is operational; `evidence_kinds` changes only via migration.)

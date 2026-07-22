@@ -1,4 +1,4 @@
-# Phase 1 orthogonal MAVE validation config for TSC2 (EVAL_PLAN orthogonal-
+# Phase 1 orthogonal MAVE validation config for TSC2 (EVALUATION Part I orthogonal-
 # validation scope). This config is POLICY + PINS for the NON_GATING
 # orthogonal comparison between RAPTOR/BIAS's own TSC2 calls and the MaveDB
 # cliPE functional assay -- it is a SEPARATE, deliberately isolated config
@@ -39,7 +39,7 @@ bootstrap:
 # Mutually-exclusive partitions (`raptor.external.mave.partition`).
 # `independent` records whether a partition's variants are free of any
 # ClinVar-derived clinical-label dependency on RAPTOR/BIAS's own TSC2
-# pipeline (EVAL_PLAN independence framing) -- HELDOUT_OVERLAP is NOT
+# pipeline (EVALUATION Part I independence framing) -- HELDOUT_OVERLAP is NOT
 # independent (BIAS was built/QA'd against ClinVar), VUS_OVERLAP IS
 # independent (no clinical label exists for a VUS).
 partitions:

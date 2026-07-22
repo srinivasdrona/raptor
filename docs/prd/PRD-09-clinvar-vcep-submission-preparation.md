@@ -10,9 +10,9 @@
 > **Format:** lean PRD (Context · Goals/Non-goals · Users · Functional · Non-functional · Acceptance ·
 > Dependencies · Risks · Open questions) + build contract + Definition-of-Ready Task Specs. Acceptance
 > criteria are authored as executable tests by the test-author **before** the doer implements; the checker
-> re-verifies (OPERATING_MODEL §4).
+> re-verifies (STRATEGY Part II §4).
 >
-> **Links:** STRATEGY §6 (three vertical lines), **§9** (scope + **two sign-off levels** + "no ClinVar
+> **Links:** STRATEGY Part I §6 (three vertical lines), **§9** (scope + **two sign-off levels** + "no ClinVar
 > submission without a qualified molecular geneticist / VCEP") · **GP-1** (validation ceiling: buildable ≠
 > authoritative), **GP-3** (oracle-first), **GP-5** (provenance/freshness), **GP-6** (config-as-truth),
 > **GP-8** (adversarial honesty), **GP-11** (enabler-not-decision-maker), **GP-13** (vertical scope) ·
@@ -31,9 +31,9 @@
 |---|---|
 | **(a) TSC/mTOR user** | The TSC VCEP curator / qualified molecular geneticist (GP-3 oracle) who will *eventually* submit expert-reviewed TSC1/TSC2 classifications to ClinVar, and the RAPTOR operator who must **prepare** a conformant, auditable submission package **without** submitting. |
 | **(b) Artifact** | (1) A deterministic **field-mapping** from RAPTOR packet/evidence/decision artifacts to the ClinVar submission schema; (2) an **offline dry-run conformance validator** that emits a report and **never an SCV**; (3) a **no-submission state machine** that is unreachable-to-submission by construction; (4) an **organization/submitter/reviewer prerequisite** checklist and a **VCEP contact/engagement package template**; (5) a **conflict/version/update/withdrawal** handling spec. |
-| **(c) Expert validator** | Mechanical checks (schema conformance / no-SCV invariant / state reachability) validate **form**. A **qualified molecular geneticist / VCEP** is the only validator of any externally meaningful **classification**, and ClinGen/NCBI are the only authorities for **VCEP status** and **organization registration** (STRATEGY §9). Schema-validity is explicitly **not** authority (GP-1). |
+| **(c) Expert validator** | Mechanical checks (schema conformance / no-SCV invariant / state reachability) validate **form**. A **qualified molecular geneticist / VCEP** is the only validator of any externally meaningful **classification**, and ClinGen/NCBI are the only authorities for **VCEP status** and **organization registration** (STRATEGY Part I §9). Schema-validity is explicitly **not** authority (GP-1). |
 | **(d) Falsifier** | Any of: the pipeline **creates or transmits an SCV** (or calls the ClinVar *production* submissions endpoint) in this increment; OR a `candidate_direction` (a *review direction*) is mapped to a ClinVar `germlineClassificationDescription` **without** a per-variant qualified sign-off record; OR the generated output emits the **legacy `clinvarSubmission`/`clinicalSignificance` shape**, or **mixes** legacy and new `germlineSubmission` in one submission (the live schema forbids their coexistence); OR the state machine can reach an "authorized/submitted" state **without** gate `PASS` + per-variant sign-off + a final approved policy; OR the **AAVC comparator** or a **BIAS `ScorerProvenance` row** is emitted as a ClinVar `citation`/evidence; OR any PHI reaches `localID`/`localKey`/`comment`; OR an **update** is expressed without the required `clinvarAccession` (SCV), or a **withdrawal** without a top-level `clinvarDeletion.accessionSet[]` SCV `accession`, in either case lacking the decision-log event; OR the validator/mapper is generated against a **drifted live schema hash** without human review + re-pin (FR2.1); OR the dry-run live check is **on by default** or runs in automated tests; OR the plan claims schema-conformance as authority to submit. |
-| **(e) Why a generic product cannot supply it** | Generic ACMG/interpretation platforms emit a *call* and a generic ClinVar exporter. RAPTOR must carry the **leakage-audited** (ADR-0009), **gate-blocked** (PRD-06), **two-sign-off** (STRATEGY §9), **review-direction-not-classification** discipline **through** the submission boundary — mapping only *after* per-variant expert authority, and proving non-submission mechanically. That is TSC-vertical governance, not a generic export (GP-11/GP-13). |
+| **(e) Why a generic product cannot supply it** | Generic ACMG/interpretation platforms emit a *call* and a generic ClinVar exporter. RAPTOR must carry the **leakage-audited** (ADR-0009), **gate-blocked** (PRD-06), **two-sign-off** (STRATEGY Part I §9), **review-direction-not-classification** discipline **through** the submission boundary — mapping only *after* per-variant expert authority, and proving non-submission mechanically. That is TSC-vertical governance, not a generic export (GP-11/GP-13). |
 
 > This section IS the persisted INTENT block. It names the five GP-13 elements and points at existing
 > surfaces (PRD-04 packet/state/decisions; the primary-source register) rather than redesigning them.
@@ -56,7 +56,7 @@ Grounding facts (dated in the primary-source register):
 - A schema-valid submission still yields **1★ ("criteria provided, single submitter")** unless submitted by
   an approved **ClinGen VCEP** (3★, "reviewed by expert panel") (register §3). TSC has **0** 3★ records today
   (STRATEGY.md).
-- STRATEGY §9: **any ClinVar submission requires a qualified molecular geneticist / VCEP**; operator approval
+- STRATEGY Part I §9: **any ClinVar submission requires a qualified molecular geneticist / VCEP**; operator approval
   is internal-only.
 
 **This increment is buildable now; it is not authoritative and cannot submit (GP-1).**
@@ -183,7 +183,7 @@ distinguishing **mechanical** items (RAPTOR can complete) from **institutional**
 | Authorize additional submitters under the org | institutional | org admin | submission_portal |
 | **Service account + `SP-API-KEY`** (request via `clinvar@ncbi.nlm.nih.gov`); store **out of repo** | institutional | org admin | register §1.5 |
 | **Assertion criteria** document (VCEP ACMG TSC specification) uploaded or citable | mixed | VCEP | register §2.1, §4.4 |
-| **Reviewer authority**: approved ClinGen **VCEP** (3★) *or* named qualified molecular geneticist (1★) | institutional | ClinGen / QMG | register §3–§4, STRATEGY §9 |
+| **Reviewer authority**: approved ClinGen **VCEP** (3★) *or* named qualified molecular geneticist (1★) | institutional | ClinGen / QMG | register §3–§4, STRATEGY Part I §9 |
 | Condition identifier (MONDO/MedGen/OMIM for TSC) confirmed | mechanical→curator-verified | curator | register §6.5 |
 
 ## 6. Dry-run conformance validator (produces **no SCV**)
@@ -314,7 +314,7 @@ package **template**; the conflict/version/update/withdrawal spec; the primary-s
 AC tests. **All of these produce zero SCV and cannot submit.**
 
 **Cannot finish without external authority (open dependencies):** the authoritative classification value
-(per-variant qualified sign-off — GP-3/STRATEGY §9); PRD-06 gate `PASS` + ADR-0009 ruling; a final approved
+(per-variant qualified sign-off — GP-3/STRATEGY Part I §9); PRD-06 gate `PASS` + ADR-0009 ruling; a final approved
 production candidate-direction policy; ClinVar **organization registration** + Terms acceptance; **service
 account + API key**; ClinGen **VCEP approval / 3★ status** (or a named qualified submitter); the published
 **assertion-criteria** (VCEP ACMG TSC specification); the **condition identifier** verification; the
@@ -359,7 +359,7 @@ this increment entirely.
 
 > Authored outputs live under `docs/prd/PRD-09-*` (this file), `docs/reference/clinvar-vcep-*`,
 > `configs/external/**`, `src/raptor/external/**`, `tests/external/**`. **No** shared PROGRAM/STRATEGY edits.
-> Tester authors tests first; doer implements; checker re-verifies (cross-family, OPERATING_MODEL §4).
+> Tester authors tests first; doer implements; checker re-verifies (cross-family, STRATEGY Part II §4).
 
 - **Task A — Mapping + deny-list.** `src/raptor/external/__init__.py` (NEW package marker) +
   `src/raptor/external/models.py` (NEW shared frozen contracts — §15.2) +
@@ -806,7 +806,7 @@ False` — it does **not** call `run_layer_b`.
 
 ## 16. Tester-correction note (tests-first authorship exposed incomplete APIs — 2026-07-12)
 
-Gemini authored the AC tests **before** the doer implemented (OPERATING_MODEL §4). That first pass could only
+Gemini authored the AC tests **before** the doer implemented (STRATEGY Part II §4). That first pass could only
 compile by `MagicMock`-ing every type and inventing symbols, which is itself the finding: **the §13 contract
 was not doer-ready.** The draft tests currently under `tests/external/` are recorded here as the correction
 trigger; §15 is the closed contract they must be **re-authored** against (planning-only — this task does not

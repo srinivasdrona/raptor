@@ -5,7 +5,7 @@
 `run_id`/`generated_at` (run metadata) are excluded (R-A11). `render()`
 produces the versioned results text: a result is citable only if it states
 the labels/benchmark snapshot, per-class held-out size, every metric, and
-the threshold status (met / not-met / not-yet-set -- EVAL_PLAN sec 5).
+the threshold status (met / not-met / not-yet-set -- EVALUATION Part I sec 5).
 """
 from __future__ import annotations
 

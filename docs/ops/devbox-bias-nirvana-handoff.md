@@ -86,7 +86,7 @@ dbSnpids  transcript  rationale
 ## 4. What happens AFTER you report back (not this pass)
 
 The ARM host will: finalize the held-out set (a governance decision on the split is pending — see
-`docs/EVAL_RUBRIC.md` §3b), emit the **label-free** held-out VCF (variant coords only — you must never
+[`docs/EVALUATION.md` Part II §3b](../EVALUATION.md#evaluation-governance-decision)), emit the **label-free** held-out VCF (variant coords only — you must never
 receive labels; that's the H1 anti-circularity boundary), and send it here for the real scoring run.
 You return the full `*.bias_output.tsv`; the ARM host ingests it, runs the eval, and checks the gate.
 

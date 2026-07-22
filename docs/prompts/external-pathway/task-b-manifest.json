@@ -35,7 +35,7 @@
       "model_role": "checker",
       "model_family": "GPT",
       "model_target": "gpt-5-class",
-      "verifies": "cross-family re-verification (OPERATING_MODEL §4)",
+      "verifies": "cross-family re-verification (STRATEGY Part II §4)",
       "order": 3,
       "mandate": "Re-verify per-rule pass/targeted-fail, PHI scan, new-shape pin + freshness-guard refusal on drift, legacy/mixed rejection, and the no-SCV/no-network invariants. Confirm the validator opens no socket and emits only a report."
     }

@@ -67,9 +67,9 @@ tavtigian_cutoffs:
   likely_benign_max: -1     # benign_max < points <= -1 -> Likely Benign
   benign_max: -7            # points <= -7 -> Benign
 
-# FR5/EVAL_PLAN sec 2: a stratum's per-truth-class held-out count below this
+# FR5/EVALUATION Part I sec 2: a stratum's per-truth-class held-out count below this
 # is reported descriptive-only + CI, never gating. Set to the CORRECTED
-# EVAL_RUBRIC power floor -- 0.90 precision at a 95% CI lower bound
+# EVALUATION Part II power floor -- 0.90 precision at a 95% CI lower bound
 # (exact Clopper-Pearson, `scipy.stats.beta.ppf`) needs >=36 zero-error
 # held-out calls (LB(35,35)=0.899968 < 0.90 <= LB(36,36)=0.902606). Below
 # this a stratum reads UNDERPOWERED (FR5).
@@ -79,14 +79,14 @@ min_count_per_class: 36
 # holdout=0.7: RAPTOR Tier-1/2 is a DETERMINISTIC rule engine (it learns nothing
 # from the benchmark), so a large held-out does not starve any training -- the
 # 30% reserve is only a development/sanity set. 0.7 puts ~51 known pathogenic
-# missense in held-out (>=36), powering the 0.90 missense bar (EVAL_RUBRIC §3a).
+# missense in held-out (>=36), powering the 0.90 missense bar (EVALUATION Part II §3a).
 split:
   seed: 20260701
   holdout_fraction: 0.7
 
 # FR6/AC5/GP-9/H13: pre-registered BLIND to held-out results (no BIAS/Nirvana
 # scores exist yet -- Track B is not run), by the domain owner (@dronasrinivas)
-# per EVAL_RUBRIC §3/§5. Gate-fidelity (Arm C, BREAKING nested-schema
+# per EVALUATION Part II §3/§5. Gate-fidelity (Arm C, BREAKING nested-schema
 # migration): `oracle_thresholds` is now `{confidence, strata: {name: {precision,
 # recall, gating, directions}}}` -- the flat `{precision, recall}` map is
 # removed; the gate now compares the 95% Clopper-Pearson LOWER bound (never the

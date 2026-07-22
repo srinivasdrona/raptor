@@ -22,7 +22,7 @@ from .report import LabelBlindReport
 from .source import MaveScoreRecord
 
 #: Pre-registered, fixed functional thresholds (not config-tunable per run --
-#: EVAL_PLAN orthogonal-validation scope). Boundaries are ambiguous, not
+#: EVALUATION Part I orthogonal-validation scope). Boundaries are ambiguous, not
 #: rounded into either functional bucket.
 FUNCTIONAL_BLB_BELOW = 0.242
 FUNCTIONAL_PLP_ABOVE = 0.477

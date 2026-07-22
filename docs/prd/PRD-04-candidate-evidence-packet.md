@@ -4,15 +4,15 @@
 > r3 closed 5 further findings (§0b)**; build contract §10; **provisional packets only**, external worklist
 > release gated on PRD-06 gate `PASS`
 > + ADR-0009 policy correction + qualified expert sign-off) · **Owner:** @dronasrinivas ·
-> **Phase:** 1/2 (STRATEGY §7; PROGRAM *Priorities* item 9) · **Last updated:** 2026-07-11
+> **Phase:** 1/2 (STRATEGY Part I §7; PROGRAM *Priorities* item 9) · **Last updated:** 2026-07-11
 >
 > **Format:** standard lean PRD (Context · Goals/Non-goals · Users · Functional · Non-functional ·
 > Acceptance · Dependencies · Risks · Open questions) + build contract (§10) + Definition-of-Ready Task
 > Specs (§11). One feature per PRD; acceptance criteria are the source for the build-loop gates
-> (OPERATING_MODEL §4) and are authored as executable tests by the test-author (Gemini) **before** the
+> (STRATEGY Part II §4) and are authored as executable tests by the test-author (Gemini) **before** the
 > Sonnet doer implements; the GPT checker re-verifies.
 >
-> **Links:** STRATEGY §6 (three vertical lines), §9 (scope + two sign-off levels) · **GP-1** (validation
+> **Links:** STRATEGY Part I §6 (three vertical lines), §9 (scope + two sign-off levels) · **GP-1** (validation
 > ceiling), **GP-3** (oracle-first), **GP-5** (provenance), **GP-6** (config-as-truth), **GP-8**
 > (adversarial honesty), **GP-9** (grounded execution), **GP-11** (enabler-not-decision-maker), **GP-13**
 > (vertical scope) · PROGRAM (census · *Priorities* item 9 · PRD backlog PRD-04) · DECISIONS **ADR-0009**
@@ -30,7 +30,7 @@
 |---|---|
 | **(a) TSC/mTOR user** | The TSC VCEP curator / qualified molecular geneticist (GP-3 oracle) triaging the ~6,618 TSC1/TSC2 VUS that today carry **0 expert-panel reviews**. |
 | **(b) Artifact** | A versioned, expert-reviewable **candidate evidence packet** (JSON source of record + deterministic Markdown rendering) and a **queue index** presenting a grounded, non-authoritative point of view per variant. |
-| **(c) Expert validator** | Mechanical checks (schema/hash/state) validate *form*; a **qualified molecular geneticist / VCEP** validates any externally meaningful disposition (STRATEGY §9 two-sign-off rule — operator approves internal records only). |
+| **(c) Expert validator** | Mechanical checks (schema/hash/state) validate *form*; a **qualified molecular geneticist / VCEP** validates any externally meaningful disposition (STRATEGY Part I §9 two-sign-off rule — operator approves internal records only). |
 | **(d) Falsifier** | An expert **cannot** reconstruct the decision + uncertainty from the packet alone; OR a candidate direction renders as a classification (or is emitted as non-null under an unapproved policy); OR a pattern-policy sign-off silently reclassifies or advances its members' state; OR any of the four named packet hashes (§4.2) is non-deterministic, or a state/reviewer action mutates a prior packet hash; OR a benchmark/label file is reachable from packet generation (the packet reads an injected `PacketInput`, not the KB/labels); OR **BIAS-row provenance is labeled as primary evidence**; OR a **reviewer/pattern decision is written to `classification_versions`** instead of the packet-owned append-only decision log; OR the AAVC comparator enters criteria/combiner/grounding or is visible in the first-pass reviewer view; OR the **`FIRST_PASS` view exposes the candidate direction, signed points, policy id, or ANY comparator/direction label** (first-pass reviewers must be blinded to **both** the RAPTOR candidate direction and the external comparator direction — §4.4 FR14.1); OR the **`packet_policy_disposition` contradicts the bias-lineage precedence** (a `validation_disposition = requires_heldout_mask` criterion rendered anything but `masked`, or an unmapped disposition combination silently defaulting to `included` instead of failing loud — §4.1 FR4.1); OR the **variant decision log forks/gaps/replays to a different variant identity, is addressed from a raw unsafe identity, or a duplicate `record_id` with a divergent payload is silently accepted** (§4.9 FR25); OR **`ScorerProvenance`/`PrimaryEvidenceRef` drops a required field or a BIAS row is emitted as a `PrimaryEvidenceRef`** (§4.1 FR4.2); OR a model-authored narrative introduces text/citations outside the approved template ids + packet field paths. |
 | **(e) Why a generic product cannot supply it** | Generic ACMG / variant-interpretation / literature-agent / NGS products emit a *call*, not a TSC-calibrated, **criterion-lineage-aware** (ADR-0009), **leakage-safe**, **gate-blocked** (PRD-06), per-criterion **expert-reviewable** packet bound to the measured TSC census patterns and the two-sign-off boundary. This is TSC-vertical evidence *assembly + auditability*, not generic classification methodology (GP-4/GP-13). |
 
@@ -105,7 +105,7 @@ This feature specifies the **candidate evidence packet**: the output contract th
 a grounded **point of view** plus the *full, inspectable* evidence trail — fired criteria, lineage,
 exclusions, contradictions, missing evidence, and a next-evidence action — in a form a qualified expert
 can accept/reject/adjust, and a **queue index** that scales that review across ~6,618 variants using the
-measured census patterns. It is the **Product Line 1** artifact (STRATEGY §6): *expert-reviewable candidate
+measured census patterns. It is the **Product Line 1** artifact (STRATEGY Part I §6): *expert-reviewable candidate
 evidence packets (eval-only, non-authoritative until validated)*.
 
 **Buildable now vs authoritative-later (GP-1/PROGRAM item 9).** The output *contract* is active and
@@ -128,11 +128,11 @@ content from non-deterministic narrative, and drives a fail-closed review workfl
 are gated on validation + expert sign-off.
 
 **Non-goals (explicit).**
-- **Any final classification / VUS→LP/LB decision.** The four values are *review directions*, human/oracle-gated (STRATEGY §9; GP-11).
+- **Any final classification / VUS→LP/LB decision.** The four values are *review directions*, human/oracle-gated (STRATEGY Part I §9; GP-11).
 - **Computing ACMG criteria** (PRD-01) or **the benchmark/gate** (PRD-06/PRD-08) — *consumed*, not built here.
 - **Importing the eval-only Tavtigian combiner** into packet generation (Slot 3 preservation — see §9).
 - **No web application, API server, authentication system, Prefect flow, clinical-report template,
-  ClinVar-submission automation, or patient communication** (Slot 2 output surfaces; STRATEGY §9; ADR-0010 freeze of generic orchestration/PRD-05).
+  ClinVar-submission automation, or patient communication** (Slot 2 output surfaces; STRATEGY Part I §9; ADR-0010 freeze of generic orchestration/PRD-05).
 - **No claim that 1,571 variants (238 + 1,333) are reclassified**, and no "% VUS resolved" headline (PROGRAM census).
 - Tier-3 literature evidence, cross-linkage, the gap-map (later PRDs / GP-2/GP-7).
 
@@ -150,7 +150,7 @@ are gated on validation + expert sign-off.
 | User | Need this feature serves |
 |---|---|
 | **VCEP curator / molecular geneticist (GP-3 oracle)** | A per-variant packet that makes the decision *and its uncertainty* inspectable — accept/reject/adjust without redoing the analysis; a queue that ranks by expert-value-per-hour (R-E4). |
-| **Operator** | Generate **provisional/internal** packets + queue for census QA and calibration-batch selection; approve *internal* records only (STRATEGY §9). |
+| **Operator** | Generate **provisional/internal** packets + queue for census QA and calibration-batch selection; approve *internal* records only (STRATEGY Part I §9). |
 | **PRD-06 gate / program** | A stable output contract whose external release is mechanically blocked on `PASS` (no hollow-green worklist — H4/H13). |
 | **Auditor** | Full provenance + append-only revision/supersession history (via PRD-03 ledger) to reconstruct any packet version (GP-5/GP-9). |
 
@@ -400,7 +400,7 @@ are gated on validation + expert sign-off.
   | `POLICY_BLOCKED` | Blocked from **candidate-direction progression**: unresolved criterion lineage (`requires_heldout_mask`/`deferred`) / unverified scorer-row source / missing canonical identity / **`production_policy_unapproved` (`candidate_direction` is null)**. | Cannot advance to any candidate-direction approval or external state until the blocker clears. **A packet blocked only by `production_policy_unapproved` that is otherwise evidence-complete remains eligible for first-pass *evidence* review (direction-blinded `FIRST_PASS` delivery, FR14.1).** |
   | `READY_FOR_EXPERT_REVIEW` | Deterministic content complete, grounded, identity present, **and a non-null `candidate_direction` under an approved production policy** — the entry to the candidate-direction review/approval chain. | Requires: scorer-row provenance resolves for every scored criterion, canonical identity, **approved production policy → non-null `candidate_direction`**, no `forbidden`/`unverified` and no un-adjudicated `requires_heldout_mask`/`deferred` in scored set. (First-pass *evidence* review needs **not** this state — it is a blinded delivery available from `DRAFT_PROVISIONAL`/`POLICY_BLOCKED`.) |
   | `EXPERT_CHANGES_REQUESTED` | Reviewer returned `reject`/`adjust`/`request-evidence`. | Re-enters review; captured as a decision-log record (§4.9). |
-  | `EXPERT_APPROVED_INTERNAL` | One qualified reviewer signed off (internal). | Operator/internal scope only (STRATEGY §9). |
+  | `EXPERT_APPROVED_INTERNAL` | One qualified reviewer signed off (internal). | Operator/internal scope only (STRATEGY Part I §9). |
   | `SECOND_REVIEW_APPROVED` | Dual review complete; inter-reviewer agreement recorded. | Requires two distinct qualified reviewers. |
   | `EXTERNAL_SUBMISSION_READY` | Cleared for external worklist. | **Requires PRD-06 gate `PASS` (missense-stratified, both directions) + ADR-0009 policy correction + per-variant qualified sign-off.** |
   | `SUPERSEDED` | Replaced by a newer packet version. | Immutable; supersession recorded (§4.7). |
@@ -408,7 +408,7 @@ are gated on validation + expert sign-off.
   **FR15.1 — Exact transition table (item 5; every transition mechanically decidable).** `T` names each
   authorized transition; every guard is a boolean test over the packet + gate status + decision log.
   Reviewer **role** = qualified molecular geneticist (QMG) unless noted; **operator** approves internal
-  records only (STRATEGY §9). Distinctness is enforced by reviewer identity.
+  records only (STRATEGY Part I §9). Distinctness is enforced by reviewer identity.
 
   | T | From → To | Trigger | Mechanical guard | Reviewer role / count / distinctness |
   |---|---|---|---|---|
@@ -582,7 +582,7 @@ Encode the measured pattern facts from the census source of record
 | Narrative plan (FR7) | Deterministic template renderer (mechanical) + reviewer | approved `template_id` + resolvable packet field paths only; `model` + `prompt_hash`; reviewer freeform in separate `reviewer_notes`, never fact-safe-claimed. |
 | Review state (FR15) | State-machine guards (mechanical) + reviewers | fail-closed transition table (§4.5 FR15.1); `production_policy_unapproved` is a `POLICY_BLOCKED` guard; T3/T7/T8/T9 require non-null direction; gate enum `PASS\|FAIL\|UNDERPOWERED\|UNVERIFIED`. |
 | Packet views / first-pass blinding (FR14/FR14.1) | `redact_for_first_pass` projection (mechanical) + reveal-state function | `PacketView ∈ {FIRST_PASS, OPERATOR, RECONCILIATION}`; `FIRST_PASS` strips candidate direction + signed points + policy id + whole comparator envelope; queue/reviewer delivery consume only `FIRST_PASS`; `RECONCILIATION` gated by `reveal_allowed` (decision-before-reveal) (AC20). |
-| Reviewer/pattern decisions (FR12/FR25) | Operator (internal) / QMG (external) — STRATEGY §9 | **one variant-scoped append-only hash-chained decision log** (path = `sha256(canonical variant identity)`), genesis `prev_hash`=64 zeroes, `record_id` idempotency, lock+fsync, replay-verified; **no `classification_versions` write this increment** (AC11/AC23). |
+| Reviewer/pattern decisions (FR12/FR25) | Operator (internal) / QMG (external) — STRATEGY Part I §9 | **one variant-scoped append-only hash-chained decision log** (path = `sha256(canonical variant identity)`), genesis `prev_hash`=64 zeroes, `record_id` idempotency, lock+fsync, replay-verified; **no `classification_versions` write this increment** (AC11/AC23). |
 | External comparator (FR27) | Reveal-only; reviewer independent-then-reconcile | AAVC DOI/checksum/commit + match method; excluded from `evidence_core_hash` + **stripped from `FIRST_PASS`** (both machine directions blinded); never enters criteria/combiner. |
 | Pattern/calibration metadata (FR16/FR17) | Deterministic selector + census snapshot | census snapshot id (`clinvar_2026-07-07`) + pinned selection policy; **selection metadata only, never cutoffs**; coverage over populated atoms. |
 | External release (`EXTERNAL_SUBMISSION_READY`) | PRD-06 gate + QMG / VCEP | gate `PASS` (missense-stratified, both directions) + ADR-0009 correction + per-variant sign-off. |
@@ -607,7 +607,7 @@ Encode the measured pattern facts from the census source of record
 
 ---
 
-## 6. Acceptance criteria *(→ OPERATING_MODEL §4 gates; test-author writes these as executable tests first)*
+## 6. Acceptance criteria *(→ STRATEGY Part II §4 gates; test-author writes these as executable tests first)*
 
 - **AC1 — Schema completeness + unknown-field handling.** A packet validates against the pinned schema;
   every §4.1 field group is present or explicitly null-with-reason; an **unknown/extra field fails loud**.
@@ -736,7 +736,7 @@ Encode the measured pattern facts from the census source of record
 | **Production candidate-direction policy** (config; separate from PRD-06 combiner) | **not started** (PROGRAM item 8) | Yes (FR5) for a non-null direction — provisional packets proceed as `null`/`POLICY_BLOCKED` (first-pass evidence-reviewable) |
 | PRD-06 · held-out gate `PASS` | **built; not yet PASS** (masked rerun + audit pending) | Yes for `EXTERNAL_SUBMISSION_READY` only (AC15) — **not** for provisional packets |
 | PRD-08 · comparator-dependent lineage adjudication (ADR-0009) | **static gate landed; Oracle ruling on `requires_heldout_mask` pending** | Yes for masking/adjudicating PS1/PM5/PM1/PP2/BP1 before external release |
-| Qualified molecular geneticist / VCEP (GP-3 oracle) | **not recruited** | Yes for any external disposition (STRATEGY §9) |
+| Qualified molecular geneticist / VCEP (GP-3 oracle) | **not recruited** | Yes for any external disposition (STRATEGY Part I §9) |
 
 > **Buildable vs authoritative (GP-1).** The packet, render, queue, decisions, and state machine are
 > **built + validated offline now** against fixtures / safe internal census records (provisional packets).
@@ -799,7 +799,7 @@ Encode the measured pattern facts from the census source of record
 
 ## 10. Build contract (v1 increment) — feeds the loop
 
-> Planner-authored (OPERATING_MODEL §2). The test-author (Gemini) writes AC tests to this public surface
+> Planner-authored (STRATEGY Part II §2). The test-author (Gemini) writes AC tests to this public surface
 > **from the spec only**; the Sonnet doer implements to pass them (may add, not weaken); the GPT checker
 > re-verifies; the conformance kit (`raptor.testkit.invariants`) is wired from the start. Config `confirm`
 > pins (the production candidate-direction policy) do **not** block the offline provisional build.
@@ -932,9 +932,9 @@ surface and is **deferred**: the packet library must not depend on it and must b
 
 ---
 
-## 11. Definition-of-Ready Task Spec (OPERATING_MODEL §3.1)
+## 11. Definition-of-Ready Task Spec (STRATEGY Part II §3.1)
 
-> **Decomposition (OPERATING_MODEL §7 — one hypothesis per task, ≤4 reference files).** The v1 increment
+> **Decomposition (STRATEGY Part II §7 — one hypothesis per task, ≤4 reference files).** The v1 increment
 > exceeds four reference files, so it is fired as **three sequenced doer tasks in dependency order
 > A → B → C** (packet core → surfaces → review workflow/comparator), sharing this PRD, each with its own
 > ≤4 reference files, preservation directive (slot 3), and inverted failure modes. A later, separate
@@ -945,7 +945,7 @@ surface and is **deferred**: the packet library must not depend on it and must b
 ```yaml
 task_id: prd04-packet-core
 goal: Build the candidate-evidence-packet model + machine-read lineage/two-level provenance + nullable production candidate-direction policy + the four canonical hashes, assembled from an injected PacketInput (no eval-combiner import; no label/benchmark/KB read; no classification_versions write).
-motivating_reference: PRD-04 §4.1/§4.2/§4.10 + §4.5 states + ADR-0009 lineage + bias_lineage gate + STRATEGY §9
+motivating_reference: PRD-04 §4.1/§4.2/§4.10 + §4.5 states + ADR-0009 lineage + bias_lineage gate + STRATEGY Part I §9
 context_surface:
   - src/raptor/packet/model.py         # NEW: CandidateEvidencePacket, PacketInput, CriterionEntry, CandidateDirection(nullable)
   - src/raptor/packet/build.py         # NEW: build_packet(PacketInput, config, *, narrative_plan=None)
@@ -988,7 +988,7 @@ invert_failure_modes:
   - "evidence_core_hash includes the narrative/comparator/run_id -> non-deterministic core (R-A11)."
 out_of_scope: rendering; queue; state machine; decision log; comparator reveal; the LLM narrative call; the KB adapter; any external release.
 na_allowed: false
-prompt_manifest:                       # placeholders — MUST be filled at Ready preflight (OPERATING_MODEL §3.1)
+prompt_manifest:                       # placeholders — MUST be filled at Ready preflight (STRATEGY Part II §3.1)
   slot1_id+hash: "docs/prompts/prd04-core/slot1-intent.md @ sha256:16e5b3e0a9be010f513b262926d455cecf9a6f9a120b351a43364dd5a6d0a08f"
   slot2_id+hash: "docs/prompts/prd04-core/slot2-core-contract.md @ sha256:e1afbca41fc901381c23ad1bbd73fff5fb6d75f3f0622db161a43889dfbfcb41"
   slot3: "Assemble from injected PacketInput; import no eval.combine; read no label/benchmark/KB file; write no classification_versions row; consume lineage from bias_lineage.yaml (never invent); derive packet_policy_disposition via the exhaustive precedence (validation dominates; requires_heldout_mask->masked; unknown combination fails loud); a BIAS row is never a PrimaryEvidenceRef; candidate_direction is nullable and never a classification."
@@ -1000,7 +1000,7 @@ prompt_manifest:                       # placeholders — MUST be filled at Read
 ```yaml
 task_id: prd04-packet-surfaces
 goal: Deterministic Markdown render with template-narrative-plan expansion + CSV/JSONL queue index + calibration-batch selection with populated-atom coverage, over the Task-A packet.
-motivating_reference: PRD-04 §4.3/§4.4/§4.6 + FR7 narrative plan + FR17 coverage + STRATEGY §9
+motivating_reference: PRD-04 §4.3/§4.4/§4.6 + FR7 narrative plan + FR17 coverage + STRATEGY Part I §9
 context_surface:
   - src/raptor/packet/render.py        # NEW: deterministic Markdown; template expansion; markers unavoidable; PacketView views; FIRST_PASS strips direction + comparator
   - src/raptor/packet/queue.py         # NEW: CSV/JSONL queue (from FIRST_PASS projection) + select_calibration_batch + coverage_report
@@ -1043,7 +1043,7 @@ prompt_manifest:
 ```yaml
 task_id: prd04-packet-workflow
 goal: Fail-closed state machine (exact transition table + gate enum + reviewer role/count/distinctness; production_policy_unapproved->POLICY_BLOCKED; T3/T9 require a non-null direction) + ONE variant-scoped append-only hash-chained decision log (deterministic path from canonical variant hash, genesis prev_hash, record_id idempotency, lock+fsync, replay-verified) + three-view first-pass double-blinding + AAVC reveal-only comparator (decision-before-reveal, append-only reconciliation), over the Task-A/B packet.
-motivating_reference: PRD-04 §4.4 FR14.1 + §4.5 FR15.1 + §4.7/§4.9 decision log + §4.11 comparator + STRATEGY §9
+motivating_reference: PRD-04 §4.4 FR14.1 + §4.5 FR15.1 + §4.7/§4.9 decision log + §4.11 comparator + STRATEGY Part I §9
 context_surface:
   - src/raptor/packet/state.py         # NEW: PacketStateMachine + transition table + can_promote(gate,reviewers)
   - src/raptor/packet/decisions.py     # NEW: ONE variant-scoped append-only hash-chained decision log (path=sha256(variant id); genesis/idempotency/lock+fsync/replay; no classification_versions write)
@@ -1097,7 +1097,7 @@ prompt_manifest:
   - `docs/prompts/prd04-packet/slot3-preservation.md` (r2 rewrite + **r3**: first-pass double-blinding, disposition-precedence integrity, variant-scoped decision-log identity, provenance-schema fidelity).
   - `docs/prompts/prd04-packet/slot1-planner.md` (minimal r3 touch: first-pass double-blinding + fail-loud disposition precedence).
   - `docs/prompts/prd04-packet/manifest.json` (recalculated SHA-256 + revision status → r3).
-- **Ready-preflight artifacts (OPERATING_MODEL §3.1; planning only):**
+- **Ready-preflight artifacts (STRATEGY Part II §3.1; planning only):**
   - `docs/prd/PRD-04-candidate-evidence-packet.md` §11.1–11.3 `prompt_manifest` placeholders filled with the persisted slot ids + SHA-256 for the three implementation-contract families.
   - `docs/prompts/prd04-core/**`, `docs/prompts/prd04-surfaces/**`, `docs/prompts/prd04-workflow/**` (new three-slot implementation contracts + manifests for doer tasks A/B/C; roles: Gemini 3.1 Pro tester, Claude Sonnet 5 doer, GPT-5.5 checker).
   - `docs/prompts/prd04-packet/manifest.json` (authorized planning outputs + Ready-preflight history entry).
@@ -1119,7 +1119,7 @@ prompt_manifest:
 - **Decision-log root + reveal confidence scale (FR14.1/FR25):** confirm the decision-log storage root
   under which `sha256(canonical_variant_spdi).jsonl` lives, and the `independent_decision` confidence
   scale/vocabulary that `reveal_allowed` gates on.
-- **Reviewer identity/role registry (STRATEGY §9):** where qualified-reviewer identity/role/distinctness is
+- **Reviewer identity/role registry (STRATEGY Part I §9):** where qualified-reviewer identity/role/distinctness is
   asserted for sign-off (config vs KB) — a data decision; the decision-log record shape (FR12/FR25) is
   source-agnostic.
 - **Narrative template catalog (FR7):** confirm the approved `configs/packet/narrative_templates.yaml`

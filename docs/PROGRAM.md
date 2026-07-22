@@ -1,9 +1,10 @@
 # RAPTOR PROGRAM STATUS
 
 > Live status rollup. For *why* the project is shaped this way, see **[STRATEGY.md](STRATEGY.md)**
-> (vision, scope, guiding policy), **[DECISIONS.md](DECISIONS.md)** (ADRs),
-> **[ARCHITECTURE.md](ARCHITECTURE.md)** (runtime), and **[RISK_REGISTER.md](RISK_REGISTER.md)**
-> (failure modes). This doc tracks *state*; those track *intent*.
+> (strategy + operating-model authority), **[EVALUATION.md](EVALUATION.md)** (benchmark / rubric
+> authority), **[DECISIONS.md](DECISIONS.md)** (ADRs), **[ARCHITECTURE.md](ARCHITECTURE.md)**
+> (runtime), and **[RISK_REGISTER.md](RISK_REGISTER.md)** (failure modes). This doc tracks *state*;
+> those track *intent*.
 
 > **Strategy status (2026-07-22 — post-ADR-0013 reconciliation).**
 > The generic-platform *uniqueness* premise was falsified and horizontal/platform expansion is
@@ -109,7 +110,7 @@ and **[ADR-0005](DECISIONS.md#adr-0005--test-strategy-separated-authorship-model
 
 Rule: the **checker is always a different model family from the doer**; nothing is "done" until the
 checker passes it against pre-stated acceptance criteria. *(Spec/verdict schema + gate automation are
-pending `OPERATING_MODEL.md` — ADR-0003.)*
+pending `STRATEGY.md` Part II §10 — ADR-0003.)*
 
 ## Health Rollup
 
@@ -250,7 +251,7 @@ index file until ≥3 exist).
 > Tier-1/2's frozen R2 run against pre-registered thresholds are complete and gated **FAIL**/
 > `BLOCKED_POLICY`; the tiered v3 post-hoc re-adjudication (ADR-0013) reports that same result more
 > precisely (per-scope, not pooled) but generates no new evidence and authorizes nothing — see
-> EVAL_PLAN §1.1/§8.
+> See [EVALUATION.md Part I §1.1](EVALUATION.md#evaluation-validation-gate), [Part I §1.3](EVALUATION.md#evaluation-v3-posthoc-prospective), and [Part II §7](EVALUATION.md#evaluation-rubric-v3).
 
 ## Path to first VUS run
 

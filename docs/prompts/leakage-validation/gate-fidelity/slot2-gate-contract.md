@@ -2,7 +2,7 @@
 
 > Planner-authored build/test surface. The test-author writes AC tests from **this file + the slot-1
 > surfaces only**, before the doer. The doer implements to pass (may add, not weaken). Every threshold /
-> power number is derived from `docs/EVAL_RUBRIC.md` §1–§3; the gate consumes GP-3's pre-registered
+> power number is derived from `docs/EVALUATION.md` Part II §§1–3; the gate consumes GP-3's pre-registered
 > values and never fits them.
 
 ---
@@ -13,16 +13,16 @@
 For `k` successes in `n` calls, the exact (Clopper-Pearson) two-sided 95% CI **lower** bound is the Beta
 quantile `Beta.ppf(alpha/2; k, n-k+1)` (0 when `k=0`), `alpha = 0.05`. The **gate compares this lower
 bound**, not `k/n`, to the threshold. **Independent oracle:** `scipy.stats.beta.ppf` (a distinct
-implementation from any hand-rolled incomplete-beta) **and** the EVAL_RUBRIC §2 anchor points
+implementation from any hand-rolled incomplete-beta) **and** the EVALUATION Part II §2 anchor points
 (scipy-exact, **corrected** — see below) — a 0.90 lower bound needs **n≥36** at 0 errors
 (`LB(35,35)=0.89996756 < 0.90`), **n≥54** at ≤1, **n≥70** at ≤2; 0.95 needs **n≥72 / 110 / 142**; 0.99
 needs **n≥368** (`LB(367,367)=0.98999890 < 0.99`). A test asserting `LB(36,36) ≥ 0.90 > LB(35,35)`,
 `LB(72,72) ≥ 0.95 > LB(71,71)`, and `LB(368,368) ≥ 0.99 > LB(367,367)` pins each boundary. These
 anchors come **directly from `scipy.stats.beta.ppf(0.025, k, n-k+1)`** (planner-verified); the prior
 `n≥35 / n≥367` values (and the `n≥53 / 90 / 109 / 175 / 555 / 880` follow-ons) were off-by-N Beta-quantile
-errors and are **not** retained via any invented tolerance (EVAL_RUBRIC §2 gets the narrow correction — §6).
+errors and are **not** retained via any invented tolerance (EVALUATION Part II §2 gets the narrow correction — §6).
 
-### 0.2 Pre-registered per-stratum thresholds (EVAL_RUBRIC §1; consumed, never fit)
+### 0.2 Pre-registered per-stratum thresholds (EVALUATION Part II §1; consumed, never fit)
 | Stratum | Metric·direction | 95%-CI lower-bound threshold | Powered? |
 |---|---|---|---|
 | **missense** (gating) | precision — both directions | **≥0.90** | yes (51 held-out P) |
@@ -142,11 +142,11 @@ No flat-schema code path or test remains; `float(dict)` is unreachable.
 
 ---
 
-## 3. Acceptance criteria (→ OPERATING_MODEL §4 gates)
+## 3. Acceptance criteria (→ STRATEGY Part II §4 gates)
 
 - **AC-G1 (mechanical) — Clopper-Pearson oracle (corrected anchors).** `clopper_pearson_lower` matches
   `scipy.stats.beta.ppf(0.025, k, n-k+1)` across a fixture grid and reproduces the **corrected**
-  EVAL_RUBRIC §2 zero-error anchors: `LB(36,36) ≥ 0.90 > LB(35,35)`, `LB(72,72) ≥ 0.95 > LB(71,71)`,
+  EVALUATION Part II §2 zero-error anchors: `LB(36,36) ≥ 0.90 > LB(35,35)`, `LB(72,72) ≥ 0.95 > LB(71,71)`,
   `LB(368,368) ≥ 0.99 > LB(367,367)`; `k=0 → 0`; `n=0 →` raises. The retired `n≥35` / `n≥367` anchors are
   proven wrong (`LB(35,35)=0.8999676 < 0.90`, `LB(367,367)=0.9899989 < 0.99`) and are **not** reintroduced
   via any tolerance.
@@ -195,7 +195,7 @@ No flat-schema code path or test remains; `float(dict)` is unreachable.
 
 ## 4. Independent oracles (never the implementation's own output)
 
-- **`scipy.stats.beta.ppf`** + the **corrected EVAL_RUBRIC §2 power table** anchor points (AC-G1) — a
+- **`scipy.stats.beta.ppf`** + the **corrected EVALUATION Part II §2 power table** anchor points (AC-G1) — a
   distinct Clopper-Pearson authority. The §2 table itself is narrowly corrected (§6) so the rubric and
   the test oracle agree on `n≥36 / 72 / 368`.
 - **Hand-computed confusion matrices** (AC-G2/G3) for precision/recall counts.
@@ -209,7 +209,7 @@ No flat-schema code path or test remains; `float(dict)` is unreachable.
   `config.py` **nested-schema migration** (+ the `float(dict)` fix, §2.1), the `pyproject.toml` scipy
   declaration (§2.2), the **corrected anchors + `min_count_per_class: 36`** (§0.1), the
   `predictor_policy.py` loader + `BLOCKED_POLICY` wiring in the terminal harness (validated against
-  synthetic policy fixtures), and the narrow EVAL_RUBRIC §2 correction (§6). AC-G1..G9. Fully offline
+  synthetic policy fixtures), and the narrow EVALUATION Part II §2 correction (§6). AC-G1..G9. Fully offline
   against synthetic label-free fixtures + independent oracles.
 - **Policy-gated terminal step (NOT built now):** the final masked-rerun report + `PASS` decision + VUS
   authorization. It waits on **both** (i) the ADR-0009 masked comparator resources (Arm A + operator) and
@@ -218,9 +218,9 @@ No flat-schema code path or test remains; `float(dict)` is unreachable.
   `BLOCKED_POLICY`/`UNVERIFIED` — never `PASS`. Threshold values stay GP-3's; this arm never fits them,
   and encodes no default-allow/ban for BP4/PP3.
 
-## 6. Narrow EVAL_RUBRIC §2 factual correction (for integration, not a PROGRAM/STRATEGY edit)
+## 6. Narrow EVALUATION Part II §2 factual correction (for integration, not a PROGRAM/STRATEGY edit)
 
-`docs/EVAL_RUBRIC.md` §2's power table and the §1/§3/§5 numbers that cite it are off-by-N Beta-quantile
+`docs/EVALUATION.md` Part II §2 power table and the Part II §1/§3/§5 numbers that cite it are off-by-N Beta-quantile
 errors. The integration doer applies a **narrow** correction (authorized output), leaving all policy /
 threshold values untouched:
 - §2 table → `≥0.90: 36 / 54 / 70`, `≥0.95: 72 / 110 / 142`, `≥0.99: 368 / 555 / 720` (from

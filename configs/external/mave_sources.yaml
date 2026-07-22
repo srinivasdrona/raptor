@@ -1,5 +1,5 @@
 # Fail-closed, pre-registered external MAVE source register (Phase 0/1,
-# EVAL_PLAN orthogonal-validation scope). Every entry here is loaded through
+# EVALUATION Part I orthogonal-validation scope). Every entry here is loaded through
 # `raptor.external.mave.register.SourceRegisterEntry` /
 # `verify_registered_source` -- an entry's `sha256` is checked byte-for-byte
 # against what was actually fetched, its `verification` state gates whether
@@ -90,7 +90,7 @@ sources:
       have not been reviewed. Do not fetch/claim until a review is
       completed and access is confirmed.
 
-# Circularity guard (PRD-01/ADR-0007 style, EVAL_PLAN orthogonal scope):
+# Circularity guard (PRD-01/ADR-0007 style, EVALUATION Part I orthogonal scope):
 # every entry above is external MAVE FUNCTIONAL-ASSAY evidence, never ACMG
 # criteria, never `raptor.scorer`/`BiasEvidenceSource` input, and never
 # ClinVar-derived. No entry here may be referenced by
