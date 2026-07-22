@@ -94,8 +94,11 @@ todos:
     Durable starting artifact: docs/project/atlas/MECHANISM_ATLAS_HANDOFF.md. Treat that handoff
     as preliminary discussion, not authority: re-verify every R611Q pathogenicity, zygosity,
     molecular-mechanism, assay and rescue statement against primary evidence; unresolved claims
-    remain hypotheses/unknowns and cannot become treatment recommendations.'
-  status: pending
+    remain hypotheses/unknowns and cannot become treatment recommendations. Definition and
+    portability contract completed 2026-07-23 at merge 9709ec6: ADR-0014 separates a
+    condition-agnostic core from the versioned TSC2 disease pack while preserving the
+    TSC2-only product and pilot scope.'
+  status: done
   depends_on:
   - rerun-masked-gate
   created: '2026-07-13'
@@ -551,8 +554,11 @@ todos:
     design input, not a factual source; independently ground the R611Q card and test the ontology
     against pathogenic, benign, conflicting and VUS examples to avoid single-case overfitting.
     Keep clinical classification separate; no cross-disease expansion, treatment recommendation
-    or DisMech dependency in the internal source of truth.'
-  status: pending
+    or DisMech dependency in the internal source of truth. Phase 1 completed and GPT-5.4-clean
+    at merge 9709ec6: generic core, TSC2 pack, synthetic tests, hashes, leakage guards and
+    Discovery templates. Remaining work is the separately gated Phase 2 primary-source
+    grounding and bounded 5-10-record pilot with named human/oracle span review.'
+  status: in_progress
   depends_on:
   - define-variant-mechanism-atlas
   - rerun-masked-gate
@@ -575,7 +581,7 @@ todos:
     rerun showed, what changed from the pre-results post, where RAPTOR failed or abstained,
     what the corrected census/packets do and do not mean, and why the bounded TSC2 Mechanism
     Atlas comes next. Use no projected results, clinical claims or grant-driven overstatement.'
-  status: pending
+  status: in_progress
   depends_on:
   - refresh-program-docs
   - refresh-repository-readme
