@@ -36,11 +36,30 @@
 # agents, Discovery Engine) that only PROPOSES untrusted candidates; RAPTOR
 # deterministically validates and promotes them. Discovery is runtime-optional and
 # never sits on the accept/hash/guard path.
+#
+# Portability seam (rev 6): the internal module splits into a CONDITION-AGNOSTIC
+# generic core (`src/raptor/atlas/`) and a VERSIONED, DECLARATIVE disease pack
+# (`configs/atlas/packs/<pack_id>/`). The core is evidence/provenance machinery
+# only: it MUST NOT contain literal TSC1/TSC2, NM_000548.5, mTOR/mTORC1, R611Q,
+# disease-specific source IDs, disease-specific classifier thresholds, or ClinVar
+# truth. The disease pack supplies allowed genes, assembly/transcript pins and
+# reconciliation policy, mechanism-ontology extensions, source-register metadata
+# pins, disease-specific prohibitions, and pilot/evaluation metadata. Phase 1 ships
+# EXACTLY ONE `tsc2` pack; core acceptance NEVER implies a second disease works.
+# The disease-pack id/version/content-hash is bound into the profile content and
+# envelope hashes so a profile can never be reinterpreted under the wrong pack.
+# This is an INTERNAL architecture portability seam for pipeline amortization, NOT
+# a pivot to a generic variant-classification platform: the SHIPPED product scope
+# stays vertical TSC/mTOR, evidence-first and non-clinical (ADR-0010 / ADR-0014,
+# STRATEGY GP-13). A second disease is NEVER named or selected in this track except
+# purely illustratively and explicitly non-committally; a second disease is claimed
+# only after a later portability EXPERIMENT passes (see portability_contract).
 
 schema: raptor-mechanism-atlas-starter-v1
-status: planner_contract_rev5_dual_path_discovery_lane
+status: planner_contract_rev6_generic_core_disease_pack
 task_id: build-mechanism-atlas-starter
-title: Bounded RAPTOR Mechanism Atlas starter — TSC2-only internal module contract
+title: RAPTOR Mechanism Atlas starter — generic evidence core + versioned disease
+  pack (Phase-1 pilot pack = tsc2)
 
 revision_log:
   - rev: 1
@@ -114,6 +133,44 @@ revision_log:
     corrections_in: [dual_path_architecture, schemas.atlas_candidate_import,
       module_api, leakage_guards, discovery_boundary, packet_dependency_split,
       workflow, stop_go, deliberate_action]
+  - rev: 6
+    head: e01ee37d3174276fc98a2f194bd3b3b190fa2b65
+    trigger: operator architecture/portability decision; plan-only follow-up commit
+      (no amend/push). Authored across four authority files (this spec + ADR-0014 +
+      ARCHITECTURE + a surgical STRATEGY clarification).
+    attribution:
+      prompt_commanded_scope:
+        - >-
+          RAPTOR monetizability depends on AMORTIZING the pipeline across
+          conditions. The operator requires that TSC2/mTORC1 assumptions MUST NOT
+          harden into the reusable core, WITHOUT broadening the scientific pilot
+          beyond TSC2 or pretending a second disease is supported. This is
+          prompt-commanded internal-architecture scope, NOT a product pivot and NOT
+          a planner miss.
+      planner_miss:
+        - >-
+          Rev 1-5 hardcoded TSC2 into the core module contract: a TSC2-only gene
+          enum on AtlasIdentity, NM_000548.5 pinned in core identity, a
+          `pathway_mtorc1` core claim-kind, an `mtorc1_state` core node layer, and
+          concrete TSC2/MaveDB/IGVF/ClinVar/Monarch source entries embedded in the
+          core source_register. These bind the core to one disease and defeat
+          amortization. Fixed by extracting them into the versioned tsc2 disease
+          pack and leaving the core condition-agnostic.
+    change: >-
+      Split the internal module into a condition-agnostic generic core
+      (`src/raptor/atlas/`) and a versioned declarative disease pack
+      (`configs/atlas/packs/<pack_id>/`, Phase-1 pack = tsc2). Disease-pack
+      id/version/content-hash is bound into the profile content + envelope hashes.
+      Added a later second-disease PORTABILITY EXPERIMENT (targets are hypotheses,
+      not achieved facts). No second disease named/selected in this track.
+    corrections_in: [authority_and_scope, generic_core_disease_pack, ontology_seeds,
+      schemas.variant_identity, schemas.observed_claim, schemas.mechanism_edge,
+      schemas.mechanism_profile, schemas.provenance, schemas.hashing,
+      schemas.atlas_candidate_import, schemas.candidate_promotion,
+      dataclass_contracts, module_api, panel_selection_contract, source_register,
+      leakage_guards, discovery_boundary, portability_contract,
+      packet_dependency_split, workflow, gemini_test_contract, stop_go,
+      extraction_gate, deliberate_action, verification_contract, commit]
 
 worktree: 'D:\AIProjects\raptor-worktrees\mechanism-atlas'
 branch: track/mechanism-atlas-2026-07
@@ -157,6 +214,12 @@ authority_and_scope:
     - id: ADR-0010
       why: RAPTOR is a vertical TSC/mTOR research-evidence product, not a generic
         platform. No cross-gene/cross-disease expansion for optics.
+    - id: ADR-0014
+      why: Generic Mechanism Atlas core + versioned disease-pack boundary. The core
+        is condition-agnostic; disease specifics live in a versioned pack; Phase 1
+        ships one tsc2 pack; NO second-disease claim until a portability experiment
+        passes. This is an internal amortization seam, not a product pivot (ADR-0010
+        stands; STRATEGY GP-13 clarified).
   program_position: Phase 1 (design + case-card contract) per the handoff phased build.
     Phase 2 pilot content is gated by this spec passing checker CLEAN and packet freeze.
   hard_prohibitions:
@@ -169,6 +232,12 @@ authority_and_scope:
     - No mechanism profile imported back into ACMG scoring without a separately
       approved evidence policy (currently unapproved).
     - No cross-disease / cross-gene expansion in this track.
+    - No TSC/disease literals in the generic core (no TSC1/TSC2, NM_000548.5,
+      mTOR/mTORC1, R611Q, disease-specific source IDs, disease-specific classifier
+      thresholds, or ClinVar truth in `src/raptor/atlas/`); disease specifics live
+      ONLY in the versioned disease pack (see generic_core_disease_pack).
+    - No second disease named, selected, packaged, or claimed as supported in this
+      track; core acceptance never implies a second disease works.
     - Every substantive claim resolves to a primary source + exact span, else UNVERIFIED.
 
 # ---------------------------------------------------------------------------
@@ -229,12 +298,163 @@ dual_path_architecture:
       5-10-case evaluation; it is out of scope for this track.
 
 # ---------------------------------------------------------------------------
+# 0.7 Generic core + versioned disease pack (portability/amortization seam)
+# ---------------------------------------------------------------------------
+# Business/architecture driver: RAPTOR monetizability depends on AMORTIZING the
+# evidence/provenance pipeline across conditions. TSC2/mTORC1 assumptions MUST NOT
+# harden into the reusable core. This is an INTERNAL architecture seam only: the
+# shipped scientific pilot stays TSC2-only and no second disease is supported or
+# claimed (ADR-0010 / ADR-0014, STRATEGY GP-13). Reconciles — does not replace —
+# dual_path_architecture: RAPTOR is still the sole source of truth; Discovery is
+# still an optional out-of-process lane.
+generic_core_disease_pack:
+  core:
+    package: src/raptor/atlas/
+    nature: >
+      Condition-agnostic evidence/provenance machinery ONLY. It knows how to admit
+      canonical SPDI identity, hold generic schemas, validate source role/type, own
+      EntryRef.span, resolve citations, hash canonically, enforce leakage guards,
+      load+validate a disease pack, and promote untrusted candidates. It knows
+      NOTHING about any specific disease.
+    must_not_contain_literals:
+      - Gene symbols (no TSC1/TSC2 or any disease gene) as code constants or enums.
+      - Transcript/assembly pins (no NM_000548.5, no NC_000016.10 as a constant).
+      - Pathway/mechanism disease terms (no mTOR/mTORC1) as code constants/enums.
+      - Variant literals (no R611Q / p.Arg611Gln) anywhere in core.
+      - Disease-specific source IDs (no mavedb-00001201-a-1, IGVF/CAGI TSC ids,
+        ClinVar-TSC, Monarch-DisMech-TSC entries) in core.
+      - Disease-specific classifier thresholds or ClinVar-derived truth in core.
+    rule: >
+      The generic core carries a small condition-agnostic SEED vocabulary (generic
+      mechanism classes, generic node layers, generic claim kinds, generic context
+      keys) and STRUCTURAL constraints only. Everything disease-specific is supplied
+      by the selected disease pack at load time via dependency injection. A grep of
+      src/raptor/atlas/ for any literal above MUST return nothing (GPT probe +
+      Gemini static test).
+  disease_pack:
+    id: atlas.disease_pack.v1
+    purpose: >
+      A versioned, declarative bundle that specializes the generic core for exactly
+      one disease/gene program. It is CONFIG (GP-6), never code, and never a source
+      of scoring truth.
+    repo_path: configs/atlas/packs/<pack_id>/pack.yaml
+    phase1_pack: configs/atlas/packs/tsc2/pack.yaml   # the ONLY pack in this track
+    schema_and_version_fields:
+      schema:
+        type: str
+        const: atlas.disease_pack.v1
+        note: "pack schema id/version"
+      pack_id:
+        type: str
+        note: "stable slug, e.g. tsc2; matches directory name"
+      pack_version:
+        type: str
+        note: "semver of the pack CONTENT (e.g. 1.0.0)"
+      pack_content_hash:
+        type: str
+        algo: sha256
+        note: "SELF-EXCLUDED canonical hash (see pack_content_hash below); the loader recomputes and MUST match"
+      created_at:
+        type: str
+        optional: true
+    declares:
+      allowed_genes:
+        type: list
+        note: "e.g. [TSC2]; enforced on identity admission"
+      assembly_pins:
+        type: list
+        note: "allowed assemblies, e.g. [GRCh38]"
+      transcript_pins:
+        type: list
+        note: "allowed transcripts + MANE-Select policy, e.g. [{transcript: NM_000548.5, requires: MANE-Select-verification}]"
+      reconciliation_policy:
+        type: obj
+        note: "alias->canonical-SPDI reconciliation rules + no-fabrication policy (see spdi_transcript_reconciliation)"
+      ontology_extensions:
+        type: obj
+        note: "namespaced claim_kind / node_layer / mechanism_class extensions + context vocabularies (see ontology_seeds)"
+      source_register_pins:
+        type: list
+        note: "disease-specific SourceRegisterEntry metadata pins (the concrete TSC2/MaveDB/IGVF/ClinVar/Monarch entries live HERE, not in core; see source_register)"
+      prohibitions:
+        type: list
+        note: "disease-specific prohibitions, e.g. the r611q_gate block and no-hardcode-handoff-mechanism rules"
+      pilot_eval_metadata:
+        type: obj
+        note: "panel strata, native-vs-Discovery eval axes, and pilot bookkeeping for THIS disease"
+    invariants:
+      - A pack whose recomputed pack_content_hash != declared pack_content_hash is
+        REJECTED at load (AtlasPackError, fail closed).
+      - A pack whose schema/pack_id/pack_version is missing or malformed is REJECTED
+        (AtlasPackError).
+      - Namespaced ontology extensions MUST be prefixed with `<pack_id>:` and MUST
+        declare a parent core seed kind/layer; an unnamespaced or parentless
+        extension is REJECTED (AtlasPackError).
+      - Exactly ONE pack is loaded per run; loading two packs into one profile is an
+        AtlasPackError. Phase 1 provides only the tsc2 pack.
+  loader_api:
+    module: src/raptor/atlas/pack.py     # core loader; imports no disease literals
+    functions:
+      - load_disease_pack(path_or_pack_id) -> DiseasePack   # loads + fully validates; AtlasPackError on any failure
+      - validate_disease_pack(pack) -> None                 # structural + hash + namespacing validation; raises AtlasPackError
+      - pack_content_hash(pack) -> str                      # canonical sha256 over the pack manifest EXCLUDING pack_content_hash
+    rule: >
+      load_disease_pack is the ONLY way disease specifics enter the core. The core's
+      admission, ontology validation, candidate promotion, and hashing all take a
+      DiseasePack argument (dependency injection); none reads a disease literal.
+  pack_binding:
+    id: atlas.pack_binding.v1
+    fields: {pack_id: str, pack_version: str, pack_content_hash: str}
+    carried_in:
+      - provenance.pack_binding (PROFILE ENVELOPE payload; bound into the envelope hash)
+      - evidence_core_payload (bound into the evidence-core hash)
+      - run_metadata (audit copy only; run_metadata is EXCLUDED from hashes)
+    rule: >
+      The pack_binding (id + version + content hash) is bound into BOTH the
+      evidence_core_hash and the profile_envelope_hash. A profile therefore cannot
+      be reinterpreted under a different pack without changing its hashes: swapping
+      the pack changes both hashes, so wrong-pack interpretation is detectable and
+      fails a hash-coherence check. The audit copy in run_metadata never
+      participates in hashing.
+  typed_errors:
+    core_errors: [AtlasSchemaError, AtlasIdentityError, AtlasProvenanceError,
+      AtlasSourceVerificationError, AtlasLeakageError, AtlasExportError]
+    pack_errors: [AtlasPackError]   # pack itself malformed/failed validation/hash-drift
+    rule: >
+      Core errors and pack-validation errors are DISTINCT types and BOTH fail
+      closed. A malformed/hash-drifted/mis-namespaced PACK raises AtlasPackError at
+      load. A record/candidate that violates a constraint declared by a VALID pack
+      (e.g. a gene not in allowed_genes, a claim_kind not in the pack's allowed
+      vocabulary) raises the appropriate CORE domain error (AtlasIdentityError /
+      AtlasSchemaError / AtlasProvenanceError) — never a silent pass.
+  no_second_disease_implication:
+    rule: >
+      A CLEAN Phase-1 core + a passing tsc2 pack proves ONLY that the tsc2 pilot
+      works. It does NOT imply any other disease is supported. A second disease is
+      supported only after a later portability EXPERIMENT passes (portability_
+      contract). No second disease is named/selected/packaged in this track except
+      purely illustratively and explicitly non-committally.
+
+# ---------------------------------------------------------------------------
 # 1. Ontology seeds (candidate mechanism classes + explicit states)
 # ---------------------------------------------------------------------------
-# These are ontology SEEDS, not established facts. Mechanisms are multi-label and
+# These are GENERIC, condition-agnostic ontology SEEDS in the core, not
+# established facts and not disease-specific. Mechanisms are multi-label and
 # context-dependent; `unknown` and `conflicting` are first-class VALID outcomes.
+# The core seeds are DISEASE-FREE (no TSC1/TSC2, no mTOR/mTORC1, no GAP-domain);
+# a disease pack refines them via NAMESPACED extensions (see
+# generic_core_disease_pack.disease_pack.ontology_extensions).
 ontology_seeds:
-  mechanism_classes:
+  vocabulary_model:
+    decision: core_seed_plus_namespaced_pack_extensions
+    rule: >
+      The core ships a small, disease-free SEED vocabulary of mechanism classes,
+      node layers, and claim kinds. A disease pack MAY add extensions, but each
+      extension MUST be namespaced `<pack_id>:<name>` and MUST declare a parent core
+      seed. The core NEVER hardcodes a disease-specific term (e.g. `pathway_mtorc1`
+      is NOT a core term; the tsc2 pack declares `tsc2:pathway_mtorc1` with parent
+      seed `pathway`). Unnamespaced/parentless extensions are AtlasPackError.
+  mechanism_classes:      # core SEED classes (disease-free labels)
     - id: rna_splicing_defect
       label: RNA / splicing defect presenting as a missense annotation
     - id: reduced_abundance_instability
@@ -242,26 +462,34 @@ ontology_seeds:
     - id: misfolding_residual_function
       label: Misfolding with residual function
     - id: complex_formation_defect
-      label: TSC1-TSC2(-TBC1D7) complex-formation defect
+      label: Protein complex-formation defect
     - id: mislocalization
       label: Mislocalization
     - id: catalytic_site_impairment
-      label: Catalytic / functional-site (e.g. GAP domain) impairment
+      label: Catalytic / functional-site impairment
     - id: dominant_negative
       label: Dominant-negative / interference mechanism
     - id: hypomorphic_partial_loss
       label: Hypomorphic partial loss of function
-  mechanism_states:
+  mechanism_states:       # states of a MECHANISM class/edge — NOT identity states
     - supported            # >=1 resolvable primary source + span, direction consistent
     - contradicted         # >=1 resolvable primary source opposes the class
     - conflicting          # supporting AND contradicting resolvable sources coexist
     - unknown              # no resolvable primary evidence either way
     - unverified           # claim asserted but no resolvable primary source/span yet
+  state_namespace_warning: >
+    mechanism_states (supported/contradicted/conflicting/unknown/unverified) are
+    OUTCOMES of a mechanism class/edge and are DISTINCT from identity_state
+    (resolved/unresolved). The two enums MUST NOT be conflated: an AtlasIdentity
+    NEVER carries `unknown`/`conflicting`, and a mechanism class/edge NEVER carries
+    `resolved`/`unresolved`.
   labeling_rules:
     - Multi-label allowed: a profile may carry several classes simultaneously.
     - Context-dependent: a class assignment is scoped to its assay/model/tissue record.
     - "`unknown` / `conflicting` must be representable and must not be coerced to a call."
     - No class may be asserted from substitution identity alone.
+    - Disease-specific class-label refinements (e.g. which complex, which domain) are
+      pack ontology_extensions, never core.
 
 # ---------------------------------------------------------------------------
 # 2. Schemas (stable, frozen, hash-bound)
@@ -275,26 +503,53 @@ schemas:
     purpose: canonical variant/transcript input contract; the ONLY admission key.
     admission_key: canonical GRCh38 SPDI (spdi_canonical). No record is admitted
       resolved without it.
+    pack_dependency: >
+      The allowed gene set, assembly pins, and transcript pins are supplied by the
+      SELECTED disease pack (allowed_genes / assembly_pins / transcript_pins), NOT a
+      core enum. The core carries NO gene/transcript/assembly literal. Admission is
+      `admit_identity(record, *, pack)`: the SPDI-keyed identity rule is generic;
+      the allowed-value constraints are read from the pack.
     fields:
-      gene: {type: enum, values: [TSC2], note: TSC2-only in this track}
-      spdi_canonical: {type: str, required_for_resolved: true,
-        note: canonical GRCh38 SPDI; the SOLE admission/identity key}
-      assembly: {type: enum, values: [GRCh38], default: GRCh38,
-        note: SPDI is GRCh38-anchored}
-      transcript_pin: {type: str, pin: NM_000548.5, requires: MANE-Select-verification,
-        role: provenance-alias}
-      hgvs_c: {type: str, optional: true, role: provenance-alias,
-        note: exact bare c. HGVS, NEVER the admission key}
-      hgvs_p: {type: str, optional: true, role: provenance-alias}
-      hgvs_g: {type: str, optional: true, role: provenance-alias,
-        note: NC_000016.10 genomic anchor}
-      identity_state: {type: enum, values: [resolved, unresolved]}
+      gene:
+        type: str
+        note: "PLAIN string; the value MUST be in pack.allowed_genes. There is NO core gene enum (no TSC2 literal in core)."
+      spdi_canonical:
+        type: str
+        required_for_resolved: true
+        note: "canonical GRCh38 SPDI; the SOLE admission/identity key"
+      assembly:
+        type: str
+        note: "MUST be in pack.assembly_pins (e.g. GRCh38); no core assembly literal beyond the SPDI-is-genome-anchored structural rule"
+      transcript_pin:
+        type: str
+        role: provenance-alias
+        note: "MUST be in pack.transcript_pins and satisfy the pack's MANE-Select policy; the concrete transcript (e.g. NM_000548.5) is a PACK value, never a core constant"
+      hgvs_c:
+        type: str
+        optional: true
+        role: provenance-alias
+        note: "exact bare c. HGVS, NEVER the admission key"
+      hgvs_p:
+        type: str
+        optional: true
+        role: provenance-alias
+      hgvs_g:
+        type: str
+        optional: true
+        role: provenance-alias
+        note: "genomic anchor (assembly per pack); never the key"
+      identity_state:
+        type: enum
+        values: [resolved, unresolved]
+        note: "ONLY these two values. NOT unknown/conflicting — those are mechanism_states, never identity states."
     spdi_transcript_reconciliation:
       rule: >
         Any hgvs_c/hgvs_g/transcript alias is reconciled TO the canonical GRCh38
-        SPDI, never the reverse. An alias is accepted only if it deterministically
-        projects to the same canonical SPDI; a mismatch or an un-projectable alias
-        yields identity_state=unresolved.
+        SPDI, never the reverse, under the pack's reconciliation_policy. An alias is
+        accepted only if it deterministically projects to the same canonical SPDI; a
+        mismatch or an un-projectable alias yields identity_state=unresolved. The
+        reconciliation ALGORITHM is generic core; the ALLOWED transcripts/policy are
+        pack-declared.
       no_fabrication: >
         No cDNA->genomic/SPDI projection is fabricated; if a deterministic resolver
         is unavailable the record stays unresolved (never silently key on an alias).
@@ -302,25 +557,35 @@ schemas:
       - Resolved admission REQUIRES a non-empty canonical GRCh38 spdi_canonical.
       - A record without a canonical SPDI is identity_state=unresolved and admission
         FAILS with AtlasIdentityError (no partial or alias-only admission).
+      - A record whose gene is not in pack.allowed_genes (or transcript not in
+        pack.transcript_pins / assembly not in pack.assembly_pins) FAILS admission
+        with AtlasIdentityError (a VALID pack constraint violated -> core domain error).
       - hgvs_c/hgvs_p/hgvs_g/transcript_pin are PROVENANCE aliases only, never the key.
+      - identity_state is ONLY resolved/unresolved; assigning unknown/conflicting is
+        AtlasSchemaError (mechanism-state/identity-state conflation).
     transcript_caveat:
       note: >
-        Existing MAVE register pins NM_000548.5 while BIAS on-disk outputs carry
-        NM_000548.4; equal bare c. strings across .4/.5 are NOT proven to share CDS
-        numbering. Because admission is SPDI-keyed (GRCh38-anchored), transcript
-        version drift cannot silently equate two variants; a c. alias that does not
-        reconcile to the canonical SPDI is rejected as unresolved.
+        The tsc2 pack pins NM_000548.5 while some external tools carry NM_000548.4;
+        equal bare c. strings across .4/.5 are NOT proven to share CDS numbering.
+        Because admission is SPDI-keyed (genome-anchored), transcript version drift
+        cannot silently equate two variants; a c. alias that does not reconcile to
+        the canonical SPDI is rejected as unresolved. The specific transcript
+        versions are pack values; the drift-rejection RULE is generic core.
   observed_claim:
     id: atlas.claim.v1
     purpose: one observed claim bound to an exact source span; never a summary.
     fields:
-      claim_id: {type: str, note: stable id; edges/evidence reference THIS, not the object}
+      claim_id:
+        type: str
+        note: "stable id; edges/evidence reference THIS, not the object"
       claim_text: {type: str}
-      claim_kind: {type: enum, values: [rna, splicing, abundance, stability,
-        complex, localization, pathway_mtorc1, phenotype, other]}
-      source_ref: {type: ref, to: source_register.EntryRef,
-        note: the SINGLE source of truth for grounding; source_ref.span is the
-          canonical exact span. ObservedClaim carries NO span field of its own.}
+      claim_kind:
+        type: str
+        note: "MUST be a core seed kind OR a namespaced pack extension `<pack_id>:<name>`. Core seed kinds are DISEASE-FREE [rna, splicing, abundance, stability, complex, localization, pathway, phenotype, other]; `pathway_mtorc1` is NOT a core kind — the tsc2 pack declares `tsc2:pathway_mtorc1` with parent seed `pathway`. Validated against the selected pack."
+      source_ref:
+        type: ref
+        to: source_register.EntryRef
+        note: "the SINGLE source of truth for grounding; source_ref.span is the canonical exact span. ObservedClaim carries NO span field of its own."
       verification: {type: enum, values: [verified, unverified]}
       directionality: {type: enum, values: [increase, decrease, none, unknown]}
     span_ownership:
@@ -347,22 +612,35 @@ schemas:
     id: atlas.context.v1
     purpose: assay / model / cell / tissue / condition context for every claim.
     fields:
-      assay: {type: str, note: e.g. VAMP-seq, SGE, co-IP, immunoblot, luciferase-mTORC1}
-      model_system: {type: str, note: e.g. HAP1, HEK293, patient fibroblast, mouse}
+      assay:
+        type: str
+        note: "generic assay label (e.g. abundance-seq, saturation editing, co-IP, immunoblot, pathway-reporter). Disease-specific assay vocabularies/normalization targets are pack context vocabularies, not core."
+      model_system:
+        type: str
+        note: "e.g. cell line, patient-derived cells, animal model"
       cell_type: {type: str, optional: true}
       tissue: {type: str, optional: true}
       zygosity_context: {type: enum, values: [germline, somatic, mosaic, inferred, unknown]}
-      assay_limitations: {type: list, note: known caveats/power limits}
+      assay_limitations:
+        type: list
+        note: "known caveats/power limits"
   mechanism_edge:
     id: atlas.edge.v1
     purpose: >
-      DNA -> RNA -> protein(abundance/stability/complex/localization) -> mTORC1 ->
-      phenotype edge representation. Each edge is evidence-bound and context-scoped.
+      Generic layered edge representation
+      dna -> rna -> protein(abundance/stability/complex/localization) ->
+      pathway_state -> phenotype. Each edge is evidence-bound and context-scoped.
+      The core layers are DISEASE-FREE; a pack maps `pathway_state` to its specific
+      pathway (the tsc2 pack maps it to mTORC1 via `tsc2:pathway_mtorc1`).
     node_layers: [dna, rna, protein_abundance, protein_stability, complex,
-      localization, mtorc1_state, phenotype]
+      localization, pathway_state, phenotype]
+    node_layers_note: >
+      `pathway_state` REPLACES the former `mtorc1_state` core layer (which hardcoded
+      a disease pathway). Disease-specific pathway naming is a namespaced pack
+      node-layer extension with parent seed `pathway_state`.
     edge_fields:
-      from_layer: {type: enum, ref: node_layers}
-      to_layer: {type: enum, ref: node_layers}
+      from_layer: {type: str, note: a core node_layer OR a namespaced pack extension}
+      to_layer: {type: str, note: a core node_layer OR a namespaced pack extension}
       effect: {type: enum, values: [increase, decrease, disrupt, none, unknown]}
       supporting_claims: {type: list, of: claim_id_ref, note: claim_id into profile.claims}
       contradicting_claims: {type: list, of: claim_id_ref, note: claim_id into profile.claims}
@@ -386,11 +664,16 @@ schemas:
     purpose: the top-level per-variant record composed of the above.
     fields:
       identity: {ref: variant_identity}
-      claims: {type: tuple, of: observed_claim,
-        note: immutable canonical claim table; the SINGLE source of claim identity;
-          edges/evidence reference members by claim_id}
-      candidate_classes: {type: list, of: {class: ontology_seeds.mechanism_classes,
-        state: ontology_seeds.mechanism_states, confidence: 'enum[low, moderate, high, na]'}}
+      pack_binding:
+        ref: generic_core_disease_pack.pack_binding
+        note: "{pack_id, pack_version, pack_content_hash} of the pack this profile was built under; bound into BOTH content hashes so wrong-pack reinterpretation is detectable"
+      claims:
+        type: tuple
+        of: observed_claim
+        note: "immutable canonical claim table; the SINGLE source of claim identity; edges/evidence reference members by claim_id"
+      candidate_classes:
+        type: list
+        of: {class: ontology_seeds.mechanism_classes, state: ontology_seeds.mechanism_states, confidence: 'enum[low, moderate, high, na]'}
       edges: {type: list, of: mechanism_edge}
       evidence: {ref: evidence_assessment}
       provenance: {ref: provenance}
@@ -400,6 +683,8 @@ schemas:
       - No confidence value is derived from any classifier or ClinVar score.
       - Every claim_id referenced by edges/evidence resolves INTO profile.claims;
         no claim exists outside the claims tuple (single source of truth for hashing).
+      - pack_binding is REQUIRED and non-empty; a profile with an empty/missing
+        pack_binding is AtlasSchemaError (a profile is always built under one pack).
   run_metadata:
     id: atlas.run_metadata.v1
     purpose: non-content run fields, isolated so hashing is field-coherent.
@@ -407,12 +692,21 @@ schemas:
       run_id: {type: str}
       generated_at: {type: str}
       tool_versions: {type: list}
+      pack_binding_audit:
+        type: obj
+        optional: true
+        note: "audit COPY of pack_binding for humans; NEVER hashed (run_metadata is excluded); the hash-bound copy is profile.pack_binding"
     note: run_metadata is EXCLUDED from both content hashes by definition.
   provenance:
     id: atlas.provenance.v1
     fields:
       source_pins: {type: tuple, of: source_register.EntryRef}
-      version_pins: {type: tuple, note: transcript, source, and dataset versions}
+      version_pins:
+        type: tuple
+        note: "transcript, source, and dataset versions"
+      pack_binding:
+        ref: generic_core_disease_pack.pack_binding
+        note: "same {pack_id, pack_version, pack_content_hash}; in the ENVELOPE payload"
       content_hashes:
         evidence_core_hash: {algo: sha256, over: evidence_core_payload}
         profile_envelope_hash: {algo: sha256, over: profile_envelope_payload}
@@ -428,18 +722,29 @@ schemas:
       exist. Ordering is applied before hashing.
     dedup: Exact-duplicate claims (identical after canonicalization) collapse to one.
     evidence_core_payload:
-      includes: [identity.spdi_canonical, identity.gene, claims, candidate_classes, edges, evidence]
+      includes: [pack_binding, identity.spdi_canonical, identity.gene, claims,
+        candidate_classes, edges, evidence]
       excludes: [provenance, run_metadata, identity.transcript_pin, identity.hgvs_c,
         identity.hgvs_p, identity.hgvs_g]
       note: >
-        The evidence core is defined ONLY over listed `includes` fields; edges/
-        evidence serialize claim references as claim_id into the same ordered claims
-        tuple, so the payload is internally coherent (no dangling/undefined field).
+        The evidence core is defined ONLY over listed `includes` fields; pack_binding
+        (pack_id + pack_version + pack_content_hash) is bound in FIRST so the same
+        evidence under a different pack yields a different core hash. edges/evidence
+        serialize claim references as claim_id into the same ordered claims tuple, so
+        the payload is internally coherent (no dangling/undefined field).
     profile_envelope_payload:
-      includes: [identity, claims, candidate_classes, edges, evidence,
+      includes: [pack_binding, identity, claims, candidate_classes, edges, evidence,
         provenance.source_pins, provenance.version_pins]
       excludes: [run_metadata, provenance.content_hashes]
-      note: excludes ONLY run_metadata and the self-referential content_hashes block.
+      note: >
+        Excludes ONLY run_metadata and the self-referential content_hashes block.
+        pack_binding is included so the envelope hash also fails closed under a
+        wrong/altered pack.
+    pack_binding_rule: >
+      Both hashes bind pack_binding. A hash-coherence check that recomputes both
+      hashes under the profile's declared pack MUST match; recomputing under any
+      other pack MUST differ. This makes reinterpretation of a profile under the
+      wrong pack a detectable, fail-closed condition (AtlasSchemaError on mismatch).
   atlas_candidate_import:
     id: atlas.candidate_import.v1
     trust: >-
@@ -448,92 +753,318 @@ schemas:
     purpose: carry Discovery-proposed evidence into RAPTOR's deterministic gate.
     fields:
       candidate_variant:
-        spdi_proposed: str
-        hgvs_aliases: list
+        type: nested_obj
+        fields:
+          spdi_proposed: {type: str, note: PROPOSED canonical SPDI (re-admitted by RAPTOR)}
+          gene_proposed: {type: str, optional: true, note: re-checked vs pack.allowed_genes}
+          hgvs_aliases: {type: list, note: provenance aliases only}
         note: >-
-          Identity is a PROPOSAL only; RAPTOR re-admits via canonical GRCh38 SPDI
-          and never trusts the proposed identity.
+          Identity is a PROPOSAL only and is a NESTED object (never a flat string);
+          RAPTOR re-admits via canonical GRCh38 SPDI under the selected pack and
+          never trusts the proposed identity.
       proposed_claims:
         type: list
-        of: [claim_text, claim_kind, directionality, source_ref_proposed,
-          span_proposed, context_proposed]
+        of_nested: [claim_text, claim_kind_proposed, directionality,
+          source_ref_proposed, span_proposed, context_proposed]
         note: >-
-          Proposals only; source refs and spans are re-resolved by RAPTOR and are
-          not grounded on import.
+          Proposals only; claim_kind_proposed is re-validated against the selected
+          pack vocabulary, and source refs and spans are re-resolved by RAPTOR and
+          are not grounded on import.
       proposed_sources:
         type: list
-        of: [entry_id, source_type, role, bib]
+        of_nested: [entry_id, source_type, role, bib]
         note: >-
           Bibliographic proposals; source_type and role are re-validated against
           the direct_evidence_leaf rule by RAPTOR.
       retrieval_provenance:
-        agents: list
-        queries: list
-        run_id: str
-        retrieved_at: str
+        type: nested_obj
+        fields:
+          agents: {type: list}
+          queries: {type: list}
+          run_id: {type: str}
+          retrieved_at: {type: str}
+          pack_binding:
+            type: obj
+            note: "{pack_id, pack_version, pack_content_hash} the candidate was retrieved under; re-checked at promotion"
+          prompt_hash:
+            type: str
+            note: "Discovery mapper prompt hash (Phase 1 may be a validated placeholder)"
+          bookshelf_version: {type: str}
         note: Discovery run trace retained for audit and native-vs-Discovery eval.
+    schema_note: >-
+      There is NO `mapper_version`/`bookshelf_version`/`prompt_hash`/`status` field
+      at the TOP level of this schema (a prior test invented them). Retrieval/version
+      metadata lives ONLY inside retrieval_provenance; acceptance state is never a
+      candidate field.
     invariants:
       - No field of this schema is trusted; promotion runs the full RAPTOR gate.
       - verification/accepted state is NEVER set by the importer; RAPTOR assigns it.
+      - candidate_variant is a nested object; a flat-string identity is AtlasSchemaError.
       - A candidate that fails identity / source-type / role / span / context /
         leakage validation is REJECTED (AtlasSchemaError / AtlasProvenanceError),
         never silently admitted.
+  promotion_context:
+    id: atlas.promotion_context.v1
+    purpose: >-
+      Dependency-injected context object carrying every collaborator the promotion
+      gate needs; promote/validate take ONE context arg, never loose kwargs or
+      ambient globals. Enables deterministic RED tests with fakes.
+    fields:
+      disease_pack:
+        type: DiseasePack
+        note: "the loaded, validated pack (identity + ontology + source constraints are read from here)"
+      citation_resolver:
+        type: callable
+        note: "resolves a proposed citation (PMID/DOI/accession) to a real source; returns/raises deterministically"
+      context_validator:
+        type: callable
+        note: "validates proposed assay/model/context against the pack's context vocabularies"
+      human_oracle_reviewer:
+        type: callable
+        note: "named human/oracle span-review result provider; Phase-1 fakes return a synthetic signoff, Phase-2 requires a real named reviewer"
+      duplicate_index:
+        type: obj
+        optional: true
+        note: "accepted-claim index for the duplicate/conflict gate"
+    rule: >-
+      All collaborators are injected via PromotionContext. The core defines the
+      INTERFACE; Phase-1 tests inject fakes. No collaborator is a disease literal.
   candidate_promotion:
     id: atlas.promotion.v1
     gate_order: [canonical_spdi_readmission, source_type_role_validation,
-      citation_resolution, exact_span_resolution, context_enum_validation,
-      duplicate_conflict_rules, no_classification_leakage, human_oracle_span_review]
+      citation_resolution, exact_span_resolution, context_ontology_pack_validation,
+      duplicate_conflict_rules, no_classification_leakage, named_human_oracle_span_review]
+    gate_semantics:
+      - n: 1
+        gate: canonical_spdi_readmission
+        checks: "re-admit via canonical GRCh38 SPDI under pack.allowed_genes/assembly/transcript; alias-only/missing SPDI or off-pack gene -> AtlasSchemaError/AtlasIdentityError."
+      - n: 2
+        gate: source_type_role_validation
+        checks: "role==direct_evidence_leaf AND source_type in allowed_direct_evidence_leaf_source_types; mis-tag -> AtlasSchemaError."
+      - n: 3
+        gate: citation_resolution
+        checks: "PromotionContext.citation_resolver resolves each proposed citation; unresolved -> AtlasProvenanceError."
+      - n: 4
+        gate: exact_span_resolution
+        checks: "non-empty EntryRef.span (locator+exact_quote+page_or_figure); missing span -> AtlasSchemaError."
+      - n: 5
+        gate: context_ontology_pack_validation
+        checks: "claim_kind and context validate against the SELECTED pack vocabulary (core seed + namespaced pack extensions); off-vocabulary -> AtlasSchemaError."
+      - n: 6
+        gate: duplicate_conflict_rules
+        checks: "duplicate/conflicting claim detection against duplicate_index; unresolved conflict -> AtlasProvenanceError."
+      - n: 7
+        gate: no_classification_leakage
+        checks: "no classifier_score / clinvar_derived_criterion field present -> AtlasProvenanceError/AtlasLeakageError."
+      - n: 8
+        gate: named_human_oracle_span_review
+        checks: "PromotionContext.human_oracle_reviewer returns a NAMED signoff; absent -> AtlasProvenanceError."
     rule: >
-      promote_candidate(import) yields accepted claims ONLY if every gate passes;
-      the importer never writes accepted state. Human/oracle span review is
-      mandatory before Phase-2 GO. Discovery is optional: a missing or failed
-      candidate never blocks RAPTOR and never mutates an accepted profile.
+      validate_candidate_import(candidate, context) runs gates 1-8 IN ORDER and
+      raises on the first failure; promote_candidate(candidate, context) yields
+      accepted claims ONLY if every gate passes. The importer never writes accepted
+      state. Human/oracle span review is mandatory before Phase-2 GO. Discovery is
+      optional: a missing or failed candidate never blocks RAPTOR and never mutates
+      an accepted profile.
+    phase1_note: >
+      Phase 1 MAY test a SYNTHETIC successful promotion (all fakes pass, fully
+      synthetic SPDI/content) but MUST NOT accept a REAL Discovery claim; real
+      grounding + a real named human/oracle reviewer are Phase-2 only.
 
 # ---------------------------------------------------------------------------
 # 3. Module API (src/raptor/atlas/)
+# ---------------------------------------------------------------------------
+# 2.5 Exact frozen dataclass contracts (RED-test constructor authority)
+# ---------------------------------------------------------------------------
+# Exact field names/types/defaults for the frozen dataclasses so RED tests use
+# precise constructors. All dataclasses are frozen (eq=True); ordered collections
+# are tuples. Field names are BINDING (a prior test used variant_id/statement/span
+# on ObservedClaim — WRONG; see gemini_test_contract.c281fca_defects).
+dataclass_contracts:
+  DiseasePack:              # from pack.py; loaded via load_disease_pack
+    frozen: true
+    fields:
+      schema: str
+      pack_id: str
+      pack_version: str
+      pack_content_hash: str
+      allowed_genes: tuple            # tuple[str, ...]
+      assembly_pins: tuple            # tuple[str, ...]
+      transcript_pins: tuple          # tuple[obj, ...] {transcript, requires}
+      reconciliation_policy: obj
+      ontology_extensions: obj        # namespaced claim_kind/node_layer/class + context vocab
+      source_register_pins: tuple     # tuple[SourceRegisterEntry, ...]
+      prohibitions: obj               # e.g. r611q_gate for the tsc2 pack
+      pilot_eval_metadata: obj
+  PackBinding:
+    frozen: true
+    fields: {pack_id: str, pack_version: str, pack_content_hash: str}
+  AtlasIdentity:
+    frozen: true
+    fields:
+      spdi_canonical: 'str | None'    # None only for identity_state=unresolved inputs
+      gene: str                       # plain str; validated against pack.allowed_genes
+      assembly: str
+      transcript_pin: 'str | None'
+      hgvs_c: 'str | None'
+      hgvs_p: 'str | None'
+      hgvs_g: 'str | None'
+      identity_state: str             # 'resolved' | 'unresolved' ONLY
+    note: NO `status` field; NO gene enum. Admission is admit_identity(record, *, pack).
+  Span:
+    frozen: true
+    fields: {locator: str, exact_quote: str, page_or_figure: str}
+  EntryRef:
+    frozen: true
+    fields: {entry_id: str, span: 'Span | None'}   # span sole owner; mandatory when used to verify
+  SourceRegisterEntry:
+    frozen: true
+    fields:
+      entry_id: str
+      source_type: str                # one of source_register.source_types
+      role: str                       # direct_evidence_leaf | provenance_only | context | crosswalk
+      urn_or_ids: obj
+      transcript: 'str | None'
+      license: 'str | None'
+      sha256: 'str | None'
+      variant_count: 'int | None'
+      verification: str               # verified | confirm_pending | unverified
+  ObservedClaim:
+    frozen: true
+    fields:
+      claim_id: str
+      claim_text: str                 # NOT `statement`
+      claim_kind: str                 # core seed OR `<pack_id>:<name>`
+      source_ref: EntryRef            # NO variant_id, NO span, NO statement field
+      verification: str               # verified | unverified
+      directionality: str             # increase | decrease | none | unknown
+    note: >-
+      There is NO `span` field and NO `variant_id` field on ObservedClaim. Passing
+      span= is AtlasSchemaError (schema-level) / TypeError (unknown kwarg). The
+      grounding span is source_ref.span only.
+  ContextRecord:
+    frozen: true
+    fields: {assay: str, model_system: str, cell_type: 'str | None',
+      tissue: 'str | None', zygosity_context: str, assay_limitations: tuple}
+  MechanismEdge:
+    frozen: true
+    fields: {from_layer: str, to_layer: str, effect: str,
+      supporting_claims: tuple, contradicting_claims: tuple,
+      context: ContextRecord, edge_state: str}
+  CandidateClass:
+    frozen: true
+    fields: {class_id: str, state: str, confidence: str}   # confidence: low|moderate|high|na
+  EvidenceAssessment:
+    frozen: true
+    fields: {supporting: tuple, contradicting: tuple, missing_evidence: tuple, unknowns: tuple}
+  RunMetadata:
+    frozen: true
+    fields: {run_id: str, generated_at: str, tool_versions: tuple, pack_binding_audit: 'obj | None'}
+  Provenance:
+    frozen: true
+    fields: {source_pins: tuple, version_pins: tuple, pack_binding: PackBinding, content_hashes: obj}
+  MechanismProfile:
+    frozen: true
+    fields:
+      identity: AtlasIdentity
+      pack_binding: PackBinding       # REQUIRED, non-empty
+      claims: tuple                   # tuple[ObservedClaim, ...]
+      candidate_classes: tuple        # tuple[CandidateClass, ...]
+      edges: tuple                    # tuple[MechanismEdge, ...]
+      evidence: EvidenceAssessment
+      provenance: Provenance
+      run_metadata: 'RunMetadata | None'
+  AtlasCandidateImport:
+    frozen: true
+    fields:
+      candidate_variant: obj          # NESTED {spdi_proposed, gene_proposed?, hgvs_aliases}
+      proposed_claims: tuple
+      proposed_sources: tuple
+      retrieval_provenance: obj       # {agents, queries, run_id, retrieved_at, pack_binding, prompt_hash, bookshelf_version}
+    note: NO top-level mapper_version/bookshelf_version/prompt_hash/status fields.
+  PromotionContext:
+    frozen: true
+    fields: {disease_pack: DiseasePack, citation_resolver: callable,
+      context_validator: callable, human_oracle_reviewer: callable,
+      duplicate_index: 'obj | None'}
+  DisMechRecord:
+    frozen: true
+    fields: {spdi_canonical: str, pack_binding: PackBinding, claims: tuple,
+      provenance: obj}
+    note: export target carries spdi_canonical (identity key) + pack_binding; no `variant_id`.
+
 # ---------------------------------------------------------------------------
 module_api:
   package: src/raptor/atlas/
   layout:
     - __init__.py
     - model.py            # frozen dataclasses for all schemas above + typed errors
-    - identity.py         # canonical variant/transcript admission contract
-    - hashing.py          # canonical-JSON sha256 (mirrors packet/hashing.py)
-    - registry.py         # source register loader + fail-closed verification
+    - pack.py             # disease-pack loader/validator (load/validate/hash); the ONLY disease-specific entry point
+    - identity.py         # canonical variant/transcript admission contract (admit_identity(record, *, pack))
+    - hashing.py          # canonical-JSON sha256 (mirrors packet/hashing.py) + pack_binding binding
+    - registry.py         # source register loader + fail-closed verification (pack-supplied pins)
+    - ontology.py         # core seed vocab + namespaced pack-extension validation
     - profile.py          # build_mechanism_profile(...) assembly
-    - promote.py          # deterministic AtlasCandidateImport validation + promotion gate
+    - promote.py          # deterministic AtlasCandidateImport validation + promotion gate (PromotionContext)
     - export.py           # one-way DisMech-compatible export (post-validation only)
-    - guards.py           # leakage/scoring-import prohibition enforcement
+    - guards.py           # leakage/scoring-import prohibition enforcement (STATIC AST import-graph)
     - README.md           # module charter (non-authority, boundaries, prohibitions)
+  disease_literal_free: >
+    NONE of these core modules may contain a disease literal (see
+    generic_core_disease_pack.core.must_not_contain_literals). pack.py loads the
+    declarative pack; the pack files live under configs/atlas/packs/, NOT in src/.
   typed_errors:
-    - AtlasSchemaError
-    - AtlasIdentityError
-    - AtlasProvenanceError
-    - AtlasSourceVerificationError
-    - AtlasLeakageError
-    - AtlasExportError
+    - AtlasSchemaError            # core: shape/field/enum/conflation violations
+    - AtlasIdentityError          # core: SPDI/admission/pack-constraint identity failures
+    - AtlasProvenanceError        # core: grounding/citation/duplicate/leakage provenance failures
+    - AtlasSourceVerificationError # core: source pin drift / confirm_pending-as-verified
+    - AtlasLeakageError           # core: scoring/criterion leakage + import-boundary breach
+    - AtlasExportError            # core: export precondition failures
+    - AtlasPackError              # PACK-validation: malformed/hash-drifted/mis-namespaced pack
   public_functions:
-    - build_mechanism_profile(identity, claims, contexts, edges, sources) -> MechanismProfile
-    - validate_candidate_import(candidate) -> None  # deterministic; raises on any gate failure
-    - promote_candidate(candidate) -> tuple  # accepted claims only after full gate + human/oracle review
-    - verify_source(entry) -> None  # raises AtlasSourceVerificationError on drift
-    - evidence_core_hash(profile) -> str
-    - profile_envelope_hash(profile) -> str
-    - export_dismech(profile) -> DisMechRecord  # one-way, post-internal-validation only
+    - load_disease_pack(path_or_pack_id) -> DiseasePack        # AtlasPackError on any failure
+    - validate_disease_pack(pack) -> None                      # AtlasPackError
+    - pack_content_hash(pack) -> str
+    - admit_identity(record, *, pack) -> AtlasIdentity         # AtlasIdentityError on unresolved/off-pack
+    - reconcile_transcript(identity, alias, *, pack, resolver) -> bool
+    - build_mechanism_profile(identity, claims, contexts, edges, sources, *, pack) -> MechanismProfile
+    - validate_candidate_import(candidate, context) -> None    # deterministic; raises on first gate failure (context: PromotionContext)
+    - promote_candidate(candidate, context) -> tuple           # accepted claims only after all 8 gates
+    - verify_source(entry) -> None                             # raises AtlasSourceVerificationError on drift
+    - validate_claim_grounding(claim, registry, *, pack) -> None
+    - evidence_core_hash(profile) -> str                       # binds pack_binding
+    - profile_envelope_hash(profile) -> str                    # binds pack_binding
+    - export_dismech(profile) -> DisMechRecord                 # one-way, post-internal-validation only
+    - assert_atlas_import_boundary(package_path='src/raptor/atlas') -> None  # STATIC AST guard
   api_independence:
-    - The Atlas API takes only canonical identity + evidence inputs; it never imports
-      raptor.scorer, raptor.eval, raptor.packet, or a ClinVar-derived criterion value.
-    - No RAPTOR scoring/gate/packet module may import raptor.atlas (enforced by guards + tests).
-    - The core atlas package imports NO Discovery SDK/agent; the Discovery lane
-      runs OUT-OF-PROCESS and reaches atlas only as an untrusted AtlasCandidateImport
+    - The Atlas API takes only canonical identity + evidence inputs + an injected
+      DiseasePack; it never imports raptor.scorer, raptor.eval, raptor.packet, or a
+      ClinVar-derived criterion value.
+    - No RAPTOR scoring/gate/packet module may import raptor.atlas (enforced by
+      guards.assert_atlas_import_boundary STATIC AST check + tests).
+    - The core atlas package imports NO Discovery SDK/agent; the Discovery lane runs
+      OUT-OF-PROCESS and reaches atlas only as an untrusted AtlasCandidateImport
       payload validated by promote.py.
+    - "CLI/config adapter placement: any adapter that bridges atlas to a runner/CLI
+      (e.g. loading a pack path from config, wiring a resolver) lives OUTSIDE
+      src/raptor/atlas/ (e.g. a thin `scripts/atlas_*` entry or a dedicated adapter
+      package), imports atlas one-way, and MUST NOT introduce an import cycle or pull
+      scorer/eval/packet into atlas."
 
 # ---------------------------------------------------------------------------
-# 4. Panel selection contract (bounded TSC2 pilot)
+# 4. Panel selection contract (bounded pilot; Phase-1 pilot pack = tsc2)
 # ---------------------------------------------------------------------------
 panel_selection_contract:
+  pilot_pack: tsc2                    # the ONLY pack in this track
   size: {min: 5, max: 10}
-  gene: TSC2
+  gene:
+    from: pack.allowed_genes
+    phase1_value: TSC2
+    note: "the pilot gene is a PACK value (tsc2 pack), NOT a core constant"
+  deterministic_sample: >
+    A deterministic eight-case sample from the frozen packet corpus is available for
+    the pilot; Phase 1 remains synthetic-only, and Phase 2 real grounding over that
+    sample still requires named human/oracle span review.
   required_strata:
     - known_pathogenic
     - known_benign
@@ -545,11 +1076,14 @@ panel_selection_contract:
     - Panel must exercise unknown, conflicting, and context-dependent representations.
     - Every admitted record needs resolved identity + independent source-span review.
   r611q_gate:
+    owner: tsc2 disease pack (prohibitions block), NOT the generic core.
     variant: TSC2 p.Arg611Gln (R611Q)
     admission: BLOCKED until exact identity + primary-source re-grounding complete.
     prohibition: Do NOT hardcode the handoff's proposed R611Q mechanism, zygosity,
       stability, complex, localization, mTOR, or rescue statements as fact.
     on_admission: represent every unsupported handoff mechanism as a hypothesis/unknown.
+    phase_note: R611Q stays BLOCKED for Phase-2 primary re-grounding; NO real R611Q
+      claims exist in Phase 1 (and the R611Q literal lives only in the tsc2 pack).
   synthetic_fixtures:
     independence: >
       Module skeleton + synthetic RED-test fixtures MUST NOT depend on any real
@@ -562,7 +1096,22 @@ panel_selection_contract:
 # ---------------------------------------------------------------------------
 # Convention mirrors configs/external/mave_sources.yaml + the reference registers.
 # verification in {verified, confirm_pending, unverified}; access-not-held allowed.
+# CORE vs PACK: the register SCHEMA (SourceRegisterEntry/EntryRef), the source-type
+# closure, the direct_evidence_leaf grounding RULE, and fail-closed verification are
+# GENERIC CORE. The concrete disease-specific ENTRIES below (MaveDB/IGVF/CAGI/
+# ClinVar/Monarch TSC2 pins) are declared by the tsc2 disease pack
+# (source_register_pins), NOT embedded in core. The `categories` block is the tsc2
+# pack's illustrative pin set; a different pack supplies its own.
 source_register:
+  pack_ownership:
+    core_owns: [entry_schema, entry_ref_schema, source_types,
+      allowed_direct_evidence_leaf_source_types, grounding_rule, register_invariants]
+    pack_owns: [categories]     # concrete disease-specific source pins (tsc2 pack)
+    rule: >
+      The core validates entries generically; the tsc2 pack supplies the concrete
+      pins. A disease literal (mavedb-00001201-a-1, IGVF/CAGI TSC ids, ClinVar-TSC,
+      Monarch-DisMech-TSC) NEVER appears in src/raptor/atlas/; it appears only in
+      configs/atlas/packs/tsc2/pack.yaml.
   reading_rule: >
     Every entry is EVIDENCE provenance, never ACMG criteria, never raptor.scorer
     input, never ClinVar-derived criterion. No score/class here may gate a call.
@@ -627,6 +1176,12 @@ source_register:
       crosswalk and CANNOT ground a verified mechanism claim, regardless of
       verification state and regardless of any role mis-tagging.
   categories:
+    # ------------------------------------------------------------------
+    # PACK-OWNED: these concrete entries are the tsc2 disease pack's
+    # source_register_pins (configs/atlas/packs/tsc2/pack.yaml). They are
+    # NOT part of the generic core and NEVER appear in src/raptor/atlas/.
+    # A different disease pack supplies its own pins under this same schema.
+    # ------------------------------------------------------------------
     primary_functional_literature:
       - entry_id: nellist-hoogeveen-westerveld-program
         source_type: PRIMARY-LIT
@@ -731,6 +1286,19 @@ leakage_guards:
       Only neutral, side-effect-free shared identity/provenance/hashing utilities
       may be shared, and only after explicit owner approval + a recorded decision;
       absent that approval, raptor.atlas depends on none of them.
+    static_enforcement:
+      mechanism: >
+        Import-boundary enforcement is STATIC (AST / module-import-graph), NOT an
+        ambient sys.modules runtime check. guards.assert_atlas_import_boundary()
+        parses every module under src/raptor/atlas/ with `ast`, collects Import /
+        ImportFrom nodes, and asserts NONE resolves to a forbidden target
+        (raptor.packet/scorer/eval, or any Discovery SDK/agent). A sys.modules
+        membership check is INSUFFICIENT (it passes vacuously when a module was never
+        imported) and is explicitly rejected as the enforcement mechanism.
+      consumer_direction: >
+        The same static scan is applied in reverse for consumers: no
+        raptor.packet/scorer/eval module's AST may contain an import resolving to
+        raptor.atlas. assert_no_consumer_import(target) enforces this.
   circularity_guard:
     forbidden_consumers:
       - raptor.packet
@@ -741,17 +1309,33 @@ leakage_guards:
       - raptor.eval.knowns
     forbidden_criteria: [PP3, BP4, PP5, BP6, PS4, PS3, BS3]
     forbidden_inputs_as_mechanism_truth: [classifier_score, clinvar_derived_criterion]
+  cli_config_adapter_placement:
+    rule: >
+      Any CLI/config adapter that wires atlas into a runner (loading a pack path from
+      config, providing a citation resolver, invoking export) lives OUTSIDE
+      src/raptor/atlas/ (a thin scripts/ entry or a dedicated adapter package). The
+      adapter imports atlas ONE-WAY and MUST NOT re-introduce scorer/eval/packet into
+      atlas or create an import cycle. The disease pack is CONFIG under
+      configs/atlas/packs/, loaded by pack.py, never imported as code.
   discovery_import_boundary:
     rule: >
       The core raptor.atlas package MUST NOT import any Discovery SDK, client, or
       agent. The Discovery research lane runs OUT-OF-PROCESS (config/templates
       only) and reaches atlas solely as an untrusted AtlasCandidateImport payload
       validated by promote.py. Discovery is runtime-optional and never on the
-      accept/hash/guard path.
+      accept/hash/guard path. Enforced by the SAME static AST scan.
     forbidden_atlas_imports_extra: [microsoft_discovery_sdk, discovery_agent_client]
-  enforcement: guards.py + Gemini RED tests assert import-direction (incl. no
-    raptor.packet/scorer/eval and no Discovery SDK/agent import from atlas), the
-    criterion bans, and the direct_evidence_leaf grounding rule.
+  disease_literal_guard:
+    rule: >
+      A static scan asserts src/raptor/atlas/ contains NO disease literal
+      (TSC1/TSC2, NM_000548.5, NC_000016.10 as a constant, mTOR/mTORC1, R611Q,
+      pathway_mtorc1, or a disease-specific source id). Disease terms appear only in
+      configs/atlas/packs/. This is a Gemini RED test + a GPT probe.
+  enforcement: >
+    guards.py (STATIC AST import-graph + disease-literal scan) + Gemini RED tests
+    assert import-direction (no raptor.packet/scorer/eval and no Discovery SDK/agent
+    import from atlas), the consumer-direction ban, the criterion bans, the
+    direct_evidence_leaf grounding rule, and the no-disease-literal-in-core rule.
 
 # ---------------------------------------------------------------------------
 # 7. One-way DisMech-compatible export
@@ -789,8 +1373,55 @@ discovery_boundary:
     source type/role, citation resolution, exact span, context enums, duplicate/
     conflict rules, no-classification leakage) before any promotion; human/oracle
     span review is required before Phase-2 GO.
+  context_templates:
+    location: configs/atlas/discovery/     # CONFIG/TEMPLATES only; out-of-process; core imports none of this
+    pack_context: >
+      Templates TAKE disease-pack context (they are parameterized by the selected
+      pack). The context manifest PINS the pack id/version/content-hash so a
+      retrieval run is bound to exactly one pack; outputs remain untrusted candidate
+      imports re-validated by RAPTOR.
+    files:
+      - path: configs/atlas/discovery/context_manifest.json
+        schema: atlas.discovery.context_manifest.v1
+        required_pins:
+          - raptor_commit          # RAPTOR git commit
+          - atlas_schema_version    # this spec's schema id
+          - disease_pack_id         # e.g. tsc2
+          - disease_pack_version
+          - disease_pack_content_hash
+          - bookshelf_version
+          - prompt_hash             # Discovery mapper prompt hash
+          - packet_manifest_hash    # ONLY required when Phase 2 needs it; Phase 1 placeholder
+        placeholder_rule: >
+          Phase 1 MAY set prompt_hash and packet_manifest_hash to an explicit
+          placeholder token (e.g. "PLACEHOLDER_PHASE2"); the manifest validator
+          ACCEPTS the placeholder in Phase 1 and REQUIRES a real hash in Phase 2. The
+          disease-pack pins (id/version/content_hash) are NOT placeholders — they are
+          real from Phase 1 because the tsc2 pack exists.
+      - path: configs/atlas/discovery/task_graph.json
+        schema: atlas.discovery.task_graph.v1
+        steps_exact_order: [identity_confirmation, literature_retrieval,
+          claim_span_extraction, contradiction_search, assay_context_normalization,
+          evidence_gap_mapping]
+        note: step names MUST EXACTLY match engine_tasks (a prior test used
+          identity/retrieval/claim_span/contradiction/context/gap_map — WRONG).
+      - path: configs/atlas/discovery/bookshelf_sources.yaml
+        schema: atlas.discovery.bookshelf.v1
+        contains: [required_context_pins, public_licensed_sources]
+        note: PUBLIC, appropriately-licensed sources only; no PHI/private/cloud data.
+      - path: configs/atlas/discovery/private_mapper_prompt.txt
+        contains: >
+          Private mapper prompt (tsc-mechanism-evidence-mapper prototype). MUST state
+          public-data-only + no-classification instructions and MUST emit
+          AtlasCandidateImport-shaped output. Takes disease-pack context.
+      - path: configs/atlas/discovery/evaluation_rubric.yaml
+        schema: atlas.discovery.eval_rubric.v1
+        contains: native_vs_discovery_evaluation.axes + public-data/no-classification rules.
+  validation_requirements_note: >
+    The context manifest, task graph, bookshelf, prompt, and rubric are the exact
+    versioned template artifacts the Discovery-context RED test inspects.
   native_vs_discovery_evaluation:
-    scope: SAME bounded 5-10-case TSC2 panel, native RAPTOR vs Discovery-assisted.
+    scope: SAME bounded 5-10-case pilot panel (tsc2 pack), native RAPTOR vs Discovery-assisted.
     axes:
       - retrieval_recall
       - valid_claim_span_yield
@@ -815,28 +1446,86 @@ discovery_boundary:
     - The core atlas package importing any Discovery SDK/agent (out-of-process only).
 
 # ---------------------------------------------------------------------------
+# 8.5 Portability contract (LATER second-disease experiment; NOT implementation)
+# ---------------------------------------------------------------------------
+# Defines HOW a second disease would be validated later. It authorizes NO
+# implementation now, names NO committed second disease, and treats all targets as
+# HYPOTHESES to be measured, never achieved facts. Reconciles with extraction_gate.
+portability_contract:
+  status: DESIGN-ONLY hypothesis; NOT scheduled, NOT authorized, NOT started in this track.
+  purpose: >
+    A falsifiable EXPERIMENT that would test whether the generic core actually
+    amortizes across conditions — the monetizability premise. It is the evidence
+    that would (or would not) justify a second disease; it is not a plan to build one.
+  design:
+    inputs: PUBLIC synthetic or independently-approved evidence ONLY; no private/
+      cloud/patient data; no scope expansion.
+    expected_core_change: ZERO core behavior changes expected. If the core must
+      change to fit a second disease, the seam FAILED (see failure_meaning).
+    additions_confined_to: [a SECOND disease pack (configs/atlas/packs/<pack2>/),
+      that pack's Discovery templates, that pack's synthetic fixtures]
+    illustrative_only: >
+      Any second disease mentioned is PURELY ILLUSTRATIVE and EXPLICITLY
+      NON-COMMITTAL (e.g. "a hypothetical second mTORopathy pack"); no gene/disease is
+      selected, named as supported, or packaged in this track.
+  measurements:
+    - reusable_test_percentage        # % of core RED tests that pass unchanged under pack 2
+    - core_diff_size                  # LOC/behavioral diff to src/raptor/atlas/ (target: 0 behavioral)
+    - pack_onboarding_effort          # effort to author pack 2 (author-hours / pack LOC)
+  hypotheses:                         # TARGETS ARE HYPOTHESES, NOT ACHIEVED FACTS
+    - id: H-PORT-1
+      statement: >-
+        >= 90% of core (pack-agnostic) RED tests pass UNCHANGED under a second pack.
+      status: hypothesis (unmeasured)
+    - id: H-PORT-2
+      statement: >-
+        ZERO behavioral diff to src/raptor/atlas/ is required to add a second pack
+        (config/pack/fixtures only).
+      status: hypothesis (unmeasured)
+    - id: H-PORT-3
+      statement: >-
+        A second pack is authorable within a bounded onboarding budget (declared per
+        experiment), evidencing amortization rather than bespoke rebuild.
+      status: hypothesis (unmeasured)
+  failure_meaning: >
+    If the experiment FAILS (core must change, most tests break, onboarding is not
+    cheaper than a bespoke build), the conclusion is that this is BESPOKE tooling for
+    TSC2, NOT a validated portable platform. Failure is recorded honestly; it does
+    NOT authorize a second disease and does NOT relabel the pilot as a platform.
+  no_commitment: >
+    A second disease is supported/claimed ONLY after this experiment PASSES under
+    owner approval, a GP-13 gate, and (for real content) an oracle. Nothing here
+    commits RAPTOR to a second disease.
+
+# ---------------------------------------------------------------------------
 # 9. Packet dependency split (what proceeds now vs. waits for frozen packets)
 # ---------------------------------------------------------------------------
 packet_dependency_split:
   proceed_now_independent_of_packets:
-    - All schemas (identity, claim, context, edge, evidence, profile, provenance).
-    - module_api skeleton (src/raptor/atlas/) + typed errors + hashing + guards.
-    - source_register structure + verified pins (MaveDB) + fail-closed verification.
+    - All schemas (identity, claim, context, edge, evidence, profile, provenance, pack_binding).
+    - The generic core module_api skeleton (src/raptor/atlas/) + typed errors +
+      hashing (with pack binding) + STATIC AST guards + disease-literal scan.
+    - The disease-pack loader/validator (pack.py) + the ONE tsc2 pack
+      (configs/atlas/packs/tsc2/pack.yaml) + pack_content_hash + pack binding.
+    - source_register SCHEMA + fail-closed verification; the tsc2 pack's verified
+      pins (MaveDB) live in the pack, not the core.
     - synthetic RED-test fixtures (ID-independent) + panel selection CONTRACT (strata rules).
-    - AtlasCandidateImport schema + deterministic promotion gate (promote.py).
-    - Discovery Bookshelf/query/task TEMPLATES (config, out-of-process) + PUBLIC
-      appropriately-licensed source collection + Discovery tool smoke tests.
+    - AtlasCandidateImport schema + PromotionContext + deterministic 8-gate promotion (promote.py).
+    - Discovery Bookshelf/query/task TEMPLATES (config, out-of-process, pack-pinned)
+      + PUBLIC appropriately-licensed source collection + Discovery tool smoke tests.
     - one-way DisMech export contract.
   waits_for_frozen_corrected_packets:
-    - Exact current-policy VUS IDs admitted into the live pilot panel.
+    - Exact current-policy VUS IDs admitted into the live pilot panel (deterministic
+      eight-case sample is available but Phase 1 stays synthetic-only).
     - R611Q admission (additionally gated on primary-source re-grounding).
     - Real leaf source enumeration (PMIDs/DOIs) + exact spans + any verified claim.
     - Any pilot CONTENT (real per-variant mechanism profiles).
     - Discovery-proposed real mechanism claims/profiles (candidates must pass the
       promotion gate + named human/oracle span review; nothing accepted in Phase 1).
-  rule: Schema/module/skeleton design MUST NOT depend on unfrozen packet IDs; only
-    concrete pilot ID admission and real source grounding (Phase 2) wait. Corrected
-    packets are generated independently.
+    - The second-disease portability EXPERIMENT (design-only; not scheduled here).
+  rule: Schema/module/skeleton/pack design MUST NOT depend on unfrozen packet IDs;
+    only concrete pilot ID admission and real source grounding (Phase 2) wait.
+    Corrected packets are generated independently.
 
 # ---------------------------------------------------------------------------
 # 10. Workflow + per-model scopes (ADR-0003 / ADR-0005 loop)
@@ -876,69 +1565,248 @@ workflow:
       - "provenance_only/context/crosswalk/grouping-bucket grounding raises AtlasProvenanceError."
       - unknown & conflicting states are representable and NOT coerced to a call.
       - context-dependence: same variant, different context -> distinct records.
-      - "leakage guards: assert atlas does NOT import raptor.packet/scorer/eval; forbidden criteria/inputs; no consumer import of atlas."
+      - "leakage guards (STATIC AST): assert atlas's AST contains no import of raptor.packet/scorer/eval or a Discovery SDK/agent; forbidden criteria/inputs; no consumer module's AST imports atlas. (sys.modules membership checks are INSUFFICIENT and must not be used.)"
+      - "no disease literals in core: a static scan of src/raptor/atlas/ finds NO TSC1/TSC2, NM_000548.5, NC_000016.10 constant, mTOR/mTORC1, R611Q, pathway_mtorc1, or disease source id."
+      - "disease pack loader: load_disease_pack validates schema/pack_id/pack_version; a hash-drifted or mis-namespaced pack raises AtlasPackError (fail closed); pack errors are DISTINCT from core errors."
+      - "pack-constrained identity: admit_identity(record, pack) admits a gene in pack.allowed_genes; a gene/transcript/assembly outside the pack raises AtlasIdentityError; identity_state is only resolved/unresolved (assigning unknown/conflicting raises AtlasSchemaError)."
+      - "ontology namespacing: a pack claim_kind/node_layer extension must be `<pack_id>:<name>` with a parent core seed; the tsc2 pack expresses `tsc2:pathway_mtorc1` (parent `pathway`); an unnamespaced/parentless extension raises AtlasPackError."
+      - "pack hash binding: evidence_core_hash AND profile_envelope_hash bind pack_binding; recomputing a profile's hashes under a DIFFERENT pack changes both hashes (wrong-pack reinterpretation is detectable / fails closed)."
+      - "candidate import exact nested shape: candidate_variant is a NESTED object (flat-string identity raises AtlasSchemaError); no top-level mapper_version/bookshelf_version/prompt_hash/status field."
+      - "PromotionContext DI: validate_candidate_import(candidate, context)/promote_candidate exercise ALL EIGHT gates IN ORDER (canonical_spdi_readmission, source_type_role_validation, citation_resolution, exact_span_resolution, context_ontology_pack_validation, duplicate_conflict_rules, no_classification_leakage, named_human_oracle_span_review) with injected fakes; each gate's failure raises; gate 6 duplicate/conflict is EXERCISED, not skipped; a synthetic all-pass promotion returns accepted claims (Phase-1 synthetic only, never a real claim)."
       - "source register fail-closed: sha256/transcript/license/count drift raises; confirm_pending treated-as-verified raises."
-      - "hash coherence: evidence_core/profile_envelope payloads over the DEFINED include/exclude fields only; claim_id refs resolve into profile.claims; canonical order/dedup deterministic; run_metadata excluded."
-      - fixtures are synthetic and ID-independent (no unfrozen VUS ID dependency).
+      - "hash coherence: evidence_core/profile_envelope payloads over the DEFINED include/exclude fields only (pack_binding included, run_metadata excluded); claim_id refs resolve into profile.claims; canonical order/dedup deterministic."
+      - fixtures are synthetic and ID-independent (no unfrozen VUS ID dependency); SPDI/content fully synthetic and valid.
       - "unresolved-source behavior: unverified/confirm_pending entries never ground a verified claim."
-      - "candidate import is UNTRUSTED: a proposed claim/source/identity never becomes accepted without passing the full promotion gate (AtlasSchemaError/AtlasProvenanceError on failure)."
-      - "promotion gate order enforced: identity re-admission, source type/role, citation resolution, exact span, context enums, duplicate/conflict, no-classification leakage; any failure REJECTS the candidate."
-      - "Discovery optionality: with the research lane unavailable/failing, RAPTOR Atlas still builds and accepted profiles are UNCHANGED (no dependency, no import)."
-      - "Discovery import boundary: core atlas imports no Discovery SDK/agent (out-of-process only)."
+      - "Discovery optionality: with the research lane unavailable/failing (no Discovery packages, rejected candidate), RAPTOR Atlas still builds the SAME accepted profile + hash (proven by an ACTUAL isolation scenario, not two identical native builds)."
+      - "Discovery context templates: configs/atlas/discovery/context_manifest.json pins raptor_commit + atlas_schema_version + disease_pack_id/version/content_hash + bookshelf_version + prompt_hash (+ packet_manifest_hash only Phase 2); Phase-1 placeholders (prompt_hash/packet_manifest_hash) are VALIDATED AS placeholders; task_graph.json steps EXACTLY match engine_tasks."
+    anti_cribbing_rule: >-
+      Anti-cribbing bans ONLY real-content phrases (e.g. a real R611Q/Arg611 claim,
+      a real PMID/DOI, a verbatim real quote). It MUST NOT ban legitimate ontology
+      terms (mtor, mtorc1, pathway_mtorc1, stability, localization, complex,
+      zygosity, abundance) — those are valid vocabulary and appear legitimately in
+      the tsc2 pack and namespaced extensions.
     must_not: assert any real verified observed claim, any real grounding span, any
       R611Q/pilot content, any mechanistic conclusion, or any classifier value
       (real bibliographic metadata pins are permitted).
   sonnet_scope:
     role: implement ONLY the Phase-1 internal module skeleton to turn RED tests GREEN.
+    authorized_file_scope:
+      generic_core:
+        - src/raptor/atlas/__init__.py
+        - src/raptor/atlas/model.py
+        - src/raptor/atlas/pack.py
+        - src/raptor/atlas/identity.py
+        - src/raptor/atlas/ontology.py
+        - src/raptor/atlas/hashing.py
+        - src/raptor/atlas/registry.py
+        - src/raptor/atlas/profile.py
+        - src/raptor/atlas/promote.py
+        - src/raptor/atlas/export.py
+        - src/raptor/atlas/guards.py
+        - src/raptor/atlas/README.md
+      tsc2_disease_pack:
+        - configs/atlas/packs/tsc2/pack.yaml   # the ONE pack; disease literals live HERE, not core
+      discovery_templates:
+        - configs/atlas/discovery/context_manifest.json
+        - configs/atlas/discovery/task_graph.json
+        - configs/atlas/discovery/bookshelf_sources.yaml
+        - configs/atlas/discovery/private_mapper_prompt.txt
+        - configs/atlas/discovery/evaluation_rubric.yaml
+      runbook:
+        - docs/project/atlas/ATLAS_RUNBOOK.md   # non-authority runbook/README (Phase-1 how-to)
+      note: NO real content anywhere; all fixtures/pins synthetic or verified-metadata only.
     in_scope:
-      - src/raptor/atlas/ model/identity/hashing/registry/profile/export/guards + README.
-      - Frozen dataclasses, tuples for ordered collections, typed errors.
-      - SPDI-keyed identity admission + reconciliation + unresolved failure.
+      - Generic core src/raptor/atlas/ (model/pack/identity/ontology/hashing/registry/profile/promote/export/guards + README) with NO disease literals.
+      - Frozen dataclasses, tuples for ordered collections, typed errors (incl. AtlasPackError).
+      - "Disease-pack loader/validator (pack.py): load/validate/hash; core-vs-pack error typing; fail closed."
+      - "The ONE tsc2 pack (configs/atlas/packs/tsc2/pack.yaml): allowed_genes/assembly/transcript pins, reconciliation policy, namespaced ontology extensions (incl. tsc2:pathway_mtorc1), source_register_pins (verified MaveDB metadata only), r611q_gate prohibition, pilot/eval metadata; disease literals live ONLY here."
+      - "SPDI-keyed identity admission admit_identity(record, *, pack) + reconciliation + unresolved failure; identity_state only resolved/unresolved."
       - "SourceRegisterEntry/EntryRef schemas + role AND source_type gating (only PRIMARY-LIT/DATASET leaves ground)."
-      - "May pin and verify real bibliographic METADATA (PMID/PMCID/DOI/accession/license) as metadata only; no grounding spans, no verified claims."
-      - Field-coherent evidence_core/profile_envelope hashing (defined include/exclude,
-        canonical order/dedup, run_metadata excluded).
-      - Fail-closed source verification; atlas_import_boundary (no packet/scorer/eval import).
-      - "provide the citation/source resolver INTERFACE keyed on source_ref (EntryRef): it resolves/validates the canonical EntryRef.span only, never a claim-local span (no real span resolution, no verified-claim output in Phase 1)."
-      - "promote.py: deterministic AtlasCandidateImport validation + promotion gate (no acceptance without the full gate; importer never writes accepted state)."
-      - "Discovery Bookshelf/query/task TEMPLATES as CONFIG/TEMPLATES outside src/raptor/atlas; core package imports no Discovery SDK/agent."
+      - "May pin and verify real bibliographic METADATA (PMID/PMCID/DOI/accession/license) as metadata only, IN THE PACK; no grounding spans, no verified claims."
+      - Field-coherent evidence_core/profile_envelope hashing with pack_binding bound in (defined include/exclude, canonical order/dedup, run_metadata excluded).
+      - Fail-closed source verification; STATIC AST atlas_import_boundary + disease-literal scan in guards.py.
+      - "citation/source resolver INTERFACE keyed on source_ref (EntryRef): resolves/validates the canonical EntryRef.span only, never a claim-local span (no real span resolution, no verified-claim output in Phase 1)."
+      - "promote.py: deterministic AtlasCandidateImport validation + 8-gate promotion via injected PromotionContext (no acceptance without the full gate; importer never writes accepted state; Phase-1 synthetic promotion only)."
+      - "Discovery Bookshelf/query/task TEMPLATES as CONFIG/TEMPLATES under configs/atlas/discovery (pack-pinned, Phase-1 placeholders); core package imports no Discovery SDK/agent."
+      - "Non-authority runbook/README describing Phase-1 usage."
     out_of_scope:
       - No real grounding spans, no real verified observed claims, no mechanistic conclusions (Phase 2 only).
       - No R611Q evidence; no pilot CONTENT; no real VUS admission; no external fetch of held data.
-      - No scorer/eval/packet/config/data edits; no PP3/BP4 or ACMG coupling.
+      - No scorer/eval/packet/config-outside-atlas/data edits; no PP3/BP4 or ACMG coupling.
+      - No disease literal in src/raptor/atlas/ (TSC/mTOR/NM_000548.5/R611Q live only in the tsc2 pack).
+      - No SECOND disease pack, no second-disease fixtures, no portability-experiment implementation.
       - No accepted Discovery candidate; no real Discovery mechanism claim/profile (Phase 2 + human/oracle review).
       - No DisMech contribution; no agent contributed to microsoft/discovery; no private/cloud/patient data.
+      - No weakening/relaxing of the RED tests to make them pass.
   gpt54_probes:
     role: independent checker; adversarial schema/guard/leakage review (Phase 1),
       source-span review deferred to Phase 2.
     probes:
       - Leakage: can any mechanism value reach the scorer/gate or a banned criterion? (must be NO)
-      - "Import boundary: does raptor.atlas import raptor.packet/scorer/eval? (must be NO)"
+      - "Import boundary (STATIC): does raptor.atlas's AST import raptor.packet/scorer/eval? Is enforcement AST/module-graph based, NOT ambient sys.modules? (must be NO / must be static)"
       - Circularity: is any confidence/class derived from a classifier/ClinVar score? (must be NO)
-      - "SPDI: is resolved admission gated on canonical GRCh38 SPDI, aliases provenance-only? (must hold)"
+      - "No TSC/disease literals in core: does a scan of src/raptor/atlas/ find TSC1/TSC2, NM_000548.5, NC_000016.10 constant, mTOR/mTORC1, R611Q, pathway_mtorc1, or a disease source id? (must be NONE — they live only in the tsc2 pack)"
+      - "Pack-only portability seam: are ALL disease specifics (genes, transcripts, ontology extensions, source pins, prohibitions) supplied by the versioned pack via load_disease_pack, with the core disease-agnostic? (must hold)"
+      - "Pack hash binding: are pack_id/pack_version/pack_content_hash bound into BOTH evidence_core_hash and profile_envelope_hash, so a profile cannot be reinterpreted under the wrong pack? (must hold)"
+      - "Core-vs-pack error typing: is a malformed/hash-drifted/mis-namespaced pack an AtlasPackError, while a valid-pack constraint violation is a core domain error, both fail-closed? (must hold)"
+      - "No second-disease implication: does a clean core + passing tsc2 pack avoid implying any other disease works; is NO second disease named/selected/packaged (except illustrative/non-committal)? (must hold)"
+      - "Portability = experiment: is the second-disease portability a DESIGN-ONLY experiment with targets as HYPOTHESES (not achieved facts), failure meaning bespoke tooling? (must hold)"
+      - "SPDI: is resolved admission gated on canonical GRCh38 SPDI, aliases provenance-only, allowed gene/transcript/assembly pack-supplied? (must hold)"
+      - "Identity-vs-mechanism state: is identity_state ONLY resolved/unresolved, never unknown/conflicting (which are mechanism_states)? (must hold)"
       - "Source-type binding: is direct_evidence_leaf accepted ONLY for PRIMARY-LIT/DATASET, and does verified-claim/EntryRef admission check BOTH role AND source_type (not role alone)? (must hold)"
       - "Leaf grounding: can only a direct_evidence_leaf + allowed source_type + verified entry ground a verified claim? (must hold)"
       - "Span ownership: is the grounding span owned SOLELY by source_ref (EntryRef.span), with NO duplicate span on ObservedClaim, so a verified claim can never hash/validate against a different locator/quote than its source reference? (must hold)"
+      - "Eight gates: does promotion run all EIGHT gates IN ORDER via an injected PromotionContext, gate 6 duplicate/conflict included, importer never writing accepted state? (must hold)"
+      - "Candidate shape: is candidate_variant a NESTED object with no invented top-level mapper_version/prompt_hash/status fields? (must hold)"
       - "Source of truth: does RAPTOR alone admit/validate/ground/hash/accept, with all Discovery output untrusted until promoted through the deterministic gate? (must hold)"
-      - "Discovery optionality: does Discovery failure/unavailability leave RAPTOR Atlas and every accepted profile unchanged? (must hold)"
+      - "Discovery optionality: does Discovery failure/unavailability leave RAPTOR Atlas and every accepted profile + hash unchanged (proven by a real isolation scenario, not two identical native builds)? (must hold)"
       - "Discovery import boundary: does the core atlas package import any Discovery SDK/agent? (must be NO)"
-      - "Hash coherence: are payloads over defined fields with claim_id refs resolving into profile.claims, run_metadata excluded? (must hold)"
+      - "Discovery templates: does context_manifest pin disease_pack_id/version/content_hash + raptor_commit + atlas_schema + bookshelf_version + prompt_hash; are Phase-1 placeholders validated AS placeholders; does task_graph match engine_tasks? (must hold)"
+      - "Hash coherence: are payloads over defined fields (pack_binding in, run_metadata out) with claim_id refs resolving into profile.claims? (must hold)"
       - Contrast: does the ontology preserve unknown/conflicting/context across strata?
       - "Skeleton purity: are there ANY real verified claim/grounding span, R611Q/pilot content, or mechanistic conclusion in Phase 1? (must be NONE; real bibliographic metadata pins are allowed)"
+      - "No test weakening: were the RED tests repaired to the contract rather than relaxed/deleted to pass; is anti-cribbing limited to real-content phrases, not ontology terms? (must hold)"
       - Fixture independence: no dependency on unfrozen packet IDs? (must hold)
       - "Phase 2 (deferred): real source-span review by deterministic resolver + named human/oracle."
     verdict: CLEAN / REVISE / DO-NOT-MERGE.
+
+# ---------------------------------------------------------------------------
+# 10.5 Gemini test contract (exact constructors/APIs + c281fca remediation)
+# ---------------------------------------------------------------------------
+# The existing c281fca tests under tests/atlas MUST be REPLACED/REPAIRED to this
+# contract BEFORE Sonnet implements. They currently do not implement the contract
+# (wrong fields/types, real fixtures in synthetic-only Phase 1, vacuous guard/
+# optionality tests, wrong candidate shape, incomplete gates, off-spec templates,
+# identity/mechanism-state conflation, over-broad anti-cribbing). Tests must COLLECT
+# cleanly, with guarded missing-feature failures (pytest.fail on ImportError), and
+# use FULLY SYNTHETIC valid SPDI/content.
+gemini_test_contract:
+  collection_rule: >
+    Guard planned imports in a try/except and pytest.fail("RED: raptor.atlas not
+    implemented", pytrace=False) so the suite COLLECTS even before implementation.
+  synthetic_rule: >
+    Use synthetic valid SPDI (e.g. "NC_000000.0:1000:A:T"-shaped placeholders) and
+    synthetic claim text ("synthetic assay signal A"); NEVER a real PMID/DOI/quote,
+    NEVER R611Q/Arg611, NEVER a real sha256/variant_count as a live fixture. A pack
+    fixture is a synthetic in-memory/temp DiseasePack (pack_id e.g. "synthpack") OR
+    the tsc2 pack loaded read-only for pack-specific tests.
+  anti_cribbing_rule: >
+    Ban ONLY real-content phrases (real R611Q/Arg611 claim text, real PMIDs/DOIs,
+    verbatim real quotes). Do NOT ban legitimate ontology vocabulary (mtor, mtorc1,
+    pathway_mtorc1, stability, localization, complex, abundance, zygosity); those are
+    valid and appear in the tsc2 pack + namespaced extensions.
+  file_mapping:
+    - file: tests/atlas/test_identity_model.py
+      covers: >
+        AtlasIdentity exact fields (spdi_canonical, gene(str), assembly, transcript_pin,
+        hgvs_c/p/g, identity_state); frozen/immutability; admit_identity(record, *, pack)
+        requires canonical SPDI and gene in pack.allowed_genes (else AtlasIdentityError);
+        identity_state ONLY resolved/unresolved (unknown/conflicting -> AtlasSchemaError);
+        reconcile_transcript(identity, alias, *, pack, resolver) uses injected resolver.
+    - file: tests/atlas/test_disease_pack.py     # NEW file (justified: pack is a new surface)
+      covers: >
+        load_disease_pack/validate_disease_pack/pack_content_hash; schema/pack_id/
+        pack_version present; hash-drift -> AtlasPackError; mis-namespaced/parentless
+        ontology extension -> AtlasPackError; core-vs-pack error typing; exactly one
+        pack per run; a clean core + tsc2 pack implies NO second disease.
+    - file: tests/atlas/test_source_registry_claims.py
+      covers: >
+        SourceRegisterEntry/EntryRef/ObservedClaim exact fields (ObservedClaim has
+        claim_id/claim_text/claim_kind/source_ref/verification/directionality — NO
+        span/variant_id/statement); span sole-ownership on EntryRef; role AND
+        source_type gating; validate_claim_grounding(claim, registry, *, pack);
+        verify_source fail-closed on drift/confirm_pending (synthetic sha values).
+    - file: tests/atlas/test_hashing_import_guards.py
+      covers: >
+        build a COMPLETE valid synthetic MechanismProfile (pack_binding, CandidateClass,
+        MechanismEdge, EvidenceAssessment, Provenance, RunMetadata typed correctly);
+        canonical order/dedup; run_metadata excluded; pack_binding bound (different pack
+        -> different hashes); source_ref.span mutation changes hashes; dangling claim
+        ref -> AtlasSchemaError; STATIC AST guard assert_atlas_import_boundary +
+        assert_no_consumer_import + disease-literal scan; one-way export_dismech.
+    - file: tests/atlas/test_discovery_candidate_import.py
+      covers: >
+        AtlasCandidateImport nested candidate_variant + proposed_claims/sources +
+        retrieval_provenance (NO top-level mapper_version/prompt_hash/status);
+        PromotionContext DI; validate_candidate_import/promote_candidate exercise ALL
+        EIGHT gates in order (incl. gate 6 duplicate/conflict) with fakes; synthetic
+        all-pass promotion returns accepted tuple; flat-string identity -> AtlasSchemaError.
+    - file: tests/atlas/test_discovery_context_templates.py
+      covers: >
+        configs/atlas/discovery/{context_manifest.json, task_graph.json,
+        bookshelf_sources.yaml, private_mapper_prompt.txt, evaluation_rubric.yaml};
+        manifest pins raptor_commit + atlas_schema_version + disease_pack_id/version/
+        content_hash + bookshelf_version + prompt_hash (+ packet_manifest_hash only
+        Phase 2); Phase-1 placeholders validated AS placeholders; task_graph steps ==
+        engine_tasks; a REAL optionality/isolation scenario (Discovery down/rejected ->
+        identical native profile + hash), not two identical native builds.
+  file_list_note: >
+    Six files (the five existing, repaired, + a NEW test_disease_pack.py). The new
+    file is JUSTIFIED: the disease-pack loader/validator/binding is a distinct new
+    surface that should not be folded into identity/hashing tests.
+  c281fca_defects:
+    - defect: ObservedClaim constructed with variant_id/statement/span fields.
+      remediation: use claim_id/claim_text/claim_kind/source_ref/verification/
+        directionality; assert `span` NOT in fields(ObservedClaim); grounding span is
+        source_ref.span only.
+    - defect: identity_state set to "unknown"/"conflicting" (mechanism states).
+      remediation: identity_state ONLY resolved/unresolved; unknown/conflicting are
+        mechanism_states used on classes/edges, never identity.
+    - defect: gene="TSC2"/transcript_pin="NM_000548.5" hardcoded with no pack.
+      remediation: inject a synthetic pack (or load tsc2 pack); gene validated against
+        pack.allowed_genes; no core gene/transcript literal.
+    - defect: real MaveDB sha256 (74fef3...)/variant_count=208 used as live fixtures.
+      remediation: use synthetic sha/count; the real verified MaveDB pin lives in the
+        tsc2 pack as metadata, not in a synthetic-phase test fixture.
+    - defect: import guard uses `mod not in sys.modules` (ambient, vacuous).
+      remediation: STATIC AST scan (assert_atlas_import_boundary) over module source;
+        sys.modules membership is explicitly rejected.
+    - defect: MechanismProfile built with candidate_classes=("class-A",), edges/
+        evidence/provenance as ad-hoc dicts, run_metadata as arbitrary dict.
+      remediation: use typed CandidateClass/MechanismEdge/EvidenceAssessment/Provenance/
+        RunMetadata per dataclass_contracts; add required pack_binding.
+    - defect: AtlasCandidateImport used flat candidate_variant + invented top-level
+        mapper_version/bookshelf_version/prompt_hash/status.
+      remediation: nested candidate_variant; retrieval/version metadata inside
+        retrieval_provenance only; no top-level acceptance/version fields.
+    - defect: eight gates incomplete (gate 6 duplicate/conflict only "tested
+        internally"); loose kwargs instead of a context object.
+      remediation: exercise all eight gates in order incl. duplicate/conflict; inject a
+        PromotionContext object.
+    - defect: Discovery task_graph order used identity/retrieval/claim_span/
+        contradiction/context/gap_map (off-spec names).
+      remediation: steps EXACTLY engine_tasks (identity_confirmation, literature_
+        retrieval, claim_span_extraction, contradiction_search, assay_context_
+        normalization, evidence_gap_mapping).
+    - defect: context_manifest missing disease_pack pins + prompt_hash; required
+        packet_manifest_sha unconditionally.
+      remediation: pin disease_pack_id/version/content_hash + prompt_hash; packet_
+        manifest_hash required only in Phase 2; validate Phase-1 placeholders as placeholders.
+    - defect: optionality test rebuilt the same native profile twice (vacuous).
+      remediation: a real isolation scenario — Discovery unavailable/candidate rejected
+        -> the accepted profile + hash is unchanged.
+    - defect: anti-cribbing banned legitimate ontology terms (mtor/stability/
+        localization/zygosity).
+      remediation: ban only real-content phrases; allow ontology vocabulary.
+  replacement_requirement: >
+    These c281fca tests MUST be replaced/repaired to this contract BEFORE Sonnet
+    implements the skeleton. Sonnet MUST NOT weaken/relax/delete tests to pass; GPT
+    probes "no test weakening".
 
 # ---------------------------------------------------------------------------
 # 11. Stop/go
 # ---------------------------------------------------------------------------
 stop_go:
   skeleton_phase_passes_only_if:      # Phase 1
-    - "Schemas frozen: SPDI-keyed identity, leaf role+source_type-typed source register, coherent hashes."
-    - "Guards CLEAN: raptor.atlas imports none of raptor.packet/scorer/eval; no banned criterion/input; no consumer imports atlas."
-    - Synthetic fixtures + unresolved-source behavior pass the RED tests.
-    - "NO real verified claim/grounding span, NO R611Q evidence, NO pilot curation, NO mechanistic conclusion (real bibliographic metadata pins ARE allowed)."
-    - "Discovery is config/templates + public-source collection + smoke tests only: core atlas imports no Discovery SDK/agent; NO accepted Discovery candidate."
+    - "Schemas frozen: SPDI-keyed identity (pack-constrained, no core gene enum), leaf role+source_type-typed source register, pack-bound coherent hashes."
+    - "Generic core is DISEASE-LITERAL-FREE: no TSC1/TSC2, NM_000548.5, NC_000016.10 constant, mTOR/mTORC1, R611Q, pathway_mtorc1, or disease source id in src/raptor/atlas/ (disease-literal scan CLEAN)."
+    - "Disease-pack loader CLEAN: exactly one tsc2 pack loads/validates; hash-drift/mis-namespacing -> AtlasPackError; pack_binding bound into both hashes (wrong-pack detectable)."
+    - "Guards CLEAN (STATIC AST): raptor.atlas's AST imports none of raptor.packet/scorer/eval or any Discovery SDK/agent; no banned criterion/input; no consumer AST imports atlas."
+    - Synthetic fixtures + unresolved-source behavior + all eight promotion gates pass the RED tests.
+    - "NO real verified claim/grounding span, NO R611Q evidence, NO pilot curation, NO mechanistic conclusion (real bibliographic metadata pins ARE allowed, in the pack)."
+    - "Discovery is config/templates (pack-pinned) + public-source collection + smoke tests only: core atlas imports no Discovery SDK/agent; NO accepted Discovery candidate."
+    - "NO second disease named/selected/packaged; core acceptance does not imply a second disease; portability remains a DESIGN-ONLY experiment."
+    - "c281fca tests replaced/repaired to gemini_test_contract; no test weakening."
   pilot_phase_passes_only_if:         # Phase 2, gated
     - The ontology handles contrasting cases (all five strata) without collapse.
     - Context, contradictions, and unknowns are preserved (not coerced to a call).
@@ -970,14 +1838,23 @@ stop_go:
 # 12. Extraction gate (repository extraction is later + evidence-gated)
 # ---------------------------------------------------------------------------
 extraction_gate:
-  default: build INSIDE RAPTOR as src/raptor/atlas/; do NOT extract now.
+  default: build INSIDE RAPTOR as src/raptor/atlas/ (generic core) + a versioned
+    tsc2 disease pack under configs/atlas/packs/; do NOT extract to a separate repo now.
+  clarification: >
+    The generic-core + versioned-disease-pack split is an INTERNAL portability seam
+    for amortization; it is NOT repository extraction. Extraction (a standalone
+    package/repo) remains gated on the evidence below and is not done here.
   extraction_evidence_required_any:
-    - the ontology survives multiple contrasting TSC2 variants;
-    - it works for another gene;
-    - the API is independent of RAPTOR;
+    - the ontology survives multiple contrasting pilot (tsc2) variants;
+    - "it works for another gene/disease — DEMONSTRATED by the portability_contract
+      experiment PASSING (a second pack with zero core behavioral diff), not asserted;"
+    - the API is independent of RAPTOR (already: pack-injected, no scorer/eval/packet);
     - another concrete consumer exists;
     - independent release / team / licensing needs emerge.
-  seam: export.py + api_independence keep extraction cheap without doing it now.
+  seam: >
+    export.py + api_independence + the generic-core/disease-pack boundary keep
+    extraction cheap without doing it now; the portability experiment is the EVIDENCE
+    that would (or would not) justify it.
 
 # ---------------------------------------------------------------------------
 # 13. Beat-4 inversion (how this spec could pass yet be wrong) + verification
@@ -986,36 +1863,51 @@ deliberate_action:
   beat4_inversions:
     - "The spec names leakage guards but leaves a back-channel where mechanism evidence becomes a PP3/BP4 predictor -> mitigated: forbidden_criteria + forbidden_consumers + closed re-entry policy, asserted by RED tests."
     - "raptor.atlas imports raptor.packet/scorer/eval, coupling the module to scoring behind the behavioral independence claim -> mitigated: atlas_import_boundary (forbidden_atlas_imports) + RED import-direction guard tests."
-    - "Admission accepts an hgvs/transcript alias without a canonical SPDI, silently equating NM_000548.4/.5 variants -> mitigated: SPDI-keyed admission, aliases provenance-only, unresolved -> AtlasIdentityError."
+    - "Admission accepts an hgvs/transcript alias without a canonical SPDI, silently equating NM_000548.4/.5 variants -> mitigated: SPDI-keyed admission (generic core), aliases provenance-only, allowed transcripts pack-supplied, unresolved -> AtlasIdentityError."
+    - "TSC2/mTORC1 assumptions harden into the reusable core (gene enum, NM_000548.5 pin, pathway_mtorc1 kind, mtorc1_state layer, embedded TSC source ids), defeating amortization -> mitigated: generic_core_disease_pack (disease-literal-free core + versioned pack), disease-literal static scan (Gemini RED + GPT probe), pack-supplied genes/transcripts/ontology/source pins."
+    - "A profile built under one pack is reinterpreted under a DIFFERENT pack, silently changing meaning -> mitigated: pack_binding (id+version+content_hash) bound into BOTH evidence_core_hash and profile_envelope_hash; recompute-under-wrong-pack changes hashes -> detectable fail-closed (Gemini hash-binding test + GPT probe)."
+    - "A clean core + passing tsc2 pack is read as 'the platform works for other diseases', inflating the pilot into a platform claim -> mitigated: no_second_disease_implication + portability_contract (design-only experiment, targets are hypotheses, failure = bespoke tooling) + STRATEGY GP-13 clarification + ADR-0014; no second disease named/selected/packaged."
+    - "A malformed/hash-drifted/mis-namespaced pack passes silently as if valid -> mitigated: AtlasPackError typed distinct from core errors, fail closed at load; namespaced-extension + content-hash validation; Gemini pack-loader RED tests."
     - "A verified mechanism claim is grounded in ClinVar / Monarch-DisMech / a review / a program grouping bucket -> mitigated: direct_evidence_leaf role gating on EntryRef + AtlasProvenanceError."
     - "A disallowed source_type is MIS-TAGGED role==direct_evidence_leaf and grounds a verified claim because only role (not type) was checked -> mitigated: allowed_direct_evidence_leaf_source_types binding (PRIMARY-LIT/DATASET), entry/EntryRef/claim admission check BOTH role AND source_type, AtlasSchemaError, negative Gemini cases + GPT source-type-binding probe."
+    - "identity_state is conflated with mechanism_state (an identity carrying unknown/conflicting) -> mitigated: identity_state enum ONLY resolved/unresolved, state_namespace_warning, AtlasSchemaError on conflation, Gemini test + GPT probe."
     - "An ObservedClaim carries its own span that DIVERGES from its source_ref (EntryRef) span, so a verified claim hashes/validates against a locator/quote the source never stated -> mitigated: single canonical span ownership on EntryRef.span, ObservedClaim carries no span field (AtlasSchemaError), ordering/hash key reads source_ref.span, Gemini span-ownership + determinism tests + GPT span-ownership probe."
-    - "Phase-1 purity is read as banning even real bibliographic metadata pins, or conversely a real grounding span slips in disguised as metadata -> mitigated: explicit split — metadata pins (PMID/PMCID/DOI/accession/license) permitted and verified as metadata; grounding spans / verified claims / mechanistic conclusions are Phase 2 only."
-    - "evidence_core_hash references a field the profile lacks (a top-level claims table) producing an undefined/unstable hash -> mitigated: top-level claims tuple + run_metadata + explicit include/exclude payloads + canonical order/dedup + claim_id refs into profile.claims."
+    - "Import-boundary enforcement is an ambient sys.modules membership check that passes vacuously when a module was never imported -> mitigated: STATIC AST/module-graph enforcement (assert_atlas_import_boundary parses module source), sys.modules checks explicitly rejected, Gemini static-guard test + GPT static-import probe."
+    - "Phase-1 purity is read as banning even real bibliographic metadata pins, or conversely a real grounding span slips in disguised as metadata -> mitigated: explicit split — metadata pins (PMID/PMCID/DOI/accession/license) permitted and verified as metadata (in the pack); grounding spans / verified claims / mechanistic conclusions are Phase 2 only."
+    - "evidence_core_hash references a field the profile lacks (a top-level claims table) producing an undefined/unstable hash -> mitigated: top-level claims tuple + pack_binding + run_metadata + explicit include/exclude payloads + canonical order/dedup + claim_id refs into profile.claims."
     - "Real PMID/DOI/span grounding, R611Q evidence, or pilot curation sneaks into the skeleton phase, pre-empting frozen packets + human review -> mitigated: Phase-1 purity + Phase-2-only real grounding + go_signal_phase2 (resolver + named human/oracle review)."
-    - "R611Q's handoff mechanism is silently treated as fact -> mitigated: r611q_gate BLOCKED + no-hardcode prohibition + GPT-5.4 probe + Phase-2 grounding gate."
-    - "Pilot fixtures depend on unfrozen VUS IDs, coupling skeleton to packet freeze -> mitigated: synthetic_fixtures independence + packet_dependency_split."
-    - "A classifier/ClinVar score leaks in as confidence/mechanism truth (R-A2 circularity) -> mitigated: forbidden_inputs_as_mechanism_truth + ADR-0009 binding."
-    - "Discovery becomes a de-facto source of truth by writing accepted claims/profiles directly -> mitigated: AtlasCandidateImport is UNTRUSTED, promote.py runs the full deterministic gate + human/oracle review, only RAPTOR writes accepted profiles."
-    - "The core atlas package imports a Discovery SDK/agent, coupling acceptance to an external service -> mitigated: discovery_import_boundary (out-of-process, config/templates only) + RED import guard + GPT probe."
-    - "Discovery unavailability or failure silently blocks RAPTOR or mutates accepted profiles -> mitigated: runtime-optional posture + RED optionality test (RAPTOR builds unchanged with the lane down) + GPT optionality probe."
+    - "R611Q's handoff mechanism is silently treated as fact -> mitigated: r611q_gate BLOCKED (in the tsc2 pack) + no-hardcode prohibition + GPT-5.4 probe + Phase-2 grounding gate; R611Q literal lives only in the pack."
+    - "Pilot fixtures depend on unfrozen VUS IDs, coupling skeleton to packet freeze -> mitigated: synthetic_fixtures independence + packet_dependency_split + deterministic eight-case sample stays synthetic-only in Phase 1."
+    - "A classifier/ClinVar score leaks in as confidence/mechanism truth (R-A2 circularity) -> mitigated: forbidden_inputs_as_mechanism_truth + ADR-0009 binding + no-classification promotion gate."
+    - "Discovery becomes a de-facto source of truth by writing accepted claims/profiles directly -> mitigated: AtlasCandidateImport is UNTRUSTED, promote.py runs the full deterministic 8-gate via injected PromotionContext + human/oracle review, only RAPTOR writes accepted profiles."
+    - "The core atlas package imports a Discovery SDK/agent, coupling acceptance to an external service -> mitigated: discovery_import_boundary (out-of-process, config/templates only) + STATIC AST import guard + GPT probe."
+    - "Discovery unavailability or failure silently blocks RAPTOR or mutates accepted profiles -> mitigated: runtime-optional posture + RED optionality/isolation test (RAPTOR builds the SAME profile+hash with the lane down) + GPT optionality probe."
+    - "Discovery templates go off-spec (task names/manifest pins drift) or omit the disease-pack binding -> mitigated: exact context_templates file/schema spec (task_graph == engine_tasks; manifest pins pack id/version/content_hash) + Gemini context-template test."
     - "Discovery pulls private/cloud/patient data or improperly-licensed sources -> mitigated: public appropriately-licensed sources only boundary + no-PHI rule + retrieval_provenance audit."
+    - "The repaired tests are WEAKENED/relaxed/deleted to pass, or anti-cribbing bans legitimate ontology terms and forces real content out -> mitigated: gemini_test_contract (exact constructors + c281fca_defects remediation), anti_cribbing_rule (real-content phrases only), GPT no-test-weakening probe."
     - "The bounded evaluation quietly expands into a microsoft/discovery catalog contribution mid-track -> mitigated: prototype is PRIVATE; contribution deferred to a SEPARATE track after a clean 5-10-case eval (contribution_gate / post_eval_options)."
-    - "The commit accidentally includes a code/config/data file -> mitigated: commit only this spec; verify with git show --stat."
+    - "The commit accidentally includes a code/config/data file, or edits a file outside the four authority docs -> mitigated: commit ONLY the four allowed authority files (spec + ADR-0014 + ARCHITECTURE + surgical STRATEGY); verify with git diff --stat + git diff --check."
   verification_contract:
     - Slot hashes verified MATCH (all three) at rev 1; composition unchanged.
     - rev 2 is a plan-only follow-up commit on head a840347 (no amend, no push).
     - rev 3 is a plan-only follow-up commit on head 29a330e (no amend, no push).
     - rev 4 is a plan-only follow-up commit on head 70091c8 (no amend, no push).
     - rev 5 is a plan-only follow-up commit on head 20a9a99 (no amend, no push).
-    - Only docs/project/specs/mechanism-atlas-starter.yaml staged and committed.
-    - Both required trailers present on the commit; YAML validated.
+    - rev 6 is a plan-only/authority follow-up commit on head e01ee37 (no amend, no
+      push); it authors four authority files (this spec + ADR-0014 + ARCHITECTURE +
+      a surgical STRATEGY clarification), no code/tests/data.
+    - Only the four allowed authority files staged and committed (spec, DECISIONS.md,
+      ARCHITECTURE.md, STRATEGY.md).
+    - Both required trailers present on the commit; YAML validated; markdown anchors validated.
 
 # ---------------------------------------------------------------------------
 # 14. Commit trailers (both required)
 # ---------------------------------------------------------------------------
 commit:
-  scope: commit ONLY this spec file; no code/tests/config/data changes; no push.
+  scope: >
+    commit ONLY the four allowed authority files (docs/project/specs/
+    mechanism-atlas-starter.yaml, docs/DECISIONS.md, docs/ARCHITECTURE.md,
+    docs/STRATEGY.md); NO code/tests/config/data changes; no amend; no push; no merge.
   required_trailers:
     - 'Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>'
     - 'Copilot-Session: 7c146921-f3dd-4a1e-8cf0-8f574de49204'

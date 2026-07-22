@@ -13,6 +13,7 @@
 
 | ID | Title | Status | Date |
 |----|-------|--------|------|
+| [ADR-0014](#adr-0014--generic-mechanism-atlas-core-with-a-versioned-disease-pack-boundary) | Generic Mechanism Atlas core with a versioned disease-pack boundary | Accepted | 2026-07-22 |
 | [ADR-0013](#adr-0013--tiered-gate-v3-post-hoc-re-adjudication-and-prospective-validation-lock) | Tiered gate v3: post-hoc re-adjudication and prospective validation lock | Accepted | 2026-07-22 |
 | [ADR-0012](#adr-0012--pp3bp4-automated-emission-disabled-for-the-current-masked-rerun) | PP3/BP4 automated emission disabled for the current masked rerun | Accepted | 2026-07-21 |
 | [ADR-0011](#adr-0011--scope-specific-research-authorization-gate-v2-truncating-pathogenic-research-scope-preregistered-separately-from-full-spectrum-vus) | Scope-specific research authorization gate (v2): truncating-pathogenic research scope preregistered separately from full-spectrum VUS | Accepted | 2026-07-14 |
@@ -35,6 +36,7 @@
 
 | ADR | Current risk linkage | Basis in current repo |
 |---|---|---|
+| **ADR-0014** | R-A2, R-A12 | Generic-core / versioned-disease-pack boundary keeps mechanism evidence classification-free (R-A2 circularity) and preserves ADR-0010's vertical TSC/mTOR scope discipline (R-A12) while enabling internal cross-condition amortization; no second-disease claim until a portability experiment passes. |
 | **ADR-0013** | R-A13, R-A14, R-A15 | Explicit risk rows cite ADR-0013's post-hoc / prospective-lock consequences. |
 | **ADR-0012** | — | No standalone risk row names ADR-0012 today; current residue is tracked through the ADR-0013-linked rows above. |
 | **ADR-0011** | R-A15 | Scope-authorization wording and the research-use disclaimer in `EVALUATION.md` Part II §5b define the overclaim boundary. |
@@ -48,6 +50,112 @@
 | **ADR-0003** | R-D1 | Explicitly cited in the checker rubber-stamp / skipped-loop risk row. |
 | **ADR-0002** | — | Document-format ADR only; no direct current risk row cites it. |
 | **ADR-0001** | — *(partially superseded by ADR-0010)* | Historical strategy framing record; current linked risks are carried by ADR-0010 instead. |
+
+---
+
+## ADR-0014 — Generic Mechanism Atlas core with a versioned disease-pack boundary
+
+- **Status:** Accepted
+- **Date:** 2026-07-22
+- **Deciders:** @dronasrinivas (operator, acting domain owner)
+- **Track:** `track/mechanism-atlas-2026-07`
+- **Supersedes:** none. Additive; complements ADR-0010 (vertical TSC/mTOR strategy) and ADR-0009 (no classifier/ClinVar leakage into mechanism evidence). Binds the Mechanism Atlas starter spec (`docs/project/specs/mechanism-atlas-starter.yaml`, rev 6).
+
+### Context
+
+RAPTOR's monetizability depends on amortizing the evidence/provenance pipeline
+across conditions rather than rebuilding it per disease. The Mechanism Atlas is
+the first component where that amortization is at stake. The prior Atlas starter
+spec and the reviewed Gemini tests hardcoded TSC2/mTORC1 assumptions into what
+should be reusable machinery: a TSC2-only gene enum, an `NM_000548.5` transcript
+constant, a `pathway_mtorc1` claim kind, an `mtorc1_state` mechanism layer, and
+disease-specific source IDs and thresholds embedded in the core.
+
+If those assumptions harden into the core, every future condition forks the
+machinery and the pipeline cannot be amortized — the exact failure mode that makes
+a bespoke tool rather than a reusable platform. At the same time, ADR-0010 falsified
+the generic-platform uniqueness premise and bound RAPTOR to a **vertical TSC/mTOR,
+evidence-first, non-clinical** strategy. We must therefore prevent TSC hardcoding in
+the *internal* core **without** broadening the *scientific/product* pilot beyond TSC2
+or implying a second disease is supported. This is an internal architecture
+portability seam, not a pivot to a generic variant-classification platform.
+
+The packet corpus is complete and frozen externally and code is merged on main. A
+deterministic eight-case sample exists, but Phase 1 remains synthetic-only and Phase 2
+real grounding still requires named human/oracle review.
+
+### Considered options
+
+1. **Keep TSC2/mTORC1 literals in the Atlas core.** Rejected: it forks the machinery
+   per condition, defeats amortization, and lets disease specifics leak into reusable
+   code and hashes.
+2. **Broaden the core now into a generic multi-disease platform with several packs.**
+   Rejected: it contradicts ADR-0010's vertical discipline, invites overclaim, and
+   spends scope on unvalidated conditions.
+3. **Split a condition-agnostic core from a single versioned, declarative disease
+   pack; ship exactly one `tsc2` pack; gate any second disease behind a later
+   portability experiment.** Adopted.
+
+### Decision
+
+Adopt **option 3**.
+
+- **Generic core.** `src/raptor/atlas/` is condition-agnostic evidence/provenance
+  machinery and MUST NOT contain literal `TSC1`/`TSC2`, `NM_000548.5`, `mTOR`/`mTORC1`,
+  `R611Q`, disease-specific source IDs, disease-specific classifier thresholds, or
+  ClinVar truth. A disease-literal static scan over the core enforces this.
+- **Disease pack.** A versioned, declarative pack at
+  `configs/atlas/packs/<pack_id>/pack.yaml` (schema `atlas.disease_pack.v1`, with
+  `pack_id`, `pack_version`, self-excluded `pack_content_hash`) supplies allowed
+  genes, assembly/transcript pins and reconciliation policy, namespaced mechanism
+  ontology extensions (`<pack_id>:<name>` under a core seed parent), source-register
+  metadata pins, disease-specific prohibitions, and pilot/evaluation metadata. It is
+  configuration (GP-6), never code, and never a source of scoring truth. Phase 1 ships
+  exactly one `tsc2` pack.
+- **Pack binding.** The pack `{pack_id, pack_version, pack_content_hash}` is carried in
+  profile provenance and run metadata and bound into **both** the evidence-core hash
+  and the profile-envelope hash, so a profile cannot be silently reinterpreted under
+  the wrong pack (wrong-pack recompute changes the hash; fail-closed).
+- **Typed, fail-closed errors.** Core domain errors (`AtlasSchemaError`,
+  `AtlasIdentityError`, `AtlasProvenanceError`, `AtlasSourceVerificationError`,
+  `AtlasLeakageError`, `AtlasExportError`) are distinct from pack-validation errors
+  (`AtlasPackError`). A malformed/hash-drifted/mis-namespaced pack fails closed as
+  `AtlasPackError`; a *valid* pack whose constraint is violated raises a core domain
+  error.
+- **Loader API.** `load_disease_pack`, `validate_disease_pack`, `pack_content_hash`
+  in `raptor.atlas.pack`; identity/ontology/source constraints and the promotion gate
+  read the pack via dependency injection (`admit_identity(record, *, pack)`,
+  `PromotionContext`).
+- **No second-disease implication.** Core acceptance and a passing `tsc2` pack never
+  imply another disease works. Whether the pipeline ports is a **hypothesis** to be
+  tested by a later, design-only **portability experiment** (public/synthetic or
+  approved evidence only, zero expected core behavioral diff, additions confined to a
+  second pack/templates/fixtures, measured by reusable-test percentage and
+  core-diff/onboarding effort). Its proposed targets are hypotheses, not achieved
+  facts; failure means bespoke tooling, not platform validation. No second disease is
+  named or selected in this track.
+
+This decision authorizes only the internal architecture seam and a synthetic-only
+Phase 1. It authorizes no clinical claim, no VUS worklist, no ClinVar submission, no
+research-scope expansion, and no second-disease support.
+
+### Consequences
+
+- The Atlas core is reusable and disease-literal-free; the `tsc2` pack expresses all
+  TSC2/mTORC1 specifics (e.g. `tsc2:pathway_mtorc1`, `NM_000548.5`, the R611Q gate).
+- Profiles are self-describing about the pack they were built under and cannot be
+  cross-interpreted without detection.
+- The shipped product scope stays TSC-only (ADR-0010 unchanged); `STRATEGY.md` GP-13
+  is clarified to state the internal seam is not vertical-washing.
+- R611Q remains blocked for Phase 2 primary re-grounding; no real R611Q claims exist
+  in Phase 1, and the `R611Q` literal lives only in the `tsc2` pack.
+- The Discovery research lane stays an optional, out-of-process candidate-import
+  source; its templates may take disease-pack context, its outputs are untrusted, and
+  its failure cannot change accepted profiles.
+- Repository extraction remains gated (see the spec `extraction_gate`); the portability
+  experiment is the evidence that would justify or refuse it.
+- The prior `c281fca` Atlas tests must be replaced/repaired to the rev-6 contract
+  before implementation; tests may not be weakened to pass.
 
 ---
 

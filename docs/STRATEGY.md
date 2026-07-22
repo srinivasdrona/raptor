@@ -27,7 +27,7 @@
 <a id="strategy-part-i"></a>
 ## Part I — Strategy
 
-> **Part I status:** DRAFT v0.2 — *vertical TSC/mTOR reset* (see [ADR-0010](DECISIONS.md#adr-0010--generic-platform-uniqueness-premise-falsified-vertical-tscmtor-research-evidence-strategy)) · **Owner:** @dronasrinivas · **Last updated:** 2026-07-22 (post-ADR-0013 reconciliation) · **Review cadence:** monthly
+> **Part I status:** DRAFT v0.2 — *vertical TSC/mTOR reset* (see [ADR-0010](DECISIONS.md#adr-0010--generic-platform-uniqueness-premise-falsified-vertical-tscmtor-research-evidence-strategy)) · **Owner:** @dronasrinivas · **Last updated:** 2026-07-22 (post-ADR-0013 reconciliation; GP-13 + §9 clarified for the ADR-0014 internal Atlas portability seam) · **Review cadence:** monthly
 >
 > **Part I format:** This section follows two established, citable standards — Roman Pichler's **Product Vision Board** (Vision · Target Group · Needs · Product · Business Goals) wrapped around Richard Rumelt's **Kernel of Good Strategy** (Diagnosis → Guiding Policy → Coherent Action, *Good Strategy / Bad Strategy*, 2011).
 
@@ -303,6 +303,16 @@ is **vertical-washing** and is out of scope (§9); this is the rule that keeps t
 back into a horizontal platform (RISK_REGISTER R-D7; supersedes the generalise-to-all-rare-disease
 framing of ADR-0001, per ADR-0010).
 
+> **Internal portability seam ≠ vertical-washing ([ADR-0014](DECISIONS.md#adr-0014--generic-mechanism-atlas-core-with-a-versioned-disease-pack-boundary)).**
+> Building the Mechanism Atlas as a condition-agnostic *internal* core plus a versioned,
+> declarative disease pack (Phase 1 ships exactly one `tsc2` pack) is an amortization
+> seam, **not** a scope expansion. The shipped **product** scope stays TSC/mTOR-only and
+> the five-part GP-13 gate is unchanged: keeping TSC2/mTORC1 literals out of reusable
+> core code neither serves a second disease nor claims one. Any second-disease support is
+> **gated and evidence-driven** — it requires passing a later, design-only portability
+> experiment (no product/scope change in this track), never a clean core alone. This
+> clarification tightens GP-13; it does not relax it.
+
 ---
 
 <a id="strategy-product-solution"></a>
@@ -393,6 +403,10 @@ review.
 - **Selected mTORopathy extensions only** for a fixed gene/disease/mechanism question with a named
   user, expert validator, falsifier, and a reason generic engines are insufficient (GP-13).
 - Integration / reuse of existing generic engines (BIAS-2015, Nirvana, KGs) — buy/reuse, don't rebuild.
+- **Internal Mechanism Atlas portability seam** — a condition-agnostic Atlas *core* plus exactly one
+  versioned `tsc2` **disease pack** (config only), so the pipeline amortizes without TSC hardcoding in
+  reusable code. This is internal architecture, **not** a second disease and **not** a generic platform
+  ([ADR-0014](DECISIONS.md#adr-0014--generic-mechanism-atlas-core-with-a-versioned-disease-pack-boundary), GP-13).
 
 **Explicitly out of scope**
 - A **generic ACMG engine / variant-interpretation platform**.
@@ -402,6 +416,9 @@ review.
 - **Cross-gene ACMG evidence transfer** (evidence proven on TSC is not reused as-is on other genes).
 - **"Same pathway therefore same drug"** claims.
 - Broad **"all things TSC"** implementation scope (vertical-washing — GP-13).
+- A **second disease pack or any second-disease claim in this track** — porting is gated on a later,
+  design-only portability experiment; a clean core plus a passing `tsc2` pack never implies another
+  disease works (ADR-0014).
 - Regulated medical devices / Software-as-a-Medical-Device claims.
 - **Any "final classification" without human sign-off.**
 - Cross-disease claims presented as validated discovery rather than cited hypothesis.
