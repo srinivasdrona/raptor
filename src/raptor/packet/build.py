@@ -19,6 +19,7 @@ from .direction import compute_candidate_direction
 from .hashing import evidence_core_hash, narrative_plan_hash, packet_envelope_hash
 from .model import (
     CandidateEvidencePacket,
+    CensusSelectionMetadata,
     CriterionEntry,
     GateStatus,
     NarrativePlan,
@@ -41,17 +42,26 @@ def build_packet(
     config: Optional[PacketConfig],
     *,
     narrative_plan: Optional[NarrativePlan] = None,
+    allow_empty_criteria: bool = False,
 ) -> CandidateEvidencePacket:
     """Validate `packet_input`, build immutable `CriterionEntry` rows by
     resolving each criterion through `config.lineage_policy.records`, derive
     contradiction/direction/state, compute all three packet hashes, and
-    return the frozen packet. `config=None` is invalid."""
+    return the frozen packet. `config=None` is invalid.
+
+    `allow_empty_criteria=True` (corrected all-VUS track, D12) permits a
+    packet with zero `criterion_inputs` -- used only by
+    `raptor.packet.corrected_universe.build_evidence_absent_packet` for a
+    BIAS row that fired no criteria at all; every other caller keeps the
+    default (fail loud on empty criteria).
+    """
     if config is None:
         raise PacketValidationError("build_packet requires a PacketConfig; got None")
     if packet_input is None:
         raise PacketValidationError("build_packet requires a PacketInput; got None")
 
-    _validate_packet_input(packet_input)
+    _validate_packet_input(packet_input, allow_empty_criteria=allow_empty_criteria)
+    _validate_selection_metadata(packet_input)
 
     entries = _build_entries(packet_input, config)
 
@@ -97,6 +107,7 @@ def build_packet(
         source_snapshot=packet_input.source_snapshot,
         predecessor_packet_id=packet_input.predecessor_packet_id,
         predecessor_envelope_hash=packet_input.predecessor_envelope_hash,
+        census_selection_stratum=packet_input.census_selection_stratum,
     )
 
     core_hash = evidence_core_hash(draft)
@@ -104,10 +115,16 @@ def build_packet(
     draft = replace(draft, evidence_core_hash=core_hash, narrative_plan_hash=plan_hash)
 
     envelope_hash = packet_envelope_hash(draft)
-    return replace(draft, packet_envelope_hash=envelope_hash, packet_id=envelope_hash)
+    final = replace(draft, packet_envelope_hash=envelope_hash, packet_id=envelope_hash)
+    # `census_selection_stratum` is a real, declared field supplied at
+    # construction above, so both hash domains already reflect it -- no
+    # post-hoc rebind/rehash needed on this path (unlike
+    # `bind_census_selection_metadata`, which attaches metadata onto an
+    # ALREADY-BUILT packet from a reused calibration helper).
+    return final
 
 
-_VALID_GENES = frozenset({"TSC1", "TSC2"})
+_VALID_GENES = frozenset({"TSC1", "TSC2", "NTHL1"})
 _VALID_VARIANT_CLASSES = frozenset({"missense", "truncating", "other"})
 
 # PRD FR2: canonical GRCh38 SPDI syntax --
@@ -124,17 +141,23 @@ _CANONICAL_SPDI_RE = re.compile(r"^NC_[0-9]{6}\.[0-9]+:[0-9]+:([ACGTN]*):([ACGTN
 _CONSEQUENCE_RE = re.compile(r"^[A-Za-z0-9_]+(?:,[A-Za-z0-9_]+)*$")
 
 # PRD FR2: per-gene canonical GRCh38 accession + MANE transcript pin.
+# NTHL1 (added for the corrected all-VUS track, D2/D11): BIAS-annotated TSC2
+# rows misannotated to NTHL1 are pre-routed to `manual_review` by
+# `raptor.census.strata.reproduce_census_strata` and still need a real,
+# validated `CanonicalVariantIdentity` to build a packet.
 _GENE_ACCESSIONS = {
     "TSC1": "NC_000009.12",
     "TSC2": "NC_000016.10",
+    "NTHL1": "NC_000016.10",
 }
 _GENE_MANE_TRANSCRIPTS = {
     "TSC1": "NM_000368.5",
     "TSC2": "NM_000548.5",
+    "NTHL1": "NM_002528.7",
 }
 
 
-def _validate_packet_input(packet_input: PacketInput) -> None:
+def _validate_packet_input(packet_input: PacketInput, *, allow_empty_criteria: bool = False) -> None:
     identity = packet_input.identity
     for name in ("canonical_spdi", "gene", "transcript", "consequence", "variant_class"):
         value = getattr(identity, name)
@@ -185,8 +208,69 @@ def _validate_packet_input(packet_input: PacketInput) -> None:
             f"got {identity.consequence!r}"
         )
 
-    if not packet_input.criterion_inputs:
+    if not packet_input.criterion_inputs and not allow_empty_criteria:
         raise PacketValidationError("PacketInput.criterion_inputs must be non-empty")
+
+
+def _validate_pattern_ref_stratum(
+    metadata: CensusSelectionMetadata, pattern_ref: Optional[object]
+) -> None:
+    """Shared PatternRef/`CensusSelectionMetadata` cross-field invariant
+    (corrected all-VUS track, D13): a present `pattern_ref` must name the
+    same stratum, and `no_deterministic_resolution`/`manual_review` never
+    carry a `pattern_ref` at all."""
+    if pattern_ref is not None and pattern_ref.census_selection_stratum != metadata.census_selection_stratum:
+        raise PacketValidationError(
+            "pattern_ref.census_selection_stratum "
+            f"{pattern_ref.census_selection_stratum!r} does not match "
+            f"census_selection_stratum {metadata.census_selection_stratum!r}"
+        )
+    if (
+        metadata.census_selection_stratum in ("no_deterministic_resolution", "manual_review")
+        and pattern_ref is not None
+    ):
+        raise PacketValidationError(
+            "pattern_ref must be None when census_selection_stratum is "
+            f"{metadata.census_selection_stratum!r}"
+        )
+
+
+def _validate_selection_metadata(packet_input: PacketInput) -> None:
+    metadata = packet_input.census_selection_stratum
+    if metadata is None:
+        return
+    _validate_pattern_ref_stratum(metadata, packet_input.pattern_ref)
+
+
+def _rebind_with_metadata(
+    packet: CandidateEvidencePacket, metadata: Optional[CensusSelectionMetadata]
+) -> CandidateEvidencePacket:
+    """Bind `metadata` onto the real, declared `census_selection_stratum`
+    field (via `dataclasses.replace`, which preserves every other field
+    unchanged) and recompute the two hash domains it is bound into. A
+    `None` metadata is a no-op."""
+    if metadata is None:
+        return packet
+    packet = replace(packet, census_selection_stratum=metadata)
+    core_hash = evidence_core_hash(packet)
+    packet = replace(packet, evidence_core_hash=core_hash)
+    envelope_hash = packet_envelope_hash(packet)
+    packet = replace(packet, packet_envelope_hash=envelope_hash, packet_id=envelope_hash)
+    return packet
+
+
+def bind_census_selection_metadata(
+    packet: CandidateEvidencePacket, metadata: Optional[CensusSelectionMetadata]
+) -> CandidateEvidencePacket:
+    """Public seam (reused by `raptor.packet.corrected_universe`) to bind
+    `metadata` onto an ALREADY-BUILT `CandidateEvidencePacket` -- e.g. one
+    produced by the unchanged `build_candidate_universe` calibration helper,
+    which never threads `PacketInput.census_selection_stratum`. Validates
+    the same PatternRef/stratum invariant `build_packet` enforces, then
+    rebinds + rehashes via `_rebind_with_metadata`."""
+    if metadata is not None:
+        _validate_pattern_ref_stratum(metadata, packet.pattern_ref)
+    return _rebind_with_metadata(packet, metadata)
 
 
 def _build_entries(packet_input: PacketInput, config: PacketConfig) -> tuple:
