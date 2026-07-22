@@ -1,0 +1,27 @@
+schema: atlas.discovery.eval_rubric.v1
+disease_pack_id: tsc2
+native_vs_discovery_evaluation:
+  axes:
+    - id: retrieval_recall
+      description: Fraction of known relevant public-data sources retrieved by the discovery pipeline versus the native/manual baseline.
+    - id: valid_claim_span_yield
+      description: Fraction of proposed claims with a resolvable, exact, non-empty span that would pass Gate 4 (exact_span_resolution).
+    - id: contradiction_detection
+      description: Fraction of known contradicting claims correctly flagged before promotion.
+    - id: hallucination_unsupported_claim_rate
+      description: Fraction of proposed claims lacking a resolvable public-data source or span; must be near zero.
+    - id: context_completeness
+      description: Fraction of claims with a fully normalized experimental context (assay, model system, zygosity).
+    - id: reproducibility
+      description: Stability of retrieval and extraction outputs across repeated runs against the same pinned disease pack and bookshelf version.
+    - id: latency_cost
+      description: Wall-clock and resource cost of the six-task discovery pipeline relative to native manual curation.
+constraints:
+  public_data_only: true
+  no_classification_inputs_allowed: true
+  no_classification_outputs_allowed: true
+  rules:
+    - "All evaluated retrieval and extraction outputs must be sourced from public-data-only bookshelf entries."
+    - "No axis may credit a no-classification violation: classifier scores and ClinVar-derived criteria never count as mechanistic evidence."
+    - "Every promoted candidate must still pass all eight raptor.atlas.promote gates regardless of rubric score."
+phase: phase1-synthetic-only

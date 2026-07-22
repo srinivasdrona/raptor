@@ -1,6 +1,6 @@
 # RAPTOR — Architecture
 
-> **Status:** DRAFT v0.1 · **Owner:** @dronasrinivas · **Last updated:** 2026-07-22 (added §6a as-built modules; deployment-status note in §7) · **Review cadence:** monthly
+> **Status:** DRAFT v0.1 · **Owner:** @dronasrinivas · **Last updated:** 2026-07-22 (added §6a as-built modules; §6b Mechanism Atlas generic-core/disease-pack boundary per ADR-0014; deployment-status note in §7) · **Review cadence:** monthly
 >
 > **Format:** Structured to the **arc42** template ([arc42.org](https://arc42.org)) with **C4-model**
 > diagram levels (Context → Container → Component; Simon Brown, [c4model.com](https://c4model.com)).
@@ -148,7 +148,60 @@ auto-upgrade on publication.
   fails closed. It performs no new run, scoring, annotation, benchmark read, network access, or data
   generation — see `no_new_evidence_statement` in `data/census/tsc_tiered_readjudication_2026-07-21.json`.
 
-## 7. Deployment view (C4 — Level 3 boundary)
+## 6b. Mechanism Atlas — generic core / disease-pack boundary (C4 — Level 2/3, planned)
+
+> **Status:** PLANNED · spec-bound, not yet implemented · **Last updated:** 2026-07-22. Bound to
+> [`docs/project/specs/mechanism-atlas-starter.yaml`](project/specs/mechanism-atlas-starter.yaml)
+> (rev 6) and [ADR-0014](DECISIONS.md#adr-0014--generic-mechanism-atlas-core-with-a-versioned-disease-pack-boundary).
+> This describes the *accepted* component boundary for the Atlas; no code has been merged for it yet.
+
+The Mechanism Atlas is split into a reusable core and a per-condition pack so the
+evidence/provenance pipeline amortizes across conditions without hardcoding one
+disease into reusable machinery (ADR-0014). Component relationships:
+
+- **`raptor.atlas` (generic core, container/component).** Condition-agnostic
+  evidence/provenance machinery: SPDI-keyed identity admission, source-register
+  role/type grounding, observed-claim/mechanism-edge/mechanism-profile schemas,
+  pack-bound hashing, and the candidate-promotion gate. It contains **no** disease
+  literals (no `TSC1`/`TSC2`, `NM_000548.5`, `mTOR`/`mTORC1`, `R611Q`, disease source
+  IDs, or disease thresholds), enforced by a static disease-literal scan.
+- **Disease pack (versioned config artifact).** `configs/atlas/packs/<pack_id>/pack.yaml`
+  (schema `atlas.disease_pack.v1`; `pack_id` + `pack_version` + self-excluded
+  `pack_content_hash`) declares allowed genes, assembly/transcript pins + reconciliation
+  policy, namespaced ontology extensions (`<pack_id>:<name>` under a core seed parent),
+  source-register metadata pins, prohibitions, and pilot/eval metadata. It is
+  configuration (GP-6), never code. **Phase 1 ships exactly one `tsc2` pack.** The core
+  reads it via `load_disease_pack(...) -> DiseasePack`, injected into
+  `admit_identity(record, *, pack)` and the promotion `PromotionContext`.
+- **Pack binding (profile-level, single source of truth).** The sole authoritative,
+  hash-bound binding is the top-level `MechanismProfile.pack_binding`
+  `{pack_id, pack_version, pack_content_hash}`, bound into **both** the evidence-core
+  and profile-envelope hashes, so a profile cannot be reinterpreted under the wrong
+  pack (fail-closed on hash mismatch). `Provenance` carries **no** `pack_binding`;
+  `RunMetadata.pack_binding_audit`, `DisMechRecord.pack_binding`, and candidate
+  retrieval-provenance copies are non-authoritative, non-hashed audit copies that MUST
+  equal the profile binding or fail (`AtlasSchemaError`).
+- **Discovery research lane (optional, out-of-process).** The Bookshelf/agents/tasks
+  research lane (§8 / the spec `discovery_boundary`) may take disease-pack context and
+  emits **untrusted** `AtlasCandidateImport` payloads. Those reach the core only through
+  the deterministic eight-gate promotion (canonical-SPDI readmission → source type/role →
+  citation → exact span → context/ontology-vs-pack → duplicate/conflict → no-classification
+  leakage → named human/oracle span review). The core imports **no** Discovery SDK; a
+  Discovery outage or rejected candidate never mutates an accepted profile.
+- **Static import boundary.** `assert_atlas_import_boundary` (AST/module-graph, not
+  ambient `sys.modules`) forbids `raptor.atlas` from importing `raptor.scorer`,
+  `raptor.eval`, or `raptor.packet` and forbids those consumers from importing
+  `raptor.atlas`. Any CLI/config adapter lives **outside** `src/raptor/atlas/` and imports
+  the core one-way.
+- **Error typing.** Core domain errors (`AtlasSchemaError`, `AtlasIdentityError`,
+  `AtlasProvenanceError`, `AtlasSourceVerificationError`, `AtlasLeakageError`,
+  `AtlasExportError`) are distinct from pack-validation `AtlasPackError`; both fail closed.
+
+Second-disease support is **not** implied by a clean core plus a passing `tsc2` pack;
+whether the pipeline ports is a hypothesis tested later by a design-only portability
+experiment (spec `portability_contract`), not a claim made here.
+
+
 
 > **Accepted architecture vs actual deployment status.** §4-§6 describe the **accepted** runtime
 > architecture (ADR-0004: LiteLLM + Prefect + SQLite + Ollama). As of this writing **no component in
@@ -223,7 +276,9 @@ auto-upgrade on publication.
 ## 9. Architecture decisions
 
 See [DECISIONS.md](DECISIONS.md). Directly relevant: **ADR-0004** (runtime stack), **ADR-0003**
-(build-time loop), **ADR-0001** (framing / validation ceilings).
+(build-time loop), **ADR-0001** (framing / validation ceilings). For the §6b Mechanism Atlas
+boundary: **ADR-0014** (generic core / versioned disease-pack), **ADR-0010** (vertical TSC/mTOR
+scope), **ADR-0009** (no classifier/ClinVar leakage into mechanism evidence).
 
 ## 10. Quality requirements
 

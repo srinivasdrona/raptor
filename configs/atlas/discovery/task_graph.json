@@ -1,0 +1,56 @@
+{
+  "schema": "atlas.discovery.task_graph.v1",
+  "disease_pack_id": "tsc2",
+  "steps_exact_order": [
+    "identity_confirmation",
+    "literature_retrieval",
+    "claim_span_extraction",
+    "contradiction_search",
+    "assay_context_normalization",
+    "evidence_gap_mapping"
+  ],
+  "steps": {
+    "identity_confirmation": {
+      "description": "Resolve and pin the canonical GRCh38-shaped SPDI and transcript alias for the candidate variant against the bound disease pack's allowed genes/assembly/transcript pins. Produces candidate_variant for AtlasCandidateImport.",
+      "depends_on": [],
+      "engine": "identity_resolution_engine",
+      "output": "candidate_variant"
+    },
+    "literature_retrieval": {
+      "description": "Retrieve public, appropriately licensed literature and dataset records relevant to the confirmed identity, restricted to the bookshelf's public_licensed_sources.",
+      "depends_on": ["identity_confirmation"],
+      "engine": "literature_retrieval_engine",
+      "output": "retrieved_documents"
+    },
+    "claim_span_extraction": {
+      "description": "Extract candidate mechanistic claims with exact source spans (locator/exact_quote/page_or_figure) from retrieved documents. Produces proposed_claims and proposed_sources for AtlasCandidateImport.",
+      "depends_on": ["literature_retrieval"],
+      "engine": "claim_span_extraction_engine",
+      "output": "proposed_claims_and_sources"
+    },
+    "contradiction_search": {
+      "description": "Search extracted claims and retrieved documents for direct contradictions and register any conflicts for the duplicate/conflict promotion gate.",
+      "depends_on": ["claim_span_extraction"],
+      "engine": "contradiction_search_engine",
+      "output": "duplicate_conflict_index"
+    },
+    "assay_context_normalization": {
+      "description": "Normalize each claim's experimental context (assay, model system, cell type, tissue, zygosity, assay limitations) against the pack's declared context vocabulary.",
+      "depends_on": ["claim_span_extraction"],
+      "engine": "assay_context_normalization_engine",
+      "output": "normalized_contexts"
+    },
+    "evidence_gap_mapping": {
+      "description": "Map remaining assay/evidence gaps and unknowns not resolved by prior steps, for downstream human-oracle review before promotion.",
+      "depends_on": ["contradiction_search", "assay_context_normalization"],
+      "engine": "evidence_gap_mapping_engine",
+      "output": "retrieval_provenance"
+    }
+  },
+  "isolation": {
+    "out_of_process": true,
+    "private": true,
+    "no_bookshelf_catalog_contribution": true,
+    "core_atlas_import": false
+  }
+}

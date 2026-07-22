@@ -1,0 +1,32 @@
+schema: atlas.discovery.bookshelf.v1
+disease_pack_id: tsc2
+required_context_pins:
+  - disease_pack_id
+  - disease_pack_version
+  - disease_pack_content_hash
+  - atlas_schema_version
+public_licensed_sources:
+  - name: PubMed Central Open Access Subset
+    access: public
+    license_family: varies-per-article-open-access
+    usage: literature_retrieval
+  - name: bioRxiv preprint server
+    access: public
+    license_family: CC-BY-4.0
+    usage: literature_retrieval
+  - name: ClinVar public dataset
+    access: public
+    license_family: public-domain-us-gov
+    usage: dataset_provenance_only
+  - name: MaveDB public functional-assay dataset listings
+    access: public
+    license_family: CC0-1.0
+    usage: dataset_provenance_only
+constraints:
+  no_phi: true
+  no_classification_only_content: true
+  public_data_only: true
+  isolation:
+    out_of_process: true
+    private: true
+    catalog_contribution: false
