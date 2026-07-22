@@ -8,6 +8,7 @@ classes -- there are no hardcoded pathway-specific branches in this module.
 
 from __future__ import annotations
 
+from collections.abc import Mapping as MappingABC
 from typing import Any, Optional
 
 from raptor.atlas.model import AtlasSchemaError
@@ -51,12 +52,12 @@ def _pack_extension_ids(pack: Optional[Any], key: str) -> set[str]:
     if pack is None:
         return set()
     extensions_root = getattr(pack, "ontology_extensions", None)
-    if not isinstance(extensions_root, dict):
+    if not isinstance(extensions_root, MappingABC):
         return set()
     entries = extensions_root.get(key) or []
     ids: set[str] = set()
     for entry in entries:
-        entry_id = entry.get("id") if isinstance(entry, dict) else getattr(entry, "id", None)
+        entry_id = entry.get("id") if isinstance(entry, MappingABC) else getattr(entry, "id", None)
         if entry_id:
             ids.add(entry_id)
     return ids
@@ -109,7 +110,7 @@ def validate_context_vocabulary(vocab_key: str, value: Optional[str], *, pack: O
     if value is None or pack is None:
         return
     extensions_root = getattr(pack, "ontology_extensions", None)
-    if not isinstance(extensions_root, dict):
+    if not isinstance(extensions_root, MappingABC):
         return
     vocab = extensions_root.get("context_vocabularies") or {}
     allowed = vocab.get(vocab_key)

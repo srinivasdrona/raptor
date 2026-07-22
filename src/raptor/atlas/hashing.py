@@ -102,14 +102,59 @@ def _edges_payload(profile: Any) -> list:
     return edges_list
 
 
+def _canonicalize_id_tuple(values: Any) -> list:
+    """Canonicalize a tuple of plain string identifiers that is
+    semantically a SET (order-insensitive, exact-duplicate-collapsing) --
+    ``EvidenceAssessment.supporting/contradicting/missing_evidence/unknowns``
+    and ``Provenance.version_pins`` -- into a deterministically sorted,
+    deduped list so two independently-constructed but semantically
+    identical profiles (e.g. with claim ids/version pins listed in a
+    different order) hash identically."""
+    return sorted(set(values or ()))
+
+
 def _evidence_payload(profile: Any) -> dict:
     evidence = profile.evidence
+    if not evidence:
+        return {"supporting": [], "contradicting": [], "missing_evidence": [], "unknowns": []}
     return {
-        "supporting": list(evidence.supporting) if evidence else [],
-        "contradicting": list(evidence.contradicting) if evidence else [],
-        "missing_evidence": list(evidence.missing_evidence) if evidence else [],
-        "unknowns": list(evidence.unknowns) if evidence else [],
+        "supporting": _canonicalize_id_tuple(evidence.supporting),
+        "contradicting": _canonicalize_id_tuple(evidence.contradicting),
+        "missing_evidence": _canonicalize_id_tuple(evidence.missing_evidence),
+        "unknowns": _canonicalize_id_tuple(evidence.unknowns),
     }
+
+
+def _source_pin_sort_key(payload: dict) -> tuple:
+    span = payload["span"]
+    return (
+        payload["entry_id"],
+        (span or {}).get("locator") or "",
+        (span or {}).get("exact_quote") or "",
+        (span or {}).get("page_or_figure") or "",
+    )
+
+
+def _canonicalized_source_pins(profile: Any) -> list:
+    """Canonicalize ``Provenance.source_pins`` -- a semantically unordered,
+    exact-duplicate-collapsing collection -- by sorting on the FULL key
+    ``(entry_id, span.locator, span.exact_quote, span.page_or_figure)``
+    (not ``entry_id`` alone, which would incorrectly conflate distinct
+    spans pinned against the same source entry) and deduping exact
+    (entry_id, span) duplicates via canonical-JSON-string set membership,
+    mirroring the claims canonicalization above."""
+
+    pins = [_entry_ref_payload(pin) for pin in profile.provenance.source_pins]
+    pins.sort(key=_source_pin_sort_key)
+
+    deduped = []
+    seen = set()
+    for pin in pins:
+        serialized = json.dumps(pin, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        if serialized not in seen:
+            seen.add(serialized)
+            deduped.append(pin)
+    return deduped
 
 
 def _pack_binding_payload(profile: Any) -> dict:
@@ -170,11 +215,6 @@ def profile_envelope_hash(profile: Any) -> str:
     (source pins + version pins). Excludes ``run_metadata`` and
     ``content_hashes`` (which would be self-referential)."""
 
-    provenance_source_pins = [
-        _entry_ref_payload(pin) for pin in profile.provenance.source_pins
-    ]
-    provenance_source_pins.sort(key=lambda pin: pin["entry_id"])
-
     payload = {
         "pack_binding": _pack_binding_payload(profile),
         "identity": _identity_envelope_payload(profile),
@@ -183,8 +223,8 @@ def profile_envelope_hash(profile: Any) -> str:
         "edges": _edges_payload(profile),
         "evidence": _evidence_payload(profile),
         "provenance": {
-            "source_pins": provenance_source_pins,
-            "version_pins": list(profile.provenance.version_pins),
+            "source_pins": _canonicalized_source_pins(profile),
+            "version_pins": _canonicalize_id_tuple(profile.provenance.version_pins),
         },
     }
     return _hash_canonical(payload)

@@ -72,6 +72,12 @@ MECHANISM_STATES = ("supported", "contradicted", "conflicting", "unknown", "unve
 ZYGOSITY_STATES = ("germline", "somatic", "mosaic", "inferred", "unknown")
 CONFIDENCE_STATES = ("low", "moderate", "high", "na")
 DIRECT_EVIDENCE_LEAF_SOURCE_TYPES = ("PRIMARY-LIT", "DATASET")
+SOURCE_REGISTER_ENTRY_SOURCE_TYPES = (
+    "PRIMARY-OFFICIAL", "PRIMARY-DOC", "PRIMARY-LIT", "SECONDARY-SYNTH",
+    "DATASET", "CROSSWALK", "UNVERIFIED",
+)
+SOURCE_REGISTER_ENTRY_ROLES = ("direct_evidence_leaf", "provenance_only", "context", "crosswalk")
+SOURCE_REGISTER_ENTRY_VERIFICATION_STATES = ("verified", "confirm_pending", "unverified")
 
 
 def _require(condition: bool, message: str, error_type: type = AtlasSchemaError) -> None:

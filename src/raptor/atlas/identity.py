@@ -9,15 +9,78 @@ HGVS-c equality or any other heuristic.
 
 from __future__ import annotations
 
+import re
+from collections.abc import Mapping as MappingABC
 from typing import Any, Callable, Mapping
 
 from raptor.atlas.model import AtlasIdentity, AtlasIdentityError
+
+#: A canonical SPDI accession/version component is shaped like a RefSeq
+#: accession -- one to four letters, an underscore, digits, a dot, and a
+#: version number (e.g. ``NC_000000.0``). This is a SHAPE check only; it
+#: never hardcodes a specific real accession.
+_SPDI_ACCESSION_RE = re.compile(r"^[A-Za-z]{1,4}_[0-9]+\.[0-9]+$")
+#: A deletion/insertion component is an uppercase nucleotide sequence
+#: (empty allowed, per canonical SPDI grammar, for pure insertions/
+#: deletions).
+_SPDI_BASE_RE = re.compile(r"^[ACGTN]*$")
+
+
+def validate_canonical_spdi_shape(spdi: Any) -> str:
+    """Validate that ``spdi`` is a syntactically well-formed canonical
+    (RefSeq-accession-shaped) SPDI string: exactly four colon-separated
+    components -- ``<accession>.<version>:<position>:<deletion>:<insertion>``
+    -- with a zero-based non-negative integer position and uppercase
+    nucleotide (A/C/G/T/N, empty allowed) deletion/insertion sequences.
+
+    This is the SOLE shared shape validator for canonical SPDI admission;
+    it is reused by both :func:`admit_identity` and the promotion pipeline's
+    canonical-SPDI-readmission gate so neither performs a bare
+    presence-only or alias-equality check. Returns ``spdi`` unchanged on
+    success; raises :class:`AtlasIdentityError` fail-closed on any
+    malformed shape (whitespace, HGVS-style punctuation, wrong colon
+    count, negative/non-integer position, or non-nucleotide bases).
+    """
+
+    if not isinstance(spdi, str) or not spdi:
+        raise AtlasIdentityError("canonical SPDI must be a non-empty string")
+    if any(ch.isspace() for ch in spdi):
+        raise AtlasIdentityError(f"canonical SPDI {spdi!r} must not contain whitespace")
+
+    parts = spdi.split(":")
+    if len(parts) != 4:
+        raise AtlasIdentityError(
+            f"canonical SPDI {spdi!r} must have exactly 4 colon-separated components "
+            f"(accession.version:position:deletion:insertion), got {len(parts)}"
+        )
+
+    accession, position, deletion, insertion = parts
+    if not _SPDI_ACCESSION_RE.match(accession):
+        raise AtlasIdentityError(
+            f"canonical SPDI {spdi!r} has a malformed accession.version component {accession!r}"
+        )
+    if not position.isdigit():
+        raise AtlasIdentityError(
+            f"canonical SPDI {spdi!r} position component {position!r} must be a "
+            "non-negative zero-based integer"
+        )
+    if not _SPDI_BASE_RE.match(deletion):
+        raise AtlasIdentityError(
+            f"canonical SPDI {spdi!r} deletion component {deletion!r} must be an "
+            "uppercase nucleotide sequence (A/C/G/T/N), empty allowed"
+        )
+    if not _SPDI_BASE_RE.match(insertion):
+        raise AtlasIdentityError(
+            f"canonical SPDI {spdi!r} insertion component {insertion!r} must be an "
+            "uppercase nucleotide sequence (A/C/G/T/N), empty allowed"
+        )
+    return spdi
 
 
 def _pack_transcript_aliases(pack: Any) -> set[str]:
     aliases: set[str] = set()
     for pin in pack.transcript_pins or ():
-        if isinstance(pin, dict):
+        if isinstance(pin, MappingABC):
             transcript = pin.get("transcript")
         else:
             transcript = pin
@@ -39,6 +102,7 @@ def admit_identity(record: Mapping[str, Any], *, pack: Any) -> AtlasIdentity:
     spdi_canonical = record.get("spdi_canonical")
     if not spdi_canonical:
         raise AtlasIdentityError("admit_identity requires a non-empty canonical SPDI string")
+    validate_canonical_spdi_shape(spdi_canonical)
 
     gene = record.get("gene")
     if gene not in pack.allowed_genes:
