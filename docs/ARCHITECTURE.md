@@ -1,6 +1,6 @@
 # RAPTOR — Architecture
 
-> **Status:** DRAFT v0.1 · **Owner:** @dronasrinivas · **Last updated:** 2026-07-22 (added §6a as-built modules; §6b Mechanism Atlas generic-core/disease-pack boundary per ADR-0014; deployment-status note in §7) · **Review cadence:** monthly
+> **Status:** DRAFT v0.1 · **Owner:** @dronasrinivas · **Last updated:** 2026-07-23 (reconciled §6b from planned to as-built Phase 1 status; deployment-status note in §7 retained) · **Review cadence:** monthly
 >
 > **Format:** Structured to the **arc42** template ([arc42.org](https://arc42.org)) with **C4-model**
 > diagram levels (Context → Container → Component; Simon Brown, [c4model.com](https://c4model.com)).
@@ -148,16 +148,21 @@ auto-upgrade on publication.
   fails closed. It performs no new run, scoring, annotation, benchmark read, network access, or data
   generation — see `no_new_evidence_statement` in `data/census/tsc_tiered_readjudication_2026-07-21.json`.
 
-## 6b. Mechanism Atlas — generic core / disease-pack boundary (C4 — Level 2/3, planned)
+## 6b. Mechanism Atlas — generic core / disease-pack boundary (C4 — Level 2/3, as-built Phase 1)
 
-> **Status:** PLANNED · spec-bound, not yet implemented · **Last updated:** 2026-07-22. Bound to
+> **Status:** AS-BUILT PHASE 1 · merged at `9709ec6`, tracker updated at `1134c2e` · **Last updated:** 2026-07-23. Bound to
 > [`docs/project/specs/mechanism-atlas-starter.yaml`](project/specs/mechanism-atlas-starter.yaml)
 > (rev 6) and [ADR-0014](DECISIONS.md#adr-0014--generic-mechanism-atlas-core-with-a-versioned-disease-pack-boundary).
-> This describes the *accepted* component boundary for the Atlas; no code has been merged for it yet.
+> This describes the implemented Phase 1 boundary for the Atlas plus the still-unimplemented
+> Phase 2 stop/go conditions. The merged Phase 1 code path is GPT-5.4-clean in the project
+> tracker and is exercised by the current 35-test `tests/atlas/` suite.
 
 The Mechanism Atlas is split into a reusable core and a per-condition pack so the
 evidence/provenance pipeline amortizes across conditions without hardcoding one
-disease into reusable machinery (ADR-0014). Component relationships:
+disease into reusable machinery (ADR-0014). The merged Phase 1 implementation consists of
+`src/raptor/atlas/`, exactly one versioned `tsc2` pack under `configs/atlas/packs/tsc2/`,
+private out-of-process Discovery templates under `configs/atlas/discovery/`, and the
+synthetic Phase 1 test suite under `tests/atlas/`. Component relationships:
 
 - **`raptor.atlas` (generic core, container/component).** Condition-agnostic
   evidence/provenance machinery: SPDI-keyed identity admission, source-register
@@ -197,6 +202,12 @@ disease into reusable machinery (ADR-0014). Component relationships:
   `AtlasProvenanceError`, `AtlasSourceVerificationError`, `AtlasLeakageError`,
   `AtlasExportError`) are distinct from pack-validation `AtlasPackError`; both fail closed.
 
+**Phase 2 is not implemented.** Real claim grounding and any bounded real-world pilot remain
+blocked on deterministic citation/source resolution, exact span re-grounding, and named
+human/oracle span review. Until those gates are satisfied, the Atlas admits **no** real
+mechanism claims, real grounding spans, R611Q conclusions, or second-disease support
+([ATLAS_RUNBOOK.md](project/atlas/ATLAS_RUNBOOK.md)).
+
 Second-disease support is **not** implied by a clean core plus a passing `tsc2` pack;
 whether the pipeline ports is a hypothesis tested later by a design-only portability
 experiment (spec `portability_contract`), not a claim made here.
@@ -207,8 +218,9 @@ experiment (spec `portability_contract`), not a claim made here.
 > architecture (ADR-0004: LiteLLM + Prefect + SQLite + Ollama). As of this writing **no component in
 > §4-§6 has been deployed as a running service** — Prefect is not scheduling any flow, no Ollama
 > gateway is live, and `variants.db` does not yet exist. All work to date (census, R2 masked
-> held-out gate, tiered v3 re-adjudication, calibration packets) has been produced by
-> **operator-invoked CLI scripts and Python modules** (§6a) run directly, not by the Prefect runtime
+> held-out gate, tiered v3 re-adjudication, calibration packets, and Mechanism Atlas Phase 1)
+> has been produced by
+> **operator-invoked CLI scripts and Python modules** (§6a-§6b) run directly, not by the Prefect runtime
 > pipeline. Do not read §4-§6 as evidence of a live weekly run; deployment remains a separate,
 > not-yet-scheduled milestone.
 

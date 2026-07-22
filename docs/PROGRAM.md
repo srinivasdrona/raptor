@@ -137,8 +137,13 @@ pending `STRATEGY.md` Part II §10 — ADR-0003.)*
 - **Non-authoritative expert-review packet generation and molecular-geneticist recruitment:** 🟡
   **ACTIVE** — packet generation continues as internal review preparation only; oracle recruitment
   (GP-3) is open (see Active Decisions & Bottlenecks)
-- **Mechanism Atlas:** 🔴 **DURABLE HANDOFF ONLY** — schema/handoff exists; implementation follows the
-  packet critical path, not yet started
+- **Mechanism Atlas:** 🟡 **PHASE 1 IMPLEMENTED / MERGED** — GPT-5.4-clean at merge `9709ec6`
+  (tracker update `1134c2e`): generic condition-agnostic core + exactly one versioned `tsc2`
+  pack + pack-bound hashes + static import/classification-leakage guards + synthetic-only
+  promotion flow and out-of-process Discovery templates; `tests/atlas/` is a 35-test Phase 1
+  suite. **Phase 2 real grounding / pilot has not started** — it remains blocked on
+  deterministic citation/source resolution plus named human/oracle span review; no real
+  mechanism claims, grounding spans, R611Q conclusions, or second-disease support are admitted
 
 ## Operations (Current Run)
 
@@ -214,8 +219,13 @@ the vertical worklist below replaces it. **Census candidate directions and the t
 13. **Non-authoritative expert-review packet generation — ACTIVE.** Provisional candidate packets
     (PRD-04 output, item 9) are being prepared for internal expert review as non-authoritative review
     preparation only; this may proceed in parallel with the pending prospective validation but cannot
-    itself authorize any scope. Mechanism Atlas has a durable handoff (schema agreed) but its
-    implementation follows this packet critical path and has not started.
+    itself authorize any scope. **Mechanism Atlas Phase 1 is implemented and merged** (`9709ec6`;
+    tracker `1134c2e`), GPT-5.4-clean: generic condition-agnostic core, exactly one versioned
+    `tsc2` pack, pack-bound hashes, static import/classification-leakage guards, a synthetic-only
+    promotion flow, and out-of-process Discovery templates, backed by the 35-test `tests/atlas/`
+    suite. **Phase 2 real grounding / bounded pilot has not started** and remains blocked on
+    deterministic citation/source resolution plus named human/oracle span review. No real
+    mechanism claims, grounding spans, R611Q conclusions, or second-disease support are admitted.
 
 > **Provisional packets now vs externally usable worklist after PASS:** items 1–8 and the PRD-04 output
 > contract (item 9) proceed now, and provisional representative/all-VUS candidate packets may be built
