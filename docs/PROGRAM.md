@@ -145,6 +145,33 @@ pending `STRATEGY.md` Part II §10 — ADR-0003.)*
   deterministic citation/source resolution plus named human/oracle span review; no real
   mechanism claims, grounding spans, R611Q conclusions, or second-disease support are admitted
 
+## Source expansion roadmap — ordered and governed
+
+> Source expansion is an evidence/provenance program, not a way to rescue the frozen R2 result.
+> No new source changes R2, the ADR-0013 prospective dataset rule, an ACMG policy, or an existing
+> packet without a separately versioned policy, material-drift decision and required revalidation.
+> The durable dependency graph lives in `docs/project/TODOS.yaml` under
+> `source-expansion-roadmap`.
+
+**Baseline already complete:** the 16-predictor decision matrix and pinned historical
+Nirvana/BIAS annotation bundle exist; ClinVar census/benchmark inputs are frozen; the verified
+MaveDB cliPE dataset is available only as non-gating orthogonal evidence. These artifacts do not
+constitute a live refresh system, and PP3/BP4 automation remains disabled.
+
+| Order | Expansion layer | Durable tasks | Admission rule |
+|---:|---|---|---|
+| 1 | **Control plane** — source owner, authoritative URL, licence, release, checksum, acquisition, cadence, consumers, drift and rollback | `sourceops-version-refresh-registry`, `governance-data-rights-privacy` | No ingestion or activation before identity/licence/provenance are explicit. |
+| 2 | **Open literature + functional evidence** — PubMed/LitVar/PMC citation stack; IGVF VAMP-seq/SGE, CAGI7 and legacy-assay access | `sources-add-literature-stack`, `assurance-expand-orthogonal-validation` | Claims remain span-grounded, non-gating and review-bound; access/licence gaps fail closed. |
+| 3 | **Safe refresh machinery** — detect, download, verify, stage and diff; materiality, packet invalidation, benchmark rebuild and rollback | `sourceops-automated-refresh-validation`, `sourceops-drift-revalidation-gates` | Never silently replace a production or historical source. |
+| 4 | **Current annotation refresh** — stage current ClinVar, gnomAD, dbNSFP, MANE, dbSNP and reference bundle on x64 | `sources-stage-annotation-refresh` | Promotion occurs only after the control-plane and drift gates; frozen R2 remains immutable. |
+| 5 | **Separate evidence/modalities** — splice, difficult regions, SV/CNV | `sources-add-splice-track`, `sources-audit-difficult-regions`, `sources-design-sv-cnv-track` | Each receives its own consequence routing, calibration, benchmark and no-double-counting policy. |
+| 6 | **Clinical/commercial sources** — phenotype/penetrance and licensed/vendor feeds | `clinical-phenotype-penetrance-track`, `sources-evaluate-commercial-sources` | Patient-level data waits for privacy/consent controls; commercial feeds require proven incremental value and permitted use. |
+
+**Completion definition:** every admitted source is registered and reproducible; every refresh is
+staged and diffed; every material change names its downstream invalidations and revalidation;
+rollback is tested; literature/functional claims resolve to exact sources and spans; and no modality
+is inserted into the small-variant scorer merely because its data is available.
+
 ## Operations (Current Run)
 
 > R2 (the leakage-safe 2,577-variant held-out set) has been scored and gated once; it is frozen and

@@ -320,13 +320,39 @@ todos:
   depends_on:
   - sources-expand-predictor-matrix
   created: '2026-07-19'
+- id: source-expansion-roadmap
+  title: Completing the governed source-expansion roadmap
+  description: 'Track: SOURCE-COVERAGE / SOURCE-OPS. Complete the ordered expansion program:
+    establish the live source/version/licence registry and governance boundary; add open
+    literature and orthogonal functional sources; implement staged refresh, drift detection,
+    packet invalidation and rollback; then develop separately calibrated splice, difficult-region,
+    SV/CNV, phenotype and commercial-source tracks. Completion means every admitted source has
+    an authoritative URL, owner, licence, release pin, checksum, acquisition method, refresh
+    cadence, downstream-consumer map, material-drift rule, revalidation trigger and rollback.
+    New sources must not modify the frozen R2 or ADR-0013 prospective policy without a separately
+    approved and validated policy version.'
+  status: pending
+  depends_on:
+  - sourceops-drift-revalidation-gates
+  - sources-add-literature-stack
+  - assurance-expand-orthogonal-validation
+  - sources-stage-annotation-refresh
+  - sources-add-splice-track
+  - sources-audit-difficult-regions
+  - sources-design-sv-cnv-track
+  - clinical-phenotype-penetrance-track
+  - sources-evaluate-commercial-sources
+  created: '2026-07-24'
 - id: sources-add-splice-track
   title: Building separate splice-evidence source track
   description: 'Track: SOURCE-COVERAGE. Design a separately calibrated splice policy using
     pinned SpliceAI and appropriate ABSplice/dbscSNV comparators, with consequence routing
     and no double counting with PVS1 or missense PP3/BP4.'
   status: pending
-  depends_on: []
+  depends_on:
+  - sourceops-version-refresh-registry
+  - governance-data-rights-privacy
+  - sources-expand-predictor-matrix
   created: '2026-07-19'
 - id: sources-add-literature-stack
   title: Adding open literature source coverage
@@ -334,7 +360,9 @@ todos:
     plan for TSC evidence and Mechanism Atlas; assess OMIM/MasterMind licensing separately
     and keep extraction claims provenance-bound.'
   status: pending
-  depends_on: []
+  depends_on:
+  - sourceops-version-refresh-registry
+  - governance-data-rights-privacy
   created: '2026-07-19'
 - id: sources-audit-difficult-regions
   title: Auditing repeats and difficult genomic regions
@@ -342,7 +370,8 @@ todos:
     duplications, camouflaged/dark regions, mappability and STR resources; distinguish public
     sources from vendor-specific CamouflagedGenes/DarkGenes/GeneyxRepeats labels.'
   status: pending
-  depends_on: []
+  depends_on:
+  - sourceops-version-refresh-registry
   created: '2026-07-19'
 - id: sources-design-sv-cnv-track
   title: Designing TSC structural-variant and CNV track
@@ -351,7 +380,10 @@ todos:
     repeat/mappability data, an independent benchmark and evidence policy. Do not insert
     SV rules into the SNV scorer.'
   status: pending
-  depends_on: []
+  depends_on:
+  - sourceops-version-refresh-registry
+  - governance-data-rights-privacy
+  - sources-audit-difficult-regions
   created: '2026-07-19'
 - id: sources-evaluate-commercial-sources
   title: Evaluating licensed and vendor-specific sources
@@ -359,7 +391,9 @@ todos:
     CamouflagedGenes, DarkGenes and GeneyxRepeats definitions; assess MasterMind and OMIM
     licensing/value; reject redundant or unverifiable feeds.'
   status: pending
-  depends_on: []
+  depends_on:
+  - sourceops-version-refresh-registry
+  - governance-data-rights-privacy
   created: '2026-07-19'
 - id: sourceops-version-refresh-registry
   title: Creating live source-version and refresh registry
@@ -388,6 +422,21 @@ todos:
   depends_on:
   - sourceops-automated-refresh-validation
   created: '2026-07-19'
+- id: sources-stage-annotation-refresh
+  title: Staging the current small-variant annotation refresh
+  description: 'Track: SOURCE-COVERAGE / SOURCE-OPS. Stage, but do not silently promote,
+    current approved ClinVar, gnomAD, dbNSFP, MANE, dbSNP, reference and related annotation
+    releases on the x64 route; verify licences, checksums, schemas and bundle manifests; quantify
+    diffs against the pinned historical Nirvana/BIAS bundle; rebuild benchmarks or invalidate
+    packets only through the material-drift and rollback gates. This milestone does not alter
+    frozen R2 evidence or activate PP3/BP4.'
+  status: pending
+  depends_on:
+  - sourceops-version-refresh-registry
+  - sourceops-automated-refresh-validation
+  - sourceops-drift-revalidation-gates
+  - sources-pin-core-annotation-bundle
+  created: '2026-07-24'
 - id: engagement-recruit-molecular-geneticist
   title: Establishing molecular-geneticist review capacity
   description: 'Track: EXPERT-ENGAGEMENT / LONG-LEAD. Recruit or contract an appropriately
@@ -474,7 +523,9 @@ todos:
     accessible TSC2 VAMP-seq/SGE maps, legacy assays, phenotype/penetrance sources and CAGI7
     if access is obtained; audit each oracle for ClinVar circularity.'
   status: pending
-  depends_on: []
+  depends_on:
+  - sourceops-version-refresh-registry
+  - governance-data-rights-privacy
   created: '2026-07-19'
 - id: modalities-mosaicism-low-vaf-track
   title: Designing mosaicism and low-VAF evidence track
@@ -491,7 +542,8 @@ todos:
     penetrance, segregation and mosaicism inputs needed for PP4/BS2 and mechanism synthesis;
     establish privacy boundaries and manual-review rules before patient-level automation.'
   status: pending
-  depends_on: []
+  depends_on:
+  - governance-data-rights-privacy
   created: '2026-07-19'
 - id: governance-data-rights-privacy
   title: Establishing data rights, privacy and clinical-boundary governance
