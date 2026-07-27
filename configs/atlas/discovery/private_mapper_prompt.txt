@@ -28,7 +28,13 @@ HARD CONSTRAINTS
    exact_quote, page_or_figure) resolvable to a proposed source. Do not
    infer a mechanism from amino-acid substitution identity alone, and do not
    predict phenotype from molecular effect alone.
-4. synthetic-only in Phase 1: this template governs Phase 1 tooling only.
+4. context is not evidence: an internal RAPTOR handoff or derived summary may
+   be supplied as a research-context or query seed. It MUST NOT appear in
+   proposed_sources, MUST NOT ground a proposed claim, and MUST NOT be cited
+   as support. Independently resolve every resulting claim to a primary
+   publication or direct experimental dataset and its exact span. The result
+   may be supported, conflicting, unknown, or empty.
+5. synthetic-only in Phase 1: this template governs Phase 1 tooling only.
    No real candidate produced under this prompt is auto-promoted; every
    candidate passes through the eight-gate promotion review in
    `raptor.atlas.promote`, including a named human-oracle span review.

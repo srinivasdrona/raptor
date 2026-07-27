@@ -601,20 +601,69 @@ todos:
   description: 'Track: MECHANISM-ATLAS / TSC2-PILOT. After the production-faithful masked
     rerun and the Atlas design contract, create the internal RAPTOR Mechanism Atlas module
     skeleton with its README, schema/contracts, tests/fixtures, canonical variant inputs,
-    mechanism-profile outputs, scoring/import leakage guards, extraction seam and a bounded
-    5-10-record TSC2 pilot. Use docs/project/atlas/MECHANISM_ATLAS_HANDOFF.md as a preliminary
-    design input, not a factual source; independently ground the R611Q card and test the ontology
-    against pathogenic, benign, conflicting and VUS examples to avoid single-case overfitting.
+    mechanism-profile outputs, scoring/import leakage guards and extraction seam. Use
+    docs/project/atlas/MECHANISM_ATLAS_HANDOFF.md as context only, never as an evidence source.
     Keep clinical classification separate; no cross-disease expansion, treatment recommendation
     or DisMech dependency in the internal source of truth. Phase 1 completed and GPT-5.4-clean
     at merge 9709ec6: generic core, TSC2 pack, synthetic tests, hashes, leakage guards and
-    Discovery templates. Remaining work is the separately gated Phase 2 primary-source
-    grounding and bounded 5-10-record pilot with named human/oracle span review.'
-  status: in_progress
+    Discovery templates. The remaining Phase 2 pilot is tracked by dedicated downstream tasks.'
+  status: done
   depends_on:
   - define-variant-mechanism-atlas
   - rerun-masked-gate
   created: '2026-07-21'
+- id: atlas-phase2-citation-resolver
+  title: Building the minimal Atlas primary-source resolver
+  description: 'Track: MECHANISM-ATLAS / PHASE-2. Resolve PMID, PMCID and DOI identifiers
+    to locally held public/licensed primary publications or direct datasets; verify document
+    identity, licence, exact quote and locator; fail closed on unresolved sources. Internal
+    handoffs and derived summaries may seed queries but cannot ground claims.'
+  status: pending
+  depends_on:
+  - build-mechanism-atlas-starter
+  created: '2026-07-27'
+- id: atlas-phase2-r611q-anchor
+  title: Grounding the first R611Q Atlas anchor
+  description: 'Track: MECHANISM-ATLAS / PHASE-2. Use TSC2 p.Arg611Gln (R611Q) as the
+    first end-to-end anchor. Treat the preliminary handoff as context/query seed only;
+    independently resolve identity, primary sources, exact spans, assay/model context,
+    contradictions and evidence gaps. Permit supported, conflicting, unknown or empty
+    outcomes; admit no claim without the general primary-source exact-span rule.'
+  status: pending
+  depends_on:
+  - atlas-phase2-citation-resolver
+  created: '2026-07-27'
+- id: atlas-phase2-contrast-panel
+  title: Running the Atlas Phase 2 contrast panel
+  description: 'Track: MECHANISM-ATLAS / PHASE-2. After the R611Q vertical slice, test
+    the ontology on known pathogenic, benign, conflicting, VUS-with-functional-evidence
+    and evidence-poor cases. Preserve unknown/context-dependent outputs and do not claim
+    ontology stability from the anchor alone.'
+  status: pending
+  depends_on:
+  - atlas-phase2-r611q-anchor
+  created: '2026-07-27'
+- id: atlas-phase2-human-span-review
+  title: Obtaining named human-oracle Atlas span review
+  description: 'Track: MECHANISM-ATLAS / PHASE-2. Have the recruited molecular geneticist
+    review every proposed anchor/panel claim, source role, exact span and assay context;
+    record accept/reject/request-more-evidence without treating review as classification.'
+  status: pending
+  depends_on:
+  - atlas-phase2-r611q-anchor
+  - engagement-recruit-molecular-geneticist
+  created: '2026-07-27'
+- id: atlas-phase2-pilot-evaluation
+  title: Evaluating the bounded Atlas Phase 2 pilot
+  description: 'Track: MECHANISM-ATLAS / PHASE-2. Evaluate source recall, valid-span
+    yield, contradiction capture, unsupported-claim rate, context completeness and
+    reproducibility across the anchor and contrast panel. Discovery may be an optional
+    execution layer, not the benchmark or source of truth.'
+  status: pending
+  depends_on:
+  - atlas-phase2-contrast-panel
+  - atlas-phase2-human-span-review
+  created: '2026-07-27'
 - id: refresh-repository-readme
   title: Publishing the RAPTOR repository README
   description: 'Track: DOCUMENTATION / PUBLIC-SURFACE. Replace the stale local README status

@@ -3,6 +3,10 @@
 > **Status:** PRELIMINARY / UNAPPROVED / UNVERIFIED DESIGN INPUT  
 > **Source:** Sanitized from the local `pre-build/raptor-mechanism-atlas-handoff.md` discussion.  
 > **Activation:** None. This document authorizes no classification, assay, intervention or treatment claim.
+>
+> **Phase 2 use:** This handoff may seed research questions and literature queries. It is not an
+> evidence source and cannot ground an accepted Atlas claim. Every real claim requires an
+> independently resolved primary publication or direct dataset plus an exact supporting span.
 
 ## Purpose
 
@@ -37,14 +41,15 @@ Possible extraction evidence:
 
 1. Start with TSC2.
 2. Use a bounded panel spanning pathogenic, benign, conflicting and VUS examples.
-3. Include `TSC2 p.Arg611Gln (R611Q)` as an initial case card only after its
-   identity and evidence are independently re-grounded.
+3. Use `TSC2 p.Arg611Gln (R611Q)` as the first Phase 2 anchor. The handoff may
+   guide questions, but every accepted claim must be independently grounded in
+   a primary publication or direct dataset with an exact span.
 4. Do not expand to TSC1 or another mTORopathy until the TSC2 pilot passes its
    stop/go criteria.
 
-The raw handoff proposed beginning with R611Q. That is useful for continuity but
-creates single-case overfitting risk; the ontology must be challenged by contrasting
-examples before it is considered stable.
+The raw handoff proposed beginning with R611Q. That is useful for an end-to-end
+vertical slice, but the anchor cannot establish generality by itself; the ontology
+must also be challenged by contrasting examples before it is considered stable.
 
 ## Candidate mechanism classes
 
@@ -169,4 +174,3 @@ After the production-faithful masked rerun:
 3. Sonnet implementation of the internal module skeleton;
 4. GPT-5.4 checker verdict;
 5. bounded pilot only after the schema and leakage guards are clean.
-

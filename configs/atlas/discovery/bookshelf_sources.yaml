@@ -22,6 +22,15 @@ public_licensed_sources:
     access: public
     license_family: CC0-1.0
     usage: dataset_provenance_only
+non_evidence_context_sources:
+  - name: RAPTOR internal handoffs and derived summaries
+    usage: context_and_query_seed_only
+    admissible_as_proposed_source: false
+    admissible_as_claim_grounding: false
+    rule: >-
+      Internal summaries may identify questions, candidate mechanisms, or
+      sources to investigate. Every resulting real claim must resolve to a
+      primary publication or direct dataset with an exact supporting span.
 constraints:
   no_phi: true
   no_classification_only_content: true

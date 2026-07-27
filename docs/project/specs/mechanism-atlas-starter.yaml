@@ -378,7 +378,7 @@ generic_core_disease_pack:
         note: "disease-specific SourceRegisterEntry metadata pins (the concrete TSC2/MaveDB/IGVF/ClinVar/Monarch entries live HERE, not in core; see source_register)"
       prohibitions:
         type: obj
-        note: "disease-specific prohibitions keyed by name (a mapping, matching DiseasePack.prohibitions: obj), e.g. the r611q_gate block and no-hardcode-handoff-mechanism rules"
+        note: "disease-specific evidence-admission and no-hardcode rules; internal summaries may seed queries but never ground accepted claims"
       pilot_eval_metadata:
         type: obj
         note: "panel strata, native-vs-Discovery eval axes, and pilot bookkeeping for THIS disease"
@@ -1035,7 +1035,7 @@ dataclass_contracts:
       reconciliation_policy: obj
       ontology_extensions: obj        # namespaced claim_kind/node_layer/class + context vocab
       source_register_pins: tuple     # tuple[SourceRegisterEntry, ...]
-      prohibitions: obj               # e.g. r611q_gate for the tsc2 pack
+      prohibitions: obj               # source-role/evidence-admission and no-hardcode rules
       pilot_eval_metadata: obj
   PackBinding:
     frozen: true
@@ -1216,15 +1216,25 @@ panel_selection_contract:
     - Strata are chosen to CONTRAST the ontology (avoid single-case overfitting).
     - Panel must exercise unknown, conflicting, and context-dependent representations.
     - Every admitted record needs resolved identity + independent source-span review.
-  r611q_gate:
-    owner: tsc2 disease pack (prohibitions block), NOT the generic core.
+  first_phase2_anchor:
+    owner: tsc2 disease pack pilot metadata, NOT the generic core.
     variant: TSC2 p.Arg611Gln (R611Q)
-    admission: BLOCKED until exact identity + primary-source re-grounding complete.
-    prohibition: Do NOT hardcode the handoff's proposed R611Q mechanism, zygosity,
-      stability, complex, localization, mTOR, or rescue statements as fact.
-    on_admission: represent every unsupported handoff mechanism as a hypothesis/unknown.
-    phase_note: R611Q stays BLOCKED for Phase-2 primary re-grounding; NO real R611Q
-      claims exist in Phase 1 (and the R611Q literal lives only in the tsc2 pack).
+    role: ordinary anchor case for the first end-to-end Phase-2 vertical slice.
+    context_rule: >-
+      The preliminary handoff MAY seed research questions and literature queries,
+      but it is not an evidence source and cannot ground an accepted claim.
+    grounding_rule: >-
+      Every real claim for this or any other variant requires an independently
+      resolved primary publication or direct dataset plus an exact supporting span.
+    outcome_rule: >-
+      The anchor may yield supported, conflicting, unknown, or empty results; no
+      mechanism narrative is required.
+    generality_rule: >-
+      The anchor does not define the generic core or demonstrate generality. The
+      contrast panel remains mandatory before the ontology is considered stable.
+    phase_note: >-
+      No real R611Q claim or span exists in Phase 1; the R611Q literal lives only
+      in the tsc2 pack and Phase-2 pilot documentation.
   synthetic_fixtures:
     independence: >
       Module skeleton + synthetic RED-test fixtures MUST NOT depend on any real
@@ -1658,7 +1668,8 @@ packet_dependency_split:
   waits_for_frozen_corrected_packets:
     - Exact current-policy VUS IDs admitted into the live pilot panel (deterministic
       eight-case sample is available but Phase 1 stays synthetic-only).
-    - R611Q admission (additionally gated on primary-source re-grounding).
+    - R611Q first-anchor execution under the general primary-source/exact-span
+      grounding rule; no variant-specific evidence exception.
     - Real leaf source enumeration (PMIDs/DOIs) + exact spans + any verified claim.
     - Any pilot CONTENT (real per-variant mechanism profiles).
     - Discovery-proposed real mechanism claims/profiles (candidates must pass the
@@ -1760,7 +1771,7 @@ workflow:
       - Generic core src/raptor/atlas/ (model/pack/identity/ontology/hashing/registry/profile/promote/export/guards + README) with NO disease literals.
       - Frozen dataclasses, tuples for ordered collections, typed errors (incl. AtlasPackError).
       - "Disease-pack loader/validator (pack.py): load/validate/hash; core-vs-pack error typing; fail closed."
-      - "The ONE tsc2 pack (configs/atlas/packs/tsc2/pack.yaml): allowed_genes/assembly/transcript pins, reconciliation policy, namespaced ontology extensions (incl. tsc2:pathway_mtorc1), source_register_pins (verified MaveDB metadata only), r611q_gate prohibition, pilot/eval metadata; disease literals live ONLY here."
+      - "The ONE tsc2 pack (configs/atlas/packs/tsc2/pack.yaml): allowed_genes/assembly/transcript pins, reconciliation policy, namespaced ontology extensions (incl. tsc2:pathway_mtorc1), source_register_pins (verified MaveDB metadata only), general internal-summary/primary-source grounding rules, R611Q first-anchor pilot metadata, and eval metadata; disease literals live ONLY here."
       - "SPDI-keyed identity admission admit_identity(record, *, pack) + reconciliation + unresolved failure; identity_state only resolved/unresolved."
       - "SourceRegisterEntry/EntryRef schemas + role AND source_type gating (only PRIMARY-LIT/DATASET leaves ground)."
       - "May pin and verify real bibliographic METADATA (PMID/PMCID/DOI/accession/license) as metadata only, IN THE PACK; no grounding spans, no verified claims."
@@ -2022,7 +2033,7 @@ deliberate_action:
     - "Phase-1 purity is read as banning even real bibliographic metadata pins, or conversely a real grounding span slips in disguised as metadata -> mitigated: explicit split — metadata pins (PMID/PMCID/DOI/accession/license) permitted and verified as metadata (in the pack); grounding spans / verified claims / mechanistic conclusions are Phase 2 only."
     - "evidence_core_hash references a field the profile lacks (a top-level claims table) producing an undefined/unstable hash -> mitigated: top-level claims tuple + pack_binding + run_metadata + explicit include/exclude payloads + canonical order/dedup + claim_id refs into profile.claims."
     - "Real PMID/DOI/span grounding, R611Q evidence, or pilot curation sneaks into the skeleton phase, pre-empting frozen packets + human review -> mitigated: Phase-1 purity + Phase-2-only real grounding + go_signal_phase2 (resolver + named human/oracle review)."
-    - "R611Q's handoff mechanism is silently treated as fact -> mitigated: r611q_gate BLOCKED (in the tsc2 pack) + no-hardcode prohibition + GPT-5.4 probe + Phase-2 grounding gate; R611Q literal lives only in the pack."
+    - "An internal handoff or derived summary is silently treated as evidence -> mitigated: context/query-seed-only source role + no-hardcode prohibition + primary-source/direct-dataset exact-span requirement for EVERY real claim; R611Q is the first ordinary anchor, not a source exception."
     - "Pilot fixtures depend on unfrozen VUS IDs, coupling skeleton to packet freeze -> mitigated: synthetic_fixtures independence + packet_dependency_split + deterministic eight-case sample stays synthetic-only in Phase 1."
     - "A classifier/ClinVar score leaks in as confidence/mechanism truth (R-A2 circularity) -> mitigated: forbidden_inputs_as_mechanism_truth + ADR-0009 binding + no-classification promotion gate."
     - "Discovery becomes a de-facto source of truth by writing accepted claims/profiles directly -> mitigated: AtlasCandidateImport is UNTRUSTED, promote.py runs the full deterministic 8-gate via injected PromotionContext + human/oracle review, only RAPTOR writes accepted profiles."

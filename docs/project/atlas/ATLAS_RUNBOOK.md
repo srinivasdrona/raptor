@@ -34,10 +34,11 @@
   bibliographic *metadata* (citation identifiers, license family) with
   `verification: confirm_pending` -- none is asserted as a `verified`,
   span-grounded, direct-evidence-leaf claim.
-* **No R611Q case card.** The pilot pack's `prohibitions.r611q_gate`
-  explicitly blocks admission of the `TSC2 p.Arg611Gln (R611Q)` case card
-  until its identity, zygosity, and every supporting claim's span are
-  independently re-grounded per the gate below.
+* **No real anchor content yet.** Phase 1 admits no real `TSC2
+  p.Arg611Gln (R611Q)` claims or spans. Phase 2 uses R611Q as its first
+  anchor under the same general rule as every other variant: internal
+  summaries may seed questions, but only primary publications or direct
+  datasets with exact supporting spans can ground accepted claims.
 * **No network access.** Nothing under `src/raptor/atlas/` or
   `configs/atlas/discovery/` performs an external fetch. Discovery output
   is assumed to already be staged locally as an `AtlasCandidateImport`
@@ -71,10 +72,12 @@
 
 ## Phase 2 gate (stop/go)
 
-Before any real-world claim, span, or the R611Q case card may be admitted:
+Before any real-world claim or span may be admitted:
 
-1. Independent re-grounding of the pinned variant identity and each
-   proposed claim's exact span against its cited public source.
+1. Independent grounding of the pinned variant identity and each proposed
+   claim's exact span against a primary publication or direct dataset.
+   Internal handoffs and derived summaries may seed queries but cannot be
+   proposed sources or claim-grounding evidence.
 2. A completed, reviewed contrast panel (pathogenic/benign/conflicting/VUS)
    demonstrating the ontology is not overfit to a single case.
 3. All eight promotion gates exercised against real (not synthetic)

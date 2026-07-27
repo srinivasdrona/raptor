@@ -1,7 +1,7 @@
 schema: atlas.disease_pack.v1
 pack_id: tsc2
 pack_version: 1.0.0-phase1
-pack_content_hash: 59f46c652cdcf09093d593e2c98d470aa0ce14a4d36659d211f173970155b2d1
+pack_content_hash: 289068af23ead6076e82265eb4e4e47a210bc21b01ba3f9e6e2b6054d98b14a8
 allowed_genes:
   - TSC2
 assembly_pins:
@@ -57,20 +57,26 @@ source_register_pins:
     verification: confirm_pending
 prohibitions:
   no_hardcode_handoff_mechanism: true
+  internal_summaries_may_seed_queries: true
+  internal_summaries_cannot_ground_claims: true
+  every_real_claim_requires_primary_source: true
+  every_real_claim_requires_exact_span: true
   no_classifier_score_as_mechanism_truth: true
   no_clinvar_criterion_as_mechanism_truth: true
   no_amino_acid_substitution_only_inference: true
   no_phenotype_prediction_from_molecular_effect_alone: true
   no_cross_disease_expansion_without_stop_go: true
-  r611q_gate:
-    status: prohibited_until_independently_regrounded
-    case_card: TSC2 p.Arg611Gln (R611Q), NM_000548.5:c.1832G>A
-    note: >-
-      Admission of any mechanism claim for this variant is blocked until
-      identity, zygosity, and each supporting claim's span are
-      independently re-grounded per the ATLAS_RUNBOOK Phase 2 gate. No
-      claim or span for this variant is admitted by Phase 1 fixtures.
 pilot_eval_metadata:
+  first_phase2_anchor:
+    case_card: TSC2 p.Arg611Gln (R611Q), NM_000548.5:c.1832G>A
+    role: ordinary_anchor_case
+    handoff_usage: context_and_query_seed_only
+    evidence_grounding: primary_source_exact_span_only
+    note: >-
+      The preliminary handoff may guide questions and searches but is not
+      an evidence source. The anchor may yield supported, conflicting,
+      unknown, or empty results. It does not define the generic core or
+      establish generality without the contrast panel.
   panel_strata:
     - pathogenic
     - benign

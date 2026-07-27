@@ -13,6 +13,7 @@
 
 | ID | Title | Status | Date |
 |----|-------|--------|------|
+| [ADR-0015](#adr-0015--atlas-internal-summaries-are-context-only-and-r611q-is-the-first-phase-2-anchor) | Atlas internal summaries are context-only and R611Q is the first Phase 2 anchor | Accepted | 2026-07-27 |
 | [ADR-0014](#adr-0014--generic-mechanism-atlas-core-with-a-versioned-disease-pack-boundary) | Generic Mechanism Atlas core with a versioned disease-pack boundary | Accepted | 2026-07-22 |
 | [ADR-0013](#adr-0013--tiered-gate-v3-post-hoc-re-adjudication-and-prospective-validation-lock) | Tiered gate v3: post-hoc re-adjudication and prospective validation lock | Accepted | 2026-07-22 |
 | [ADR-0012](#adr-0012--pp3bp4-automated-emission-disabled-for-the-current-masked-rerun) | PP3/BP4 automated emission disabled for the current masked rerun | Accepted | 2026-07-21 |
@@ -36,6 +37,7 @@
 
 | ADR | Current risk linkage | Basis in current repo |
 |---|---|---|
+| **ADR-0015** | R-A2, R-A6, H1 | Internal summaries may guide searches but cannot ground claims; primary-source exact-span admission prevents circular citation laundering while preserving unknown/conflicting/empty outcomes. |
 | **ADR-0014** | R-A2, R-A12 | Generic-core / versioned-disease-pack boundary keeps mechanism evidence classification-free (R-A2 circularity) and preserves ADR-0010's vertical TSC/mTOR scope discipline (R-A12) while enabling internal cross-condition amortization; no second-disease claim until a portability experiment passes. |
 | **ADR-0013** | R-A13, R-A14, R-A15 | Explicit risk rows cite ADR-0013's post-hoc / prospective-lock consequences. |
 | **ADR-0012** | — | No standalone risk row names ADR-0012 today; current residue is tracked through the ADR-0013-linked rows above. |
@@ -50,6 +52,57 @@
 | **ADR-0003** | R-D1 | Explicitly cited in the checker rubber-stamp / skipped-loop risk row. |
 | **ADR-0002** | — | Document-format ADR only; no direct current risk row cites it. |
 | **ADR-0001** | — *(partially superseded by ADR-0010)* | Historical strategy framing record; current linked risks are carried by ADR-0010 instead. |
+
+---
+
+## ADR-0015 — Atlas internal summaries are context-only and R611Q is the first Phase 2 anchor
+
+- **Status:** Accepted
+- **Date:** 2026-07-27
+- **Deciders:** @dronasrinivas (operator, acting domain owner)
+- **Supersedes:** the variant-specific `r611q_gate` prohibition in the TSC2 disease pack and Atlas starter spec. It does not supersede the Phase 1 synthetic-only boundary or ADR-0014.
+
+### Context
+
+The preliminary Atlas handoff contains proposed questions and mechanism narratives for
+`TSC2 p.Arg611Gln (R611Q)`. Prior discussion does not make the variant scientifically
+invalid or unsuitable as a pilot anchor. Treating the handoff itself as evidence, however,
+would create circular grounding: an internal summary could be repeated as an accepted claim
+without resolving the primary publication or direct dataset that supports it.
+
+A variant-specific prohibition is the wrong abstraction. The same source-role rule must
+apply to every real variant, whether or not it appeared in prior discussion.
+
+### Decision
+
+1. Use R611Q as the first Phase 2 end-to-end anchor.
+2. Internal RAPTOR handoffs and derived summaries may seed research questions, candidate
+   mechanisms, search terms and source leads.
+3. Internal summaries are `context`/`query_seed` only. They cannot appear as
+   `direct_evidence_leaf`, cannot ground an accepted claim and cannot substitute for an
+   exact source span.
+4. Every real Atlas claim, for every variant, must resolve to a primary publication or
+   direct experimental dataset with an exact supporting span and assay/model context.
+5. The engine may return supported, conflicting, unknown or empty results; it must not
+   manufacture a mechanism narrative.
+6. No variant-specific expectation is hardcoded in the generic core or disease pack.
+7. R611Q establishes only the first vertical slice. A contrasting panel of known
+   pathogenic, benign, conflicting and evidence-poor variants remains required before
+   claiming ontology stability or generality.
+8. Reported rescue or perturbation observations remain research evidence in their exact
+   experimental context, never patient-specific mitigation or treatment advice.
+
+### Consequences
+
+- The TSC2 pack replaces `r611q_gate` with general internal-summary and primary-source
+  grounding rules, and records R611Q only as pilot metadata.
+- Discovery may use the handoff to formulate queries, but may not emit it as a proposed
+  source or claim-grounding record.
+- The handoff becomes useful as a post-extraction audit target: RAPTOR can record which
+  proposed statements were independently supported, contradicted, unresolved or absent.
+- Independent retrieval benchmarking, if later required, must be defined separately from
+  the product-development anchor run; it does not restrict the operational Phase 2 pilot.
+- The existing classification, clinical-use and treatment-recommendation prohibitions remain.
 
 ---
 
