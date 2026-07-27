@@ -1,10 +1,10 @@
 {
   "schema": "atlas.discovery.context_manifest.v1",
-  "raptor_commit": "cdfaf705a295e120952e211b36c89e44e334b233",
+  "raptor_commit": "8669d319ce8f0748c59286352ad3bfdbfe33a75d",
   "atlas_schema_version": "raptor-mechanism-atlas-starter-v1",
   "disease_pack_id": "tsc2",
   "disease_pack_version": "1.0.0-phase1",
-  "disease_pack_content_hash": "59f46c652cdcf09093d593e2c98d470aa0ce14a4d36659d211f173970155b2d1",
+  "disease_pack_content_hash": "289068af23ead6076e82265eb4e4e47a210bc21b01ba3f9e6e2b6054d98b14a8",
   "bookshelf_version": "phase1-synthetic-v1",
   "prompt_hash": "PLACEHOLDER_PHASE2_PROMPT_HASH",
   "packet_manifest_hash": "PLACEHOLDER_PHASE2_PACKET_MANIFEST_HASH",
@@ -14,5 +14,5 @@
     "no_classification_inputs_or_outputs": true,
     "synthetic_only_phase": "phase1"
   },
-  "notes": "Phase 1: disease pack pins are real and hash-verified. raptor_commit pins the exact code/pack implementation commit (Commit A of the code-review remediation) this Discovery context targets -- never the metadata-only commit that sets this pin itself, which would be self-referential and impossible to compute in advance. atlas_schema_version pins the authoritative Mechanism Atlas starter spec schema id, not the disease-pack manifest schema id. prompt_hash and packet_manifest_hash are explicit Phase-2 placeholders -- no real Discovery run has produced a prompt or packet manifest yet."
+  "notes": "The disease-pack pins are real and hash-verified. raptor_commit pins the exact non-self-referential code/pack/policy commit this Discovery context targets; the later metadata-only commit that sets this pin cannot pin itself. Internal handoffs may seed queries but cannot appear as proposed sources or ground claims. atlas_schema_version pins the authoritative Mechanism Atlas starter spec schema id, not the disease-pack manifest schema id. prompt_hash and packet_manifest_hash remain explicit Phase-2 placeholders until a real Discovery run freezes them."
 }
