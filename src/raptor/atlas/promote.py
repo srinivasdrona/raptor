@@ -220,23 +220,21 @@ def _validate_resolved_citation_shape(
 
     Beyond the standalone ``identifier.canonical`` echo, this also
     validates that the resolved SOURCE itself internally corroborates the
-    requested identifier: ``resolved.source.identifiers`` must be a tuple
-    of properly-typed :class:`CitationIdentifier` values (never trust an
-    untyped/garbage entry merely because the outer ``CatalogSource``
-    dataclass instance passed ``isinstance``), and -- whenever that tuple
-    is non-empty -- the exact requested ``canonical_string`` must be one
-    of the source's own declared identifiers. This defeats a spoofing
-    resolver that returns ``identifier.canonical`` matching what was
-    requested while attaching it to a ``source`` that itself advertises a
-    DIFFERENT identifier (e.g. requested ``PMID:12345`` bound to a source
-    whose own ``identifiers`` only contains ``PMID:99999``). A source that
-    declares an EMPTY identifiers tuple is tolerated (this defense
-    degrades to the standalone ``identifier.canonical`` check alone in
-    that case): a real catalog load never produces an empty identifiers
-    tuple for a grounding-eligible ``direct_evidence_leaf`` source
-    (enforced at ``load_catalog`` time), so this only relaxes for a
-    minimal resolver double that does not populate that field, not for a
-    real catalog-backed resolver."""
+    requested identifier: ``resolved.source.identifiers`` must be a
+    NON-EMPTY tuple of properly-typed :class:`CitationIdentifier` values
+    (never trust an untyped/garbage entry merely because the outer
+    ``CatalogSource`` dataclass instance passed ``isinstance``), and the
+    exact requested ``canonical_string`` must be one of the source's own
+    declared identifiers. This defeats a spoofing resolver that returns
+    ``identifier.canonical`` matching what was requested while attaching
+    it to a ``source`` that itself advertises a DIFFERENT identifier (e.g.
+    requested ``PMID:12345`` bound to a source whose own ``identifiers``
+    only contains ``PMID:99999``). An EMPTY identifiers tuple is ALWAYS
+    rejected -- there is no compatibility exception: a real catalog load
+    never produces an empty identifiers tuple for a grounding-eligible
+    ``direct_evidence_leaf`` source (enforced at ``load_catalog`` time),
+    so a resolver that omits them entirely is treated exactly like one
+    that fails to corroborate the requested identifier."""
 
     if not isinstance(resolved, ResolvedCitation):
         raise AtlasProvenanceError(
@@ -269,10 +267,11 @@ def _validate_resolved_citation_shape(
         )
 
     source_identifiers = resolved.source.identifiers
-    if not isinstance(source_identifiers, tuple):
+    if not isinstance(source_identifiers, tuple) or not source_identifiers:
         raise AtlasProvenanceError(
-            f"citation resolver returned a source with a non-tuple identifiers field for "
-            f"proposed source {entry_id!r} identifier {canonical_string!r}"
+            f"citation resolver returned a source with a non-tuple or empty identifiers "
+            f"field for proposed source {entry_id!r} identifier {canonical_string!r}; a "
+            "resolved source must itself declare at least one typed identifier"
         )
     source_canonicals = []
     for source_identifier in source_identifiers:
@@ -287,7 +286,7 @@ def _validate_resolved_citation_shape(
                 f"{canonical_string!r}"
             )
         source_canonicals.append(source_identifier.canonical)
-    if source_canonicals and canonical_string not in source_canonicals:
+    if canonical_string not in source_canonicals:
         raise AtlasProvenanceError(
             f"citation resolver resolved identifier {canonical_string!r} for proposed "
             f"source {entry_id!r} to a source that does not itself declare that "
