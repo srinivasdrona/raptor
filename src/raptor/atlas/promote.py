@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Tuple
 
 from raptor.atlas.guards import scan_for_classification_leakage
 from raptor.atlas.identity import validate_canonical_spdi_shape
@@ -855,6 +855,62 @@ def _gate3_citation_resolution(
     return resolved_by_source
 
 
+def _validate_span_proposed_shape(
+    source_ref: object, span_proposed: object
+) -> Tuple[str, str, Optional[str]]:
+    """Structurally validate a raw ``span_proposed`` payload BEFORE any
+    :class:`Span` construction, helper call, or resolver invocation.
+    Fails closed with :class:`AtlasSchemaError` -- never a raw
+    ``TypeError``/``AttributeError`` -- for any non-conforming shape or
+    type, and never calls the resolver.
+
+    - ``span_proposed`` itself must be a ``dict`` (rejects ``str``/``list``/
+      ``None``/etc).
+    - ``locator`` must be a ``str`` (``bool`` is never an instance of
+      ``str`` so it is rejected too) that is nonblank after stripping;
+      the ORIGINAL, unstripped value is returned/stored so exact-match
+      comparisons downstream are never altered.
+    - ``exact_quote`` follows the identical str/nonblank-after-strip rule
+      as ``locator``, with the same preserve-original-bytes guarantee --
+      only the blank-check strips a throwaway copy.
+    - ``page_or_figure`` is optional descriptive metadata only (per spec,
+      "never substitutes for text verification"): if present (not
+      ``None``) it must be a ``str``, but a blank string is a valid value
+      for this field -- only the TYPE is enforced, never presence/blankness.
+
+    Returns the validated ``(locator, exact_quote, page_or_figure)``
+    triple for direct use in constructing a :class:`Span`.
+    """
+    if not isinstance(span_proposed, dict):
+        raise AtlasSchemaError(
+            f"proposed claim referencing {source_ref!r} has a span_proposed that is not "
+            f"a mapping (got {type(span_proposed).__name__})"
+        )
+
+    locator = span_proposed.get("locator")
+    if not isinstance(locator, str) or not locator.strip():
+        raise AtlasSchemaError(
+            f"proposed claim referencing {source_ref!r} has a span_proposed.locator that "
+            f"is not a nonblank string (got {type(locator).__name__})"
+        )
+
+    exact_quote = span_proposed.get("exact_quote")
+    if not isinstance(exact_quote, str) or not exact_quote.strip():
+        raise AtlasSchemaError(
+            f"proposed claim referencing {source_ref!r} has a span_proposed.exact_quote "
+            f"that is not a nonblank string (got {type(exact_quote).__name__})"
+        )
+
+    page_or_figure = span_proposed.get("page_or_figure")
+    if page_or_figure is not None and not isinstance(page_or_figure, str):
+        raise AtlasSchemaError(
+            f"proposed claim referencing {source_ref!r} has a span_proposed.page_or_figure "
+            f"that is not a string (got {type(page_or_figure).__name__})"
+        )
+
+    return locator, exact_quote, page_or_figure
+
+
 def _gate4_exact_span_resolution(
     candidate: AtlasCandidateImport,
     context: PromotionContext,
@@ -863,15 +919,9 @@ def _gate4_exact_span_resolution(
     for claim in candidate.proposed_claims:
         source_ref = claim.get("source_ref_proposed")
         span_proposed = claim.get("span_proposed")
-        if (
-            not isinstance(span_proposed, dict)
-            or not span_proposed.get("locator")
-            or not span_proposed.get("exact_quote")
-        ):
-            raise AtlasSchemaError(
-                f"proposed claim referencing {source_ref!r} lacks a complete span_proposed "
-                "(both a nonblank locator AND a nonblank exact_quote are required)"
-            )
+        locator, exact_quote, page_or_figure = _validate_span_proposed_shape(
+            source_ref, span_proposed
+        )
 
         resolved = resolved_by_source.get(source_ref)
         if resolved is None:
@@ -881,9 +931,9 @@ def _gate4_exact_span_resolution(
             )
 
         span = Span(
-            locator=span_proposed.get("locator"),
-            exact_quote=span_proposed.get("exact_quote"),
-            page_or_figure=span_proposed.get("page_or_figure"),
+            locator=locator,
+            exact_quote=exact_quote,
+            page_or_figure=page_or_figure,
         )
         # This claim's text-char span requires a COMPLETE, internally
         # consistent extracted-text pin on the resolved source -- checked
@@ -964,13 +1014,21 @@ def promote_candidate(candidate: AtlasCandidateImport, context: PromotionContext
 
     accepted = []
     for index, claim in enumerate(candidate.proposed_claims):
-        span_proposed = claim.get("span_proposed") or {}
-        span = Span(
-            locator=span_proposed.get("locator"),
-            exact_quote=span_proposed.get("exact_quote"),
-            page_or_figure=span_proposed.get("page_or_figure"),
+        source_ref_proposed = claim.get("source_ref_proposed")
+        span_proposed = claim.get("span_proposed")
+        # Re-validated here (rather than trusted from the prior
+        # validate_candidate_import call above) so this Span construction
+        # site independently never proceeds on an unchecked shape/type --
+        # consistent with "before any Span construction" at every call site.
+        locator, exact_quote, page_or_figure = _validate_span_proposed_shape(
+            source_ref_proposed, span_proposed
         )
-        source_ref = EntryRef(entry_id=claim.get("source_ref_proposed"), span=span)
+        span = Span(
+            locator=locator,
+            exact_quote=exact_quote,
+            page_or_figure=page_or_figure,
+        )
+        source_ref = EntryRef(entry_id=source_ref_proposed, span=span)
         accepted.append(
             ObservedClaim(
                 claim_id=f"promoted-{index}",
