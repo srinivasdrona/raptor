@@ -854,3 +854,283 @@ def test_verify_span_happy_and_adversarial_red(tmp_path):
         resolver.verify_span(resolved, Span(locator="text-char:5:2", exact_quote="T")) # start >= end
     with pytest.raises(syms["AtlasSpanMismatchError"]):
         resolver.verify_span(resolved, Span(locator="wrong-schema:0:5", exact_quote="T"))
+
+
+def test_gemini_citation_identifiers_schema_validation_red(tmp_path):
+    """
+    Focused test suite verifying the strict validation schema of catalog source identifiers.
+    Asserts compliance with docs/project/specs/atlas-citation-resolver-v1.yaml.
+    Specifically tests that invalid shapes of the 'identifiers' field and its values
+    fail with AtlasCatalogSchemaError, and valid ones load properly.
+    """
+    syms = get_resolver_symbols()
+    load_catalog = syms["load_catalog"]
+    AtlasCatalogSchemaError = syms["AtlasCatalogSchemaError"]
+
+    # Base valid manifest structure with no sources yet.
+    base_manifest = {
+        "schema": "atlas.citation_catalog.v1",
+        "catalog_id": "gemini-identifiers-test-catalog",
+        "catalog_version": "1.0.0",
+        "catalog_content_hash": "placeholder",
+        "disease_pack_binding": {
+            "pack_id": "synthpack",
+            "pack_version": "1.0.0",
+            "pack_content_hash": "bf7369f8faa24a6f746956ee1122281e798185f320b012a844ffbc683f2e7b21"
+        },
+        "content_root_policy": {"policy": "relative"},
+        "sources": []
+    }
+
+    # Dummy files needed for any direct_evidence_leaf checks
+    (tmp_path / "x.pdf").write_bytes(b"")
+
+    def try_load(sources):
+        manifest = dict(base_manifest)
+        manifest["sources"] = sources
+        manifest["catalog_content_hash"] = oracle_catalog_content_hash(manifest)
+        
+        manifest_file = tmp_path / "catalog.yaml"
+        with open(manifest_file, "w", encoding="utf-8") as f:
+            yaml.safe_dump(manifest, f)
+            
+        return load_catalog(manifest_file, content_root=tmp_path)
+
+    # 1. identifiers field omitted
+    # Testing both grounding leaf (role: direct_evidence_leaf) and non-grounding context/provenance source
+    with pytest.raises(AtlasCatalogSchemaError):
+        try_load([
+            {
+                "source_id": "src-omit-grounding",
+                "source_type": "PRIMARY-LIT",
+                "role": "direct_evidence_leaf",
+                # identifiers is omitted
+                "permitted_use": "grounding_and_quote",
+                "verification": "verified",
+                "raw_artifact": {"relative_path": "x.pdf", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "byte_length": 0, "media_type": "pdf"}
+            }
+        ])
+
+    with pytest.raises(AtlasCatalogSchemaError):
+        try_load([
+            {
+                "source_id": "src-omit-nongrounding",
+                "source_type": "PRIMARY-LIT",
+                "role": "context",
+                # identifiers is omitted
+                "permitted_use": "context_only",
+                "verification": "verified"
+            }
+        ])
+
+    # 2. identifiers is null
+    with pytest.raises(AtlasCatalogSchemaError):
+        try_load([
+            {
+                "source_id": "src-null",
+                "source_type": "PRIMARY-LIT",
+                "role": "context",
+                "identifiers": None,
+                "permitted_use": "context_only",
+                "verification": "verified"
+            }
+        ])
+
+    # 3. identifiers is empty list
+    with pytest.raises(AtlasCatalogSchemaError):
+        try_load([
+            {
+                "source_id": "src-empty-list",
+                "source_type": "PRIMARY-LIT",
+                "role": "context",
+                "identifiers": [],
+                "permitted_use": "context_only",
+                "verification": "verified"
+            }
+        ])
+
+    # 4. identifiers is string
+    with pytest.raises(AtlasCatalogSchemaError):
+        try_load([
+            {
+                "source_id": "src-string",
+                "source_type": "PRIMARY-LIT",
+                "role": "context",
+                "identifiers": "pmid:12345",
+                "permitted_use": "context_only",
+                "verification": "verified"
+            }
+        ])
+
+    # 5. identifiers is scalar (int)
+    with pytest.raises(AtlasCatalogSchemaError):
+        try_load([
+            {
+                "source_id": "src-scalar",
+                "source_type": "PRIMARY-LIT",
+                "role": "context",
+                "identifiers": 42,
+                "permitted_use": "context_only",
+                "verification": "verified"
+            }
+        ])
+
+    # 6. identifiers empty mapping is allowed for non-grounding but direct_evidence_leaf requires at least one
+    # Grounding leaf with empty mapping must fail:
+    with pytest.raises(AtlasCatalogSchemaError):
+        try_load([
+            {
+                "source_id": "src-grounding-empty-mapping",
+                "source_type": "PRIMARY-LIT",
+                "role": "direct_evidence_leaf",
+                "identifiers": {},
+                "permitted_use": "grounding_and_quote",
+                "verification": "verified",
+                "raw_artifact": {"relative_path": "x.pdf", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "byte_length": 0, "media_type": "pdf"}
+            }
+        ])
+
+    # Non-grounding leaf with empty mapping is allowed:
+    catalog_empty_mapping = try_load([
+        {
+            "source_id": "src-nongrounding-empty-mapping",
+            "source_type": "PRIMARY-LIT",
+            "role": "context",
+            "identifiers": {},
+            "permitted_use": "context_only",
+            "verification": "verified"
+        }
+    ])
+    assert catalog_empty_mapping is not None
+
+    # 7. Each present scheme value must be list[str] (no falsey/coerced values)
+    # - Empty string scheme value
+    with pytest.raises(AtlasCatalogSchemaError):
+        try_load([
+            {
+                "source_id": "src-scheme-val-empty-str",
+                "source_type": "PRIMARY-LIT",
+                "role": "context",
+                "identifiers": {"pmid": ""},
+                "permitted_use": "context_only",
+                "verification": "verified"
+            }
+        ])
+
+    # - Null scheme value
+    with pytest.raises(AtlasCatalogSchemaError):
+        try_load([
+            {
+                "source_id": "src-scheme-val-null",
+                "source_type": "PRIMARY-LIT",
+                "role": "context",
+                "identifiers": {"pmid": None},
+                "permitted_use": "context_only",
+                "verification": "verified"
+            }
+        ])
+
+    # - Scalar scheme value
+    with pytest.raises(AtlasCatalogSchemaError):
+        try_load([
+            {
+                "source_id": "src-scheme-val-scalar",
+                "source_type": "PRIMARY-LIT",
+                "role": "context",
+                "identifiers": {"pmid": 12345},
+                "permitted_use": "context_only",
+                "verification": "verified"
+            }
+        ])
+
+    # - Mapping scheme value
+    with pytest.raises(AtlasCatalogSchemaError):
+        try_load([
+            {
+                "source_id": "src-scheme-val-mapping",
+                "source_type": "PRIMARY-LIT",
+                "role": "context",
+                "identifiers": {"pmid": {"id": "12345"}},
+                "permitted_use": "context_only",
+                "verification": "verified"
+            }
+        ])
+
+    # 8. List entries must be nonblank strings and normalize successfully
+    # - Empty string entry
+    with pytest.raises(AtlasCatalogSchemaError):
+        try_load([
+            {
+                "source_id": "src-entry-empty-str",
+                "source_type": "PRIMARY-LIT",
+                "role": "context",
+                "identifiers": {"pmid": [""]},
+                "permitted_use": "context_only",
+                "verification": "verified"
+            }
+        ])
+
+    # - Malformed identifier value (e.g. invalid PMID format with leading zero)
+    with pytest.raises(AtlasCatalogSchemaError):
+        try_load([
+            {
+                "source_id": "src-entry-malformed",
+                "source_type": "PRIMARY-LIT",
+                "role": "context",
+                "identifiers": {"pmid": ["012345"]},
+                "permitted_use": "context_only",
+                "verification": "verified"
+            }
+        ])
+
+    # 9. Mixed valid DOI plus malformed empty PMID must reject whole catalog
+    with pytest.raises(AtlasCatalogSchemaError):
+        try_load([
+            {
+                "source_id": "src-mixed-malformed",
+                "source_type": "PRIMARY-LIT",
+                "role": "context",
+                "identifiers": {"doi": ["10.5555/abc"], "pmid": ""},
+                "permitted_use": "context_only",
+                "verification": "verified"
+            }
+        ])
+
+    # 10. Fully valid identifier mapping loads, duplicate/cross-source rules preserved
+    # Valid load:
+    valid_catalog = try_load([
+        {
+            "source_id": "src-valid-1",
+            "source_type": "PRIMARY-LIT",
+            "role": "direct_evidence_leaf",
+            "identifiers": {"doi": ["10.5555/abc"], "pmid": ["12345"]},
+            "permitted_use": "grounding_and_quote",
+            "verification": "verified",
+            "raw_artifact": {"relative_path": "x.pdf", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "byte_length": 0, "media_type": "pdf"}
+        }
+    ])
+    assert valid_catalog is not None
+
+    # Cross-source duplicate alias (duplicate PMID across sources):
+    with pytest.raises(AtlasCatalogSchemaError):
+        try_load([
+            {
+                "source_id": "src-valid-1",
+                "source_type": "PRIMARY-LIT",
+                "role": "direct_evidence_leaf",
+                "identifiers": {"pmid": ["12345"]},
+                "permitted_use": "grounding_and_quote",
+                "verification": "verified",
+                "raw_artifact": {"relative_path": "x.pdf", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "byte_length": 0, "media_type": "pdf"}
+            },
+            {
+                "source_id": "src-valid-2",
+                "source_type": "PRIMARY-LIT",
+                "role": "direct_evidence_leaf",
+                "identifiers": {"pmid": ["12345"]},
+                "permitted_use": "grounding_and_quote",
+                "verification": "verified",
+                "raw_artifact": {"relative_path": "x.pdf", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "byte_length": 0, "media_type": "pdf"}
+            }
+        ])
+
