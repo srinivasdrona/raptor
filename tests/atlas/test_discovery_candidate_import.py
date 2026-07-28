@@ -2334,7 +2334,11 @@ def test_gate4_locator_scheme_spoof_gemini():
     - Lowercase text-char:50:60 with matching offsets passes.
     - Case variants (TEXT-CHAR:50:60, Text-Char:50:60) and malformed same-scheme
       variants must be rejected.
-    - Opaque/different scheme remains governed by spec (not overconstrained).
+    - Every non-text-char locator (plain L1, other-scheme, URL/page/figure locator,
+      uppercase/mixed/spacing text-char) is rejected by validate_candidate_import with
+      AtlasSchemaError/AtlasProvenanceError before acceptance.
+    - Spies show appropriate Gate4 invocation/zero where structural (no resolver call
+      if structurally rejected).
     """
     try:
         import raptor.atlas.model as model_mod
@@ -2409,17 +2413,37 @@ def test_gate4_locator_scheme_spoof_gemini():
         resolver.verify_span_calls.clear()
         with pytest.raises((model_mod.AtlasProvenanceError, model_mod.AtlasSchemaError)) as exc_info:
             run_with_locator(bad_locator)
+        # If structural (AtlasSchemaError), verify_span_calls must be exactly zero (no resolver invocation)
+        if issubclass(exc_info.type, model_mod.AtlasSchemaError):
+            assert len(resolver.verify_span_calls) == 0
 
     # 3. Malformed same-scheme variants - must raise
     for bad_locator in ["text-char:50", "text-char:50:60:extra", "text-char:+50:60", "text-char:50: 60"]:
         resolver.verify_span_calls.clear()
-        with pytest.raises((model_mod.AtlasProvenanceError, model_mod.AtlasSchemaError)):
+        with pytest.raises((model_mod.AtlasProvenanceError, model_mod.AtlasSchemaError)) as exc_info:
             run_with_locator(bad_locator)
+        # If structural (AtlasSchemaError), verify_span_calls must be exactly zero
+        if issubclass(exc_info.type, model_mod.AtlasSchemaError):
+            assert len(resolver.verify_span_calls) == 0
 
-    # 4. Opaque different scheme remains governed by spec (does not overconstrain)
-    resolver.verify_span_calls.clear()
-    run_with_locator("other-scheme:50:60")
-    assert len(resolver.verify_span_calls) == 1
+    # 4. Other non-text-char locators - must raise AtlasProvenanceError or AtlasSchemaError.
+    # Supported v1 is ONLY exact lowercase "text-char:<start>:<end>".
+    # Non-text-char locators (plain "L1", "other-scheme", URL, page, figure locators) are rejected.
+    non_text_char_locators = [
+        "L1",
+        "other-scheme",
+        "other-scheme:50:60",
+        "https://example.com/doc.pdf",
+        "page-12",
+        "fig-2"
+    ]
+    for bad_locator in non_text_char_locators:
+        resolver.verify_span_calls.clear()
+        with pytest.raises((model_mod.AtlasProvenanceError, model_mod.AtlasSchemaError)) as exc_info:
+            run_with_locator(bad_locator)
+        # Spies show appropriate Gate4 invocation / zero where structural
+        if issubclass(exc_info.type, model_mod.AtlasSchemaError):
+            assert len(resolver.verify_span_calls) == 0
 
 
 
