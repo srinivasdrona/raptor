@@ -569,54 +569,46 @@ def _require_extracted_pin_complete_for_span(
         )
 
 
-def _parse_gate4_text_char_locator(entry_id: Any, locator: str) -> Optional[Tuple[int, int]]:
+def _parse_gate4_text_char_locator(entry_id: Any, locator: str) -> Tuple[int, int]:
     """Strictly parse a ``text-char:<start>:<end>`` locator string against
     the exact grammar mirrored (never imported) from citation.py's own
     ``_TEXT_CHAR_LOCATOR_RE``, so Gate 4's resolver-offset binding check
     below is independently re-derived rather than trusting the resolver's
     own parsing of the same string.
 
-    A locator whose scheme token (the substring before its first ``:``,
-    compared case-INsensitively and with incidental surrounding whitespace
-    stripped) is not ``text-char`` at all is some other locator scheme
-    opaque to this offset-binding check -- it is left to the pre-existing
-    length/self-consistency check alone, so this returns ``None`` rather
-    than raising (this is the only scheme Gate 4 knows how to bind
-    ``VerifiedSpan.start``/``end`` against, but rejecting every other
-    scheme outright is out of scope for this defense-in-depth check).
+    Gate 4 citation resolution v1 supports EXACTLY ONE locator scheme --
+    the exact lowercase ``text-char:<start>:<end>`` grammar -- and nothing
+    else. There is no opaque/unknown-scheme passthrough: ANY locator that
+    does not match this grammar byte-for-byte is a rejected locator, full
+    stop. This includes (non-exhaustively) unrelated/opaque schemes such
+    as a bare ``"L1"`` or ``"other-scheme:50:60"``, URL locators, and
+    page/figure-style labels (``"page-12"``, ``"fig-2"``) -- none of these
+    are some other scheme left to a separate check; they are simply not
+    the one locator grammar Gate 4 v1 understands, and are rejected here.
+    Case variants (``TEXT-CHAR:50:60``, ``Text-Char:50:60``) and spacing
+    variants (``text-char :50:60``, ``text-char:50: 60``) of the
+    ``text-char`` scheme are likewise rejected -- only the EXACT lowercase
+    grammar with no incidental whitespace is ever accepted.
 
-    Critically, that scheme-token detection is deliberately case/whitespace
-    -INsensitive so that ``TEXT-CHAR:``/``Text-Char:``/``text-char :``
-    (and similar spoofed variants) are recognized as an ATTEMPT to declare
-    this scheme and are never treated as some other opaque scheme -- only
-    the EXACT lowercase ``text-char:<start>:<end>`` grammar (mirrored from
-    citation.py's own ``_TEXT_CHAR_LOCATOR_RE``) is ever accepted; any
-    case/whitespace/otherwise-malformed variant of the ``text-char`` scheme
-    fails closed with :class:`AtlasProvenanceError` rather than silently
-    falling through to the opaque path.
+    Every rejection here fails closed with :class:`AtlasProvenanceError`:
+    this check only ever runs once a claim's raw ``span_proposed.locator``
+    has already passed the separate, more permissive "nonblank string"
+    structural check (:class:`AtlasSchemaError`, raised earlier and before
+    the resolver is ever invoked, by ``_validate_span_proposed_shape``) --
+    a locator that fails THIS stricter grammar check is instead a
+    provenance/binding failure, surfacing only once we are about to trust
+    the resolver's own reported offsets against it.
 
-    Once a locator's scheme token matches ``text-char`` (case-insensitively),
-    it must fully match the EXACT lowercase grammar -- ``start``/``end``
-    must each be a bare decimal nonnegative integer (the ``[0-9]+`` grammar
-    already rejects a leading ``-``/``+`` sign or any non-digit) and ``end``
-    must be ``>= start`` -- or it fails closed with
-    :class:`AtlasProvenanceError`. The raw ``span_proposed.locator`` field's
-    more permissive "nonblank string" shape was already enforced
-    structurally (as :class:`AtlasSchemaError`, before the resolver was
-    ever invoked) by ``_validate_span_proposed_shape``; a locator that
-    fails THIS stricter grammar check here is instead a provenance/binding
-    failure, because it only surfaces once we are about to trust the
-    resolver's own reported offsets against it."""
+    On success this ALWAYS returns the parsed ``(start, end)`` integer
+    offsets -- there is no ``None``/opaque return path -- so callers can
+    unconditionally bind ``VerifiedSpan.start``/``end`` against them."""
 
-    scheme_token = locator.split(":", 1)[0].strip().lower()
-    if scheme_token != "text-char":
-        return None
     match = _GATE4_TEXT_CHAR_LOCATOR_RE.match(locator)
     if not match:
         raise AtlasProvenanceError(
             f"proposed claim referencing {entry_id!r} has a span locator {locator!r} that "
-            "declares the 'text-char:' scheme (case-insensitively) but does not exactly "
-            "match the lowercase 'text-char:<start>:<end>' grammar"
+            "does not exactly match the only locator grammar Gate 4 v1 supports, the "
+            "lowercase 'text-char:<start>:<end>' grammar"
         )
     start = int(match.group(1))
     end = int(match.group(2))
@@ -648,11 +640,17 @@ def _validate_verified_span_shape(
     exact requested locator string yet report DIFFERENT ``start``/``end``
     integers that merely happen to be internally self-consistent with
     ``exact_quote``'s length (e.g. a duplicate/repeated quote occurring at
-    more than one offset). So whenever the requested locator declares the
-    ``text-char:`` scheme, it is independently re-parsed here via
-    ``_parse_gate4_text_char_locator`` and ``verified.start``/``verified.end``
-    are additionally required to be EXACTLY equal to the locator's own
-    decoded offsets -- not merely length-consistent with ``exact_quote``."""
+    more than one offset). Gate 4 citation resolution v1 supports EXACTLY
+    ONE locator grammar -- the exact lowercase ``text-char:<start>:<end>``
+    grammar -- so the requested ``span.locator`` is unconditionally
+    re-parsed here via ``_parse_gate4_text_char_locator``, which always
+    either returns the locator's own decoded ``(start, end)`` offsets or
+    raises :class:`AtlasProvenanceError` itself for any locator that is
+    not that exact grammar (there is no opaque/other-scheme passthrough).
+    ``verified.start``/``verified.end`` are then additionally required to
+    be EXACTLY equal to those decoded offsets -- not merely
+    length-consistent with ``exact_quote`` -- so ``VerifiedSpan.start``/
+    ``end`` are always bound exactly to the locator that was requested."""
 
     if not isinstance(verified, VerifiedSpan):
         raise AtlasProvenanceError(
@@ -677,7 +675,7 @@ def _validate_verified_span_shape(
         or not _is_int_not_bool(verified.end)
         or verified.start < 0
         or verified.end < verified.start
-        or (locator_offsets is not None and (verified.start, verified.end) != locator_offsets)
+        or (verified.start, verified.end) != locator_offsets
         or (verified.end - verified.start) != len(verified.exact_quote)
     ):
         raise AtlasProvenanceError(
