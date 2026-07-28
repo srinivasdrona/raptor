@@ -1325,8 +1325,12 @@ def test_gate3_multi_alias_catalog_source_consistency():
                 extraction_version=resolved.source.extraction_version,
                 text_normalization=resolved.source.text_normalization
             )
-            # Fail closed with AtlasProvenanceError if full equality is required or verified
-            raise model_mod.AtlasProvenanceError("Split identifier tuples resolve to unequal CatalogSource objects")
+            return ResolvedCitation(
+                identifier=resolved.identifier,
+                source=source,
+                content=resolved.content,
+                content_verified=True
+            )
 
     split_resolver = SplitIdentifiersResolver()
     ctx_split = model_mod.PromotionContext(
@@ -1352,6 +1356,9 @@ def test_gate3_multi_alias_catalog_source_consistency():
 
     with pytest.raises(model_mod.AtlasProvenanceError):
         validate_candidate_import(cand_split, ctx_split)
+
+    assert "PMID:12345" in split_resolver.resolve_calls
+    assert "DOI:10.5555/lit" in split_resolver.resolve_calls
 
     # 3. NEGATIVE CASE: Same source_id with differing license/permitted_use/content fields
     class DifferingFieldsResolver(FakeCitationResolver):
@@ -1385,8 +1392,12 @@ def test_gate3_multi_alias_catalog_source_consistency():
                 extraction_version=resolved.source.extraction_version,
                 text_normalization=resolved.source.text_normalization
             )
-            # Fail closed with AtlasProvenanceError if full equality is required or verified
-            raise model_mod.AtlasProvenanceError("Same source_id with differing metadata resolve to unequal CatalogSource objects")
+            return ResolvedCitation(
+                identifier=resolved.identifier,
+                source=source,
+                content=resolved.content,
+                content_verified=True
+            )
 
     diff_resolver = DifferingFieldsResolver()
     ctx_diff = model_mod.PromotionContext(
@@ -1399,5 +1410,8 @@ def test_gate3_multi_alias_catalog_source_consistency():
 
     with pytest.raises(model_mod.AtlasProvenanceError):
         validate_candidate_import(cand_split, ctx_diff)
+
+    assert "PMID:12345" in diff_resolver.resolve_calls
+    assert "DOI:10.5555/lit" in diff_resolver.resolve_calls
 
 
