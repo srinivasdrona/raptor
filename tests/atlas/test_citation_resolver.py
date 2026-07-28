@@ -1134,3 +1134,80 @@ def test_gemini_citation_identifiers_schema_validation_red(tmp_path):
             }
         ])
 
+    # 11. Mixed/non-string keys in identifiers mapping must raise AtlasCatalogSchemaError, never raw TypeError
+    def try_load_raw(sources):
+        manifest = dict(base_manifest)
+        manifest["sources"] = sources
+        manifest["catalog_content_hash"] = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" # placeholder
+        manifest_file = tmp_path / "catalog_raw.yaml"
+        with open(manifest_file, "w", encoding="utf-8") as f:
+            yaml.safe_dump(manifest, f)
+        return load_catalog(manifest_file, content_root=tmp_path)
+
+    # int key (causes TypeError in current production because of sorted() on mixed set)
+    with pytest.raises(AtlasCatalogSchemaError):
+        try_load_raw([
+            {
+                "source_id": "src-int-key",
+                "source_type": "PRIMARY-LIT",
+                "role": "context",
+                "identifiers": {123: ["12345"], "unsupported": ["abc"]},
+                "permitted_use": "context_only",
+                "verification": "verified"
+            }
+        ])
+
+    # bool key (causes TypeError in current production because of sorted() on mixed set)
+    with pytest.raises(AtlasCatalogSchemaError):
+        try_load_raw([
+            {
+                "source_id": "src-bool-key",
+                "source_type": "PRIMARY-LIT",
+                "role": "context",
+                "identifiers": {True: ["12345"], "unsupported": ["abc"]},
+                "permitted_use": "context_only",
+                "verification": "verified"
+            }
+        ])
+
+    # null/None key (causes TypeError in current production because of sorted() on mixed set)
+    with pytest.raises(AtlasCatalogSchemaError):
+        try_load_raw([
+            {
+                "source_id": "src-null-key",
+                "source_type": "PRIMARY-LIT",
+                "role": "context",
+                "identifiers": {None: ["12345"], "unsupported": ["abc"]},
+                "permitted_use": "context_only",
+                "verification": "verified"
+            }
+        ])
+
+    # tuple/object where direct mapping probe (causes TypeError in current production because of sorted() on mixed set)
+    from raptor.atlas.citation import _validate_and_build_sources
+    with pytest.raises(AtlasCatalogSchemaError):
+        _validate_and_build_sources([
+            {
+                "source_id": "src-tuple-key",
+                "source_type": "PRIMARY-LIT",
+                "role": "context",
+                "identifiers": {("a", "b"): ["12345"], "unsupported": ["abc"]},
+                "permitted_use": "context_only",
+                "verification": "verified"
+            }
+        ])
+
+    # Unsupported string keys also raise AtlasCatalogSchemaError
+    with pytest.raises(AtlasCatalogSchemaError):
+        try_load([
+            {
+                "source_id": "src-unsupported-key",
+                "source_type": "PRIMARY-LIT",
+                "role": "context",
+                "identifiers": {"unsupported": ["abc"]},
+                "permitted_use": "context_only",
+                "verification": "verified"
+            }
+        ])
+
+

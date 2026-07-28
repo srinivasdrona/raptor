@@ -2328,5 +2328,100 @@ def test_gate4_resolver_spoof_offset_validation():
         validate_candidate_import(cand_duplicate, ctx_mismatched_duplicate)
 
 
+def test_gate4_locator_scheme_spoof_gemini():
+    """Verify Gate4 locator scheme spoof validation.
+    
+    - Lowercase text-char:50:60 with matching offsets passes.
+    - Case variants (TEXT-CHAR:50:60, Text-Char:50:60) and malformed same-scheme
+      variants must be rejected.
+    - Opaque/different scheme remains governed by spec (not overconstrained).
+    """
+    try:
+        import raptor.atlas.model as model_mod
+        from raptor.atlas.promote import validate_candidate_import
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
+
+    mock_pack = make_schema_valid_disease_pack(model_mod)
+
+    # Base valid variant and retrieval
+    valid_variant = {
+        "spdi_proposed": "NC_000000.0:1000:A:T", "gene_proposed": "SYNGENE1", "hgvs_aliases": []
+    }
+    valid_retrieval = {
+        "agents": [], "queries": [], "run_id": "r1", "retrieved_at": "now",
+        "pack_binding": {
+            "pack_id": mock_pack.pack_id, "pack_version": mock_pack.pack_version, "pack_content_hash": mock_pack.pack_content_hash
+        },
+        "prompt_hash": "h", "bookshelf_version": "v1"
+    }
+
+    class SpoofLocatorResolver(FakeCitationResolver):
+        def verify_span(self, resolved, span):
+            self.verify_span_calls.append((resolved, span))
+            from raptor.atlas.model import VerifiedSpan
+            if "50:60" in span.locator:
+                start, end = 50, 60
+            else:
+                start, end = 0, len(span.exact_quote or "")
+            return VerifiedSpan(
+                source_id=resolved.source.source_id,
+                locator=span.locator,
+                start=start,
+                end=end,
+                exact_quote=span.exact_quote or "",
+                extracted_text_sha256=resolved.content.extracted_text_sha256
+            )
+
+    resolver = SpoofLocatorResolver()
+    ctx = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=resolver,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+
+    def run_with_locator(locator_str):
+        cand = model_mod.AtlasCandidateImport(
+            candidate_variant=valid_variant,
+            proposed_claims=[{
+                "claim_text": "text", "claim_kind_proposed": "pathway", "directionality": "increase",
+                "source_ref_proposed": "lit-1",
+                "span_proposed": {"locator": locator_str, "exact_quote": "1234567890", "page_or_figure": "page-1"},
+                "context_proposed": "cell-assay-A"
+            }],
+            proposed_sources=[{
+                "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+                "bib": {"pmid": "12345"}
+            }],
+            retrieval_provenance=valid_retrieval
+        )
+        validate_candidate_import(cand, ctx)
+
+    # 1. Exact lowercase passes
+    resolver.verify_span_calls.clear()
+    run_with_locator("text-char:50:60")
+    assert len(resolver.verify_span_calls) == 1
+
+    # 2. Case variants - must raise AtlasProvenanceError or AtlasSchemaError
+    for bad_locator in ["TEXT-CHAR:50:60", "Text-Char:50:60", "text-char :50:60"]:
+        resolver.verify_span_calls.clear()
+        with pytest.raises((model_mod.AtlasProvenanceError, model_mod.AtlasSchemaError)) as exc_info:
+            run_with_locator(bad_locator)
+
+    # 3. Malformed same-scheme variants - must raise
+    for bad_locator in ["text-char:50", "text-char:50:60:extra", "text-char:+50:60", "text-char:50: 60"]:
+        resolver.verify_span_calls.clear()
+        with pytest.raises((model_mod.AtlasProvenanceError, model_mod.AtlasSchemaError)):
+            run_with_locator(bad_locator)
+
+    # 4. Opaque different scheme remains governed by spec (does not overconstrain)
+    resolver.verify_span_calls.clear()
+    run_with_locator("other-scheme:50:60")
+    assert len(resolver.verify_span_calls) == 1
+
+
+
 
 
