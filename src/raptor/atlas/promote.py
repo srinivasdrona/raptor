@@ -10,27 +10,83 @@ input candidate.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Dict
 
 from raptor.atlas.guards import scan_for_classification_leakage
 from raptor.atlas.identity import validate_canonical_spdi_shape
 from raptor.atlas.model import (
     AtlasCandidateImport,
+    AtlasCatalogError,
     AtlasIdentityError,
     AtlasProvenanceError,
     AtlasSchemaError,
+    CitationResolver,
     DIRECT_EVIDENCE_LEAF_SOURCE_TYPES,
     EntryRef,
     ObservedClaim,
     PromotionContext,
+    ResolvedCitation,
     Span,
 )
 
+#: Raw, scheme-less bib field -> ("prefix used to construct the canonical
+#: identifier string", "the already-prefixed/URL forms rejected structurally
+#: BEFORE the resolver is ever invoked").
+_BIB_SCHEME_PREFIXES = (
+    ("pmid", "PMID"),
+    ("pmcid", "PMCID"),
+    ("doi", "DOI"),
+    ("accession", "ACCESSION"),
+)
 
-def _extract_citation_key(bib: Any):
+_DOI_URL_PREFIXES = (
+    "https://doi.org/",
+    "http://doi.org/",
+    "https://dx.doi.org/",
+    "http://dx.doi.org/",
+)
+
+
+def _bib_declares_any_identifier(bib: Any) -> bool:
     if not isinstance(bib, dict):
-        return None
-    return bib.get("pmid") or bib.get("doi") or bib.get("accession")
+        return False
+    return any(isinstance(bib.get(scheme_key), str) and bib.get(scheme_key) for scheme_key, _ in _BIB_SCHEME_PREFIXES)
+
+
+def _validate_bib_raw_payload(entry_id: Any, scheme_key: str, prefix: str, raw_value: Any) -> None:
+    """Gate 3's OWN structural pre-check (``bib_mapping.bib_field_grammar``):
+    ``proposed_sources[].bib`` values are RAW and SCHEME-LESS ONLY. Reject --
+    with :class:`AtlasSchemaError`, BEFORE constructing the prefixed
+    identifier string or touching the resolver -- any value that is already
+    scheme-prefixed, a DOI URL, whitespace-bearing, or (for accession)
+    unqualified. Never strips/rewrites the raw value first."""
+
+    if not isinstance(raw_value, str) or not raw_value:
+        raise AtlasSchemaError(
+            f"proposed source {entry_id!r} bib.{scheme_key} must be a nonblank raw string"
+        )
+    if any(ch.isspace() for ch in raw_value):
+        raise AtlasSchemaError(
+            f"proposed source {entry_id!r} bib.{scheme_key} value {raw_value!r} must not "
+            "contain whitespace (raw, scheme-less payload only)"
+        )
+    if raw_value.lower().startswith(prefix.lower() + ":"):
+        raise AtlasSchemaError(
+            f"proposed source {entry_id!r} bib.{scheme_key} value {raw_value!r} is already "
+            "scheme-prefixed; bib values must be raw and scheme-less"
+        )
+    if scheme_key == "doi":
+        for url_prefix in _DOI_URL_PREFIXES:
+            if raw_value.lower().startswith(url_prefix):
+                raise AtlasSchemaError(
+                    f"proposed source {entry_id!r} bib.doi value {raw_value!r} must not be "
+                    "a URL form; bib values must be raw and scheme-less"
+                )
+    if scheme_key == "accession" and ":" not in raw_value:
+        raise AtlasSchemaError(
+            f"proposed source {entry_id!r} bib.accession value {raw_value!r} must be "
+            "'<namespace>:<opaque>' (unqualified accessions are rejected)"
+        )
 
 
 def _is_valid_named_signoff(signoff: Any) -> bool:
@@ -130,29 +186,142 @@ def _gate2_source_type_role_validation(candidate: AtlasCandidateImport, context:
                 f"{linked_source.get('source_type')!r}, which is not one of "
                 f"{DIRECT_EVIDENCE_LEAF_SOURCE_TYPES}"
             )
-        if _extract_citation_key(linked_source.get("bib")) is None:
+        if _bib_declares_any_identifier(linked_source.get("bib")) is False:
             raise AtlasSchemaError(
                 f"proposed claim's linked source {source_ref!r} lacks a resolvable "
-                "bibliographic proposal (pmid/doi/accession)"
+                "bibliographic proposal (pmid/pmcid/doi/accession)"
             )
 
 
-def _gate3_citation_resolution(candidate: AtlasCandidateImport, context: PromotionContext) -> None:
+def _gate3_citation_resolution(
+    candidate: AtlasCandidateImport, context: PromotionContext
+) -> Dict[str, ResolvedCitation]:
+    """Reject a non-conforming resolver, then resolve every raw bib alias of
+    every ``direct_evidence_leaf`` proposed source, requiring all aliases of
+    a given source to agree, and return a LOCAL ``resolved_by_source`` map
+    (threaded explicitly to Gate 4 -- no globals, no cross-candidate state)."""
+
+    if not isinstance(context.citation_resolver, CitationResolver):
+        raise AtlasSchemaError(
+            "PromotionContext.citation_resolver must implement the CitationResolver "
+            "protocol (resolve + verify_span); a bare boolean/callable is not a citation "
+            "resolver"
+        )
+
+    resolved_by_source: Dict[str, ResolvedCitation] = {}
+
     for source in candidate.proposed_sources:
-        citation_key = _extract_citation_key(source.get("bib"))
-        if not context.citation_resolver(citation_key):
-            raise AtlasProvenanceError(
-                f"citation resolver could not resolve proposed source {source.get('entry_id')!r}"
-            )
+        if not isinstance(source, dict):
+            raise AtlasSchemaError(f"candidate.proposed_sources entry {source!r} must be a mapping")
+        if source.get("role") != "direct_evidence_leaf":
+            # provenance_only/context/crosswalk sources never ground; they are
+            # not resolved here (Gate 2 already enforces their structural role/type).
+            continue
 
-
-def _gate4_exact_span_resolution(candidate: AtlasCandidateImport, context: PromotionContext) -> None:
-    for claim in candidate.proposed_claims:
-        span_proposed = claim.get("span_proposed")
-        if not isinstance(span_proposed, dict) or not span_proposed.get("locator"):
+        entry_id = source.get("entry_id")
+        bib = source.get("bib")
+        if not isinstance(bib, dict) or not bib:
             raise AtlasSchemaError(
-                f"proposed claim {claim.get('claim_text')!r} lacks a complete span_proposed"
+                f"proposed source {entry_id!r} has role='direct_evidence_leaf' but its "
+                "bib mapping is missing or empty"
             )
+
+        resolved_aliases = []
+        for scheme_key, prefix in _BIB_SCHEME_PREFIXES:
+            if scheme_key not in bib:
+                continue
+            raw_value = bib[scheme_key]
+            _validate_bib_raw_payload(entry_id, scheme_key, prefix, raw_value)
+
+            # Construct the canonical identifier string by CONCATENATION
+            # only; promote.py never imports/calls normalize_identifier
+            # (import-independence: promote.py depends only on model.py
+            # and the injected resolver). The resolver itself is
+            # responsible for normalizing/validating this string via its
+            # own CitationResolver.resolve() implementation.
+            canonical_string = f"{prefix}:{raw_value}"
+
+            try:
+                resolved = context.citation_resolver.resolve(canonical_string)
+            except AtlasCatalogError as exc:
+                raise AtlasProvenanceError(
+                    f"citation resolver failed to resolve proposed source {entry_id!r} "
+                    f"identifier {canonical_string!r}"
+                ) from exc
+
+            resolved_aliases.append((canonical_string, resolved))
+
+        if not resolved_aliases:
+            raise AtlasSchemaError(
+                f"proposed source {entry_id!r} has role='direct_evidence_leaf' but its bib "
+                "declares zero supported identifiers (pmid/pmcid/doi/accession)"
+            )
+
+        first_identifier, first_resolved = resolved_aliases[0]
+        for identifier, resolved in resolved_aliases[1:]:
+            if (
+                resolved.source.source_id != first_resolved.source.source_id
+                or resolved.source.source_type != first_resolved.source.source_type
+            ):
+                raise AtlasProvenanceError(
+                    f"proposed source {entry_id!r} bib aliases disagree on resolved source: "
+                    f"{first_identifier!r} -> {first_resolved.source.source_id!r} "
+                    f"but {identifier!r} -> {resolved.source.source_id!r}"
+                )
+
+        if (
+            first_resolved.source.source_type != source.get("source_type")
+            or first_resolved.source.role != "direct_evidence_leaf"
+        ):
+            raise AtlasProvenanceError(
+                f"proposed source {entry_id!r} resolved catalog source_type/role "
+                f"({first_resolved.source.source_type!r}/{first_resolved.source.role!r}) "
+                f"does not match the candidate-declared source_type "
+                f"{source.get('source_type')!r}"
+            )
+
+        resolved_by_source[entry_id] = first_resolved
+
+    return resolved_by_source
+
+
+def _gate4_exact_span_resolution(
+    candidate: AtlasCandidateImport,
+    context: PromotionContext,
+    resolved_by_source: Dict[str, ResolvedCitation],
+) -> None:
+    for claim in candidate.proposed_claims:
+        source_ref = claim.get("source_ref_proposed")
+        span_proposed = claim.get("span_proposed")
+        if (
+            not isinstance(span_proposed, dict)
+            or not span_proposed.get("locator")
+            or not span_proposed.get("exact_quote")
+        ):
+            raise AtlasSchemaError(
+                f"proposed claim referencing {source_ref!r} lacks a complete span_proposed "
+                "(both a nonblank locator AND a nonblank exact_quote are required)"
+            )
+
+        resolved = resolved_by_source.get(source_ref)
+        if resolved is None:
+            raise AtlasProvenanceError(
+                f"proposed claim references source_ref_proposed {source_ref!r} which was "
+                "not resolved by Gate 3 (defense-in-depth; Gate 2 guarantees a resolved leaf)"
+            )
+
+        span = Span(
+            locator=span_proposed.get("locator"),
+            exact_quote=span_proposed.get("exact_quote"),
+            page_or_figure=span_proposed.get("page_or_figure"),
+        )
+        try:
+            context.citation_resolver.verify_span(resolved, span)
+        except AtlasCatalogError as exc:
+            raise AtlasProvenanceError(
+                f"exact span verification failed for proposed claim referencing "
+                f"{source_ref!r}"
+            ) from exc
 
 
 def _gate5_context_ontology_pack_validation(candidate: AtlasCandidateImport, context: PromotionContext) -> None:
@@ -194,12 +363,14 @@ def _gate8_named_human_oracle_span_review(candidate: AtlasCandidateImport, conte
 
 def validate_candidate_import(candidate: AtlasCandidateImport, context: PromotionContext) -> None:
     """Run all eight promotion gates, in exact order, short-circuiting on
-    the first failure."""
+    the first failure. Gate 3's resolved-source map is a LOCAL variable
+    threaded explicitly to Gate 4 -- no module global, no hidden cache, no
+    cross-candidate leakage."""
 
     _gate1_canonical_spdi_readmission(candidate, context)
     _gate2_source_type_role_validation(candidate, context)
-    _gate3_citation_resolution(candidate, context)
-    _gate4_exact_span_resolution(candidate, context)
+    resolved_by_source = _gate3_citation_resolution(candidate, context)
+    _gate4_exact_span_resolution(candidate, context, resolved_by_source)
     _gate5_context_ontology_pack_validation(candidate, context)
     _gate6_duplicate_conflict_rules(candidate, context)
     _gate7_no_classification_leakage(candidate, context)

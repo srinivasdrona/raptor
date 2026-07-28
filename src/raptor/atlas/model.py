@@ -20,7 +20,7 @@ core model.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Mapping, Optional
+from typing import Any, Callable, Mapping, Optional, Protocol, Tuple, runtime_checkable
 
 
 # ---------------------------------------------------------------------------
@@ -58,6 +58,50 @@ class AtlasExportError(AtlasError):
 
 class AtlasPackError(AtlasError):
     """A disease pack manifest failed structural validation or hash checks."""
+
+
+class AtlasCatalogError(AtlasError):
+    """Base for the offline citation-catalog/resolver subsystem (sibling of
+    :class:`AtlasPackError`). Raised ONLY by ``raptor.atlas.citation``
+    catalog/resolver operations (``load_catalog``, ``catalog_content_hash``,
+    ``normalize_identifier``, ``resolve``, ``verify_content``,
+    ``verify_span``); it is not a blanket type for every Atlas failure."""
+
+
+class AtlasCatalogSchemaError(AtlasCatalogError):
+    """A citation catalog manifest failed structural validation: malformed
+    schema/field/enum, duplicate ``source_id``, duplicate/cross-source
+    identifier alias, or an ineligible role/source_type leaf pairing."""
+
+
+class AtlasCatalogHashError(AtlasCatalogError):
+    """A citation catalog's declared ``catalog_content_hash`` does not match
+    the recomputed digest of its own content (self-hash drift)."""
+
+
+class AtlasCatalogPathError(AtlasCatalogError):
+    """A citation catalog manifest or content-root artifact path failed
+    safety checks: traversal, symlink/junction escape, drive/UNC/absolute
+    path where a relative one is required, or a missing/non-regular file."""
+
+
+class AtlasCitationResolutionError(AtlasCatalogError):
+    """Identifier normalization failed, or resolution failed: unknown
+    scheme, unresolved/ambiguous/cross-alias identifier, or a structurally
+    valid catalog source that is not grounding-eligible (fails the full
+    grounding predicate) or whose declared source_type disagrees."""
+
+
+class AtlasContentDriftError(AtlasCatalogError):
+    """A raw or extracted-text artifact's recomputed sha256/byte-length
+    disagrees with the catalog-declared value, or the extracted-text
+    artifact is not valid UTF-8. Declared hashes are never trusted."""
+
+
+class AtlasSpanMismatchError(AtlasCatalogError):
+    """A claim span failed exact verification: invalid locator grammar or
+    out-of-range offsets, a missing extracted-text artifact, or an
+    ``exact_quote`` that does not equal the normalized text slice exactly."""
 
 
 # ---------------------------------------------------------------------------
@@ -378,6 +422,115 @@ class MechanismProfile:
 
 
 # ---------------------------------------------------------------------------
+# Citation resolver: frozen value/result types, typed errors' companion
+# dataclasses, and the CitationResolver protocol.
+#
+# These are the frozen VALUE/RESULT types shared by the offline citation
+# catalog + resolver (``raptor.atlas.citation``, which owns the loader and
+# verification LOGIC) and by promotion (``raptor.atlas.promote``, which
+# consumes them through ``PromotionContext.citation_resolver``). Neither
+# this module nor any type below imports ``raptor.atlas.citation`` --
+# import direction stays acyclic (citation.py -> model.py).
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, eq=True)
+class CitationIdentifier:
+    """A normalized, canonical citation identifier (PMID/PMCID/DOI/
+    ACCESSION), as returned by ``normalize_identifier``."""
+
+    scheme: str
+    value: str
+    canonical: str
+
+
+@dataclass(frozen=True, eq=True)
+class CatalogSource:
+    """A flattened, frozen projection of one validated catalog source
+    entry. ``identifiers`` is a normalized, order-stable tuple of
+    :class:`CitationIdentifier`. The ``extracted_*``/``extraction_*``/
+    ``text_normalization`` fields default to ``None`` because a
+    provenance/context-only source, or a leaf with no extracted-text
+    artifact, structurally loads without one -- only a span verification
+    requires it (see ``verify_span``)."""
+
+    source_id: str
+    source_type: str
+    role: str
+    identifiers: Tuple["CitationIdentifier", ...]
+    license: Optional[str]
+    permitted_use: str
+    verification: str
+    authoritative_url: Optional[str]
+    document_date: Optional[str]
+    document_version: Optional[str]
+    raw_relative_path: Optional[str]
+    raw_declared_sha256: Optional[str]
+    raw_declared_byte_length: Optional[int]
+    raw_media_type: Optional[str]
+    extracted_relative_path: Optional[str] = None
+    extracted_declared_sha256: Optional[str] = None
+    extracted_declared_byte_length: Optional[int] = None
+    extraction_method: Optional[str] = None
+    extraction_version: Optional[str] = None
+    text_normalization: Optional[str] = None
+
+
+@dataclass(frozen=True, eq=True)
+class ContentVerification:
+    """The RECOMPUTED (from-disk) content verification result. Declared
+    catalog hashes/byte-lengths are never trusted -- only this recomputed
+    result is authoritative."""
+
+    raw_sha256: str
+    raw_byte_length: int
+    extracted_text_sha256: Optional[str]
+    extracted_text_byte_length: Optional[int]
+
+
+@dataclass(frozen=True, eq=True)
+class ResolvedCitation:
+    """The result of a successful, content-verified grounding resolution.
+    Carries no text payload (kept lightweight) -- ``verify_span``
+    re-reads and re-verifies the extracted-text artifact as
+    defense-in-depth."""
+
+    identifier: CitationIdentifier
+    source: CatalogSource
+    content: ContentVerification
+    content_verified: bool
+
+
+@dataclass(frozen=True, eq=True)
+class VerifiedSpan:
+    """The result of a successful exact-span verification. Returned ONLY
+    on success -- any mismatch raises :class:`AtlasSpanMismatchError`."""
+
+    source_id: str
+    locator: str
+    start: int
+    end: int
+    exact_quote: str
+    extracted_text_sha256: str
+
+
+@runtime_checkable
+class CitationResolver(Protocol):
+    """The minimal production interface :class:`PromotionContext` requires.
+    Promotion Gate 3 calls ``resolve``; Gate 4 calls ``verify_span``. A
+    strict test fake need implement exactly these two methods -- this
+    Protocol is ``runtime_checkable`` so ``isinstance(obj, CitationResolver)``
+    performs a structural (duck-typed) check and rejects a bare boolean or
+    callable that lacks both methods."""
+
+    def resolve(self, identifier: "CitationIdentifier | str") -> "ResolvedCitation":
+        ...
+
+    def verify_span(self, resolved: "ResolvedCitation", span: "Span") -> "VerifiedSpan":
+        ...
+
+
+# ---------------------------------------------------------------------------
 # Discovery candidate import / promotion (out-of-process staging)
 # ---------------------------------------------------------------------------
 
@@ -419,7 +572,7 @@ class PromotionContext:
     staged candidate into the frozen core model."""
 
     disease_pack: DiseasePack
-    citation_resolver: Callable[[Mapping[str, Any]], bool]
+    citation_resolver: CitationResolver
     context_validator: Callable[[str, Mapping[str, Any]], bool]
     human_oracle_reviewer: Callable[[Any], bool]
     duplicate_index: Optional[Mapping[str, str]] = None
