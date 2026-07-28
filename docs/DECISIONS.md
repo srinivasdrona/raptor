@@ -103,7 +103,11 @@ verifies, what it deliberately excludes, and how the promotion gates change with
 3. The catalog has a canonical self-excluding content hash
    (`atlas.citation_catalog_content_hash.v1`) mirroring `atlas.pack_content_hash.v1`, is
    deep-frozen after load, and stores only **relative** artifact paths beneath an explicitly
-   supplied external content root. The library never reads the environment; path safety rejects
+   supplied external content root. `load_catalog(path_or_catalog_id, *, content_root)` accepts
+   `str | os.PathLike[str]` for **both** arguments; the id-vs-path choice is stat-independent
+   (a safe bare token is a repo-root catalog id, anything with path syntax or any `os.PathLike`
+   is an explicit path) — this intentionally **diverges** from `pack.py` (str-only) while reusing
+   the same containment principles. The library never reads the environment; path safety rejects
    absolute/drive/`..`/symlink/junction escape via resolved-realpath containment. Catalog-declared
    file hashes are **never trusted**: raw and extracted-text `sha256`/byte-length are always
    recomputed from disk, and drift fails closed.
@@ -115,12 +119,16 @@ verifies, what it deliberately excludes, and how the promotion gates change with
    file hash. Dataset row/key locators are deferred out of v1.
 5. `PromotionContext.citation_resolver` becomes a typed, `runtime_checkable` **`CitationResolver`
    protocol** (`resolve(identifier) -> ResolvedCitation`, `verify_span(resolved, span) ->
-   VerifiedSpan`). Gate 3 rejects a bare boolean/callable, resolves every `direct_evidence_leaf`
-   source into a per-candidate resolved-source map, cross-checks aliases/role/type, and requires
-   **all** identifiers a source supplies to resolve to the same catalog source (no priority
-   ordering); Gate 4 verifies each linked claim's exact span through that map. The eight-gate order
-   and short-circuit are preserved, and the named-human Gate 8 review remains **after** deterministic
-   verification — deterministic verification never replaces the human oracle.
+   VerifiedSpan`). Candidate `bib` fields carry **raw, scheme-less** payloads (`pmid` decimal
+   digits, `pmcid` `PMC`+digits, `doi` bare `10.…`, `accession` `<namespace>:<opaque>`); Gate 3
+   rejects a bare boolean/callable, constructs each prefixed identifier by concatenation (rejecting
+   an already-prefixed/URL/whitespace/percent bib value structurally with `AtlasSchemaError` before
+   the resolver), resolves every `direct_evidence_leaf` source into a per-candidate resolved-source
+   map, cross-checks aliases/role/type, and requires **all** identifiers a source supplies to
+   resolve to the same catalog source (no priority ordering); Gate 4 verifies each linked claim's
+   exact span through that map. The public `normalize_identifier` stays flexible for direct callers.
+   The eight-gate order and short-circuit are preserved, and the named-human Gate 8 review remains
+   **after** deterministic verification — deterministic verification never replaces the human oracle.
 6. Resolver/catalog failures raise distinct typed errors under a new `AtlasCatalogError` family
    (`AtlasCatalogSchemaError`, `AtlasCatalogHashError`, `AtlasCatalogPathError`,
    `AtlasCitationResolutionError`, `AtlasContentDriftError`, `AtlasSpanMismatchError`) so

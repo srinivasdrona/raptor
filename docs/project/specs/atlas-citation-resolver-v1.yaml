@@ -276,12 +276,40 @@ identifier_grammar:
         The resolver enforces only the ACCESSION GRAMMAR, not registry membership; which
         namespaces are permitted is a catalog-content concern, not a resolver rule.
   bib_mapping:
+    bib_field_grammar:
+      note: >-
+        AtlasCandidateImport.proposed_sources[].bib carries RAW, SCHEME-LESS payloads ONLY
+        (no scheme prefix, no URL, no wrapping). Gate 3 constructs the scheme-prefixed
+        string and calls normalize_identifier. A bib value that is ALREADY prefixed/URL/
+        wrapped is a STRUCTURAL defect rejected with AtlasSchemaError BEFORE the resolver
+        (no double-prefixing, no silent normalization).
+      pmid: >-
+        decimal digits only, WITHOUT a "PMID:" prefix (e.g. "12345"); reject anything
+        containing ':' or a "pmid" prefix or whitespace -> AtlasSchemaError.
+      pmcid: >-
+        "PMC" + digits, WITHOUT a "PMCID:" wrapper (e.g. "PMC12345"); reject a leading
+        "PMCID:" or whitespace -> AtlasSchemaError.
+      doi: >-
+        bare DOI payload beginning "10." ONLY (e.g. "10.1234/abc"); reject a "doi:" prefix,
+        any URL (doi.org/dx.doi.org), surrounding or internal whitespace, percent-encoding,
+        and trailing sentence punctuation -> AtlasSchemaError.
+      accession: >-
+        provider-qualified raw payload "<namespace>:<opaque>" WITHOUT a leading
+        "ACCESSION:" (e.g. "geo:GSE12345"); reject a leading "ACCESSION:", a bare
+        unqualified value (no namespace), or whitespace -> AtlasSchemaError.
     from_candidate_bib: >-
-      Gate 3 maps candidate `bib` fields to scheme-prefixed identifier strings: bib.pmid
-      -> "PMID:", bib.pmcid -> "PMCID:", bib.doi -> "DOI:", bib.accession -> "ACCESSION:".
-      bib.accession MUST be namespace-qualified ("<namespace>:<opaque>", optionally with a
-      leading "ACCESSION:"); a bare unqualified accession is rejected as ambiguous. Each
-      mapped string is passed through normalize_identifier.
+      For each present bib field Gate 3 builds the prefixed string by CONCATENATION only:
+      bib.pmid -> "PMID:" + raw, bib.pmcid -> "PMCID:" + raw, bib.doi -> "DOI:" + raw,
+      bib.accession -> "ACCESSION:" + raw. It NEVER strips/rewrites the raw value first; a
+      value that already looks prefixed/URL/wrapped is rejected structurally
+      (AtlasSchemaError) per bib_field_grammar. Each constructed string is then passed to
+      normalize_identifier, and ALL supplied bib aliases are normalized and must resolve
+      to the SAME source_id (see alias_selection_and_cross_alias_check).
+    normalize_identifier_stays_flexible: >-
+      The PUBLIC normalize_identifier remains flexible for DIRECT caller inputs (it still
+      accepts "PMID:"/"doi:"/doi.org URL/"ACCESSION:" prefixed forms). The strict
+      raw-payload rule is a GATE-3 pre-check on candidate bib only, not a change to
+      normalize_identifier.
   ambiguity_and_duplicates:
     catalog_alias_index: >-
       At catalog load, every source identifier is normalized and inserted into a single
@@ -305,35 +333,49 @@ catalog:
   repo_path: configs/atlas/catalogs/<catalog_id>/catalog.yaml
   phase2_template: 'configs/atlas/catalogs/tsc2/catalog.yaml   # committed, metadata-only, sources: []'
   manifest_path_resolution:
-    mirrors: src/raptor/atlas/pack.py _resolve_pack_path (hardened pack loader) exactly.
+    design_note: >-
+      This INTENTIONALLY DIVERGES from pack.py: unlike _resolve_pack_path (which accepts
+      a str only), load_catalog accepts str OR os.PathLike[str] and content_root accepts
+      str OR os.PathLike[str]. It does NOT claim to mirror pack.py exactly; it REUSES the
+      same containment PRINCIPLES (repo-root-anchored id root, stat-independent
+      syntax classification, resolved-realpath containment, non-symlink manifest).
+    signature: 'load_catalog(path_or_catalog_id: str | os.PathLike[str], *, content_root: str | os.PathLike[str]) -> CitationCatalog'
     catalogs_root: >-
       CATALOGS_ROOT = _REPO_ROOT / "configs" / "atlas" / "catalogs", where _REPO_ROOT =
-      Path(__file__).resolve().parents[3] (same anchor pack.py uses for PACKS_ROOT).
+      Path(__file__).resolve().parents[3] (same repo-root anchor pack.py uses for
+      PACKS_ROOT). Bare IDs resolve ONLY under this repo-root catalog root.
     safe_catalog_id_regex: '^[A-Za-z0-9_-]+$'
     disambiguation:
       pathlike_arg: >-
-        If the caller passes an os.PathLike / pathlib.Path, it is ALWAYS treated as an
-        explicit path (never a bare id). Recommended for explicit paths.
+        If the caller passes an os.PathLike[str] (e.g. pathlib.Path), it is ALWAYS an
+        EXPLICIT PATH, never a bare id (regardless of its text). Recommended form for
+        explicit paths.
       string_arg: >-
-        A str is treated as an EXPLICIT PATH iff it "looks like a path": it contains '/'
-        or '\\', OR it equals '.' or '..', OR it ends (case-insensitively) with '.yaml'
-        or '.yml'. Otherwise it is a BARE CATALOG ID.
+        A str is classified by SYNTAX, stat-independently: it is a BARE CATALOG ID iff it
+        matches safe_catalog_id_regex ^[A-Za-z0-9_-]+$ AND contains no path syntax.
+        Otherwise it is an EXPLICIT PATH — specifically when it equals '.' or '..', OR
+        contains any '/' or '\\', OR has a drive/root/UNC prefix, OR ends
+        (case-insensitively) with '.yaml' or '.yml'. (A safe bare token like 'tsc2' is an
+        id; 'catalog.yaml', './x', 'a/b', 'C:\\x', '\\\\host\\share' are explicit paths.)
       no_existence_branch: >-
-        The bare-id-vs-explicit-path choice is made PURELY from the argument syntax and
-        type, NEVER from whether a path exists on disk (mirrors pack.py, which
-        deliberately does not stat to choose the branch).
+        The id-vs-path choice is made PURELY from argument type and string syntax, NEVER
+        from whether a path exists on disk (same stat-independent principle as pack.py; it
+        is NOT a claim of identical code).
     bare_id_rules:
-      - Must match safe_catalog_id_regex ^[A-Za-z0-9_-]+$ .
+      - Must match safe_catalog_id_regex ^[A-Za-z0-9_-]+$ (which already excludes '.', '..', separators, ':', whitespace).
       - >-
         Reject empty, '.', '..', any string containing a path separator ('/' or '\\'),
         a drive/root/UNC prefix, a ':' , or any whitespace -> AtlasCatalogPathError.
-      - Resolves to CATALOGS_ROOT / <catalog_id> / "catalog.yaml".
+      - Resolves to CATALOGS_ROOT / <catalog_id> / "catalog.yaml" (repo-root catalog root only).
     explicit_path_rules:
-      - A relative explicit path resolves against the caller's process CWD (mirrors pack.py Path(text)).
       - >-
-        The resolved catalog MANIFEST need NOT live under content_root, but MUST be a
-        regular, NON-SYMLINK file (resolve(strict=True) + lstat check that the final
-        component is not a symlink/junction) -> else AtlasCatalogPathError.
+        A relative explicit path (str or PathLike) resolves against the caller's process
+        CWD (Path(arg) then resolve(strict=True)); an absolute explicit path is used as
+        given. The manifest may live anywhere (need NOT be under content_root).
+      - >-
+        The resolved catalog MANIFEST MUST be a regular, NON-SYMLINK file
+        (resolve(strict=True) + lstat check that the final component is not a
+        symlink/junction) -> else AtlasCatalogPathError.
     manifest_vs_content: >-
       Only the CATALOG MANIFEST may sit outside content_root (regular non-symlink file);
       every CONTENT ARTIFACT (raw_artifact / extracted_text) MUST resolve strictly under
@@ -714,7 +756,7 @@ module_api:
         alias_index: 'Mapping  # canonical-identifier -> source_id (MappingProxyType)'
         content_root: 'Path  # resolved absolute allowed root (runtime, NOT hashed)'
     functions:
-      - 'load_catalog(path_or_catalog_id: str, *, content_root: str | Path) -> CitationCatalog'
+      - 'load_catalog(path_or_catalog_id: str | os.PathLike[str], *, content_root: str | os.PathLike[str]) -> CitationCatalog'
       - 'catalog_content_hash(manifest: Mapping[str, Any]) -> str'
       - 'normalize_identifier(raw: str) -> CitationIdentifier'
     class_LocalCitationResolver:
@@ -859,16 +901,21 @@ promotion_integration:
         citation resolver"). This REJECTS truthy-boolean resolvers in production. This is
         a GATE-level structural check (not a resolver error).
       - >-
-        For each proposed source with role == 'direct_evidence_leaf': build the set of
-        scheme-prefixed identifier strings from its bib (pmid->'PMID:', pmcid->'PMCID:',
-        doi->'DOI:', accession->'ACCESSION:'). A leaf whose bib carries zero supported
-        identifiers is a structural defect -> AtlasSchemaError. A bib.accession that is
-        not namespace-qualified ("<namespace>:<opaque>") is malformed and surfaces as a
-        translated AtlasProvenanceError (resolver AtlasCitationResolutionError).
+        For each proposed source with role == 'direct_evidence_leaf': read its RAW,
+        SCHEME-LESS bib payloads (bib.pmid decimal digits, bib.pmcid "PMC"+digits, bib.doi
+        bare "10." payload, bib.accession "<namespace>:<opaque>"). BEFORE the resolver,
+        structurally validate each present value per bib_mapping.bib_field_grammar; a value
+        that is already prefixed ("PMID:"/"PMCID:"/"doi:"/"ACCESSION:"), a URL
+        (doi.org/dx.doi.org), whitespace-bearing, percent-encoded, or (for accession)
+        unqualified -> AtlasSchemaError (structural; NOT a resolver error, no double-prefix,
+        no silent normalization). A leaf whose bib carries zero supported identifiers is
+        also a structural defect -> AtlasSchemaError.
       - >-
-        Resolve EACH identifier via context.citation_resolver.resolve(...); require all
-        resolved ResolvedCitation.source.source_id equal (cross-alias agreement) — any
-        unresolved/disagreeing identifier fails.
+        Construct the prefixed identifier string by CONCATENATION only (bib.pmid ->
+        "PMID:"+raw, bib.pmcid -> "PMCID:"+raw, bib.doi -> "DOI:"+raw, bib.accession ->
+        "ACCESSION:"+raw) and resolve EACH via context.citation_resolver.resolve(...);
+        require all resolved ResolvedCitation.source.source_id equal (cross-alias
+        agreement) — any unresolved/disagreeing identifier fails.
       - >-
         Cross-check the resolved catalog source_type equals the candidate declared
         source_type and resolved role == 'direct_evidence_leaf'.
@@ -1099,7 +1146,10 @@ workflow:
             separator/traversal/whitespace) -> AtlasCatalogPathError; an EXPLICIT path
             whose manifest is a symlink/junction -> AtlasCatalogPathError (skip only if
             the OS/user cannot create a symlink); a str with '/'/'\\'/'.yaml' is treated
-            as an explicit path, a bare token as an id, chosen WITHOUT stat.
+            as an explicit path, a bare token as an id, chosen WITHOUT stat; a
+            pathlib.Path / os.PathLike arg (e.g. Path('tsc2') or a Path to a manifest) is
+            ALWAYS an explicit path even when its text is a safe token; content_root
+            accepts str AND os.PathLike.
           - >-
             content drift (ADVERSARIAL): after load, mutate the raw or extracted-text
             file on disk so its sha256/byte_length differ from declared -> resolve/
@@ -1156,6 +1206,25 @@ workflow:
             Gate 3 builds a per-leaf resolved map used by Gate 4 (no re-resolution):
             assert resolve called once per leaf source; verify_span called once per
             claim.
+          - >-
+            bib raw payloads (gap-2/blocker-2, SUCCESS): a leaf whose bib carries RAW
+            scheme-less payloads (pmid='12345', pmcid='PMC12345', doi='10.5555/abc',
+            accession='geo:GSE12345') promotes; assert Gate 3 calls resolve with the
+            CONSTRUCTED prefixed strings ('PMID:12345','PMCID:PMC12345','DOI:10.5555/abc',
+            'ACCESSION:geo:GSE12345') via a spy fake, i.e. concatenation only (no
+            double-prefix, no rewrite).
+          - >-
+            bib already-prefixed/URL (gap-2/blocker-2, REJECT): a leaf whose bib.doi is
+            'doi:10.5555/abc' or 'https://doi.org/10.5555/abc', or bib.pmid is 'PMID:12345',
+            or bib.pmcid is 'PMCID:PMC1', or bib.accession is 'ACCESSION:geo:x' or bare
+            unqualified 'GSE1', or any bib value bearing whitespace/percent-encoding/
+            trailing punctuation -> AtlasSchemaError raised STRUCTURALLY (before the
+            resolver is called; assert the fake resolver.resolve was NOT invoked).
+          - >-
+            all supplied bib aliases resolve to same source (blocker-2): a leaf with both
+            pmcid + doi raw payloads resolves each and requires the same source_id; a
+            synthetic fake mapping them to different source_ids -> translated
+            AtlasProvenanceError.
           - >-
             successful synthetic promotion returns an accepted tuple when the fake
             resolver resolves + verifies the synthetic source/span; candidate is never
@@ -1240,11 +1309,14 @@ workflow:
         Path safety: are traversal/absolute/drive/symlink-junction-escape/missing/mutated
         files all rejected via resolved-realpath containment (strict=True)? (must hold)
       - >-
-        Manifest path/id resolution (gap-3): is the bare-id vs explicit-path choice made
-        from arg type/syntax WITHOUT stat (mirrors pack.py)? Bare id ->
-        CATALOGS_ROOT/<id>/catalog.yaml with ^[A-Za-z0-9_-]+$; bare id with
-        separator/drive/traversal/whitespace rejected; explicit manifest must be a
-        regular NON-SYMLINK file; content artifacts strictly under content_root? (must hold)
+        Manifest path/id resolution (gap-3): does load_catalog accept str | os.PathLike[str]
+        for BOTH path_or_catalog_id and content_root? Is the id-vs-path choice made from arg
+        TYPE + string syntax WITHOUT stat (equivalent principle to pack.py, NOT identical
+        code)? PathLike is always explicit; a safe bare token ^[A-Za-z0-9_-]+$ with no path
+        syntax -> CATALOGS_ROOT/<id>/catalog.yaml; '.', '..', separator, drive/root/UNC, or
+        .yaml/.yml suffix -> explicit path; bare id with separator/drive/traversal/whitespace
+        rejected; explicit manifest must be a regular NON-SYMLINK file; content artifacts
+        strictly under content_root? (must hold)
       - >-
         Catalog self-hash: is only the top-level catalog_content_hash excluded, algorithm
         identical to atlas.pack_content_hash.v1, and immutability via deep-freeze? (must
@@ -1255,6 +1327,14 @@ workflow:
         doi:/doi.org/dx.doi.org forms accepted; ACCESSION namespace-lowercased + opaque
         case-preserved + prefix-required; duplicate/cross-source alias rejected at load;
         ALL supplied aliases must agree at resolve (no priority)? (must hold)
+      - >-
+        Candidate bib raw payloads (blocker-2): does AtlasCandidateImport bib carry RAW
+        scheme-less payloads (pmid digits, pmcid PMC+digits, doi bare '10.' only, accession
+        '<ns>:<opaque>')? Does Gate 3 CONSTRUCT the prefixed string by concatenation then
+        call normalize_identifier, rejecting an already-prefixed/URL/whitespace/percent/
+        trailing-punct bib value STRUCTURALLY with AtlasSchemaError BEFORE the resolver (no
+        double-prefix, no silent normalize)? Does public normalize_identifier stay flexible
+        for direct callers? Do all supplied bib aliases resolve to the same source? (must hold)
       - >-
         Grounding eligibility (gap-2): does resolve enforce the FULL predicate (role ==
         direct_evidence_leaf, source_type in {PRIMARY-LIT,DATASET}, permitted_use ==

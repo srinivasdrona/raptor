@@ -119,20 +119,29 @@ referenced only by relative path.
 
 **Usage (planned).**
 
-1. `raptor.atlas.citation.load_catalog(path_or_catalog_id, content_root=...)`
-   validates structure, recomputes/verifies `atlas.citation_catalog_content_hash.v1`
-   fail-closed, and deep-freezes the catalog.
+1. `raptor.atlas.citation.load_catalog(path_or_catalog_id, *, content_root)` — both
+   arguments accept `str | os.PathLike[str]`. A `str` `path_or_catalog_id` is
+   classified stat-independently: a safe bare token (`^[A-Za-z0-9_-]+$`, no path
+   syntax) is a catalog **id** resolved under the repo-root catalog root
+   (`configs/atlas/catalogs/<id>/catalog.yaml`); anything with a separator, drive/UNC
+   prefix, `.`/`..`, or a `.yaml`/`.yml` suffix is an **explicit path**, as is any
+   `os.PathLike`. It validates structure, recomputes/verifies
+   `atlas.citation_catalog_content_hash.v1` fail-closed, and deep-freezes the catalog.
 2. `raptor.atlas.citation.normalize_identifier(raw)` canonicalizes an identifier
-   (`PMID:...`, `PMCID:PMC...`, `DOI:...`, `ACCESSION:<namespace>:<opaque>`).
+   (`PMID:...`, `PMCID:PMC...`, `DOI:...`, `ACCESSION:<namespace>:<opaque>`). It stays
+   flexible for direct callers (accepts prefixed/`doi:`/`doi.org` URL forms).
 3. `resolver = LocalCitationResolver(catalog)`; `resolver.resolve(identifier)`
    returns a content-verified `ResolvedCitation` (raw + extracted-text
    `sha256`/byte-length recomputed from disk); `resolver.verify_span(resolved,
    span)` verifies an `exact_quote` at a `text-char:<start>:<end>` locator.
 4. In promotion, inject the resolver as `PromotionContext.citation_resolver` (now
-   a typed `CitationResolver` protocol). Gate 3 resolves every
-   `direct_evidence_leaf` source; Gate 4 verifies each linked claim's exact span.
-   The eight-gate order is unchanged and the named-human Gate 8 review still runs
-   **after** deterministic verification.
+   a typed `CitationResolver` protocol). Candidate `bib` fields carry **raw,
+   scheme-less** payloads (`pmid` digits, `pmcid` `PMC…`, `doi` bare `10.…`,
+   `accession` `<namespace>:<opaque>`); Gate 3 constructs the prefixed identifier by
+   concatenation and rejects an already-prefixed/URL/whitespace bib value structurally
+   (`AtlasSchemaError`) before resolving every `direct_evidence_leaf` source; Gate 4
+   verifies each linked claim's exact span. The eight-gate order is unchanged and the
+   named-human Gate 8 review still runs **after** deterministic verification.
 
 **Hard limits.**
 

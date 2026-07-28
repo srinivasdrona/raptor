@@ -621,7 +621,9 @@ todos:
     provider-qualified <namespace>:<opaque>, namespace lowercased, opaque case-preserved); load and
     self-hash-verify (atlas.citation_catalog_content_hash.v1, mirroring
     atlas.pack_content_hash.v1) a versioned local catalog at configs/atlas/catalogs/<catalog_id>/catalog.yaml
-    (committed tsc2 template metadata-only, sources: []); resolve identifiers for grounding only when
+    (committed tsc2 template metadata-only, sources: []; load_catalog accepts str|os.PathLike for
+    path_or_catalog_id and content_root, classifying a str stat-independently as a repo-root catalog id
+    or an explicit path, os.PathLike always explicit); resolve identifiers for grounding only when
     role==direct_evidence_leaf AND source_type in {PRIMARY-LIT,DATASET} AND permitted_use==grounding_and_quote
     AND verification==verified AND >=1 identifier AND verified raw content (load is structural-only; a
     non-grounding row loads for context but fails resolve-for-grounding); recompute raw and extracted-text sha256/byte-length from disk under an
@@ -630,8 +632,12 @@ todos:
     UTF-8 text normalized by atlas.text_norm.v1 (CRLF/CR to LF, NFC, no case-fold, no whitespace collapse),
     with no fuzzy matching. Add frozen types CitationIdentifier/CatalogSource/ContentVerification/
     ResolvedCitation/VerifiedSpan and a runtime_checkable CitationResolver protocol (resolve, verify_span)
-    in model.py; retype PromotionContext.citation_resolver from Callable to that protocol; rewrite Gate 3 to
-    build a per-candidate resolved-source map (rejecting bare-boolean resolvers) and Gate 4 to verify each
+    in model.py; retype PromotionContext.citation_resolver from Callable to that protocol; candidate bib
+    carries raw scheme-less payloads (pmid digits, pmcid PMC+digits, doi bare 10. payload, accession
+    <namespace>:<opaque>); rewrite Gate 3 to construct prefixed identifiers by concatenation (rejecting an
+    already-prefixed/URL/whitespace bib value structurally with AtlasSchemaError before the resolver, and
+    rejecting bare-boolean resolvers) into a per-candidate resolved-source map with all supplied bib aliases
+    resolving to the same source, and Gate 4 to verify each
     linked claim exact span, preserving the eight-gate order/short-circuit and the named-human Gate 8 after
     deterministic verification; add a static assert_no_network_imports guard. Typed errors under a new
     AtlasCatalogError family distinguish catalog schema/hash/path, identifier resolution, content drift and
