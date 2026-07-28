@@ -11,6 +11,7 @@ input candidate.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any, Dict
 
 from raptor.atlas.guards import scan_for_classification_leakage
@@ -64,6 +65,35 @@ _DOI_RAW_VALUE_RE = re.compile(r"^10\.[0-9]{4,9}/[^\s%]+$")
 _ACCESSION_NAMESPACE_RAW_RE = re.compile(r"^[a-z0-9]+([._-][a-z0-9]+)*$")
 _ACCESSION_OPAQUE_RAW_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _DOI_TRAILING_PUNCTUATION = (".", ",", ";", ":", ")", "\u2014")
+
+# Grounding-predicate constants (grounding_eligibility in the spec). These
+# MIRROR (never import) citation.py's own values -- promote.py depends only
+# on model.py and the injected resolver (import_independence) -- so Gate 3
+# can independently re-derive the FULL grounding predicate from a resolved
+# CatalogSource/ContentVerification rather than trusting the resolver's own
+# content_verified=True signal.
+_GROUNDING_PERMITTED_USE = "grounding_and_quote"
+_GROUNDING_VERIFICATION = "verified"
+
+
+def _is_safe_relative_path(value: Any) -> bool:
+    """Structural (no filesystem I/O) plausibility check mirroring
+    citation.py's ``_resolve_content_artifact`` path-safety rules:
+    promote.py has no ``content_root`` and never touches the filesystem
+    itself, but a resolver-declared ``raw_relative_path`` must at least be
+    a nonblank, non-drive-qualified, non-absolute, traversal-free relative
+    path string before its declared content pin is trusted as complete."""
+
+    if not isinstance(value, str) or not value:
+        return False
+    if value.startswith("/") or value.startswith("\\"):
+        return False
+    candidate = Path(value)
+    if candidate.drive or candidate.is_absolute():
+        return False
+    if ".." in candidate.parts:
+        return False
+    return True
 
 
 def _bib_declares_any_identifier(bib: Any) -> bool:
@@ -234,7 +264,26 @@ def _validate_resolved_citation_shape(
     never produces an empty identifiers tuple for a grounding-eligible
     ``direct_evidence_leaf`` source (enforced at ``load_catalog`` time),
     so a resolver that omits them entirely is treated exactly like one
-    that fails to corroborate the requested identifier."""
+    that fails to corroborate the requested identifier.
+
+    Finally, independently re-derives the FULL spec ``grounding_predicate``
+    from the resolved ``CatalogSource``/``ContentVerification`` -- never
+    trusting the resolver's bare ``content_verified=True`` claim alone --
+    exactly mirroring (never importing) ``LocalCitationResolver.resolve()``'s
+    own predicate: ``permitted_use == 'grounding_and_quote'``,
+    ``verification == 'verified'``, a complete/valid ``raw_artifact`` pin
+    (nonblank safe relative path, nonblank declared sha256, a POSITIVE
+    -- not merely non-negative -- int byte_length that is not a ``bool``,
+    and a nonblank media_type string), and a ``ContentVerification`` whose
+    own ``raw_sha256``/``raw_byte_length`` match the source's DECLARED raw
+    pin exactly, and whose ``extracted_text_sha256``/
+    ``extracted_text_byte_length`` match the source's declared extracted
+    pin exactly whenever the source declares one (extracted-text pins
+    remain OPTIONAL at resolve/grounding time per spec -- required only to
+    additionally satisfy a claim SPAN, verified later at Gate 4's
+    ``verify_span``, not here). Any missing/malformed/inconsistent field
+    fails closed with :class:`AtlasProvenanceError`, never a raw
+    ``TypeError``/``AttributeError``."""
 
     if not isinstance(resolved, ResolvedCitation):
         raise AtlasProvenanceError(
@@ -292,6 +341,95 @@ def _validate_resolved_citation_shape(
             f"source {entry_id!r} to a source that does not itself declare that "
             f"identifier among its own identifiers {tuple(source_canonicals)!r}"
         )
+
+    # --- Independent grounding-predicate re-derivation ------------------
+    # Never trust the resolver's bare content_verified=True claim: re-check
+    # every clause of the spec's grounding_predicate directly against the
+    # resolved CatalogSource/ContentVerification fields themselves, exactly
+    # as LocalCitationResolver.resolve() itself would (mirrored, never
+    # imported), so a spoofing/buggy resolver cannot claim success for a
+    # source that is not actually grounding-admissible.
+    source = resolved.source
+    if source.permitted_use != _GROUNDING_PERMITTED_USE:
+        raise AtlasProvenanceError(
+            f"citation resolver returned a source with permitted_use "
+            f"{source.permitted_use!r} for proposed source {entry_id!r} identifier "
+            f"{canonical_string!r}; grounding requires {_GROUNDING_PERMITTED_USE!r}"
+        )
+    if source.verification != _GROUNDING_VERIFICATION:
+        raise AtlasProvenanceError(
+            f"citation resolver returned a source with verification "
+            f"{source.verification!r} for proposed source {entry_id!r} identifier "
+            f"{canonical_string!r}; grounding requires {_GROUNDING_VERIFICATION!r}"
+        )
+    if not _is_safe_relative_path(source.raw_relative_path):
+        raise AtlasProvenanceError(
+            f"citation resolver returned a source with an invalid or unsafe "
+            f"raw_relative_path {source.raw_relative_path!r} for proposed source "
+            f"{entry_id!r} identifier {canonical_string!r}"
+        )
+    if (
+        not isinstance(source.raw_declared_sha256, str)
+        or not source.raw_declared_sha256
+    ):
+        raise AtlasProvenanceError(
+            f"citation resolver returned a source with an invalid or missing "
+            f"raw_declared_sha256 {source.raw_declared_sha256!r} for proposed source "
+            f"{entry_id!r} identifier {canonical_string!r}"
+        )
+    if (
+        not isinstance(source.raw_declared_byte_length, int)
+        or isinstance(source.raw_declared_byte_length, bool)
+        or source.raw_declared_byte_length <= 0
+    ):
+        raise AtlasProvenanceError(
+            f"citation resolver returned a source with an invalid "
+            f"raw_declared_byte_length {source.raw_declared_byte_length!r} for proposed "
+            f"source {entry_id!r} identifier {canonical_string!r}; a grounding-eligible "
+            "raw artifact must declare a positive byte length"
+        )
+    if not isinstance(source.raw_media_type, str) or not source.raw_media_type:
+        raise AtlasProvenanceError(
+            f"citation resolver returned a source with an invalid raw_media_type "
+            f"{source.raw_media_type!r} for proposed source {entry_id!r} identifier "
+            f"{canonical_string!r}"
+        )
+
+    content = resolved.content
+    if (
+        not isinstance(content.raw_sha256, str)
+        or content.raw_sha256 != source.raw_declared_sha256
+        or not isinstance(content.raw_byte_length, int)
+        or isinstance(content.raw_byte_length, bool)
+        or content.raw_byte_length != source.raw_declared_byte_length
+    ):
+        raise AtlasProvenanceError(
+            f"citation resolver's ContentVerification does not corroborate the declared "
+            f"raw content pin for proposed source {entry_id!r} identifier "
+            f"{canonical_string!r}"
+        )
+    # extracted-text pins remain OPTIONAL at resolve()/grounding time (only
+    # required to additionally satisfy a claim SPAN at Gate 4's
+    # verify_span), but whenever the source itself DECLARES an extracted
+    # pin, the resolver's own ContentVerification must agree with it
+    # exactly -- a resolver may not silently drift the two apart.
+    if source.extracted_declared_sha256 is not None and (
+        content.extracted_text_sha256 != source.extracted_declared_sha256
+    ):
+        raise AtlasProvenanceError(
+            f"citation resolver's ContentVerification does not corroborate the declared "
+            f"extracted_text sha256 pin for proposed source {entry_id!r} identifier "
+            f"{canonical_string!r}"
+        )
+    if source.extracted_declared_byte_length is not None and (
+        content.extracted_text_byte_length != source.extracted_declared_byte_length
+    ):
+        raise AtlasProvenanceError(
+            f"citation resolver's ContentVerification does not corroborate the declared "
+            f"extracted_text byte_length pin for proposed source {entry_id!r} identifier "
+            f"{canonical_string!r}"
+        )
+
     return resolved
 
 
