@@ -614,10 +614,33 @@ todos:
   created: '2026-07-21'
 - id: atlas-phase2-citation-resolver
   title: Building the minimal Atlas primary-source resolver
-  description: 'Track: MECHANISM-ATLAS / PHASE-2. Resolve PMID, PMCID and DOI identifiers
-    to locally held public/licensed primary publications or direct datasets; verify document
-    identity, licence, exact quote and locator; fail closed on unresolved sources. Internal
-    handoffs and derived summaries may seed queries but cannot ground claims.'
+  description: 'Track: MECHANISM-ATLAS / PHASE-2. Per docs/project/specs/atlas-citation-resolver-v1.yaml
+    and ADR-0016, build a deterministic, offline, fail-closed citation resolver
+    (src/raptor/atlas/citation.py) enforcing ADR-0015 grounding. Scope: canonicalize PMID/PMCID/DOI
+    identifiers; load and self-hash-verify (atlas.citation_catalog_content_hash.v1, mirroring
+    atlas.pack_content_hash.v1) a versioned local catalog at configs/atlas/catalogs/<catalog_id>/catalog.yaml
+    (committed tsc2 template metadata-only, sources: []); resolve identifiers only to PRIMARY-LIT/DATASET
+    direct_evidence_leaf sources; recompute raw and extracted-text sha256/byte-length from disk under an
+    explicit external content root (reject absolute/drive/.. paths and symlink/junction escape; never trust
+    catalog-declared hashes); verify an exact_quote at a text-char:<start>:<end> locator against extracted
+    UTF-8 text normalized by atlas.text_norm.v1 (CRLF/CR to LF, NFC, no case-fold, no whitespace collapse),
+    with no fuzzy matching. Add frozen types CitationIdentifier/CatalogSource/ContentVerification/
+    ResolvedCitation/VerifiedSpan and a runtime_checkable CitationResolver protocol (resolve, verify_span)
+    in model.py; retype PromotionContext.citation_resolver from Callable to that protocol; rewrite Gate 3 to
+    build a per-candidate resolved-source map (rejecting bare-boolean resolvers) and Gate 4 to verify each
+    linked claim exact span, preserving the eight-gate order/short-circuit and the named-human Gate 8 after
+    deterministic verification; add a static assert_no_network_imports guard. Typed errors under a new
+    AtlasCatalogError family distinguish catalog schema/hash/path, identifier resolution, content drift and
+    span mismatch. Out of scope: any network fetch, a source-acquisition/refresh adapter, PDF/HTML/XML
+    parsing, fuzzy matching, dataset row/key locators, a source-registry platform, Discovery comparison.
+    Internal handoffs and derived summaries may seed queries but never ground claims and are never a catalog
+    grounding leaf. Acceptance: RED tests authored by Gemini (new tests/atlas/test_citation_resolver.py plus
+    repaired tests/atlas/test_discovery_candidate_import.py and tests/atlas/test_hashing_import_guards.py)
+    covering catalog load/hash, normalize, resolve, content drift, exact span and adversarial
+    traversal/symlink/duplicate-alias/hash-drift/CRLF/Unicode/duplicate-quote/offset/span-mismatch/source-role/
+    promotion-gate-order cases; Sonnet implements only the authorized files; fixtures fully synthetic (no real
+    PMID/PMCID/DOI, no real quote, no R611Q content); Phase-1 hashing/profile/identity/pack/export behavior and
+    the full tests/atlas suite stay green; GPT-5.4 checker CLEAN. Does not block Aug-2 application packaging.'
   status: pending
   depends_on:
   - build-mechanism-atlas-starter

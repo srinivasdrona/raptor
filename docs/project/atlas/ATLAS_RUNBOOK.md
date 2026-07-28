@@ -94,3 +94,63 @@ Before any real-world claim or span may be admitted:
 Until all of the above are satisfied, this repository's Mechanism Atlas
 remains Phase 1: synthetic-only, disease-pack-scoped, and non-authoritative
 for any clinical, classification, or treatment purpose.
+
+## Phase 2 citation resolver (usage & limits)
+
+> Governed by ADR-0016 and `docs/project/specs/atlas-citation-resolver-v1.yaml`.
+> The resolver is the deterministic enforcement of ADR-0015: it is how a real
+> claim gets grounded to a primary source and an exact span. It is planned, not
+> yet implemented; this section states its intended usage and hard limits.
+
+**Posture.** The resolver (`src/raptor/atlas/citation.py`) is **offline,
+deterministic, and fail-closed**. It performs **no network access of any kind**
+(a static AST guard, `assert_no_network_imports`, forbids network imports across
+the Atlas package). Source acquisition and text extraction are a **separate
+future adapter** and are out of scope; the resolver only verifies content that is
+already staged locally.
+
+**What it resolves.** Normalized `PMID` / `PMCID` / `DOI` identifiers against a
+versioned, hash-bound **local catalog**
+(`configs/atlas/catalogs/<catalog_id>/catalog.yaml`, schema
+`atlas.citation_catalog.v1`). The committed `tsc2` catalog template is
+metadata-only (`sources: []`); real source artifacts and extracted-text files are
+**never committed** and live under an explicitly supplied external content root,
+referenced only by relative path.
+
+**Usage (planned).**
+
+1. `raptor.atlas.citation.load_catalog(path_or_catalog_id, content_root=...)`
+   validates structure, recomputes/verifies `atlas.citation_catalog_content_hash.v1`
+   fail-closed, and deep-freezes the catalog.
+2. `raptor.atlas.citation.normalize_identifier(raw)` canonicalizes an identifier
+   (`PMID:...`, `PMCID:PMC...`, `DOI:...`).
+3. `resolver = LocalCitationResolver(catalog)`; `resolver.resolve(identifier)`
+   returns a content-verified `ResolvedCitation` (raw + extracted-text
+   `sha256`/byte-length recomputed from disk); `resolver.verify_span(resolved,
+   span)` verifies an `exact_quote` at a `text-char:<start>:<end>` locator.
+4. In promotion, inject the resolver as `PromotionContext.citation_resolver` (now
+   a typed `CitationResolver` protocol). Gate 3 resolves every
+   `direct_evidence_leaf` source; Gate 4 verifies each linked claim's exact span.
+   The eight-gate order is unchanged and the named-human Gate 8 review still runs
+   **after** deterministic verification.
+
+**Hard limits.**
+
+* Only `PRIMARY-LIT` / `DATASET` sources with `role == direct_evidence_leaf` can
+  ground a claim. Reviews, ClinVar, crosswalks, context/provenance-only sources
+  and internal handoffs can never be a grounding leaf.
+* Catalog-declared hashes are **never trusted**; raw and extracted-text hashes are
+  recomputed from disk and drift fails closed. Path traversal, absolute/drive
+  paths, and symlink/junction escape of the content root are rejected.
+* Span matching is **exact** against text normalized by `atlas.text_norm.v1`
+  (CRLF/CR→LF, Unicode NFC, no case-fold, no whitespace collapse), using character
+  offsets. **No fuzzy matching**; missing, duplicate, mismatched or out-of-range
+  spans fail. The resolver does **not** parse PDF/HTML/XML — it verifies a
+  separately generated extracted-text artifact plus the raw file hash.
+* The resolver guarantees source **fidelity and identity**, not scientific
+  **sufficiency**; whether a verified quote actually supports the claim remains the
+  named human oracle's decision at Gate 8.
+
+Real R611Q source acquisition, extraction, and a real catalog follow **after** the
+resolver is checker-clean, under a separate external, uncommitted content root with
+only public/appropriately-licensed, non-patient, non-paywalled content.

@@ -13,6 +13,7 @@
 
 | ID | Title | Status | Date |
 |----|-------|--------|------|
+| [ADR-0016](#adr-0016--deterministic-offline-citation-resolver-and-phase-2-promotion-span-verification) | Deterministic offline citation resolver and Phase 2 promotion span verification | Accepted | 2026-07-27 |
 | [ADR-0015](#adr-0015--atlas-internal-summaries-are-context-only-and-r611q-is-the-first-phase-2-anchor) | Atlas internal summaries are context-only and R611Q is the first Phase 2 anchor | Accepted | 2026-07-27 |
 | [ADR-0014](#adr-0014--generic-mechanism-atlas-core-with-a-versioned-disease-pack-boundary) | Generic Mechanism Atlas core with a versioned disease-pack boundary | Accepted | 2026-07-22 |
 | [ADR-0013](#adr-0013--tiered-gate-v3-post-hoc-re-adjudication-and-prospective-validation-lock) | Tiered gate v3: post-hoc re-adjudication and prospective validation lock | Accepted | 2026-07-22 |
@@ -37,6 +38,7 @@
 
 | ADR | Current risk linkage | Basis in current repo |
 |---|---|---|
+| **ADR-0016** | R-A2, R-A6, H1 | Deterministic offline resolver enforces ADR-0015 grounding: primary-source/dataset direct-leaf resolution + exact normalized-slice span verification with from-disk hash recompute, closing presence-only Gate 4 and truthy-boolean Gate 3 laundering while keeping acquisition out of scope (no network). |
 | **ADR-0015** | R-A2, R-A6, H1 | Internal summaries may guide searches but cannot ground claims; primary-source exact-span admission prevents circular citation laundering while preserving unknown/conflicting/empty outcomes. |
 | **ADR-0014** | R-A2, R-A12 | Generic-core / versioned-disease-pack boundary keeps mechanism evidence classification-free (R-A2 circularity) and preserves ADR-0010's vertical TSC/mTOR scope discipline (R-A12) while enabling internal cross-condition amortization; no second-disease claim until a portability experiment passes. |
 | **ADR-0013** | R-A13, R-A14, R-A15 | Explicit risk rows cite ADR-0013's post-hoc / prospective-lock consequences. |
@@ -52,6 +54,95 @@
 | **ADR-0003** | R-D1 | Explicitly cited in the checker rubber-stamp / skipped-loop risk row. |
 | **ADR-0002** | — | Document-format ADR only; no direct current risk row cites it. |
 | **ADR-0001** | — *(partially superseded by ADR-0010)* | Historical strategy framing record; current linked risks are carried by ADR-0010 instead. |
+
+---
+
+## ADR-0016 — Deterministic offline citation resolver and Phase 2 promotion span verification
+
+- **Status:** Accepted
+- **Date:** 2026-07-27
+- **Deciders:** @dronasrinivas (operator, acting domain owner)
+- **Track:** `track/atlas-citation-resolver-2026-07`
+- **Supersedes:** none. Additive. Enforces ADR-0015 (internal summaries are context-only;
+  every real claim needs a primary publication or direct dataset with an exact supporting
+  span) and preserves ADR-0014 (generic core / versioned disease-pack boundary) and ADR-0009
+  (no ClinVar/classifier leakage into mechanism evidence). Binds
+  `docs/project/specs/atlas-citation-resolver-v1.yaml` (rev 1).
+
+### Context
+
+ADR-0015 fixed the grounding **policy** but not the **mechanism** that enforces it. As merged,
+the Phase 1 promotion pipeline cannot honour that policy: `PromotionContext.citation_resolver`
+is only a bare `Callable[..., bool]`, Gate 3 accepts any truthy return as "citation resolved",
+and Gate 4 checks only that a span carries a locator — never that the quote actually matches a
+real source. A synthetic true value or a locator string is enough to pass. That is exactly the
+circular, presence-only laundering ADR-0015 forbids.
+
+Phase 2 needs deterministic local resolution and real span verification **without** introducing
+network acquisition, a source-refresh registry, or a full PubMed/PMC/LitVar ingestion pipeline,
+and without weakening the frozen Phase 1 synthetic tests. It also must not block the Aug-2
+application packaging. The open question was where to draw the boundary: what the resolver
+verifies, what it deliberately excludes, and how the promotion gates change without a bypass.
+
+### Decision
+
+1. Add a **deterministic, offline, fail-closed** citation resolver (`src/raptor/atlas/citation.py`)
+   that resolves normalized `PMID` / `PMCID` / `DOI` identifiers against a versioned, hash-bound
+   **local catalog** of locally-held public/permitted source artifacts. It performs **no network
+   access of any kind**; a static AST guard (`assert_no_network_imports`) forbids network imports
+   across the Atlas package. Source acquisition and text extraction are a **separate future
+   adapter**, explicitly out of scope here.
+2. Only a catalog source with `source_type` in `{PRIMARY-LIT, DATASET}` **and** `role ==
+   direct_evidence_leaf` may ground a claim. Reviews, ClinVar, crosswalks, internal summaries and
+   any context/provenance-only source may be cataloged for provenance but can never satisfy
+   grounding. Internal handoffs are never admitted as a grounding leaf (ADR-0015).
+3. The catalog has a canonical self-excluding content hash
+   (`atlas.citation_catalog_content_hash.v1`) mirroring `atlas.pack_content_hash.v1`, is
+   deep-frozen after load, and stores only **relative** artifact paths beneath an explicitly
+   supplied external content root. The library never reads the environment; path safety rejects
+   absolute/drive/`..`/symlink/junction escape via resolved-realpath containment. Catalog-declared
+   file hashes are **never trusted**: raw and extracted-text `sha256`/byte-length are always
+   recomputed from disk, and drift fails closed.
+4. Span verification is **exact**: the resolver verifies an `exact_quote` at a deterministic
+   `text-char:<start>:<end>` character-offset locator against extracted UTF-8 text normalized by
+   `atlas.text_norm.v1` (CRLF/CR→LF, Unicode NFC, no case-fold, no whitespace collapse). There is
+   no fuzzy matching; missing, duplicate, mismatched or out-of-range spans fail. The resolver does
+   not parse PDF/HTML/XML — it verifies a separately-generated extracted-text artifact plus the raw
+   file hash. Dataset row/key locators are deferred out of v1.
+5. `PromotionContext.citation_resolver` becomes a typed, `runtime_checkable` **`CitationResolver`
+   protocol** (`resolve(identifier) -> ResolvedCitation`, `verify_span(resolved, span) ->
+   VerifiedSpan`). Gate 3 rejects a bare boolean/callable, resolves every `direct_evidence_leaf`
+   source into a per-candidate resolved-source map, and cross-checks aliases/role/type; Gate 4
+   verifies each linked claim's exact span through that map. The eight-gate order and short-circuit
+   are preserved, and the named-human Gate 8 review remains **after** deterministic verification —
+   deterministic verification never replaces the human oracle.
+6. All failure modes raise distinct typed errors under a new `AtlasCatalogError` family
+   (`AtlasCatalogSchemaError`, `AtlasCatalogHashError`, `AtlasCatalogPathError`,
+   `AtlasCitationResolutionError`, `AtlasContentDriftError`, `AtlasSpanMismatchError`) so
+   catalog/path, identifier, content-drift and span failures are individually catchable. No silent
+   fallback, no auto-repin.
+7. Implementation tests are **fully synthetic** (no real PMID/PMCID/DOI, no real quote, no
+   R611Q/Arg611 content, committed catalog template `sources: []`). Real R611Q source acquisition
+   and a real catalog follow **after** this resolver is checker-clean, under a separate external,
+   uncommitted content root with only public/appropriately-licensed, non-patient, non-paywalled
+   content.
+
+### Consequences
+
+- Phase 2 grounding is honest: a claim can only promote when its source resolves to a real
+  primary-literature/dataset leaf and its exact quote matches the verified source slice, plus the
+  named-human Gate 8 sign-off. Presence-only Gate 4 and truthy-boolean Gate 3 are closed.
+- The change is additive and does not alter Phase 1 hashing, profile, identity, pack, registry or
+  export behavior; the only interface change is the `citation_resolver` type and Gate 3/4
+  semantics. The frozen promotion tests are legitimately updated to inject a strict fake resolver
+  object (not a bare boolean), which is the intended consequence of the protocol change, not a test
+  weakening. Backout is a straight revert of the implementation commits.
+- Network acquisition, continuous refresh, a source-registry platform, PDF parsing, fuzzy matching
+  and dataset span grammars remain explicitly out of scope; they are future work behind the
+  acquisition adapter. This keeps the slice small and non-blocking for the Aug-2 application.
+- The resolver guarantees source **fidelity and identity** (right source, unmutated content, exact
+  quote), not scientific **sufficiency**; whether a verified quote actually supports the claim
+  remains the named human oracle's responsibility at Gate 8.
 
 ---
 
