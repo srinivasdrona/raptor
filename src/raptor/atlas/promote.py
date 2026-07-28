@@ -576,34 +576,47 @@ def _parse_gate4_text_char_locator(entry_id: Any, locator: str) -> Optional[Tupl
     below is independently re-derived rather than trusting the resolver's
     own parsing of the same string.
 
-    A locator that does not even DECLARE the ``text-char:`` scheme (i.e.
-    lacks the ``text-char:`` prefix entirely) is some other locator scheme
+    A locator whose scheme token (the substring before its first ``:``,
+    compared case-INsensitively and with incidental surrounding whitespace
+    stripped) is not ``text-char`` at all is some other locator scheme
     opaque to this offset-binding check -- it is left to the pre-existing
     length/self-consistency check alone, so this returns ``None`` rather
     than raising (this is the only scheme Gate 4 knows how to bind
     ``VerifiedSpan.start``/``end`` against, but rejecting every other
     scheme outright is out of scope for this defense-in-depth check).
 
-    Once a locator DOES declare the ``text-char:`` scheme, it must fully
-    match the grammar -- ``start``/``end`` must each be a bare decimal
-    nonnegative integer (the ``[0-9]+`` grammar already rejects a leading
-    ``-``/``+`` sign or any non-digit) and ``end`` must be ``>= start`` --
-    or it fails closed with :class:`AtlasProvenanceError`. The raw
-    ``span_proposed.locator`` field's more permissive "nonblank string"
-    shape was already enforced structurally (as :class:`AtlasSchemaError`,
-    before the resolver was ever invoked) by ``_validate_span_proposed_shape``;
-    a locator that fails THIS stricter grammar check here is instead a
-    provenance/binding failure, because it only surfaces once we are about
-    to trust the resolver's own reported offsets against it."""
+    Critically, that scheme-token detection is deliberately case/whitespace
+    -INsensitive so that ``TEXT-CHAR:``/``Text-Char:``/``text-char :``
+    (and similar spoofed variants) are recognized as an ATTEMPT to declare
+    this scheme and are never treated as some other opaque scheme -- only
+    the EXACT lowercase ``text-char:<start>:<end>`` grammar (mirrored from
+    citation.py's own ``_TEXT_CHAR_LOCATOR_RE``) is ever accepted; any
+    case/whitespace/otherwise-malformed variant of the ``text-char`` scheme
+    fails closed with :class:`AtlasProvenanceError` rather than silently
+    falling through to the opaque path.
 
-    if not locator.startswith("text-char:"):
+    Once a locator's scheme token matches ``text-char`` (case-insensitively),
+    it must fully match the EXACT lowercase grammar -- ``start``/``end``
+    must each be a bare decimal nonnegative integer (the ``[0-9]+`` grammar
+    already rejects a leading ``-``/``+`` sign or any non-digit) and ``end``
+    must be ``>= start`` -- or it fails closed with
+    :class:`AtlasProvenanceError`. The raw ``span_proposed.locator`` field's
+    more permissive "nonblank string" shape was already enforced
+    structurally (as :class:`AtlasSchemaError`, before the resolver was
+    ever invoked) by ``_validate_span_proposed_shape``; a locator that
+    fails THIS stricter grammar check here is instead a provenance/binding
+    failure, because it only surfaces once we are about to trust the
+    resolver's own reported offsets against it."""
+
+    scheme_token = locator.split(":", 1)[0].strip().lower()
+    if scheme_token != "text-char":
         return None
     match = _GATE4_TEXT_CHAR_LOCATOR_RE.match(locator)
     if not match:
         raise AtlasProvenanceError(
             f"proposed claim referencing {entry_id!r} has a span locator {locator!r} that "
-            "declares the 'text-char:' scheme but does not match the "
-            "'text-char:<start>:<end>' grammar"
+            "declares the 'text-char:' scheme (case-insensitively) but does not exactly "
+            "match the lowercase 'text-char:<start>:<end>' grammar"
         )
     start = int(match.group(1))
     end = int(match.group(2))

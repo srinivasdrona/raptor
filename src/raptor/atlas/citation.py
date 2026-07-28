@@ -404,6 +404,22 @@ def _validate_and_build_sources(
             f"{type(identifiers_obj).__name__}",
         )
 
+        # Every 'identifiers' key MUST be a string before it is ever placed in a
+        # set/sorted alongside the (all-string) `_IDENTIFIER_SCHEME_PREFIXES` keys
+        # below -- a bare `sorted(set(identifiers_obj) - ...)` on a mapping with a
+        # non-string key (int, bool, None, tuple, ...) raises an unstructured
+        # TypeError from CPython's heterogeneous comparison, not a typed catalog
+        # error. Non-string keys are reported via their `repr()`, sorted as
+        # strings for a stable/deterministic message regardless of key type
+        # (the raw keys themselves may not be mutually orderable).
+        non_string_keys = [key for key in identifiers_obj if not isinstance(key, str)]
+        _require_catalog(
+            not non_string_keys,
+            f"source {source_id!r} field 'identifiers' has non-string key(s) "
+            f"{sorted(repr(key) for key in non_string_keys)!r}; identifiers mapping keys "
+            "must be strings",
+        )
+
         unsupported_scheme_keys = sorted(set(identifiers_obj) - set(_IDENTIFIER_SCHEME_PREFIXES))
         _require_catalog(
             not unsupported_scheme_keys,
