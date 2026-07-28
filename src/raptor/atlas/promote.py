@@ -160,6 +160,29 @@ def _validate_bib_raw_payload(entry_id: Any, scheme_key: str, prefix: str, raw_v
         return
 
 
+def _canonical_bib_identifier(scheme_key: str, prefix: str, raw_value: str) -> str:
+    """Compute the EXACT canonical identifier string that
+    ``normalize_identifier`` would produce for this already
+    grammar-validated (:func:`_validate_bib_raw_payload`) raw bib value --
+    WITHOUT importing/calling ``normalize_identifier`` itself
+    (import_independence: promote.py depends only on model.py and the
+    injected resolver). PMID/PMCID payloads have no case ambiguity once
+    grammar-valid; DOI lowercases the WHOLE payload; ACCESSION lowercases
+    ONLY the namespace, preserving the opaque part's case -- exactly
+    mirroring citation.py's ``_normalize_doi_payload``/``normalize_identifier``
+    per-scheme canonicalization. Used both as the string passed to
+    ``CitationResolver.resolve()`` and for an EXACT (not case-insensitive)
+    identity comparison against the resolver's return value in
+    :func:`_validate_resolved_citation_shape`."""
+
+    if scheme_key == "doi":
+        return f"{prefix}:{raw_value.lower()}"
+    if scheme_key == "accession":
+        namespace, _sep, opaque = raw_value.partition(":")
+        return f"{prefix}:{namespace.lower()}:{opaque}"
+    return f"{prefix}:{raw_value}"
+
+
 def _is_conforming_citation_resolver(candidate: Any) -> bool:
     """isinstance(candidate, CitationResolver) alone is NOT sufficient: a
     ``runtime_checkable`` Protocol's ``isinstance`` check only confirms
@@ -186,11 +209,34 @@ def _validate_resolved_citation_shape(
     ``ResolvedCitation`` (e.g. a ``source``/``identifier``/``content`` of
     the wrong type), or a citation for a DIFFERENT identifier than the one
     requested is a resolution failure (:class:`AtlasProvenanceError`), not
-    a raw ``TypeError``/``AttributeError`` escaping to the caller. The
-    canonical-string comparison is case-insensitive because DOI payloads
-    and ACCESSION namespaces are case-insensitively canonicalized (see
-    ``identifier_grammar``); a resolver that echoes back an unrelated
-    identifier still fails this check."""
+    a raw ``TypeError``/``AttributeError`` escaping to the caller.
+
+    ``canonical_string`` is ALREADY canonicalized exactly as
+    ``normalize_identifier`` would (see ``_canonical_bib_identifier``), so
+    the comparison against ``resolved.identifier.canonical`` is an EXACT
+    (not case-insensitive) string comparison -- a resolver that echoes
+    back a differently-cased identifier is itself non-conforming and must
+    fail, not be silently tolerated by a fuzzy comparison.
+
+    Beyond the standalone ``identifier.canonical`` echo, this also
+    validates that the resolved SOURCE itself internally corroborates the
+    requested identifier: ``resolved.source.identifiers`` must be a tuple
+    of properly-typed :class:`CitationIdentifier` values (never trust an
+    untyped/garbage entry merely because the outer ``CatalogSource``
+    dataclass instance passed ``isinstance``), and -- whenever that tuple
+    is non-empty -- the exact requested ``canonical_string`` must be one
+    of the source's own declared identifiers. This defeats a spoofing
+    resolver that returns ``identifier.canonical`` matching what was
+    requested while attaching it to a ``source`` that itself advertises a
+    DIFFERENT identifier (e.g. requested ``PMID:12345`` bound to a source
+    whose own ``identifiers`` only contains ``PMID:99999``). A source that
+    declares an EMPTY identifiers tuple is tolerated (this defense
+    degrades to the standalone ``identifier.canonical`` check alone in
+    that case): a real catalog load never produces an empty identifiers
+    tuple for a grounding-eligible ``direct_evidence_leaf`` source
+    (enforced at ``load_catalog`` time), so this only relaxes for a
+    minimal resolver double that does not populate that field, not for a
+    real catalog-backed resolver."""
 
     if not isinstance(resolved, ResolvedCitation):
         raise AtlasProvenanceError(
@@ -209,7 +255,7 @@ def _validate_resolved_citation_shape(
         )
     if (
         not isinstance(resolved.identifier.canonical, str)
-        or resolved.identifier.canonical.lower() != canonical_string.lower()
+        or resolved.identifier.canonical != canonical_string
     ):
         raise AtlasProvenanceError(
             f"citation resolver returned a citation for identifier "
@@ -220,6 +266,32 @@ def _validate_resolved_citation_shape(
         raise AtlasProvenanceError(
             f"citation resolver returned a ResolvedCitation with an invalid source_id for "
             f"proposed source {entry_id!r} identifier {canonical_string!r}"
+        )
+
+    source_identifiers = resolved.source.identifiers
+    if not isinstance(source_identifiers, tuple):
+        raise AtlasProvenanceError(
+            f"citation resolver returned a source with a non-tuple identifiers field for "
+            f"proposed source {entry_id!r} identifier {canonical_string!r}"
+        )
+    source_canonicals = []
+    for source_identifier in source_identifiers:
+        if (
+            not isinstance(source_identifier, CitationIdentifier)
+            or not isinstance(source_identifier.canonical, str)
+            or not source_identifier.canonical
+        ):
+            raise AtlasProvenanceError(
+                f"citation resolver returned a source with a malformed identifier entry "
+                f"{source_identifier!r} for proposed source {entry_id!r} identifier "
+                f"{canonical_string!r}"
+            )
+        source_canonicals.append(source_identifier.canonical)
+    if source_canonicals and canonical_string not in source_canonicals:
+        raise AtlasProvenanceError(
+            f"citation resolver resolved identifier {canonical_string!r} for proposed "
+            f"source {entry_id!r} to a source that does not itself declare that "
+            f"identifier among its own identifiers {tuple(source_canonicals)!r}"
         )
     return resolved
 
@@ -395,13 +467,16 @@ def _gate3_citation_resolution(
             raw_value = bib[scheme_key]
             _validate_bib_raw_payload(entry_id, scheme_key, prefix, raw_value)
 
-            # Construct the canonical identifier string by CONCATENATION
-            # only; promote.py never imports/calls normalize_identifier
-            # (import-independence: promote.py depends only on model.py
-            # and the injected resolver). The resolver itself is
-            # responsible for normalizing/validating this string via its
-            # own CitationResolver.resolve() implementation.
-            canonical_string = f"{prefix}:{raw_value}"
+            # Construct the canonical identifier string by mirroring
+            # citation.py's per-scheme canonicalization LOCALLY
+            # (_canonical_bib_identifier); promote.py never imports/calls
+            # normalize_identifier itself (import-independence: promote.py
+            # depends only on model.py and the injected resolver). The
+            # resolver is still independently responsible for validating
+            # this string via its own CitationResolver.resolve()
+            # implementation -- this local canonicalization only ensures
+            # Gate 3's own identity checks compare like-for-like forms.
+            canonical_string = _canonical_bib_identifier(scheme_key, prefix, raw_value)
 
             try:
                 resolved = context.citation_resolver.resolve(canonical_string)

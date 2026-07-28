@@ -745,7 +745,15 @@ def _read_verified_file(path: Path, *, content_root: Optional[Path] = None, what
          same identity, still a regular file, and -- if ``content_root``
          is given -- still realpath-contained under it.
     Any mismatch at any checkpoint fails closed with
-    :class:`AtlasCatalogPathError` -- never a bare ``OSError``.
+    :class:`AtlasCatalogPathError` -- never a bare ``OSError``. EVERY
+    stdlib syscall that can fail (``lstat``, ``open``, ``fstat``,
+    ``read``, the post-close ``lstat``, and -- when ``content_root`` is
+    given -- the final ``resolve``) is individually wrapped so no raw
+    ``OSError`` can escape this function; the file descriptor is always
+    closed via ``finally``, and a failure from ``close`` itself (a
+    resource-cleanup edge case, not a content-integrity signal) is
+    swallowed rather than allowed to override an already-propagating
+    typed error or already-read data.
 
     Residual limitation (documented, not silently assumed away): Windows
     provides no ``os.open`` flag to refuse following a reparse point, so a
@@ -769,21 +777,41 @@ def _read_verified_file(path: Path, *, content_root: Optional[Path] = None, what
         raise AtlasCatalogPathError(f"{what} could not be opened at {path}") from exc
 
     try:
-        post_open_stat = os.fstat(fd)
+        try:
+            post_open_stat = os.fstat(fd)
+        except OSError as exc:
+            raise AtlasCatalogPathError(
+                f"{what} {path} could not be fstat'd immediately after open"
+            ) from exc
         if not stat.S_ISREG(post_open_stat.st_mode) or _identity(post_open_stat) != _identity(pre_open_lstat):
             raise AtlasCatalogPathError(
                 f"{what} {path} identity changed between check and open (TOCTOU)"
             )
         chunks = []
         while True:
-            chunk = os.read(fd, 1 << 20)
+            try:
+                chunk = os.read(fd, 1 << 20)
+            except OSError as exc:
+                raise AtlasCatalogPathError(f"{what} {path} could not be read") from exc
             if not chunk:
                 break
             chunks.append(chunk)
         data = b"".join(chunks)
-        post_read_stat = os.fstat(fd)
+        try:
+            post_read_stat = os.fstat(fd)
+        except OSError as exc:
+            raise AtlasCatalogPathError(
+                f"{what} {path} could not be fstat'd immediately after read"
+            ) from exc
     finally:
-        os.close(fd)
+        # Best-effort close: a failure here is a resource-cleanup edge case,
+        # not a content-integrity signal, and must never override/mask an
+        # AtlasCatalogPathError already propagating from the try body above
+        # (or the successfully-read data) with a raw OSError from close().
+        try:
+            os.close(fd)
+        except OSError:
+            pass
 
     if not stat.S_ISREG(post_read_stat.st_mode) or _identity(post_read_stat) != _identity(pre_open_lstat):
         raise AtlasCatalogPathError(f"{what} {path} identity changed during read (TOCTOU)")
@@ -854,7 +882,12 @@ def load_catalog(
         raise AtlasCatalogSchemaError(
             f"citation catalog manifest at {manifest_path} is not valid UTF-8"
         ) from exc
-    raw_manifest = yaml.safe_load(manifest_text)
+    try:
+        raw_manifest = yaml.safe_load(manifest_text)
+    except yaml.YAMLError as exc:
+        raise AtlasCatalogSchemaError(
+            f"citation catalog manifest at {manifest_path} is not valid YAML"
+        ) from exc
 
     _validate_catalog_manifest(raw_manifest)
     sources, alias_index = _validate_and_build_sources(raw_manifest["sources"])
