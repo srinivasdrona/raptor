@@ -431,7 +431,17 @@ def _gate3_citation_resolution(
     """Reject a non-conforming resolver, then resolve every raw bib alias of
     every ``direct_evidence_leaf`` proposed source, requiring all aliases of
     a given source to agree, and return a LOCAL ``resolved_by_source`` map
-    (threaded explicitly to Gate 4 -- no globals, no cross-candidate state)."""
+    (threaded explicitly to Gate 4 -- no globals, no cross-candidate state).
+
+    "Agree" means FULL frozen ``CatalogSource`` equality (every field --
+    ``identifiers``, ``license``, ``permitted_use``, ``verification``, raw/
+    extracted content pins, extraction metadata -- not merely matching
+    ``source_id``/``source_type``): a resolver that returns a split
+    ``identifiers`` tuple (each alias's own subset individually contains
+    the alias it was asked to resolve) or that varies any other field
+    across aliases of the SAME proposed source is a resolution failure,
+    since it means the aliases do not actually corroborate a single,
+    internally-consistent catalog source declaration."""
 
     if not _is_conforming_citation_resolver(context.citation_resolver):
         raise AtlasSchemaError(
@@ -496,15 +506,43 @@ def _gate3_citation_resolution(
             )
 
         first_identifier, first_resolved = resolved_aliases[0]
+
+        # Full CatalogSource equality (frozen dataclass field-wise ==, not
+        # merely source_id/source_type): a resolver that returns a source
+        # whose identifiers tuple is split across aliases (each alias's own
+        # membership check individually passes, per
+        # _validate_resolved_citation_shape) or that differs in ANY other
+        # field -- license, permitted_use, verification, content/path/hash
+        # pins, extraction metadata -- across aliases of the SAME proposed
+        # source is rejected here. Comparing every alias's resolved source
+        # to resolved_aliases[0] is order-independent: if all N sources are
+        # pairwise equal, the choice of reference element does not change
+        # the accept/reject outcome.
         for identifier, resolved in resolved_aliases[1:]:
-            if (
-                resolved.source.source_id != first_resolved.source.source_id
-                or resolved.source.source_type != first_resolved.source.source_type
-            ):
+            if resolved.source != first_resolved.source:
                 raise AtlasProvenanceError(
-                    f"proposed source {entry_id!r} bib aliases disagree on resolved source: "
-                    f"{first_identifier!r} -> {first_resolved.source.source_id!r} "
-                    f"but {identifier!r} -> {resolved.source.source_id!r}"
+                    f"proposed source {entry_id!r} bib aliases resolve to inconsistent "
+                    f"CatalogSource declarations: alias {first_identifier!r} resolved to "
+                    f"{first_resolved.source!r} but alias {identifier!r} resolved to "
+                    f"{resolved.source!r} (full CatalogSource equality is required across "
+                    "all aliases of one proposed source, not merely matching "
+                    "source_id/source_type)"
+                )
+
+        # Equivalent restatement of the same invariant: once every alias's
+        # resolved source is confirmed identical, there is exactly ONE
+        # common identifiers tuple, and it must itself declare every
+        # canonical alias that was actually requested for this proposed
+        # source (each alias resolved exactly once, above).
+        common_source_canonicals = {
+            source_identifier.canonical for source_identifier in first_resolved.source.identifiers
+        }
+        for identifier, _resolved in resolved_aliases:
+            if identifier not in common_source_canonicals:
+                raise AtlasProvenanceError(
+                    f"proposed source {entry_id!r} common resolved CatalogSource identifiers "
+                    f"{tuple(sorted(common_source_canonicals))!r} do not include requested "
+                    f"alias {identifier!r}"
                 )
 
         if (
