@@ -651,8 +651,12 @@ todos:
     traversal/symlink/duplicate-alias/hash-drift/CRLF/Unicode/duplicate-quote/offset/span-mismatch/source-role/
     promotion-gate-order cases; Sonnet implements only the authorized files; fixtures fully synthetic (no real
     PMID/PMCID/DOI, no real quote, no R611Q content); Phase-1 hashing/profile/identity/pack/export behavior and
-    the full tests/atlas suite stay green; GPT-5.4 checker CLEAN. Does not block Aug-2 application packaging.'
-  status: pending
+    the full tests/atlas suite stay green; GPT-5.4 checker CLEAN. Does not block Aug-2 application packaging.
+    Completed and merged at dc8826b: offline catalog resolver, exact lowercase self-hash,
+    fail-closed path/content verification, strict PMID/PMCID/DOI/ACCESSION normalization,
+    text-char exact-span binding, Gate 3/4 integration, static no-network guard and 64 passing
+    Atlas tests.'
+  status: done
   depends_on:
   - build-mechanism-atlas-starter
   created: '2026-07-27'
