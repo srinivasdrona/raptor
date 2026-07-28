@@ -2096,4 +2096,237 @@ def test_resolver_whitespace_spoof_regression_cases():
     assert len(resolver_control.verify_span_calls) > 0
 
 
+def test_gate4_resolver_spoof_offset_validation():
+    """Add non-vacuous Gate4 resolver-spoof tests:
+    - requested locator `text-char:50:60`, exact_quote length 10; resolver returns normal VerifiedSpan echoing locator/quote/source/hash but start=0,end=10 -> validate_candidate_import must raise AtlasProvenanceError itself;
+    - start/end partially mismatched, reversed, bool/non-int if typed object construction permits; production should reject before acceptance;
+    - exact start=50,end=60 passes;
+    - duplicate same quote scenario demonstrates locator offsets bind exact occurrence.
+    Resolver must not raise; spy proves verify_span called. Current production should RED on mismatched offset.
+    """
+    try:
+        import raptor.atlas.model as model_mod
+        from raptor.atlas.promote import validate_candidate_import
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
+
+    mock_pack = make_schema_valid_disease_pack(model_mod)
+
+    # Base valid variant and retrieval
+    valid_variant = {
+        "spdi_proposed": "NC_000000.0:1000:A:T", "gene_proposed": "SYNGENE1", "hgvs_aliases": []
+    }
+    valid_retrieval = {
+        "agents": [], "queries": [], "run_id": "r1", "retrieved_at": "now",
+        "pack_binding": {
+            "pack_id": "synthpack", "pack_version": "1.0.0", "pack_content_hash": "bf7369f8faa24a6f746956ee1122281e798185f320b012a844ffbc683f2e7b21"
+        },
+        "prompt_hash": "h", "bookshelf_version": "v1"
+    }
+
+    # Helper to build basic source
+    def make_sources():
+        return [{
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {"pmid": "12345"}
+        }]
+
+    # 1. requested locator `text-char:50:60`, exact_quote length 10; resolver returns normal VerifiedSpan echoing locator/quote/source/hash but start=0,end=10 -> validate_candidate_import must raise AtlasProvenanceError itself;
+    # Resolver must not raise; spy proves verify_span called.
+    class OffsetSpoofResolver(FakeCitationResolver):
+        def __init__(self, start, end):
+            super().__init__()
+            self.start_val = start
+            self.end_val = end
+
+        def verify_span(self, resolved, span):
+            self.verify_span_calls.append((resolved, span))
+            from raptor.atlas.model import VerifiedSpan
+            return VerifiedSpan(
+                source_id=resolved.source.source_id,
+                locator=span.locator,
+                start=self.start_val,
+                end=self.end_val,
+                exact_quote=span.exact_quote or "",
+                extracted_text_sha256=resolved.content.extracted_text_sha256
+            )
+
+    # A. start=0, end=10 (internally consistent but mismatched with text-char:50:60)
+    resolver_spoof = OffsetSpoofResolver(0, 10)
+    ctx_spoof = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=resolver_spoof,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+    cand_spoof = model_mod.AtlasCandidateImport(
+        candidate_variant=valid_variant,
+        proposed_claims=[{
+            "claim_text": "text", "claim_kind_proposed": "pathway", "directionality": "increase",
+            "source_ref_proposed": "lit-1",
+            "span_proposed": {"locator": "text-char:50:60", "exact_quote": "1234567890", "page_or_figure": "page-1"},
+            "context_proposed": "cell-assay-A"
+        }],
+        proposed_sources=make_sources(),
+        retrieval_provenance=valid_retrieval
+    )
+
+    with pytest.raises(model_mod.AtlasProvenanceError) as exc_info:
+        validate_candidate_import(cand_spoof, ctx_spoof)
+
+    # Prove spy verify_span was called and did NOT raise
+    assert len(resolver_spoof.verify_span_calls) == 1
+    assert resolver_spoof.verify_span_calls[0][1].locator == "text-char:50:60"
+
+
+    # B. start/end partially mismatched, reversed, bool/non-int if typed object construction permits; production should reject before acceptance;
+    
+    # B1. Partially mismatched: start=51, end=61
+    resolver_mismatch = OffsetSpoofResolver(51, 61)
+    ctx_mismatch = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=resolver_mismatch,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+    with pytest.raises(model_mod.AtlasProvenanceError):
+        validate_candidate_import(cand_spoof, ctx_mismatch)
+    assert len(resolver_mismatch.verify_span_calls) == 1
+
+    # B2. Reversed: start=60, end=50
+    resolver_reversed = OffsetSpoofResolver(60, 50)
+    ctx_reversed = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=resolver_reversed,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+    with pytest.raises(model_mod.AtlasProvenanceError):
+        validate_candidate_import(cand_spoof, ctx_reversed)
+    assert len(resolver_reversed.verify_span_calls) == 1
+
+    # B3. Bool/non-int
+    for bad_offset in [10.5, True]:
+        class BadTypeOffsetResolver(FakeCitationResolver):
+            def verify_span(self, resolved, span):
+                self.verify_span_calls.append((resolved, span))
+                from raptor.atlas.model import VerifiedSpan
+                return VerifiedSpan(
+                    source_id=resolved.source.source_id,
+                    locator=span.locator,
+                    start=bad_offset,
+                    end=bad_offset + 10 if isinstance(bad_offset, (int, float)) else 10,
+                    exact_quote=span.exact_quote or "",
+                    extracted_text_sha256=resolved.content.extracted_text_sha256
+                )
+        
+        resolver_bad_type = BadTypeOffsetResolver()
+        ctx_bad_type = model_mod.PromotionContext(
+            disease_pack=mock_pack,
+            citation_resolver=resolver_bad_type,
+            context_validator=lambda kind, ctx: True,
+            human_oracle_reviewer=lambda cand_id: "sig",
+            duplicate_index={}
+        )
+        with pytest.raises((model_mod.AtlasProvenanceError, TypeError, AttributeError)):
+            validate_candidate_import(cand_spoof, ctx_bad_type)
+        assert len(resolver_bad_type.verify_span_calls) == 1
+
+
+    # C. exact start=50,end=60 passes;
+    resolver_exact = OffsetSpoofResolver(50, 60)
+    ctx_exact = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=resolver_exact,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+    validate_candidate_import(cand_spoof, ctx_exact)
+    assert len(resolver_exact.verify_span_calls) == 1
+
+
+    # D. duplicate same quote scenario demonstrates locator offsets bind exact occurrence.
+    class DuplicateQuoteResolver(FakeCitationResolver):
+        def verify_span(self, resolved, span):
+            self.verify_span_calls.append((resolved, span))
+            from raptor.atlas.model import VerifiedSpan
+            if span.locator == "text-char:10:20":
+                start, end = 10, 20
+            elif span.locator == "text-char:40:50":
+                start, end = 40, 50
+            else:
+                start, end = 0, len(span.exact_quote or "")
+            return VerifiedSpan(
+                source_id=resolved.source.source_id,
+                locator=span.locator,
+                start=start,
+                end=end,
+                exact_quote=span.exact_quote or "",
+                extracted_text_sha256=resolved.content.extracted_text_sha256
+            )
+
+    cand_duplicate = model_mod.AtlasCandidateImport(
+        candidate_variant=valid_variant,
+        proposed_claims=[
+            {
+                "claim_text": "text1", "claim_kind_proposed": "pathway", "directionality": "increase",
+                "source_ref_proposed": "lit-1",
+                "span_proposed": {"locator": "text-char:10:20", "exact_quote": "same_quote", "page_or_figure": "page-1"},
+                "context_proposed": "cell-assay-A"
+            },
+            {
+                "claim_text": "text2", "claim_kind_proposed": "pathway", "directionality": "increase",
+                "source_ref_proposed": "lit-1",
+                "span_proposed": {"locator": "text-char:40:50", "exact_quote": "same_quote", "page_or_figure": "page-1"},
+                "context_proposed": "cell-assay-A"
+            }
+        ],
+        proposed_sources=make_sources(),
+        retrieval_provenance=valid_retrieval
+    )
+
+    resolver_duplicate = DuplicateQuoteResolver()
+    ctx_duplicate = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=resolver_duplicate,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+
+    validate_candidate_import(cand_duplicate, ctx_duplicate)
+    assert len(resolver_duplicate.verify_span_calls) == 2
+
+    # Now let's try a resolver that always returns 40:50 for both locators (spoofing the first occurrence)
+    class MismatchedDuplicateResolver(FakeCitationResolver):
+        def verify_span(self, resolved, span):
+            self.verify_span_calls.append((resolved, span))
+            from raptor.atlas.model import VerifiedSpan
+            return VerifiedSpan(
+                source_id=resolved.source.source_id,
+                locator=span.locator,
+                start=40,
+                end=50,
+                exact_quote=span.exact_quote or "",
+                extracted_text_sha256=resolved.content.extracted_text_sha256
+            )
+
+    resolver_mismatched_duplicate = MismatchedDuplicateResolver()
+    ctx_mismatched_duplicate = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=resolver_mismatched_duplicate,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+
+    with pytest.raises(model_mod.AtlasProvenanceError):
+        validate_candidate_import(cand_duplicate, ctx_mismatched_duplicate)
+
+
+
 
