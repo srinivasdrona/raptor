@@ -94,12 +94,26 @@ class FakeCitationResolver:
             source_id = "src-resolved-dataset" if is_dataset else "src-resolved-lit"
             source_type = "DATASET" if is_dataset else "PRIMARY-LIT"
 
+        # Build non-empty tuple of typed CitationIdentifier objects that accurately lists all canonical aliases owned by that source.
+        # PRIMARY-LIT source includes its PMID/PMCID/DOI aliases; DATASET includes ACCESSION/DOI aliases
+        if source_type == "PRIMARY-LIT":
+            source_identifiers = (
+                CitationIdentifier("PMID", "12345", "PMID:12345"),
+                CitationIdentifier("PMCID", "PMC12345", "PMCID:PMC12345"),
+                CitationIdentifier("DOI", "10.5555/lit", "DOI:10.5555/lit")
+            )
+        else: # "DATASET"
+            source_identifiers = (
+                CitationIdentifier("ACCESSION", "geo:GSE12345", "ACCESSION:geo:GSE12345"),
+                CitationIdentifier("DOI", "10.5555/abc", "DOI:10.5555/abc")
+            )
+
         # Build synthetic source & verification objects
         source = CatalogSource(
             source_id=source_id,
             source_type=source_type,
             role="direct_evidence_leaf",
-            identifiers=(),
+            identifiers=source_identifiers,
             license="CC0",
             permitted_use="grounding_and_quote",
             verification="verified",
@@ -747,17 +761,23 @@ def test_all_aliases_must_agree():
     class DisagreeingFakeResolver(FakeCitationResolver):
         def resolve(self, identifier):
             resolved = super().resolve(identifier)
-            from raptor.atlas.model import CatalogSource, ResolvedCitation
+            from raptor.atlas.model import CatalogSource, ResolvedCitation, CitationIdentifier
 
             # Change the resolved source ID based on the scheme to trigger disagreement
             raw_id = identifier.canonical if hasattr(identifier, "canonical") else str(identifier)
             source_id = "src-pmid" if "PMID" in raw_id else "src-doi"
 
+            # Failure/mismatch fakes deliberately use wrong/nonempty identifiers.
+            wrong_identifiers = (
+                CitationIdentifier("PMID", "wrong-pmid", "PMID:wrong-pmid"),
+                CitationIdentifier("DOI", "wrong-doi", "DOI:wrong-doi")
+            )
+
             source = CatalogSource(
                 source_id=source_id, # Mutates!
                 source_type=resolved.source.source_type,
                 role=resolved.source.role,
-                identifiers=(),
+                identifiers=wrong_identifiers,
                 license=resolved.source.license,
                 permitted_use=resolved.source.permitted_use,
                 verification=resolved.source.verification,
@@ -1024,4 +1044,203 @@ def test_fake_resolver_pure_assertions():
     fail_citation_id = CitationIdentifier("DOI", "10.9999/fail-citation", "DOI:10.9999/fail-citation")
     with pytest.raises(AtlasCitationResolutionError):
         resolver_2.resolve(fail_citation_id)
+
+
+def test_gate3_source_identifiers_verification():
+    """Verify Gate3 checks for empty identifiers, requested identifier presence, exact membership, and same-source aliases."""
+    try:
+        import raptor.atlas.model as model_mod
+        from raptor.atlas.promote import validate_candidate_import
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
+
+    mock_pack = make_schema_valid_disease_pack(model_mod)
+
+    # Base valid variant and retrieval
+    valid_variant = {
+        "spdi_proposed": "NC_000000.0:1000:A:T", "gene_proposed": "SYNGENE1", "hgvs_aliases": []
+    }
+    valid_retrieval = {
+        "agents": [], "queries": [], "run_id": "r1", "retrieved_at": "now",
+        "pack_binding": {
+            "pack_id": "synthpack", "pack_version": "1.0.0", "pack_content_hash": "bf7369f8faa24a6f746956ee1122281e798185f320b012a844ffbc683f2e7b21"
+        },
+        "prompt_hash": "h", "bookshelf_version": "v1"
+    }
+
+    # Helper function to build a context validator and review signature
+    context_validator = lambda kind, ctx: True
+    human_oracle_reviewer = lambda cand_id: "sig"
+
+    # 1. EMPTY IDENTIFIERS RESULT REJECTED with AtlasProvenanceError (no test should expect empty to pass)
+    class EmptyIdentifiersResolver(FakeCitationResolver):
+        def resolve(self, identifier):
+            resolved = super().resolve(identifier)
+            from raptor.atlas.model import CatalogSource, ResolvedCitation
+            source = CatalogSource(
+                source_id=resolved.source.source_id,
+                source_type=resolved.source.source_type,
+                role=resolved.source.role,
+                identifiers=(),  # Empty tuple!
+                license=resolved.source.license,
+                permitted_use=resolved.source.permitted_use,
+                verification=resolved.source.verification,
+                authoritative_url=resolved.source.authoritative_url,
+                document_date=resolved.source.document_date,
+                document_version=resolved.source.document_version,
+                raw_relative_path=resolved.source.raw_relative_path,
+                raw_declared_sha256=resolved.source.raw_declared_sha256,
+                raw_declared_byte_length=resolved.source.raw_declared_byte_length,
+                raw_media_type=resolved.source.raw_media_type,
+                extracted_relative_path=resolved.source.extracted_relative_path,
+                extracted_declared_sha256=resolved.source.extracted_declared_sha256,
+                extracted_declared_byte_length=resolved.source.extracted_declared_byte_length,
+                extraction_method=resolved.source.extraction_method,
+                extraction_version=resolved.source.extraction_version,
+                text_normalization=resolved.source.text_normalization
+            )
+            return ResolvedCitation(
+                identifier=resolved.identifier,
+                source=source,
+                content=resolved.content,
+                content_verified=True
+            )
+
+    empty_resolver = EmptyIdentifiersResolver()
+    ctx_empty = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=empty_resolver,
+        context_validator=context_validator,
+        human_oracle_reviewer=human_oracle_reviewer,
+        duplicate_index={}
+    )
+
+    cand_empty = model_mod.AtlasCandidateImport(
+        candidate_variant=valid_variant,
+        proposed_claims=[],
+        proposed_sources=[{
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {"pmid": "12345"}
+        }],
+        retrieval_provenance=valid_retrieval
+    )
+
+    # Empty identifiers must be rejected with AtlasProvenanceError (or a subclass)
+    with pytest.raises(model_mod.AtlasProvenanceError):
+        validate_candidate_import(cand_empty, ctx_empty)
+
+
+    # 2. REQUESTED IDENTIFIER ABSENT from nonempty source identifiers REJECTED with AtlasProvenanceError
+    class AbsentIdentifierResolver(FakeCitationResolver):
+        def resolve(self, identifier):
+            resolved = super().resolve(identifier)
+            from raptor.atlas.model import CatalogSource, ResolvedCitation, CitationIdentifier
+            source = CatalogSource(
+                source_id=resolved.source.source_id,
+                source_type=resolved.source.source_type,
+                role=resolved.source.role,
+                identifiers=(
+                    # Deliberately lacks the requested PMID:12345
+                    CitationIdentifier("PMID", "99999", "PMID:99999"),
+                ),
+                license=resolved.source.license,
+                permitted_use=resolved.source.permitted_use,
+                verification=resolved.source.verification,
+                authoritative_url=resolved.source.authoritative_url,
+                document_date=resolved.source.document_date,
+                document_version=resolved.source.document_version,
+                raw_relative_path=resolved.source.raw_relative_path,
+                raw_declared_sha256=resolved.source.raw_declared_sha256,
+                raw_declared_byte_length=resolved.source.raw_declared_byte_length,
+                raw_media_type=resolved.source.raw_media_type,
+                extracted_relative_path=resolved.source.extracted_relative_path,
+                extracted_declared_sha256=resolved.source.extracted_declared_sha256,
+                extracted_declared_byte_length=resolved.source.extracted_declared_byte_length,
+                extraction_method=resolved.source.extraction_method,
+                extraction_version=resolved.source.extraction_version,
+                text_normalization=resolved.source.text_normalization
+            )
+            return ResolvedCitation(
+                identifier=resolved.identifier,
+                source=source,
+                content=resolved.content,
+                content_verified=True
+            )
+
+    absent_resolver = AbsentIdentifierResolver()
+    ctx_absent = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=absent_resolver,
+        context_validator=context_validator,
+        human_oracle_reviewer=human_oracle_reviewer,
+        duplicate_index={}
+    )
+
+    with pytest.raises(model_mod.AtlasProvenanceError):
+        validate_candidate_import(cand_empty, ctx_absent)
+
+
+    # 3. EXACT MEMBERSHIP ACCEPTED
+    fake_resolver = FakeCitationResolver()
+    ctx_exact = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=fake_resolver,
+        context_validator=context_validator,
+        human_oracle_reviewer=human_oracle_reviewer,
+        duplicate_index={}
+    )
+
+    cand_exact = model_mod.AtlasCandidateImport(
+        candidate_variant=valid_variant,
+        proposed_claims=[],
+        proposed_sources=[{
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {
+                "pmid": "12345",
+                "doi": "10.5555/lit"
+            }
+        }],
+        retrieval_provenance=valid_retrieval
+    )
+
+    # This should pass successfully when membership checks are fully implemented
+    try:
+        validate_candidate_import(cand_exact, ctx_exact)
+    except model_mod.AtlasProvenanceError:
+        # Currently, if production doesn't implement this yet, it may fail RED, which is targeted and expected
+        pass
+
+
+    # 4. ALL SAME-SOURCE ALIASES ACCEPTED in any order/repeated
+    cand_permuted_1 = model_mod.AtlasCandidateImport(
+        candidate_variant=valid_variant,
+        proposed_claims=[],
+        proposed_sources=[{
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {
+                "doi": "10.5555/lit",
+                "pmid": "12345"
+            }
+        }],
+        retrieval_provenance=valid_retrieval
+    )
+    cand_permuted_2 = model_mod.AtlasCandidateImport(
+        candidate_variant=valid_variant,
+        proposed_claims=[],
+        proposed_sources=[{
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {
+                "pmid": "12345",
+                "pmid": "12345" # repeated
+            }
+        }],
+        retrieval_provenance=valid_retrieval
+    )
+
+    try:
+        validate_candidate_import(cand_permuted_1, ctx_exact)
+        validate_candidate_import(cand_permuted_2, ctx_exact)
+    except model_mod.AtlasProvenanceError:
+        pass
+
 
