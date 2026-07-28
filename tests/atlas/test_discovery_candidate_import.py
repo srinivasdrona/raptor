@@ -1415,3 +1415,147 @@ def test_gate3_multi_alias_catalog_source_consistency():
     assert "DOI:10.5555/lit" in diff_resolver.resolve_calls
 
 
+def test_gate3_grounding_criteria_verification():
+    """Verify that Gate3 strictly validates the catalog-source grounding criteria:
+    permitted_use, verification status, completeness/presence of raw content fields,
+    and content_verification fully verified and consistent with source-declared metadata.
+    """
+    try:
+        import raptor.atlas.model as model_mod
+        from raptor.atlas.promote import validate_candidate_import
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
+
+    mock_pack = make_schema_valid_disease_pack(model_mod)
+
+    # Base valid variant and retrieval
+    valid_variant = {
+        "spdi_proposed": "NC_000000.0:1000:A:T", "gene_proposed": "SYNGENE1", "hgvs_aliases": []
+    }
+    valid_retrieval = {
+        "agents": [], "queries": [], "run_id": "r1", "retrieved_at": "now",
+        "pack_binding": {
+            "pack_id": "synthpack", "pack_version": "1.0.0", "pack_content_hash": "bf7369f8faa24a6f746956ee1122281e798185f320b012a844ffbc683f2e7b21"
+        },
+        "prompt_hash": "h", "bookshelf_version": "v1"
+    }
+
+    # Template for synthetic candidate sources
+    def make_cand_sources():
+        return [{
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {
+                "pmid": "12345"
+            }
+        }]
+
+    # A helper to run verification and assert resolver was invoked
+    def run_negative_case(resolver_cls, **kwargs):
+        resolver = resolver_cls(**kwargs)
+        ctx = model_mod.PromotionContext(
+            disease_pack=mock_pack,
+            citation_resolver=resolver,
+            context_validator=lambda kind, ctx: True,
+            human_oracle_reviewer=lambda cand_id: "sig",
+            duplicate_index={}
+        )
+        cand = model_mod.AtlasCandidateImport(
+            candidate_variant=valid_variant,
+            proposed_claims=[],
+            proposed_sources=make_cand_sources(),
+            retrieval_provenance=valid_retrieval
+        )
+        with pytest.raises(model_mod.AtlasProvenanceError):
+            validate_candidate_import(cand, ctx)
+        assert len(resolver.resolve_calls) > 0, "Resolver must have been called before rejection"
+
+    # A positive exact grounding source accepted
+    positive_resolver = FakeCitationResolver()
+    ctx_positive = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=positive_resolver,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+    cand_positive = model_mod.AtlasCandidateImport(
+        candidate_variant=valid_variant,
+        proposed_claims=[],
+        proposed_sources=make_cand_sources(),
+        retrieval_provenance=valid_retrieval
+    )
+    validate_candidate_import(cand_positive, ctx_positive)
+    assert "PMID:12345" in positive_resolver.resolve_calls
+
+    # 1. Negative Case: permitted_use is provenance_only or context_only (must raise AtlasProvenanceError)
+    class PermittedUseResolver(FakeCitationResolver):
+        def __init__(self, val):
+            super().__init__()
+            self.val = val
+        def resolve(self, identifier):
+            resolved = super().resolve(identifier)
+            import dataclasses
+            new_source = dataclasses.replace(resolved.source, permitted_use=self.val)
+            return dataclasses.replace(resolved, source=new_source)
+
+    run_negative_case(PermittedUseResolver, val="provenance_only")
+    run_negative_case(PermittedUseResolver, val="context_only")
+
+    # 2. Negative Case: verification is unverified or confirm_pending (must raise AtlasProvenanceError)
+    class VerificationResolver(FakeCitationResolver):
+        def __init__(self, val):
+            super().__init__()
+            self.val = val
+        def resolve(self, identifier):
+            resolved = super().resolve(identifier)
+            import dataclasses
+            new_source = dataclasses.replace(resolved.source, verification=self.val)
+            return dataclasses.replace(resolved, source=new_source)
+
+    run_negative_case(VerificationResolver, val="unverified")
+    run_negative_case(VerificationResolver, val="confirm_pending")
+
+    # 3. Negative Case: missing/malformed raw relative path fields or raw fields (must raise AtlasProvenanceError)
+    class RawPathResolver(FakeCitationResolver):
+        def __init__(self, **kwargs):
+            super().__init__()
+            self.kwargs = kwargs
+        def resolve(self, identifier):
+            resolved = super().resolve(identifier)
+            import dataclasses
+            new_source = dataclasses.replace(resolved.source, **self.kwargs)
+            return dataclasses.replace(resolved, source=new_source)
+
+    run_negative_case(RawPathResolver, raw_relative_path=None)
+    run_negative_case(RawPathResolver, raw_relative_path="")
+    run_negative_case(RawPathResolver, raw_declared_sha256=None)
+    run_negative_case(RawPathResolver, raw_declared_sha256="")
+    run_negative_case(RawPathResolver, raw_declared_byte_length=0)
+    run_negative_case(RawPathResolver, raw_declared_byte_length=-5)
+    run_negative_case(RawPathResolver, raw_media_type=None)
+    run_negative_case(RawPathResolver, raw_media_type="")
+
+    # 4. Negative Case: content_verification not fully verified / fields inconsistent (must raise AtlasProvenanceError)
+    class InconsistentContentResolver(FakeCitationResolver):
+        def __init__(self, **kwargs):
+            super().__init__()
+            self.kwargs = kwargs
+        def resolve(self, identifier):
+            resolved = super().resolve(identifier)
+            import dataclasses
+            new_content = dataclasses.replace(resolved.content, **self.kwargs)
+            return dataclasses.replace(resolved, content=new_content)
+
+    class NotVerifiedResolver(FakeCitationResolver):
+        def resolve(self, identifier):
+            resolved = super().resolve(identifier)
+            import dataclasses
+            return dataclasses.replace(resolved, content_verified=False)
+    run_negative_case(NotVerifiedResolver)
+
+    run_negative_case(InconsistentContentResolver, raw_sha256="mismatched-sha")
+    run_negative_case(InconsistentContentResolver, raw_byte_length=99999)
+    run_negative_case(InconsistentContentResolver, extracted_text_sha256="mismatched-ext-sha")
+    run_negative_case(InconsistentContentResolver, extracted_text_byte_length=99999)
+
+
