@@ -470,7 +470,7 @@ def test_load_catalog_and_validation_red(tmp_path):
         "schema": "atlas.citation_catalog.v1",
         "catalog_id": "synthetic-catalog",
         "catalog_version": "1.0.0",
-        "catalog_content_hash": "wrong_hash_mismatch",
+        "catalog_content_hash": "a" * 64,  # Well-formed lowercase 64hex value
         "disease_pack_binding": {
             "pack_id": "synthpack",
             "pack_version": "1.0.0",
@@ -484,9 +484,29 @@ def test_load_catalog_and_validation_red(tmp_path):
     with open(manifest_file, "w", encoding="utf-8") as f:
         yaml.safe_dump(manifest, f)
 
-    # Self-hash mismatch must raise AtlasCatalogHashError
+    # A well-formed lowercase 64hex value different from recomputed digest fails with AtlasCatalogHashError
     with pytest.raises(syms["AtlasCatalogHashError"]):
         load_catalog(manifest_file, content_root=tmp_path)
+
+    # Malformed nonstring/nonhex/wrong length/upper/mixed values fail schema validation with AtlasCatalogSchemaError
+    malformed_hashes = [
+        "wrong_hash_mismatch",                    # non-hex, wrong length
+        1234567890123456789012345678901234567890123456789012345678901234,  # non-string (int)
+        True,                                     # non-string (bool)
+        None,                                     # non-string (NoneType)
+        "g" * 64,                                 # non-hex string
+        "a" * 63,                                 # wrong length (too short)
+        "a" * 65,                                 # wrong length (too long)
+        "A" * 64,                                 # uppercase
+        "a" * 63 + "A",                           # mixedcase
+    ]
+    for malformed_val in malformed_hashes:
+        manifest_malformed = dict(manifest)
+        manifest_malformed["catalog_content_hash"] = malformed_val
+        with open(manifest_file, "w", encoding="utf-8") as f:
+            yaml.safe_dump(manifest_malformed, f)
+        with pytest.raises(syms["AtlasCatalogSchemaError"]):
+            load_catalog(manifest_file, content_root=tmp_path)
 
     # Duplicate source_id
     manifest_dup_id = dict(manifest)
