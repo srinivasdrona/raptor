@@ -78,6 +78,17 @@ _DOI_TRAILING_PUNCTUATION = (".", ",", ";", ":", ")", "\u2014")
 
 _PERMITTED_USE_VALUES = ("grounding_and_quote", "provenance_only", "context_only")
 
+#: Supported ``identifiers`` mapping scheme keys -> the canonical scheme
+#: prefix used to build the ``normalize_identifier`` input. Any other key
+#: present in a source's ``identifiers`` mapping is an unknown scheme and is
+#: rejected structurally (never silently ignored).
+_IDENTIFIER_SCHEME_PREFIXES = {
+    "pmid": "PMID",
+    "pmcid": "PMCID",
+    "doi": "DOI",
+    "accession": "ACCESSION",
+}
+
 #: Repo root anchored three levels above this file's directory
 #: (``src/raptor/atlas/citation.py``) -- never dependent on the process's
 #: current working directory. Mirrors ``pack.py``'s ``_REPO_ROOT``/
@@ -348,7 +359,7 @@ def _validate_and_build_sources(
 
     for entry in sources_raw:
         _require_catalog(isinstance(entry, dict), f"citation catalog source entry {entry!r} must be a mapping")
-        for field_name in ("source_id", "source_type", "role", "permitted_use", "verification"):
+        for field_name in ("source_id", "source_type", "role", "permitted_use", "verification", "identifiers"):
             _require_catalog(
                 field_name in entry,
                 f"citation catalog source entry is missing required field {field_name!r}",
@@ -386,23 +397,36 @@ def _validate_and_build_sources(
             f"source {source_id!r} has invalid verification {verification!r}",
         )
 
-        identifiers_obj = entry.get("identifiers") or {}
+        identifiers_obj = entry["identifiers"]
         _require_catalog(
             isinstance(identifiers_obj, dict),
-            f"source {source_id!r} field 'identifiers' must be a mapping",
+            f"source {source_id!r} field 'identifiers' must be a mapping, got "
+            f"{type(identifiers_obj).__name__}",
+        )
+
+        unsupported_scheme_keys = sorted(set(identifiers_obj) - set(_IDENTIFIER_SCHEME_PREFIXES))
+        _require_catalog(
+            not unsupported_scheme_keys,
+            f"source {source_id!r} field 'identifiers' has unsupported scheme key(s) "
+            f"{unsupported_scheme_keys!r}; supported schemes are "
+            f"{tuple(_IDENTIFIER_SCHEME_PREFIXES)!r}",
         )
 
         normalized_identifiers = []
-        for scheme_key, prefix in (("pmid", "PMID"), ("pmcid", "PMCID"), ("doi", "DOI"), ("accession", "ACCESSION")):
-            raw_values = identifiers_obj.get(scheme_key) or []
+        for scheme_key, prefix in _IDENTIFIER_SCHEME_PREFIXES.items():
+            if scheme_key not in identifiers_obj:
+                continue
+            raw_values = identifiers_obj[scheme_key]
             _require_catalog(
                 isinstance(raw_values, list),
-                f"source {source_id!r} field 'identifiers.{scheme_key}' must be a list",
+                f"source {source_id!r} field 'identifiers.{scheme_key}' must be a list, got "
+                f"{type(raw_values).__name__}",
             )
             for raw_value in raw_values:
                 _require_catalog(
-                    isinstance(raw_value, str) and raw_value,
-                    f"source {source_id!r} identifiers.{scheme_key} entries must be nonblank strings",
+                    _is_nonblank_str(raw_value),
+                    f"source {source_id!r} identifiers.{scheme_key} entries must be nonblank strings, "
+                    f"got {raw_value!r}",
                 )
                 try:
                     identifier = normalize_identifier(f"{prefix}:{raw_value}")
