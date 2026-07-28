@@ -79,13 +79,20 @@ class FakeCitationResolver:
         if "fail-schema" in raw_id:
             raise AtlasCatalogSchemaError(f"Schema error for {raw_id}")
 
-        # Distinguish source types based on accession prefix
-        is_dataset = "ACCESSION:geo" in raw_id
-        source_type = "DATASET" if is_dataset else "PRIMARY-LIT"
+        # Data-driven identification mapping
+        if "ACCESSION:geo" in raw_id or "GSE12345" in raw_id:
+            source_id = "src-resolved-dataset"
+            source_type = "DATASET"
+        elif raw_id == "DOI:10.5555/abc" and "ACCESSION:geo:GSE12345" in self.resolve_calls:
+            source_id = "src-resolved-dataset"
+            source_type = "DATASET"
+        else:
+            source_id = "src-resolved-lit"
+            source_type = "PRIMARY-LIT"
 
         # Build synthetic source & verification objects
         source = CatalogSource(
-            source_id="src-resolved",
+            source_id=source_id,
             source_type=source_type,
             role="direct_evidence_leaf",
             identifiers=(),
