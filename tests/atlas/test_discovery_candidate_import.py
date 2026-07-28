@@ -54,6 +54,13 @@ class FakeCitationResolver:
     def __init__(self):
         self.resolve_calls = []
         self.verify_span_calls = []
+        self.mapping = {
+            "PMID:12345": ("src-resolved-lit", "PRIMARY-LIT"),
+            "PMCID:PMC12345": ("src-resolved-lit", "PRIMARY-LIT"),
+            "DOI:10.5555/lit": ("src-resolved-lit", "PRIMARY-LIT"),
+            "ACCESSION:geo:GSE12345": ("src-resolved-dataset", "DATASET"),
+            "DOI:10.5555/abc": ("src-resolved-dataset", "DATASET"),
+        }
 
     def resolve(self, identifier):
         from raptor.atlas.model import CitationIdentifier
@@ -79,16 +86,13 @@ class FakeCitationResolver:
         if "fail-schema" in raw_id:
             raise AtlasCatalogSchemaError(f"Schema error for {raw_id}")
 
-        # Data-driven identification mapping
-        if "ACCESSION:geo" in raw_id or "GSE12345" in raw_id:
-            source_id = "src-resolved-dataset"
-            source_type = "DATASET"
-        elif raw_id == "DOI:10.5555/abc" and "ACCESSION:geo:GSE12345" in self.resolve_calls:
-            source_id = "src-resolved-dataset"
-            source_type = "DATASET"
+        # Data-driven identification mapping lookup
+        if raw_id in self.mapping:
+            source_id, source_type = self.mapping[raw_id]
         else:
-            source_id = "src-resolved-lit"
-            source_type = "PRIMARY-LIT"
+            is_dataset = "ACCESSION:geo" in raw_id
+            source_id = "src-resolved-dataset" if is_dataset else "src-resolved-lit"
+            source_type = "DATASET" if is_dataset else "PRIMARY-LIT"
 
         # Build synthetic source & verification objects
         source = CatalogSource(
@@ -626,7 +630,7 @@ def test_bib_raw_payloads_success_and_reject_prefixed():
             "bib": {
                 "pmid": "12345",
                 "pmcid": "PMC12345",
-                "doi": "10.5555/abc"
+                "doi": "10.5555/lit"
             }
         }],
         retrieval_provenance={
@@ -644,7 +648,7 @@ def test_bib_raw_payloads_success_and_reject_prefixed():
     # Prove spy resolver received exact prefixed concatenated forms
     assert "PMID:12345" in fake_resolver.resolve_calls
     assert "PMCID:PMC12345" in fake_resolver.resolve_calls
-    assert "DOI:10.5555/abc" in fake_resolver.resolve_calls
+    assert "DOI:10.5555/lit" in fake_resolver.resolve_calls
 
     # 2. Successful synthetic setup with DATASET raw scheme-less accession payloads
     cand_valid_dataset = model_mod.AtlasCandidateImport(
@@ -785,7 +789,7 @@ def test_all_aliases_must_agree():
             "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
             "bib": {
                 "pmid": "12345",
-                "doi": "10.5555/abc"
+                "doi": "10.5555/lit"
             }
         }],
         retrieval_provenance={
@@ -962,3 +966,62 @@ def test_pure_preimplementation_fixture_shape_audit():
     assert binding["pack_id"] == "synthpack"
     assert binding["pack_version"] == "1.0.0"
     assert binding["pack_content_hash"] == "bf7369f8faa24a6f746956ee1122281e798185f320b012a844ffbc683f2e7b21"
+
+
+def test_fake_resolver_pure_assertions():
+    """Verify that FakeCitationResolver lookup result never depends on prior calls or resolution order."""
+    try:
+        from raptor.atlas.model import CitationIdentifier, AtlasCitationResolutionError
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
+
+    resolver = FakeCitationResolver()
+
+    # 1. Resolve dataset DOI first, then accession
+    doi_id = CitationIdentifier("DOI", "10.5555/abc", "DOI:10.5555/abc")
+    acc_id = CitationIdentifier("ACCESSION", "geo:GSE12345", "ACCESSION:geo:GSE12345")
+
+    res_doi_first = resolver.resolve(doi_id)
+    res_acc_second = resolver.resolve(acc_id)
+
+    assert res_doi_first.source.source_id == "src-resolved-dataset"
+    assert res_doi_first.source.source_type == "DATASET"
+    assert res_acc_second.source.source_id == "src-resolved-dataset"
+    assert res_acc_second.source.source_type == "DATASET"
+
+    # 2. Reset resolver and resolve accession first, then DOI
+    resolver_2 = FakeCitationResolver()
+    res_acc_first = resolver_2.resolve(acc_id)
+    res_doi_second = resolver_2.resolve(doi_id)
+
+    assert res_acc_first.source.source_id == "src-resolved-dataset"
+    assert res_acc_first.source.source_type == "DATASET"
+    assert res_doi_second.source.source_id == "src-resolved-dataset"
+    assert res_doi_second.source.source_type == "DATASET"
+
+    # 3. Repeated DOI always returns the exact same ResolvedCitation/source/type
+    res_doi_repeated = resolver_2.resolve(doi_id)
+    assert res_doi_repeated.source.source_id == res_doi_second.source.source_id
+    assert res_doi_repeated.source.source_type == res_doi_second.source.source_type
+
+    # 4. Lit aliases stable
+    pmid_id = CitationIdentifier("PMID", "12345", "PMID:12345")
+    pmcid_id = CitationIdentifier("PMCID", "PMC12345", "PMCID:PMC12345")
+    lit_doi_id = CitationIdentifier("DOI", "10.5555/lit", "DOI:10.5555/lit")
+
+    res_pmid = resolver_2.resolve(pmid_id)
+    res_pmcid = resolver_2.resolve(pmcid_id)
+    res_lit_doi = resolver_2.resolve(lit_doi_id)
+
+    assert res_pmid.source.source_id == "src-resolved-lit"
+    assert res_pmid.source.source_type == "PRIMARY-LIT"
+    assert res_pmcid.source.source_id == "src-resolved-lit"
+    assert res_pmcid.source.source_type == "PRIMARY-LIT"
+    assert res_lit_doi.source.source_id == "src-resolved-lit"
+    assert res_lit_doi.source.source_type == "PRIMARY-LIT"
+
+    # 5. Fail sentinel raises regardless of order
+    fail_citation_id = CitationIdentifier("DOI", "10.9999/fail-citation", "DOI:10.9999/fail-citation")
+    with pytest.raises(AtlasCitationResolutionError):
+        resolver_2.resolve(fail_citation_id)
+
