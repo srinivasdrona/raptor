@@ -79,6 +79,12 @@ _GROUNDING_VERIFICATION = "verified"
 _SHA256_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
 # Exact mirror of citation.py's own ``_TEXT_NORMALIZATION_ID``.
 _GROUNDING_TEXT_NORMALIZATION_ID = "atlas.text_norm.v1"
+# Exact mirror (never imported) of citation.py's own
+# ``_TEXT_CHAR_LOCATOR_RE`` -- promote.py depends only on model.py and the
+# injected resolver (import_independence), so Gate 4's own offset-binding
+# check parses the ``text-char:<start>:<end>`` grammar independently of
+# whatever the resolver itself used to build/verify the locator.
+_GATE4_TEXT_CHAR_LOCATOR_RE = re.compile(r"^text-char:([0-9]+):([0-9]+)$")
 # A path segment consisting solely of one-or-more '.' characters ("." /
 # ".." / "..." / ...) is never a real relative file name -- reject any of
 # them, not merely the classic ".." traversal segment.
@@ -563,6 +569,52 @@ def _require_extracted_pin_complete_for_span(
         )
 
 
+def _parse_gate4_text_char_locator(entry_id: Any, locator: str) -> Optional[Tuple[int, int]]:
+    """Strictly parse a ``text-char:<start>:<end>`` locator string against
+    the exact grammar mirrored (never imported) from citation.py's own
+    ``_TEXT_CHAR_LOCATOR_RE``, so Gate 4's resolver-offset binding check
+    below is independently re-derived rather than trusting the resolver's
+    own parsing of the same string.
+
+    A locator that does not even DECLARE the ``text-char:`` scheme (i.e.
+    lacks the ``text-char:`` prefix entirely) is some other locator scheme
+    opaque to this offset-binding check -- it is left to the pre-existing
+    length/self-consistency check alone, so this returns ``None`` rather
+    than raising (this is the only scheme Gate 4 knows how to bind
+    ``VerifiedSpan.start``/``end`` against, but rejecting every other
+    scheme outright is out of scope for this defense-in-depth check).
+
+    Once a locator DOES declare the ``text-char:`` scheme, it must fully
+    match the grammar -- ``start``/``end`` must each be a bare decimal
+    nonnegative integer (the ``[0-9]+`` grammar already rejects a leading
+    ``-``/``+`` sign or any non-digit) and ``end`` must be ``>= start`` --
+    or it fails closed with :class:`AtlasProvenanceError`. The raw
+    ``span_proposed.locator`` field's more permissive "nonblank string"
+    shape was already enforced structurally (as :class:`AtlasSchemaError`,
+    before the resolver was ever invoked) by ``_validate_span_proposed_shape``;
+    a locator that fails THIS stricter grammar check here is instead a
+    provenance/binding failure, because it only surfaces once we are about
+    to trust the resolver's own reported offsets against it."""
+
+    if not locator.startswith("text-char:"):
+        return None
+    match = _GATE4_TEXT_CHAR_LOCATOR_RE.match(locator)
+    if not match:
+        raise AtlasProvenanceError(
+            f"proposed claim referencing {entry_id!r} has a span locator {locator!r} that "
+            "declares the 'text-char:' scheme but does not match the "
+            "'text-char:<start>:<end>' grammar"
+        )
+    start = int(match.group(1))
+    end = int(match.group(2))
+    if end < start:
+        raise AtlasProvenanceError(
+            f"proposed claim referencing {entry_id!r} has a span locator {locator!r} whose "
+            "end offset is less than its start offset"
+        )
+    return start, end
+
+
 def _validate_verified_span_shape(
     entry_id: Any, resolved: ResolvedCitation, span: Span, verified: Any
 ) -> VerifiedSpan:
@@ -576,7 +628,18 @@ def _validate_verified_span_shape(
     (already independently corroborated against the source's own declared
     extracted pin by ``_require_extracted_pin_complete_for_span``), and the
     internal ``start``/``end``/``exact_quote`` offset consistency -- never
-    a raw ``TypeError``/``AttributeError`` on a malformed field."""
+    a raw ``TypeError``/``AttributeError`` on a malformed field.
+
+    Critically, matching ``verified.locator == span.locator`` as a STRING
+    is not sufficient binding on its own: a resolver could return the
+    exact requested locator string yet report DIFFERENT ``start``/``end``
+    integers that merely happen to be internally self-consistent with
+    ``exact_quote``'s length (e.g. a duplicate/repeated quote occurring at
+    more than one offset). So whenever the requested locator declares the
+    ``text-char:`` scheme, it is independently re-parsed here via
+    ``_parse_gate4_text_char_locator`` and ``verified.start``/``verified.end``
+    are additionally required to be EXACTLY equal to the locator's own
+    decoded offsets -- not merely length-consistent with ``exact_quote``."""
 
     if not isinstance(verified, VerifiedSpan):
         raise AtlasProvenanceError(
@@ -595,16 +658,19 @@ def _validate_verified_span_shape(
             f"citation resolver verify_span result is not bound to the exact resolved "
             f"source/span requested for proposed claim referencing {entry_id!r}"
         )
+    locator_offsets = _parse_gate4_text_char_locator(entry_id, span.locator)
     if (
         not _is_int_not_bool(verified.start)
         or not _is_int_not_bool(verified.end)
         or verified.start < 0
         or verified.end < verified.start
+        or (locator_offsets is not None and (verified.start, verified.end) != locator_offsets)
         or (verified.end - verified.start) != len(verified.exact_quote)
     ):
         raise AtlasProvenanceError(
-            f"citation resolver verify_span returned an internally inconsistent "
-            f"start/end/exact_quote offset for proposed claim referencing {entry_id!r}"
+            f"citation resolver verify_span returned a start/end offset that does not "
+            f"exactly match the requested span locator's own 'text-char:<start>:<end>' "
+            f"offsets for proposed claim referencing {entry_id!r}"
         )
     if (
         not isinstance(verified.extracted_text_sha256, str)
