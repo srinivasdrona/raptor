@@ -69,20 +69,40 @@ _DOI_TRAILING_PUNCTUATION = (".", ",", ";", ":", ")", "\u2014")
 # Grounding-predicate constants (grounding_eligibility in the spec). These
 # MIRROR (never import) citation.py's own values -- promote.py depends only
 # on model.py and the injected resolver (import_independence) -- so Gate 3
-# can independently re-derive the FULL grounding predicate from a resolved
-# CatalogSource/ContentVerification rather than trusting the resolver's own
-# content_verified=True signal.
+# / Gate 4 can independently re-derive the FULL grounding predicate from a
+# resolved CatalogSource/ContentVerification/VerifiedSpan rather than
+# trusting the resolver's own content_verified=True/success signal.
 _GROUNDING_PERMITTED_USE = "grounding_and_quote"
 _GROUNDING_VERIFICATION = "verified"
+# Exact mirror of citation.py's own ``_SHA256_HEX_RE`` -- a lowercase
+# 64-hex digest, never uppercase/short/invalid-char.
+_SHA256_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
+# Exact mirror of citation.py's own ``_TEXT_NORMALIZATION_ID``.
+_GROUNDING_TEXT_NORMALIZATION_ID = "atlas.text_norm.v1"
+# A path segment consisting solely of one-or-more '.' characters ("." /
+# ".." / "..." / ...) is never a real relative file name -- reject any of
+# them, not merely the classic ".." traversal segment.
+_ALL_DOTS_PATH_SEGMENT_RE = re.compile(r"^\.+$")
+
+
+def _is_int_not_bool(value: Any) -> bool:
+    """``bool`` is an ``int`` subclass in Python -- a byte_length of
+    ``True`` must never be silently accepted as ``1``."""
+
+    return isinstance(value, int) and not isinstance(value, bool)
 
 
 def _is_safe_relative_path(value: Any) -> bool:
     """Structural (no filesystem I/O) plausibility check mirroring
     citation.py's ``_resolve_content_artifact`` path-safety rules:
     promote.py has no ``content_root`` and never touches the filesystem
-    itself, but a resolver-declared ``raw_relative_path`` must at least be
-    a nonblank, non-drive-qualified, non-absolute, traversal-free relative
-    path string before its declared content pin is trusted as complete."""
+    itself, but a resolver-declared ``raw_relative_path``/
+    ``extracted_relative_path`` must at least be a nonblank,
+    non-drive-qualified, non-absolute, traversal-free relative path
+    string before its declared content pin is trusted as complete.
+    Also rejects ``.``, ``..``, ``...`` (and any other all-dots segment,
+    including a bare all-dots ``value`` that normalizes to zero path
+    ``parts`` under ``pathlib``) -- none of these are real file names."""
 
     if not isinstance(value, str) or not value:
         return False
@@ -91,7 +111,12 @@ def _is_safe_relative_path(value: Any) -> bool:
     candidate = Path(value)
     if candidate.drive or candidate.is_absolute():
         return False
-    if ".." in candidate.parts:
+    parts = candidate.parts
+    if not parts:
+        # e.g. "." alone normalizes away to zero parts under pathlib and
+        # would resolve to content_root itself -- never a real file.
+        return False
+    if any(_ALL_DOTS_PATH_SEGMENT_RE.match(part) for part in parts):
         return False
     return True
 
@@ -269,21 +294,27 @@ def _validate_resolved_citation_shape(
     Finally, independently re-derives the FULL spec ``grounding_predicate``
     from the resolved ``CatalogSource``/``ContentVerification`` -- never
     trusting the resolver's bare ``content_verified=True`` claim alone --
-    exactly mirroring (never importing) ``LocalCitationResolver.resolve()``'s
-    own predicate: ``permitted_use == 'grounding_and_quote'``,
-    ``verification == 'verified'``, a complete/valid ``raw_artifact`` pin
-    (nonblank safe relative path, nonblank declared sha256, a POSITIVE
-    -- not merely non-negative -- int byte_length that is not a ``bool``,
-    and a nonblank media_type string), and a ``ContentVerification`` whose
-    own ``raw_sha256``/``raw_byte_length`` match the source's DECLARED raw
-    pin exactly, and whose ``extracted_text_sha256``/
+    exactly mirroring (never importing) citation.py's own catalog-schema
+    validation (``_validate_artifact_pin``) and
+    ``LocalCitationResolver.resolve()``'s predicate:
+    ``permitted_use == 'grounding_and_quote'``, ``verification ==
+    'verified'``, a complete/valid ``raw_artifact`` pin (nonblank safe
+    relative path -- rejecting ``.``/``..``/``...``/any all-dots segment
+    and absolute/drive/UNC/backslash traversal, a lowercase 64-hex
+    ``sha256``, a non-negative (zero IS valid, per the catalog schema)
+    ``int`` ``byte_length`` that is not a ``bool``, and a nonblank
+    media_type string), and a ``ContentVerification`` whose own
+    ``raw_sha256``/``raw_byte_length`` match the source's DECLARED raw pin
+    exactly (both are separately format/type-checked, not merely compared
+    for equality), and whose ``extracted_text_sha256``/
     ``extracted_text_byte_length`` match the source's declared extracted
     pin exactly whenever the source declares one (extracted-text pins
-    remain OPTIONAL at resolve/grounding time per spec -- required only to
-    additionally satisfy a claim SPAN, verified later at Gate 4's
-    ``verify_span``, not here). Any missing/malformed/inconsistent field
-    fails closed with :class:`AtlasProvenanceError`, never a raw
-    ``TypeError``/``AttributeError``."""
+    remain OPTIONAL at resolve/grounding time per spec -- a claim SPAN
+    additionally REQUIRES a complete one, enforced independently by Gate
+    4's own extracted-pin completeness check, not here). Any missing/
+    malformed/inconsistent field fails closed with
+    :class:`AtlasProvenanceError`, never a raw ``TypeError``/
+    ``AttributeError``."""
 
     if not isinstance(resolved, ResolvedCitation):
         raise AtlasProvenanceError(
@@ -370,23 +401,22 @@ def _validate_resolved_citation_shape(
         )
     if (
         not isinstance(source.raw_declared_sha256, str)
-        or not source.raw_declared_sha256
+        or not _SHA256_HEX_RE.match(source.raw_declared_sha256)
     ):
         raise AtlasProvenanceError(
-            f"citation resolver returned a source with an invalid or missing "
-            f"raw_declared_sha256 {source.raw_declared_sha256!r} for proposed source "
-            f"{entry_id!r} identifier {canonical_string!r}"
+            f"citation resolver returned a source with an invalid raw_declared_sha256 "
+            f"{source.raw_declared_sha256!r} for proposed source {entry_id!r} identifier "
+            f"{canonical_string!r}; expected a lowercase 64-hex sha256 digest"
         )
     if (
-        not isinstance(source.raw_declared_byte_length, int)
-        or isinstance(source.raw_declared_byte_length, bool)
-        or source.raw_declared_byte_length <= 0
+        not _is_int_not_bool(source.raw_declared_byte_length)
+        or source.raw_declared_byte_length < 0
     ):
         raise AtlasProvenanceError(
             f"citation resolver returned a source with an invalid "
             f"raw_declared_byte_length {source.raw_declared_byte_length!r} for proposed "
             f"source {entry_id!r} identifier {canonical_string!r}; a grounding-eligible "
-            "raw artifact must declare a positive byte length"
+            "raw artifact must declare a non-negative int byte length (zero is valid)"
         )
     if not isinstance(source.raw_media_type, str) or not source.raw_media_type:
         raise AtlasProvenanceError(
@@ -398,9 +428,9 @@ def _validate_resolved_citation_shape(
     content = resolved.content
     if (
         not isinstance(content.raw_sha256, str)
+        or not _SHA256_HEX_RE.match(content.raw_sha256)
         or content.raw_sha256 != source.raw_declared_sha256
-        or not isinstance(content.raw_byte_length, int)
-        or isinstance(content.raw_byte_length, bool)
+        or not _is_int_not_bool(content.raw_byte_length)
         or content.raw_byte_length != source.raw_declared_byte_length
     ):
         raise AtlasProvenanceError(
@@ -409,10 +439,11 @@ def _validate_resolved_citation_shape(
             f"{canonical_string!r}"
         )
     # extracted-text pins remain OPTIONAL at resolve()/grounding time (only
-    # required to additionally satisfy a claim SPAN at Gate 4's
-    # verify_span), but whenever the source itself DECLARES an extracted
-    # pin, the resolver's own ContentVerification must agree with it
-    # exactly -- a resolver may not silently drift the two apart.
+    # required to additionally satisfy a claim SPAN, independently enforced
+    # by Gate 4's own extracted-pin completeness check), but whenever the
+    # source itself DECLARES an extracted pin, the resolver's own
+    # ContentVerification must agree with it exactly -- a resolver may not
+    # silently drift the two apart.
     if source.extracted_declared_sha256 is not None and (
         content.extracted_text_sha256 != source.extracted_declared_sha256
     ):
@@ -433,6 +464,100 @@ def _validate_resolved_citation_shape(
     return resolved
 
 
+def _require_extracted_pin_complete_for_span(
+    entry_id: Any, resolved: ResolvedCitation, span: Span
+) -> None:
+    """Independently re-derive completeness of the resolved source's
+    extracted-text pin BEFORE trusting ``verify_span()``'s result --
+    extracted-text pins are OPTIONAL at Gate 3/``resolve()`` time (a
+    direct_evidence_leaf source may ground claims that carry no textual
+    span), but THIS claim's ``text-char`` span requires an exact slice of
+    extracted text, so its source must declare a COMPLETE, internally
+    consistent extracted-text artifact pin. Mirrors (never imports)
+    citation.py's catalog-load-time ``_validate_extracted_text`` (all six
+    sub-fields required together) plus its ``verify_span``/
+    ``verify_content`` content-drift re-checks. Any missing, malformed, or
+    inconsistent field fails closed with :class:`AtlasProvenanceError`
+    before the resolver's ``verify_span`` is ever called."""
+
+    source = resolved.source
+    if not _is_safe_relative_path(source.extracted_relative_path):
+        raise AtlasProvenanceError(
+            f"proposed claim referencing source {entry_id!r} requires a text-char span, "
+            "but the resolved source has no complete/safe extracted_relative_path "
+            f"({source.extracted_relative_path!r})"
+        )
+    if (
+        not isinstance(source.extracted_declared_sha256, str)
+        or not _SHA256_HEX_RE.match(source.extracted_declared_sha256)
+    ):
+        raise AtlasProvenanceError(
+            f"proposed claim referencing source {entry_id!r} requires a text-char span, "
+            "but the resolved source has an invalid extracted_declared_sha256 "
+            f"({source.extracted_declared_sha256!r})"
+        )
+    if (
+        not _is_int_not_bool(source.extracted_declared_byte_length)
+        or source.extracted_declared_byte_length < 0
+    ):
+        raise AtlasProvenanceError(
+            f"proposed claim referencing source {entry_id!r} requires a text-char span, "
+            "but the resolved source has an invalid extracted_declared_byte_length "
+            f"({source.extracted_declared_byte_length!r})"
+        )
+    quote_length = len(span.exact_quote or "")
+    if quote_length > 0 and source.extracted_declared_byte_length == 0:
+        # Zero extracted bytes is structurally VALID on its own (matches
+        # the catalog loader's non-negative rule), but this claim's
+        # nonblank exact_quote/offset span logically cannot be sliced out
+        # of a zero-byte extracted-text artifact.
+        raise AtlasProvenanceError(
+            f"proposed claim referencing source {entry_id!r} pins a zero-byte "
+            "extracted-text artifact, which cannot contain the claim's nonblank "
+            "exact_quote/offset span"
+        )
+    if not isinstance(source.extraction_method, str) or not source.extraction_method:
+        raise AtlasProvenanceError(
+            f"proposed claim referencing source {entry_id!r} requires a text-char span, "
+            f"but the resolved source has an invalid extraction_method "
+            f"({source.extraction_method!r})"
+        )
+    if not isinstance(source.extraction_version, str) or not source.extraction_version:
+        raise AtlasProvenanceError(
+            f"proposed claim referencing source {entry_id!r} requires a text-char span, "
+            f"but the resolved source has an invalid extraction_version "
+            f"({source.extraction_version!r})"
+        )
+    if source.text_normalization != _GROUNDING_TEXT_NORMALIZATION_ID:
+        raise AtlasProvenanceError(
+            f"proposed claim referencing source {entry_id!r} requires a text-char span, "
+            f"but the resolved source's text_normalization "
+            f"{source.text_normalization!r} is not exactly "
+            f"{_GROUNDING_TEXT_NORMALIZATION_ID!r}"
+        )
+
+    content = resolved.content
+    if (
+        not isinstance(content.extracted_text_sha256, str)
+        or not _SHA256_HEX_RE.match(content.extracted_text_sha256)
+        or content.extracted_text_sha256 != source.extracted_declared_sha256
+    ):
+        raise AtlasProvenanceError(
+            f"proposed claim referencing source {entry_id!r}: resolved "
+            "ContentVerification.extracted_text_sha256 does not corroborate the source's "
+            "declared extracted-text pin"
+        )
+    if (
+        not _is_int_not_bool(content.extracted_text_byte_length)
+        or content.extracted_text_byte_length != source.extracted_declared_byte_length
+    ):
+        raise AtlasProvenanceError(
+            f"proposed claim referencing source {entry_id!r}: resolved "
+            "ContentVerification.extracted_text_byte_length does not corroborate the "
+            "source's declared extracted-text pin"
+        )
+
+
 def _validate_verified_span_shape(
     entry_id: Any, resolved: ResolvedCitation, span: Span, verified: Any
 ) -> VerifiedSpan:
@@ -440,7 +565,13 @@ def _validate_verified_span_shape(
     EXACT result type of ``verify_span()`` and assert it is bound to the
     EXACT resolved source and the EXACT span that was requested -- a
     resolver that verifies a DIFFERENT source/locator/quote than the one
-    Gate 4 asked about must not be trusted."""
+    Gate 4 asked about must not be trusted. Also validates the ONE
+    extracted-artifact binding field ``VerifiedSpan`` itself carries
+    (``extracted_text_sha256``) against the resolved ``ContentVerification``
+    (already independently corroborated against the source's own declared
+    extracted pin by ``_require_extracted_pin_complete_for_span``), and the
+    internal ``start``/``end``/``exact_quote`` offset consistency -- never
+    a raw ``TypeError``/``AttributeError`` on a malformed field."""
 
     if not isinstance(verified, VerifiedSpan):
         raise AtlasProvenanceError(
@@ -448,15 +579,40 @@ def _validate_verified_span_shape(
             f"referencing {entry_id!r}; expected VerifiedSpan"
         )
     if (
-        verified.source_id != resolved.source.source_id
+        not isinstance(verified.source_id, str)
+        or verified.source_id != resolved.source.source_id
+        or not isinstance(verified.locator, str)
         or verified.locator != span.locator
+        or not isinstance(verified.exact_quote, str)
         or verified.exact_quote != span.exact_quote
     ):
         raise AtlasProvenanceError(
             f"citation resolver verify_span result is not bound to the exact resolved "
             f"source/span requested for proposed claim referencing {entry_id!r}"
         )
+    if (
+        not _is_int_not_bool(verified.start)
+        or not _is_int_not_bool(verified.end)
+        or verified.start < 0
+        or verified.end < verified.start
+        or (verified.end - verified.start) != len(verified.exact_quote)
+    ):
+        raise AtlasProvenanceError(
+            f"citation resolver verify_span returned an internally inconsistent "
+            f"start/end/exact_quote offset for proposed claim referencing {entry_id!r}"
+        )
+    if (
+        not isinstance(verified.extracted_text_sha256, str)
+        or not _SHA256_HEX_RE.match(verified.extracted_text_sha256)
+        or verified.extracted_text_sha256 != resolved.content.extracted_text_sha256
+    ):
+        raise AtlasProvenanceError(
+            f"citation resolver verify_span result's extracted_text_sha256 does not "
+            f"corroborate the resolved source's own verified content for proposed claim "
+            f"referencing {entry_id!r}"
+        )
     return verified
+
 
 
 def _is_valid_named_signoff(signoff: Any) -> bool:
@@ -729,6 +885,12 @@ def _gate4_exact_span_resolution(
             exact_quote=span_proposed.get("exact_quote"),
             page_or_figure=span_proposed.get("page_or_figure"),
         )
+        # This claim's text-char span requires a COMPLETE, internally
+        # consistent extracted-text pin on the resolved source -- checked
+        # independently BEFORE ever calling the resolver's verify_span, so
+        # an incomplete/malformed pin fails closed without depending on
+        # the resolver's own (possibly buggy/malicious) behavior.
+        _require_extracted_pin_complete_for_span(source_ref, resolved, span)
         try:
             verified = context.citation_resolver.verify_span(resolved, span)
         except AtlasCatalogError as exc:
