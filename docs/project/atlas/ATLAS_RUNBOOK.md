@@ -94,3 +94,81 @@ Before any real-world claim or span may be admitted:
 Until all of the above are satisfied, this repository's Mechanism Atlas
 remains Phase 1: synthetic-only, disease-pack-scoped, and non-authoritative
 for any clinical, classification, or treatment purpose.
+
+## Phase 2 citation resolver (usage & limits)
+
+> Governed by ADR-0016 and `docs/project/specs/atlas-citation-resolver-v1.yaml`.
+> The resolver is the deterministic enforcement of ADR-0015: it is how a real
+> claim gets grounded to a primary source and an exact span. It is planned, not
+> yet implemented; this section states its intended usage and hard limits.
+
+**Posture.** The resolver (`src/raptor/atlas/citation.py`) is **offline,
+deterministic, and fail-closed**. It performs **no network access of any kind**
+(a static AST guard, `assert_no_network_imports`, forbids network imports across
+the Atlas package). Source acquisition and text extraction are a **separate
+future adapter** and are out of scope; the resolver only verifies content that is
+already staged locally.
+
+**What it resolves.** Normalized `PMID` / `PMCID` / `DOI` / `ACCESSION`
+identifiers against a versioned, hash-bound **local catalog**
+(`configs/atlas/catalogs/<catalog_id>/catalog.yaml`, schema
+`atlas.citation_catalog.v1`). The committed `tsc2` catalog template is
+metadata-only (`sources: []`); real source artifacts and extracted-text files are
+**never committed** and live under an explicitly supplied external content root,
+referenced only by relative path.
+
+**Usage (planned).**
+
+1. `raptor.atlas.citation.load_catalog(path_or_catalog_id, *, content_root)` — both
+   arguments accept `str | os.PathLike[str]`. A `str` `path_or_catalog_id` is
+   classified stat-independently: a safe bare token (`^[A-Za-z0-9_-]+$`, no path
+   syntax) is a catalog **id** resolved under the repo-root catalog root
+   (`configs/atlas/catalogs/<id>/catalog.yaml`); anything with a separator, drive/UNC
+   prefix, `.`/`..`, or a `.yaml`/`.yml` suffix is an **explicit path**, as is any
+   `os.PathLike`. It validates structure, recomputes/verifies
+   `atlas.citation_catalog_content_hash.v1` fail-closed, and deep-freezes the catalog.
+2. `raptor.atlas.citation.normalize_identifier(raw)` canonicalizes an identifier
+   (`PMID:...`, `PMCID:PMC...`, `DOI:...`, `ACCESSION:<namespace>:<opaque>`). It stays
+   flexible for direct callers (accepts prefixed/`doi:`/`doi.org` URL forms).
+3. `resolver = LocalCitationResolver(catalog)`; `resolver.resolve(identifier)`
+   returns a content-verified `ResolvedCitation` (raw + extracted-text
+   `sha256`/byte-length recomputed from disk); `resolver.verify_span(resolved,
+   span)` verifies an `exact_quote` at a `text-char:<start>:<end>` locator.
+4. In promotion, inject the resolver as `PromotionContext.citation_resolver` (now
+   a typed `CitationResolver` protocol). Candidate `bib` fields carry **raw,
+   scheme-less** payloads (`pmid` digits, `pmcid` `PMC…`, `doi` bare `10.…`,
+   `accession` `<namespace>:<opaque>`); Gate 3 constructs the prefixed identifier by
+   concatenation and rejects an already-prefixed/URL/whitespace bib value structurally
+   (`AtlasSchemaError`) before resolving every `direct_evidence_leaf` source; Gate 4
+   verifies each linked claim's exact span. The eight-gate order is unchanged and the
+   named-human Gate 8 review still runs **after** deterministic verification.
+
+**Hard limits.**
+
+* A source can ground a claim **only** if all hold: `role == direct_evidence_leaf`;
+  `source_type` in `{PRIMARY-LIT, DATASET}`; `permitted_use == grounding_and_quote`;
+  `verification == verified`; at least one supported identifier; and verified raw
+  content. Reviews, ClinVar, crosswalks, context/provenance-only, not-yet-verified
+  (`confirm_pending`/`unverified`), or licence-not-cleared sources, and internal
+  handoffs can never be a grounding leaf. `load_catalog` checks structure only;
+  `resolve` enforces the full grounding predicate and fails closed
+  (`AtlasCitationResolutionError`) for a non-grounding source.
+* Resolver failures are typed under the `AtlasCatalogError` family and are raised
+  only by the resolver; promotion Gate 3/4 **translate** them into the existing
+  `AtlasProvenanceError` / `AtlasSchemaError`, and the static network guard raises
+  `AtlasLeakageError`.
+* Catalog-declared hashes are **never trusted**; raw and extracted-text hashes are
+  recomputed from disk and drift fails closed. Path traversal, absolute/drive
+  paths, and symlink/junction escape of the content root are rejected.
+* Span matching is **exact** against text normalized by `atlas.text_norm.v1`
+  (CRLF/CR→LF, Unicode NFC, no case-fold, no whitespace collapse), using character
+  offsets. **No fuzzy matching**; missing, duplicate, mismatched or out-of-range
+  spans fail. The resolver does **not** parse PDF/HTML/XML — it verifies a
+  separately generated extracted-text artifact plus the raw file hash.
+* The resolver guarantees source **fidelity and identity**, not scientific
+  **sufficiency**; whether a verified quote actually supports the claim remains the
+  named human oracle's decision at Gate 8.
+
+Real R611Q source acquisition, extraction, and a real catalog follow **after** the
+resolver is checker-clean, under a separate external, uncommitted content root with
+only public/appropriately-licensed, non-patient, non-paywalled content.

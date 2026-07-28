@@ -1,0 +1,29 @@
+# Mechanism Atlas -- citation catalog manifest (atlas.citation_catalog.v1)
+#
+# Phase-2 committed template for the tsc2 catalog: METADATA-ONLY, sources: []
+# (zero source rows). Loads successfully against any existing content_root
+# directory and references no external file. It carries NO real R611Q source,
+# content, identifier, patient data, or paywalled material -- see
+# docs/project/specs/atlas-citation-resolver-v1.yaml (external_content_root
+# .committed_template_rule). Real R611Q/pilot catalogs and content are
+# created out of band under an externally-supplied content root and are
+# NEVER committed to this repository.
+schema: atlas.citation_catalog.v1
+catalog_id: tsc2
+catalog_version: 1.0.0-phase2-template
+catalog_content_hash: 2dc4b81c5c591b9bf5b1928112d3bcc97ab417b7fa7de5e1552455cddcc5e56d
+disease_pack_binding:
+  pack_id: tsc2
+  pack_version: 1.0.0-phase1
+  pack_content_hash: 289068af23ead6076e82265eb4e4e47a210bc21b01ba3f9e6e2b6054d98b14a8
+content_root_policy:
+  description: >-
+    Source raw and extracted-text artifacts are never committed to this
+    repository and are never referenced by absolute path. They live under
+    an explicit, externally-supplied allowed content root (an absolute
+    directory on the operator machine) and are referenced here only via
+    paths relative to that root.
+  root_supplied_by: >-
+    caller (load_catalog content_root parameter); the library never reads
+    the environment.
+sources: []

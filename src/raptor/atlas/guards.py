@@ -28,6 +28,34 @@ FORBIDDEN_ATLAS_IMPORT_PREFIXES = ("raptor.packet", "raptor.scorer", "raptor.eva
 FORBIDDEN_CONSUMER_MODULES = ("raptor.packet", "raptor.scorer", "raptor.eval")
 ATLAS_MODULE_PREFIX = "raptor.atlas"
 
+#: Static AST network-import guard (ADR-0016 / atlas-citation-resolver-v1 spec,
+#: section ``network_guard``): the citation resolver is strictly offline, so
+#: no module under the atlas package may import any of these network-capable
+#: modules (stdlib or third-party).
+FORBIDDEN_NETWORK_IMPORT_PREFIXES = (
+    "socket",
+    "ssl",
+    "http",
+    "urllib",
+    "urllib2",
+    "urllib3",
+    "httplib",
+    "http.client",
+    "requests",
+    "httpx",
+    "aiohttp",
+    "ftplib",
+    "telnetlib",
+    "asyncio",
+    "xmlrpc",
+    "smtplib",
+    "Bio.Entrez",
+    "pycurl",
+    "websocket",
+    "websockets",
+    "grpc",
+)
+
 FORBIDDEN_LEAKAGE_KEYS = frozenset({"classifier_score", "clinvar_derived_criterion"})
 FORBIDDEN_ACMG_CRITERIA = frozenset({"PP3", "BP4", "PP5", "BP6", "PS4", "PS3", "BS3"})
 
@@ -117,6 +145,37 @@ def assert_no_consumer_import(target: str = "raptor.atlas") -> None:
     if violations:
         raise AtlasLeakageError(
             "consumer import boundary violated:\n" + "\n".join(violations)
+        )
+
+
+def assert_no_network_imports(package_path: str = "src/raptor/atlas") -> None:
+    """Fail if any module under ``package_path`` (the atlas package by
+    default) imports a forbidden network-capable module.
+
+    Purely static (AST-based, mirrors :func:`assert_atlas_import_boundary`):
+    never introspects ``sys.modules`` or performs any dynamic import.
+    Additive to the existing atlas/consumer boundary guards; does not alter
+    their behavior. Raises :class:`AtlasLeakageError` naming the forbidden
+    module on the first offending import found.
+    """
+
+    root = _resolve_scan_root(package_path)
+    py_files = list(root.glob("**/*.py"))
+    if not py_files:
+        raise AtlasLeakageError(f"no Python files found under network-guard scan root {package_path!r}")
+
+    violations = []
+    for py_file in py_files:
+        for module_name in _iter_imported_module_names(py_file):
+            hit = _matches_forbidden_prefix(module_name, FORBIDDEN_NETWORK_IMPORT_PREFIXES)
+            if hit is not None:
+                violations.append(
+                    f"{py_file}: imports forbidden network module {module_name!r} (prefix {hit!r})"
+                )
+
+    if violations:
+        raise AtlasLeakageError(
+            "static network-import guard violated:\n" + "\n".join(violations)
         )
 
 

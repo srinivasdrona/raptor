@@ -910,7 +910,7 @@ def test_pure_preimplementation_fake_pack_568_audit():
         "prohibitions": {},
         "pilot_eval_metadata": {}
     }
-    
+
     canonical_bytes = json.dumps(fake_pack_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     assert len(canonical_bytes) == 568, f"Expected 568 bytes, got {len(canonical_bytes)}"
     computed_hash = hashlib.sha256(canonical_bytes).hexdigest().lower()
@@ -918,4 +918,45 @@ def test_pure_preimplementation_fake_pack_568_audit():
     assert computed_hash == expected_hash, f"Hash mismatch: computed {computed_hash}, expected {expected_hash}"
 
 
+def test_static_ast_network_import_guard(tmp_path):
+    """Verify that raptor.atlas has a static AST scan network-import guard."""
+    try:
+        from raptor.atlas.guards import assert_no_network_imports
+        from raptor.atlas.model import AtlasLeakageError
+    except (ImportError, AttributeError):
+        pytest.fail("RED: assert_no_network_imports or AtlasLeakageError not implemented", pytrace=False)
 
+    # 1. Run the guard over the atlas package (clean-tree positive)
+    assert_no_network_imports()
+
+    # 2. Verify with explicit path
+    assert_no_network_imports("src/raptor/atlas")
+
+    # 3. Non-vacuous negative: create a temp module importing a forbidden network module
+    bad_dir = tmp_path / "bad_pkg"
+    bad_dir.mkdir()
+    
+    # Negative test for requests
+    with open(bad_dir / "test_requests.py", "w", encoding="utf-8") as f:
+        f.write("import requests\n")
+        
+    with pytest.raises(AtlasLeakageError) as exc_info:
+        assert_no_network_imports(str(bad_dir))
+    assert "requests" in str(exc_info.value), f"Expected 'requests' in error, got: {exc_info.value}"
+
+    # Negative test for urllib.request
+    with open(bad_dir / "test_urllib.py", "w", encoding="utf-8") as f:
+        f.write("from urllib.request import urlopen\n")
+        
+    with pytest.raises(AtlasLeakageError) as exc_info:
+        assert_no_network_imports(str(bad_dir))
+    assert "urllib" in str(exc_info.value) or "urlopen" in str(exc_info.value), f"Expected 'urllib' in error, got: {exc_info.value}"
+
+    # 4. Allowed offline imports (no false-positives)
+    good_dir = tmp_path / "good_pkg"
+    good_dir.mkdir()
+    with open(good_dir / "offline.py", "w", encoding="utf-8") as f:
+        f.write("import ast\nimport json\nimport pathlib\nimport os\nimport sys\n")
+        
+    # Should not raise any error
+    assert_no_network_imports(str(good_dir))
