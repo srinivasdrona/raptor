@@ -1211,3 +1211,104 @@ def test_gemini_citation_identifiers_schema_validation_red(tmp_path):
         ])
 
 
+def test_gemini_catalog_content_hash_schema_validation_red(tmp_path):
+    """
+    Non-vacuous catalog_content_hash schema tests using otherwise-valid synthetic catalog.
+    Asserts compliance with the specification for catalog_content_hash:
+    - Exact lowercase 64-hex computed digest loads and stored catalog hash is exactly lowercase/recomputed.
+    - Uppercase and mixed-case correct digests must be rejected with AtlasCatalogSchemaError or AtlasCatalogHashError (no casefold).
+    - Malformed length, non-hex, blank, or non-string values must be rejected with typed exceptions.
+    - Direct catalog_content_hash() remains lowercase.
+    """
+    syms = get_resolver_symbols()
+    load_catalog = syms["load_catalog"]
+    catalog_content_hash = syms["catalog_content_hash"]
+    AtlasCatalogSchemaError = syms["AtlasCatalogSchemaError"]
+    AtlasCatalogHashError = syms["AtlasCatalogHashError"]
+
+    # Base valid manifest structure with no sources yet.
+    base_manifest = {
+        "schema": "atlas.citation_catalog.v1",
+        "catalog_id": "gemini-hash-test-catalog",
+        "catalog_version": "1.0.0",
+        "catalog_content_hash": "placeholder",
+        "disease_pack_binding": {
+            "pack_id": "synthpack",
+            "pack_version": "1.0.0",
+            "pack_content_hash": "bf7369f8faa24a6f746956ee1122281e798185f320b012a844ffbc683f2e7b21"
+        },
+        "content_root_policy": {"policy": "relative"},
+        "sources": []
+    }
+
+    # 1. Direct catalog_content_hash() remains lowercase 64-hex
+    h_direct = catalog_content_hash(base_manifest)
+    assert h_direct.islower(), "direct catalog_content_hash must be lowercase"
+    assert len(h_direct) == 64, "direct catalog_content_hash must be exactly 64 characters"
+    assert all(c in "0123456789abcdef" for c in h_direct), "direct catalog_content_hash must be hex digest"
+
+    def try_load_with_hash(h_val):
+        manifest = dict(base_manifest)
+        manifest["catalog_content_hash"] = h_val
+        manifest_file = tmp_path / "catalog_hash_test.yaml"
+        with open(manifest_file, "w", encoding="utf-8") as f:
+            yaml.safe_dump(manifest, f)
+        return load_catalog(manifest_file, content_root=tmp_path)
+
+    # 2. Exact lowercase 64hex computed digest loads and stored catalog hash is exactly lowercase/recomputed
+    loaded_catalog = try_load_with_hash(h_direct)
+    assert loaded_catalog is not None
+    assert loaded_catalog.catalog_content_hash == h_direct
+
+    # 3. Uppercase and mixed-case correct digest rejected with AtlasCatalogSchemaError/HashError (no casefold)
+    # This will fail on current production (RED) since current production accepts uppercase/mixed-case.
+    with pytest.raises((AtlasCatalogSchemaError, AtlasCatalogHashError)):
+        try_load_with_hash(h_direct.upper())
+
+    mixed_hash = h_direct[:32].upper() + h_direct[32:].lower()
+    with pytest.raises((AtlasCatalogSchemaError, AtlasCatalogHashError)):
+        try_load_with_hash(mixed_hash)
+
+    # 4. Malformed length/nonhex/blank/nonstring rejected typed
+    # - Malformed length (63 characters)
+    with pytest.raises((AtlasCatalogSchemaError, AtlasCatalogHashError)):
+        try_load_with_hash(h_direct[:-1])
+
+    # - Malformed length (65 characters)
+    with pytest.raises((AtlasCatalogSchemaError, AtlasCatalogHashError)):
+        try_load_with_hash(h_direct + "a")
+
+    # - Non-hex characters
+    nonhex_hash = h_direct[:-1] + "g"
+    with pytest.raises((AtlasCatalogSchemaError, AtlasCatalogHashError)):
+        try_load_with_hash(nonhex_hash)
+
+    # - Blank / Empty string
+    with pytest.raises((AtlasCatalogSchemaError, AtlasCatalogHashError)):
+        try_load_with_hash("")
+
+    # - Whitespace only
+    with pytest.raises((AtlasCatalogSchemaError, AtlasCatalogHashError)):
+        try_load_with_hash(" " * 64)
+
+    # - Non-string: integer
+    with pytest.raises((AtlasCatalogSchemaError, AtlasCatalogHashError)):
+        try_load_with_hash(12345)
+
+    # - Non-string: boolean
+    with pytest.raises((AtlasCatalogSchemaError, AtlasCatalogHashError)):
+        try_load_with_hash(True)
+
+    # - Non-string: None
+    with pytest.raises((AtlasCatalogSchemaError, AtlasCatalogHashError)):
+        try_load_with_hash(None)
+
+    # - Non-string: list
+    with pytest.raises((AtlasCatalogSchemaError, AtlasCatalogHashError)):
+        try_load_with_hash([h_direct])
+
+    # - Non-string: dict
+    with pytest.raises((AtlasCatalogSchemaError, AtlasCatalogHashError)):
+        try_load_with_hash({"hash": h_direct})
+
+
