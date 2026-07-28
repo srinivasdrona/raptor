@@ -1773,3 +1773,109 @@ def test_promotion_boundary_contracts():
     assert len(positive_extracted_resolver.verify_span_calls) > 0
 
 
+def test_gate4_raw_span_type_checks():
+    """Verify that Gate4 strictly validates raw span types and fields at schema/pre-check time,
+    raising AtlasSchemaError (and never attempting verify_span or leaking TypError) for invalid types.
+    """
+    try:
+        import raptor.atlas.model as model_mod
+        from raptor.atlas.promote import validate_candidate_import
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
+
+    mock_pack = make_schema_valid_disease_pack(model_mod)
+
+    # Base valid variant and retrieval
+    valid_variant = {
+        "spdi_proposed": "NC_000000.0:1000:A:T", "gene_proposed": "SYNGENE1", "hgvs_aliases": []
+    }
+    valid_retrieval = {
+        "agents": [], "queries": [], "run_id": "r1", "retrieved_at": "now",
+        "pack_binding": {
+            "pack_id": "synthpack", "pack_version": "1.0.0", "pack_content_hash": "bf7369f8faa24a6f746956ee1122281e798185f320b012a844ffbc683f2e7b21"
+        },
+        "prompt_hash": "h", "bookshelf_version": "v1"
+    }
+
+    def run_span_negative_case(span_proposed):
+        resolver = FakeCitationResolver()
+        ctx = model_mod.PromotionContext(
+            disease_pack=mock_pack,
+            citation_resolver=resolver,
+            context_validator=lambda kind, ctx: True,
+            human_oracle_reviewer=lambda cand_id: "sig",
+            duplicate_index={}
+        )
+        cand = model_mod.AtlasCandidateImport(
+            candidate_variant=valid_variant,
+            proposed_claims=[{
+                "claim_text": "text", "claim_kind_proposed": "pathway", "directionality": "increase",
+                "source_ref_proposed": "lit-1",
+                "span_proposed": span_proposed, "context_proposed": "cell-assay-A"
+            }],
+            proposed_sources=[{
+                "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+                "bib": {"pmid": "12345"}
+            }],
+            retrieval_provenance=valid_retrieval
+        )
+        with pytest.raises(model_mod.AtlasSchemaError):
+            validate_candidate_import(cand, ctx)
+        assert len(resolver.verify_span_calls) == 0, "Resolver's verify_span must never be called"
+
+    # 1. span_proposed is not a dict
+    run_span_negative_case("not-a-dict")
+    run_span_negative_case(["not-a-dict"])
+    run_span_negative_case(None)
+
+    # 2. locator missing/None/int/bool/list/blank/whitespace
+    run_span_negative_case({"exact_quote": "some quote"})
+    run_span_negative_case({"locator": None, "exact_quote": "some quote"})
+    run_span_negative_case({"locator": 123, "exact_quote": "some quote"})
+    run_span_negative_case({"locator": True, "exact_quote": "some quote"})
+    run_span_negative_case({"locator": ["L1"], "exact_quote": "some quote"})
+    run_span_negative_case({"locator": "", "exact_quote": "some quote"})
+    run_span_negative_case({"locator": "   ", "exact_quote": "some quote"})
+
+    # 3. exact_quote missing/None/int/bool/list/blank/whitespace
+    run_span_negative_case({"locator": "L1"})
+    run_span_negative_case({"locator": "L1", "exact_quote": None})
+    run_span_negative_case({"locator": "L1", "exact_quote": 123})
+    run_span_negative_case({"locator": "L1", "exact_quote": True})
+    run_span_negative_case({"locator": "L1", "exact_quote": ["some quote"]})
+    run_span_negative_case({"locator": "L1", "exact_quote": ""})
+    run_span_negative_case({"locator": "L1", "exact_quote": "   "})
+
+    # 4. page_or_figure wrong type if contract requires str
+    run_span_negative_case({"locator": "L1", "exact_quote": "some quote", "page_or_figure": 123})
+    run_span_negative_case({"locator": "L1", "exact_quote": "some quote", "page_or_figure": True})
+    run_span_negative_case({"locator": "L1", "exact_quote": "some quote", "page_or_figure": ["page-1"]})
+
+    # 5. Positive case: valid nonblank string is accepted
+    resolver_positive = FakeCitationResolver()
+    ctx_positive = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=resolver_positive,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+    cand_positive = model_mod.AtlasCandidateImport(
+        candidate_variant=valid_variant,
+        proposed_claims=[{
+            "claim_text": "text", "claim_kind_proposed": "pathway", "directionality": "increase",
+            "source_ref_proposed": "lit-1",
+            "span_proposed": {"locator": "L1", "exact_quote": "some quote", "page_or_figure": "page-1"},
+            "context_proposed": "cell-assay-A"
+        }],
+        proposed_sources=[{
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {"pmid": "12345"}
+        }],
+        retrieval_provenance=valid_retrieval
+    )
+    validate_candidate_import(cand_positive, ctx_positive)
+    assert len(resolver_positive.resolve_calls) > 0
+    assert len(resolver_positive.verify_span_calls) > 0
+
+
