@@ -139,14 +139,16 @@ adr_decision:
 scope_boundary:
   resolver_posture: offline, deterministic, fail-closed, pure-local.
   in_scope:
-    - Canonicalize PMID / PMCID / DOI identifiers (exact grammar below).
+    - Canonicalize PMID / PMCID / DOI / ACCESSION identifiers (exact grammar below).
     - Load + structurally validate + self-hash-verify a versioned LOCAL catalog.
     - >-
       Map a normalized identifier to at most ONE catalog source (fail-closed on
       unresolved / ambiguous / duplicate / cross-source alias).
     - >-
-      Enforce that only a grounding-eligible LEAF (source_type in {PRIMARY-LIT,
-      DATASET} AND role == direct_evidence_leaf) can ground a claim.
+      Enforce the full grounding_predicate (see grounding_eligibility) at resolve time:
+      role == direct_evidence_leaf, source_type in {PRIMARY-LIT, DATASET}, permitted_use
+      == grounding_and_quote, verification == verified, >=1 supported identifier, and
+      verified content pins.
     - >-
       Recompute + verify raw-file and extracted-text sha256/byte-length from disk under
       an explicit allowed content root (reject traversal/symlink/junction escape/
@@ -162,49 +164,124 @@ scope_boundary:
     - Fuzzy/approximate quote matching; dataset row/key span grammar (deferred).
     - Continuous refresh; a source-registry platform; a Discovery-vs-native comparison.
   grounding_eligibility:
-    only_leaves_ground: >-
-      Only a catalog source with source_type in {PRIMARY-LIT, DATASET} AND role ==
-      direct_evidence_leaf may satisfy claim grounding. Reviews, internal summaries,
-      ClinVar records, crosswalks, and any context/provenance_only source MAY be
-      cataloged (for provenance/context) but can NEVER satisfy grounding; resolving one
-      for grounding raises AtlasCitationResolutionError.
+    grounding_predicate: >-
+      A catalog source is GROUNDING-ADMISSIBLE (resolve-for-grounding succeeds) if and
+      ONLY IF ALL of the following hold: (1) role == 'direct_evidence_leaf'; (2)
+      source_type in {PRIMARY-LIT, DATASET} (== DIRECT_EVIDENCE_LEAF_SOURCE_TYPES); (3)
+      permitted_use == 'grounding_and_quote'; (4) verification == 'verified'; (5) at
+      least one supported canonical identifier (PMID/PMCID/DOI/ACCESSION) is present and
+      normalizes; (6) the raw_artifact pin is complete/valid and its content verifies
+      from disk. To additionally satisfy a CLAIM SPAN, the source must ALSO have a
+      complete/valid extracted_text pin whose content verifies and an exact-matching span
+      (enforced at verify_span). A source failing ANY clause is NOT grounding-admissible.
+    permitted_use_enum:
+      values: [grounding_and_quote, provenance_only, context_only]
+      grounding_and_quote: the ONLY value that permits grounding + exact-quote use.
+      provenance_only: citable for provenance/attribution; never grounds a claim.
+      context_only: background/context; never grounds a claim.
+    verification_enum:
+      ref: model.SOURCE_REGISTER_ENTRY_VERIFICATION_STATES
+      values: [verified, confirm_pending, unverified]
+      grounding_value: >-
+        only 'verified' is grounding-admissible; 'confirm_pending' and 'unverified' load
+        for context but never ground.
+    non_grounding_examples: >-
+      role context/provenance_only/crosswalk; permitted_use provenance_only/context_only;
+      verification confirm_pending/unverified; metadata-only rows (no content pins);
+      licence-not-cleared (permitted_use != grounding_and_quote). Reviews, internal
+      summaries and ClinVar records are cataloged for context/provenance only and can
+      NEVER ground.
+    load_vs_resolve:
+      load: >-
+        load_catalog enforces only STRUCTURAL well-formedness. A structurally valid but
+        non-grounding row (e.g. a provenance_only source, or a direct_evidence_leaf whose
+        verification is confirm_pending, or permitted_use provenance_only) LOADS fine and
+        is cataloged for context. Load does NOT gate on the permitted_use or verification
+        VALUE.
+      resolve: >-
+        resolve() applies the FULL grounding_predicate. A structurally valid but non-
+        grounding source resolved FOR GROUNDING fails closed with
+        AtlasCitationResolutionError. Promotion Gate 3 only ever calls the grounding
+        resolution path; there is no non-grounding resolve entry point in v1.
     internal_handoff_rule: >-
       Internal RAPTOR handoffs/derived summaries are NEVER admitted to the catalog as a
       grounding leaf. They may (out of band) seed queries only. The resolver has no
       concept of a handoff source; there is simply no eligible catalog leaf for one.
 
 # ---------------------------------------------------------------------------
-# A.1 Identifier grammar & canonicalization (PMID / PMCID / DOI)
+# A.1 Identifier grammar & canonicalization (PMID / PMCID / DOI / ACCESSION)
 # ---------------------------------------------------------------------------
 identifier_grammar:
-  supported_schemes: [PMID, PMCID, DOI]
+  supported_schemes: [PMID, PMCID, DOI, ACCESSION]
+  scheme_scope_note: >-
+    PMID/PMCID/DOI identify PRIMARY-LIT (and DOI-bearing DATASET) sources; ACCESSION
+    identifies direct DATASET sources by provider-qualified accession. A single source
+    MAY carry several identifiers across schemes.
   canonical_form: >-
-    "<SCHEME>:<value>" e.g. "PMID:12345", "PMCID:PMC12345", "DOI:10.1234/abc.def"
+    "<SCHEME>:<value>" e.g. "PMID:12345", "PMCID:PMC12345", "DOI:10.1234/abc.def",
+    "ACCESSION:clinvar:VCV000012397".
   normalize_identifier_input: >-
-    Accepts a single raw string. A leading scheme token is OPTIONAL on input and, if
-    present, must agree with the detected scheme. Leading/trailing ASCII whitespace is
-    stripped; NO internal whitespace is permitted. Returns a frozen CitationIdentifier
-    (scheme, value, canonical). Raises AtlasCitationResolutionError on any malformed /
-    unknown-scheme / empty / whitespace-bearing input.
+    Accepts a single raw string. Only OUTER ASCII whitespace is trimmed; ANY internal
+    whitespace is rejected. A recognized scheme prefix ("PMID:", "PMCID:", "DOI:",
+    "ACCESSION:") is matched CASE-INSENSITIVELY and, if present, fixes the scheme; DOI
+    additionally accepts the "doi:" and URL forms below. If no scheme prefix is present
+    the scheme is detected from the bare value: all-digits -> PMID; "^PMC[0-9]+$" (PMC
+    case-insensitive) -> PMCID; "^10\." -> DOI. A bare accession has NO reliable bare
+    form and MUST use the "ACCESSION:" prefix (a bare "<ns>:<opaque>" is unknown-scheme).
+    Returns a frozen CitationIdentifier(scheme, value, canonical). Deterministic and pure
+    (no I/O). Raises AtlasCitationResolutionError on empty / internal-whitespace /
+    unknown-scheme / malformed input.
   rules:
     PMID:
-      accept: '"PMID:<digits>" or bare "<digits>"'
+      accept: '"PMID:<digits>" (prefix case-insensitive) or bare "<digits>"'
       value_regex: '^[1-9][0-9]*$'
-      value_regex_note: no leading zeros; positive integer
+      value_regex_note: no leading zeros; positive integer; reject "0" and leading-zero forms
       canonical: '"PMID:" + value'
     PMCID:
-      accept: '"PMCID:PMC<digits>" or bare "PMC<digits>" (PMC uppercased)'
+      accept: '"PMCID:PMC<digits>" (prefix case-insensitive) or bare "PMC<digits>" (PMC core uppercased)'
       value_regex: '^PMC[0-9]+$'
-      value_regex_note: value RETAINS the PMC prefix
+      value_regex_note: value RETAINS the uppercased PMC prefix; digits kept verbatim
       canonical: '"PMCID:" + value'
     DOI:
-      accept: >-
-        "DOI:<doi>", bare "<doi>", or a "doi:" / "https://doi.org/" /
-        "http://dx.doi.org/" prefixed form; the registrant prefix is stripped, then the
-        DOI is LOWERCASED (DOIs are case-insensitive; lowercase is canonical).
-      value_regex: '^10\.[0-9]{4,9}/\S+$'
-      value_regex_note: applied to the lowercased, prefix-stripped DOI
+      accepted_input_forms:
+        - bare DOI beginning "10."
+        - '"doi:" prefix (case-insensitive)'
+        - 'URL form with case-insensitive scheme+host: http(s)://doi.org/ or http(s)://dx.doi.org/'
+      whitespace: trim OUTER ASCII whitespace only; reject any internal whitespace.
+      trailing_punctuation: >-
+        REJECT (never strip) a DOI whose payload ends in one of . , ; : ) — such trailing
+        sentence punctuation makes the input invalid (AtlasCitationResolutionError); the
+        resolver does not guess boundaries.
+      percent_encoding: >-
+        REJECT any "%" in the DOI payload (v1 does not decode/normalize percent-encoding)
+        -> AtlasCitationResolutionError.
+      case: canonical DOI payload is LOWERCASED (DOIs are case-insensitive).
+      value_regex: '^10\.[0-9]{4,9}/[^\s%]+$'
+      value_regex_note: >-
+        applied to the lowercased, prefix/URL-stripped DOI AFTER the trailing-punctuation
+        and percent-encoding rejections; must not end in . , ; : ) .
       canonical: '"DOI:" + lowercased_doi'
+    ACCESSION:
+      accept: '"ACCESSION:<namespace>:<opaque>" — the "ACCESSION:" scheme prefix is REQUIRED; there is no bare form'
+      namespace_regex: '^[a-z0-9]+([._-][a-z0-9]+)*$'
+      namespace_note: provider registry key; LOWERCASED on normalization (case-insensitive)
+      opaque_regex: '^[A-Za-z0-9][A-Za-z0-9._-]*$'
+      opaque_note: >-
+        provider-native accession; CASE PRESERVED (many accessions are case-sensitive,
+        e.g. GEO GSE12345, ClinVar VCV000012397, EGA EGAD00001000001).
+      whitespace: trim OUTER ASCII whitespace only; reject any internal whitespace.
+      value: '"<namespace_lower>:<opaque>"'
+      canonical: '"ACCESSION:" + namespace_lower + ":" + opaque'
+      registry_note: >-
+        The resolver enforces only the ACCESSION GRAMMAR, not registry membership; which
+        namespaces are permitted is a catalog-content concern, not a resolver rule.
+  bib_mapping:
+    from_candidate_bib: >-
+      Gate 3 maps candidate `bib` fields to scheme-prefixed identifier strings: bib.pmid
+      -> "PMID:", bib.pmcid -> "PMCID:", bib.doi -> "DOI:", bib.accession -> "ACCESSION:".
+      bib.accession MUST be namespace-qualified ("<namespace>:<opaque>", optionally with a
+      leading "ACCESSION:"); a bare unqualified accession is rejected as ambiguous. Each
+      mapped string is passed through normalize_identifier.
   ambiguity_and_duplicates:
     catalog_alias_index: >-
       At catalog load, every source identifier is normalized and inserted into a single
@@ -212,12 +289,14 @@ identifier_grammar:
       to two different source_ids (cross-source alias) OR appears twice (duplicate),
       load fails closed with AtlasCatalogSchemaError. Thus at resolve time each
       identifier maps to AT MOST one source.
-    resolve_cross_alias_check: >-
-      When a candidate source carries multiple identifiers (e.g. pmcid + doi), Gate 3
-      resolves EACH present identifier and requires ALL resolved source_ids to be equal;
-      a disagreement (an identifier stapled to the wrong source) raises
-      AtlasCitationResolutionError. An identifier absent from the catalog is unresolved
-      (AtlasCitationResolutionError), never silently ignored.
+    alias_selection_and_cross_alias_check: >-
+      There is NO priority ordering among a source's identifiers. When a candidate source
+      supplies multiple identifiers (e.g. pmcid + doi, or doi + accession), Gate 3
+      resolves EVERY supplied identifier and requires ALL to normalize successfully AND
+      to resolve to the SAME source_id; any disagreement (an identifier stapled to the
+      wrong source) or an identifier absent from the catalog fails closed (resolver
+      raises AtlasCitationResolutionError, which Gate 3 translates to AtlasProvenanceError).
+      An absent identifier is unresolved, never silently ignored.
 
 # ---------------------------------------------------------------------------
 # B. Catalog schema, hashing, path policy, immutability
@@ -225,6 +304,40 @@ identifier_grammar:
 catalog:
   repo_path: configs/atlas/catalogs/<catalog_id>/catalog.yaml
   phase2_template: 'configs/atlas/catalogs/tsc2/catalog.yaml   # committed, metadata-only, sources: []'
+  manifest_path_resolution:
+    mirrors: src/raptor/atlas/pack.py _resolve_pack_path (hardened pack loader) exactly.
+    catalogs_root: >-
+      CATALOGS_ROOT = _REPO_ROOT / "configs" / "atlas" / "catalogs", where _REPO_ROOT =
+      Path(__file__).resolve().parents[3] (same anchor pack.py uses for PACKS_ROOT).
+    safe_catalog_id_regex: '^[A-Za-z0-9_-]+$'
+    disambiguation:
+      pathlike_arg: >-
+        If the caller passes an os.PathLike / pathlib.Path, it is ALWAYS treated as an
+        explicit path (never a bare id). Recommended for explicit paths.
+      string_arg: >-
+        A str is treated as an EXPLICIT PATH iff it "looks like a path": it contains '/'
+        or '\\', OR it equals '.' or '..', OR it ends (case-insensitively) with '.yaml'
+        or '.yml'. Otherwise it is a BARE CATALOG ID.
+      no_existence_branch: >-
+        The bare-id-vs-explicit-path choice is made PURELY from the argument syntax and
+        type, NEVER from whether a path exists on disk (mirrors pack.py, which
+        deliberately does not stat to choose the branch).
+    bare_id_rules:
+      - Must match safe_catalog_id_regex ^[A-Za-z0-9_-]+$ .
+      - >-
+        Reject empty, '.', '..', any string containing a path separator ('/' or '\\'),
+        a drive/root/UNC prefix, a ':' , or any whitespace -> AtlasCatalogPathError.
+      - Resolves to CATALOGS_ROOT / <catalog_id> / "catalog.yaml".
+    explicit_path_rules:
+      - A relative explicit path resolves against the caller's process CWD (mirrors pack.py Path(text)).
+      - >-
+        The resolved catalog MANIFEST need NOT live under content_root, but MUST be a
+        regular, NON-SYMLINK file (resolve(strict=True) + lstat check that the final
+        component is not a symlink/junction) -> else AtlasCatalogPathError.
+    manifest_vs_content: >-
+      Only the CATALOG MANIFEST may sit outside content_root (regular non-symlink file);
+      every CONTENT ARTIFACT (raw_artifact / extracted_text) MUST resolve strictly under
+      content_root (see path_safety). The two roots are independent.
   external_content_root:
     policy: >-
       Raw source artifacts and extracted-text artifacts are NEVER committed to Git and
@@ -286,9 +399,11 @@ catalog:
           pmid: 'list[str] optional'
           pmcid: 'list[str] optional'
           doi: 'list[str] optional'
+          accession: 'list[str] optional  # provider-qualified "<namespace>:<opaque>", DATASET leaves'
         note: >-
           Each entry normalized via identifier_grammar; a grounding-eligible leaf MUST
           carry >=1 identifier; context/provenance_only sources MAY carry zero.
+          accession entries are namespace-qualified and typically used by DATASET leaves.
       authoritative_url:
         type: str
         optional: true
@@ -371,6 +486,12 @@ catalog:
       load_catalog recomputes and compares against the stored hash; mismatch ->
       AtlasCatalogHashError (fail closed).
   path_safety:
+    manifest_path: >-
+      The catalog manifest itself is located via manifest_path_resolution (bare id ->
+      CATALOGS_ROOT/<id>/catalog.yaml, else explicit path). The resolved manifest MUST be
+      a regular, NON-SYMLINK file (resolve(strict=True) then verify the final component is
+      not a symlink/junction via lstat); otherwise AtlasCatalogPathError. The manifest may
+      live outside content_root; content artifacts may NOT.
     root_resolution: >-
       content_root is resolved once with Path(content_root).resolve(strict=True); if it
       is not an existing directory -> AtlasCatalogPathError.
@@ -400,14 +521,24 @@ catalog:
       NEVER trusted for content; the resolver always recomputes from disk and fails
       closed on drift (AtlasContentDriftError).
   duplicate_handling:
-    - Duplicate source_id -> AtlasCatalogSchemaError.
-    - Duplicate or cross-source canonical identifier alias -> AtlasCatalogSchemaError.
-    - >-
-      role == direct_evidence_leaf with source_type not in {PRIMARY-LIT, DATASET} ->
-      AtlasCatalogSchemaError (reuse DIRECT_EVIDENCE_LEAF_SOURCE_TYPES).
-    - >-
-      grounding-eligible leaf missing raw_artifact, or with zero identifiers ->
-      AtlasCatalogSchemaError.
+    load_is_structural_only: >-
+      load_catalog enforces STRUCTURAL well-formedness only; it does NOT reject a row for
+      being non-grounding (e.g. permitted_use provenance_only, verification
+      confirm_pending). Grounding admissibility (permitted_use / verification VALUE) is
+      checked at resolve time, not load time (see grounding_eligibility.load_vs_resolve).
+    structural_load_failures:
+      - Duplicate source_id -> AtlasCatalogSchemaError.
+      - Duplicate or cross-source canonical identifier alias -> AtlasCatalogSchemaError.
+      - >-
+        role == direct_evidence_leaf with source_type not in {PRIMARY-LIT, DATASET} ->
+        AtlasCatalogSchemaError (reuse DIRECT_EVIDENCE_LEAF_SOURCE_TYPES).
+      - >-
+        role == direct_evidence_leaf missing raw_artifact, or with zero identifiers ->
+        AtlasCatalogSchemaError (a leaf that could never ground is structurally invalid).
+      - >-
+        Note: a direct_evidence_leaf with verification confirm_pending / permitted_use
+        provenance_only is STRUCTURALLY valid and LOADS (it just fails resolve-for-
+        grounding); only the pairings above are structural load failures.
   bounded_note: >-
     This catalog is bounded to the Phase-2 pilot. It deliberately does NOT duplicate the
     future source-refresh registry, refresh cadence, or acquisition provenance platform.
@@ -449,6 +580,26 @@ typed_errors:
     checker and tests can assert the exact fail-closed reason. All subclass
     AtlasCatalogError (hence AtlasError). None subclass AtlasSchemaError/
     AtlasProvenanceError, keeping the resolver family orthogonal to Phase-1 gate errors.
+  error_surface_scope:
+    catalog_family_is_resolver_only: >-
+      The AtlasCatalogError family (AtlasCatalogSchemaError, AtlasCatalogHashError,
+      AtlasCatalogPathError, AtlasCitationResolutionError, AtlasContentDriftError,
+      AtlasSpanMismatchError) is raised ONLY by citation.py catalog/resolver operations
+      (load_catalog, catalog_content_hash, normalize_identifier, resolve, verify_content,
+      verify_span). It is the taxonomy for catalog schema/hash/path, identifier
+      resolution, content drift, and span mismatch/ambiguity. It is NOT a blanket type
+      for every failure everywhere.
+    promotion_translation: >-
+      Promotion gates in promote.py do NOT surface AtlasCatalogError to callers. Gate 3
+      and Gate 4 CATCH the resolver's AtlasCatalogError subclasses and RE-RAISE the exact
+      EXISTING Phase-1 gate error (AtlasProvenanceError / AtlasSchemaError) using
+      "raise ... from exc" to preserve the cause chain (see promotion_integration.error_translation).
+    static_guard_stays_leakage: >-
+      The static network/import guard (guards.py, enforced at import/CI, not a runtime
+      resolver op) continues to raise AtlasLeakageError. It is unaffected by this family.
+    no_blanket_claim: >-
+      There is NO claim anywhere that ALL resolver-related failures are AtlasCatalogError;
+      promotion failures are Phase-1 gate errors, guard failures are AtlasLeakageError.
 
 dataclass_contracts:
   location_rule: >-
@@ -461,7 +612,7 @@ dataclass_contracts:
     frozen: true
     module: model.py
     fields:
-      scheme: 'str  # in {PMID, PMCID, DOI}'
+      scheme: 'str  # in {PMID, PMCID, DOI, ACCESSION}'
       value: str
       canonical: str
   CatalogSource:
@@ -574,13 +725,20 @@ module_api:
         - 'verify_content(self, source: CatalogSource) -> ContentVerification'
         - 'verify_span(self, resolved: ResolvedCitation, span: Span) -> VerifiedSpan'
       resolve_behavior: >-
-        normalize (if str) -> alias_index lookup (unresolved ->
-        AtlasCitationResolutionError) -> load the CatalogSource -> assert
-        grounding-eligible (source_type in {PRIMARY-LIT,DATASET} AND
-        role==direct_evidence_leaf, else AtlasCitationResolutionError) ->
-        verify_content(source) (recompute raw + extracted hashes/bytes from disk under
-        content_root; drift -> AtlasContentDriftError; path problems ->
-        AtlasCatalogPathError) -> return content-verified ResolvedCitation.
+        Applies the FULL grounding_predicate (resolve-for-grounding is the ONLY resolve
+        path in v1). Steps: normalize (if str) -> alias_index lookup (unresolved ->
+        AtlasCitationResolutionError) -> load the CatalogSource -> assert ALL grounding
+        clauses, else AtlasCitationResolutionError: (a) role == direct_evidence_leaf;
+        (b) source_type in {PRIMARY-LIT, DATASET} (DIRECT_EVIDENCE_LEAF_SOURCE_TYPES);
+        (c) permitted_use == 'grounding_and_quote'; (d) verification == 'verified';
+        (e) >=1 supported canonical identifier present; (f) raw_artifact pin complete ->
+        verify_content(source) recomputes raw (and, when present, extracted) hashes/bytes
+        from disk under content_root (drift -> AtlasContentDriftError; path problems ->
+        AtlasCatalogPathError) -> return content-verified ResolvedCitation. A structurally
+        valid but non-grounding source (provenance_only/context role, permitted_use
+        provenance_only/context_only, verification confirm_pending/unverified,
+        metadata-only) LOADS but FAILS resolve-for-grounding with
+        AtlasCitationResolutionError.
       verify_content_behavior: >-
         resolve raw_relative_path under content_root (path_safety) -> recompute sha256 +
         byte_length -> compare to declared -> mismatch -> AtlasContentDriftError. If
@@ -698,22 +856,33 @@ promotion_integration:
       - >-
         Assert isinstance(context.citation_resolver, CitationResolver) (has callable
         resolve + verify_span); else AtlasSchemaError ("a bare boolean callable is not a
-        citation resolver"). This REJECTS truthy-boolean resolvers in production.
+        citation resolver"). This REJECTS truthy-boolean resolvers in production. This is
+        a GATE-level structural check (not a resolver error).
       - >-
         For each proposed source with role == 'direct_evidence_leaf': build the set of
         scheme-prefixed identifier strings from its bib (pmid->'PMID:', pmcid->'PMCID:',
-        doi->'DOI:'); an 'accession'-only bib is not a v1 citation identifier ->
-        AtlasCitationResolutionError.
+        doi->'DOI:', accession->'ACCESSION:'). A leaf whose bib carries zero supported
+        identifiers is a structural defect -> AtlasSchemaError. A bib.accession that is
+        not namespace-qualified ("<namespace>:<opaque>") is malformed and surfaces as a
+        translated AtlasProvenanceError (resolver AtlasCitationResolutionError).
       - >-
-        Require >=1 identifier; resolve EACH via context.citation_resolver.resolve(...);
-        require all resolved ResolvedCitation.source.source_id equal (cross-alias check)
-        else AtlasCitationResolutionError.
+        Resolve EACH identifier via context.citation_resolver.resolve(...); require all
+        resolved ResolvedCitation.source.source_id equal (cross-alias agreement) — any
+        unresolved/disagreeing identifier fails.
       - >-
         Cross-check the resolved catalog source_type equals the candidate declared
-        source_type and resolved role == 'direct_evidence_leaf' (else
-        AtlasCitationResolutionError).
+        source_type and resolved role == 'direct_evidence_leaf'.
       - Store resolved_by_source[source['entry_id']] = resolved (ONE per leaf source).
       - Return resolved_by_source (threaded to Gate 4; no re-resolution, no globals).
+    error_translation: >-
+      Gate 3 CATCHES the resolver's AtlasCatalogError subclasses and RE-RAISES the exact
+      Phase-1 gate error with "raise <GateError>(...) from exc": AtlasCitationResolution
+      Error, AtlasContentDriftError, AtlasCatalogHashError, AtlasCatalogPathError, and
+      AtlasCatalogSchemaError arising from resolve() -> AtlasProvenanceError (a source
+      that cannot be resolved/verified is a provenance failure). Gate 3's OWN structural
+      checks (resolver not a CitationResolver; a leaf with zero supported identifiers)
+      raise AtlasSchemaError directly. Gate 3 never propagates a raw AtlasCatalogError to
+      the caller.
     non_leaf_sources: >-
       provenance_only/context/crosswalk proposed sources are NOT resolved (they never
       ground); they remain subject to Gate 2 role/type structural checks.
@@ -723,15 +892,23 @@ promotion_integration:
       - >-
         For each proposed claim: require span_proposed is a dict with BOTH a nonblank
         locator AND a nonblank exact_quote (else AtlasSchemaError). (Phase-1 checked
-        locator only; Phase 2 additionally requires exact_quote.)
+        locator only; Phase 2 additionally requires exact_quote.) This is a GATE-level
+        structural check.
       - >-
         resolved = resolved_by_source.get(claim['source_ref_proposed']); if None ->
         AtlasProvenanceError (defense-in-depth; Gate 2 guarantees the linked source is a
         resolved leaf).
       - >-
         Build Span(locator, exact_quote, page_or_figure) and call
-        context.citation_resolver.verify_span(resolved, span); a mismatch raises
-        AtlasSpanMismatchError. Gate 4 no longer accepts presence-only spans.
+        context.citation_resolver.verify_span(resolved, span). Gate 4 no longer accepts
+        presence-only spans.
+    error_translation: >-
+      Gate 4 CATCHES the resolver's AtlasSpanMismatchError / AtlasContentDriftError /
+      AtlasCatalogPathError from verify_span and RE-RAISES AtlasProvenanceError with
+      "from exc" (a span that does not verify against the source is a provenance
+      failure). Gate 4's OWN structural checks (missing locator/exact_quote; missing
+      resolved source) raise AtlasSchemaError / AtlasProvenanceError directly as above.
+      Gate 4 never propagates a raw AtlasCatalogError to the caller.
   validate_candidate_import_wiring:
     order: >-
       gate1 -> gate2 -> (resolved = gate3) -> gate4(candidate, context, resolved) ->
@@ -749,10 +926,13 @@ promotion_integration:
     human reviewer.
   requirements_summary:
     - source_ref_proposed linkage present (Gate 2) AND a resolved leaf (Gate 3).
-    - direct_evidence_leaf role + PRIMARY-LIT/DATASET type, in candidate AND catalog.
-    - exact citation alias resolves unambiguously to one catalog source.
-    - raw + extracted content verified from disk before span (inside resolve).
-    - exact span verified (Gate 4) via verify_span.
+    - >-
+      full grounding_predicate holds at resolve: role == direct_evidence_leaf,
+      source_type in {PRIMARY-LIT, DATASET}, permitted_use == grounding_and_quote,
+      verification == verified, >=1 canonical identifier, raw content verified from disk.
+    - exact citation alias resolves unambiguously to one catalog source; all supplied aliases agree.
+    - raw content verified at resolve; extracted-text content re-verified at verify_span.
+    - exact span verified (Gate 4) via verify_span (text-char offsets == exact_quote).
     - named human Gate 8 signoff after all of the above.
   discovery_untrusted: >-
     Internal/Discovery candidates remain untrusted staging input; the resolver neither
@@ -766,7 +946,7 @@ fixtures_pilot:
     NO real R611Q claim, real PMID/PMCID/DOI, or real quote appears in any implementation
     test. Fixtures use synthetic catalogs written to a pytest tmp_path, synthetic
     extracted-text files, synthetic identifiers (e.g. 'PMID:1', 'PMCID:PMC2',
-    'DOI:10.5555/synthetic.a'), and synthetic quotes. Anti-cribbing bans the same
+    'DOI:10.5555/synthetic.a', 'ACCESSION:synthns:SYN0001'), and synthetic quotes. Anti-cribbing bans the same
     real-content phrases as the existing suite (pmc11185720, 10.1101/2024.06.07.597916,
     c.1832G>A, p.Arg611Gln).
   real_pilot_later: >-
@@ -783,8 +963,12 @@ fixtures_pilot:
 # ---------------------------------------------------------------------------
 security_privacy_errors:
   fail_closed_invariants:
-    - No network of any kind; enforced by a STATIC AST network-import guard (below).
-    - No silent fallback: every failure raises a distinct typed AtlasCatalogError subclass.
+    - No network of any kind; enforced by a STATIC AST network-import guard (below), which raises AtlasLeakageError.
+    - >-
+      No silent fallback. Every RESOLVER/CATALOG failure raises a distinct typed
+      AtlasCatalogError subclass; promotion Gate 3/4 then TRANSLATE those to the existing
+      Phase-1 AtlasProvenanceError / AtlasSchemaError (see promotion_integration.
+      error_translation). No failure is swallowed.
     - No auto-repin / auto-heal: content drift never rewrites the catalog; it fails.
     - No fuzzy quote: exact slice equality only.
     - Never trust catalog-declared file hashes; always recompute from disk.
@@ -862,6 +1046,19 @@ workflow:
             lowercased); rejects leading-zero PMID, whitespace-bearing, empty,
             unknown-scheme -> AtlasCitationResolutionError.
           - >-
+            DOI forms (ADVERSARIAL): accept bare '10.5555/abc', 'doi:10.5555/AbC'
+            (case-insensitive prefix), 'HTTPS://DOI.ORG/10.5555/abc' and
+            'http://dx.doi.org/10.5555/abc' (scheme+host case-insensitive), all canonical
+            'DOI:10.5555/abc'; REJECT (not strip) a trailing '.'/','/';'/':'/')'
+            ('10.5555/abc.'), REJECT internal whitespace, and REJECT any '%'
+            ('10.5555/ab%20c') -> AtlasCitationResolutionError.
+          - >-
+            ACCESSION (gap-4): accept 'ACCESSION:GEO:GSE12345' and
+            'ACCESSION:clinvar:VCV000012397' -> namespace LOWERCASED, opaque CASE
+            PRESERVED (canonical 'ACCESSION:geo:GSE12345'); REJECT a bare unprefixed
+            'GEO:GSE12345' (unknown scheme), a missing namespace, and an opaque with
+            illegal chars/whitespace -> AtlasCitationResolutionError.
+          - >-
             catalog_content_hash recompute equals the stored hash for a synthetic
             catalog; a one-byte change to ANY included field changes the digest; only
             the top-level catalog_content_hash is excluded.
@@ -884,9 +1081,25 @@ workflow:
             cannot create one; junction/'..' cases still run.)
           - >-
             resolve of an unresolved identifier -> AtlasCitationResolutionError; resolve
-            of a context/provenance_only source (not a leaf) ->
-            AtlasCitationResolutionError; resolve returns a content-verified
-            ResolvedCitation for a valid synthetic leaf.
+            returns a content-verified ResolvedCitation for a valid synthetic leaf.
+          - >-
+            grounding_predicate (gap-2, ADVERSARIAL): a structurally valid but
+            NON-GROUNDING source LOADS but resolve-for-grounding fails
+            AtlasCitationResolutionError for EACH of: role context/provenance_only;
+            source_type not in {PRIMARY-LIT,DATASET}; permitted_use provenance_only /
+            context_only; verification confirm_pending / unverified. Assert the SAME
+            catalog loads without error (load is structural only).
+          - >-
+            alias agreement (gap-4): a leaf carrying two identifiers (e.g. pmcid + doi)
+            both resolve to the same source_id; a catalog with the same identifier on two
+            source_ids fails load (cross-source alias -> AtlasCatalogSchemaError).
+          - >-
+            manifest path/id (gap-3, ADVERSARIAL): a BARE catalog id 'tsc2' resolves to
+            CATALOGS_ROOT/tsc2/catalog.yaml; bare ids '..', 'a/b', 'C:\\x', ' x ' (drive/
+            separator/traversal/whitespace) -> AtlasCatalogPathError; an EXPLICIT path
+            whose manifest is a symlink/junction -> AtlasCatalogPathError (skip only if
+            the OS/user cannot create a symlink); a str with '/'/'\\'/'.yaml' is treated
+            as an explicit path, a bare token as an id, chosen WITHOUT stat.
           - >-
             content drift (ADVERSARIAL): after load, mutate the raw or extracted-text
             file on disk so its sha256/byte_length differ from declared -> resolve/
@@ -926,12 +1139,19 @@ workflow:
             bool/lambda resolver reaching Gate 3 -> AtlasSchemaError (truthy-boolean
             rejected).
           - >-
-            eight gates still run IN ORDER, short-circuiting; Gate 3 fail
-            (resolver.resolve raises for a synthetic 'fail-citation' id) ->
-            AtlasCitationResolutionError and no later collaborator runs; Gate 4
-            structural-incomplete span (missing exact_quote) -> AtlasSchemaError after
-            Gate 3 ran; NEW Gate 4 span-mismatch case (verify_span raises) ->
-            AtlasSpanMismatchError with Gate 5+ not run.
+            eight gates still run IN ORDER, short-circuiting; Gate 3 fail (resolver.
+            resolve raises AtlasCitationResolutionError for a synthetic 'fail-citation'
+            id) is TRANSLATED by Gate 3 to AtlasProvenanceError (chained via __cause__)
+            and no later collaborator runs; Gate 4 structural-incomplete span (missing
+            exact_quote) -> AtlasSchemaError after Gate 3 ran; NEW Gate 4 span-mismatch
+            case (verify_span raises AtlasSpanMismatchError) is TRANSLATED to
+            AtlasProvenanceError (chained) with Gate 5+ not run.
+          - >-
+            error translation (gap-1): assert the promotion-surface exceptions are the
+            EXISTING Phase-1 types (AtlasProvenanceError / AtlasSchemaError), NOT raw
+            AtlasCatalogError subclasses, and that __cause__ is the underlying resolver
+            AtlasCatalogError. Resolver-level tests (test_citation_resolver.py) still
+            assert the AtlasCatalogError subclasses directly.
           - >-
             Gate 3 builds a per-leaf resolved map used by Gate 4 (no re-resolution):
             assert resolve called once per leaf source; verify_span called once per
@@ -1002,8 +1222,17 @@ workflow:
         Network: does any atlas .py (esp. citation.py) import a network module? Is
         enforcement a STATIC AST scan (not sys.modules)? (must be NO / static)
       - >-
-        Determinism/fail-closed: are ALL failure paths typed AtlasCatalogError
-        subclasses, with no silent fallback, no auto-repin, no fuzzy match? (must hold)
+        Error taxonomy scope (gap-1): are the AtlasCatalogError subclasses raised ONLY by
+        citation.py resolver/catalog ops (load/hash/normalize/resolve/verify)? Is there NO
+        blanket claim that ALL failures are AtlasCatalogError? (must hold)
+      - >-
+        Error translation (gap-1): do promotion Gate 3/4 CATCH resolver AtlasCatalogError
+        and RE-RAISE existing Phase-1 AtlasProvenanceError/AtlasSchemaError with
+        'from exc'? Does the static network guard still raise AtlasLeakageError? Do
+        promotion tests assert the Phase-1 types (not raw AtlasCatalogError)? (must hold)
+      - >-
+        Determinism/fail-closed: no silent fallback, no auto-repin, no fuzzy match; every
+        resolver failure raises a distinct typed AtlasCatalogError subclass? (must hold)
       - >-
         Declared-hash distrust: does resolve/verify recompute raw+extracted hashes from
         disk and fail on drift, never trusting catalog-declared hashes? (must hold)
@@ -1011,16 +1240,27 @@ workflow:
         Path safety: are traversal/absolute/drive/symlink-junction-escape/missing/mutated
         files all rejected via resolved-realpath containment (strict=True)? (must hold)
       - >-
+        Manifest path/id resolution (gap-3): is the bare-id vs explicit-path choice made
+        from arg type/syntax WITHOUT stat (mirrors pack.py)? Bare id ->
+        CATALOGS_ROOT/<id>/catalog.yaml with ^[A-Za-z0-9_-]+$; bare id with
+        separator/drive/traversal/whitespace rejected; explicit manifest must be a
+        regular NON-SYMLINK file; content artifacts strictly under content_root? (must hold)
+      - >-
         Catalog self-hash: is only the top-level catalog_content_hash excluded, algorithm
         identical to atlas.pack_content_hash.v1, and immutability via deep-freeze? (must
         hold)
       - >-
-        Identifier canonicalization: PMID/PMCID/DOI grammar exact; DOI lowercased;
-        duplicate/cross-source alias rejected at load; cross-alias conflict rejected at
-        resolve? (must hold)
+        Identifier canonicalization (gap-4): PMID/PMCID/DOI/ACCESSION grammar exact; DOI
+        lowercased with trailing-punct + '%' + internal-whitespace REJECTED and
+        doi:/doi.org/dx.doi.org forms accepted; ACCESSION namespace-lowercased + opaque
+        case-preserved + prefix-required; duplicate/cross-source alias rejected at load;
+        ALL supplied aliases must agree at resolve (no priority)? (must hold)
       - >-
-        Grounding eligibility: can ONLY a PRIMARY-LIT/DATASET direct_evidence_leaf ground;
-        are reviews/ClinVar/context/handoff never grounding leaves? (must hold)
+        Grounding eligibility (gap-2): does resolve enforce the FULL predicate (role ==
+        direct_evidence_leaf, source_type in {PRIMARY-LIT,DATASET}, permitted_use ==
+        grounding_and_quote, verification == verified, >=1 identifier, verified content)?
+        Do non-grounding rows LOAD (structural) but fail resolve-for-grounding? Are
+        reviews/ClinVar/context/handoff never grounding leaves? (must hold)
       - >-
         Span semantics: NFC + CRLF->LF normalization, character offsets, half-open
         interval, exact slice equality, duplicate-quote disambiguated by offsets, no

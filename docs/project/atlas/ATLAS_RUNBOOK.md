@@ -109,8 +109,8 @@ the Atlas package). Source acquisition and text extraction are a **separate
 future adapter** and are out of scope; the resolver only verifies content that is
 already staged locally.
 
-**What it resolves.** Normalized `PMID` / `PMCID` / `DOI` identifiers against a
-versioned, hash-bound **local catalog**
+**What it resolves.** Normalized `PMID` / `PMCID` / `DOI` / `ACCESSION`
+identifiers against a versioned, hash-bound **local catalog**
 (`configs/atlas/catalogs/<catalog_id>/catalog.yaml`, schema
 `atlas.citation_catalog.v1`). The committed `tsc2` catalog template is
 metadata-only (`sources: []`); real source artifacts and extracted-text files are
@@ -123,7 +123,7 @@ referenced only by relative path.
    validates structure, recomputes/verifies `atlas.citation_catalog_content_hash.v1`
    fail-closed, and deep-freezes the catalog.
 2. `raptor.atlas.citation.normalize_identifier(raw)` canonicalizes an identifier
-   (`PMID:...`, `PMCID:PMC...`, `DOI:...`).
+   (`PMID:...`, `PMCID:PMC...`, `DOI:...`, `ACCESSION:<namespace>:<opaque>`).
 3. `resolver = LocalCitationResolver(catalog)`; `resolver.resolve(identifier)`
    returns a content-verified `ResolvedCitation` (raw + extracted-text
    `sha256`/byte-length recomputed from disk); `resolver.verify_span(resolved,
@@ -136,9 +136,18 @@ referenced only by relative path.
 
 **Hard limits.**
 
-* Only `PRIMARY-LIT` / `DATASET` sources with `role == direct_evidence_leaf` can
-  ground a claim. Reviews, ClinVar, crosswalks, context/provenance-only sources
-  and internal handoffs can never be a grounding leaf.
+* A source can ground a claim **only** if all hold: `role == direct_evidence_leaf`;
+  `source_type` in `{PRIMARY-LIT, DATASET}`; `permitted_use == grounding_and_quote`;
+  `verification == verified`; at least one supported identifier; and verified raw
+  content. Reviews, ClinVar, crosswalks, context/provenance-only, not-yet-verified
+  (`confirm_pending`/`unverified`), or licence-not-cleared sources, and internal
+  handoffs can never be a grounding leaf. `load_catalog` checks structure only;
+  `resolve` enforces the full grounding predicate and fails closed
+  (`AtlasCitationResolutionError`) for a non-grounding source.
+* Resolver failures are typed under the `AtlasCatalogError` family and are raised
+  only by the resolver; promotion Gate 3/4 **translate** them into the existing
+  `AtlasProvenanceError` / `AtlasSchemaError`, and the static network guard raises
+  `AtlasLeakageError`.
 * Catalog-declared hashes are **never trusted**; raw and extracted-text hashes are
   recomputed from disk and drift fails closed. Path traversal, absolute/drive
   paths, and symlink/junction escape of the content root are rejected.

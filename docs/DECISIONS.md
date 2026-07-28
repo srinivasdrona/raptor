@@ -87,15 +87,19 @@ verifies, what it deliberately excludes, and how the promotion gates change with
 ### Decision
 
 1. Add a **deterministic, offline, fail-closed** citation resolver (`src/raptor/atlas/citation.py`)
-   that resolves normalized `PMID` / `PMCID` / `DOI` identifiers against a versioned, hash-bound
-   **local catalog** of locally-held public/permitted source artifacts. It performs **no network
-   access of any kind**; a static AST guard (`assert_no_network_imports`) forbids network imports
-   across the Atlas package. Source acquisition and text extraction are a **separate future
+   that resolves normalized `PMID` / `PMCID` / `DOI` / `ACCESSION` identifiers against a versioned,
+   hash-bound **local catalog** of locally-held public/permitted source artifacts. It performs **no
+   network access of any kind**; a static AST guard (`assert_no_network_imports`) forbids network
+   imports across the Atlas package. Source acquisition and text extraction are a **separate future
    adapter**, explicitly out of scope here.
-2. Only a catalog source with `source_type` in `{PRIMARY-LIT, DATASET}` **and** `role ==
-   direct_evidence_leaf` may ground a claim. Reviews, ClinVar, crosswalks, internal summaries and
-   any context/provenance-only source may be cataloged for provenance but can never satisfy
-   grounding. Internal handoffs are never admitted as a grounding leaf (ADR-0015).
+2. A catalog source is **grounding-admissible** only if **all** hold: `role ==
+   direct_evidence_leaf`; `source_type` in `{PRIMARY-LIT, DATASET}`; `permitted_use ==
+   grounding_and_quote`; `verification == verified`; at least one supported canonical identifier;
+   and verified raw content. Reviews, ClinVar, crosswalks, internal summaries and any
+   context/provenance-only or not-yet-verified source may be **loaded** for context but can never
+   satisfy grounding — `load_catalog` enforces structure only, while `resolve` enforces the full
+   grounding predicate and fails closed (`AtlasCitationResolutionError`) for a non-grounding source.
+   Internal handoffs are never admitted as a grounding leaf (ADR-0015).
 3. The catalog has a canonical self-excluding content hash
    (`atlas.citation_catalog_content_hash.v1`) mirroring `atlas.pack_content_hash.v1`, is
    deep-frozen after load, and stores only **relative** artifact paths beneath an explicitly
@@ -112,15 +116,20 @@ verifies, what it deliberately excludes, and how the promotion gates change with
 5. `PromotionContext.citation_resolver` becomes a typed, `runtime_checkable` **`CitationResolver`
    protocol** (`resolve(identifier) -> ResolvedCitation`, `verify_span(resolved, span) ->
    VerifiedSpan`). Gate 3 rejects a bare boolean/callable, resolves every `direct_evidence_leaf`
-   source into a per-candidate resolved-source map, and cross-checks aliases/role/type; Gate 4
-   verifies each linked claim's exact span through that map. The eight-gate order and short-circuit
-   are preserved, and the named-human Gate 8 review remains **after** deterministic verification —
-   deterministic verification never replaces the human oracle.
-6. All failure modes raise distinct typed errors under a new `AtlasCatalogError` family
+   source into a per-candidate resolved-source map, cross-checks aliases/role/type, and requires
+   **all** identifiers a source supplies to resolve to the same catalog source (no priority
+   ordering); Gate 4 verifies each linked claim's exact span through that map. The eight-gate order
+   and short-circuit are preserved, and the named-human Gate 8 review remains **after** deterministic
+   verification — deterministic verification never replaces the human oracle.
+6. Resolver/catalog failures raise distinct typed errors under a new `AtlasCatalogError` family
    (`AtlasCatalogSchemaError`, `AtlasCatalogHashError`, `AtlasCatalogPathError`,
    `AtlasCitationResolutionError`, `AtlasContentDriftError`, `AtlasSpanMismatchError`) so
-   catalog/path, identifier, content-drift and span failures are individually catchable. No silent
-   fallback, no auto-repin.
+   catalog/path, identifier, content-drift and span failures are individually catchable. This
+   family is raised **only** by `citation.py` resolver/catalog operations — it is **not** a blanket
+   type for all failures. Promotion Gate 3/4 **translate** a caught `AtlasCatalogError` into the
+   existing Phase-1 `AtlasProvenanceError` / `AtlasSchemaError` (chained via `from exc`), and the
+   static network-import guard continues to raise `AtlasLeakageError`. No silent fallback, no
+   auto-repin.
 7. Implementation tests are **fully synthetic** (no real PMID/PMCID/DOI, no real quote, no
    R611Q/Arg611 content, committed catalog template `sources: []`). Real R611Q source acquisition
    and a real catalog follow **after** this resolver is checker-clean, under a separate external,

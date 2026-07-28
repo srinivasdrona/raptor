@@ -616,11 +616,15 @@ todos:
   title: Building the minimal Atlas primary-source resolver
   description: 'Track: MECHANISM-ATLAS / PHASE-2. Per docs/project/specs/atlas-citation-resolver-v1.yaml
     and ADR-0016, build a deterministic, offline, fail-closed citation resolver
-    (src/raptor/atlas/citation.py) enforcing ADR-0015 grounding. Scope: canonicalize PMID/PMCID/DOI
-    identifiers; load and self-hash-verify (atlas.citation_catalog_content_hash.v1, mirroring
+    (src/raptor/atlas/citation.py) enforcing ADR-0015 grounding. Scope: canonicalize PMID/PMCID/DOI/ACCESSION
+    identifiers (DOI lowercased, trailing-punctuation/percent/internal-whitespace rejected; ACCESSION
+    provider-qualified <namespace>:<opaque>, namespace lowercased, opaque case-preserved); load and
+    self-hash-verify (atlas.citation_catalog_content_hash.v1, mirroring
     atlas.pack_content_hash.v1) a versioned local catalog at configs/atlas/catalogs/<catalog_id>/catalog.yaml
-    (committed tsc2 template metadata-only, sources: []); resolve identifiers only to PRIMARY-LIT/DATASET
-    direct_evidence_leaf sources; recompute raw and extracted-text sha256/byte-length from disk under an
+    (committed tsc2 template metadata-only, sources: []); resolve identifiers for grounding only when
+    role==direct_evidence_leaf AND source_type in {PRIMARY-LIT,DATASET} AND permitted_use==grounding_and_quote
+    AND verification==verified AND >=1 identifier AND verified raw content (load is structural-only; a
+    non-grounding row loads for context but fails resolve-for-grounding); recompute raw and extracted-text sha256/byte-length from disk under an
     explicit external content root (reject absolute/drive/.. paths and symlink/junction escape; never trust
     catalog-declared hashes); verify an exact_quote at a text-char:<start>:<end> locator against extracted
     UTF-8 text normalized by atlas.text_norm.v1 (CRLF/CR to LF, NFC, no case-fold, no whitespace collapse),
@@ -631,7 +635,8 @@ todos:
     linked claim exact span, preserving the eight-gate order/short-circuit and the named-human Gate 8 after
     deterministic verification; add a static assert_no_network_imports guard. Typed errors under a new
     AtlasCatalogError family distinguish catalog schema/hash/path, identifier resolution, content drift and
-    span mismatch. Out of scope: any network fetch, a source-acquisition/refresh adapter, PDF/HTML/XML
+    span mismatch, and are raised only by the resolver; promotion Gate 3/4 translate them into the existing
+    AtlasProvenanceError/AtlasSchemaError (via from exc) and the network guard raises AtlasLeakageError. Out of scope: any network fetch, a source-acquisition/refresh adapter, PDF/HTML/XML
     parsing, fuzzy matching, dataset row/key locators, a source-registry platform, Discovery comparison.
     Internal handoffs and derived summaries may seed queries but never ground claims and are never a catalog
     grounding leaf. Acceptance: RED tests authored by Gemini (new tests/atlas/test_citation_resolver.py plus
