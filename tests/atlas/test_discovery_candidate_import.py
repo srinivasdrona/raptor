@@ -121,20 +121,20 @@ class FakeCitationResolver:
             document_date=None,
             document_version=None,
             raw_relative_path="raw.pdf",
-            raw_declared_sha256="sha",
+            raw_declared_sha256="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             raw_declared_byte_length=100,
             raw_media_type="application/pdf",
             extracted_relative_path="extract.txt",
-            extracted_declared_sha256="sha2",
+            extracted_declared_sha256="85136db6d4512cb593c66f543d2c88f1ae7e786bdfc14c55d0ac5b42dcd45c7f",
             extracted_declared_byte_length=150,
             extraction_method="pdftotext",
             extraction_version="1.0.0",
             text_normalization="atlas.text_norm.v1"
         )
         content = ContentVerification(
-            raw_sha256="sha",
+            raw_sha256="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             raw_byte_length=100,
-            extracted_text_sha256="sha2",
+            extracted_text_sha256="85136db6d4512cb593c66f543d2c88f1ae7e786bdfc14c55d0ac5b42dcd45c7f",
             extracted_text_byte_length=150
         )
         return ResolvedCitation(
@@ -160,7 +160,7 @@ class FakeCitationResolver:
             start=0,
             end=len(span.exact_quote or ""),
             exact_quote=span.exact_quote or "",
-            extracted_text_sha256=resolved.content.extracted_text_sha256 or "sha2"
+            extracted_text_sha256=resolved.content.extracted_text_sha256 or "85136db6d4512cb593c66f543d2c88f1ae7e786bdfc14c55d0ac5b42dcd45c7f"
         )
 
     def __call__(self, *args, **kwargs):
@@ -1557,5 +1557,219 @@ def test_gate3_grounding_criteria_verification():
     run_negative_case(InconsistentContentResolver, raw_byte_length=99999)
     run_negative_case(InconsistentContentResolver, extracted_text_sha256="mismatched-ext-sha")
     run_negative_case(InconsistentContentResolver, extracted_text_byte_length=99999)
+
+
+def test_promotion_boundary_contracts():
+    """Verify Gate3 and Gate4 boundary contract cases for raw and extracted pins."""
+    try:
+        import raptor.atlas.model as model_mod
+        from raptor.atlas.promote import validate_candidate_import
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
+
+    mock_pack = make_schema_valid_disease_pack(model_mod)
+
+    # Base valid variant and retrieval
+    valid_variant = {
+        "spdi_proposed": "NC_000000.0:1000:A:T", "gene_proposed": "SYNGENE1", "hgvs_aliases": []
+    }
+    valid_retrieval = {
+        "agents": [], "queries": [], "run_id": "r1", "retrieved_at": "now",
+        "pack_binding": {
+            "pack_id": "synthpack", "pack_version": "1.0.0", "pack_content_hash": "bf7369f8faa24a6f746956ee1122281e798185f320b012a844ffbc683f2e7b21"
+        },
+        "prompt_hash": "h", "bookshelf_version": "v1"
+    }
+
+    # Template for synthetic candidate claim referencing a source
+    def make_cand_claims():
+        return [{
+            "claim_text": "synthetic assay signal C", "claim_kind_proposed": "pathway", "directionality": "increase",
+            "source_ref_proposed": "lit-1",
+            "span_proposed": {"locator": "L1", "exact_quote": "synthetic quote C", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
+        }]
+
+    def make_cand_sources():
+        return [{
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {
+                "pmid": "12345"
+            }
+        }]
+
+    # A helper to run verification and assert resolver was invoked at Gate3 or Gate4
+    def run_boundary_negative_case(resolver):
+        ctx = model_mod.PromotionContext(
+            disease_pack=mock_pack,
+            citation_resolver=resolver,
+            context_validator=lambda kind, ctx: True,
+            human_oracle_reviewer=lambda cand_id: "sig",
+            duplicate_index={}
+        )
+        cand = model_mod.AtlasCandidateImport(
+            candidate_variant=valid_variant,
+            proposed_claims=make_cand_claims(),
+            proposed_sources=make_cand_sources(),
+            retrieval_provenance=valid_retrieval
+        )
+        with pytest.raises(model_mod.AtlasProvenanceError):
+            validate_candidate_import(cand, ctx)
+        assert len(resolver.resolve_calls) > 0, "Resolver's resolve() must have been called"
+
+
+    # --- PART 1: Gate3 raw pin contract cases ---
+
+    class Gate3RawPinResolver(FakeCitationResolver):
+        def __init__(self, raw_kwargs=None, content_kwargs=None):
+            super().__init__()
+            self.raw_kwargs = raw_kwargs or {}
+            self.content_kwargs = content_kwargs or {}
+
+        def resolve(self, identifier):
+            resolved = super().resolve(identifier)
+            import dataclasses
+            new_source = dataclasses.replace(resolved.source, **self.raw_kwargs)
+            new_content = dataclasses.replace(resolved.content, **self.content_kwargs)
+            return dataclasses.replace(resolved, source=new_source, content=new_content)
+
+    # raw_relative_path '.' and '..' / dot-only invalid rejected
+    run_boundary_negative_case(Gate3RawPinResolver(raw_kwargs={"raw_relative_path": "."}))
+    run_boundary_negative_case(Gate3RawPinResolver(raw_kwargs={"raw_relative_path": ".."}))
+    run_boundary_negative_case(Gate3RawPinResolver(raw_kwargs={"raw_relative_path": "..."}))
+
+    # malformed/non-lowercase/non-64hex raw_declared_sha256 rejected
+    run_boundary_negative_case(Gate3RawPinResolver(
+        raw_kwargs={"raw_declared_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"},
+        content_kwargs={"raw_sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"}
+    ))
+    run_boundary_negative_case(Gate3RawPinResolver(
+        raw_kwargs={"raw_declared_sha256": "e3b0c442"},
+        content_kwargs={"raw_sha256": "e3b0c442"}
+    ))
+    run_boundary_negative_case(Gate3RawPinResolver(
+        raw_kwargs={"raw_declared_sha256": "zzzzzzzz78fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+        content_kwargs={"raw_sha256": "zzzzzzzz78fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
+    ))
+
+    # raw_declared_byte_length bool/negative rejected
+    run_boundary_negative_case(Gate3RawPinResolver(
+        raw_kwargs={"raw_declared_byte_length": True},
+        content_kwargs={"raw_byte_length": True}
+    ))
+    run_boundary_negative_case(Gate3RawPinResolver(
+        raw_kwargs={"raw_declared_byte_length": -10},
+        content_kwargs={"raw_byte_length": -10}
+    ))
+
+    # raw_declared_byte_length 0 is VALID per spec/catalog loader (positive case) with matching ContentVerification
+    positive_zero_byte_resolver = Gate3RawPinResolver(
+        raw_kwargs={"raw_declared_byte_length": 0},
+        content_kwargs={"raw_byte_length": 0}
+    )
+    ctx_zero_byte = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=positive_zero_byte_resolver,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+    cand_zero_byte = model_mod.AtlasCandidateImport(
+        candidate_variant=valid_variant,
+        proposed_claims=make_cand_claims(),
+        proposed_sources=make_cand_sources(),
+        retrieval_provenance=valid_retrieval
+    )
+    validate_candidate_import(cand_zero_byte, ctx_zero_byte)
+    assert len(positive_zero_byte_resolver.resolve_calls) > 0
+    assert len(positive_zero_byte_resolver.verify_span_calls) > 0
+
+    # safe nested relative + lowercase 64hex accepted
+    positive_nested_resolver = Gate3RawPinResolver(
+        raw_kwargs={"raw_relative_path": "subdir/nested_path.pdf"}
+    )
+    ctx_nested = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=positive_nested_resolver,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+    cand_nested = model_mod.AtlasCandidateImport(
+        candidate_variant=valid_variant,
+        proposed_claims=make_cand_claims(),
+        proposed_sources=make_cand_sources(),
+        retrieval_provenance=valid_retrieval
+    )
+    validate_candidate_import(cand_nested, ctx_nested)
+    assert len(positive_nested_resolver.resolve_calls) > 0
+
+
+    # --- PART 2: Gate4 extracted text requirements ---
+
+    class Gate4ExtractedResolver(FakeCitationResolver):
+        def __init__(self, raw_kwargs=None, content_kwargs=None, span_kwargs=None):
+            super().__init__()
+            self.raw_kwargs = raw_kwargs or {}
+            self.content_kwargs = content_kwargs or {}
+            self.span_kwargs = span_kwargs or {}
+
+        def resolve(self, identifier):
+            resolved = super().resolve(identifier)
+            import dataclasses
+            new_source = dataclasses.replace(resolved.source, **self.raw_kwargs)
+            new_content = dataclasses.replace(resolved.content, **self.content_kwargs)
+            return dataclasses.replace(resolved, source=new_source, content=new_content)
+
+        def verify_span(self, resolved, span):
+            verified = super().verify_span(resolved, span)
+            import dataclasses
+            return dataclasses.replace(verified, **self.span_kwargs)
+
+    # missing any extracted_relative_path/hash/byte_length/extraction_method/extraction_version/text_normalization on source rejected
+    run_boundary_negative_case(Gate4ExtractedResolver(raw_kwargs={"extracted_relative_path": None}))
+    run_boundary_negative_case(Gate4ExtractedResolver(raw_kwargs={"extracted_declared_sha256": None}))
+    run_boundary_negative_case(Gate4ExtractedResolver(raw_kwargs={"extracted_declared_byte_length": None}))
+    run_boundary_negative_case(Gate4ExtractedResolver(raw_kwargs={"extraction_method": None}))
+    run_boundary_negative_case(Gate4ExtractedResolver(raw_kwargs={"extraction_version": None}))
+    run_boundary_negative_case(Gate4ExtractedResolver(raw_kwargs={"text_normalization": None}))
+
+    # malformed extracted hash/path/negative or bool byte length rejected
+    run_boundary_negative_case(Gate4ExtractedResolver(raw_kwargs={"extracted_relative_path": "."}))
+    run_boundary_negative_case(Gate4ExtractedResolver(raw_kwargs={"extracted_declared_sha256": "not-64hex"}))
+    run_boundary_negative_case(Gate4ExtractedResolver(raw_kwargs={"extracted_declared_byte_length": -1}))
+    run_boundary_negative_case(Gate4ExtractedResolver(raw_kwargs={"extracted_declared_byte_length": True}))
+
+    # ContentVerification extracted fields missing/mismatched rejected
+    run_boundary_negative_case(Gate4ExtractedResolver(content_kwargs={"extracted_text_sha256": "85136db6d4512cb593c66f543d2c88f1ae7e786bdfc14c55d0ac5b42dcd45c7e"}))
+    run_boundary_negative_case(Gate4ExtractedResolver(content_kwargs={"extracted_text_byte_length": 9999}))
+
+    # VerifiedSpan must corroborate exact source/content extracted artifact metadata per spec, not only echo source_id/locator/quote
+    run_boundary_negative_case(Gate4ExtractedResolver(span_kwargs={"extracted_text_sha256": "85136db6d4512cb593c66f543d2c88f1ae7e786bdfc14c55d0ac5b42dcd45c7e"}))
+
+    # zero-byte extracted text with non-empty span proposed must raise AtlasProvenanceError (quote cannot fit zero-byte artifact)
+    run_boundary_negative_case(Gate4ExtractedResolver(
+        raw_kwargs={"extracted_declared_byte_length": 0},
+        content_kwargs={"extracted_text_byte_length": 0},
+        span_kwargs={"extracted_text_sha256": "85136db6d4512cb593c66f543d2c88f1ae7e786bdfc14c55d0ac5b42dcd45c7f"}
+    ))
+
+    # complete extracted pins/content + exact VerifiedSpan accepted
+    positive_extracted_resolver = Gate4ExtractedResolver()
+    ctx_positive = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=positive_extracted_resolver,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+    cand_positive = model_mod.AtlasCandidateImport(
+        candidate_variant=valid_variant,
+        proposed_claims=make_cand_claims(),
+        proposed_sources=make_cand_sources(),
+        retrieval_provenance=valid_retrieval
+    )
+    validate_candidate_import(cand_positive, ctx_positive)
+    assert len(positive_extracted_resolver.resolve_calls) > 0
+    assert len(positive_extracted_resolver.verify_span_calls) > 0
 
 
