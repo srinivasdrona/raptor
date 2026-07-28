@@ -99,6 +99,25 @@ def _require_catalog(condition: bool, message: str) -> None:
         raise AtlasCatalogSchemaError(message)
 
 
+def _require_optional_str_field(source_id: str, field_name: str, value: Any) -> Optional[str]:
+    """Validate a ``str | None`` optional catalog scalar (``license``,
+    ``authoritative_url``, ``document_date``, ``document_version``).
+    Rejects ANY other type -- notably a YAML-auto-parsed ``bool``/``int``/
+    ``date``/``datetime`` (e.g. an unquoted ``document_date: 2024-01-01``
+    is parsed by ``yaml.safe_load`` as ``datetime.date``, not ``str``) or a
+    ``list``/``dict`` -- with :class:`AtlasCatalogSchemaError` BEFORE this
+    value ever reaches JSON serialization in :func:`catalog_content_hash`
+    (which would otherwise raise a raw, untyped ``TypeError``)."""
+
+    if value is None or isinstance(value, str):
+        return value
+    raise AtlasCatalogSchemaError(
+        f"source {source_id!r} field {field_name!r} must be a string or null, got "
+        f"{type(value).__name__} ({value!r}); note an unquoted YAML date/bareword is "
+        "parsed as a non-string scalar"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Identifier normalization (PMID / PMCID / DOI / ACCESSION)
 # ---------------------------------------------------------------------------
@@ -218,12 +237,26 @@ def catalog_content_hash(manifest: Mapping[str, Any]) -> str:
     ``atlas.pack_content_hash.v1`` (:func:`raptor.atlas.pack.pack_content_hash`)
     exactly: canonical JSON (``sort_keys=True``, ``separators=(",", ":")``,
     ``ensure_ascii=False``, sequence order preserved), lowercase SHA-256
-    hex digest."""
+    hex digest.
+
+    ``load_catalog`` always calls this AFTER structural validation (so a
+    non-JSON-native scalar, e.g. a YAML-auto-parsed date, is already
+    rejected by then). Because this is also a PUBLIC function callable
+    directly with an arbitrary mapping, a value ``json.dumps`` cannot
+    serialize (e.g. ``datetime.date``, ``set``, a custom object) is
+    translated to :class:`AtlasCatalogSchemaError` here too -- never a raw
+    ``TypeError``/``ValueError`` escaping to the caller."""
 
     payload = {key: value for key, value in manifest.items() if key != "catalog_content_hash"}
-    canonical_bytes = json.dumps(
-        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode("utf-8")
+    try:
+        canonical_bytes = json.dumps(
+            payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise AtlasCatalogSchemaError(
+            f"citation catalog manifest contains a value that is not JSON-native and "
+            f"cannot be hashed: {exc}"
+        ) from exc
     return hashlib.sha256(canonical_bytes).hexdigest().lower()
 
 
@@ -424,18 +457,34 @@ def _validate_and_build_sources(
                 f"source {source_id!r} has role='direct_evidence_leaf' but declares zero identifiers",
             )
 
+        # Validate the four optional str|None scalars BEFORE they are ever
+        # retained on the frozen CatalogSource -- and, transitively, before
+        # catalog_content_hash's JSON serialization -- so a YAML-native
+        # non-string scalar (bool/int/date/list/dict) fails closed here with
+        # AtlasCatalogSchemaError, never as a raw TypeError from json.dumps.
+        license_value = _require_optional_str_field(source_id, "license", entry.get("license"))
+        authoritative_url_value = _require_optional_str_field(
+            source_id, "authoritative_url", entry.get("authoritative_url")
+        )
+        document_date_value = _require_optional_str_field(
+            source_id, "document_date", entry.get("document_date")
+        )
+        document_version_value = _require_optional_str_field(
+            source_id, "document_version", entry.get("document_version")
+        )
+
         built.append(
             CatalogSource(
                 source_id=source_id,
                 source_type=source_type,
                 role=role,
                 identifiers=tuple(normalized_identifiers),
-                license=entry.get("license"),
+                license=license_value,
                 permitted_use=permitted_use,
                 verification=verification,
-                authoritative_url=entry.get("authoritative_url"),
-                document_date=entry.get("document_date"),
-                document_version=entry.get("document_version"),
+                authoritative_url=authoritative_url_value,
+                document_date=document_date_value,
+                document_version=document_version_value,
                 raw_relative_path=raw_relative_path,
                 raw_declared_sha256=raw_declared_sha256,
                 raw_declared_byte_length=raw_declared_byte_length,
@@ -586,8 +635,12 @@ def _resolve_content_root(content_root: Union[str, "os.PathLike[str]"]) -> Path:
 def _resolve_content_artifact(content_root: Path, relative_path: Any) -> Path:
     """Resolve ``relative_path`` under ``content_root`` with full
     containment safety: rejects non-relative paths (drive, absolute,
-    leading slash), any ``..`` traversal segment, and -- via resolved
-    realpath containment -- a symlink/junction that escapes the root."""
+    leading slash), any ``..`` traversal segment, an un-resolved symlink
+    or Windows reparse point/junction AT THE CANDIDATE PATH ITSELF
+    (checked via ``lstat`` BEFORE following it -- mirrors
+    ``_resolve_catalog_manifest_path``'s manifest check), and -- via
+    resolved realpath containment -- any symlink/junction chain that
+    escapes the root."""
 
     _require_content_path(
         isinstance(relative_path, str) and bool(relative_path),
@@ -610,6 +663,18 @@ def _resolve_content_artifact(content_root: Path, relative_path: Any) -> Path:
 
     candidate = content_root / relative_path
     try:
+        candidate_lstat = candidate.lstat()
+    except OSError as exc:
+        raise AtlasCatalogPathError(f"content artifact not found at {candidate}") from exc
+    if stat.S_ISLNK(candidate_lstat.st_mode):
+        raise AtlasCatalogPathError(
+            f"content artifact {candidate} must be a regular, non-symlink/junction file"
+        )
+    reparse_bit = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    if reparse_bit and (getattr(candidate_lstat, "st_file_attributes", 0) & reparse_bit):
+        raise AtlasCatalogPathError(f"content artifact {candidate} must not be a reparse point/junction")
+
+    try:
         real_file = candidate.resolve(strict=True)
     except OSError as exc:
         raise AtlasCatalogPathError(f"content artifact not found at {candidate}") from exc
@@ -627,6 +692,121 @@ def _resolve_content_artifact(content_root: Path, relative_path: Any) -> Path:
 def _require_content_path(condition: bool, message: str) -> None:
     if not condition:
         raise AtlasCatalogPathError(message)
+
+
+# ---------------------------------------------------------------------------
+# TOCTOU-hardened checked-handle file reads
+# ---------------------------------------------------------------------------
+#
+# Every security-sensitive read (the catalog manifest itself, and each raw /
+# extracted-text content artifact) goes through _read_verified_file below --
+# NEVER "resolve/check a Path, hand it back, and let the caller reopen it by
+# name later" (that pattern is exactly the check-then-use race this closes).
+
+
+def _identity(result: "os.stat_result") -> Tuple[int, int]:
+    return (result.st_dev, result.st_ino)
+
+
+def _reject_unsafe_stat(path: Path, result: "os.stat_result", *, what: str) -> None:
+    if stat.S_ISLNK(result.st_mode):
+        raise AtlasCatalogPathError(f"{what} {path} must be a regular, non-symlink/junction file")
+    reparse_bit = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    if reparse_bit and (getattr(result, "st_file_attributes", 0) & reparse_bit):
+        raise AtlasCatalogPathError(f"{what} {path} must not be a reparse point/junction")
+    if not stat.S_ISREG(result.st_mode):
+        raise AtlasCatalogPathError(f"{what} {path} must be a regular file")
+
+
+def _read_verified_file(path: Path, *, content_root: Optional[Path] = None, what: str = "file") -> bytes:
+    """Read the FULL contents of ``path`` through a single checked file
+    descriptor -- an immediate lstat-check -> open -> fstat-identity-check
+    -> read -> post-read fstat -> post-close lstat/realpath-recheck
+    sequence -- rather than returning a "checked" :class:`Path` for a
+    caller to reopen by name later (the classic TOCTOU anti-pattern).
+
+    Sequence:
+      1. ``lstat`` the un-opened path and reject a symlink, a Windows
+         reparse point/junction (``FILE_ATTRIBUTE_REPARSE_POINT``), or any
+         non-regular file BEFORE any ``open`` is attempted.
+      2. ``os.open`` read-only, adding ``O_NOFOLLOW`` when the platform
+         defines it (POSIX only -- Windows' ``os.open`` has no equivalent
+         flag).
+      3. ``os.fstat`` the just-opened descriptor and require its
+         (device, inode) identity and regular-file-ness to match the
+         pre-open ``lstat`` exactly. This still detects a same-name
+         symlink/file swap on platforms without ``O_NOFOLLOW`` because a
+         substituted target necessarily carries a different inode.
+      4. Read every byte through that SAME descriptor (never a second
+         open).
+      5. ``fstat`` the descriptor again immediately post-read (detects a
+         change during the read).
+      6. After closing, ``lstat`` the path ONE more time and require the
+         same identity, still a regular file, and -- if ``content_root``
+         is given -- still realpath-contained under it.
+    Any mismatch at any checkpoint fails closed with
+    :class:`AtlasCatalogPathError` -- never a bare ``OSError``.
+
+    Residual limitation (documented, not silently assumed away): Windows
+    provides no ``os.open`` flag to refuse following a reparse point, so a
+    race landing EXACTLY between step 1's ``lstat`` and step 2's ``open``
+    is only CAUGHT (via the inevitable identity mismatch a substitution
+    produces) rather than prevented outright. This module assumes a
+    trusted local filesystem with no concurrent hostile writer racing the
+    read; it does not claim atomicity on Windows.
+    """
+
+    try:
+        pre_open_lstat = path.lstat()
+    except OSError as exc:
+        raise AtlasCatalogPathError(f"{what} not found at {path}") from exc
+    _reject_unsafe_stat(path, pre_open_lstat, what=what)
+
+    open_flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(path, open_flags)
+    except OSError as exc:
+        raise AtlasCatalogPathError(f"{what} could not be opened at {path}") from exc
+
+    try:
+        post_open_stat = os.fstat(fd)
+        if not stat.S_ISREG(post_open_stat.st_mode) or _identity(post_open_stat) != _identity(pre_open_lstat):
+            raise AtlasCatalogPathError(
+                f"{what} {path} identity changed between check and open (TOCTOU)"
+            )
+        chunks = []
+        while True:
+            chunk = os.read(fd, 1 << 20)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        data = b"".join(chunks)
+        post_read_stat = os.fstat(fd)
+    finally:
+        os.close(fd)
+
+    if not stat.S_ISREG(post_read_stat.st_mode) or _identity(post_read_stat) != _identity(pre_open_lstat):
+        raise AtlasCatalogPathError(f"{what} {path} identity changed during read (TOCTOU)")
+
+    try:
+        post_close_lstat = path.lstat()
+    except OSError as exc:
+        raise AtlasCatalogPathError(f"{what} vanished immediately after read at {path}") from exc
+    _reject_unsafe_stat(path, post_close_lstat, what=what)
+    if _identity(post_close_lstat) != _identity(pre_open_lstat):
+        raise AtlasCatalogPathError(f"{what} {path} was swapped immediately after read (TOCTOU)")
+
+    if content_root is not None:
+        try:
+            real_check = path.resolve(strict=True)
+        except OSError as exc:
+            raise AtlasCatalogPathError(f"{what} not found at {path}") from exc
+        if real_check != content_root and content_root not in real_check.parents:
+            raise AtlasCatalogPathError(
+                f"{what} {real_check} escapes the allowed content_root {content_root}"
+            )
+
+    return data
 
 
 # ---------------------------------------------------------------------------
@@ -667,8 +847,14 @@ def load_catalog(
 
     manifest_path = _resolve_catalog_manifest_path(path_or_catalog_id)
 
-    with manifest_path.open("r", encoding="utf-8") as handle:
-        raw_manifest = yaml.safe_load(handle)
+    manifest_bytes = _read_verified_file(manifest_path, what="citation catalog manifest")
+    try:
+        manifest_text = manifest_bytes.decode("utf-8", errors="strict")
+    except UnicodeDecodeError as exc:
+        raise AtlasCatalogSchemaError(
+            f"citation catalog manifest at {manifest_path} is not valid UTF-8"
+        ) from exc
+    raw_manifest = yaml.safe_load(manifest_text)
 
     _validate_catalog_manifest(raw_manifest)
     sources, alias_index = _validate_and_build_sources(raw_manifest["sources"])
@@ -781,7 +967,9 @@ class LocalCitationResolver:
         the catalog-declared values. Never trusts declared values."""
 
         raw_path = _resolve_content_artifact(self._catalog.content_root, source.raw_relative_path)
-        raw_bytes = raw_path.read_bytes()
+        raw_bytes = _read_verified_file(
+            raw_path, content_root=self._catalog.content_root, what="raw content artifact"
+        )
         raw_sha256 = hashlib.sha256(raw_bytes).hexdigest().lower()
         raw_byte_length = len(raw_bytes)
         if raw_sha256 != source.raw_declared_sha256 or raw_byte_length != source.raw_declared_byte_length:
@@ -797,7 +985,11 @@ class LocalCitationResolver:
             extracted_path = _resolve_content_artifact(
                 self._catalog.content_root, source.extracted_relative_path
             )
-            extracted_bytes = extracted_path.read_bytes()
+            extracted_bytes = _read_verified_file(
+                extracted_path,
+                content_root=self._catalog.content_root,
+                what="extracted-text content artifact",
+            )
             extracted_text_sha256 = hashlib.sha256(extracted_bytes).hexdigest().lower()
             extracted_text_byte_length = len(extracted_bytes)
             if (
@@ -832,7 +1024,9 @@ class LocalCitationResolver:
             )
 
         extracted_path = _resolve_content_artifact(self._catalog.content_root, source.extracted_relative_path)
-        raw_bytes = extracted_path.read_bytes()
+        raw_bytes = _read_verified_file(
+            extracted_path, content_root=self._catalog.content_root, what="extracted-text content artifact"
+        )
 
         recomputed_sha256 = hashlib.sha256(raw_bytes).hexdigest().lower()
         recomputed_byte_length = len(raw_bytes)

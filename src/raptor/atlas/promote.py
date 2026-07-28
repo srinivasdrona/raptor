@@ -10,6 +10,7 @@ input candidate.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict
 
 from raptor.atlas.guards import scan_for_classification_leakage
@@ -20,13 +21,17 @@ from raptor.atlas.model import (
     AtlasIdentityError,
     AtlasProvenanceError,
     AtlasSchemaError,
+    CatalogSource,
+    CitationIdentifier,
     CitationResolver,
+    ContentVerification,
     DIRECT_EVIDENCE_LEAF_SOURCE_TYPES,
     EntryRef,
     ObservedClaim,
     PromotionContext,
     ResolvedCitation,
     Span,
+    VerifiedSpan,
 )
 
 #: Raw, scheme-less bib field -> ("prefix used to construct the canonical
@@ -46,6 +51,20 @@ _DOI_URL_PREFIXES = (
     "http://dx.doi.org/",
 )
 
+# The FULL raw-payload grammar per scheme (bib_mapping.bib_field_grammar).
+# These constants intentionally MIRROR (never import) the equivalent
+# grammar in citation.py -- promote.py depends only on model.py and the
+# injected resolver (import_independence) -- so that a grammatically
+# invalid candidate bib value fails Gate 3's OWN structural pre-check
+# (AtlasSchemaError, zero resolver calls) rather than being passed through
+# to the resolver as a "resolution failure" (AtlasProvenanceError).
+_PMID_RAW_VALUE_RE = re.compile(r"^[1-9][0-9]*$")
+_PMCID_RAW_VALUE_RE = re.compile(r"^PMC[0-9]+$")
+_DOI_RAW_VALUE_RE = re.compile(r"^10\.[0-9]{4,9}/[^\s%]+$")
+_ACCESSION_NAMESPACE_RAW_RE = re.compile(r"^[a-z0-9]+([._-][a-z0-9]+)*$")
+_ACCESSION_OPAQUE_RAW_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_DOI_TRAILING_PUNCTUATION = (".", ",", ";", ":", ")", "\u2014")
+
 
 def _bib_declares_any_identifier(bib: Any) -> bool:
     if not isinstance(bib, dict):
@@ -54,12 +73,17 @@ def _bib_declares_any_identifier(bib: Any) -> bool:
 
 
 def _validate_bib_raw_payload(entry_id: Any, scheme_key: str, prefix: str, raw_value: Any) -> None:
-    """Gate 3's OWN structural pre-check (``bib_mapping.bib_field_grammar``):
-    ``proposed_sources[].bib`` values are RAW and SCHEME-LESS ONLY. Reject --
-    with :class:`AtlasSchemaError`, BEFORE constructing the prefixed
-    identifier string or touching the resolver -- any value that is already
-    scheme-prefixed, a DOI URL, whitespace-bearing, or (for accession)
-    unqualified. Never strips/rewrites the raw value first."""
+    """Gate 3's OWN structural pre-check -- the FULL raw, scheme-less bib
+    grammar (``bib_mapping.bib_field_grammar``). ``proposed_sources[].bib``
+    values are RAW and SCHEME-LESS ONLY. Reject -- with
+    :class:`AtlasSchemaError`, BEFORE constructing the prefixed identifier
+    string or touching the resolver -- any value that is already
+    scheme-prefixed, a URL, whitespace-bearing, percent-encoded, or (per
+    scheme) grammatically malformed. This is intentionally FULL grammar
+    validation (not just prefix/URL/whitespace rejection): a value like a
+    leading-zero PMID or a malformed DOI/accession fails HERE with zero
+    resolver calls, not as a deferred resolver-side provenance failure.
+    Never strips/rewrites the raw value first."""
 
     if not isinstance(raw_value, str) or not raw_value:
         raise AtlasSchemaError(
@@ -75,6 +99,23 @@ def _validate_bib_raw_payload(entry_id: Any, scheme_key: str, prefix: str, raw_v
             f"proposed source {entry_id!r} bib.{scheme_key} value {raw_value!r} is already "
             "scheme-prefixed; bib values must be raw and scheme-less"
         )
+
+    if scheme_key == "pmid":
+        if not _PMID_RAW_VALUE_RE.match(raw_value):
+            raise AtlasSchemaError(
+                f"proposed source {entry_id!r} bib.pmid value {raw_value!r} must be positive "
+                "decimal digits with no leading zero"
+            )
+        return
+
+    if scheme_key == "pmcid":
+        if not _PMCID_RAW_VALUE_RE.match(raw_value):
+            raise AtlasSchemaError(
+                f"proposed source {entry_id!r} bib.pmcid value {raw_value!r} must be exactly "
+                "'PMC' followed by digits, with no wrapper"
+            )
+        return
+
     if scheme_key == "doi":
         for url_prefix in _DOI_URL_PREFIXES:
             if raw_value.lower().startswith(url_prefix):
@@ -82,11 +123,131 @@ def _validate_bib_raw_payload(entry_id: Any, scheme_key: str, prefix: str, raw_v
                     f"proposed source {entry_id!r} bib.doi value {raw_value!r} must not be "
                     "a URL form; bib values must be raw and scheme-less"
                 )
-    if scheme_key == "accession" and ":" not in raw_value:
-        raise AtlasSchemaError(
-            f"proposed source {entry_id!r} bib.accession value {raw_value!r} must be "
-            "'<namespace>:<opaque>' (unqualified accessions are rejected)"
+        if "%" in raw_value:
+            raise AtlasSchemaError(
+                f"proposed source {entry_id!r} bib.doi value {raw_value!r} must not contain "
+                "percent-encoding"
+            )
+        if raw_value[-1] in _DOI_TRAILING_PUNCTUATION:
+            raise AtlasSchemaError(
+                f"proposed source {entry_id!r} bib.doi value {raw_value!r} must not end in "
+                "trailing sentence punctuation"
+            )
+        if not _DOI_RAW_VALUE_RE.match(raw_value.lower()):
+            raise AtlasSchemaError(
+                f"proposed source {entry_id!r} bib.doi value {raw_value!r} must be a bare "
+                "'10.<4-9 digits>/...' payload"
+            )
+        return
+
+    if scheme_key == "accession":
+        if ":" not in raw_value:
+            raise AtlasSchemaError(
+                f"proposed source {entry_id!r} bib.accession value {raw_value!r} must be "
+                "'<namespace>:<opaque>' (unqualified accessions are rejected)"
+            )
+        namespace, _sep, opaque = raw_value.partition(":")
+        if not namespace or not _ACCESSION_NAMESPACE_RAW_RE.match(namespace.lower()):
+            raise AtlasSchemaError(
+                f"proposed source {entry_id!r} bib.accession value {raw_value!r} has an "
+                "invalid namespace"
+            )
+        if not opaque or not _ACCESSION_OPAQUE_RAW_RE.match(opaque):
+            raise AtlasSchemaError(
+                f"proposed source {entry_id!r} bib.accession value {raw_value!r} has an "
+                "invalid opaque identifier"
+            )
+        return
+
+
+def _is_conforming_citation_resolver(candidate: Any) -> bool:
+    """isinstance(candidate, CitationResolver) alone is NOT sufficient: a
+    ``runtime_checkable`` Protocol's ``isinstance`` check only confirms
+    that attributes NAMED ``resolve``/``verify_span`` are PRESENT -- it
+    does not confirm they are callable. A spoofed object with
+    ``resolve = "not callable"`` passes ``isinstance`` but must still be
+    rejected here, before any call is attempted."""
+
+    return (
+        isinstance(candidate, CitationResolver)
+        and callable(getattr(candidate, "resolve", None))
+        and callable(getattr(candidate, "verify_span", None))
+    )
+
+
+def _validate_resolved_citation_shape(
+    entry_id: Any, canonical_string: str, resolved: Any
+) -> ResolvedCitation:
+    """Defense-in-depth against a malicious/buggy resolver: validate the
+    EXACT result type/shape of ``resolve()``'s return value (never trust a
+    duck-typed or partially-shaped object) and assert that the resolution
+    actually corresponds to the identifier that was requested. A resolver
+    that returns the wrong type, an internally inconsistent
+    ``ResolvedCitation`` (e.g. a ``source``/``identifier``/``content`` of
+    the wrong type), or a citation for a DIFFERENT identifier than the one
+    requested is a resolution failure (:class:`AtlasProvenanceError`), not
+    a raw ``TypeError``/``AttributeError`` escaping to the caller. The
+    canonical-string comparison is case-insensitive because DOI payloads
+    and ACCESSION namespaces are case-insensitively canonicalized (see
+    ``identifier_grammar``); a resolver that echoes back an unrelated
+    identifier still fails this check."""
+
+    if not isinstance(resolved, ResolvedCitation):
+        raise AtlasProvenanceError(
+            f"citation resolver returned {type(resolved)!r} for proposed source "
+            f"{entry_id!r} identifier {canonical_string!r}; expected ResolvedCitation"
         )
+    if (
+        not isinstance(resolved.identifier, CitationIdentifier)
+        or not isinstance(resolved.source, CatalogSource)
+        or not isinstance(resolved.content, ContentVerification)
+        or resolved.content_verified is not True
+    ):
+        raise AtlasProvenanceError(
+            f"citation resolver returned a malformed ResolvedCitation for proposed source "
+            f"{entry_id!r} identifier {canonical_string!r}"
+        )
+    if (
+        not isinstance(resolved.identifier.canonical, str)
+        or resolved.identifier.canonical.lower() != canonical_string.lower()
+    ):
+        raise AtlasProvenanceError(
+            f"citation resolver returned a citation for identifier "
+            f"{resolved.identifier.canonical!r} but {canonical_string!r} was requested "
+            f"for proposed source {entry_id!r} (resolver identity mismatch)"
+        )
+    if not isinstance(resolved.source.source_id, str) or not resolved.source.source_id:
+        raise AtlasProvenanceError(
+            f"citation resolver returned a ResolvedCitation with an invalid source_id for "
+            f"proposed source {entry_id!r} identifier {canonical_string!r}"
+        )
+    return resolved
+
+
+def _validate_verified_span_shape(
+    entry_id: Any, resolved: ResolvedCitation, span: Span, verified: Any
+) -> VerifiedSpan:
+    """Defense-in-depth against a malicious/buggy resolver: validate the
+    EXACT result type of ``verify_span()`` and assert it is bound to the
+    EXACT resolved source and the EXACT span that was requested -- a
+    resolver that verifies a DIFFERENT source/locator/quote than the one
+    Gate 4 asked about must not be trusted."""
+
+    if not isinstance(verified, VerifiedSpan):
+        raise AtlasProvenanceError(
+            f"citation resolver verify_span returned {type(verified)!r} for proposed claim "
+            f"referencing {entry_id!r}; expected VerifiedSpan"
+        )
+    if (
+        verified.source_id != resolved.source.source_id
+        or verified.locator != span.locator
+        or verified.exact_quote != span.exact_quote
+    ):
+        raise AtlasProvenanceError(
+            f"citation resolver verify_span result is not bound to the exact resolved "
+            f"source/span requested for proposed claim referencing {entry_id!r}"
+        )
+    return verified
 
 
 def _is_valid_named_signoff(signoff: Any) -> bool:
@@ -201,11 +362,12 @@ def _gate3_citation_resolution(
     a given source to agree, and return a LOCAL ``resolved_by_source`` map
     (threaded explicitly to Gate 4 -- no globals, no cross-candidate state)."""
 
-    if not isinstance(context.citation_resolver, CitationResolver):
+    if not _is_conforming_citation_resolver(context.citation_resolver):
         raise AtlasSchemaError(
             "PromotionContext.citation_resolver must implement the CitationResolver "
-            "protocol (resolve + verify_span); a bare boolean/callable is not a citation "
-            "resolver"
+            "protocol with CALLABLE resolve + verify_span; a bare boolean/callable (or an "
+            "object exposing non-callable resolve/verify_span attributes) is not a "
+            "citation resolver"
         )
 
     resolved_by_source: Dict[str, ResolvedCitation] = {}
@@ -248,6 +410,8 @@ def _gate3_citation_resolution(
                     f"citation resolver failed to resolve proposed source {entry_id!r} "
                     f"identifier {canonical_string!r}"
                 ) from exc
+
+            resolved = _validate_resolved_citation_shape(entry_id, canonical_string, resolved)
 
             resolved_aliases.append((canonical_string, resolved))
 
@@ -316,12 +480,14 @@ def _gate4_exact_span_resolution(
             page_or_figure=span_proposed.get("page_or_figure"),
         )
         try:
-            context.citation_resolver.verify_span(resolved, span)
+            verified = context.citation_resolver.verify_span(resolved, span)
         except AtlasCatalogError as exc:
             raise AtlasProvenanceError(
                 f"exact span verification failed for proposed claim referencing "
                 f"{source_ref!r}"
             ) from exc
+
+        _validate_verified_span_shape(source_ref, resolved, span, verified)
 
 
 def _gate5_context_ontology_pack_validation(candidate: AtlasCandidateImport, context: PromotionContext) -> None:
