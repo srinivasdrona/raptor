@@ -154,11 +154,20 @@ class FakeCitationResolver:
         if "fail-span" in span.locator or "fail-span" in (span.exact_quote or ""):
             raise AtlasSpanMismatchError(f"Span mismatch for {span.locator}")
 
+        start, end = 0, len(span.exact_quote or "")
+        if span.locator and span.locator.startswith("text-char:"):
+            try:
+                parts = span.locator.split(":")
+                start = int(parts[1])
+                end = int(parts[2])
+            except Exception:
+                pass
+
         return VerifiedSpan(
             source_id=resolved.source.source_id,
             locator=span.locator,
-            start=0,
-            end=len(span.exact_quote or ""),
+            start=start,
+            end=end,
             exact_quote=span.exact_quote or "",
             extracted_text_sha256=resolved.content.extracted_text_sha256 or "85136db6d4512cb593c66f543d2c88f1ae7e786bdfc14c55d0ac5b42dcd45c7f"
         )
@@ -450,7 +459,7 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
         proposed_claims=[{
             "claim_text": "text", "claim_kind_proposed": "pathway", "directionality": "increase",
             "source_ref_proposed": "lit-1",
-            "span_proposed": {"locator": "fail-span", "exact_quote": "fail-span", "page_or_figure": "1"},
+            "span_proposed": {"locator": "text-char:0:9", "exact_quote": "fail-span", "page_or_figure": "1"},
             "context_proposed": "cell-assay-A"
         }],
         proposed_sources=[{
@@ -482,7 +491,7 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
         proposed_claims=[{
             "claim_text": "text", "claim_kind_proposed": "fail-kind", "directionality": "increase",
             "source_ref_proposed": "lit-1",
-            "span_proposed": {"locator": "L1", "exact_quote": "Q1", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
+            "span_proposed": {"locator": "text-char:0:2", "exact_quote": "Q1", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
         }],
         proposed_sources=[{
             "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
@@ -507,7 +516,7 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
         proposed_claims=[{
             "claim_text": "text", "claim_kind_proposed": "pathway", "directionality": "increase",
             "source_ref_proposed": "lit-1",
-            "span_proposed": {"locator": "L1", "exact_quote": "Q1", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
+            "span_proposed": {"locator": "text-char:0:2", "exact_quote": "Q1", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
         }],
         proposed_sources=[{
             "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
@@ -534,7 +543,7 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
         proposed_claims=[{
             "claim_text": "text", "claim_kind_proposed": "pathway", "directionality": "increase",
             "source_ref_proposed": "lit-1",
-            "span_proposed": {"locator": "L1", "exact_quote": "Q1", "page_or_figure": "1"}, "context_proposed": "cell-assay-A",
+            "span_proposed": {"locator": "text-char:0:2", "exact_quote": "Q1", "page_or_figure": "1"}, "context_proposed": "cell-assay-A",
             "classifier_score": 0.95  # LEAKAGE!
         }],
         proposed_sources=[{
@@ -555,7 +564,7 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
         proposed_claims=[{
             "claim_text": "text", "claim_kind_proposed": "pathway", "directionality": "increase",
             "source_ref_proposed": "fail-human",
-            "span_proposed": {"locator": "L1", "exact_quote": "Q1", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
+            "span_proposed": {"locator": "text-char:0:2", "exact_quote": "Q1", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
         }],
         proposed_sources=[{
             "entry_id": "fail-human", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
@@ -637,7 +646,7 @@ def test_bib_raw_payloads_success_and_reject_prefixed():
         },
         proposed_claims=[{
             "claim_text": "synthetic text", "claim_kind_proposed": "pathway", "directionality": "increase",
-            "source_ref_proposed": "lit-1", "span_proposed": {"locator": "L1", "exact_quote": "Q1", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
+            "source_ref_proposed": "lit-1", "span_proposed": {"locator": "text-char:0:2", "exact_quote": "Q1", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
         }],
         proposed_sources=[{
             "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
@@ -671,7 +680,7 @@ def test_bib_raw_payloads_success_and_reject_prefixed():
         },
         proposed_claims=[{
             "claim_text": "synthetic dataset claim", "claim_kind_proposed": "pathway", "directionality": "increase",
-            "source_ref_proposed": "dataset-1", "span_proposed": {"locator": "L1", "exact_quote": "Q1", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
+            "source_ref_proposed": "dataset-1", "span_proposed": {"locator": "text-char:0:2", "exact_quote": "Q1", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
         }],
         proposed_sources=[{
             "entry_id": "dataset-1", "source_type": "DATASET", "role": "direct_evidence_leaf",
@@ -900,7 +909,7 @@ def test_successful_synthetic_promotion():
         proposed_claims=[{
             "claim_text": "synthetic assay signal C", "claim_kind_proposed": "pathway", "directionality": "increase",
             "source_ref_proposed": "lit-1",
-            "span_proposed": {"locator": "L1", "exact_quote": "synthetic quote C", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
+            "span_proposed": {"locator": "text-char:0:17", "exact_quote": "synthetic quote C", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
         }],
         proposed_sources=[{
             "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
@@ -948,7 +957,7 @@ def test_pure_preimplementation_fixture_shape_audit():
                 "claim_kind_proposed": "pathway",
                 "directionality": "increase",
                 "source_ref_proposed": "lit-1",
-                "span_proposed": {"locator": "L1", "exact_quote": "Q1", "page_or_figure": "1"},
+                "span_proposed": {"locator": "text-char:0:2", "exact_quote": "Q1", "page_or_figure": "1"},
                 "context_proposed": "cell-assay-A"
             }
         ],
@@ -1586,7 +1595,7 @@ def test_promotion_boundary_contracts():
         return [{
             "claim_text": "synthetic assay signal C", "claim_kind_proposed": "pathway", "directionality": "increase",
             "source_ref_proposed": "lit-1",
-            "span_proposed": {"locator": "L1", "exact_quote": "synthetic quote C", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
+            "span_proposed": {"locator": "text-char:0:17", "exact_quote": "synthetic quote C", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
         }]
 
     def make_cand_sources():
@@ -1865,7 +1874,7 @@ def test_gate4_raw_span_type_checks():
         proposed_claims=[{
             "claim_text": "text", "claim_kind_proposed": "pathway", "directionality": "increase",
             "source_ref_proposed": "lit-1",
-            "span_proposed": {"locator": "L1", "exact_quote": "some quote", "page_or_figure": "page-1"},
+            "span_proposed": {"locator": "text-char:0:10", "exact_quote": "some quote", "page_or_figure": "page-1"},
             "context_proposed": "cell-assay-A"
         }],
         proposed_sources=[{
@@ -1924,7 +1933,7 @@ def test_resolver_whitespace_spoof_regression_cases():
         return [{
             "claim_text": "text", "claim_kind_proposed": "pathway", "directionality": "increase",
             "source_ref_proposed": "lit-1",
-            "span_proposed": {"locator": "L1", "exact_quote": "some quote", "page_or_figure": "page-1"},
+            "span_proposed": {"locator": "text-char:0:10", "exact_quote": "some quote", "page_or_figure": "page-1"},
             "context_proposed": "cell-assay-A"
         }]
 
