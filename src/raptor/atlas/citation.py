@@ -579,8 +579,9 @@ def _validate_catalog_manifest(manifest: Any) -> None:
     )
 
     _require_catalog(
-        isinstance(manifest["catalog_content_hash"], str),
-        "citation catalog manifest 'catalog_content_hash' must be a string",
+        isinstance(manifest["catalog_content_hash"], str)
+        and bool(_SHA256_HEX_RE.match(manifest["catalog_content_hash"])),
+        "citation catalog manifest 'catalog_content_hash' must be a lowercase 64-hex digest",
     )
 
     disease_pack_binding = manifest["disease_pack_binding"]
@@ -934,7 +935,7 @@ def load_catalog(
 
     stored_hash = raw_manifest.get("catalog_content_hash")
     computed_hash = catalog_content_hash(raw_manifest)
-    if not isinstance(stored_hash, str) or stored_hash.lower() != computed_hash:
+    if not isinstance(stored_hash, str) or stored_hash != computed_hash:
         raise AtlasCatalogHashError(
             f"citation catalog manifest at {manifest_path} has catalog_content_hash "
             f"{stored_hash!r} but recomputes to {computed_hash!r}"
@@ -946,7 +947,7 @@ def load_catalog(
         schema=raw_manifest["schema"],
         catalog_id=raw_manifest["catalog_id"],
         catalog_version=raw_manifest["catalog_version"],
-        catalog_content_hash=stored_hash,
+        catalog_content_hash=computed_hash,
         disease_pack_binding=_deep_freeze(raw_manifest["disease_pack_binding"]),
         sources=sources,
         alias_index=types.MappingProxyType(dict(alias_index)),
