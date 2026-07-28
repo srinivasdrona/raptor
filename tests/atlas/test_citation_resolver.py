@@ -495,12 +495,12 @@ def test_load_catalog_and_validation_red(tmp_path):
         {
             "source_id": "src-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
             "identifiers": {"pmid": ["12345"]}, "permitted_use": "grounding_and_quote", "verification": "verified",
-            "raw_artifact": {"relative_path": "x.pdf", "sha256": "h", "byte_length": 1, "media_type": "pdf"}
+            "raw_artifact": {"relative_path": "x.pdf", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "byte_length": 0, "media_type": "application/pdf"}
         },
         {
             "source_id": "src-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
             "identifiers": {"pmid": ["54321"]}, "permitted_use": "grounding_and_quote", "verification": "verified",
-            "raw_artifact": {"relative_path": "y.pdf", "sha256": "h", "byte_length": 1, "media_type": "pdf"}
+            "raw_artifact": {"relative_path": "y.pdf", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "byte_length": 0, "media_type": "application/pdf"}
         }
     ]
     manifest_dup_id["catalog_content_hash"] = oracle_catalog_content_hash(manifest_dup_id)
@@ -516,12 +516,12 @@ def test_load_catalog_and_validation_red(tmp_path):
         {
             "source_id": "src-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
             "identifiers": {"pmid": ["12345"]}, "permitted_use": "grounding_and_quote", "verification": "verified",
-            "raw_artifact": {"relative_path": "x.pdf", "sha256": "h", "byte_length": 1, "media_type": "pdf"}
+            "raw_artifact": {"relative_path": "x.pdf", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "byte_length": 0, "media_type": "application/pdf"}
         },
         {
             "source_id": "src-2", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
             "identifiers": {"pmid": ["12345"]}, "permitted_use": "grounding_and_quote", "verification": "verified",
-            "raw_artifact": {"relative_path": "y.pdf", "sha256": "h", "byte_length": 1, "media_type": "pdf"}
+            "raw_artifact": {"relative_path": "y.pdf", "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "byte_length": 0, "media_type": "application/pdf"}
         }
     ]
     manifest_cross_alias["catalog_content_hash"] = oracle_catalog_content_hash(manifest_cross_alias)
@@ -815,15 +815,10 @@ def test_verify_span_happy_and_adversarial_red(tmp_path):
     # 1. Happy path: exact verify
     # Normalized text: "This is a synthetic citation sentence.\nIt has composed unicode: ä.\nAnd another line."
     # Let's verify composited unicode: "ä"
-    # "This is a synthetic citation sentence.\nIt has composed unicode: " has length: 39 + 1 + 26 = 66
-    # Let's count characters to be precise:
-    # "This is a synthetic citation sentence." = 38 chars
-    # "\n" = 1 char
-    # "It has composed unicode: " = 26 chars
-    # compose character "ä" (composed, NFC) = 1 char. Total offset is 38 + 1 + 26 = 65. Let's verify with Python:
+    # Derive the exact start offset of "ä" dynamically from the normalized text.
     norm_text = oracle_text_normalization(text_bytes)
     start_composed = norm_text.find("\u00e4")
-    assert start_composed == 65
+    assert start_composed == 64, f"Expected dynamically derived index to be 64, got {start_composed}"
 
     from raptor.atlas.model import Span
     span_composed = Span(locator=f"text-char:{start_composed}:{start_composed+1}", exact_quote="\u00e4")

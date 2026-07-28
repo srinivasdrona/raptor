@@ -203,16 +203,29 @@ def test_candidate_import_exact_schema():
 
 
 def test_promotion_context_fields():
-    """Verify PromotionContext fields strictly conform to the spec."""
+    """Verify PromotionContext fields strictly conform to the spec, including CitationResolver protocol annotation."""
     try:
-        from raptor.atlas.model import PromotionContext
+        from raptor.atlas.model import PromotionContext, CitationResolver
     except (ImportError, ModuleNotFoundError):
         pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
 
+    import typing
+    hints = typing.get_type_hints(PromotionContext)
+    
+    # Assert exact type annotation is CitationResolver Protocol, not Callable bool
+    assert hints["citation_resolver"] is CitationResolver, "PromotionContext.citation_resolver must be typed as CitationResolver protocol"
+
+    # Verify attributes/fields list
     fields_list = [f.name for f in dataclasses.fields(PromotionContext)]
     expected = ["disease_pack", "citation_resolver", "context_validator", "human_oracle_reviewer", "duplicate_index"]
     for field in expected:
         assert field in fields_list, f"PromotionContext is missing expected field: {field}"
+
+    # Verify that the resolver is a runtime-checkable Protocol
+    fake_resolver = FakeCitationResolver()
+    assert isinstance(fake_resolver, CitationResolver), "Fake resolver must satisfy Protocol"
+    assert hasattr(fake_resolver, "resolve"), "Protocol must have resolve method"
+    assert hasattr(fake_resolver, "verify_span"), "Protocol must have verify_span method"
 
 
 def make_schema_valid_disease_pack(model_mod):
@@ -364,7 +377,7 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
         proposed_claims=[],
         proposed_sources=[{
             "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
-            "bib": {"pmid": "fail-citation"}
+            "bib": {"doi": "10.9999/fail-citation"} # Syntactically valid bare DOI failure
         }],
         retrieval_provenance=valid_retrieval
     )
@@ -592,8 +605,8 @@ def test_bib_raw_payloads_success_and_reject_prefixed():
         duplicate_index={}
     )
 
-    # 1. Successful synthetic setup with RAW scheme-less payloads
-    cand_valid = model_mod.AtlasCandidateImport(
+    # 1. Successful synthetic setup with PRIMARY-LIT raw scheme-less payloads (no accession mix)
+    cand_valid_lit = model_mod.AtlasCandidateImport(
         candidate_variant={
             "spdi_proposed": "NC_000000.0:1000:A:T", "gene_proposed": "SYNGENE1", "hgvs_aliases": []
         },
@@ -606,8 +619,7 @@ def test_bib_raw_payloads_success_and_reject_prefixed():
             "bib": {
                 "pmid": "12345",
                 "pmcid": "PMC12345",
-                "doi": "10.5555/abc",
-                "accession": "geo:GSE12345"
+                "doi": "10.5555/abc"
             }
         }],
         retrieval_provenance={
@@ -620,15 +632,63 @@ def test_bib_raw_payloads_success_and_reject_prefixed():
     )
 
     fake_resolver.resolve_calls.clear()
-    validate_candidate_import(cand_valid, ctx)
+    validate_candidate_import(cand_valid_lit, ctx)
 
     # Prove spy resolver received exact prefixed concatenated forms
     assert "PMID:12345" in fake_resolver.resolve_calls
     assert "PMCID:PMC12345" in fake_resolver.resolve_calls
     assert "DOI:10.5555/abc" in fake_resolver.resolve_calls
-    assert "ACCESSION:geo:GSE12345" in fake_resolver.resolve_calls
 
-    # 2. Structural failure on already-prefixed bib values (rejection before resolver is invoked)
+    # 2. Successful synthetic setup with DATASET raw scheme-less accession payloads
+    cand_valid_dataset = model_mod.AtlasCandidateImport(
+        candidate_variant={
+            "spdi_proposed": "NC_000000.0:1000:A:T", "gene_proposed": "SYNGENE1", "hgvs_aliases": []
+        },
+        proposed_claims=[{
+            "claim_text": "synthetic dataset claim", "claim_kind_proposed": "pathway", "directionality": "increase",
+            "source_ref_proposed": "dataset-1", "span_proposed": {"locator": "L1", "exact_quote": "Q1", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
+        }],
+        proposed_sources=[{
+            "entry_id": "dataset-1", "source_type": "DATASET", "role": "direct_evidence_leaf",
+            "bib": {
+                "accession": "geo:GSE12345",
+                "doi": "10.5555/abc" # Dataset DOI
+            }
+        }],
+        retrieval_provenance={
+            "agents": [], "queries": [], "run_id": "r1", "retrieved_at": "now",
+            "pack_binding": {
+                "pack_id": "synthpack", "pack_version": "1.0.0", "pack_content_hash": "bf7369f8faa24a6f746956ee1122281e798185f320b012a844ffbc683f2e7b21"
+            },
+            "prompt_hash": "h", "bookshelf_version": "v1"
+        }
+    )
+
+    fake_resolver.resolve_calls.clear()
+    validate_candidate_import(cand_valid_dataset, ctx)
+    assert "ACCESSION:geo:GSE12345" in fake_resolver.resolve_calls
+    assert "DOI:10.5555/abc" in fake_resolver.resolve_calls
+
+
+def test_invalid_raw_pmid_structural_rejection():
+    """Verify that syntactically invalid raw bib payloads are rejected structurally before resolver invocation."""
+    try:
+        import raptor.atlas.model as model_mod
+        from raptor.atlas.promote import validate_candidate_import
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
+
+    mock_pack = make_schema_valid_disease_pack(model_mod)
+    fake_resolver = FakeCitationResolver()
+    ctx = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=fake_resolver,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+
+    # Rejection of already-prefixed bib values (rejection before resolver is invoked)
     for bad_bib in [
         {"pmid": "PMID:12345"},
         {"pmcid": "PMCID:PMC12345"},
