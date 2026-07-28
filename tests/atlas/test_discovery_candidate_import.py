@@ -1879,3 +1879,221 @@ def test_gate4_raw_span_type_checks():
     assert len(resolver_positive.verify_span_calls) > 0
 
 
+def test_resolver_whitespace_spoof_regression_cases():
+    """Verify that Gate3 and Gate4 reject whitespace-only fields returned by a resolver with AtlasProvenanceError.
+    
+    The resolver returns a typed ResolvedCitation but CatalogSource fields are whitespace-only:
+    - raw_relative_path = '   '
+    - raw_media_type = '   '
+    - extracted_relative_path = '   '
+    - extraction_method = '   '
+    - extraction_version = '   '
+    
+    validate_candidate_import must raise AtlasProvenanceError itself, the resolver must not raise,
+    and call spies must prove that the intended gate is reached. Include valid nonblank controls.
+    """
+    try:
+        import raptor.atlas.model as model_mod
+        from raptor.atlas.promote import validate_candidate_import
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
+
+    mock_pack = make_schema_valid_disease_pack(model_mod)
+
+    # Base valid variant and retrieval
+    valid_variant = {
+        "spdi_proposed": "NC_000000.0:1000:A:T", "gene_proposed": "SYNGENE1", "hgvs_aliases": []
+    }
+    valid_retrieval = {
+        "agents": [], "queries": [], "run_id": "r1", "retrieved_at": "now",
+        "pack_binding": {
+            "pack_id": "synthpack", "pack_version": "1.0.0", "pack_content_hash": "bf7369f8faa24a6f746956ee1122281e798185f320b012a844ffbc683f2e7b21"
+        },
+        "prompt_hash": "h", "bookshelf_version": "v1"
+    }
+
+    # Helper to build basic source
+    def make_sources():
+        return [{
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {"pmid": "12345"}
+        }]
+
+    # Helper to build basic claims with span to trigger Gate 4
+    def make_claims_with_span():
+        return [{
+            "claim_text": "text", "claim_kind_proposed": "pathway", "directionality": "increase",
+            "source_ref_proposed": "lit-1",
+            "span_proposed": {"locator": "L1", "exact_quote": "some quote", "page_or_figure": "page-1"},
+            "context_proposed": "cell-assay-A"
+        }]
+
+    # 1. TEST CASE: raw_relative_path='   '
+    class SpoofRawPathResolver(FakeCitationResolver):
+        def resolve(self, identifier):
+            resolved = super().resolve(identifier)
+            import dataclasses
+            new_source = dataclasses.replace(resolved.source, raw_relative_path="   ")
+            return dataclasses.replace(resolved, source=new_source)
+
+    resolver_raw_path = SpoofRawPathResolver()
+    ctx_raw_path = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=resolver_raw_path,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+    cand_raw_path = model_mod.AtlasCandidateImport(
+        candidate_variant=valid_variant,
+        proposed_claims=[],  # No claims needed to reach Gate 3
+        proposed_sources=make_sources(),
+        retrieval_provenance=valid_retrieval
+    )
+
+    with pytest.raises(model_mod.AtlasProvenanceError) as exc_info:
+        validate_candidate_import(cand_raw_path, ctx_raw_path)
+    
+    # Resolver itself must not raise any exception, and call spy proves Gate 3 reached
+    assert len(resolver_raw_path.resolve_calls) > 0
+    assert len(resolver_raw_path.verify_span_calls) == 0
+
+    # 2. TEST CASE: raw_media_type='   '
+    class SpoofRawMediaTypeResolver(FakeCitationResolver):
+        def resolve(self, identifier):
+            resolved = super().resolve(identifier)
+            import dataclasses
+            new_source = dataclasses.replace(resolved.source, raw_media_type="   ")
+            return dataclasses.replace(resolved, source=new_source)
+
+    resolver_raw_media = SpoofRawMediaTypeResolver()
+    ctx_raw_media = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=resolver_raw_media,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+    cand_raw_media = model_mod.AtlasCandidateImport(
+        candidate_variant=valid_variant,
+        proposed_claims=[],  # No claims needed to reach Gate 3
+        proposed_sources=make_sources(),
+        retrieval_provenance=valid_retrieval
+    )
+
+    with pytest.raises(model_mod.AtlasProvenanceError) as exc_info:
+        validate_candidate_import(cand_raw_media, ctx_raw_media)
+        
+    assert len(resolver_raw_media.resolve_calls) > 0
+    assert len(resolver_raw_media.verify_span_calls) == 0
+
+    # 3. TEST CASE: extracted_relative_path='   ' (fails in Gate 4)
+    class SpoofExtractedPathResolver(FakeCitationResolver):
+        def resolve(self, identifier):
+            resolved = super().resolve(identifier)
+            import dataclasses
+            new_source = dataclasses.replace(resolved.source, extracted_relative_path="   ")
+            return dataclasses.replace(resolved, source=new_source)
+
+    resolver_ext_path = SpoofExtractedPathResolver()
+    ctx_ext_path = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=resolver_ext_path,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+    cand_ext_path = model_mod.AtlasCandidateImport(
+        candidate_variant=valid_variant,
+        proposed_claims=make_claims_with_span(),  # Has proposed claims with span to trigger Gate 4
+        proposed_sources=make_sources(),
+        retrieval_provenance=valid_retrieval
+    )
+
+    with pytest.raises(model_mod.AtlasProvenanceError) as exc_info:
+        validate_candidate_import(cand_ext_path, ctx_ext_path)
+        
+    assert len(resolver_ext_path.resolve_calls) > 0
+    assert len(resolver_ext_path.verify_span_calls) == 0  # Gate 4 fails BEFORE verify_span is called
+
+    # 4. TEST CASE: extraction_method='   ' (fails in Gate 4)
+    class SpoofExtractionMethodResolver(FakeCitationResolver):
+        def resolve(self, identifier):
+            resolved = super().resolve(identifier)
+            import dataclasses
+            new_source = dataclasses.replace(resolved.source, extraction_method="   ")
+            return dataclasses.replace(resolved, source=new_source)
+
+    resolver_ext_method = SpoofExtractionMethodResolver()
+    ctx_ext_method = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=resolver_ext_method,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+    cand_ext_method = model_mod.AtlasCandidateImport(
+        candidate_variant=valid_variant,
+        proposed_claims=make_claims_with_span(),
+        proposed_sources=make_sources(),
+        retrieval_provenance=valid_retrieval
+    )
+
+    with pytest.raises(model_mod.AtlasProvenanceError) as exc_info:
+        validate_candidate_import(cand_ext_method, ctx_ext_method)
+        
+    assert len(resolver_ext_method.resolve_calls) > 0
+    assert len(resolver_ext_method.verify_span_calls) == 0  # Gate 4 fails BEFORE verify_span is called
+
+    # 5. TEST CASE: extraction_version='   ' (fails in Gate 4)
+    class SpoofExtractionVersionResolver(FakeCitationResolver):
+        def resolve(self, identifier):
+            resolved = super().resolve(identifier)
+            import dataclasses
+            new_source = dataclasses.replace(resolved.source, extraction_version="   ")
+            return dataclasses.replace(resolved, source=new_source)
+
+    resolver_ext_version = SpoofExtractionVersionResolver()
+    ctx_ext_version = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=resolver_ext_version,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+    cand_ext_version = model_mod.AtlasCandidateImport(
+        candidate_variant=valid_variant,
+        proposed_claims=make_claims_with_span(),
+        proposed_sources=make_sources(),
+        retrieval_provenance=valid_retrieval
+    )
+
+    with pytest.raises(model_mod.AtlasProvenanceError) as exc_info:
+        validate_candidate_import(cand_ext_version, ctx_ext_version)
+        
+    assert len(resolver_ext_version.resolve_calls) > 0
+    assert len(resolver_ext_version.verify_span_calls) == 0  # Gate 4 fails BEFORE verify_span is called
+
+    # 6. VALID NONBLANK CONTROL: Verifies that valid nonblank values successfully pass import validation
+    resolver_control = FakeCitationResolver()
+    ctx_control = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=resolver_control,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+    cand_control = model_mod.AtlasCandidateImport(
+        candidate_variant=valid_variant,
+        proposed_claims=make_claims_with_span(),
+        proposed_sources=make_sources(),
+        retrieval_provenance=valid_retrieval
+    )
+    
+    # Should run successfully without raising any exceptions
+    validate_candidate_import(cand_control, ctx_control)
+    assert len(resolver_control.resolve_calls) > 0
+    assert len(resolver_control.verify_span_calls) > 0
+
+
+
