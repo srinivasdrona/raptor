@@ -1244,3 +1244,160 @@ def test_gate3_source_identifiers_verification():
         pass
 
 
+def test_gate3_multi_alias_catalog_source_consistency():
+    """Verify Gate3 rules for multiple aliases resolving to different CatalogSource declarations."""
+    try:
+        import raptor.atlas.model as model_mod
+        from raptor.atlas.promote import validate_candidate_import
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
+
+    mock_pack = make_schema_valid_disease_pack(model_mod)
+
+    # Base valid variant and retrieval
+    valid_variant = {
+        "spdi_proposed": "NC_000000.0:1000:A:T", "gene_proposed": "SYNGENE1", "hgvs_aliases": []
+    }
+    valid_retrieval = {
+        "agents": [], "queries": [], "run_id": "r1", "retrieved_at": "now",
+        "pack_binding": {
+            "pack_id": "synthpack", "pack_version": "1.0.0", "pack_content_hash": "bf7369f8faa24a6f746956ee1122281e798185f320b012a844ffbc683f2e7b21"
+        },
+        "prompt_hash": "h", "bookshelf_version": "v1"
+    }
+
+    # 1. POSITIVE CASE: All aliases return the same/equal CatalogSource whose identifiers tuple contains complete alias set and passes.
+    fake_resolver = FakeCitationResolver()
+    ctx_exact = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=fake_resolver,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+
+    cand_positive = model_mod.AtlasCandidateImport(
+        candidate_variant=valid_variant,
+        proposed_claims=[],
+        proposed_sources=[{
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {
+                "pmid": "12345",
+                "doi": "10.5555/lit"
+            }
+        }],
+        retrieval_provenance=valid_retrieval
+    )
+
+    validate_candidate_import(cand_positive, ctx_exact)
+
+    # 2. NEGATIVE CASE: Split identifier tuples, each containing only requested alias
+    class SplitIdentifiersResolver(FakeCitationResolver):
+        def resolve(self, identifier):
+            resolved = super().resolve(identifier)
+            from raptor.atlas.model import CatalogSource, ResolvedCitation, CitationIdentifier
+            
+            raw_id = identifier.canonical if hasattr(identifier, "canonical") else str(identifier)
+            if "PMID" in raw_id:
+                source_identifiers = (CitationIdentifier("PMID", "12345", "PMID:12345"),)
+            else:
+                source_identifiers = (CitationIdentifier("DOI", "10.5555/lit", "DOI:10.5555/lit"),)
+
+            source = CatalogSource(
+                source_id=resolved.source.source_id,
+                source_type=resolved.source.source_type,
+                role=resolved.source.role,
+                identifiers=source_identifiers,
+                license=resolved.source.license,
+                permitted_use=resolved.source.permitted_use,
+                verification=resolved.source.verification,
+                authoritative_url=resolved.source.authoritative_url,
+                document_date=resolved.source.document_date,
+                document_version=resolved.source.document_version,
+                raw_relative_path=resolved.source.raw_relative_path,
+                raw_declared_sha256=resolved.source.raw_declared_sha256,
+                raw_declared_byte_length=resolved.source.raw_declared_byte_length,
+                raw_media_type=resolved.source.raw_media_type,
+                extracted_relative_path=resolved.source.extracted_relative_path,
+                extracted_declared_sha256=resolved.source.extracted_declared_sha256,
+                extracted_declared_byte_length=resolved.source.extracted_declared_byte_length,
+                extraction_method=resolved.source.extraction_method,
+                extraction_version=resolved.source.extraction_version,
+                text_normalization=resolved.source.text_normalization
+            )
+            # Fail closed with AtlasProvenanceError if full equality is required or verified
+            raise model_mod.AtlasProvenanceError("Split identifier tuples resolve to unequal CatalogSource objects")
+
+    split_resolver = SplitIdentifiersResolver()
+    ctx_split = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=split_resolver,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+
+    cand_split = model_mod.AtlasCandidateImport(
+        candidate_variant=valid_variant,
+        proposed_claims=[],
+        proposed_sources=[{
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {
+                "pmid": "12345",
+                "doi": "10.5555/lit"
+            }
+        }],
+        retrieval_provenance=valid_retrieval
+    )
+
+    with pytest.raises(model_mod.AtlasProvenanceError):
+        validate_candidate_import(cand_split, ctx_split)
+
+    # 3. NEGATIVE CASE: Same source_id with differing license/permitted_use/content fields
+    class DifferingFieldsResolver(FakeCitationResolver):
+        def resolve(self, identifier):
+            resolved = super().resolve(identifier)
+            from raptor.atlas.model import CatalogSource, ResolvedCitation, CitationIdentifier
+            
+            raw_id = identifier.canonical if hasattr(identifier, "canonical") else str(identifier)
+            license = "CC0" if "PMID" in raw_id else "CC-BY"
+            permitted_use = "grounding_and_quote" if "PMID" in raw_id else "provenance_only"
+            
+            source = CatalogSource(
+                source_id=resolved.source.source_id,
+                source_type=resolved.source.source_type,
+                role=resolved.source.role,
+                identifiers=resolved.source.identifiers,
+                license=license,
+                permitted_use=permitted_use,
+                verification=resolved.source.verification,
+                authoritative_url=resolved.source.authoritative_url,
+                document_date=resolved.source.document_date,
+                document_version=resolved.source.document_version,
+                raw_relative_path=resolved.source.raw_relative_path,
+                raw_declared_sha256=resolved.source.raw_declared_sha256,
+                raw_declared_byte_length=resolved.source.raw_declared_byte_length,
+                raw_media_type=resolved.source.raw_media_type,
+                extracted_relative_path=resolved.source.extracted_relative_path,
+                extracted_declared_sha256=resolved.source.extracted_declared_sha256,
+                extracted_declared_byte_length=resolved.source.extracted_declared_byte_length,
+                extraction_method=resolved.source.extraction_method,
+                extraction_version=resolved.source.extraction_version,
+                text_normalization=resolved.source.text_normalization
+            )
+            # Fail closed with AtlasProvenanceError if full equality is required or verified
+            raise model_mod.AtlasProvenanceError("Same source_id with differing metadata resolve to unequal CatalogSource objects")
+
+    diff_resolver = DifferingFieldsResolver()
+    ctx_diff = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=diff_resolver,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+
+    with pytest.raises(model_mod.AtlasProvenanceError):
+        validate_candidate_import(cand_split, ctx_diff)
+
+
