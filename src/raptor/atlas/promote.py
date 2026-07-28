@@ -102,9 +102,14 @@ def _is_safe_relative_path(value: Any) -> bool:
     string before its declared content pin is trusted as complete.
     Also rejects ``.``, ``..``, ``...`` (and any other all-dots segment,
     including a bare all-dots ``value`` that normalizes to zero path
-    ``parts`` under ``pathlib``) -- none of these are real file names."""
+    ``parts`` under ``pathlib``) -- none of these are real file names.
+    Mirrors citation.py's own ``_is_nonblank_str`` trust-boundary
+    semantics: a whitespace-only string (e.g. ``"   "``) is truthy and
+    would otherwise slip past a bare ``not value`` emptiness check, so
+    ``value.strip()`` must also be nonblank -- never trust a
+    resolver-declared pin that is merely non-empty."""
 
-    if not isinstance(value, str) or not value:
+    if not isinstance(value, str) or not value.strip():
         return False
     if value.startswith("/") or value.startswith("\\"):
         return False
@@ -418,7 +423,7 @@ def _validate_resolved_citation_shape(
             f"source {entry_id!r} identifier {canonical_string!r}; a grounding-eligible "
             "raw artifact must declare a non-negative int byte length (zero is valid)"
         )
-    if not isinstance(source.raw_media_type, str) or not source.raw_media_type:
+    if not isinstance(source.raw_media_type, str) or not source.raw_media_type.strip():
         raise AtlasProvenanceError(
             f"citation resolver returned a source with an invalid raw_media_type "
             f"{source.raw_media_type!r} for proposed source {entry_id!r} identifier "
@@ -516,13 +521,13 @@ def _require_extracted_pin_complete_for_span(
             "extracted-text artifact, which cannot contain the claim's nonblank "
             "exact_quote/offset span"
         )
-    if not isinstance(source.extraction_method, str) or not source.extraction_method:
+    if not isinstance(source.extraction_method, str) or not source.extraction_method.strip():
         raise AtlasProvenanceError(
             f"proposed claim referencing source {entry_id!r} requires a text-char span, "
             f"but the resolved source has an invalid extraction_method "
             f"({source.extraction_method!r})"
         )
-    if not isinstance(source.extraction_version, str) or not source.extraction_version:
+    if not isinstance(source.extraction_version, str) or not source.extraction_version.strip():
         raise AtlasProvenanceError(
             f"proposed claim referencing source {entry_id!r} requires a text-char span, "
             f"but the resolved source has an invalid extraction_version "
