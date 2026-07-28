@@ -910,7 +910,7 @@ def test_pure_preimplementation_fake_pack_568_audit():
         "prohibitions": {},
         "pilot_eval_metadata": {}
     }
-    
+
     canonical_bytes = json.dumps(fake_pack_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     assert len(canonical_bytes) == 568, f"Expected 568 bytes, got {len(canonical_bytes)}"
     computed_hash = hashlib.sha256(canonical_bytes).hexdigest().lower()
@@ -918,4 +918,15 @@ def test_pure_preimplementation_fake_pack_568_audit():
     assert computed_hash == expected_hash, f"Hash mismatch: computed {computed_hash}, expected {expected_hash}"
 
 
+def test_static_ast_network_import_guard():
+    """Verify that raptor.atlas has a static AST scan network-import guard."""
+    try:
+        from raptor.atlas.guards import assert_no_network_imports
+    except (ImportError, AttributeError):
+        pytest.fail("RED: assert_no_network_imports not implemented", pytrace=False)
 
+    # 1. Run the guard over the atlas package
+    assert_no_network_imports()
+
+    # 2. Verify with explicit path
+    assert_no_network_imports("src/raptor/atlas")

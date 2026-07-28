@@ -18,6 +18,7 @@ Spec coverage:
 - Assert that no later gate runs after any gate fails (strict short-circuit and execution ordering).
 - promote_candidate returns accepted tuple only after all gates pass; importer cannot write accepted state.
 - No real claims or spans accepted (only synthetic GRCh38 SPDI and data).
+- Update to CitationResolver Protocol and exact Eight Gates instrumentation.
 """
 
 import sys
@@ -43,6 +44,108 @@ def assert_no_cribbing(obj):
         for item in obj:
             assert_no_cribbing(item)
 
+
+# ---------------------------------------------------------------------------
+# Strict Fake Citation Resolver implementing the CitationResolver Protocol
+# ---------------------------------------------------------------------------
+class FakeCitationResolver:
+    """Strict fake implementing the typed CitationResolver protocol."""
+
+    def __init__(self):
+        self.resolve_calls = []
+        self.verify_span_calls = []
+
+    def resolve(self, identifier):
+        from raptor.atlas.model import CitationIdentifier
+        raw_id = identifier.canonical if isinstance(identifier, CitationIdentifier) else str(identifier)
+        self.resolve_calls.append(raw_id)
+
+        try:
+            from raptor.atlas.model import (
+                CatalogSource, ResolvedCitation, ContentVerification,
+                AtlasCitationResolutionError, AtlasContentDriftError,
+                AtlasCatalogPathError, AtlasCatalogSchemaError
+            )
+        except ImportError:
+            pytest.fail("RED: raptor.atlas model/citation classes not implemented", pytrace=False)
+
+        # Handle synthetic error triggers
+        if "fail-citation" in raw_id:
+            raise AtlasCitationResolutionError(f"Failed to resolve {raw_id}")
+        if "fail-drift" in raw_id:
+            raise AtlasContentDriftError(f"Drift for {raw_id}")
+        if "fail-path" in raw_id:
+            raise AtlasCatalogPathError(f"Path error for {raw_id}")
+        if "fail-schema" in raw_id:
+            raise AtlasCatalogSchemaError(f"Schema error for {raw_id}")
+
+        # Distinguish source types based on accession prefix
+        is_dataset = "ACCESSION:geo" in raw_id
+        source_type = "DATASET" if is_dataset else "PRIMARY-LIT"
+
+        # Build synthetic source & verification objects
+        source = CatalogSource(
+            source_id="src-resolved",
+            source_type=source_type,
+            role="direct_evidence_leaf",
+            identifiers=(),
+            license="CC0",
+            permitted_use="grounding_and_quote",
+            verification="verified",
+            authoritative_url=None,
+            document_date=None,
+            document_version=None,
+            raw_relative_path="raw.pdf",
+            raw_declared_sha256="sha",
+            raw_declared_byte_length=100,
+            raw_media_type="application/pdf",
+            extracted_relative_path="extract.txt",
+            extracted_declared_sha256="sha2",
+            extracted_declared_byte_length=150,
+            extraction_method="pdftotext",
+            extraction_version="1.0.0",
+            text_normalization="atlas.text_norm.v1"
+        )
+        content = ContentVerification(
+            raw_sha256="sha",
+            raw_byte_length=100,
+            extracted_text_sha256="sha2",
+            extracted_text_byte_length=150
+        )
+        return ResolvedCitation(
+            identifier=identifier if isinstance(identifier, CitationIdentifier) else CitationIdentifier("PMID", raw_id, raw_id),
+            source=source,
+            content=content,
+            content_verified=True
+        )
+
+    def verify_span(self, resolved, span):
+        self.verify_span_calls.append((resolved, span))
+        try:
+            from raptor.atlas.model import VerifiedSpan, AtlasSpanMismatchError
+        except ImportError:
+            pytest.fail("RED: raptor.atlas model/citation classes not implemented", pytrace=False)
+
+        if "fail-span" in span.locator or "fail-span" in (span.exact_quote or ""):
+            raise AtlasSpanMismatchError(f"Span mismatch for {span.locator}")
+
+        return VerifiedSpan(
+            source_id=resolved.source.source_id,
+            locator=span.locator,
+            start=0,
+            end=len(span.exact_quote or ""),
+            exact_quote=span.exact_quote or "",
+            extracted_text_sha256=resolved.content.extracted_text_sha256 or "sha2"
+        )
+
+    def __call__(self, *args, **kwargs):
+        # Fail with pytest failure to denote planned RED gate transition checks
+        pytest.fail("RED: Promotion code still uses old Callable interface instead of CitationResolver protocol")
+
+
+# ---------------------------------------------------------------------------
+# Existing structural schema tests (Preserved)
+# ---------------------------------------------------------------------------
 
 def test_candidate_import_exact_schema():
     """Verify that AtlasCandidateImport matches the exact spec schema with nested fields and no top-level flat fields."""
@@ -171,15 +274,8 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
     # 1. Mock disease pack (now schema-valid using helper)
     mock_pack = make_schema_valid_disease_pack(model_mod)
 
-    # 2. Instrumentation: we create wrappers for the DI callables to trace calls
+    # 2. Instrumentation: we create trackers
     calls = []
-
-    def citation_resolver(pmid_or_doi):
-        calls.append("citation_resolver")
-        # Fail on "fail-citation"
-        if pmid_or_doi == "fail-citation":
-            return False
-        return True
 
     def context_validator(claim_kind, context_name):
         calls.append("context_validator")
@@ -201,14 +297,14 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
         "gene_proposed": "SYNGENE1",
         "hgvs_aliases": []
     }
-    
+
     # Perfect pack binding matching mock_pack per Finding 3:
     pack_binding_dict = {
         "pack_id": mock_pack.pack_id,
         "pack_version": mock_pack.pack_version,
         "pack_content_hash": mock_pack.pack_content_hash
     }
-    
+
     valid_retrieval = {
         "agents": [],
         "queries": [],
@@ -231,9 +327,11 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
         retrieval_provenance=valid_retrieval
     )
 
+    fake_resolver = FakeCitationResolver()
+
     ctx = model_mod.PromotionContext(
         disease_pack=mock_pack,
-        citation_resolver=citation_resolver,
+        citation_resolver=fake_resolver,
         context_validator=context_validator,
         human_oracle_reviewer=human_oracle_reviewer,
         duplicate_index={}
@@ -271,14 +369,23 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
         retrieval_provenance=valid_retrieval
     )
     calls.clear()
-    with pytest.raises(model_mod.AtlasProvenanceError):
+    fake_resolver.resolve_calls.clear()
+    with pytest.raises(model_mod.AtlasProvenanceError) as exc_info:
         validate_candidate_import(cand_g3_fail, ctx)
-    assert "citation_resolver" in calls
+
+    # Check error translation & cause chain
+    try:
+        from raptor.atlas.model import AtlasCitationResolutionError
+        assert isinstance(exc_info.value.__cause__, AtlasCitationResolutionError)
+    except ImportError:
+        pass # Expected before implementation is complete
+
+    assert len(fake_resolver.resolve_calls) > 0
     assert "context_validator" not in calls
     assert "human_oracle_reviewer" not in calls
 
     # Gate 4 failed (exact_span_resolution) -> claim missing span
-    cand_g4_fail = model_mod.AtlasCandidateImport(
+    cand_g4_fail_missing_span = model_mod.AtlasCandidateImport(
         candidate_variant=valid_variant,
         proposed_claims=[{
             "claim_text": "text", "claim_kind_proposed": "pathway", "directionality": "increase",
@@ -286,15 +393,48 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
         }],
         proposed_sources=[{
             "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
-            "bib": {"pmid": "resolved-pmid"}
+            "bib": {"pmid": "12345"}
         }],
         retrieval_provenance=valid_retrieval
     )
     calls.clear()
+    fake_resolver.resolve_calls.clear()
     with pytest.raises(model_mod.AtlasSchemaError):
-        validate_candidate_import(cand_g4_fail, ctx)
+        validate_candidate_import(cand_g4_fail_missing_span, ctx)
     # Since citation resolution is Gate 3, it should be called before Gate 4 checks span!
-    assert "citation_resolver" in calls
+    assert len(fake_resolver.resolve_calls) > 0
+    assert "context_validator" not in calls
+    assert "human_oracle_reviewer" not in calls
+
+    # Gate 4 failed span mismatch (verify_span throws AtlasSpanMismatchError -> translated to AtlasProvenanceError)
+    cand_g4_fail_span_mismatch = model_mod.AtlasCandidateImport(
+        candidate_variant=valid_variant,
+        proposed_claims=[{
+            "claim_text": "text", "claim_kind_proposed": "pathway", "directionality": "increase",
+            "source_ref_proposed": "lit-1",
+            "span_proposed": {"locator": "fail-span", "exact_quote": "fail-span", "page_or_figure": "1"},
+            "context_proposed": "cell-assay-A"
+        }],
+        proposed_sources=[{
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {"pmid": "12345"}
+        }],
+        retrieval_provenance=valid_retrieval
+    )
+    calls.clear()
+    fake_resolver.resolve_calls.clear()
+    fake_resolver.verify_span_calls.clear()
+    with pytest.raises(model_mod.AtlasProvenanceError) as exc_info:
+        validate_candidate_import(cand_g4_fail_span_mismatch, ctx)
+
+    try:
+        from raptor.atlas.model import AtlasSpanMismatchError
+        assert isinstance(exc_info.value.__cause__, AtlasSpanMismatchError)
+    except ImportError:
+        pass
+
+    assert len(fake_resolver.resolve_calls) > 0
+    assert len(fake_resolver.verify_span_calls) > 0
     assert "context_validator" not in calls
     assert "human_oracle_reviewer" not in calls
 
@@ -308,14 +448,15 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
         }],
         proposed_sources=[{
             "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
-            "bib": {"pmid": "resolved-pmid"}
+            "bib": {"pmid": "12345"}
         }],
         retrieval_provenance=valid_retrieval
     )
     calls.clear()
+    fake_resolver.resolve_calls.clear()
     with pytest.raises(model_mod.AtlasSchemaError):
         validate_candidate_import(cand_g5_fail, ctx)
-    assert "citation_resolver" in calls
+    assert len(fake_resolver.resolve_calls) > 0
     assert "context_validator" in calls
     assert "human_oracle_reviewer" not in calls
 
@@ -332,13 +473,13 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
         }],
         proposed_sources=[{
             "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
-            "bib": {"pmid": "resolved-pmid"}
+            "bib": {"pmid": "12345"}
         }],
         retrieval_provenance=valid_retrieval
     )
     ctx_conflict = model_mod.PromotionContext(
         disease_pack=mock_pack,
-        citation_resolver=citation_resolver,
+        citation_resolver=fake_resolver,
         context_validator=context_validator,
         human_oracle_reviewer=human_oracle_reviewer,
         duplicate_index=duplicate_conflict_index
@@ -346,7 +487,6 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
     calls.clear()
     with pytest.raises(model_mod.AtlasProvenanceError):
         validate_candidate_import(cand_g6_fail, ctx_conflict)
-    assert "citation_resolver" in calls
     assert "context_validator" in calls
     assert "human_oracle_reviewer" not in calls
 
@@ -361,14 +501,13 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
         }],
         proposed_sources=[{
             "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
-            "bib": {"pmid": "resolved-pmid"}
+            "bib": {"pmid": "12345"}
         }],
         retrieval_provenance=valid_retrieval
     )
     calls.clear()
     with pytest.raises((model_mod.AtlasLeakageError, model_mod.AtlasProvenanceError)):
         validate_candidate_import(cand_g7_fail, ctx)
-    assert "citation_resolver" in calls
     assert "context_validator" in calls
     assert "human_oracle_reviewer" not in calls
 
@@ -382,16 +521,217 @@ def test_eight_gates_ordered_execution_and_short_circuiting():
         }],
         proposed_sources=[{
             "entry_id": "fail-human", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
-            "bib": {"pmid": "resolved-pmid"}
+            "bib": {"pmid": "12345"}
         }],
         retrieval_provenance=valid_retrieval
     )
     calls.clear()
     with pytest.raises(model_mod.AtlasProvenanceError):
         validate_candidate_import(cand_g8_fail, ctx)
-    assert "citation_resolver" in calls
     assert "context_validator" in calls
     assert "human_oracle_reviewer" in calls
+
+
+def test_rejection_of_boolean_or_callable_resolver():
+    """Verify that bare callable/boolean resolvers are structurally rejected at Gate 3 with AtlasSchemaError."""
+    try:
+        import raptor.atlas.model as model_mod
+        from raptor.atlas.promote import validate_candidate_import
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
+
+    mock_pack = make_schema_valid_disease_pack(model_mod)
+    ctx = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=lambda citation: True,  # Bare callable!
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+
+    cand = model_mod.AtlasCandidateImport(
+        candidate_variant={
+            "spdi_proposed": "NC_000000.0:1000:A:T",
+            "gene_proposed": "SYNGENE1",
+            "hgvs_aliases": []
+        },
+        proposed_claims=[],
+        proposed_sources=[{
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {"pmid": "12345"}
+        }],
+        retrieval_provenance={
+            "agents": [], "queries": [], "run_id": "r1", "retrieved_at": "now",
+            "pack_binding": {
+                "pack_id": "synthpack", "pack_version": "1.0.0",
+                "pack_content_hash": "bf7369f8faa24a6f746956ee1122281e798185f320b012a844ffbc683f2e7b21"
+            },
+            "prompt_hash": "h", "bookshelf_version": "v1"
+        }
+    )
+
+    with pytest.raises(model_mod.AtlasSchemaError):
+        validate_candidate_import(cand, ctx)
+
+
+def test_bib_raw_payloads_success_and_reject_prefixed():
+    """Verify raw payload schema pre-checks: success on bare schema, structural fail on prefixed."""
+    try:
+        import raptor.atlas.model as model_mod
+        from raptor.atlas.promote import validate_candidate_import
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
+
+    mock_pack = make_schema_valid_disease_pack(model_mod)
+    fake_resolver = FakeCitationResolver()
+    ctx = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=fake_resolver,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+
+    # 1. Successful synthetic setup with RAW scheme-less payloads
+    cand_valid = model_mod.AtlasCandidateImport(
+        candidate_variant={
+            "spdi_proposed": "NC_000000.0:1000:A:T", "gene_proposed": "SYNGENE1", "hgvs_aliases": []
+        },
+        proposed_claims=[{
+            "claim_text": "synthetic text", "claim_kind_proposed": "pathway", "directionality": "increase",
+            "source_ref_proposed": "lit-1", "span_proposed": {"locator": "L1", "exact_quote": "Q1", "page_or_figure": "1"}, "context_proposed": "cell-assay-A"
+        }],
+        proposed_sources=[{
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {
+                "pmid": "12345",
+                "pmcid": "PMC12345",
+                "doi": "10.5555/abc",
+                "accession": "geo:GSE12345"
+            }
+        }],
+        retrieval_provenance={
+            "agents": [], "queries": [], "run_id": "r1", "retrieved_at": "now",
+            "pack_binding": {
+                "pack_id": "synthpack", "pack_version": "1.0.0", "pack_content_hash": "bf7369f8faa24a6f746956ee1122281e798185f320b012a844ffbc683f2e7b21"
+            },
+            "prompt_hash": "h", "bookshelf_version": "v1"
+        }
+    )
+
+    fake_resolver.resolve_calls.clear()
+    validate_candidate_import(cand_valid, ctx)
+
+    # Prove spy resolver received exact prefixed concatenated forms
+    assert "PMID:12345" in fake_resolver.resolve_calls
+    assert "PMCID:PMC12345" in fake_resolver.resolve_calls
+    assert "DOI:10.5555/abc" in fake_resolver.resolve_calls
+    assert "ACCESSION:geo:GSE12345" in fake_resolver.resolve_calls
+
+    # 2. Structural failure on already-prefixed bib values (rejection before resolver is invoked)
+    for bad_bib in [
+        {"pmid": "PMID:12345"},
+        {"pmcid": "PMCID:PMC12345"},
+        {"doi": "doi:10.5555/abc"},
+        {"doi": "https://doi.org/10.5555/abc"},
+        {"accession": "ACCESSION:geo:GSE12345"},
+        {"accession": "GSE12345"}, # unqualified
+        {"pmid": "123 45"}, # internal whitespace
+    ]:
+        cand_invalid = model_mod.AtlasCandidateImport(
+            candidate_variant={
+                "spdi_proposed": "NC_000000.0:1000:A:T", "gene_proposed": "SYNGENE1", "hgvs_aliases": []
+            },
+            proposed_claims=[],
+            proposed_sources=[{
+                "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+                "bib": bad_bib
+            }],
+            retrieval_provenance={
+                "agents": [], "queries": [], "run_id": "r1", "retrieved_at": "now",
+                "pack_binding": {
+                    "pack_id": "synthpack", "pack_version": "1.0.0", "pack_content_hash": "bf7369f8faa24a6f746956ee1122281e798185f320b012a844ffbc683f2e7b21"
+                },
+                "prompt_hash": "h", "bookshelf_version": "v1"
+            }
+        )
+
+        fake_resolver.resolve_calls.clear()
+        with pytest.raises(model_mod.AtlasSchemaError):
+            validate_candidate_import(cand_invalid, ctx)
+        assert len(fake_resolver.resolve_calls) == 0, "Fake resolver must not be invoked on structural bib failures"
+
+
+def test_all_aliases_must_agree():
+    """Verify that multiple aliases defined for a single leaf source must all resolve to the same source ID."""
+    try:
+        import raptor.atlas.model as model_mod
+        from raptor.atlas.promote import validate_candidate_import
+    except (ImportError, ModuleNotFoundError):
+        pytest.fail("RED test: raptor.atlas promote/candidate_import implementation is missing")
+
+    mock_pack = make_schema_valid_disease_pack(model_mod)
+
+    # We will build a special fake resolver that maps different identifiers to different source IDs to simulate alias disagreement
+    class DisagreeingFakeResolver(FakeCitationResolver):
+        def resolve(self, identifier):
+            resolved = super().resolve(identifier)
+            from raptor.atlas.model import CatalogSource, ResolvedCitation
+
+            # Change the resolved source ID based on the scheme to trigger disagreement
+            raw_id = identifier.canonical if hasattr(identifier, "canonical") else str(identifier)
+            source_id = "src-pmid" if "PMID" in raw_id else "src-doi"
+
+            source = CatalogSource(
+                source_id=source_id, # Mutates!
+                source_type=resolved.source.source_type,
+                role=resolved.source.role,
+                identifiers=(),
+                license=resolved.source.license,
+                permitted_use=resolved.source.permitted_use,
+                verification=resolved.source.verification,
+                authoritative_url=None, document_date=None, document_version=None,
+                raw_relative_path="raw.pdf", raw_declared_sha256="sha", raw_declared_byte_length=10, raw_media_type="pdf"
+            )
+            return ResolvedCitation(
+                identifier=resolved.identifier,
+                source=source,
+                content=resolved.content,
+                content_verified=True
+            )
+
+    disagreeing_resolver = DisagreeingFakeResolver()
+    ctx = model_mod.PromotionContext(
+        disease_pack=mock_pack,
+        citation_resolver=disagreeing_resolver,
+        context_validator=lambda kind, ctx: True,
+        human_oracle_reviewer=lambda cand_id: "sig",
+        duplicate_index={}
+    )
+
+    cand = model_mod.AtlasCandidateImport(
+        candidate_variant={
+            "spdi_proposed": "NC_000000.0:1000:A:T", "gene_proposed": "SYNGENE1", "hgvs_aliases": []
+        },
+        proposed_claims=[],
+        proposed_sources=[{
+            "entry_id": "lit-1", "source_type": "PRIMARY-LIT", "role": "direct_evidence_leaf",
+            "bib": {
+                "pmid": "12345",
+                "doi": "10.5555/abc"
+            }
+        }],
+        retrieval_provenance={
+            "agents": [], "queries": [], "run_id": "r1", "retrieved_at": "now",
+            "pack_binding": {
+                "pack_id": "synthpack", "pack_version": "1.0.0", "pack_content_hash": "bf7369f8faa24a6f746956ee1122281e798185f320b012a844ffbc683f2e7b21"
+            },
+            "prompt_hash": "h", "bookshelf_version": "v1"
+        }
+    )
+
+    with pytest.raises(model_mod.AtlasProvenanceError):
+        validate_candidate_import(cand, ctx)
 
 
 def test_wrong_pack_mismatch_negative():
@@ -432,7 +772,7 @@ def test_wrong_pack_mismatch_negative():
 
     ctx = model_mod.PromotionContext(
         disease_pack=mock_pack,
-        citation_resolver=lambda citation: True,
+        citation_resolver=FakeCitationResolver(),
         context_validator=lambda kind, ctx: True,
         human_oracle_reviewer=lambda cand_id: "oracle-signoff-001",
         duplicate_index={}
@@ -454,7 +794,7 @@ def test_successful_synthetic_promotion():
 
     ctx = model_mod.PromotionContext(
         disease_pack=mock_pack,
-        citation_resolver=lambda citation: True,
+        citation_resolver=FakeCitationResolver(),
         context_validator=lambda kind, ctx: True,
         human_oracle_reviewer=lambda cand_id: "oracle-signoff-001",
         duplicate_index={}
@@ -543,18 +883,15 @@ def test_pure_preimplementation_fixture_shape_audit():
             "bookshelf_version": "v1"
         }
     }
-    
+
     assert isinstance(raw_candidate["candidate_variant"]["hgvs_aliases"], list)
     assert isinstance(raw_candidate["proposed_claims"], list)
     assert isinstance(raw_candidate["proposed_sources"], list)
     assert isinstance(raw_candidate["retrieval_provenance"]["agents"], list)
     assert isinstance(raw_candidate["retrieval_provenance"]["queries"], list)
-    
+
     # Assert binding match consistency per Finding 3 & 4:
     binding = raw_candidate["retrieval_provenance"]["pack_binding"]
     assert binding["pack_id"] == "synthpack"
     assert binding["pack_version"] == "1.0.0"
     assert binding["pack_content_hash"] == "bf7369f8faa24a6f746956ee1122281e798185f320b012a844ffbc683f2e7b21"
-
-
-
