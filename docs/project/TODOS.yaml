@@ -560,7 +560,7 @@ todos:
     commit IDs, frozen inputs, test/checker verdicts, held-out results, limitations,
     sample packet/Atlas artifacts and public-output candidates. Cap this at 15 minutes
     per execution day; it must not delay the VUS critical path or create grant-only features.'
-  status: pending
+  status: done
   depends_on: []
   created: '2026-07-21'
 - id: grant-anthropic-eligibility-data-terms
@@ -569,7 +569,7 @@ todos:
     eligibility interpretation, public-output requirement, Anthropic program-data licence,
     publicity terms, and the rule that only public and appropriately licensed inputs/outputs
     enter grant-funded workflows. Do not represent institutional affiliation that does not exist.'
-  status: pending
+  status: done
   depends_on: []
   created: '2026-07-21'
 - id: grant-anthropic-dismech-integration-path
@@ -591,7 +591,7 @@ todos:
     Claude-specific acceleration, Monarch public outputs, limitations, team gaps and
     public-data boundary. Submit by the owner-approved deadline buffer; never project
     unfinished results or delay core execution to manufacture application claims.'
-  status: pending
+  status: in_progress
   depends_on:
   - grant-anthropic-application-evidence-log
   - grant-anthropic-eligibility-data-terms
