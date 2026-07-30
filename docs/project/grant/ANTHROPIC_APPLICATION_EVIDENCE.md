@@ -2,10 +2,10 @@
 
 > **Status: application-support evidence record, prepared 2026-07-30.** This ledger cites only
 > committed repository artifacts and git history at evidence-base commit
-> `377abf1689a2c2658d23f61bdc80a9f9376de9cd` on public `main`; this ledger document
-> is committed separately on branch `docs/grant-evidence-2026-07` at `b002cae`
-> (public repository
-> [`github.com/srinivasdrona/raptor`](https://github.com/srinivasdrona/raptor)). It does not read
+> `377abf1689a2c2658d23f61bdc80a9f9376de9cd` on public `main`
+> ([`github.com/srinivasdrona/raptor`](https://github.com/srinivasdrona/raptor)).
+> This ledger is an additive application-support document; its eventual merge commit is not part
+> of, and does not change, the evidence snapshot it describes. It does not read
 > `.discovery`, local untracked notes, pre-build literature review, patient/private content, or any
 > external `raptor-data` identities. Every commit, hash, and count below was independently
 > re-verified against the working tree during preparation of this document (see §9).
