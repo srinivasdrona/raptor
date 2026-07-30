@@ -13,7 +13,7 @@
 | Independent applicant eligibility | **UNCLEAR - owner decision required** |
 | Award | Up to $50,000 in Claude credits over six months; credits are not cash |
 | Public outputs | Track One outputs will be made publicly available through Monarch |
-| Confidentiality | The application form says submitted information is non-confidential; include no confidential, proprietary, patient, private, or paywalled material |
+| Application submission | The form says information submitted through it is treated as non-confidential or proprietary; include no confidential, proprietary, patient, private, or paywalled material |
 | Program-data terms | Public Program Rules appear to permit Anthropic training/research use of selected researchers' Program data, including Inputs and Outputs; confirm before accepting an award |
 | Publicity terms | Public Program Rules include publicity/release language; confirm award-time terms before acceptance |
 
@@ -124,16 +124,26 @@ format before discussing the contribution workflow with maintainers.
 
 ## Data, confidentiality, training, and publicity
 
-### Proposal content
+### Application-submission handling
 
-The application form says information submitted through the form is non-confidential or proprietary.
-The proposal must contain no:
+The application form states:
+
+> Anthropic treats information submitted through this form as non-confidential or proprietary,
+> so please do not submit confidential or proprietary information in your proposal.
+
+This statement governs the application submission. The proposal must contain no:
 
 - patient or private data;
 - unpublished confidential research;
 - proprietary data or source content;
 - paywalled full text;
 - credentials, secrets, or private identifiers.
+
+Later use of Claude/API services is a separate context. Anthropic's baseline Commercial Terms state
+that Customer Content is Confidential Information, the customer retains Inputs and owns Outputs,
+and Anthropic may not train models on Customer Content from Services, subject to other applicable
+terms. The AI for Science Program Rules may add program-specific terms for selected researchers, as
+described below.
 
 ### RAPTOR input boundary
 
@@ -150,6 +160,11 @@ researchers to have permissions allowing Anthropic to collect, analyze, train mo
 research on Program data, including Inputs and Outputs, and grant a perpetual, irrevocable licence
 for those purposes.
 
+The Program Rules also state that selected researchers accepting Credits will participate in
+research surveys and interviews. Anthropic may retain, analyze, and conduct research on resulting
+interview transcripts and may publish anonymized and aggregated research findings from program
+participation.
+
 This apparent program-specific override is material. Before accepting an award, the owner should
 confirm:
 
@@ -157,7 +172,8 @@ confirm:
 2. exact retention periods;
 3. whether all credit-funded prompts and outputs may be used for model training;
 4. whether additional award terms apply;
-5. whether RAPTOR's public-source licences permit the contemplated processing and program-data use.
+5. whether RAPTOR's public-source licences permit the contemplated processing and program-data use;
+6. the scope, retention, recording, and publication terms for surveys and interviews.
 
 ### Publicity
 
@@ -208,4 +224,3 @@ approved affiliation.
 - [Anthropic Service Specific Terms](https://www.anthropic.com/legal/service-specific-terms)
 - [Mondo](https://mondo.monarchinitiative.org/)
 - [DisMech](https://github.com/monarch-initiative/dismech)
-
