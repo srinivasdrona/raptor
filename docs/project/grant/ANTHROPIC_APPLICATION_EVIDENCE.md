@@ -1,8 +1,10 @@
 # RAPTOR — Anthropic Rare-Disease Application: Evidence Ledger
 
 > **Status: application-support evidence record, prepared 2026-07-30.** This ledger cites only
-> committed repository artifacts and git history at `HEAD 377abf1689a2c2658d23f61bdc80a9f9376de9cd`
-> (branch `docs/grant-evidence-2026-07`, public repository
+> committed repository artifacts and git history at evidence-base commit
+> `377abf1689a2c2658d23f61bdc80a9f9376de9cd` on public `main`; this ledger document
+> is committed separately on branch `docs/grant-evidence-2026-07` at `b002cae`
+> (public repository
 > [`github.com/srinivasdrona/raptor`](https://github.com/srinivasdrona/raptor)). It does not read
 > `.discovery`, local untracked notes, pre-build literature review, patient/private content, or any
 > external `raptor-data` identities. Every commit, hash, and count below was independently
@@ -24,7 +26,8 @@ ClinVar-submission claim would be authorized (`docs/DECISIONS.md#adr-0011--scope
 ## 2. Fact ledger
 
 All hashes below are the canonical **LF, no-BOM git-blob byte content** of the cited path at
-`HEAD`, reproduced with `git cat-file -p HEAD:<path> | sha256sum` (see §9); a plain Windows
+evidence-base commit `377abf1689a2c2658d23f61bdc80a9f9376de9cd`, reproduced with
+`git cat-file -p <evidence-base>:<path>` (see §9); a plain Windows
 checkout of the same path is CRLF-translated and hashes differently — the repository's own specs
 label that checkout hash `sha256_windows_crlf_checkout_do_not_pin` (e.g.
 `docs/project/specs/corrected-review-packets-2026-07.yaml:531-533`) and it is **not** used here.
@@ -35,10 +38,10 @@ label that checkout hash `sha256_windows_crlf_checkout_do_not_pin` (e.g.
 | 2 | R2 masked held-out conservation | `bias_rows=2577`, `canonical_join_rows=2577`, `mask_removed_identities=2577`, `remask_survivors=0`, `returned_artifacts_verified=28` | `data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json` (`integrity` block); `docs/DECISIONS.md#adr-0012--pp3bp4-automated-emission-disabled-for-the-current-masked-rerun` | `48dd0b4` (ADR), `ec34aba` (data freeze), `dfed3b9`/`d2d8053` (GPT-5.4 remediation) | `7c55cd4e3059713d1d53886d8893a3819153375b62ce9d37187d731132c6a77f` (self-described `content_hash` field is a separate, self-excluding internal hash: `2ead589d2f129f988d9932bb01153891902f0d675000554887a1524e567413b2`) | Proves no held-out identity leaked/survived masking; proves nothing about classification accuracy |
 | 3 | ADR-0012 `disabled_manual` PP3/BP4 mode | `policy.bp4pp3.mode="disabled_manual"`, `approved=true`; `pp3bp4_scored_calls=0`; `pp3bp4_suppressed_counts={BP4:1929, PP3:134}` | `docs/DECISIONS.md#adr-0012--pp3bp4-automated-emission-disabled-for-the-current-masked-rerun`; `data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json` | `48dd0b4` | same as row 2 | Authorizes only the disabled/manual evidence mode — no VUS classification, worklist, research scope, or ClinVar submission |
 | 4 | ADR-0013 tiered v3 post-hoc re-adjudication | `full_spectrum_status=NOT_VALIDATED`; `research_scope_authorization=PENDING_PROSPECTIVE`; `prospective_validation_status=PENDING`; `truncating:pathogenic` scope_evidence_status=`SUPPORTED_POSTHOC` | `data/census/tsc_tiered_readjudication_2026-07-21.json`; `docs/DECISIONS.md#adr-0013--tiered-gate-v3-post-hoc-re-adjudication-and-prospective-validation-lock` | `ea90921` (ADR + data), impl. commit `c56cb8914b8bf91b40a81f41fb7c5d8140e13f38` (recorded in-file) | `1e36b2d07767fdd8e32fbf07dd42f60a2b4cae2ff9b21c7dfb9430d741c5bc5f` (matches committed `tsc_tiered_readjudication_2026-07-21.sha256`); `source_canonical_lf_sha256=7c55cd4e...` independently verified equal to row 2's file hash | Re-interprets the frozen R2 aggregate on independent axes; performs **no new run, scoring, or data generation**; prospective validation still requires the first NCBI ClinVar GRCh38 monthly archive dated on/after 2026-08-01 |
-| 5 | Current TSC1/TSC2 VUS census (`disabled_manual`) | `total_vus=6618`; `candidate_LP_review=157`; `candidate_LB_review=7`; `no_deterministic_resolution=6424`; `annotation_manual_review=30` (157+7+6424+30=6618) | `data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json`; `docs/PROGRAM.md`; `docs/STRATEGY.md#strategy-appendix-a` | `ec34aba` | `45ff9f9abada7d5369c131bf7ffde28d0786eea41ff9bf7905f51da0cabd59ac` (matches `data/census/README.md`'s recorded certified hash) | The file's own `non_authoritative_boundary` field: "creates no public worklist, classification, research authorization, or clinical claim" — candidate LP/LB directions are eval-only triage signals |
+| 5 | Current TSC1/TSC2 VUS census (`disabled_manual`) | `total_vus=6618`; `candidate_LP_review=157`; `candidate_LB_review=7`; `no_deterministic_resolution=6424`; `annotation_manual_review=30` (157+7+6424+30=6618) | `data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json`; `docs/PROGRAM.md` | `ec34aba` | `45ff9f9abada7d5369c131bf7ffde28d0786eea41ff9bf7905f51da0cabd59ac` (matches `data/census/README.md`'s recorded certified hash) | The file's own `non_authoritative_boundary` field: "creates no public worklist, classification, research authorization, or clinical claim" — candidate LP/LB directions are eval-only triage signals |
 | 6 | Corrected all-VUS review packets | External run `corrected-review-packets-2026-07-22-r1`: 6,618 operator packets, 6,618 blinded first-pass views, a 164-row priority (LP+LB) queue, and a hash-only 8-case Discovery sample | `docs/reference/corrected-review-packets-runbook.md`; `docs/project/specs/corrected-review-packets-2026-07.yaml` (hash pins, e.g. `manifest sha256=7f9937521a425e73b31422fa9191c90e67fa80cc58f351517ac732b1d32fcbba`, `bias_tsv sha256=0a55cab470d3de93f06cd87ba30957fd1674c0ae2098ec86350f5aaac1a1162e`); `docs/project/TODOS.yaml` (`core-generate-review-packets`, status `done`) | `071111e33579ed1014b92cea77ab2eb7ca2312c0` (merge) | Packet-input hashes above are committed; the run's own packets/`aggregate_manifest.json` are written only to an external, non-repository `raptor-data` root and are not committed or cited here by path | Every packet keeps `candidate_direction=null`, `review_state=POLICY_BLOCKED`; authorizes no classification, worklist, or submission |
 | 7 | Reviewer package (external adjudication) | No repository evidence found — omitted | — | — | — | — |
-| 8 | Mechanism Atlas Phase 1 → citation resolver | Phase 1 generic core + `tsc2` pack merged with 35 tests (`9709ec6`, ADR-0014); citation/span resolver merged with 64 passing tests, GPT-5.4 checker **CLEAN** (`dc8826b`) | `docs/DECISIONS.md#adr-0014--generic-mechanism-atlas-core-with-a-versioned-disease-pack-boundary`; `docs/project/TODOS.yaml` (`atlas-phase2-citation-resolver`, status `done`) | `9709ec6` (Phase 1 merge), `e55f9e6` (ADR-0014), `dc8826b` (resolver merge), `377abf1` (HEAD, TODOS completion note) | — | Test counts independently reproduced: `git grep -c "def test_" 9709ec6 -- tests/atlas/` = 35; same command at `HEAD` = 64; `python -m pytest tests/atlas -q` = **64 passed** locally. All fixtures are **fully synthetic**: no real PMID/PMCID/DOI, no real quote, no R611Q content (ADR-0016 item 7) |
+| 8 | Mechanism Atlas Phase 1 → citation resolver | Phase 1 generic core + `tsc2` pack merged with 35 tests (`9709ec6`, ADR-0014); citation/span resolver merged with 64 passing tests, GPT-5.4 checker **CLEAN** (`dc8826b`) | `docs/DECISIONS.md#adr-0014--generic-mechanism-atlas-core-with-a-versioned-disease-pack-boundary`; `docs/project/TODOS.yaml` (`atlas-phase2-citation-resolver`, status `done`) | `9709ec6` (Phase 1 merge), `e55f9e6` (ADR-0014), `dc8826b` (resolver merge), `377abf1` (evidence-base TODO completion note) | — | Test counts independently reproduced: `git grep -c "def test_" 9709ec6 -- tests/atlas/` = 35; same command at evidence-base `377abf1` = 64; `python -m pytest tests/atlas -q` = **64 passed** locally. All fixtures are **fully synthetic**: no real PMID/PMCID/DOI, no real quote, no R611Q content (ADR-0016 item 7) |
 | 9 | MaveDB TSC2 orthogonal validation (non-gating) | Scoreset `urn:mavedb:00001201-a-1`, CC0-1.0, **208** raw rows, transcript `NM_000548.5`; 66-variant VUS-independent overlap and 32-variant ClinVar-heldout (non-independent) overlap | `docs/reference/mave-tsc2-source-register-2026-07.md`; `data/census/tsc2_mave_clipe_orthogonal_2026-07-13.json` | `9d15ef7`, `23211a7`, `e5bf3a5af325ba0a5263c238a84e714836fb5e92` (merge) | Pinned CSV `sha256=74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717` (recorded in the register doc) | Explicitly `NON_GATING`: no score/class/correlation here feeds `raptor.scorer`, PS3/BS3, or `decide_gate`; the 32-variant overlap is **not independent**; identity matching by exact `c.` HGVS string is an unverified-assumption bridge across `NM_000548.4`/`.5` (documented, not resolved) |
 | 10 | Public blog / docs / strategy | Two public progress posts; public GitHub README mirrors the committed census/benchmark figures (independently fetched 2026-07-30) | `docs/blog/2026-07-10-before-the-first-score.md`; `docs/blog/2026-07-23-after-the-first-rerun.md`; `README.md`; `docs/STRATEGY.md`, `docs/EVALUATION.md`, `docs/DECISIONS.md`, `docs/PROGRAM.md`, `docs/ARCHITECTURE.md` | `253c9fd` (post 1), `aa2edfa`/`c8ec5ae` (post 2) | — | Both posts explicitly disclaim "validated"/"works"/"passed the benchmark" language (`docs/prompts/progress-blog/slot3-overclaim-guard.md`) |
 | 11 | Team gap: molecular geneticist | `engagement-recruit-molecular-geneticist` status **`in_progress`** (not complete); `core-molecular-geneticist-adjudication` status **`pending`**, zero adjudications recorded | `docs/project/TODOS.yaml`; `docs/RISK_REGISTER.md` row **R-E1** ("No domain oracle is ever recruited") | — | — | No expert has reviewed any packet or Atlas claim; `atlas-phase2-human-span-review` and `engagement-submission-pilot` both depend on this and are `pending` |
@@ -46,7 +49,7 @@ label that checkout hash `sha256_windows_crlf_checkout_do_not_pin` (e.g.
 
 ## 3. Preliminary assets
 
-**Code** (all merged to `HEAD`, none exposes real patient/clinical identities):
+**Code** (all merged by evidence-base commit `377abf1`, none exposes real patient/clinical identities):
 - `src/raptor/atlas/` — generic-core Mechanism Atlas: `model.py`, `hashing.py`, `identity.py`,
   `ontology.py`, `pack.py`, `profile.py`, `promote.py`, `registry.py`, `guards.py`, `export.py`
   (one-way `DisMechRecord` export), `citation.py` (ADR-0016 deterministic offline resolver).
@@ -70,7 +73,7 @@ label that checkout hash `sha256_windows_crlf_checkout_do_not_pin` (e.g.
 
 **Evaluations:**
 - Frozen benchmark (`data/benchmark/`), full census/gate/audit history in `data/census/`
-  (16 committed JSON records plus two `.sha256` manifests).
+  (17 committed JSON records plus one `.sha256` manifest).
 - Test suites: `tests/atlas/` — **64/64 passing** (`python -m pytest tests/atlas -q`, reproduced
   2026-07-30); `tests/packet/`, `tests/census/`, `tests/external/` together — **112 passed, 3
   skipped**; `tests/eval/` (excluding the `pysam`-dependent CLI contract test) — **668 passed, 6
@@ -155,7 +158,8 @@ a proposed use of that same fail-closed boundary, none of it built:
 
 ## 6. Six-month milestones (grounded in current TODOs — no projected results)
 
-All items below are copied from `docs/project/TODOS.yaml` status fields as of `HEAD`; none report a
+All items below are copied from `docs/project/TODOS.yaml` status fields at evidence-base
+commit `377abf1`; none report a
 result because none have run yet. No collaborator, institution, or partner beyond the operator
 (`@dronasrinivas`) is named or implied.
 
@@ -222,11 +226,12 @@ institutional affiliation is claimed or implied.
 ## 9. Verified commits, hashes, and reproducibility commands
 
 Every commit below was confirmed present with `git cat-file -e <sha>` and confirmed an ancestor of
-`HEAD` with `git merge-base --is-ancestor <sha> HEAD` (exit code `0`) on 2026-07-30.
+evidence-base commit `377abf1` with `git merge-base --is-ancestor <sha> 377abf1`
+(exit code `0`) on 2026-07-30.
 
 | Commit | Subject |
 |---|---|
-| `377abf1689a2c2658d23f61bdc80a9f9376de9cd` (**HEAD**) | docs(project): complete Atlas citation resolver |
+| `377abf1689a2c2658d23f61bdc80a9f9376de9cd` (**evidence base**) | docs(project): complete Atlas citation resolver |
 | `dc8826b` | merge: add offline Atlas citation and span resolver |
 | `c56cb8914b8bf91b40a81f41fb7c5d8140e13f38` | fix(eval): require clean tiered-gate provenance |
 | `9709ec6` | merge: add portable Mechanism Atlas Phase 1 |
@@ -245,19 +250,19 @@ Every commit below was confirmed present with `git cat-file -e <sha>` and confir
 **Reproducibility commands** (run from the repository root on a clean checkout of `377abf1`):
 
 ```powershell
-# Confirm HEAD and commit ancestry
-git rev-parse HEAD
-git merge-base --is-ancestor <sha> HEAD   # exit 0 => ancestor confirmed
+# Confirm evidence base and commit ancestry
+git rev-parse 377abf1
+git merge-base --is-ancestor <sha> 377abf1   # exit 0 => ancestor confirmed
 
 # Recompute a canonical (LF, no-BOM) artifact hash exactly as the repo pins it —
 # do NOT hash the raw Windows/CRLF checkout, it differs (see spec files' own
 # "sha256_windows_crlf_checkout_do_not_pin" fields)
-git cat-file -p HEAD:data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json > blob.tmp
+git cat-file -p 377abf1:data/census/tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json > blob.tmp
 python -c "import hashlib;print(hashlib.sha256(open('blob.tmp','rb').read()).hexdigest())"
 Remove-Item blob.tmp
 
 # Atlas test count and pass/fail (reproduced 2026-07-30: 64 passed)
-git grep -c "def test_" HEAD -- tests/atlas/
+git grep -c "def test_" 377abf1 -- tests/atlas/
 python -m pytest tests/atlas -q
 
 # Packet/census/external suites (reproduced 2026-07-30: 112 passed, 3 skipped)
@@ -274,7 +279,8 @@ python -m pytest tests/eval -q --ignore=tests/eval/test_live_eval_export.py
 
 ---
 
-**Result summary:** 12 fact-ledger rows (§2), 15 verified commits (§9), 10 six-month milestones
+**Result summary:** 12 fact-ledger rows (§2), 15 verified commit rows / 18 distinct commits (§9),
+10 six-month milestones
 (§6, all grounded in existing `pending`/`in_progress` TODOs), zero projected results, zero
 fabricated collaborators, zero use of "clinical validation," "reclassification," "first in world,"
 "production-ready," or any funding-amount figure. Unresolved gaps carried forward: no molecular
