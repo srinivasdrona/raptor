@@ -389,12 +389,29 @@ todos:
   title: Evaluating licensed and vendor-specific sources
   description: 'Track: SOURCE-COVERAGE. Clarify LifeCell/Geneyx Converge, GeneEnhancerSV,
     CamouflagedGenes, DarkGenes and GeneyxRepeats definitions; assess MasterMind and OMIM
-    licensing/value; reject redundant or unverifiable feeds.'
+    licensing/value; record JMDC as commercial phenotype/pharmacoepidemiology context with no
+    genomic variant evidence for current RAPTOR scope; reject redundant or unverifiable feeds.'
   status: pending
   depends_on:
   - sourceops-version-refresh-registry
   - governance-data-rights-privacy
   created: '2026-07-19'
+- id: evaluate-every-cure-mtor-hypothesis-source
+  title: Evaluating Every Cure for a gated mTOR hypothesis packet
+  description: 'Track: MTOR-HYPOTHESIS / DEFERRED. After the bounded TSC2 Atlas pilot and
+    molecular-geneticist onboarding, evaluate whether Every Cure public KG edges and separately
+    licensed/research-use matrix scores add evidence to one GP-13-admitted mTOR-condition
+    hypothesis question. Verify upstream licences, attribution, source provenance, mechanism
+    independence and incremental value. Never use Every Cure scores as ACMG criteria, Atlas
+    direct-evidence leaves, treatment recommendations or proof that a cross-disease mechanism
+    is valid.'
+  status: pending
+  depends_on:
+  - atlas-phase2-pilot-evaluation
+  - engagement-recruit-molecular-geneticist
+  - sourceops-version-refresh-registry
+  - governance-data-rights-privacy
+  created: '2026-07-31'
 - id: sourceops-version-refresh-registry
   title: Creating live source-version and refresh registry
   description: 'Track: SOURCE-OPS. Define source owner, URL, license, pin, checksum, update
@@ -590,10 +607,12 @@ todos:
 - id: grant-anthropic-dismech-integration-path
   title: Defining the DisMech contribution path
   description: 'Track: GRANT-ENABLEMENT / MECHANISM-ATLAS. After the bounded TSC2 Atlas
-    design exists, define a one-way DisMech-compatible export and contribution route,
-    including the existing TSC entry, schema/ontology/reference validation, origin-branch
-    access requirements and maintainer review. Do not redesign RAPTOR around DisMech or
-    initiate external contact without owner approval.'
+    design exists, define a one-way Monarch/DisMech public-output route, including the
+    existing TSC entry, Mondo/ontology alignment, schema/reference validation, origin-branch
+    access requirements and maintainer review. The route may be designed before Phase 2,
+    but no real contribution is proposed until source-grounded profiles receive named human
+    review. Do not redesign RAPTOR around DisMech, promise Monarch acceptance or initiate
+    external contact without owner approval.'
   status: pending
   depends_on:
   - define-variant-mechanism-atlas
