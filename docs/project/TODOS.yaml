@@ -563,6 +563,21 @@ todos:
   status: done
   depends_on: []
   created: '2026-07-21'
+- id: publish-prospective-validation-release
+  title: Publishing the prospective-validation result release
+  description: 'Track: PUBLIC-SURFACE / FIXED-DATA. After ADR-0013 prospective validation
+    completes on the first eligible NCBI ClinVar GRCh38 monthly variant_summary archive dated
+    on or after 2026-08-01, publish a dated GitHub prerelease (planned v0.2.0 if the tag is
+    available) whose notes report the frozen result whether PASS, FAIL, NOT_ESTIMABLE or
+    BLOCKED_DATA. When the archive resolves, link its URL/date/MD5/SHA-256 plus unchanged
+    policy/config hashes, evaluation artifact and limitations. If the registered archive is
+    unavailable or invalid, link the attempted URL and recorded unavailability/invalidity
+    evidence instead. Do not publish before the registered outcome is determined, do not
+    substitute a weekly XML release, and do not imply authorization beyond the recorded gate.'
+  status: pending
+  depends_on:
+  - validate-tiered-gate-prospectively
+  created: '2026-07-31'
 - id: grant-anthropic-eligibility-data-terms
   title: Resolving Anthropic eligibility and data terms
   description: 'Track: GRANT-ENABLEMENT. Before submission, document the independent-applicant

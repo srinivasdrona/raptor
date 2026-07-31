@@ -5,6 +5,10 @@ reproducible variant evidence packets, validation controls, and governed
 ClinVar/VCEP preparation. It is not a clinical diagnostic system and does not
 issue authoritative variant classifications.
 
+> **Start with the engineering method:** [`METHOD.md`](METHOD.md) summarizes the
+> model-separated plan/test/build/review loop, Definition-of-Done gates, evidence and
+> authorization ladder, and failure modes that changed RAPTOR's implementation and conclusions.
+
 ## Current status
 
 The complete TSC evidence census, the leakage-safe masked held-out rerun
@@ -82,6 +86,7 @@ policy.
 
 ## Repository guide
 
+- [`METHOD.md`](METHOD.md) — engineering method, gates, evidence ladder, and failures caught
 - [`docs/PROGRAM.md`](docs/PROGRAM.md) — live program status and priorities
 - [`docs/STRATEGY.md`](docs/STRATEGY.md) — strategy + operating-model authority
 - [`docs/EVALUATION.md`](docs/EVALUATION.md) — evaluation protocol + acceptance-rubric authority
