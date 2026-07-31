@@ -19,9 +19,9 @@ Owner inputs still required
 
 - [OWNER INPUT: submission email]
 - [OWNER INPUT: applicant legal name]
-- [OWNER INPUT: truthful affiliation or organization wording]
-- [OWNER INPUT: truthful position or title]
-- [OWNER INPUT: website, GitHub, Google Scholar, and public profile URLs]
+- Organization wording: Independent researcher
+- Position/title: Independent researcher and open-source maintainer
+- Public project/profile: https://github.com/srinivasdrona/raptor and https://github.com/srinivasdrona
 - [OWNER INPUT: Anthropic Organization ID and controlling entity]
 - [OWNER INPUT: genuine collaborators and approved roles or affiliations, or None]
 - [OWNER INPUT: approve the recommended credit amount or replace it]
@@ -49,30 +49,14 @@ Paste:
 
 ## 3. Organization or research institution
 
-Independent-applicant version:
-
 ```text
-[OWNER INPUT: truthful independent affiliation wording, or enter "Independent researcher" only if accurate]
-```
-
-Institution-affiliated alternative:
-
-```text
-[OWNER INPUT: exact approved institution or organization name]
+Independent researcher
 ```
 
 ## 4. Position or title
 
-Independent-applicant version:
-
 ```text
-[OWNER INPUT: truthful title, or enter "Independent researcher and open-source maintainer" only if accurate]
-```
-
-Institution-affiliated alternative:
-
-```text
-[OWNER INPUT: exact approved institutional title]
+Independent researcher and open-source maintainer
 ```
 
 ## 5. Organization, research-group, Google Scholar, or GitHub link
@@ -81,12 +65,6 @@ Recommended project link:
 
 ```text
 https://github.com/srinivasdrona/raptor
-```
-
-Optional owner or organization alternative:
-
-```text
-[OWNER INPUT: organization site, research group, Google Scholar, or GitHub link if preferred]
 ```
 
 ## 6. Track One or Track Two
@@ -123,23 +101,11 @@ Paste:
 
 ## 10. Team and credentials (limit: 100 words)
 
-Independent-applicant version:
-
 ```text
 Independent researcher and open-source maintainer building RAPTOR, a public-data-only TSC1/TSC2 research-evidence program. Current assets include a frozen TSC benchmark, a negative masked held-out rerun that remains non-authorizing, a 6,618-variant census with 164 priority review packets, and a merged Mechanism Atlas core with deterministic citation/span checks. We have initiated outreach to qualified molecular geneticists and prepared the evidence-review materials. No reviewer is yet formally engaged; scientific onboarding and review may extend beyond the application deadline.
 ```
 
 Word count: 77/100. Independent check: 77.
-
-Institution-affiliated alternative:
-
-```text
-[OWNER INPUT: legal name], [OWNER INPUT: title] at [OWNER INPUT: institution], leads RAPTOR, a public-data-only TSC1/TSC2 research-evidence program. Current assets include a frozen TSC benchmark, a negative masked held-out rerun that remains non-authorizing, a 6,618-variant census with 164 priority review packets, and a merged Mechanism Atlas core with deterministic citation/span checks. We have initiated outreach to qualified molecular geneticists and prepared the evidence-review materials. No reviewer is yet formally engaged; scientific onboarding and review may extend beyond the application deadline.
-```
-
-Word count with placeholders as shown: 83/100. Independent check: 83. Recount after replacing placeholders.
-
-Optional collaborator note: if you have genuine collaborators, revise this field within 100 words and name only approved people.
 
 ## 11. Professional or academic profiles
 
@@ -147,9 +113,9 @@ Paste:
 
 ```text
 Project repository: https://github.com/srinivasdrona/raptor
-GitHub: [OWNER INPUT: GitHub profile URL or N/A]
-Google Scholar: [OWNER INPUT: Google Scholar URL or N/A]
-Website or institutional profile: [OWNER INPUT: public profile URL or N/A]
+GitHub: https://github.com/srinivasdrona
+Google Scholar: N/A
+Website or institutional profile: N/A
 ```
 
 ## 12. Project question, methods, outcomes, deliverables, and timeline (limit: 500 words)
@@ -256,12 +222,6 @@ Optional final sentence if applying independently:
 
 ```text
 Independent-applicant eligibility for Track One is not clearly confirmed in the published materials, so this submission is intentionally truthful about affiliation and asks to be evaluated on that basis.
-```
-
-Optional collaborator insertion:
-
-```text
-[OWNER INPUT: add only genuine collaborators, with approved names and roles, if any]
 ```
 
 ## 19. Acceptance of terms
