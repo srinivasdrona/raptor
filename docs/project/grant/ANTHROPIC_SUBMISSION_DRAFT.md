@@ -126,18 +126,18 @@ Paste:
 Independent-applicant version:
 
 ```text
-Independent researcher and open-source maintainer building RAPTOR, a public-data-only TSC1/TSC2 research-evidence program. Current assets include a frozen TSC benchmark, a negative masked held-out rerun that remains non-authorizing, a 6,618-variant census with 164 priority review packets, and a merged Mechanism Atlas core with deterministic citation/span checks. The project does not yet include a molecular geneticist; expert review is a planned milestone, not a completed capability.
+Independent researcher and open-source maintainer building RAPTOR, a public-data-only TSC1/TSC2 research-evidence program. Current assets include a frozen TSC benchmark, a negative masked held-out rerun that remains non-authorizing, a 6,618-variant census with 164 priority review packets, and a merged Mechanism Atlas core with deterministic citation/span checks. We have initiated outreach to qualified molecular geneticists and prepared the evidence-review materials. No reviewer is yet formally engaged; scientific onboarding and review may extend beyond the application deadline.
 ```
 
-Word count: 67/100. Independent check: 67.
+Word count: 77/100. Independent check: 77.
 
 Institution-affiliated alternative:
 
 ```text
-[OWNER INPUT: legal name], [OWNER INPUT: title] at [OWNER INPUT: institution], leads RAPTOR, a public-data-only TSC1/TSC2 research-evidence program. Current assets include a frozen TSC benchmark, a negative masked held-out rerun that remains non-authorizing, a 6,618-variant census with 164 priority review packets, and a merged Mechanism Atlas core with deterministic citation/span checks. The project does not yet include a molecular geneticist; expert review is a planned milestone, not a completed capability.
+[OWNER INPUT: legal name], [OWNER INPUT: title] at [OWNER INPUT: institution], leads RAPTOR, a public-data-only TSC1/TSC2 research-evidence program. Current assets include a frozen TSC benchmark, a negative masked held-out rerun that remains non-authorizing, a 6,618-variant census with 164 priority review packets, and a merged Mechanism Atlas core with deterministic citation/span checks. We have initiated outreach to qualified molecular geneticists and prepared the evidence-review materials. No reviewer is yet formally engaged; scientific onboarding and review may extend beyond the application deadline.
 ```
 
-Word count with placeholders as shown: 73/100. Independent check: 73. Recount after replacing placeholders.
+Word count with placeholders as shown: 83/100. Independent check: 83. Recount after replacing placeholders.
 
 Optional collaborator note: if you have genuine collaborators, revise this field within 100 words and name only approved people.
 
@@ -249,7 +249,7 @@ This project uses only public rare-disease literature and public variant and ass
 Core text:
 
 ```text
-RAPTOR is developed in public at https://github.com/srinivasdrona/raptor, and this application intentionally includes negative evidence as well as positive milestones: the masked held-out R2 rerun did not authorize deployment, PP3/BP4 automated emission remains disabled/manual, prospective validation is still pending, and no real grounded Phase 2 mechanism claim has yet been accepted. The requested work is therefore a bounded research-evidence project, not a clinical or therapeutic program. Planned public outputs are a benchmark and rubric package, a methods and failure report, source-grounded TSC mechanism profiles released only after human review, and a one-way DisMech-compatible export path without promising Monarch or DisMech acceptance. The current team still lacks an engaged molecular geneticist, and expert review is a core milestone.
+RAPTOR development began on July 8, 2026 and is conducted in public at https://github.com/srinivasdrona/raptor. The short development history demonstrates execution speed but also means the project is early-stage. This application intentionally includes negative evidence as well as positive milestones: the masked held-out R2 rerun did not authorize deployment, PP3/BP4 automated emission remains disabled/manual, prospective validation is still pending, and no real grounded Phase 2 mechanism claim has yet been accepted. The requested work is therefore a bounded research-evidence project, not a clinical or therapeutic program. Planned public outputs are a benchmark and rubric package, a methods and failure report, source-grounded TSC mechanism profiles released only after human review, and a one-way DisMech-compatible export path without promising Monarch or DisMech acceptance. We have initiated outreach to qualified molecular geneticists and prepared the evidence-review materials. No reviewer is yet formally engaged; scientific onboarding and review may extend beyond the application deadline.
 ```
 
 Optional final sentence if applying independently:
