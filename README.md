@@ -30,6 +30,10 @@ Public progress posts:
 | v3 tiered re-adjudication (ADR-0013, post-hoc) | missense pathogenic `NO_CALLS`/`NOT_ESTIMABLE`; missense benign `UNDERPOWERED`/`NOT_ESTIMABLE`; truncating pathogenic `ADEQUATE`+`MET`/`SUPPORTED_POSTHOC`; full spectrum `NOT_VALIDATED`/`NOT_AUTHORIZED` |
 | Prospective validation | `PENDING` — locked to the first NCBI ClinVar GRCh38 monthly archive dated on/after 2026-08-01, frozen before labels/scoring |
 | VUS / research-scope authorization | **No** — canonical validated research-scope flag remains `false` |
+| Mechanism Atlas source catalog | Five resolver-verified grounding sources plus seven mechanically non-grounding leads; public identifiers, licences and hashes are committed |
+| `$TSC2$` `$p.\mathrm{Arg611Gln}$` deterministic pass | Two exact spans passed Gates 1–7; Gate 8 blocked for missing named review; zero accepted claims |
+| Six-variant gate-smoke cohort | 6/6 technical packages passed Gates 1–7 and blocked only at Gate 8; zero accepted claims; explicitly **not** the formal contrast panel |
+| Formal Atlas contrast panel | **Not run** — the 35-entry candidate universe is hash-locked, but assay observations must be locked before protocol-driven selection |
 
 v3 is a post-hoc semantic correction of the frozen R2 aggregate: it separates
 run integrity, data sufficiency, conditional performance, policy parity and
@@ -44,6 +48,12 @@ Source of record:
 [`data/census/tsc_masked_holdout_gate_2026-07-13.json`](data/census/tsc_masked_holdout_gate_2026-07-13.json)
 run remains a superseded historical comparator, not the current approved
 policy.
+
+The real-source Atlas runs establish deterministic source identity, content
+hashes, exact spans, ontology/context structure, and classification-leakage
+controls. They do not establish scientific sufficiency: no claim is promoted
+until named human Gate 8 review. Public run manifests are under
+[`data/atlas/runs/2026-08-03/`](data/atlas/runs/2026-08-03/).
 
 ## What is built
 
@@ -62,6 +72,11 @@ policy.
   PP3/BP4-disabled/manual policy (ADR-0012);
 - immutable, first-pass-blinded candidate evidence packets;
 - a 30-pattern internal calibration batch;
+- a condition-agnostic Mechanism Atlas core, versioned `$TSC2$` disease pack,
+  deterministic offline citation/exact-span resolver, hash-frozen
+  post-discovery selection protocol, and candidate-free universe lock;
+- public metadata-only source and gate-run manifests for the first real
+  `$TSC2$` deterministic-verification runs;
 - ClinVar/VCEP schema and lifecycle preparation with submission disabled.
 
 ## Boundaries
@@ -81,6 +96,9 @@ policy.
   the prospective, unseen-data validation locked by ADR-0013 completes.
 - No external VUS worklist or ClinVar submission is authorized before a
   passed prospective validation and variant-level expert sign-off.
+- Atlas Gates 1–7 verify provenance and deterministic fidelity, not biological
+  truth. The current eight spans across seven variants remain unaccepted at
+  Gate 8; the six-variant cohort is engineering repeatability only.
 - BIAS remains an external, separate-process dependency under the arm's-length
   boundary documented in ADR-0007.
 
@@ -95,6 +113,8 @@ policy.
 - [`docs/RISK_REGISTER.md`](docs/RISK_REGISTER.md) — failure modes and controls
 - [`docs/prd/`](docs/prd/) — feature contracts
 - [`data/census/`](data/census/) — committed non-identifying aggregate records
+- [`data/atlas/runs/2026-08-03/`](data/atlas/runs/2026-08-03/) — public
+  source licences/hashes, span locators, gate outcomes, and reconstruction boundary
 
 Large ClinVar, Nirvana, BIAS, packet, and held-out artifacts remain outside the
 repository. Their checksums and operator contracts are recorded under
