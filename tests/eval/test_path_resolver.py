@@ -26,6 +26,21 @@ def resolve_raptor_data_root(repo_root: Path) -> Path:
     )
 
 
+def require_raptor_data_root(repo_root: Path) -> Path:
+    """Resolve reference data or skip explicitly in offline CI.
+
+    An explicitly configured but missing root is a broken environment and
+    fails instead of silently skipping.
+    """
+    env_root = os.environ.get("RAPTOR_DATA_ROOT")
+    if env_root and not Path(env_root).exists():
+        pytest.fail(f"RAPTOR_DATA_ROOT does not exist: {env_root}")
+    try:
+        return resolve_raptor_data_root(repo_root)
+    except FileNotFoundError as exc:
+        pytest.skip(f"requires_reference: {exc}")
+
+
 def test_resolver_with_synthetic_paths(tmp_path):
     # Proves the resolver works for both main and worktree layouts
     
