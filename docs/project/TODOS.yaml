@@ -557,7 +557,12 @@ todos:
   title: Designing phenotype and penetrance evidence track
   description: 'Track: CLINICAL-EVIDENCE. Define consented phenotype, age, tissue,
     penetrance, segregation and mosaicism inputs needed for PP4/BS2 and mechanism synthesis;
-    establish privacy boundaries and manual-review rules before patient-level automation.'
+    establish privacy boundaries and manual-review rules before patient-level automation.
+    Google/Open Health Stack FHIR R4 phenotype capture and offline Android workflows are a
+    deferred potential input here only (see governance-data-rights-privacy), gated on a
+    concrete clinical partner/patient-data requirement and post-pilot reassessment; not used
+    for variant normalization, literature extraction, genomic evidence or mechanism/classification
+    logic now.'
   status: pending
   depends_on:
   - governance-data-rights-privacy
@@ -566,7 +571,17 @@ todos:
   title: Establishing data rights, privacy and clinical-boundary governance
   description: 'Track: GOVERNANCE / CROSS-CUTTING. Maintain license/permitted-use,
     patient-data privacy, retention, access control, clinical/research boundary, audit,
-    COI and external-sharing controls for every source, packet and engagement workflow.'
+    COI and external-sharing controls for every source, packet and engagement workflow.
+    DEFERRED: Google/Open Health Stack is a clinical-interoperability option only -- not a
+    genomics evidence source, source-expansion input, Mechanism Atlas dependency or current
+    grant/Atlas critical-path item; it supplies no variant normalization, literature
+    extraction, genomic evidence, pathway synthesis, VCF/GA4GH handling or classification
+    logic. Potential later uses, only once a concrete clinical partner/patient-data
+    requirement exists: FHIR R4 expert/phenotype structured data capture, offline Android
+    workflows, reviewed-result interoperability via appropriate FHIR Genomics Reporting
+    profiles, and FHIR Info Gateway RBAC/privacy controls. Reassess only after the bounded
+    Atlas pilot, molecular-geneticist onboarding and a concrete clinical partner/interoperability
+    requirement; no implementation now.'
   status: pending
   depends_on: []
   created: '2026-07-19'
@@ -700,8 +715,19 @@ todos:
     first end-to-end anchor. Treat the preliminary handoff as context/query seed only;
     independently resolve identity, primary sources, exact spans, assay/model context,
     contradictions and evidence gaps. Permit supported, conflicting, unknown or empty
-    outcomes; admit no claim without the general primary-source exact-span rule.'
-  status: pending
+    outcomes; admit no claim without the general primary-source exact-span rule. A
+    supervised, optional out-of-process six-stage Discovery DAG (identity -> literature
+    -> claims -> {contradictions, context} -> gaps) is operational for this anchor;
+    identity and literature reached executionDone (GRCh38 SPDI/ClinVar/dbSNP identity
+    proposed; literature/licence survey confirms both older primary papers remain
+    paywalled and PMC11185720 is CC BY-NC-ND 4.0, not CC-BY-4.0). Claims (exact-span
+    extraction) is on hold pending permitted full-text access; only a MaveDB CC0
+    direct-dataset observation (score 0.345544328, urn:mavedb:00001201-a-1, c.1832G>A/p.Arg611Gln)
+    is staged as a dataset observation, not an accepted literature claim, and no accepted
+    Phase 2 Atlas claim/classification/mechanism statement exists yet -- untrusted research
+    staging pending human/deterministic review. Contradictions, context and gaps remain
+    blocked on claims.'
+  status: in_progress
   depends_on:
   - atlas-phase2-citation-resolver
   created: '2026-07-27'
@@ -710,9 +736,13 @@ todos:
   description: 'Track: MECHANISM-ATLAS / PHASE-2. After the R611Q vertical slice, test
     the ontology on known pathogenic, benign, conflicting, VUS-with-functional-evidence
     and evidence-poor cases. Preserve unknown/context-dependent outputs and do not claim
-    ontology stability from the anchor alone.'
+    ontology stability from the anchor alone. Panel membership is fixed upstream by
+    atlas-phase2-panel-selection-run under the frozen selection protocol; this task executes
+    the Atlas pipeline over that provisional panel and never re-selects members based on
+    observed mechanism direction.'
   status: pending
   depends_on:
+  - atlas-phase2-panel-selection-run
   - atlas-phase2-r611q-anchor
   created: '2026-07-27'
 - id: atlas-phase2-human-span-review
@@ -775,3 +805,217 @@ todos:
   depends_on:
   - core-generate-review-packets
   created: '2026-07-22'
+- id: atlas-phase2-panel-protocol-freeze
+  title: Freezing the Atlas Phase 2 panel-selection protocol
+  description: 'Track: MECHANISM-ATLAS / PHASE-2 / GOVERNANCE. Register and freeze
+    docs/project/atlas/ATLAS_PHASE2_PANEL_SELECTION_PROTOCOL.md before any contrast-panel
+    member is chosen, with the freeze timestamp, version, seed literal and protocol digest
+    recorded in the adjacent
+    docs/project/atlas/atlas-phase2-panel-selection-registration-v1.yaml. Because candidate
+    discovery already ran, label this honestly as a post-discovery, pre-selection registered
+    protocol, never a preregistration. The protocol must name no candidate, report no
+    candidate count and state no functional result; it fixes the locked universe handoff
+    contract, identity normalization, eligibility/exclusion, the 5-10 panel-size rule,
+    coverage of the six frozen strata (strong signal, partial/intermediate, null/benign-like,
+    conflicting-across-assays, context-dependent, evidence-poor/abstention), assay/model
+    diversity, source-concentration caps with a fail-closed relaxation ladder, single
+    high-throughput dataset limits, the abstention control, duplicate/same-codon/same-residue
+    handling, seeded deterministic ordering and tie-breaking, empty-stratum and infeasibility
+    handling, the full inclusion/exclusion audit and the no-outcome-dependent-replacement
+    rule. Sampling labels (including ClinVar classification, computational scores and open
+    access status) define strata only and never become mechanism evidence. Version 1.0.1 is a
+    pre-first-run correction of six adversarial-review findings: discovery-set commitment plus
+    normalization ledger binding the universe to the immutable raw inventory, machine-executable
+    multi-stratum predicates with declared precedence, recomputed source-lineage collapse with
+    conservative unknown pooling, fail-closed pack-hash and registration-digest preconditions,
+    a fixed-size deterministic complete search replacing the circular greedy sizing, and an
+    explicit taxonomy crosswalk that keeps the starter-spec strata binding as compatibility
+    coverage without amending the spec. Version 1.0.2 adds a mandatory tracked candidate-free
+    pre-selection universe lock record, mandatory executor replay of normalization and pack
+    identity admission from every raw inventory row, deterministic search over the full eligible
+    universe with budget exhaustion reported as undetermined rather than relaxed or infeasible,
+    and report-only handling of stale external classification labels in the crosswalk. Citable
+    only as a completed governance milestone, never as a scientific result.'
+  status: done
+  depends_on: []
+  created: '2026-08-02'
+- id: atlas-phase2-candidate-universe-lock
+  title: Normalizing and locking the Atlas Phase 2 candidate universe
+  description: 'Track: MECHANISM-ATLAS / PHASE-2. Capture the complete discovery output as an
+    immutable raw inventory, then normalize every discovered TSC2 missense candidate to
+    canonical GRCh38 SPDI plus pinned MANE-Select transcript HGVS, collapse exact duplicates,
+    and emit the locked universe at configs/atlas/panels/tsc2/candidate_universe.yaml (schema
+    atlas.candidate_universe.v1). The universe must bind back to the raw inventory through its
+    hash and row count, a total normalization ledger with one row per raw row, and a
+    pre-selection discovery-set commitment (count plus hash over the sorted distinct canonical
+    identity keys); unresolved identities are carried as surrogate-keyed records with their
+    exclusion code and are never dropped. Carry only primitive selection metadata -- per
+    observation reported outcome bucket with attributable basis, assay kind, model system,
+    context keys, throughput class, normalized source identifiers, dataset accession, version
+    linkage, program/lab/protocol lineage keys, access status, licence family and span
+    verifiability -- plus the classification-derived spec stratum and its derivation mode, so the
+    executor can replay normalization and recompute strata, lineage groups and support class
+    deterministically. No ranking, recommendation, effect size, aggregated verdict or mechanism
+    narrative. Record access-blocked and evidence-absent candidates as distinct states so open
+    access never becomes a proxy for positive findings. Immediately after normalization and
+    before any selection attempt, publish the tracked, candidate-free lock record at
+    configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v1.yaml (schema
+    atlas.candidate_universe_lock.v1) pinning the universe, raw-inventory, ledger and
+    discovery-set hashes plus counts, the pack binding and the protocol digests in force, with
+    its own non-circular content hash; candidate data may stay under the external uncommitted
+    content root but the lock record must be tracked. Exactly one lock record per
+    universe_version; corrections require a version bump, a recorded reason, a new lock record
+    and a full deterministic re-run. Completed 2026-08-02: raw inventory 35 rows (content_hash
+    fee39ffa9c826b6e0ccb85ad583b09c2f81794036b115d91a91eab521365befb), normalization ledger 35
+    rows (hash 7c1e94938980199d7048f80c3a2f98058883cdb9de918e99fbbca2f707f6c834), discovery-set
+    commitment count 35 (hash 0e33cebb4521b5ce94f592c73a508ee9cec0741cb5f1fa3c4de615a0de552c49),
+    universe_content_hash 22b08a99fe56ac5c07798a27b7fc3abf9b6fa60985c99ad8ed4e3250f30e094b,
+    lock_content_hash fcceb1a8cc09b07378a6882c82a0f7199d4afb54d9d6782135297f3a0ee0178c at
+    configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v1.yaml; 28 resolved plus 7
+    unresolved(X1) plus 1 X3 anchor-residue exclusion, all hashes independently re-verified in a
+    fresh process against the on-disk artifacts and the live pack hash.'
+  status: done
+  depends_on:
+  - atlas-phase2-panel-protocol-freeze
+  created: '2026-08-02'
+- id: atlas-phase2-open-source-registration
+  title: Registering permitted open R611Q sources
+  description: 'Track: MECHANISM-ATLAS / PHASE-2. Register only lawfully accessible, public,
+    appropriately licensed R611Q sources in configs/atlas/catalogs/tsc2/catalog.yaml with
+    normalized PMID/PMCID/DOI/ACCESSION identifiers, correct licence family, permitted_use,
+    role and verification state, and recomputed raw plus extracted-text digests under the
+    external uncommitted content root. Record paywalled or licence-restricted evidence as
+    documented unavailable evidence rather than dropping it silently, and never treat
+    availability as support. Internal handoffs, derived summaries, reviews and ClinVar remain
+    context or provenance only and can never be a grounding leaf. Completed 2026-08-03:
+    external catalog tsc2-r611q-primary-v1 hash
+    5d83d8b5e7c3c4923dc6dae038530360db47760abe8c3f86fbc26f3d5821b22e registers five
+    resolver-verified grounding leaves (four CC-BY-4.0 primary publications plus one CC0
+    MaveDB dataset) and seven metadata-only/restricted leads. All 13 grounding aliases,
+    including the MaveDB accession, resolve consistently; metadata-only rows fail grounding.
+    The committed tsc2 catalog remains an empty template.'
+  status: done
+  depends_on: []
+  created: '2026-08-02'
+- id: atlas-phase2-r611q-span-pass
+  title: Running the R611Q exact-span and Gate 1-7 pass
+  description: 'Track: MECHANISM-ATLAS / PHASE-2. Against the registered open sources, run the
+    deterministic R611Q pass end to end: exact-span verification at text-char locators under
+    atlas.text_norm.v1 followed by promotion Gates 1-7 (canonical SPDI readmission, source
+    role/type, citation resolution, exact span resolution, context/ontology pack validation,
+    duplicate/conflict rules, no-classification leakage). Gate 8 named human-oracle review
+    stays a separate downstream task and is never pre-empted. Permit supported, conflicting,
+    unknown or empty outcomes; a fail-closed result with documented unavailable evidence is a
+    valid outcome, and no accepted claim may exist without a verified primary or direct
+    dataset span. Completed 2026-08-02 (external, uncommitted artifacts only, at
+    D:\AIProjects\raptor-data\atlas\r611q-gate1-7-v1\: candidate.json, gate_result.json,
+    run_gate1_7.py): staged one real external AtlasCandidateImport (TSC2 R611Q, SPDI
+    NC_000016.10:2070570:G:A) with 2 proposed claims and 2 proposed sources against
+    pmc4843954 and pmc11593644, both CC-BY-4.0 and resolver-verified across all 6
+    PMID/PMCID/DOI aliases, against pack tsc2 (hash
+    1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927) and catalog
+    tsc2-r611q-primary-v1 (hash 5d83d8b5e7c3c4923dc6dae038530360db47760abe8c3f86fbc26f3d5821b22e).
+    Independently located and resolver-verified both exact spans under atlas.text_norm.v1:
+    text-char:20956:21353 (extracted-text sha256
+    54a09c6fba81b218210f2051496d4226265eed958f5b6ee2a86f3737a463be77) and
+    text-char:31054:31266 (extracted-text sha256
+    0a6f1a0410cf1eda7f86dd375dcf4954cfb1cc72950670ef22357eb267873544). The real, unmodified
+    validate_candidate_import ran Gates 1-7 without exception (real ontology-backed
+    context_validator against the live pack, empty duplicate_index, independent Gate 7
+    leakage re-scan also clean) then raised AtlasProvenanceError at Gate 8 because the
+    human_oracle_reviewer honestly returns no reviewer for every claim; terminal status
+    BLOCKED_HUMAN_REVIEW, accepted claim count 0, promote_candidate never invoked. tests/atlas
+    64/64 still pass; no tracked repository file changed except this entry.'
+  status: done
+  depends_on:
+  - atlas-phase2-open-source-registration
+  created: '2026-08-02'
+- id: atlas-phase2-panel-selection-run
+  title: Selecting the provisional Atlas Phase 2 contrast panel
+  description: 'Track: MECHANISM-ATLAS / PHASE-2. Apply the frozen selection protocol
+    mechanically to the locked candidate universe: verify the protocol digest, recompute and
+    verify the registration digest itself, confirm the recorded seed, fail closed on TSC2 pack
+    drift against the registration snapshot, the universe pack binding and the universe lock
+    record, verify the pre-selection universe lock record and every digest and count it pins,
+    then replay normalization and pack identity admission from every raw inventory row before
+    recomputing strata, lineage groups and support class. Run the fixed-size attempt schedule
+    with the declared complete deterministic search over the full eligible universe; a
+    budget-exhausted attempt is undetermined and must never license relaxation or an infeasible
+    verdict. Emit the provisional 5-10 member panel plus a run record at
+    data/atlas/tsc2_phase2_panel_selection_run_<date>.json containing every verified digest,
+    the replay attestation, the attempt log, every universe record disposition with its rule id,
+    per-stratum and spec-taxonomy coverage, access-attrition, unknown-lineage and discordant-label
+    counts, any applied relaxation step and the independence status. Report empty strata, a
+    missing abstention control, undetermined search or an infeasible panel honestly instead of
+    substituting more attractive candidates, and perform no evidence reading during selection.
+    The panel stays provisional until named human-oracle review.'
+  status: pending
+  depends_on:
+  - atlas-phase2-panel-protocol-freeze
+  - atlas-phase2-candidate-universe-lock
+  created: '2026-08-02'
+- id: grant-anthropic-atlas-readiness-fold-in
+  title: Folding verified Atlas readiness into the application
+  description: 'Track: GRANT-ENABLEMENT / FIXED-DATE. Before the owner-approved submission
+    buffer, fold only verified Atlas readiness into the application narrative: completed
+    governance milestones such as the frozen post-discovery panel-selection protocol and its
+    registration digest, plus any deterministically verified span or gate result that already
+    exists. Describe unstarted or in-flight items as not started, and never project a panel,
+    a mechanism claim, a classification or a result that has not passed its gate. Cite the
+    selection protocol as a governance milestone only, never as a scientific finding. Do not
+    edit the grant draft from the Atlas planning phase or delay Atlas execution to manufacture
+    application claims. Completed 2026-08-03 in the grant worktree: Section 12 records the
+    frozen protocol, 35-entry candidate frame, five-source grounding catalog, and two exact
+    spans passing deterministic Gates 1-7 while Gate 8 remains blocked and accepted-claim
+    count remains zero. It also records the separate hash-selected six-variant technical
+    repeatability cohort, explicitly not the formal contrast panel, which reproduced the
+    Gate 1-7 pass and Gate 8 block with zero accepted claims. The bounded answer is 479/500
+    words and preserves every negative result, reviewer gap and non-clinical boundary.'
+  status: done
+  depends_on:
+  - atlas-phase2-panel-protocol-freeze
+  created: '2026-08-02'
+- id: atlas-phase2-gate-smoke-cohort
+  title: Running the six-candidate TSC2 gate-smoke batch
+  description: 'Track: MECHANISM-ATLAS / PHASE-2 (engineering repeatability, non-panel; NOT
+    the formal contrast panel and asserts no scientific or clinical result). Build six
+    independent, external AtlasCandidateImport packages from the hash-locked
+    tsc2-gate-smoke-v1 cohort (SMOKE_COHORT_LOCK.yaml, cohort_content_hash
+    99462b3064a8bc53737ac3dc22c0d2c07e87d999cc429a1ebde2aadb09832388) against the same
+    registered tsc2-r611q-primary-v1 catalog and tsc2 pack already verified by
+    atlas-phase2-r611q-span-pass, and run the real, unmodified validate_candidate_import
+    exactly once per package. Each technical probe must independently verify one exact
+    source span, pass Gates 1-7, and terminate ONLY at Gate 8 (named human-oracle review);
+    it must call no promotion API and accept zero claims. This never substitutes for or
+    supersedes atlas-phase2-panel-selection-run. Completed 2026-08-03 (external, uncommitted
+    artifacts only, at D:\AIProjects\raptor-data\atlas\tsc2-gate-smoke-v1\packages\:
+    run_smoke_batch.py, BATCH_RESULT.json, and per-candidate candidate.json/gate_result.json
+    for ile723val, arg1743gly, thr509pro, leu916pro, asp1656tyr, arg308trp): independently
+    recomputed the cohort (hash above), catalog
+    (5d83d8b5e7c3c4923dc6dae038530360db47760abe8c3f86fbc26f3d5821b22e), pack
+    (1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927) and both
+    extracted-text (0a6f1a0410cf1eda7f86dd375dcf4954cfb1cc72950670ef22357eb267873544,
+    07bd6a0c98a838717cbf256257756e71be1139a12baa7548d116d0f8d6bec37e) hashes before
+    building anything, then independently located and resolver-verified all six exact
+    spans (four copied byte-for-byte from the source text, plus leu916pro verified to
+    contain the required U+2010/U+2009 characters and arg308trp verified as a nine-variant
+    joint statement, neither hand-retyped) and resolved every PMID/PMCID/DOI alias of both
+    sources to one agreeing CatalogSource each. All six real, unmodified
+    validate_candidate_import calls (real ontology-backed context_validator against the
+    live pack, empty duplicate_index, an honest reviewer that always returns None) raised
+    AtlasProvenanceError naming Gate 8 specifically, never an earlier gate under the same
+    exception type; terminal status BLOCKED_HUMAN_REVIEW for all six, accepted claim count
+    0, promote_candidate never invoked (also enforced by a runtime mock tripwire). The
+    arg1743gly/thr509pro pair intentionally shares one joint-statement span without
+    fabricating an individual quantitative magnitude; asp1656tyr records, and explicitly
+    does not resolve, an in-source r.4960/4961 and *40/*41 numbering discrepancy. Eight
+    false-green inversion probes (fake truthy reviewer, earlier-gate mislabeling under the
+    same exception type, ASCII-substituted Unicode slice, joint-to-magnitude fabrication,
+    silently-reconciled splicing discrepancy, formal-panel/classification language leakage,
+    shared-quote-mistaken-for-corruption, and promotion-API invocation) were each executed
+    and each behaved as required (rejected/blocked/detected). tests/atlas 64/64 still pass;
+    no tracked repository file changed except this entry.'
+  status: done
+  depends_on:
+  - atlas-phase2-r611q-span-pass
+  created: '2026-08-03'

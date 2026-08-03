@@ -4,7 +4,7 @@
   "atlas_schema_version": "raptor-mechanism-atlas-starter-v1",
   "disease_pack_id": "tsc2",
   "disease_pack_version": "1.0.0-phase1",
-  "disease_pack_content_hash": "289068af23ead6076e82265eb4e4e47a210bc21b01ba3f9e6e2b6054d98b14a8",
+  "disease_pack_content_hash": "1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927",
   "bookshelf_version": "phase1-synthetic-v1",
   "prompt_hash": "PLACEHOLDER_PHASE2_PROMPT_HASH",
   "packet_manifest_hash": "PLACEHOLDER_PHASE2_PACKET_MANIFEST_HASH",

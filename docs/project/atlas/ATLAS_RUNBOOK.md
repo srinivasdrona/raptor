@@ -78,8 +78,16 @@ Before any real-world claim or span may be admitted:
    claim's exact span against a primary publication or direct dataset.
    Internal handoffs and derived summaries may seed queries but cannot be
    proposed sources or claim-grounding evidence.
-2. A completed, reviewed contrast panel (pathogenic/benign/conflicting/VUS)
-   demonstrating the ontology is not overfit to a single case.
+2. A completed, reviewed contrast panel (pathogenic/benign/conflicting/VUS as **sampling
+   strata only**, never as mechanism evidence) demonstrating the ontology is not overfit
+   to a single case. Panel membership is fixed by the frozen, deterministic
+   [`ATLAS_PHASE2_PANEL_SELECTION_PROTOCOL.md`](ATLAS_PHASE2_PANEL_SELECTION_PROTOCOL.md)
+   (digest and freeze metadata in
+   [`atlas-phase2-panel-selection-registration-v1.yaml`](atlas-phase2-panel-selection-registration-v1.yaml)),
+   applied to a hash-locked candidate universe. That protocol keeps the starter spec's
+   five `required_strata` binding as compatibility coverage while six functional-situation
+   strata govern selection coverage — selection is a sampling decision and grants no
+   admissibility.
 3. All eight promotion gates exercised against real (not synthetic)
    `AtlasCandidateImport` payloads, with a named human-oracle reviewer
    signing off on every claim's span.

@@ -11,11 +11,11 @@
 schema: atlas.citation_catalog.v1
 catalog_id: tsc2
 catalog_version: 1.0.0-phase2-template
-catalog_content_hash: 2dc4b81c5c591b9bf5b1928112d3bcc97ab417b7fa7de5e1552455cddcc5e56d
+catalog_content_hash: 579035b38f168c67dcde89ace29af5f4ac4f1f6b34b5be38e7af0a88b6b3b514
 disease_pack_binding:
   pack_id: tsc2
   pack_version: 1.0.0-phase1
-  pack_content_hash: 289068af23ead6076e82265eb4e4e47a210bc21b01ba3f9e6e2b6054d98b14a8
+  pack_content_hash: 1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927
 content_root_policy:
   description: >-
     Source raw and extracted-text artifacts are never committed to this

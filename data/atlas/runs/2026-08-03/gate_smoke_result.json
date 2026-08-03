@@ -1,0 +1,23 @@
+{
+  "schema": "raptor.atlas_public_gate_smoke_result.v1",
+  "run_id": "tsc2-gate-smoke-v1",
+  "scope": "technical_gate_repeatability_only_not_formal_contrast_panel",
+  "cohort_content_hash": "99462b3064a8bc53737ac3dc22c0d2c07e87d999cc429a1ebde2aadb09832388",
+  "pack_content_hash": "1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927",
+  "catalog_content_hash": "5d83d8b5e7c3c4923dc6dae038530360db47760abe8c3f86fbc26f3d5821b22e",
+  "candidate_count": 6,
+  "gate_8_blocked_count": 6,
+  "earlier_gate_failure_count": 0,
+  "accepted_claim_count": 0,
+  "promote_candidate_invoked_count": 0,
+  "formal_contrast_panel": false,
+  "scientific_validation": false,
+  "results": [
+    {"variant": "NP_000539.2:p.Ile723Val", "spdi": "NC_000016.10:2072309:A:G", "source_id": "pmc11593644", "locator": "text-char:33327:33537", "status": "BLOCKED_HUMAN_REVIEW"},
+    {"variant": "NP_000539.2:p.Arg1743Gly", "spdi": "NC_000016.10:2088292:C:G", "source_id": "pmc11593644", "locator": "text-char:39217:39353", "status": "BLOCKED_HUMAN_REVIEW"},
+    {"variant": "NP_000539.2:p.Thr509Pro", "spdi": "NC_000016.10:2064352:A:C", "source_id": "pmc11593644", "locator": "text-char:39217:39353", "status": "BLOCKED_HUMAN_REVIEW"},
+    {"variant": "NP_000539.2:p.Leu916Pro", "spdi": "NC_000016.10:2076494:T:C", "source_id": "pmc7154745", "locator": "text-char:40192:40583", "status": "BLOCKED_HUMAN_REVIEW"},
+    {"variant": "NP_000539.2:p.Asp1656Tyr", "spdi": "NC_000016.10:2086847:G:T", "source_id": "pmc7154745", "locator": "text-char:39831:40011", "status": "BLOCKED_HUMAN_REVIEW"},
+    {"variant": "NP_000539.2:p.Arg308Trp", "spdi": "NC_000016.10:2058819:C:T", "source_id": "pmc7154745", "locator": "text-char:34213:34515", "status": "BLOCKED_HUMAN_REVIEW"}
+  ]
+}

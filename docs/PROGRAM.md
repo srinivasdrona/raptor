@@ -141,9 +141,25 @@ pending `STRATEGY.md` Part II §10 — ADR-0003.)*
   (tracker update `1134c2e`): generic condition-agnostic core + exactly one versioned `tsc2`
   pack + pack-bound hashes + static import/classification-leakage guards + synthetic-only
   promotion flow and out-of-process Discovery templates; `tests/atlas/` is a 35-test Phase 1
-  suite. **Phase 2 real grounding / pilot has not started** — it remains blocked on
-  deterministic citation/source resolution plus named human/oracle span review; no real
-  mechanism claims, grounding spans, R611Q conclusions, or second-disease support are admitted
+  suite. **Phase 2 real grounding has begun (non-authoritative).** The deterministic
+  citation/source resolver is complete; a supervised, optional, out-of-process six-stage
+  Discovery DAG (identity → literature → claims → {contradictions, context} → gaps) has
+  reached `executionDone` for the R611Q anchor's identity and literature stages (GRCh38
+  SPDI/ClinVar/dbSNP identity proposed; literature/licence survey confirms both older
+  primary papers remain paywalled and PMC11185720 is CC BY-NC-ND 4.0, not CC-BY-4.0). The
+  original Discovery claims stage was superseded by permitted external-source staging. A
+  hash-bound external catalog now registers five resolver-verified grounding leaves (four
+  CC-BY-4.0 publications and one CC0 MaveDB dataset) plus seven non-grounding leads. Two
+  R611Q exact spans pass deterministic Gates 1-7; Gate 8 blocks because no named reviewer is
+  engaged, and zero claims are accepted. A separate, hash-selected six-variant technical
+  repeatability cohort also passed Gates 1-7 in all six cases and blocked only at Gate 8,
+  with zero accepted claims; it is explicitly not the formal contrast panel or scientific
+  validation. The candidate-free lock commits a 35-entry discovery frame (31 missense
+  alleles; 28 identities resolved, seven unresolved), but the formal selector has not run
+  because assay observations have not yet been locked into that universe. Contradiction,
+  context, gap synthesis, named human review, accepted Atlas profiles, classifications and
+  second-disease support all remain pending. Discovery remains an optional out-of-process
+  aid, never a runtime dependency of the core RAPTOR workflow.
 
 ## Source expansion roadmap — ordered and governed
 
@@ -250,9 +266,17 @@ the vertical worklist below replaces it. **Census candidate directions and the t
     tracker `1134c2e`), GPT-5.4-clean: generic condition-agnostic core, exactly one versioned
     `tsc2` pack, pack-bound hashes, static import/classification-leakage guards, a synthetic-only
     promotion flow, and out-of-process Discovery templates, backed by the 35-test `tests/atlas/`
-    suite. **Phase 2 real grounding / bounded pilot has not started** and remains blocked on
-    deterministic citation/source resolution plus named human/oracle span review. No real
-    mechanism claims, grounding spans, R611Q conclusions, or second-disease support are admitted.
+    suite. **Phase 2 real grounding has begun (non-authoritative).** The deterministic
+    citation/source resolver is complete; a supervised, optional, out-of-process six-stage
+    Discovery DAG has reached `executionDone` for the R611Q anchor's identity and literature
+    stages (GRCh38 SPDI/ClinVar/dbSNP identity proposed; literature/licence survey confirms
+    both older primary papers remain paywalled and PMC11185720 is CC BY-NC-ND 4.0, not
+    CC-BY-4.0). The claims (exact-span extraction) stage is on hold pending permitted
+    full-text access; only a MaveDB CC0 direct-dataset observation is staged, not an accepted
+    claim, and downstream contradiction/context/gap stages remain blocked. No real mechanism
+    claims, grounding spans, R611Q conclusions, classifications, or second-disease support
+    are admitted — this is untrusted research staging pending named human/oracle review, and
+    Discovery remains an optional out-of-process aid, never a runtime dependency.
 
 > **Provisional packets now vs externally usable worklist after PASS:** items 1–8 and the PRD-04 output
 > contract (item 9) proceed now, and provisional representative/all-VUS candidate packets may be built

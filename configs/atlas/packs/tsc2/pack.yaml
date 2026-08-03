@@ -1,7 +1,7 @@
 schema: atlas.disease_pack.v1
 pack_id: tsc2
 pack_version: 1.0.0-phase1
-pack_content_hash: 289068af23ead6076e82265eb4e4e47a210bc21b01ba3f9e6e2b6054d98b14a8
+pack_content_hash: 1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927
 allowed_genes:
   - TSC2
 assembly_pins:
@@ -37,7 +37,7 @@ source_register_pins:
     urn_or_ids:
       pmcid: PMC11185720
       doi: 10.1101/2024.06.07.597916
-    license: CC-BY-4.0
+    license: CC-BY-NC-ND-4.0
     verification: confirm_pending
   - entry_id: clinvar-VCV000012397
     source_type: DATASET

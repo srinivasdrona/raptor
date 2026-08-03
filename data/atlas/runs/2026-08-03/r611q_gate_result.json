@@ -1,0 +1,29 @@
+{
+  "schema": "raptor.atlas_public_gate_result.v1",
+  "run_id": "r611q-gate1-7-v1",
+  "scope": "deterministic_fidelity_only",
+  "variant": {
+    "spdi": "NC_000016.10:2070570:G:A",
+    "hgvs_c": "NM_000548.5:c.1832G>A",
+    "hgvs_p": "NP_000539.2:p.Arg611Gln"
+  },
+  "pack_content_hash": "1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927",
+  "catalog_content_hash": "5d83d8b5e7c3c4923dc6dae038530360db47760abe8c3f86fbc26f3d5821b22e",
+  "verified_spans": [
+    {
+      "source_id": "pmc4843954",
+      "locator": "text-char:20956:21353",
+      "extracted_text_sha256": "54a09c6fba81b218210f2051496d4226265eed958f5b6ee2a86f3737a463be77"
+    },
+    {
+      "source_id": "pmc11593644",
+      "locator": "text-char:31054:31266",
+      "extracted_text_sha256": "0a6f1a0410cf1eda7f86dd375dcf4954cfb1cc72950670ef22357eb267873544"
+    }
+  ],
+  "deterministic_gates_1_through_7": "passed",
+  "gate_8": "BLOCKED_HUMAN_REVIEW",
+  "accepted_claim_count": 0,
+  "promote_candidate_invoked": false,
+  "scientific_sufficiency_reviewed": false
+}

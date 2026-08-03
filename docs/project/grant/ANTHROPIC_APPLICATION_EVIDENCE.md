@@ -1,6 +1,9 @@
 # RAPTOR — Anthropic Rare-Disease Application: Evidence Ledger
 
-> **Status: application-support evidence record, prepared 2026-07-30.** This ledger cites only
+> **Status: application-support evidence record, prepared 2026-07-30; bounded
+> pre-submission addendum added 2026-08-03.** Rows 1-12 preserve the original evidence-base
+> snapshot; §2A records the later Atlas governance and deterministic-verification milestones
+> committed alongside this addendum. This ledger cites only
 > committed repository artifacts and git history at evidence-base commit
 > `377abf1689a2c2658d23f61bdc80a9f9376de9cd` on public `main`
 > ([`github.com/srinivasdrona/raptor`](https://github.com/srinivasdrona/raptor)).
@@ -46,6 +49,25 @@ label that checkout hash `sha256_windows_crlf_checkout_do_not_pin` (e.g.
 | 10 | Public blog / docs / strategy | Two public progress posts; public GitHub README mirrors the committed census/benchmark figures (independently fetched 2026-07-30) | `docs/blog/2026-07-10-before-the-first-score.md`; `docs/blog/2026-07-23-after-the-first-rerun.md`; `README.md`; `docs/STRATEGY.md`, `docs/EVALUATION.md`, `docs/DECISIONS.md`, `docs/PROGRAM.md`, `docs/ARCHITECTURE.md` | `253c9fd` (post 1), `aa2edfa`/`c8ec5ae` (post 2) | — | Both posts explicitly disclaim "validated"/"works"/"passed the benchmark" language (`docs/prompts/progress-blog/slot3-overclaim-guard.md`) |
 | 11 | Team gap: molecular geneticist | `engagement-recruit-molecular-geneticist` status **`in_progress`** (not complete); `core-molecular-geneticist-adjudication` status **`pending`**, zero adjudications recorded | `docs/project/TODOS.yaml`; `docs/RISK_REGISTER.md` row **R-E1** ("No domain oracle is ever recruited") | — | — | No expert has reviewed any packet or Atlas claim; `atlas-phase2-human-span-review` and `engagement-submission-pilot` both depend on this and are `pending` |
 | 12 | No prospective PASS / no accepted Phase 2 claim / no second disease | `validate-tiered-gate-prospectively` status `pending`; `atlas-phase2-r611q-anchor`, `atlas-phase2-contrast-panel`, `atlas-phase2-pilot-evaluation` all status `pending`; ADR-0014 explicit: "Core acceptance and a passing `tsc2` pack never imply another disease works" | `docs/project/TODOS.yaml`; `docs/DECISIONS.md#adr-0014--generic-mechanism-atlas-core-with-a-versioned-disease-pack-boundary` | — | — | Prospective lock requires the first NCBI ClinVar GRCh38 monthly archive dated ≥2026-08-01, frozen URL/date/MD5/SHA-256 before scoring, else `BLOCKED_DATA` |
+
+## 2A. Pre-submission Atlas execution addendum (2026-08-03)
+
+This addendum records deterministic engineering milestones completed after the frozen row-1-to-12
+snapshot. It does **not** amend the negative prospective-validation result, create a variant
+classification, or establish a scientifically accepted mechanism.
+
+| Milestone | Verified result | Durable public evidence | Non-public evidence boundary | What it does not establish |
+|---|---|---|---|---|
+| Post-discovery panel protocol | Protocol v1.0.2, document hash `685319b54d52183f44e6f98605b0a6d00a1348b8fc055c69b54d334872385efc`, registration hash `82261ab52ade28f35db35cfe569a6bbcb70b8bac24c46159352d40ce03bbe37e`; explicitly `is_preregistration: false` | `docs/project/atlas/ATLAS_PHASE2_PANEL_SELECTION_PROTOCOL.md`; `docs/project/atlas/atlas-phase2-panel-selection-registration-v1.yaml` | No candidate names/results occur in the protocol | No formal panel has been selected |
+| Candidate-universe commitment | Candidate-free lock binds 35 discovered entries: 31 missense alleles, 28 resolved identities and seven unresolved; lock hash `fcceb1a8cc09b07378a6882c82a0f7199d4afb54d9d6782135297f3a0ee0178c` | `configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v1.yaml`; `docs/project/TODOS.yaml` | Candidate-bearing universe remains under the external uncommitted content root | Assay observations are not yet locked; the formal selector has not run |
+| Permitted-source catalog | External catalog hash `5d83d8b5e7c3c4923dc6dae038530360db47760abe8c3f86fbc26f3d5821b22e`; five resolver-verified grounding leaves and seven mechanically non-grounding leads | `data/atlas/runs/2026-08-03/source_catalog_manifest.yaml`; `docs/project/TODOS.yaml` | Raw JATS, extracted text, MaveDB CSV and populated catalog remain external and uncommitted by ADR-0016 | Source fidelity does not establish scientific sufficiency |
+| R611Q deterministic pass | Two real CC-BY source spans pass Gates 1-7; Gate 8 blocks on missing named review; accepted-claim count `0` | `data/atlas/runs/2026-08-03/r611q_gate_result.json`; `docs/project/TODOS.yaml` | Exact quotes and candidate payload remain external | No claim is promoted or scientifically accepted |
+| Six-variant gate-smoke cohort | Six of six hash-selected technical packages pass Gates 1-7 and block only at Gate 8; earlier-gate failures `0`, accepted claims `0`, promotion calls `0` | `data/atlas/runs/2026-08-03/gate_smoke_result.json`; `docs/project/TODOS.yaml` | Candidate packages and exact quotes remain external | Explicitly not the formal contrast panel, biological validation or independent replication |
+
+The two R611Q spans plus the six technical packages total eight resolver-verified spans across seven
+variants. Every package remains unaccepted pending named expert review. The accessible functional
+literature is concentrated in the Nellist/Erasmus lineage, so these results demonstrate gate
+repeatability, not broad laboratory independence.
 
 ## 3. Preliminary assets
 
@@ -122,22 +144,22 @@ label that checkout hash `sha256_windows_crlf_checkout_do_not_pin` (e.g.
 
 ## 5. Claude-specific acceleration opportunities (future work — not achieved)
 
-ADR-0016 already establishes a **deterministic guard boundary** that any future LLM-assisted step
-would sit behind, never replace: `src/raptor/atlas/citation.py` verifies source **fidelity and
+ADR-0016 establishes a **deterministic guard boundary** that any LLM-assisted step
+must sit behind, never replace: `src/raptor/atlas/citation.py` verifies source **fidelity and
 identity** only (a normalized `PMID`/`PMCID`/`DOI`/`ACCESSION` resolves to a hash-verified,
 `role=direct_evidence_leaf` local catalog entry; an `exact_quote` matches a recomputed-from-disk
 extracted-text span at a precise character offset) — it does **not**, and is not designed to,
 judge scientific sufficiency. A static AST guard (`assert_no_network_imports`) forbids network
 imports anywhere in `src/raptor/atlas/`, and the named-human Gate 8 review always runs **after**
 deterministic verification and is never replaced by it (ADR-0016 Consequences). Every item below is
-a proposed use of that same fail-closed boundary, none of it built:
+a proposed use of that same fail-closed boundary. Source registration and the bounded Gate 1-7
+passes in §2A are now built; the broader synthesis/evaluation work remains future:
 
-1. **Primary-source retrieval and span extraction** — populating the (currently `sources: []`)
-   catalog with real, licensed PMC/PubMed/dataset content for the R611Q anchor and beyond
-   (`atlas-phase2-r611q-anchor`, `tier3-literature-ingestion`, `sources-add-literature-stack`, all
-   `pending`). Claude could accelerate candidate identification/extraction, but every candidate
-   would still have to clear the existing Gate 3/4 catalog-hash and exact-span checks, and Gate 8
-   human sign-off, before it could ground any claim.
+1. **Primary-source retrieval and span extraction** — the committed catalog remains an empty
+   template as required, while a populated external catalog now holds five grounding leaves and
+   seven non-grounding leads. R611Q and six non-panel technical probes have cleared Gate 3/4 and
+   deterministic Gates 1-7; all remain blocked at Gate 8 with zero accepted claims. Continuous
+   ingestion and the formal contrast panel remain pending.
 2. **Contradiction search** — extracting supported/conflicting/unknown/empty outcomes per variant
    into the Mechanism Atlas schema (ADR-0015 explicitly permits all four outcomes and forbids
    manufacturing a narrative); tracked as `tier3-evidence-extraction-scoring` (`pending`).
@@ -279,11 +301,12 @@ python -m pytest tests/eval -q --ignore=tests/eval/test_live_eval_export.py
 
 ---
 
-**Result summary:** 12 fact-ledger rows (§2), 15 verified commit rows / 18 distinct commits (§9),
+**Result summary:** 12 frozen fact-ledger rows (§2), a bounded later-execution addendum (§2A),
+15 verified commit rows / 18 distinct commits (§9),
 10 six-month milestones
 (§6, all grounded in existing `pending`/`in_progress` TODOs), zero projected results, zero
 fabricated collaborators, zero use of "clinical validation," "reclassification," "first in world,"
 "production-ready," or any funding-amount figure. Unresolved gaps carried forward: no molecular
-geneticist yet engaged; no prospective ClinVar-archive validation run; no real (non-synthetic)
-Atlas source grounded; Anthropic eligibility/data-terms and the DisMech contribution route both
-remain undefined pending owner decisions.
+geneticist yet engaged; no prospective ClinVar-archive validation run; no accepted real Atlas
+claim or formal contrast panel; Anthropic eligibility/data-terms and the DisMech contribution
+route both remain pending owner decisions.

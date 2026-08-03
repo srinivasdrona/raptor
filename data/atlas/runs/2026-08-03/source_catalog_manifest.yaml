@@ -1,0 +1,81 @@
+schema: raptor.atlas_public_source_manifest.v1
+catalog_id: tsc2-r611q-primary-v1
+catalog_content_hash: 5d83d8b5e7c3c4923dc6dae038530360db47760abe8c3f86fbc26f3d5821b22e
+pack_binding:
+  pack_id: tsc2
+  pack_version: 1.0.0-phase1
+  pack_content_hash: 1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927
+artifact_policy: >-
+  Raw and extracted source content remains under the external uncommitted
+  content root. This public manifest exposes identifiers, licences, official
+  retrieval URLs and hashes needed to reconstruct and verify that content.
+extractor:
+  method: deterministic-whole-jats-text
+  version: extract_jats_text_v1
+  sha256: 64f7aa82f9709d0034dded221e0e6864479a92badbcfe0544abb1035a7bd5380
+grounding_sources:
+  - source_id: pmc11593644
+    source_type: PRIMARY-LIT
+    identifiers:
+      pmid: '39596632'
+      pmcid: PMC11593644
+      doi: 10.3390/genes15111432
+    official_url: https://www.ebi.ac.uk/europepmc/webservices/rest/PMC11593644/fullTextXML
+    license: CC-BY-4.0
+    raw_sha256: 515aec1c1601f6b6d9a6ca60b3cb8eb90f156f15dfddcc45da728acf6f90eea0
+    raw_byte_length: 278940
+    extracted_text_sha256: 0a6f1a0410cf1eda7f86dd375dcf4954cfb1cc72950670ef22357eb267873544
+    extracted_text_byte_length: 53885
+  - source_id: pmc7154745
+    source_type: PRIMARY-LIT
+    identifiers:
+      pmid: '31799751'
+      pmcid: PMC7154745
+      doi: 10.1002/humu.23963
+    official_url: https://www.ebi.ac.uk/europepmc/webservices/rest/PMC7154745/fullTextXML
+    license: CC-BY-4.0
+    raw_sha256: 997c5265356a7fb4934532239c98f3f3d150f26c4c3003afb2d6fb65e085d547
+    raw_byte_length: 135149
+    extracted_text_sha256: 07bd6a0c98a838717cbf256257756e71be1139a12baa7548d116d0f8d6bec37e
+    extracted_text_byte_length: 51871
+  - source_id: pmc4843954
+    source_type: PRIMARY-LIT
+    identifiers:
+      pmid: '26703369'
+      pmcid: PMC4843954
+      doi: 10.1002/humu.22951
+    official_url: https://www.ebi.ac.uk/europepmc/webservices/rest/PMC4843954/fullTextXML
+    license: CC-BY-4.0
+    raw_sha256: c840995fbf0cf567a1124fcc9374a01a2d30595dca737c91f89e2a8e01350fe1
+    raw_byte_length: 89446
+    extracted_text_sha256: 54a09c6fba81b218210f2051496d4226265eed958f5b6ee2a86f3737a463be77
+    extracted_text_byte_length: 34479
+  - source_id: pmc7303179
+    source_type: PRIMARY-LIT
+    identifiers:
+      pmid: '32555378'
+      pmcid: PMC7303179
+      doi: 10.1038/s41598-020-66588-4
+    official_url: https://www.ebi.ac.uk/europepmc/webservices/rest/PMC7303179/fullTextXML
+    license: CC-BY-4.0
+    raw_sha256: 27ce8ceaddfd685c0f0c043409d6197093a2dfcfe563e88395862700f949bd71
+    raw_byte_length: 97419
+    extracted_text_sha256: ff79279a5c15ba79b231268919615fa493c338c9d9b6bf650cf230f25ff62a4f
+    extracted_text_byte_length: 33103
+  - source_id: mavedb-00001201-a-1
+    source_type: DATASET
+    identifiers:
+      accession: mavedb:00001201-a-1
+    metadata_url: https://api.mavedb.org/api/v1/score-sets/urn:mavedb:00001201-a-1
+    scores_url: https://api.mavedb.org/api/v1/score-sets/urn:mavedb:00001201-a-1/scores
+    license: CC0-1.0
+    raw_sha256: 74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717
+    raw_byte_length: 14277
+non_grounding_sources:
+  - {source_id: pmc2986163, reason: no_confirmed_open_license}
+  - {source_id: pmc11185720, reason: CC-BY-NC-ND-4.0}
+  - {source_id: pmid11741832, reason: paywalled}
+  - {source_id: pmid15483652, reason: paywalled}
+  - {source_id: pmid21309039, reason: paywalled}
+  - {source_id: pmid22903760, reason: paywalled}
+  - {source_id: pmid18230340, reason: paywalled}
