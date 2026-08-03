@@ -10,9 +10,9 @@ from pathlib import Path
 # Helper to load the real benchmark rows
 def _load_real_benchmark_rows():
     from raptor.eval.model import BenchmarkRow
-    from tests.eval.test_path_resolver import resolve_raptor_data_root
+    from tests.eval.test_path_resolver import require_raptor_data_root
     repo_root = Path(__file__).resolve().parents[2]
-    data_root = resolve_raptor_data_root(repo_root)
+    data_root = require_raptor_data_root(repo_root)
     real_benchmark_path = data_root / "clinvar" / "benchmark" / "benchmark.jsonl"
     if not real_benchmark_path.exists():
         pytest.fail(f"Missing real frozen benchmark: {real_benchmark_path}")
@@ -51,6 +51,7 @@ def _compute_ids_hash(ids):
     return hasher.hexdigest()
 
 
+@pytest.mark.requires_reference
 def test_te1_stage_b_attestation_and_rejection(tmp_path):
     """T-E1 Stage B transportability boundary.
 
@@ -168,6 +169,7 @@ def test_te1_stage_b_attestation_and_rejection(tmp_path):
         )
 
 
+@pytest.mark.requires_reference
 def test_te2_dev_split_composition_and_power():
     """T-E2 counts/power.
 
@@ -203,6 +205,7 @@ def test_te2_dev_split_composition_and_power():
     assert power == "UNDERPOWERED"
 
 
+@pytest.mark.requires_reference
 def test_te1_no_writeback():
     """T-E1 no label writeback.
 
@@ -282,4 +285,3 @@ def test_cli_help_bootstrap():
     res = subprocess.run(cmd, capture_output=True, text=True, env=env)
     assert res.returncode == 0, f"CLI help failed under clean PYTHONPATH: {res.stderr}"
     assert "usage" in res.stdout.lower() or "help" in res.stdout.lower()
-

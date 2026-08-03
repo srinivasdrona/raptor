@@ -774,8 +774,12 @@ def test_g_dm13_authorization_neutrality_unit():
         assert "policy_mode" not in sig.parameters
 
     # Run them with passing and failing metrics and verify they behave normally without any policy override
-    from conftest import make_eval_config, Metrics
-    from test_scope_gate import make_v2_auth_config, make_oracle_thresholds
+    from tests.eval.factories import (
+        Metrics,
+        make_eval_config,
+        make_oracle_thresholds,
+        make_v2_auth_config,
+    )
 
     # PASSING CASE (distinct Metrics objects for each stratum with passing pathogenic and benign bounds)
     passing_config = make_eval_config(

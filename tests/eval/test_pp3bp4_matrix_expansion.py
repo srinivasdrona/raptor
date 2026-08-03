@@ -847,4 +847,3 @@ def test_t20_source_id_rule():
             if avail.get("status") == "confirm_pending":
                 assert len(avail.get("source_ids", [])) == 0, f"'{cid}' structured_score_availability has non-empty source_ids"
 
-
