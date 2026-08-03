@@ -212,6 +212,20 @@ runtime_api:
 
 acquisition_adapter:
   path: scripts/build_atlas_raw_identity_map.py
+  public_api: >-
+    build_identity_map(raw_inventory_path, pack_path, external_output_root,
+    tracked_lock_output, email, api_key=None, *, transport=None,
+    now_utc=None, sleep=None) -> tuple[Path, Path]. Tests inject transport,
+    clock and sleep; production defaults use the bounded NCBI transport.
+  transport_protocol: >-
+    get_json(endpoint: str, params: Mapping[str, str]) -> tuple[int, bytes].
+    The adapter interprets only HTTP 200 plus valid E-utilities JSON as a
+    response. Any exception, non-200 status, malformed body, or E-utilities
+    error aborts the complete acquisition and publishes nothing.
+  exclusive_publication_seam: >-
+    _publish_exclusive(staged_path: Path, final_path: Path) creates the final
+    path without overwrite. A competing path is preserved byte-for-byte and
+    the build fails closed with no lock publication.
   inputs:
     - --raw-inventory
     - --pack
