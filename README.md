@@ -33,7 +33,7 @@ Public progress posts:
 | Mechanism Atlas source catalog | Five resolver-verified grounding sources plus seven mechanically non-grounding leads; public identifiers, licences and hashes are committed |
 | `$TSC2$` `$p.\mathrm{Arg611Gln}$` deterministic pass | Two exact spans passed Gates 1–7; Gate 8 blocked for missing named review; zero accepted claims |
 | Six-variant gate-smoke cohort | 6/6 technical packages passed Gates 1–7 and blocked only at Gate 8; zero accepted claims; explicitly **not** the formal contrast panel |
-| Formal Atlas contrast panel | **Not run** — the 35-entry candidate universe is hash-locked, but assay observations must be locked before protocol-driven selection |
+| Formal Atlas contrast panel | **Not run** — enriched universe v2 now locks 37 observations across 32 of 35 records; selector execution awaits a registration amendment binding lock v2 |
 
 v3 is a post-hoc semantic correction of the frozen R2 aggregate: it separates
 run integrity, data sufficiency, conditional performance, policy parity and

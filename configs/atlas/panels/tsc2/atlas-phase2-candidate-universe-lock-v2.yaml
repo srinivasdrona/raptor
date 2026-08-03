@@ -1,0 +1,43 @@
+schema: atlas.candidate_universe_lock.v1
+lock_id: tsc2-phase2-candidate-universe-lock
+lock_version: '2'
+universe_id: tsc2-phase2-contrast-panel-candidate-universe
+universe_version: '2'
+created_at: '2026-08-03T10:23:40Z'
+created_by_role: candidate_universe_custodian
+protocol_version: 1.0.2
+protocol_doc_hash: 685319b54d52183f44e6f98605b0a6d00a1348b8fc055c69b54d334872385efc
+registration_content_hash: 82261ab52ade28f35db35cfe569a6bbcb70b8bac24c46159352d40ce03bbe37e
+universe_content_hash: eba2708fb09f58dd1b237c33feedc70241a1a312cbb62380167e12c9a70c3c7e
+universe_content_hash_algorithm: atlas.candidate_universe_content_hash.v1
+raw_inventory:
+  path: discovery_inventory.raw.yaml
+  content_hash: fee39ffa9c826b6e0ccb85ad583b09c2f81794036b115d91a91eab521365befb
+  content_hash_algorithm: atlas.raw_inventory_hash.v1
+  record_count: 35
+  normalized_byte_length: 6062
+  captured_at: '2026-08-02T19:25:56Z'
+normalization_ledger:
+  hash: 7c1e94938980199d7048f80c3a2f98058883cdb9de918e99fbbca2f707f6c834
+  hash_algorithm: atlas.normalization_ledger_hash.v1
+  row_count: 35
+discovery_set_commitment:
+  hash: 0e33cebb4521b5ce94f592c73a508ee9cec0741cb5f1fa3c4de615a0de552c49
+  hash_algorithm: atlas.discovery_set_commitment.v1
+  count: 35
+  committed_at: '2026-08-02T19:25:56Z'
+pack_binding:
+  pack_id: tsc2
+  pack_version: 1.0.0-phase1
+  pack_content_hash: 1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927
+storage_location: external_content_root
+completeness_attestation_ref:
+  location: candidate_universe.yaml#completeness_attestation
+  attesting_role: candidate_universe_custodian
+  attested_at: '2026-08-03T10:23:40Z'
+predecessor_lock_ref:
+  lock_version: '1'
+  path: configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v1.yaml
+  note: 'Superseded, not replaced: lock v1 remains tracked, unchanged and valid for
+    universe_version 1. This lock covers only universe_version 2 (evidence-enriched).'
+lock_content_hash: 014dedb3ec5006d0faecbf69b64a7676bcb3e256aa162758c33357c7eb805dfa

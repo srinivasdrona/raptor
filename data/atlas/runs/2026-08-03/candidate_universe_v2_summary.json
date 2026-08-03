@@ -1,0 +1,47 @@
+{
+  "schema": "raptor.atlas_public_candidate_universe_summary.v1",
+  "universe_id": "tsc2-phase2-contrast-panel-candidate-universe",
+  "universe_version": "2",
+  "generated_at": "2026-08-03T10:23:40Z",
+  "protocol_version": "1.0.2",
+  "protocol_doc_hash": "685319b54d52183f44e6f98605b0a6d00a1348b8fc055c69b54d334872385efc",
+  "pack_content_hash": "1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927",
+  "universe_content_hash": "eba2708fb09f58dd1b237c33feedc70241a1a312cbb62380167e12c9a70c3c7e",
+  "lock_content_hash": "014dedb3ec5006d0faecbf69b64a7676bcb3e256aa162758c33357c7eb805dfa",
+  "raw_inventory_content_hash": "fee39ffa9c826b6e0ccb85ad583b09c2f81794036b115d91a91eab521365befb",
+  "normalization_ledger_hash": "7c1e94938980199d7048f80c3a2f98058883cdb9de918e99fbbca2f707f6c834",
+  "discovery_set_hash": "0e33cebb4521b5ce94f592c73a508ee9cec0741cb5f1fa3c4de615a0de552c49",
+  "counts": {
+    "raw_rows": 35,
+    "ledger_rows": 35,
+    "records": 35,
+    "resolved_identities": 28,
+    "unresolved_identities": 7,
+    "missense_hints": 31,
+    "non_missense_hints": 4,
+    "evidence_bearing_records": 32,
+    "evidence_absent_records": 3,
+    "observations": 37
+  },
+  "reported_outcome_buckets": {
+    "near_reference": 15,
+    "intermediate_deviation": 3,
+    "substantial_deviation": 19
+  },
+  "primary_strata": {
+    "S1": 16,
+    "S2": 3,
+    "S3": 12,
+    "S4": 0,
+    "S5": 1,
+    "S6": 3
+  },
+  "support_classes": {
+    "single_low_throughput": 14,
+    "access_blocked": 18,
+    "evidence_absent": 3,
+    "multi_independent": 0
+  },
+  "no_selection_performed": true,
+  "next_gate": "registration_amendment_required_before_formal_selection"
+}

@@ -639,8 +639,10 @@ todos:
     research question, preliminary assets/results, six-month VUS-to-mechanism plan,
     Claude-specific acceleration, Monarch public outputs, limitations, team gaps and
     public-data boundary. Submit by the owner-approved deadline buffer; never project
-    unfinished results or delay core execution to manufacture application claims.'
-  status: in_progress
+    unfinished results or delay core execution to manufacture application claims.
+    Submitted by the owner on 2026-08-03. No private form receipt or owner-entered
+    identifiers are stored in this public repository.'
+  status: done
   depends_on:
   - grant-anthropic-application-evidence-log
   - grant-anthropic-eligibility-data-terms
@@ -873,11 +875,56 @@ todos:
     lock_content_hash fcceb1a8cc09b07378a6882c82a0f7199d4afb54d9d6782135297f3a0ee0178c at
     configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v1.yaml; 28 resolved plus 7
     unresolved(X1) plus 1 X3 anchor-residue exclusion, all hashes independently re-verified in a
-    fresh process against the on-disk artifacts and the live pack hash.'
+    fresh process against the on-disk artifacts and the live pack hash. This v1 artifact is the
+    complete identity-custody lock, but its observation arrays are empty and it is not yet
+    selection-ready; evidence enrichment and a versioned v2 re-lock are tracked separately.'
   status: done
   depends_on:
   - atlas-phase2-panel-protocol-freeze
   created: '2026-08-02'
+- id: atlas-phase2-candidate-universe-enrichment
+  title: Enriching and re-locking the Atlas candidate universe
+  description: 'Track: MECHANISM-ATLAS / PHASE-2. Starting from the immutable 35-row
+    identity-custody universe v1, populate every attributable functional observation needed by
+    the frozen selection protocol: reported outcome bucket, assay kind, model/context,
+    throughput class, normalized source identifiers, dataset/version/program/lab/protocol
+    lineage, access/licence state, span verifiability and attributable bucket basis. Preserve
+    explicit evidence-absent, access-blocked and unresolved states; never infer mechanism from
+    classifications, predictors, residue proximity or availability. Do not rank or select.
+    Publish a versioned external candidate_universe v2 plus a new tracked candidate-free lock
+    record; retain v1 and its lock unchanged for audit. Corrections require a version bump and
+    full hash/conservation/replay verification. Completed 2026-08-03: external v2 universe
+    published at D:\AIProjects\raptor-data\atlas\tsc2-phase2-panel-v2\candidate_universe.yaml
+    (universe_content_hash
+    eba2708fb09f58dd1b237c33feedc70241a1a312cbb62380167e12c9a70c3c7e); raw inventory and
+    normalization ledger remain byte/hash-identical to v1 (35 raw rows, 35 ledger rows, 35
+    records; 28 resolved plus 7 unresolved identities; 31 missense plus 4 non-missense hints,
+    all unchanged). 32 evidence-bearing plus 3 evidence-absent records now carry 37
+    attributable, source-categorical observations (15 near_reference, 3
+    intermediate_deviation, 19 substantial_deviation), each with a declared bucket_basis and no
+    inferred threshold, effect size, score, percentage or free-text mechanism narrative. Strata,
+    lineage and support fields recompute mechanically from primitives (16 S1, 3 S2, 12 S3, 1
+    S5, 3 S6 primary_stratum; 0 multi_independent, 14 single_low_throughput, 18 access_blocked,
+    3 evidence_absent support_class; every lab_lineage_key defaults to unknown, so no
+    cross-source independence is manufactured). New candidate-free tracked lock published at
+    configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v2.yaml (lock_content_hash
+    014dedb3ec5006d0faecbf69b64a7676bcb3e256aa162758c33357c7eb805dfa); v1 universe, v1 lock and
+    both v1 build scripts independently re-hashed unchanged; tests/atlas 64/64 still pass.
+    Provenance correction 2026-08-03: an initial build carried a fabricated future-dated
+    custody timestamp; build_universe_v2.py now captures NOW live from the host UTC clock
+    at build time (single shared value 2026-08-03T10:23:40Z across attested_at/performed_at/
+    created_at/generated_at) and a regression assertion enforces timezone-aware UTC parsing,
+    cross-field agreement, NOW >= predecessor raw_captured_at (2026-08-02T19:25:56Z) and NOW
+    <= a freshly read verifier UTC clock within a documented 5-minute execution-skew
+    tolerance; both hashes above reflect the corrected rebuild and were independently
+    recomputed, with all row/identity/bucket counts unchanged from the prior build. No
+    selection performed; formal selection stays pending a separate registration amendment to
+    repoint at lock v2.'
+  status: done
+  depends_on:
+  - atlas-phase2-candidate-universe-lock
+  - atlas-phase2-open-source-registration
+  created: '2026-08-03'
 - id: atlas-phase2-open-source-registration
   title: Registering permitted open R611Q sources
   description: 'Track: MECHANISM-ATLAS / PHASE-2. Register only lawfully accessible, public,
@@ -953,6 +1000,7 @@ todos:
   depends_on:
   - atlas-phase2-panel-protocol-freeze
   - atlas-phase2-candidate-universe-lock
+  - atlas-phase2-candidate-universe-enrichment
   created: '2026-08-02'
 - id: grant-anthropic-atlas-readiness-fold-in
   title: Folding verified Atlas readiness into the application

@@ -154,12 +154,15 @@ pending `STRATEGY.md` Part II §10 — ADR-0003.)*
   engaged, and zero claims are accepted. A separate, hash-selected six-variant technical
   repeatability cohort also passed Gates 1-7 in all six cases and blocked only at Gate 8,
   with zero accepted claims; it is explicitly not the formal contrast panel or scientific
-  validation. The candidate-free lock commits a 35-entry discovery frame (31 missense
-  alleles; 28 identities resolved, seven unresolved), but the formal selector has not run
-  because assay observations have not yet been locked into that universe. Contradiction,
-  context, gap synthesis, named human review, accepted Atlas profiles, classifications and
-  second-disease support all remain pending. Discovery remains an optional out-of-process
-  aid, never a runtime dependency of the core RAPTOR workflow.
+  validation. Identity-custody universe v1 commits a 35-entry discovery frame (31 missense
+  alleles; 28 identities resolved, seven unresolved). Evidence-enriched universe v2 now
+  carries 37 attributable observations across 32 records (15 near-reference, three
+  intermediate and 19 substantial-deviation source categories), with three explicit
+  evidence-absent records and no manufactured cross-source independence. Its candidate-free
+  lock is committed; formal selection remains pending a registration amendment binding lock
+  v2. Contradiction, context, gap synthesis, named human review, accepted Atlas profiles,
+  classifications and second-disease support all remain pending. Discovery remains an
+  optional out-of-process aid, never a runtime dependency of the core RAPTOR workflow.
 
 ## Source expansion roadmap — ordered and governed
 
