@@ -19,14 +19,14 @@
 #
 schema: atlas.panel_selection_registration.v1
 registration_id: atlas-phase2-panel-selection
-protocol_version: 1.0.2
+protocol_version: 1.0.3
 protocol_path: docs/project/atlas/ATLAS_PHASE2_PANEL_SELECTION_PROTOCOL.md
 protocol_doc_hash_algorithm: atlas.protocol_doc_hash.v1
-protocol_doc_hash: 685319b54d52183f44e6f98605b0a6d00a1348b8fc055c69b54d334872385efc
+protocol_doc_hash: df9b9a33a4343968c20993feaab6622d129118152cd0c90452936c4b5f81cfc0
 registration_content_hash_algorithm: atlas.registration_content_hash.v1
-registration_content_hash: 82261ab52ade28f35db35cfe569a6bbcb70b8bac24c46159352d40ce03bbe37e
-frozen_at: '2026-08-02T23:41:07+05:30'
-frozen_at_utc: '2026-08-02T18:11:07Z'
+registration_content_hash: d79486b3b74f81d87a3d25c10bd1f0eea31ada562a940d632f4a29ef8574b7b2
+frozen_at: '2026-08-03T16:32:57+05:30'
+frozen_at_utc: '2026-08-03T11:02:57Z'
 registrar_role: independent protocol planner (blinded to candidate discovery output)
 registration_class: post_discovery_pre_selection
 is_preregistration: false
@@ -131,13 +131,53 @@ candidate_universe_contract:
   lineage_collapse_algorithm: atlas.source_lineage_collapse.v1
   universe_lock:
     required_before_selection: true
-    path: configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v1.yaml
+    active:
+      path: configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v2.yaml
+      lock_version: '2'
+      universe_id: tsc2-phase2-contrast-panel-candidate-universe
+      universe_version: '2'
+      universe_label: evidence_enriched
+      created_at: '2026-08-03T10:23:40Z'
+      created_by_role: candidate_universe_custodian
+      storage_location: external_content_root
+      lock_content_hash: 014dedb3ec5006d0faecbf69b64a7676bcb3e256aa162758c33357c7eb805dfa
+      universe_content_hash: eba2708fb09f58dd1b237c33feedc70241a1a312cbb62380167e12c9a70c3c7e
+      raw_inventory_content_hash: fee39ffa9c826b6e0ccb85ad583b09c2f81794036b115d91a91eab521365befb
+      raw_inventory_record_count: 35
+      raw_inventory_normalized_byte_length: 6062
+      normalization_ledger_hash: 7c1e94938980199d7048f80c3a2f98058883cdb9de918e99fbbca2f707f6c834
+      normalization_ledger_row_count: 35
+      discovery_set_hash: 0e33cebb4521b5ce94f592c73a508ee9cec0741cb5f1fa3c4de615a0de552c49
+      discovery_set_count: 35
+      pack_binding:
+        pack_id: tsc2
+        pack_version: 1.0.0-phase1
+        pack_content_hash: 1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927
+      bindings_in_force_at_lock_time:
+        protocol_version: 1.0.2
+        protocol_doc_hash: 685319b54d52183f44e6f98605b0a6d00a1348b8fc055c69b54d334872385efc
+        registration_content_hash: 82261ab52ade28f35db35cfe569a6bbcb70b8bac24c46159352d40ce03bbe37e
+      counts_note: >-
+        record_count / row_count / discovery_set_count are aggregate conservation totals copied
+        verbatim from the lock record. They are not a panel, not a result and not evidence; they
+        exist only so the executor can prove nothing was dropped between the raw inventory and
+        the normalized universe.
+    superseded:
+      - path: configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v1.yaml
+        lock_version: '1'
+        universe_version: '1'
+        created_at: '2026-08-02T19:25:56Z'
+        lock_content_hash: fcceb1a8cc09b07378a6882c82a0f7199d4afb54d9d6782135297f3a0ee0178c
+        universe_content_hash: 22b08a99fe56ac5c07798a27b7fc3abf9b6fa60985c99ad8ed4e3250f30e094b
+        disposition: >-
+          Retained tracked and byte-identical for audit. Superseded, not replaced, and never the
+          selection input while universe_version 2 is active.
     schema: atlas.candidate_universe_lock.v1
     content_hash_algorithm: atlas.universe_lock_content_hash.v1
     self_hash_field: lock_content_hash
     tracked_in_repository: true
     candidate_free: true
-    status: not_yet_created
+    status: locked
     created_when: >-
       immediately after normalization completes and before any selection attempt; exactly one
       lock record per universe_version
@@ -150,18 +190,25 @@ candidate_universe_contract:
       - protocol_version / protocol_doc_hash / registration_content_hash in force at lock time
       - universe_id / universe_version / created_at / created_by_role / storage_location
       - lock_content_hash (own non-circular content hash)
+    optional_fields:
+      - predecessor_lock_ref (lock_version / path / note) -- lineage only, never authority to
+        edit, delete or re-hash a superseded lock
     note: >-
-      Declared here as a forward requirement only. Candidate-derived digests are intentionally
-      absent because the universe-lock task follows protocol freeze and no candidate artifact
-      was inspected at freeze time. The candidate data itself may live under the external
-      uncommitted content root; the lock record must be tracked regardless so the commitment is
-      durable. Selection consumes and verifies this record (precondition V5, checks K1-K6) and
-      fails closed on absence, corruption, mismatch or duplication.
-  lock_status: not_yet_locked
+      The executor resolves the lock from universe_lock.active.path, never from a hardcoded
+      path. The candidate data itself lives under the external uncommitted content root; the
+      lock record is tracked regardless so the commitment is durable. Selection consumes and
+      verifies this record (precondition V5, checks K1-K6) and fails closed on absence,
+      corruption, mismatch, duplication, future-dating or an incomplete/unreconcilable
+      lock_protocol_version_delta.
+  lock_status: locked
   lock_status_note: >-
-    Universe, raw-inventory, ledger and discovery-set digests are recorded in the universe lock
-    record when the universe is locked, and re-verified plus copied into every selection run
-    record; they are intentionally absent here.
+    universe_version 2 (evidence-enriched) was locked at 2026-08-03T10:23:40Z under protocol
+    1.0.2. Universe, raw-inventory, ledger and discovery-set digests live in the lock record and
+    are mirrored above so the executor can cross-check the lock it loads; they are re-verified
+    from the live artifacts and copied into every selection run record. The lock legitimately
+    records the protocol and registration digests in force at lock time; that difference from
+    the current 1.0.3 registration is carried by the run-time lock_protocol_version_delta (K5),
+    never by editing the lock.
   completeness_binding: >-
     The normalized universe must bind back to an immutable raw discovery inventory via a
     hash/count pin, a total normalization ledger (one row per raw row), and a pre-selection
@@ -169,6 +216,45 @@ candidate_universe_contract:
     identities are carried as surrogate-keyed records with exclusion X1 and are never
     dropped. Conservation checks U1-U7 -- including full executor replay of normalization and
     pack identity admission from every raw row -- fail closed.
+lock_protocol_version_delta_contract:
+  required_in_every_run: true
+  waives_nothing: >-
+    A delta records an administrative version difference only. It never waives K2 (lock
+    self-hash / registration mirror), K3 (universe, raw-inventory, ledger and discovery-set
+    content), K4 (pack binding) or K6 (per-universe_version uniqueness and non-future
+    created_at), and never changes a rule, seed, predicate, constraint, ladder step or search
+    algorithm.
+  fields:
+    lock_protocol_version: copied verbatim from the active lock record
+    lock_protocol_doc_hash: copied verbatim from the active lock record
+    lock_registration_content_hash: copied verbatim from the active lock record
+    current_protocol_version: this registration's protocol_version
+    current_protocol_doc_hash: the digest verified in V1
+    current_registration_content_hash: the digest recomputed and verified in V2
+    differs: >-
+      boolean; true iff any of the three lock values differs from its current counterpart
+    reconciled_via_amendment_log_versions: >-
+      ordered list of amendment_log versions traversed from the lock's protocol version to the
+      current one; empty list iff differs is false
+  admissibility: >-
+    admissible only if the lock's (protocol_version, protocol_doc_hash,
+    registration_content_hash) triple equals the current values or appears in amendment_log as
+    an entry's own version/digests or as an entry's supersedes_digests; otherwise
+    UNIVERSE_LOCK_PROTOCOL_UNKNOWN and terminate. A missing, partial or free-text delta is
+    UNIVERSE_LOCK_DELTA_INCOMPLETE and terminates the run.
+  expected_delta_for_active_lock:
+    lock_protocol_version: 1.0.2
+    lock_protocol_doc_hash: 685319b54d52183f44e6f98605b0a6d00a1348b8fc055c69b54d334872385efc
+    lock_registration_content_hash: 82261ab52ade28f35db35cfe569a6bbcb70b8bac24c46159352d40ce03bbe37e
+    current_protocol_version: 1.0.3
+    differs: true
+    reconciled_via_amendment_log_versions:
+      - 1.0.3
+    note: >-
+      current_protocol_doc_hash and current_registration_content_hash are intentionally not
+      pre-stated here: the executor must recompute them in V1/V2 from the live files rather than
+      copy an asserted value, and embedding this registration's own digest inside itself would
+      be circular.
 executor_preconditions:
   V1: protocol_doc_hash recomputed and matched
   V2: registration_content_hash recomputed and matched (self-verification)
@@ -178,9 +264,12 @@ executor_preconditions:
     pack_binding_observed_at_freeze.pack_content_hash, the locked universe pack_binding, and the
     universe lock record pack_binding; otherwise PACK_DRIFT and terminate
   V5: >-
-    universe lock record present, self-verifying, and binding the live universe, raw inventory,
-    normalization ledger and discovery-set commitment (K1-K6); otherwise UNIVERSE_LOCK_MISSING /
-    _CORRUPT / _MISMATCH / _INVALID and terminate
+    universe lock record resolved from candidate_universe_contract.universe_lock.active.path,
+    present, self-verifying against both its own lock_content_hash and the active mirror above,
+    and binding the live universe, raw inventory, normalization ledger and discovery-set
+    commitment (K1-K6, including the mandatory lock_protocol_version_delta of K5); otherwise
+    UNIVERSE_LOCK_MISSING / _CORRUPT / _MISMATCH / _INVALID / _PROTOCOL_UNKNOWN /
+    _DELTA_INCOMPLETE and terminate
   V6: >-
     universe conservation checks U1-U7 pass, including the mandatory normalization/admission
     replay RP1-RP7 recomputed from the raw inventory (custodian outcomes are never trusted)
@@ -283,3 +372,53 @@ amendment_log:
       registration_content_hash: 6de6eafbac57c914075004e54ad8d04c4d1d7b96d34d8ca2b27e47c35fb252d2
       note: >-
         v1.0.1 digests, retained for audit. No selection run ever executed under v1.0.1.
+  - version: 1.0.3
+    timestamp: '2026-08-03T16:32:57+05:30'
+    timestamp_utc: '2026-08-03T11:02:57Z'
+    change_class: administrative_binding_repoint
+    reason: >-
+      Third pre-first-run correction, made before any selection run has ever executed. The
+      candidate universe was re-normalized as evidence-enriched universe_version 2 and locked at
+      2026-08-03T10:23:40Z, but this registration and the protocol still hardcoded
+      universe-lock v1 with status not_yet_created / not_yet_locked, so the executor would have
+      failed K1 against a stale path. This amendment (a) repoints
+      candidate_universe_contract.universe_lock to the active v2 lock and records its
+      universe / raw-inventory / ledger / discovery-set / pack digests and counts verbatim from
+      the lock record, retaining lock v1 as superseded-not-replaced; (b) sets lock_status to
+      locked; (c) hardens K5 into an exact eight-field lock_protocol_version_delta object so the
+      difference between the bindings in force at lock time (protocol 1.0.2, registration
+      82261ab5...) and the current bindings is recorded and reconciled at run time instead of
+      being hidden by editing the lock; (d) states explicitly that a delta never waives the
+      content, pack, uniqueness or timestamp checks K2/K3/K4/K6. No lock record was modified;
+      lock v1 and lock v2 remain byte-identical.
+    semantic_preservation_attestation: >-
+      selection_seed, panel_size_rule, attempt schedule, search_parameters, sampling_strata and
+      Omega precedence, eligibility rules E1-E8, coverage C1-C5, diversity D1-D2, source
+      concentration P1-P3, the metadata/evidence firewall, the taxonomy crosswalk, the
+      relaxation ladder R1-R7, the relaxation gate and never_relaxed are unchanged in this
+      amendment. Only administrative bindings, the K5 delta contract and the corresponding
+      executor checklist/run-record fields changed.
+    known_candidate_level_results_at_amendment: true
+    known_results_disclosure: >-
+      TRUE, and stated plainly. Candidate discovery and R611Q gate-smoke work have already run,
+      and a candidate-free aggregate universe summary exists in-repo. The registrar read only
+      aggregate, candidate-free artifacts (the lock record and public summary counts/digests);
+      no candidate identity, no per-candidate finding and no ranking was inspected. Because no
+      selection rule, seed, stratum predicate, constraint, ladder step or search algorithm was
+      changed, this amendment cannot move any candidate into or out of the panel: it only tells
+      the executor which locked universe to read and how to record a version delta. It is
+      therefore an administrative repoint, not an outcome-based panel selection.
+    active_universe_lock_after_amendment:
+      path: configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v2.yaml
+      lock_content_hash: 014dedb3ec5006d0faecbf69b64a7676bcb3e256aa162758c33357c7eb805dfa
+      universe_content_hash: eba2708fb09f58dd1b237c33feedc70241a1a312cbb62380167e12c9a70c3c7e
+    pre_first_run_correction: true
+    first_selection_run_executed: false
+    supersedes_digests:
+      protocol_doc_hash: 685319b54d52183f44e6f98605b0a6d00a1348b8fc055c69b54d334872385efc
+      registration_content_hash: 82261ab52ade28f35db35cfe569a6bbcb70b8bac24c46159352d40ce03bbe37e
+      note: >-
+        v1.0.2 digests, retained for audit. These are exactly the bindings recorded inside
+        universe lock v1 and lock v2, which is why every selection run must carry a
+        lock_protocol_version_delta reconciling them with the current digests. No selection run
+        ever executed under v1.0.2.

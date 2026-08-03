@@ -3,8 +3,8 @@
 | Field | Value |
 |---|---|
 | Status | **REGISTERED / FROZEN — post-discovery, pre-selection** |
-| Protocol version | `1.0.2` (pre-first-run correction of `1.0.1`; no selection run has ever executed) |
-| Freeze timestamp | `2026-08-02T23:41:07+05:30` (`2026-08-02T18:11:07Z`) |
+| Protocol version | `1.0.3` (pre-first-run correction of `1.0.2`; no selection run has ever executed) |
+| Freeze timestamp | `2026-08-03T16:32:57+05:30` (`2026-08-03T11:02:57Z`) |
 | Registration artifact | `docs/project/atlas/atlas-phase2-panel-selection-registration-v1.yaml` |
 | Scope | Selection of the TSC2 missense contrast panel for the bounded Phase 2 Atlas pilot |
 | Governs | Which already-discovered candidates enter the panel, and in what order |
@@ -100,7 +100,7 @@ amendment. Do not improvise.
 |---|---|
 | Raw discovery inventory | `configs/atlas/panels/tsc2/discovery_inventory.raw.yaml` (immutable once captured) |
 | Normalized universe | `configs/atlas/panels/tsc2/candidate_universe.yaml` |
-| Pre-selection universe lock | `configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v1.yaml` (tracked, candidate-free; §4.6) |
+| Pre-selection universe lock | The record named by `candidate_universe_contract.universe_lock.active.path` in the registration artifact — currently `configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v2.yaml` (tracked, candidate-free; §4.6). Locks for superseded `universe_version`s stay tracked and unmodified |
 | Schema id | `atlas.candidate_universe.v1` |
 | Self-hash field | `universe_content_hash` |
 | Universe hash algorithm | `atlas.candidate_universe_content_hash.v1` — identical in construction to `atlas.pack_content_hash.v1`: `yaml.safe_load` the file, validate, strip **only** the top-level `universe_content_hash` key, serialize the remainder as canonical JSON (`sort_keys=True`, `separators=(",",":")`, `ensure_ascii=False`, sequence order preserved), lowercase SHA-256 hex |
@@ -265,7 +265,8 @@ a separate, tracked, candidate-free lock record that must exist **before** selec
 
 | Item | Value |
 |---|---|
-| Path | `configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v1.yaml` |
+| Active lock path | Resolved from the registration artifact's `candidate_universe_contract.universe_lock.active.path`; currently `configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v2.yaml` |
+| Superseded locks | Remain tracked, unmodified and valid for their own `universe_version` (e.g. `…-lock-v1.yaml`). A superseded lock is never the selection input and is never edited to match a newer protocol |
 | Schema id | `atlas.candidate_universe_lock.v1` |
 | Self-hash field | `lock_content_hash` |
 | Hash algorithm | `atlas.universe_lock_content_hash.v1` — `yaml.safe_load`, strip **only** the top-level `lock_content_hash` key, canonical JSON (`sort_keys=True`, `separators=(",",":")`, `ensure_ascii=False`), lowercase SHA-256 hex. Non-circular: the record never contains a digest of itself as input |
@@ -285,19 +286,47 @@ the aggregate counts below, no result of any kind):
 `pack_content_hash`), `storage_location` (`repository` | `external_content_root`),
 `completeness_attestation_ref`, `lock_content_hash`.
 
+**Optional field:** `predecessor_lock_ref` (`lock_version`, `path`, note) — present when this lock
+supersedes an earlier `universe_version`. It documents lineage only; it never authorizes editing,
+deleting or re-hashing the predecessor.
+
+**A lock record is written once and never rewritten.** It legitimately records the protocol and
+registration digests **in force at lock time**; when the protocol is later amended, the difference
+is carried by the run-time delta of `K5`, **never** by editing the lock.
+
 **Executor obligations (precondition `V5`, §17.1):**
 
 | Id | Lock check |
 |---|---|
-| K1 | The lock record exists at the declared path; absence ⇒ `UNIVERSE_LOCK_MISSING`, terminate |
-| K2 | Recomputed `atlas.universe_lock_content_hash.v1` equals its stored `lock_content_hash` ⇒ else `UNIVERSE_LOCK_CORRUPT`, terminate |
+| K1 | The active lock record, resolved from the registration's `universe_lock.active.path`, exists at that path and declares the `universe_version` the registration marks active; absence ⇒ `UNIVERSE_LOCK_MISSING`, terminate |
+| K2 | Recomputed `atlas.universe_lock_content_hash.v1` equals its stored `lock_content_hash`, **and** equals `universe_lock.active.lock_content_hash` in the registration ⇒ else `UNIVERSE_LOCK_CORRUPT`, terminate |
 | K3 | `universe_content_hash`, `raw_inventory.content_hash` + `record_count`, `normalization_ledger.hash` + `row_count`, and `discovery_set_commitment.hash` + `count` in the lock record equal the values recomputed from the live artifacts ⇒ else `UNIVERSE_LOCK_MISMATCH`, terminate |
 | K4 | `pack_binding.pack_content_hash` in the lock record equals the live pack hash and the registration snapshot (§17.1 `V4`) |
-| K5 | The lock's `protocol_doc_hash` / `registration_content_hash` either equal the digests in force, or the run explicitly records a `lock_protocol_version_delta` naming both versions; a delta never waives `K3` |
-| K6 | Exactly one lock record exists for the cited `universe_version`; a second lock record for the same version, or a lock `created_at` later than any selection attempt, ⇒ `UNIVERSE_LOCK_INVALID`, terminate |
+| K5 | The run records a complete `lock_protocol_version_delta` object (§4.6.1) reconciling the lock's `protocol_version` / `protocol_doc_hash` / `registration_content_hash` with the digests verified in `V1`/`V2`. The object is mandatory whether or not the values differ. A delta is admissible only if the lock's triple matches either the current digests or a version recorded in the registration `amendment_log` (as that entry's own digests or its `supersedes_digests`); otherwise ⇒ `UNIVERSE_LOCK_PROTOCOL_UNKNOWN`, terminate. **A delta never waives `K2`, `K3`, `K4` or `K6`** — content, pack, uniqueness and timestamp checks are unconditional |
+| K6 | Exactly one lock record exists for the cited `universe_version`, and its `created_at` is not later than the selection attempt; a duplicate for that version, or a future-dated lock, ⇒ `UNIVERSE_LOCK_INVALID`, terminate. Locks covering *other* `universe_version`s are not duplicates and do not violate uniqueness |
 
 A universe that is not locked is not selectable. There is no "unlocked run", no "provisional run",
 and no override flag.
+
+### 4.6.1 `lock_protocol_version_delta` (exact object, `K5`)
+
+The delta is a fixed eight-field object; every field is mandatory and non-null. Missing, partial or
+free-text deltas ⇒ `UNIVERSE_LOCK_DELTA_INCOMPLETE`, terminate.
+
+| Field | Source |
+|---|---|
+| `lock_protocol_version` | copied verbatim from the active lock record |
+| `lock_protocol_doc_hash` | copied verbatim from the active lock record |
+| `lock_registration_content_hash` | copied verbatim from the active lock record |
+| `current_protocol_version` | this document's version |
+| `current_protocol_doc_hash` | the digest verified in `V1` |
+| `current_registration_content_hash` | the digest recomputed and verified in `V2` (equals the registration's own stored value; nothing is self-referential because the lock pins the *earlier* registration digest) |
+| `differs` | boolean; `true` iff any of the three lock values differs from its current counterpart |
+| `reconciled_via_amendment_log_versions` | the ordered list of registration `amendment_log` versions traversed from the lock's protocol version to the current one; empty list iff `differs == false` |
+
+The delta is a **record of an administrative version difference only**. It never changes an
+eligibility rule, a stratum predicate, the seed, a constraint, the relaxation ladder or the search
+algorithm, and it never licenses proceeding past a failed `K2`/`K3`/`K4`/`K6`.
 
 ### 4.7 Immutability and the no-names rule
 
@@ -759,7 +788,7 @@ as independent replication.
 | V2 | Recomputed `atlas.registration_content_hash.v1` of the registration artifact equals its stored `registration_content_hash` (self-verification; §20.3) |
 | V3 | `selection_seed` used equals the registration artifact's `selection_seed` |
 | V4 | **Pack binding**: `atlas.pack_content_hash.v1` recomputed from the live `configs/atlas/packs/tsc2/pack.yaml` equals **all three** of `pack_binding_observed_at_freeze.pack_content_hash` in the registration artifact, `pack_binding.pack_content_hash` in the locked universe, and `pack_binding.pack_content_hash` in the universe lock record. Any mismatch ⇒ `PACK_DRIFT`, terminate |
-| V5 | **Universe lock**: the §4.6 lock record exists, self-verifies, and binds the live universe, raw inventory, normalization ledger and discovery-set commitment (checks `K1`–`K6`). Absence or mismatch ⇒ `UNIVERSE_LOCK_MISSING` / `UNIVERSE_LOCK_CORRUPT` / `UNIVERSE_LOCK_MISMATCH` / `UNIVERSE_LOCK_INVALID`, terminate |
+| V5 | **Universe lock**: the §4.6 lock record named by the registration's `candidate_universe_contract.universe_lock.active.path` exists, self-verifies against both its own stored `lock_content_hash` and the registration's `universe_lock.active.lock_content_hash`, and binds the live universe, raw inventory, normalization ledger and discovery-set commitment (checks `K1`–`K6`, including the mandatory §4.6.1 `lock_protocol_version_delta`). Absence or mismatch ⇒ `UNIVERSE_LOCK_MISSING` / `UNIVERSE_LOCK_CORRUPT` / `UNIVERSE_LOCK_MISMATCH` / `UNIVERSE_LOCK_INVALID` / `UNIVERSE_LOCK_PROTOCOL_UNKNOWN` / `UNIVERSE_LOCK_DELTA_INCOMPLETE`, terminate |
 | V6 | All §4.5.4 conservation checks `U1`–`U7` pass, including the §4.5.5 normalization/admission replay (`RP1`–`RP7`) |
 
 Every verified digest (`protocol_doc_hash`, `registration_content_hash`, live
@@ -856,7 +885,7 @@ narratives during selection. Selection completes before any source is read.
 | Item | Value |
 |---|---|
 | Path | `data/atlas/tsc2_phase2_panel_selection_run_<YYYY-MM-DD>.json` |
-| Verified digests | `protocol_version`, `verified_protocol_doc_hash`, `verified_registration_content_hash`, `verified_live_pack_content_hash`, `verified_lock_content_hash`, `verified_universe_content_hash`, `verified_raw_inventory_hash` + `record_count`, `verified_normalization_ledger_hash` + `row_count`, `verified_discovery_set_hash` + `discovery_set_count`, `lock_protocol_version_delta` (if any) |
+| Verified digests | `protocol_version`, `verified_protocol_doc_hash`, `verified_registration_content_hash`, `verified_live_pack_content_hash`, `active_universe_lock` (`path`, `lock_version`, `universe_version`), `verified_lock_content_hash`, `verified_universe_content_hash`, `verified_raw_inventory_hash` + `record_count`, `verified_normalization_ledger_hash` + `row_count`, `verified_discovery_set_hash` + `discovery_set_count`, `lock_protocol_version_delta` (the complete eight-field object of §4.6.1 — **always present**, never omitted when `differs == false`) |
 | Replay | `normalization_replay`: replayed row count, per-`normalization_outcome` counts, `RP1`–`RP7` all-pass attestation |
 | Procedure | `selection_seed`, `search_scope: full_eligible_universe`, `search_node_budget`, any proved candidate-subset optimization with its proof id, declared constraint set, `attempt_log` (per `(L, n)`: `SOLUTION` / `INFEASIBLE_COMPLETE` / `UNDETERMINED`), applied `relaxation_step`s, `independence_status`, `terminal_outcome` |
 | Result | `N_target`, `N_selected`, selected members, per-stratum coverage table, auxiliary (secondary) stratum-match table, `spec_taxonomy_coverage`, recomputed lineage groups with `lineage_confidence`, `label_function_discordant` and `stale_label_discordant` counts with the discordant `spec_stratum` × stratum cells named, `unresolved_identity_count`, `X5` access-attrition counts and distribution |
@@ -943,7 +972,14 @@ python -c "import hashlib,json,yaml,pathlib;m=yaml.safe_load(pathlib.Path('docs/
   exists; **MINOR** = added constraint or clarification that cannot change an already-computed
   panel; **PATCH** = editorial, **or any correction made before the first selection run has ever
   executed** (`pre_first_run_correction: true` in the registration record), since no computed panel
-  can be affected. Versions `1.0.1` and `1.0.2` are such pre-first-run corrections of `1.0.0`.
+  can be affected. Versions `1.0.1`, `1.0.2` and `1.0.3` are such pre-first-run corrections of
+  `1.0.0`; each is recorded with `pre_first_run_correction: true` and
+  `first_selection_run_executed: false`.
+* An amendment that only **repoints administrative bindings** — the active universe lock path and
+  its pinned digests, or the reconciliation of a lock written under an earlier protocol version —
+  is a PATCH. It must leave the seed, panel-size rule, eligibility rules, stratum predicates,
+  constraints, relaxation ladder and search algorithm textually and semantically unchanged, and the
+  registration amendment entry must assert that preservation explicitly.
 * **Every** content change to this file requires a new registration record with the new version, a
   new digest, a reason, and a timestamp. A stale digest is fail-closed for the executor (`V1`).
 * A panel already selected under `vN` is never silently re-derived under `vN+1`; a re-run is a new
@@ -959,7 +995,7 @@ python -c "import hashlib,json,yaml,pathlib;m=yaml.safe_load(pathlib.Path('docs/
 2. Recompute §20.3 digest of the registration artifact and compare with its own stored value (`V2`). Mismatch ⇒ stop.
 3. Confirm the seed literal (`V3`). Mismatch ⇒ stop.
 4. Recompute the live pack hash and compare with the registration snapshot, the universe pack binding **and** the lock record (`V4`). Mismatch ⇒ `PACK_DRIFT`, stop.
-5. Load the §4.6 universe lock record, verify its self-hash and every pinned digest/count (`V5`, `K1`–`K6`). Missing, corrupt, mismatched or duplicated ⇒ stop.
+5. Resolve the active §4.6 universe lock record from the registration's `universe_lock.active.path`, verify its self-hash, every pinned digest/count and the mandatory §4.6.1 `lock_protocol_version_delta` (`V5`, `K1`–`K6`). Missing, corrupt, mismatched, duplicated, future-dated, or an incomplete/unreconcilable delta ⇒ stop.
 6. Verify the raw inventory hash/count, ledger hash/bijection, discovery-set commitment and universe hash (`U1`–`U6`), then **replay** normalization and pack admission for every raw row (`U7`, `RP1`–`RP7`). Any disagreement ⇒ `UNIVERSE_CONTRACT_BREACH`, stop.
 7. Recompute `all_matched_strata` / `primary_stratum` (§6) and lineage groups / `support_class` (§7, §14); disagreement with declared values ⇒ stop.
 8. Apply eligibility (§8) over every record, then run the §17.3 schedule with the §17.5 complete search over the **full eligible universe**; relax only after a level is proved `INFEASIBLE_COMPLETE`.
@@ -973,7 +1009,8 @@ python -c "import hashlib,json,yaml,pathlib;m=yaml.safe_load(pathlib.Path('docs/
 ## Related artifacts
 
 * `docs/project/atlas/atlas-phase2-panel-selection-registration-v1.yaml` — freeze/registration record.
-* `configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v1.yaml` — pre-selection universe lock record (§4.6), created by the universe custodian before selection.
+* `configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v2.yaml` — **active** pre-selection universe lock record (§4.6) for `universe_version` 2, created by the universe custodian before selection.
+* `configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v1.yaml` — superseded lock record for `universe_version` 1; retained unmodified for audit, never the selection input.
 * `docs/project/atlas/ATLAS_RUNBOOK.md` — Phase 1/2 operational guide and Phase 2 stop/go gate.
 * `docs/project/specs/mechanism-atlas-starter.yaml` — `panel_selection_contract` (size, spec strata; §10), unchanged by this protocol.
 * `docs/project/specs/atlas-citation-resolver-v1.yaml` — identifier normalization and span binding.

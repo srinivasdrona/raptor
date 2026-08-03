@@ -159,8 +159,9 @@ pending `STRATEGY.md` Part II §10 — ADR-0003.)*
   carries 37 attributable observations across 32 records (15 near-reference, three
   intermediate and 19 substantial-deviation source categories), with three explicit
   evidence-absent records and no manufactured cross-source independence. Its candidate-free
-  lock is committed; formal selection remains pending a registration amendment binding lock
-  v2. Contradiction, context, gap synthesis, named human review, accepted Atlas profiles,
+  lock is committed, and administrative protocol/registration v1.0.3 now binds lock v2 while
+  preserving the original seed and all selection rules. Formal selection is ready but has not
+  run. Contradiction, context, gap synthesis, named human review, accepted Atlas profiles,
   classifications and second-disease support all remain pending. Discovery remains an
   optional out-of-process aid, never a runtime dependency of the core RAPTOR workflow.
 

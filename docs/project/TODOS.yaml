@@ -984,6 +984,9 @@ todos:
     verify the registration digest itself, confirm the recorded seed, fail closed on TSC2 pack
     drift against the registration snapshot, the universe pack binding and the universe lock
     record, verify the pre-selection universe lock record and every digest and count it pins,
+    resolving it from the registration pointer universe_lock.active.path (universe_version 2) and
+    recording the complete eight-field lock_protocol_version_delta that reconciles the
+    protocol/registration bindings in force at lock time with the digests verified now,
     then replay normalization and pack identity admission from every raw inventory row before
     recomputing strata, lineage groups and support class. Run the fixed-size attempt schedule
     with the declared complete deterministic search over the full eligible universe; a
@@ -1001,6 +1004,7 @@ todos:
   - atlas-phase2-panel-protocol-freeze
   - atlas-phase2-candidate-universe-lock
   - atlas-phase2-candidate-universe-enrichment
+  - atlas-phase2-panel-registration-amendment
   created: '2026-08-02'
 - id: grant-anthropic-atlas-readiness-fold-in
   title: Folding verified Atlas readiness into the application
@@ -1066,4 +1070,38 @@ todos:
   status: done
   depends_on:
   - atlas-phase2-r611q-span-pass
+  created: '2026-08-03'
+- id: atlas-phase2-panel-registration-amendment
+  title: Repointing the frozen panel registration at universe lock v2
+  description: 'Track: MECHANISM-ATLAS / PHASE-2 (governance/administrative; asserts no
+    scientific or clinical result and selects no variant). Amend the frozen panel-selection
+    protocol and its registration record, before any formal selection run has ever executed, so
+    the active candidate universe is the evidence-enriched universe_version 2 and the active
+    lock is configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v2.yaml. Replace the
+    hardcoded v1/not_yet_locked bindings with the v2 lock path, status locked and the lock
+    universe/raw-inventory/ledger/discovery-set/pack hashes and counts copied verbatim, keeping
+    lock v1 tracked and byte-identical as superseded-not-replaced. Harden protocol check K5 into
+    an exact eight-field lock_protocol_version_delta object so a run must record the protocol
+    version and doc/registration hashes in force at lock time alongside the digests it verifies
+    now; a delta never waives the content, pack, uniqueness or timestamp checks K2/K3/K4/K6.
+    Preserve the selection seed, panel-size rule, every eligibility, stratum, coverage,
+    diversity, concentration and firewall rule, the relaxation ladder and the full-universe
+    deterministic search exactly as frozen, and perform no selection, ranking or candidate
+    inspection. Completed 2026-08-03: protocol amended to 1.0.3 (protocol_doc_hash
+    df9b9a33a4343968c20993feaab6622d129118152cd0c90452936c4b5f81cfc0, registration_content_hash
+    d79486b3b74f81d87a3d25c10bd1f0eea31ada562a940d632f4a29ef8574b7b2, superseding
+    685319b5.../82261ab5...); registration universe_lock now points at lock v2
+    (lock_content_hash 014dedb3ec5006d0faecbf69b64a7676bcb3e256aa162758c33357c7eb805dfa,
+    universe_content_hash eba2708fb09f58dd1b237c33feedc70241a1a312cbb62380167e12c9a70c3c7e, 35
+    raw rows / 35 ledger rows / 35 discovery-set entries, pack
+    1294478c...) with status locked and lock v1 retained as superseded. Both lock files
+    re-hashed byte-identical and untouched; the seed raptor-atlas-phase2-panel-v1, panel-size
+    rule, strata, eligibility, coverage, diversity, concentration, firewall, ladder and search
+    blocks show zero diff lines. No selection run has executed and no selection artifact
+    exists. Validation: 77 todos import with no drift, DAG acyclic with no dangling
+    dependencies, tests/atlas 64/64 pass, all four digests self-verify.'
+  status: done
+  depends_on:
+  - atlas-phase2-panel-protocol-freeze
+  - atlas-phase2-candidate-universe-enrichment
   created: '2026-08-03'
