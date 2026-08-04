@@ -104,6 +104,50 @@ class AtlasSpanMismatchError(AtlasCatalogError):
     ``exact_quote`` that does not equal the normalized text slice exactly."""
 
 
+class AtlasIdentityMapError(AtlasError):
+    """Base for the offline raw-identity replay mapper subsystem (sibling
+    of :class:`AtlasPackError`/:class:`AtlasCatalogError`). Raised ONLY by
+    ``raptor.atlas.identity_map`` (``load_identity_map``,
+    ``identity_map_content_hash``, ``identity_map_lock_content_hash``,
+    :class:`OfflineRawIdentityMapper`) and by the out-of-process acquisition
+    adapter (``scripts/build_atlas_raw_identity_map.py``); it is not a
+    blanket type for every Atlas failure."""
+
+
+class AtlasIdentityMapSchemaError(AtlasIdentityMapError):
+    """A raw identity map, lock, raw inventory, or replay record failed
+    structural validation: malformed schema/field/type, a missing required
+    field, an invalid enum value, a record/row count mismatch, or a raw
+    identity string that is not a recognized protein-change notation."""
+
+
+class AtlasIdentityMapHashError(AtlasIdentityMapError):
+    """A raw identity map's or lock's declared self-hash, a lock-to-map
+    binding, a pack binding, a raw-inventory binding, a response file hash,
+    a response bundle hash, or an acquisition-tool hash disagrees with the
+    recomputed value. Declared hashes are never trusted."""
+
+
+class AtlasIdentityMapPathError(AtlasIdentityMapError):
+    """A raw identity map or lock artifact path failed safety checks:
+    traversal, symlink/junction escape, drive/UNC/absolute path where a
+    relative one is required, a missing/non-regular file, or an attempted
+    publish over an existing (colliding) path."""
+
+
+class AtlasIdentityMapResponseError(AtlasIdentityMapError):
+    """An official response artifact is not valid UTF-8/JSON, is missing an
+    expected ESearch/ESummary field, or its content does not permit a
+    deterministic consequence/scope classification."""
+
+
+class AtlasIdentityMapAmbiguityError(AtlasIdentityMapError):
+    """A record's independently recomputed resolution classification (or
+    identity/consequence/scope derivation) disagrees with its declared
+    value, or a replay lookup does not exactly match a pinned
+    raw_record_id/raw_identity_string/source_reported_consequence_hint."""
+
+
 # ---------------------------------------------------------------------------
 # Core structural vocabulary (condition-agnostic state enumerations)
 # ---------------------------------------------------------------------------
@@ -592,3 +636,69 @@ class DisMechRecord:
     pack_binding: PackBinding
     claims: tuple[ObservedClaim, ...]
     provenance: Mapping[str, Any]
+
+
+# ---------------------------------------------------------------------------
+# Offline raw-identity replay mapper (RP1-RP7 replay tuple)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, eq=True)
+class RawIdentityReplay:
+    """The full RP1-RP7 replay tuple for one raw identity, independently
+    recomputed from immutable, hash-verified official response bytes by
+    :func:`raptor.atlas.identity_map.load_identity_map`. Never constructed
+    directly from untrusted/declared input -- only by a verified mapper."""
+
+    normalization_outcome: str
+    universe_key: str
+    identity_state: str
+    spdi_canonical: Optional[str]
+    hgvs_c: Optional[str]
+    hgvs_p: Optional[str]
+    transcript_pin: Optional[str]
+    residue_index: Optional[int]
+    codon_index: Optional[int]
+    consequence_class: Optional[str]
+    scope_decision: str
+    exclusion_code: Optional[str]
+
+    def __post_init__(self) -> None:
+        _require(
+            self.identity_state in IDENTITY_STATES,
+            f"RawIdentityReplay.identity_state must be one of {IDENTITY_STATES}, "
+            f"got {self.identity_state!r}",
+        )
+        if self.identity_state == "resolved":
+            _require(
+                self.spdi_canonical is not None and self.hgvs_c is not None,
+                "RawIdentityReplay: a 'resolved' identity_state requires a non-null "
+                "spdi_canonical and hgvs_c",
+            )
+            _require(
+                self.exclusion_code is None,
+                "RawIdentityReplay: a 'resolved' identity_state must not carry an "
+                "exclusion_code",
+            )
+        else:
+            _require(
+                self.spdi_canonical is None and self.hgvs_c is None,
+                "RawIdentityReplay: an 'unresolved' identity_state must not carry a "
+                "spdi_canonical or hgvs_c",
+            )
+
+
+@runtime_checkable
+class RawIdentityMapper(Protocol):
+    """The minimal offline replay interface the Atlas panel selector requires
+    to independently replay a raw discovered identity against the pinned
+    official response bundle. ``runtime_checkable`` so
+    ``isinstance(obj, RawIdentityMapper)`` performs a structural check."""
+
+    def replay(
+        self,
+        raw_record_id: str,
+        raw_identity_string: str,
+        source_reported_consequence_hint: str,
+    ) -> RawIdentityReplay:
+        ...

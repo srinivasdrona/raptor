@@ -18,6 +18,12 @@ from raptor.atlas.model import (
     AtlasExportError,
     AtlasIdentity,
     AtlasIdentityError,
+    AtlasIdentityMapAmbiguityError,
+    AtlasIdentityMapError,
+    AtlasIdentityMapHashError,
+    AtlasIdentityMapPathError,
+    AtlasIdentityMapResponseError,
+    AtlasIdentityMapSchemaError,
     AtlasLeakageError,
     AtlasPackError,
     AtlasProvenanceError,
@@ -40,6 +46,8 @@ from raptor.atlas.model import (
     PackBinding,
     Provenance,
     PromotionContext,
+    RawIdentityMapper,
+    RawIdentityReplay,
     ResolvedCitation,
     RunMetadata,
     SourceRegisterEntry,
@@ -47,6 +55,11 @@ from raptor.atlas.model import (
     VerifiedSpan,
 )
 from raptor.atlas.identity import admit_identity, reconcile_transcript
+from raptor.atlas.identity_map import (
+    identity_map_content_hash,
+    identity_map_lock_content_hash,
+    load_identity_map,
+)
 from raptor.atlas.pack import load_disease_pack, pack_content_hash, validate_disease_pack
 from raptor.atlas.hashing import evidence_core_hash, profile_envelope_hash
 from raptor.atlas.registry import validate_claim_grounding, verify_source
@@ -79,6 +92,12 @@ __all__ = [
     "AtlasExportError",
     "AtlasIdentity",
     "AtlasIdentityError",
+    "AtlasIdentityMapAmbiguityError",
+    "AtlasIdentityMapError",
+    "AtlasIdentityMapHashError",
+    "AtlasIdentityMapPathError",
+    "AtlasIdentityMapResponseError",
+    "AtlasIdentityMapSchemaError",
     "AtlasLeakageError",
     "AtlasPackError",
     "AtlasProvenanceError",
@@ -103,6 +122,8 @@ __all__ = [
     "PackBinding",
     "Provenance",
     "PromotionContext",
+    "RawIdentityMapper",
+    "RawIdentityReplay",
     "ResolvedCitation",
     "RunMetadata",
     "SourceRegisterEntry",
@@ -110,6 +131,9 @@ __all__ = [
     "VerifiedSpan",
     "admit_identity",
     "reconcile_transcript",
+    "identity_map_content_hash",
+    "identity_map_lock_content_hash",
+    "load_identity_map",
     "load_disease_pack",
     "pack_content_hash",
     "validate_disease_pack",
