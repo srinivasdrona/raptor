@@ -38,6 +38,7 @@ import yaml
 from raptor.atlas.identity_map import (
     _classify_record,
     _compute_bundle_hash,
+    _derive_protein_accession,
     _single_allowed_gene,
     _single_assembly_pin,
     _single_pinned_transcript,
@@ -53,6 +54,7 @@ from raptor.atlas.pack import load_disease_pack
 
 SEARCH_ENDPOINT = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 SUMMARY_ENDPOINT = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
+PROTEIN_REFERENCE_ENDPOINT = "https://clinicaltables.nlm.nih.gov/api/variants/v4/search"
 TOOL_NAME = "raptor-atlas-identity-map"
 
 _REQUESTS_PER_SECOND_NO_KEY = 3.0
@@ -60,8 +62,8 @@ _REQUESTS_PER_SECOND_WITH_KEY = 10.0
 _MAX_ATTEMPTS = 3
 _TRANSIENT_HTTP_STATUSES = frozenset({429, 500, 502, 503, 504})
 
-_MAP_SCHEMA_ID = "atlas.raw_identity_map.v1"
-_LOCK_SCHEMA_ID = "atlas.raw_identity_map_lock.v1"
+_MAP_SCHEMA_ID = "atlas.raw_identity_map.v2"
+_LOCK_SCHEMA_ID = "atlas.raw_identity_map_lock.v2"
 _ACQUISITION_TOOL_RELATIVE_PATH = "acquisition-tool.py"
 
 
@@ -121,10 +123,12 @@ def _call_transport(
 ) -> bytes:
     """Call ``transport.get_json`` with bounded retry on transient HTTP
     statuses. Returns the RAW response bytes -- captured before any
-    interpretation -- for a successful (HTTP 200, parseable, non-error)
-    response. Any transport exception, non-200/non-transient status, or
-    malformed/error JSON body is a hard acquisition failure and is NEVER
-    represented as a zero-match result."""
+    interpretation -- for a successful (HTTP 200, parseable JSON) response.
+    Endpoint-specific error/schema validation occurs only after capture:
+    E-utilities returns mappings while NLM Clinical Tables returns a list.
+    Any transport exception, non-200/non-transient status, or malformed JSON
+    body is a hard acquisition failure and is NEVER represented as a
+    zero-match result."""
 
     last_error: Optional[BaseException] = None
     for attempt in range(1, _MAX_ATTEMPTS + 1):
@@ -147,17 +151,13 @@ def _call_transport(
                 raise AtlasIdentityMapResponseError(
                     f"{what}: HTTP 200 body is not valid UTF-8 JSON"
                 ) from exc
-            if not isinstance(payload, dict) or payload.get("error"):
-                raise AtlasIdentityMapResponseError(
-                    f"{what}: E-utilities response reports an error: {payload!r}"
-                )
             return body
 
         if status in _TRANSIENT_HTTP_STATUSES and attempt < _MAX_ATTEMPTS:
             sleep(2.0 ** (attempt - 1))
             continue
 
-        raise AtlasIdentityMapResponseError(f"{what}: HTTP {status} is not a successful E-utilities response")
+        raise AtlasIdentityMapResponseError(f"{what}: HTTP {status} is not a successful JSON response")
 
     raise AtlasIdentityMapResponseError(f"{what}: exhausted retries ({last_error!r})")
 
@@ -167,6 +167,7 @@ def _acquire_row(
     *,
     gene: str,
     transcript: str,
+    protein_accession: str,
     disease_pack: Any,
     responses_root: Path,
     transport: Any,
@@ -203,6 +204,11 @@ def _acquire_row(
     search_path.parent.mkdir(parents=True, exist_ok=True)
     search_path.write_bytes(search_body)
     search_payload = json.loads(search_body.decode("utf-8"))
+    if not isinstance(search_payload, dict) or search_payload.get("error"):
+        raise AtlasIdentityMapResponseError(
+            f"esearch response for raw_record_id {raw_record_id!r} is not a valid "
+            "E-utilities result mapping"
+        )
 
     idlist = search_payload.get("esearchresult", {}).get("idlist")
     if not isinstance(idlist, list):
@@ -228,6 +234,11 @@ def _acquire_row(
         summary_path.parent.mkdir(parents=True, exist_ok=True)
         summary_path.write_bytes(summary_body)
         summary_payload = json.loads(summary_body.decode("utf-8"))
+        if not isinstance(summary_payload, dict) or summary_payload.get("error"):
+            raise AtlasIdentityMapResponseError(
+                f"esummary response for raw_record_id {raw_record_id!r} uid {uid!r} "
+                "is not a valid E-utilities result mapping"
+            )
 
         result = summary_payload.get("result")
         if not isinstance(result, dict) or uid not in result:
@@ -251,12 +262,8 @@ def _acquire_row(
         search_payload=search_payload,
         summary_payloads=summary_payloads,
         disease_pack=disease_pack,
+        protein_accession=protein_accession,
     )
-
-    # hgvs_p has no derivable ground truth in an ESummary response; the
-    # transcript-qualified protein descriptor is a deterministic,
-    # pack-parameterized (never disease-literal) construction.
-    hgvs_p = f"{transcript}:{raw_identity_string}" if derived.identity_state == "resolved" else None
 
     return {
         "raw_record_id": raw_record_id,
@@ -273,7 +280,7 @@ def _acquire_row(
         "identity_state": derived.identity_state,
         "spdi_canonical": derived.spdi_canonical,
         "hgvs_c": derived.hgvs_c,
-        "hgvs_p": hgvs_p,
+        "hgvs_p": derived.hgvs_p,
         "transcript_pin": derived.transcript_pin,
         "residue_index": derived.residue_index,
         "codon_index": derived.codon_index,
@@ -304,6 +311,7 @@ def build_identity_map(
     tracked_lock_output: "str | os.PathLike[str]",
     email: str,
     api_key: Optional[str] = None,
+    map_version: str = "1",
     *,
     transport: Optional[Any] = None,
     now_utc: Optional[Callable[[], datetime]] = None,
@@ -330,6 +338,8 @@ def build_identity_map(
 
     if not isinstance(email, str) or not email.strip():
         raise AtlasIdentityMapSchemaError("build_identity_map requires a nonblank operator email")
+    if not isinstance(map_version, str) or not map_version.strip():
+        raise AtlasIdentityMapSchemaError("build_identity_map requires a nonblank map_version")
 
     # Collision pre-checks happen before any read/network/staging side
     # effect: a competing path must be preserved byte-for-byte.
@@ -380,9 +390,77 @@ def build_identity_map(
             sleep=sleep,
         )
 
+        reference_page_size = 500
+        reference_offset = 0
+        reference_total: Optional[int] = None
+        reference_payloads = []
+        reference_pins = []
+        while reference_total is None or reference_offset < reference_total:
+            reference_params = {
+                "terms": transcript,
+                "sf": "HGVS_c",
+                "df": "VariationID,Name,GeneSymbol,HGVS_c,HGVS_p",
+                "count": str(reference_page_size),
+                "offset": str(reference_offset),
+            }
+            reference_body = _call_transport(
+                transport,
+                PROTEIN_REFERENCE_ENDPOINT,
+                reference_params,
+                sleep=sleep,
+                rate_limiter=rate_limiter,
+                what=f"protein reference page at offset {reference_offset}",
+            )
+            try:
+                reference_payload = json.loads(reference_body.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise AtlasIdentityMapResponseError(
+                    "protein reference response is not valid UTF-8 JSON"
+                ) from exc
+            if (
+                not isinstance(reference_payload, list)
+                or len(reference_payload) < 4
+                or not isinstance(reference_payload[0], int)
+                or not isinstance(reference_payload[1], list)
+                or not isinstance(reference_payload[3], list)
+            ):
+                raise AtlasIdentityMapResponseError(
+                    "protein reference response has an unexpected Clinical Tables shape"
+                )
+            if reference_total is None:
+                reference_total = reference_payload[0]
+                if reference_total > 7500:
+                    raise AtlasIdentityMapResponseError(
+                        f"protein reference result count {reference_total} exceeds the "
+                        "Clinical Tables pagination limit"
+                    )
+            elif reference_payload[0] != reference_total:
+                raise AtlasIdentityMapResponseError(
+                    "protein reference pages disagree on total_count"
+                )
+            reference_relative = f"reference/protein-{reference_offset:05d}.json"
+            reference_path = responses_root / reference_relative
+            reference_path.parent.mkdir(parents=True, exist_ok=True)
+            reference_path.write_bytes(reference_body)
+            reference_payloads.append(reference_payload)
+            reference_pins.append(
+                {
+                    "offset": reference_offset,
+                    "count": reference_page_size,
+                    "relative_path": reference_relative,
+                    "sha256": hashlib.sha256(reference_body).hexdigest(),
+                    "byte_length": len(reference_body),
+                }
+            )
+            reference_offset += reference_page_size
+        protein_accession = _derive_protein_accession(
+            reference_payloads, genes={gene}, transcript=transcript
+        )
+
         records = [
             _acquire_row(
-                row, gene=gene, transcript=transcript, disease_pack=disease_pack,
+                row, gene=gene, transcript=transcript, protein_accession=protein_accession,
+                disease_pack=disease_pack,
                 responses_root=responses_root, transport=transport, email=email, api_key=api_key,
                 rate_limiter=rate_limiter, sleep=sleep,
             )
@@ -402,16 +480,20 @@ def build_identity_map(
             "pack_content_hash": disease_pack.pack_content_hash,
         }
         reference_binding = {
-            "provider": "NCBI",
-            "database": "clinvar",
+            "provider": "NCBI/NLM",
+            "database": "clinvar+clinicaltables",
             "transcript": transcript,
+            "protein": protein_accession,
             "assembly": _single_assembly_pin(disease_pack),
+            "protein_reference_total_count": reference_total,
+            "protein_reference_page_size": reference_page_size,
+            "protein_reference_response_pins": reference_pins,
         }
 
         manifest = {
             "schema": _MAP_SCHEMA_ID,
             "map_id": f"atlas-raw-identity-map-{disease_pack.pack_id}",
-            "map_version": "1",
+            "map_version": map_version,
             "map_content_hash": "0" * 64,
             "created_at": created_at,
             "pack_binding": pack_binding,
@@ -437,7 +519,7 @@ def build_identity_map(
         lock = {
             "schema": _LOCK_SCHEMA_ID,
             "lock_id": f"atlas-raw-identity-map-lock-{disease_pack.pack_id}",
-            "lock_version": "1",
+            "lock_version": map_version,
             "created_at": created_at,
             "map_id": manifest["map_id"],
             "map_version": manifest["map_version"],
@@ -505,6 +587,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--email", required=True, help="operator email for the NCBI E-utilities tool/email params")
     parser.add_argument("--api-key", default=None, help="optional NCBI API key (raises the rate limit)")
+    parser.add_argument("--map-version", default="1", help="version for the map and lock artifacts")
     return parser
 
 
@@ -517,6 +600,7 @@ def main(argv: Optional[list] = None) -> int:
         args.tracked_lock_output,
         args.email,
         args.api_key,
+        args.map_version,
     )
     print(f"Published raw identity map: {map_path}")
     print(f"Published tracked lock: {lock_path}")

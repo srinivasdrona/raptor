@@ -1,8 +1,8 @@
 """Offline raw-identity replay mapper for Atlas panel selection.
 
 Loads, hash-verifies, and deep-freezes an externally acquired
-``atlas.raw_identity_map.v1`` manifest plus its candidate-free
-``atlas.raw_identity_map_lock.v1`` lock, cross-verifies both against the
+``atlas.raw_identity_map.v2`` manifest plus its candidate-free
+``atlas.raw_identity_map_lock.v2`` lock, cross-verifies both against the
 raw discovery inventory, the bound disease pack, and the immutable official
 NCBI ClinVar response bundle on disk, and returns an
 :class:`OfflineRawIdentityMapper` that replays the full RP1-RP7 tuple for a
@@ -65,8 +65,8 @@ __all__ = [
 # Schema constants
 # ---------------------------------------------------------------------------
 
-_MAP_SCHEMA_ID = "atlas.raw_identity_map.v1"
-_LOCK_SCHEMA_ID = "atlas.raw_identity_map_lock.v1"
+_MAP_SCHEMA_ID = "atlas.raw_identity_map.v2"
+_LOCK_SCHEMA_ID = "atlas.raw_identity_map_lock.v2"
 
 _SHA256_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
 
@@ -76,7 +76,16 @@ _REQUIRED_MAP_FIELDS = (
     "response_bundle", "acquisition_tool", "records",
 )
 _REQUIRED_PACK_BINDING_FIELDS = ("pack_id", "pack_version", "pack_content_hash")
-_REQUIRED_REFERENCE_BINDING_FIELDS = ("provider", "database", "transcript", "assembly")
+_REQUIRED_REFERENCE_BINDING_FIELDS = (
+    "provider",
+    "database",
+    "transcript",
+    "protein",
+    "assembly",
+    "protein_reference_total_count",
+    "protein_reference_page_size",
+    "protein_reference_response_pins",
+)
 _REQUIRED_RAW_INVENTORY_BINDING_FIELDS = ("path", "sha256", "record_count")
 _REQUIRED_RESPONSE_BUNDLE_FIELDS = ("sha256", "file_count", "byte_count")
 _REQUIRED_ACQUISITION_TOOL_FIELDS = ("relative_path", "sha256")
@@ -98,6 +107,7 @@ _REQUIRED_RECORD_FIELDS = (
     "scope_decision", "exclusion_code",
 )
 _REQUIRED_SUMMARY_PIN_FIELDS = ("uid", "relative_path", "sha256", "byte_length")
+_REQUIRED_REFERENCE_PIN_FIELDS = ("offset", "count", "relative_path", "sha256", "byte_length")
 _REQUIRED_RAW_ROW_FIELDS = ("raw_record_id", "raw_identity_string", "source_reported_consequence_hint")
 
 MATCH_STATE_RESOLVED = "resolved_unique_official_match"
@@ -163,7 +173,7 @@ def _require_exact_keys(value: Mapping[str, Any], expected: tuple[str, ...], *, 
 
 
 def identity_map_content_hash(manifest: Mapping[str, Any]) -> str:
-    """Compute the canonical ``atlas.raw_identity_map.v1`` digest of
+    """Compute the canonical ``atlas.raw_identity_map.v2`` digest of
     ``manifest``, excluding only the top-level ``map_content_hash`` key."""
 
     payload = {key: value for key, value in manifest.items() if key != "map_content_hash"}
@@ -174,7 +184,7 @@ def identity_map_content_hash(manifest: Mapping[str, Any]) -> str:
 
 
 def identity_map_lock_content_hash(manifest: Mapping[str, Any]) -> str:
-    """Compute the canonical ``atlas.raw_identity_map_lock.v1`` digest of
+    """Compute the canonical ``atlas.raw_identity_map_lock.v2`` digest of
     ``manifest``, excluding only the top-level ``lock_content_hash`` key."""
 
     payload = {key: value for key, value in manifest.items() if key != "lock_content_hash"}
@@ -424,10 +434,50 @@ def _validate_map_schema(manifest: Any) -> None:
     _require_exact_keys(
         reference_binding, _REQUIRED_REFERENCE_BINDING_FIELDS, what="reference_binding"
     )
-    for field_name in _REQUIRED_REFERENCE_BINDING_FIELDS:
+    for field_name in (
+        "provider",
+        "database",
+        "transcript",
+        "protein",
+        "assembly",
+    ):
         _require_schema(
             _is_nonblank_str(reference_binding[field_name]),
             f"reference_binding.{field_name} must be a nonblank string",
+        )
+    for count_field in ("protein_reference_total_count", "protein_reference_page_size"):
+        _require_schema(
+            _is_int_not_bool(reference_binding[count_field])
+            and reference_binding[count_field] > 0,
+            f"reference_binding.{count_field} must be a positive int",
+        )
+    pins = reference_binding["protein_reference_response_pins"]
+    _require_schema(
+        isinstance(pins, list) and bool(pins),
+        "reference_binding.protein_reference_response_pins must be a nonempty list",
+    )
+    for pin in pins:
+        _require_schema(isinstance(pin, dict), "protein reference pin must be a mapping")
+        _require_exact_keys(pin, _REQUIRED_REFERENCE_PIN_FIELDS, what="protein reference pin")
+        _require_schema(
+            _is_int_not_bool(pin["offset"]) and pin["offset"] >= 0,
+            "protein reference pin offset must be a non-negative int",
+        )
+        _require_schema(
+            _is_int_not_bool(pin["count"]) and pin["count"] > 0,
+            "protein reference pin count must be a positive int",
+        )
+        _require_schema(
+            _is_nonblank_str(pin["relative_path"]),
+            "protein reference pin relative_path must be nonblank",
+        )
+        _require_schema(
+            isinstance(pin["sha256"], str) and bool(_SHA256_HEX_RE.match(pin["sha256"])),
+            "protein reference pin sha256 must be lowercase 64-hex",
+        )
+        _require_schema(
+            _is_int_not_bool(pin["byte_length"]) and pin["byte_length"] >= 0,
+            "protein reference pin byte_length must be non-negative",
         )
 
     raw_inventory_binding = manifest["raw_inventory_binding"]
@@ -757,7 +807,7 @@ class _DerivedRecord:
 
     __slots__ = (
         "match_state", "normalization_outcome", "universe_key", "identity_state",
-        "spdi_canonical", "hgvs_c", "transcript_pin", "residue_index", "codon_index",
+        "spdi_canonical", "hgvs_c", "hgvs_p", "transcript_pin", "residue_index", "codon_index",
         "consequence_class", "scope_decision", "exclusion_code", "search_count", "search_term",
     )
 
@@ -770,6 +820,7 @@ class _DerivedRecord:
         identity_state: str,
         spdi_canonical: Optional[str],
         hgvs_c: Optional[str],
+        hgvs_p: Optional[str],
         transcript_pin: Optional[str],
         residue_index: Optional[int],
         codon_index: Optional[int],
@@ -785,6 +836,7 @@ class _DerivedRecord:
         self.identity_state = identity_state
         self.spdi_canonical = spdi_canonical
         self.hgvs_c = hgvs_c
+        self.hgvs_p = hgvs_p
         self.transcript_pin = transcript_pin
         self.residue_index = residue_index
         self.codon_index = codon_index
@@ -806,6 +858,7 @@ def _unresolved_derived(raw_identity_string: str, search_term: str, count: int, 
         identity_state="unresolved",
         spdi_canonical=None,
         hgvs_c=None,
+        hgvs_p=None,
         transcript_pin=None,
         residue_index=None,
         codon_index=None,
@@ -824,6 +877,7 @@ def _classify_record(
     search_payload: Mapping[str, Any],
     summary_payloads: Mapping[str, Mapping[str, Any]],
     disease_pack: DiseasePack,
+    protein_accession: str,
 ) -> _DerivedRecord:
     """Independently derive the full resolution classification for one raw
     identity from already-parsed, already hash-verified official response
@@ -906,13 +960,8 @@ def _classify_record(
         f"transcript/gene {transcript!r}({gene!r})",
     )
 
-    ref, position, alt = _parse_protein_change(raw_identity_string)
-    _require_verified(
-        title_match.group("protein3") == raw_identity_string[len("p."):],
-        f"esummary title protein change {title_match.group('protein3')!r} for {raw_record_id!r} "
-        f"does not match the queried raw identity string {raw_identity_string!r}",
-    )
-    alias_one_letter = f"{ref}{position}{alt}"
+    raw_ref, raw_position, raw_alt = _parse_protein_change(raw_identity_string)
+    alias_one_letter = f"{raw_ref}{raw_position}{raw_alt}"
 
     protein_change = summary.get("protein_change")
     _require_verified(
@@ -950,6 +999,10 @@ def _classify_record(
     consequence_class, scope_decision = _classify_consequence(summary.get("molecular_consequence_list"))
 
     hgvs_c = f"{transcript}:{title_match.group('hgvs_c')}"
+    hgvs_p = f"{protein_accession}:p.{title_match.group('protein3')}"
+    _current_ref, current_position, _current_alt = _parse_protein_change(
+        "p." + title_match.group("protein3")
+    )
 
     return _DerivedRecord(
         match_state=MATCH_STATE_RESOLVED,
@@ -958,9 +1011,10 @@ def _classify_record(
         identity_state="resolved",
         spdi_canonical=qualifying_spdi,
         hgvs_c=hgvs_c,
+        hgvs_p=hgvs_p,
         transcript_pin=transcript,
-        residue_index=position,
-        codon_index=position,
+        residue_index=current_position,
+        codon_index=current_position,
         consequence_class=consequence_class,
         scope_decision=scope_decision,
         exclusion_code=None,
@@ -979,6 +1033,7 @@ def _verify_record_matches_declared(record: Mapping[str, Any], derived: _Derived
         "identity_state": derived.identity_state,
         "spdi_canonical": derived.spdi_canonical,
         "hgvs_c": derived.hgvs_c,
+        "hgvs_p": derived.hgvs_p,
         "transcript_pin": derived.transcript_pin,
         "residue_index": derived.residue_index,
         "codon_index": derived.codon_index,
@@ -993,23 +1048,6 @@ def _verify_record_matches_declared(record: Mapping[str, Any], derived: _Derived
             f"map record {record.get('raw_record_id')!r} declares {field_name}={declared_value!r} "
             f"but independently recomputes to {expected_value!r}",
         )
-
-    # hgvs_p has no derivable ground truth in an ESummary response; only its
-    # null-ness (resolved <-> non-null, unresolved <-> null) is checked.
-    declared_hgvs_p = record.get("hgvs_p")
-    if derived.identity_state == "resolved":
-        _require_verified(
-            _is_nonblank_str(declared_hgvs_p),
-            f"map record {record.get('raw_record_id')!r} has a resolved identity_state but a "
-            f"null/blank hgvs_p",
-        )
-    else:
-        _require_verified(
-            declared_hgvs_p is None,
-            f"map record {record.get('raw_record_id')!r} has an unresolved identity_state but a "
-            f"non-null hgvs_p {declared_hgvs_p!r}",
-        )
-
 
 # ---------------------------------------------------------------------------
 # Offline mapper
@@ -1107,15 +1145,63 @@ def _verify_pack_binding(declared: Mapping[str, Any], disease_pack: DiseasePack)
         )
 
 
-def _verify_reference_binding(
-    declared: Mapping[str, Any], disease_pack: DiseasePack
-) -> None:
-    pinned_transcripts = {
-        (
-            pin.get("transcript")
-            if isinstance(pin, Mapping)
-            else pin
+def _derive_protein_accession(
+    responses: list[Any], *, genes: set[str], transcript: str
+) -> str:
+    protein_accessions: set[str] = set()
+    totals: set[int] = set()
+    ids_seen: set[str] = set()
+    row_count = 0
+    for response in responses:
+        _require_response(
+            isinstance(response, list)
+            and len(response) >= 4
+            and isinstance(response[0], int)
+            and isinstance(response[1], list)
+            and isinstance(response[3], list)
+            and len(response[1]) == len(response[3]),
+            "protein reference response has an unexpected Clinical Tables shape",
         )
+        totals.add(response[0])
+        for variation_id, row in zip(response[1], response[3]):
+            _require_response(
+                isinstance(variation_id, str)
+                and variation_id not in ids_seen
+                and isinstance(row, list)
+                and len(row) >= 5
+                and row[0] == variation_id,
+                "protein reference response has duplicate or misaligned VariationIDs",
+            )
+            ids_seen.add(variation_id)
+            row_count += 1
+            _variation_id, _name, gene_symbol, hgvs_c, hgvs_p = row[:5]
+            if (
+                gene_symbol in genes
+                and isinstance(hgvs_c, str)
+                and hgvs_c.startswith(transcript + ":")
+                and isinstance(hgvs_p, str)
+                and ":" in hgvs_p
+                and hgvs_p != "-"
+            ):
+                protein_accessions.add(hgvs_p.split(":", 1)[0])
+    _require_response(
+        len(totals) == 1 and row_count == next(iter(totals)),
+        "protein reference pages are incomplete or disagree on total_count",
+    )
+    _require_verified(
+        len(protein_accessions) == 1,
+        "protein reference response does not uniquely identify one protein accession",
+    )
+    return next(iter(protein_accessions))
+
+
+def _verify_reference_binding(
+    declared: Mapping[str, Any],
+    disease_pack: DiseasePack,
+    response_root: Path,
+) -> str:
+    pinned_transcripts = {
+        (pin.get("transcript") if isinstance(pin, Mapping) else pin)
         for pin in disease_pack.transcript_pins
     }
     _require_hash(
@@ -1126,6 +1212,41 @@ def _verify_reference_binding(
         declared.get("assembly") in set(disease_pack.assembly_pins),
         "map reference_binding.assembly is not pinned by the bound disease pack",
     )
+    pins = sorted(
+        declared["protein_reference_response_pins"], key=lambda pin: pin["offset"]
+    )
+    expected_offset = 0
+    responses = []
+    for pin in pins:
+        _require_hash(
+            pin["offset"] == expected_offset
+            and pin["count"] == declared["protein_reference_page_size"],
+            "protein reference response pins are not contiguous fixed-size pages",
+        )
+        response_path = _resolve_response_artifact(response_root, pin["relative_path"])
+        response_bytes = response_path.read_bytes()
+        _require_hash(
+            len(response_bytes) == pin["byte_length"]
+            and hashlib.sha256(response_bytes).hexdigest() == pin["sha256"],
+            "protein reference response page does not match its declared hash/byte length",
+        )
+        responses.append(_parse_json_bytes(response_bytes, what="protein reference response"))
+        expected_offset += pin["count"]
+    protein_accession = _derive_protein_accession(
+        responses,
+        genes=set(disease_pack.allowed_genes),
+        transcript=declared["transcript"],
+    )
+    _require_hash(
+        sum(len(response[1]) for response in responses)
+        == declared["protein_reference_total_count"],
+        "protein reference response pins do not cover the declared total count",
+    )
+    _require_verified(
+        protein_accession == declared["protein"],
+        "protein reference response does not verify the declared protein accession",
+    )
+    return protein_accession
 
 
 def _verify_raw_inventory_binding(
@@ -1214,7 +1335,9 @@ def load_identity_map(
 
     _verify_lock_matches_map(lock, manifest)
     _verify_pack_binding(manifest["pack_binding"], disease_pack)
-    _verify_reference_binding(manifest["reference_binding"], disease_pack)
+    protein_accession = _verify_reference_binding(
+        manifest["reference_binding"], disease_pack, resolved_response_root
+    )
 
     raw_inventory_bytes = resolved_raw_inventory_path.read_bytes()
     raw_inventory_sha256 = hashlib.sha256(raw_inventory_bytes).hexdigest()
@@ -1321,6 +1444,7 @@ def load_identity_map(
             search_payload=search_payload,
             summary_payloads=summary_payloads,
             disease_pack=disease_pack,
+            protein_accession=protein_accession,
         )
         _verify_record_matches_declared(record, derived)
 
@@ -1330,7 +1454,7 @@ def load_identity_map(
             identity_state=derived.identity_state,
             spdi_canonical=derived.spdi_canonical,
             hgvs_c=derived.hgvs_c,
-            hgvs_p=record["hgvs_p"],
+            hgvs_p=derived.hgvs_p,
             transcript_pin=derived.transcript_pin,
             residue_index=derived.residue_index,
             codon_index=derived.codon_index,

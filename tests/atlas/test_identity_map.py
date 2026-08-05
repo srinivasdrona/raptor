@@ -11,6 +11,7 @@ import ast
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -101,6 +102,7 @@ def _write_tree(
     title: str = "SYN_TX001.1(SYNGENE99):c.4A>G (p.Lys2Glu)",
     gene: str = "SYNGENE99",
     assembly: str = "SYNASM1",
+    protein_change: str = "K2E",
     malformed_summary: bool = False,
 ) -> dict:
     root = tmp_path / "responses"
@@ -122,7 +124,7 @@ def _write_tree(
                     "gene_sort": gene,
                     "genes": [{"symbol": gene}],
                     "title": title,
-                    "protein_change": "K2E",
+                    "protein_change": protein_change,
                     "molecular_consequence_list": ["missense variant"],
                     "variation_set": [
                         {
@@ -149,6 +151,25 @@ def _write_tree(
                 "byte_length": len(path.read_bytes()),
             }
         )
+
+    current_cdna = title.split("):", 1)[1].split(" (p.", 1)[0]
+    current_protein = title.split("(p.", 1)[1].rstrip(")")
+    current_residue = int(re.search(r"(\d+)", current_protein).group(1))
+    reference = [
+        1,
+        ["9001"],
+        None,
+        [[
+            "9001",
+            title,
+            gene,
+            "SYN_TX001.1:c.4A>G",
+            f"SYN_PROT001.1:p.{current_protein}",
+        ]],
+    ]
+    reference_path = root / "reference" / "protein.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps(reference), encoding="utf-8")
 
     tool = root / "acquisition-tool.py"
     tool.write_text("# synthetic acquisition tool\n", encoding="utf-8")
@@ -190,18 +211,18 @@ def _write_tree(
         ),
         "identity_state": "resolved" if resolved else "unresolved",
         "spdi_canonical": "SYN_NC001.1:3:A:G" if resolved else None,
-        "hgvs_c": "SYN_TX001.1:c.4A>G" if resolved else None,
-        "hgvs_p": "SYN_PROT001.1:p.Lys2Glu" if resolved else None,
+        "hgvs_c": f"SYN_TX001.1:{current_cdna}" if resolved else None,
+        "hgvs_p": f"SYN_PROT001.1:p.{current_protein}" if resolved else None,
         "transcript_pin": "SYN_TX001.1" if resolved else None,
-        "residue_index": 2 if resolved else None,
-        "codon_index": 2 if resolved else None,
+        "residue_index": current_residue if resolved else None,
+        "codon_index": current_residue if resolved else None,
         "consequence_class": "missense_substitution" if resolved else None,
         "scope_decision": "in_scope" if resolved else "unresolved",
         "exclusion_code": None if resolved else "X1",
     }
     bundle_hash, file_count, byte_count = _bundle_hash(root)
     manifest = {
-        "schema": "atlas.raw_identity_map.v1",
+        "schema": "atlas.raw_identity_map.v2",
         "map_id": "synthetic-map",
         "map_version": "1",
         "map_content_hash": "0" * 64,
@@ -215,7 +236,17 @@ def _write_tree(
             "provider": "SYNTHETIC",
             "database": "synthetic-variants",
             "transcript": "SYN_TX001.1",
+            "protein": "SYN_PROT001.1",
             "assembly": "SYNASM1",
+            "protein_reference_total_count": 1,
+            "protein_reference_page_size": 500,
+            "protein_reference_response_pins": [{
+                "offset": 0,
+                "count": 500,
+                "relative_path": "reference/protein.json",
+                "sha256": hashlib.sha256(reference_path.read_bytes()).hexdigest(),
+                "byte_length": len(reference_path.read_bytes()),
+            }],
         },
         "raw_inventory_binding": {
             "path": raw_inventory.name,
@@ -238,7 +269,7 @@ def _write_tree(
     map_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
 
     lock = {
-        "schema": "atlas.raw_identity_map_lock.v1",
+        "schema": "atlas.raw_identity_map_lock.v2",
         "lock_id": "synthetic-map-lock",
         "lock_version": "1",
         "created_at": "2026-01-01T00:00:00Z",

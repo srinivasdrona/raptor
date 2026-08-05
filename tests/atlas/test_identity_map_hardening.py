@@ -2,15 +2,24 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
+from datetime import datetime, timezone
 
 import pytest
 import yaml
 
 import raptor.atlas.identity_map as identity_map
+from scripts import build_atlas_raw_identity_map as acquisition
 from raptor.atlas.model import AtlasIdentityMapError
-from tests.atlas.test_identity_map import _load, _synthetic_pack, _write_tree
+from raptor.atlas.pack import pack_content_hash
+from tests.atlas.test_identity_map import (
+    _load,
+    _raw_inventory,
+    _synthetic_pack,
+    _write_tree,
+)
 
 
 def _rehash_map(tree: dict) -> None:
@@ -111,6 +120,19 @@ def test_reference_binding_accepts_string_transcript_pins(tmp_path: Path) -> Non
     assert mapper.replay("raw-1", "p.Lys2Glu", "missense_substitution").identity_state == "resolved"
 
 
+def test_legacy_alias_membership_derives_current_protein_hgvs(tmp_path: Path) -> None:
+    tree = _write_tree(
+        tmp_path,
+        title="SYN_TX001.1(SYNGENE99):c.7A>G (p.Lys3Glu)",
+        protein_change="K3E, K2E",
+    )
+    replay = _load(tree).replay("raw-1", "p.Lys2Glu", "missense_substitution")
+    assert replay.hgvs_c == "SYN_TX001.1:c.7A>G"
+    assert replay.hgvs_p == "SYN_PROT001.1:p.Lys3Glu"
+    assert replay.residue_index == 3
+    assert replay.codon_index == 3
+
+
 def test_response_root_rejects_windows_reparse_point(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -157,3 +179,150 @@ def test_bundle_hash_rejects_nested_windows_reparse_point(
     monkeypatch.setattr(Path, "lstat", fake_lstat)
     with pytest.raises(AtlasIdentityMapError):
         identity_map._compute_bundle_hash(root)
+
+
+def test_transport_accepts_clinical_tables_list_json() -> None:
+    class Transport:
+        def get_json(self, endpoint, params):
+            return 200, b"[1, [], null, []]"
+
+    clock = lambda: datetime(2026, 1, 1, tzinfo=timezone.utc)
+    limiter = acquisition._RateLimiter(
+        requests_per_second=3.0, now_utc=clock, sleep=lambda _: None
+    )
+    body = acquisition._call_transport(
+        Transport(),
+        "https://synthetic.invalid",
+        {},
+        sleep=lambda _: None,
+        rate_limiter=limiter,
+        what="synthetic clinical table",
+    )
+    assert body == b"[1, [], null, []]"
+
+
+@pytest.mark.parametrize("wrong_endpoint", ["esearch", "esummary"])
+def test_eutils_wrong_shape_is_typed_response_error(
+    tmp_path: Path, wrong_endpoint: str
+) -> None:
+    class Transport:
+        def get_json(self, endpoint, params):
+            if "esearch" in endpoint:
+                payload = (
+                    []
+                    if wrong_endpoint == "esearch"
+                    else {"esearchresult": {"count": "1", "idlist": ["9001"]}}
+                )
+            else:
+                payload = [] if wrong_endpoint == "esummary" else {}
+            return 200, json.dumps(payload).encode("utf-8")
+
+    clock = lambda: datetime(2026, 1, 1, tzinfo=timezone.utc)
+    limiter = acquisition._RateLimiter(
+        requests_per_second=3.0, now_utc=clock, sleep=lambda _: None
+    )
+    with pytest.raises(AtlasIdentityMapError):
+        acquisition._acquire_row(
+            {
+                "raw_record_id": "raw-1",
+                "raw_identity_string": "p.Lys2Glu",
+                "source_reported_consequence_hint": "missense_substitution",
+            },
+            gene="SYNGENE99",
+            transcript="SYN_TX001.1",
+            protein_accession="SYN_PROT001.1",
+            disease_pack=_synthetic_pack(),
+            responses_root=tmp_path,
+            transport=Transport(),
+            email="operator@example.test",
+            api_key=None,
+            rate_limiter=limiter,
+            sleep=lambda _: None,
+        )
+
+
+def test_injected_transport_builds_complete_map_and_lock(tmp_path: Path) -> None:
+    pack_data = {
+        "schema": "atlas.disease_pack.v1",
+        "pack_id": "synthpack",
+        "pack_version": "1.0.0",
+        "pack_content_hash": "0" * 64,
+        "allowed_genes": ["SYNGENE99"],
+        "assembly_pins": ["SYNASM1"],
+        "transcript_pins": [
+            {"transcript": "SYN_TX001.1", "requires": "synthetic-verification"}
+        ],
+        "reconciliation_policy": {
+            "alias_to_canonical_spdi_only": True,
+            "no_fabrication": True,
+        },
+        "ontology_extensions": {
+            "claim_kinds": [],
+            "node_layers": [],
+            "mechanism_classes": [],
+            "context_vocabularies": {},
+        },
+        "source_register_pins": [],
+        "prohibitions": {},
+        "pilot_eval_metadata": {},
+    }
+    pack_data["pack_content_hash"] = pack_content_hash(pack_data)
+    pack_path = tmp_path / "pack.yaml"
+    pack_path.write_text(yaml.safe_dump(pack_data, sort_keys=False), encoding="utf-8")
+
+    class Transport:
+        def get_json(self, endpoint, params):
+            if "clinicaltables" in endpoint:
+                payload = [
+                    1,
+                    ["9001"],
+                    None,
+                    [[
+                        "9001",
+                        "SYN_TX001.1(SYNGENE99):c.4A>G (p.Lys2Glu)",
+                        "SYNGENE99",
+                        "SYN_TX001.1:c.4A>G",
+                        "SYN_PROT001.1:p.Lys2Glu",
+                    ]],
+                ]
+            elif "esearch" in endpoint:
+                payload = {"esearchresult": {"count": "1", "idlist": ["9001"]}}
+            else:
+                payload = {
+                    "result": {
+                        "uids": ["9001"],
+                        "9001": {
+                            "uid": "9001",
+                            "gene_sort": "SYNGENE99",
+                            "genes": [{"symbol": "SYNGENE99"}],
+                            "title": "SYN_TX001.1(SYNGENE99):c.4A>G (p.Lys2Glu)",
+                            "protein_change": "K2E",
+                            "molecular_consequence_list": ["missense variant"],
+                            "variation_set": [{
+                                "variant_type": "single nucleotide variant",
+                                "canonical_spdi": "SYN_NC001.1:3:A:G",
+                                "variation_loc": [{
+                                    "status": "current",
+                                    "assembly_name": "SYNASM1",
+                                }],
+                            }],
+                        },
+                    }
+                }
+            return 200, json.dumps(payload).encode("utf-8")
+
+    raw = _raw_inventory(tmp_path)
+    out = tmp_path / "out"
+    lock = tmp_path / "lock.yaml"
+    map_path, lock_path = acquisition.build_identity_map(
+        raw,
+        pack_path,
+        out,
+        lock,
+        "operator@example.test",
+        transport=Transport(),
+        now_utc=lambda: datetime(2026, 1, 1, tzinfo=timezone.utc),
+        sleep=lambda _: None,
+    )
+    assert map_path.is_file()
+    assert lock_path.is_file()

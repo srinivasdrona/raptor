@@ -72,7 +72,7 @@ decision_ledger:
     falsifier: Protocol/registration/lock or any selection parameter changes.
 
 official_source_contract:
-  provider: NCBI ClinVar E-utilities
+  provider: NCBI ClinVar E-utilities plus NLM Clinical Tables
   database: clinvar
   tool: raptor-atlas-identity-map
   email: operator-supplied
@@ -87,6 +87,22 @@ official_source_contract:
   summary:
     endpoint: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi
     parameters: {db: clinvar, retmode: json}
+  protein_reference:
+    endpoint: https://clinicaltables.nlm.nih.gov/api/variants/v4/search
+    parameters:
+      terms: '<pinned-transcript>'
+      sf: HGVS_c
+      df: VariationID,Name,GeneSymbol,HGVS_c,HGVS_p
+      count: 500
+      offset: '<0,500,... until total_count rows are captured>'
+    rule: >-
+      Retain every raw page. Require page totals to agree, offsets to be
+      contiguous, returned VariationIDs to be unique, and the retrieved row
+      count to equal total_count. Require at least one row for the pinned gene
+      and transcript with a nonblank protein HGVS. Every qualifying row across
+      all pages must share exactly one protein accession prefix. The unique
+      prefix is stored in reference_binding.protein; disagreement or incomplete
+      pagination fails acquisition.
   success_rule: HTTP 200 plus parseable E-utilities JSON with no error output.
   network_failure_rule: >-
     Timeout, HTTP error, rate limit, malformed JSON, or E-utilities error is an
@@ -103,7 +119,7 @@ external_response_bundle:
   immutability: Any corrected acquisition requires map_version and lock_version bump.
 
 map_schema:
-  id: atlas.raw_identity_map.v1
+  id: atlas.raw_identity_map.v2
   external_path: '<explicit-external-content-root>/raw_identity_map.yaml'
   self_hash_field: map_content_hash
   self_hash_algorithm: >-
@@ -152,8 +168,9 @@ map_schema:
     - exactly one summary response is pinned
     - summary gene_sort and genes symbol identify TSC2
     - protein_change contains the queried alias after deterministic three-to-one conversion
-    - title identifies NM_000548.5(TSC2)
-    - one current GRCh38 variation_loc supplies canonical_spdi on NC_000016.10
+    - title identifies the pinned transcript and current protein change
+    - pinned Clinical Tables reference response supplies one protein accession for the transcript
+    - one current pinned-assembly variation_loc supplies canonical_spdi
     - molecular_consequence_list and variant_type permit deterministic consequence/scope
   unresolved_rule:
     zero: search_count == 0 and successful pinned search response
@@ -162,7 +179,7 @@ map_schema:
     exclusion_code: X1
 
 lock_schema:
-  id: atlas.raw_identity_map_lock.v1
+  id: atlas.raw_identity_map_lock.v2
   tracked_path: configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v1.yaml
   candidate_free: true
   self_hash_field: lock_content_hash
@@ -190,6 +207,15 @@ lock_schema:
   no_identity_rule: >-
     Lock contains no raw identity, HGVS, SPDI, residue, ClinVar UID, query term,
     candidate count beyond aggregate record counts, or selected result.
+  reference_binding_fields:
+    - provider
+    - database
+    - transcript
+    - protein
+    - assembly
+    - protein_reference_total_count
+    - protein_reference_page_size
+    - protein_reference_response_pins
 
 runtime_api:
   model_additions:
@@ -214,7 +240,7 @@ acquisition_adapter:
   path: scripts/build_atlas_raw_identity_map.py
   public_api: >-
     build_identity_map(raw_inventory_path, pack_path, external_output_root,
-    tracked_lock_output, email, api_key=None, *, transport=None,
+    tracked_lock_output, email, api_key=None, map_version="1", *, transport=None,
     now_utc=None, sleep=None) -> tuple[Path, Path]. Tests inject transport,
     clock and sleep; production defaults use the bounded NCBI transport.
   transport_protocol: >-
