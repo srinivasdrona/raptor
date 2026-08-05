@@ -347,6 +347,7 @@ dataclass_contracts:
       note: 'supplied by the caller; E3/section 16.3 input. Never a literal in code or spec.'
     SelectionInputs:
       fields:
+        repo_root: 'pathlib.Path  # explicit tracked-artifact containment root; no default'
         protocol_path: pathlib.Path
         registration_path: pathlib.Path
         pack_path: pathlib.Path
@@ -359,6 +360,9 @@ dataclass_contracts:
         identity_map_response_root: 'pathlib.Path  # external pinned official response bundle root; explicit, no default'
         node_budget_override: 'int | None  # may only LOWER the registration budget; a higher value is an input fault'
       note: >-
+        repo_root is explicit and every tracked protocol/registration/pack/lock
+        path must resolve beneath it. Core never searches parent directories,
+        inspects .git, or reads the process CWD/environment to infer a root.
         universe_lock_path is deliberately ABSENT: the lock is resolved from the
         registration pointer (K1). A caller-supplied lock path would let an
         operator point the run at a stale or hand-made lock. The identity-map
@@ -561,7 +565,7 @@ module_api:
       - 'def registration_content_hash(manifest: Mapping[str, Any]) -> str'
       - 'def universe_lock_content_hash(manifest: Mapping[str, Any]) -> str'
       - 'def candidate_universe_content_hash(manifest: Mapping[str, Any]) -> str'
-      - 'def raw_inventory_hash(rows: Sequence[Mapping[str, Any]]) -> tuple[str, int]   # (hash, normalized_byte_length)'
+      - 'def raw_inventory_hash(path: pathlib.Path) -> tuple[str, int]   # atlas.raw_inventory_hash.v1 over normalized UTF-8 file text'
       - 'def normalization_ledger_hash(rows: Sequence[Mapping[str, Any]]) -> str'
       - 'def discovery_set_commitment(universe_keys: Iterable[str]) -> tuple[int, str]   # (count, hash)'
       - 'def raw_identity_normalized(raw: str) -> str   # NFC, strip, collapse internal whitespace runs; NO case-fold'
