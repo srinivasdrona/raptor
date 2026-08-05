@@ -9,17 +9,18 @@
 # NO candidate count, NO functional result, and it performs NO selection.
 #
 # Authority order for BEHAVIOUR:
-#   1. docs/project/atlas/ATLAS_PHASE2_PANEL_SELECTION_PROTOCOL.md  (v1.0.3)
+#   1. docs/project/atlas/ATLAS_PHASE2_PANEL_SELECTION_PROTOCOL.md  (v1.0.4)
 #   2. docs/project/atlas/atlas-phase2-panel-selection-registration-v1.yaml
-#   3. configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v2.yaml
-#   4. docs/DECISIONS.md (ADR-0014/0015/0016), docs/project/specs/
+#   3. configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v4.yaml
+#   4. configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v4.yaml
+#   5. docs/DECISIONS.md (ADR-0014/0015/0016), docs/project/specs/
 #      mechanism-atlas-starter.yaml, tests/atlas/
 # This spec is subordinate to all of them. Where this spec and the protocol
 # appear to differ, the protocol governs and this spec is defective. Existing
 # code is NOT behaviour authority.
 
 schema: raptor-atlas-panel-selector-v1
-status: planner_contract_rev1_offline_deterministic_selector
+status: planner_contract_rev2_offline_deterministic_selector_identity_map_bound
 task_id: atlas-phase2-panel-selection-run
 title: >-
   RAPTOR Atlas Phase-2 offline deterministic contrast-panel selector
@@ -43,6 +44,63 @@ revision_log:
       no code, no tests, no todo/status edit, no commit, no push, no selection run.
     authors:
       - 'docs/project/specs/atlas-panel-selector-v1.yaml   # this spec (NEW, only file written)'
+  - rev: 2
+    head: 13c0c3ba1f5f0bcefd60c1f92ceb678070026dfb
+    at: '2026-08-05T14:33:47+05:30'
+    at_utc: '2026-08-05T09:03:47Z'
+    trigger: >-
+      Two authorities moved under rev 1. (a) The offline raw identity mapper was
+      specified, implemented and locked as map_version 4
+      (src/raptor/atlas/identity_map.py, configs/atlas/panels/tsc2/
+      atlas-phase2-raw-identity-map-lock-v4.yaml), which resolves rev 1's
+      missing_deterministic_mappers blocker; its shipped API is
+      load_identity_map(...) -> OfflineRawIdentityMapper with
+      RawIdentityMapper.replay(...) -> RawIdentityReplay, NOT the placeholder
+      map(...) -> RawIdentityParse that rev 1 assumed. (b) Protocol v1.0.4 made
+      the verified map a fail-closed precondition (V7 / IM1-IM6), repointed the
+      active universe lock to v4 and pinned the precondition execution order.
+      Rev 2 realigns this spec with both. Selection semantics are untouched:
+      seed, panel size, strata, eligibility, constraints, ladder and the
+      full-universe complete search are unchanged.
+    changes:
+      - behaviour_authority updated to protocol 1.0.4 / registration 5b898002...,
+        universe lock v4, identity-map lock v4
+      - SelectionInputs gains identity_map_path + identity_map_response_root and
+        LOSES the injectable raw_identity_mapper object
+      - RawIdentityMapper protocol replaced with a NON-NORMATIVE sketch of the shipped
+        replay(...) shape; the shipped source is the sole API authority
+      - verification gains verify_identity_map (V7 / IM1-IM6) and the pinned
+        V1,V2,V3,V4,V5,V7,V6 order
+      - typed errors gain AtlasIdentityMapBindingError and four codes
+      - run record gains the identity-map attestation block
+      - test contract gains PS-M-001..008 (synthetic) and PS-I-001..005 (external)
+      - preservation set and RED baseline updated (64 -> 109 Atlas tests)
+    pre_commit_correction:
+      at: '2026-08-05T16:53:52+05:30'
+      at_utc: '2026-08-05T11:23:52Z'
+      trigger: >-
+        Independent review rejected the first uncommitted draft of protocol v1.0.4. Universe lock
+        v3 recorded 1.0.2 lock-time bindings although 1.0.3 was already frozen, so its lock-time
+        claim was false and the drafted K5 chain [1.0.3, 1.0.4] laundered it through the
+        amendment log. A corrected universe lock v4 (parsed-data identical identities and
+        observations, honest 1.0.3 lock-time bindings) replaced it, and v1.0.4 -- never committed,
+        never issued, never bound by a lock or read by a run -- was corrected in place.
+      changes:
+        - active universe lock repointed v3 -> v4 and the recomputed protocol/registration
+          digests re-mirrored
+        - K5 chain expectation for the active lock narrowed to ('1.0.4',) and extended to reject
+          invalid-binding locks and rejected_draft_digests as chain steps or admissibility
+          sources
+        - exact mapper API/loader-signature restatements de-authorized in favour of the shipped
+          source; replay's source_reported_consequence_hint corrected to a REQUIRED str
+        - identity-map lock path documented as registration-resolved at run time, never hardcoded
+        - PS-I-001/002 retargeted to lock v4; PS-I-005 added for the invalid-binding rejection
+      unchanged: >-
+        No selection semantics were touched: seed, panel size, strata, eligibility, constraints,
+        ladder, search, budget, evidence firewall and the no-selection boundary are byte- or
+        semantically identical to the rejected draft.
+    authors:
+      - 'docs/project/specs/atlas-panel-selector-v1.yaml   # this spec (only file written by this rev)'
 
 # ---------------------------------------------------------------------------
 # A. Authority, scope, non-authority
@@ -50,27 +108,54 @@ revision_log:
 authority_and_scope:
   behaviour_authority:
     - path: docs/project/atlas/ATLAS_PHASE2_PANEL_SELECTION_PROTOCOL.md
-      protocol_version: 1.0.3
-      protocol_doc_hash: df9b9a33a4343968c20993feaab6622d129118152cd0c90452936c4b5f81cfc0
+      protocol_version: 1.0.4
+      protocol_doc_hash: 7b0596ab4a52601566c85a3a2c7ca42aead9c35916890397e58b3e11876e5823
       hash_algorithm: atlas.protocol_doc_hash.v1
       role: >-
         Sole source of selection semantics. This spec REFERENCES its rule ids
-        (V1-V6, K1-K6, U1-U7, RP1-RP7, E1-E8, X1-X10, S1-S6, C1-C5, D1-D4,
-        P1-P3, H1-H3, L1-L6, R1-R7, Omega, SEL/NS_*) and never restates,
+        (V1-V7, K1-K6, IM1-IM6, U1-U7, RP1-RP7, E1-E8, X1-X10, S1-S6, C1-C5,
+        D1-D4, P1-P3, H1-H3, L1-L6, R1-R7, Omega, SEL/NS_*) and never restates,
         paraphrases as authority, reorders, or weakens them.
     - path: docs/project/atlas/atlas-phase2-panel-selection-registration-v1.yaml
-      registration_content_hash: d79486b3b74f81d87a3d25c10bd1f0eea31ada562a940d632f4a29ef8574b7b2
+      registration_content_hash: 5b8980024bd88f9f3c7269badf7fc3e709fef4ba135b3575a7513e5d17ad1653
       hash_algorithm: atlas.registration_content_hash.v1
       role: >-
         Machine-loadable parameter authority: selection_seed, panel_size_rule,
         search_parameters, sampling_strata, taxonomy_governance,
         relaxation_ladder, relaxation_gate, never_relaxed,
-        executor_preconditions, pack_binding_observed_at_freeze,
-        candidate_universe_contract (incl. universe_lock.active) and
+        executor_preconditions (incl. V7 and execution_order),
+        pack_binding_observed_at_freeze, candidate_universe_contract (incl.
+        universe_lock.active), identity_map_contract (incl. active + IM1-IM6) and
         lock_protocol_version_delta_contract. The implementation READS these at
         run time; it never hardcodes their values.
-    - path: configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v2.yaml
-      role: active pre-selection universe lock (candidate-free) resolved via the registration pointer.
+    - path: configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v4.yaml
+      role: >-
+        active pre-selection universe lock (candidate-free). Shown for orientation only: the
+        implementation ALWAYS resolves it from
+        registration.candidate_universe_contract.universe_lock.active.path and never from this
+        literal or any other hardcoded string.
+      inadmissible_predecessor_note: >-
+        Universe lock v3 is retained tracked but is an invalid-binding lock (protocol 4.6.2): it
+        recorded 1.0.2 lock-time bindings after 1.0.3 was frozen. It is never active, never a K5
+        predecessor and never a traversed chain step; a run that resolves to it terminates with
+        UNIVERSE_LOCK_PROTOCOL_UNKNOWN.
+    - path: configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v4.yaml
+      role: >-
+        active raw identity map lock (candidate-free), resolved at run time from the
+        registration identity_map_contract.active.path pointer; the path above is orientation
+        only and is never hardcoded. Protocol-independent: it records no protocol version/digest
+        and is NOT subject to K5.
+    - path: docs/project/specs/atlas-raw-identity-mapper-v1.yaml
+      role: >-
+        build/runtime authority for the offline mapper this selector loads. This spec never
+        re-derives identities; it loads and verifies that artifact.
+      non_authority_for_call_shape: >-
+        That spec governs the mapper's BUILD and VERIFICATION semantics, not this selector's call
+        shape. Its rendered signature summary has drifted from the shipped module in the past
+        (e.g. it omits the raw_inventory_path keyword that load_identity_map actually requires),
+        so the implementer MUST read src/raptor/atlas/identity_map.py and
+        src/raptor/atlas/model.py at implementation time for the exact API. Neither that spec nor
+        this one is authority for the signature.
     - path: configs/atlas/packs/tsc2/pack.yaml
       role: bound disease pack; identity admission + ontology authority (ADR-0014).
   supporting_authority:
@@ -188,6 +273,20 @@ typed_errors:
         V6 failure: U1-U7 conservation, RP1-RP7 replay, prohibited universe
         content (protocol section 4.4), strata/lineage/support recompute
         disagreement, or a contradictory recomputed-derivation crosswalk cell.
+    AtlasIdentityMapBindingError:
+      base: AtlasPanelError
+      means: >-
+        V7 failure via IM1-IM6: the active identity-map lock is absent, corrupt,
+        stale-versioned, or does not bind the map manifest, response bundle,
+        acquisition tool, raw inventory, pack or the universe lock's
+        identity_map_binding. This is a SELECTOR-side binding error and is
+        deliberately distinct from raptor.atlas.model.AtlasIdentityMapError,
+        which the mapper loader raises for its own artifact faults; the selector
+        catches the latter and re-raises as this class with the IM check id, so
+        the fail-closed reason stays attributable to a protocol rule.
+      never: >-
+        NEVER downgraded to an unresolved identity, an out_of_scope row, an
+        eligibility failure or a partial result. A mapper fault stops the run.
   error_payload:
     required_attributes:
       code: >-
@@ -198,6 +297,8 @@ typed_errors:
         UNIVERSE_LOCK_MISMATCH, UNIVERSE_LOCK_INVALID,
         UNIVERSE_LOCK_PROTOCOL_UNKNOWN, UNIVERSE_LOCK_DELTA_INCOMPLETE,
         UNIVERSE_CONTRACT_BREACH, REPLAY_MAPPER_UNAVAILABLE,
+        IDENTITY_MAP_LOCK_MISSING, IDENTITY_MAP_LOCK_CORRUPT,
+        IDENTITY_MAP_MISMATCH, IDENTITY_MAP_UNVERIFIED,
         UNSUPPORTED_SEARCH_SCOPE, INPUT_FAULT.
       check_id: 'str | None  # e.g. V4, K5, U3, RP4, E6, L2, C3 -- the exact protocol rule id'
       locus: 'str | None  # record_id / raw_record_id / universe_key / path, whichever localizes the fault'
@@ -205,10 +306,11 @@ typed_errors:
       Messages state the recomputed value and the declared value. They never
       contain a suggested repair, and the implementation never applies one.
   discrimination_requirement: >-
-    Registration/digest, pack-drift, lock, delta and universe-contract failures
-    MUST be distinct catchable subclasses so tests and the checker can assert the
-    exact fail-closed reason. Catching AtlasPanelError must never be sufficient to
-    distinguish a pack drift from a replay breach.
+    Registration/digest, pack-drift, lock, delta, identity-map-binding and
+    universe-contract failures MUST be distinct catchable subclasses so tests and
+    the checker can assert the exact fail-closed reason. Catching AtlasPanelError
+    must never be sufficient to distinguish a pack drift from a replay breach, or
+    an identity-map binding fault from a universe-contract breach.
   outcomes_are_not_errors:
     rule: >-
       SOLUTION / INFEASIBLE_COMPLETE / UNDETERMINED (per attempt) and
@@ -253,12 +355,39 @@ dataclass_contracts:
         anchor: AnchorSpec
         run_started_at: 'datetime  # tz-aware; injected clock, never read inside core'
         executor_identity: str
-        raw_identity_mapper: 'RawIdentityMapper  # injected; no default'
+        identity_map_path: 'pathlib.Path  # external candidate-bearing map manifest; explicit, no default, no env read'
+        identity_map_response_root: 'pathlib.Path  # external pinned official response bundle root; explicit, no default'
         node_budget_override: 'int | None  # may only LOWER the registration budget; a higher value is an input fault'
       note: >-
         universe_lock_path is deliberately ABSENT: the lock is resolved from the
         registration pointer (K1). A caller-supplied lock path would let an
-        operator point the run at a stale or hand-made lock.
+        operator point the run at a stale or hand-made lock. The identity-map
+        LOCK path is absent for exactly the same reason (IM1: resolved from
+        registration identity_map_contract.active.path); only the EXTERNAL,
+        candidate-bearing map manifest and response-bundle roots are caller-supplied,
+        because they must not be tracked and must never be guessed from a default.
+      mapper_injection_prohibition:
+        rule: >-
+          A ready-made RawIdentityMapper OBJECT is NOT an input (rev-1 field
+          raw_identity_mapper is REMOVED). Core constructs the mapper itself
+          inside verify_identity_map by calling
+          raptor.atlas.identity_map.load_identity_map(...) against the
+          registration-resolved lock path and the caller's external map/response
+          paths.
+        rationale: >-
+          An injectable mapper is a hole straight through V7: a caller could pass
+          an object that echoes universe-declared fields, and RP1-RP7 would pass
+          vacuously while proving nothing. Making construction internal means the
+          only way to satisfy the replay is a real, hash-verified, locked map.
+        tradeoff: >-
+          Loses the convenient unit-test injection seam. Accepted: tests build
+          SYNTHETIC map manifests, locks and response bundles under tmp_path (the
+          pattern already used by tests/atlas/test_identity_map.py) rather than
+          stubbing the mapper protocol, which also exercises IM1-IM6 for real.
+        falsifier: >-
+          If SelectionInputs (or any keyword of select_panel) can accept a mapper
+          instance, callable factory, or monkeypatchable module-level default that
+          bypasses load_identity_map, the implementation violates this spec.
     LockProtocolVersionDelta:
       fields:
         lock_protocol_version: str
@@ -339,28 +468,70 @@ dataclass_contracts:
         dispositions: 'tuple[RecordDisposition, ...]  # EVERY universe record'
         flags: 'Mapping[str, object]  # section 18.1 reported flags'
   protocols:
+    api_authority_note: >-
+      DE-AUTHORIZED IN THE REV-2 CORRECTION. The signatures reproduced in this block are a
+      NON-NORMATIVE orientation sketch of already-shipped code. The sole authority for the exact
+      API is the shipped source: src/raptor/atlas/model.py (RawIdentityMapper, RawIdentityReplay)
+      and src/raptor/atlas/identity_map.py (load_identity_map, OfflineRawIdentityMapper). If this
+      sketch and the source disagree, the SOURCE wins and this spec is stale, never the reverse.
+      The implementer MUST read those modules rather than code against the text below, and MUST
+      NOT modify them to match it. Rationale: a rendered signature in a planning document has
+      already drifted once from the shipped keyword set.
     RawIdentityMapper:
+      status: >-
+        SHIPPED in src/raptor/atlas/model.py (rev 2). This spec no longer defines
+        it; it consumes it. The rev-1 placeholder shape
+        'map(raw_identity_string, *, pack) -> RawIdentityParse' NEVER EXISTED and
+        must not be implemented.
       runtime_checkable: true
-      method: 'def map(self, raw_identity_string: str, *, pack: DiseasePack) -> RawIdentityParse'
-      note: 'see missing_deterministic_mappers; there is NO default implementation.'
-    RawIdentityParse:
+      method_sketch: >-
+        NON-NORMATIVE. As shipped, replay takes raw_record_id: str, raw_identity_string: str and
+        source_reported_consequence_hint: str -- the hint is a REQUIRED str, never optional and
+        never None -- and returns RawIdentityReplay. All three arguments are matched against the
+        pinned map record character-for-character; a mismatch on any of them is an
+        AtlasIdentityMapAmbiguityError, so passing None or a normalized/defaulted hint is a fault,
+        not a convenience.
+      construction: >-
+        The only admissible instance is the OfflineRawIdentityMapper returned by
+        raptor.atlas.identity_map.load_identity_map. The selector constructs it internally during
+        V7 and never accepts it as an argument. The loader's exact keyword set (which includes a
+        required raw_inventory_path in the shipped module) is read from the source at
+        implementation time; this spec pins the CALL SITE OBLIGATIONS, not the signature: every
+        path the loader needs is supplied explicitly, none is defaulted, none is read from the
+        environment in core, and the lock path is the registration-resolved one.
+      note: >-
+        The mapper carries no codon table and no reference sequence: every field
+        it returns is read from the pinned official response bundle that IM3
+        re-digests from disk.
+    RawIdentityReplay:
+      status: SHIPPED frozen dataclass in src/raptor/atlas/model.py; fields are authority, not proposals.
       frozen: true
       fields:
-        resolvable: bool
+        normalization_outcome: str
+        universe_key: str
+        identity_state: str
         spdi_canonical: 'str | None'
-        gene: 'str | None'
-        assembly: 'str | None'
-        transcript_pin: 'str | None'
         hgvs_c: 'str | None'
         hgvs_p: 'str | None'
+        transcript_pin: 'str | None'
         residue_index: 'int | None'
         codon_index: 'int | None'
         consequence_class: 'str | None'
-        scope_decision: 'str | None  # in_scope | out_of_scope_consequence | out_of_scope_gene_or_transcript'
-        undecidable_reason: 'str | None'
+        scope_decision: 'str | None'
+        exclusion_code: 'str | None'
+      rp_field_mapping:
+        RP1: normalization_outcome
+        RP2: universe_key
+        RP3: identity_state
+        RP4: 'spdi_canonical + transcript_pin + hgvs_c + hgvs_p + residue_index + codon_index'
+        RP5: 'consequence_class + scope_decision'
+        RP6: exclusion_code
+        RP7: 'ledger bijection -- recomputed by the selector from the full replay set, not a per-row field'
       note: >-
-        A mapper that cannot decide returns resolvable=False with an
-        undecidable_reason; it NEVER guesses a residue, codon or consequence.
+        A mapper that cannot decide returns the unresolved identity_state with its
+        exclusion code; it NEVER guesses a residue, codon or consequence. A mapper
+        that cannot answer AT ALL for a raw row is REPLAY_MAPPER_UNAVAILABLE and
+        stops the run -- it is never recorded as an unresolved identity.
 
 # ---------------------------------------------------------------------------
 # F. Module API
@@ -381,6 +552,7 @@ module_api:
       - AtlasUniverseLockError
       - AtlasLockDeltaError
       - AtlasUniverseContractError
+      - AtlasIdentityMapBindingError
   canonicalization_and_hashing:
     functions:
       - 'def text_norm(text: str) -> str   # atlas.text_norm.v1: CRLF/CR -> LF, NFC, no case-fold, no whitespace collapse'
@@ -433,19 +605,114 @@ module_api:
       - 'def verify_universe_lock(lock, *, registration, universe, raw, ledger_rows, now) -> None  # K2,K3,K4,K6'
       - 'def build_lock_delta(*, lock, registration, verified_protocol_doc_hash, verified_registration_content_hash) -> LockProtocolVersionDelta  # K5'
       - 'def verify_conservation(universe, raw) -> None  # U1-U6'
+      - 'def verify_identity_map(inputs: SelectionInputs, *, registration, lock, live_pack, raw_inventory_path, repo_root) -> IdentityMapAttestation  # V7, IM1-IM6'
       - 'def replay_normalization(raw, universe, *, pack, mapper) -> NormalizationReplay  # U7, RP1-RP7'
-      - 'def verify_preconditions(inputs: SelectionInputs) -> PreconditionReport  # orchestrates V1-V6 in order'
+      - 'def verify_preconditions(inputs: SelectionInputs) -> PreconditionReport  # orchestrates V1-V5, V7, V6 in that order'
     ordering_rule: >-
-      Checks run in protocol order V1, V2, V3, V4, V5 (K1..K6), V6 (U1..U6, U7 ->
-      RP1..RP7) and SHORT-CIRCUIT on the first failure. A later check never
-      "rescues" an earlier one and no check is skipped when an earlier one passes.
+      Checks run in the registration-pinned executor_preconditions.execution_order
+      V1, V2, V3, V4, V5 (K1..K6), V7 (IM1..IM6), V6 (U1..U6, U7 -> RP1..RP7) and
+      SHORT-CIRCUIT on the first failure. The ids are names, not an ordering: V7
+      MUST precede V6 because the RP1-RP7 replay runs through the mapper V7
+      verifies; replaying against an unverified mapper proves nothing. A later
+      check never "rescues" an earlier one and no check is skipped when an earlier
+      one passes.
+    ordering_falsifier: >-
+      If verify_preconditions can reach replay_normalization without
+      verify_identity_map having returned an attestation, the implementation
+      violates this spec.
+    v7_contract:
+      resolution: >-
+        The identity-map LOCK path is resolved from
+        registration.identity_map_contract.active.path relative to repo_root and
+        is NEVER caller-supplied (IM1), exactly as the universe lock is resolved
+        under K1. Only inputs.identity_map_path (external map manifest) and
+        inputs.identity_map_response_root (external response bundle root) come
+        from the caller, because they are untracked by design.
+      construction: >-
+        verify_identity_map constructs the mapper through
+        raptor.atlas.identity_map.load_identity_map, supplying inputs.identity_map_path as the
+        map manifest, inputs.identity_map_response_root as the response-bundle root, the
+        REGISTRATION-RESOLVED active lock path, the live V4-verified pack, and the live raw
+        inventory -- every one explicitly, none defaulted, none from the environment. The exact
+        keyword names are read from the shipped module (see api_authority_note). That loader
+        already recomputes every self-hash, the lock<->map binding, the pack binding, the
+        raw-inventory binding, the acquisition-tool digest, the response-bundle digest, every
+        per-file digest and every per-record classification from disk bytes, with no network and
+        no environment read; the selector does not re-implement it, does not patch it, and does
+        not accept a substitute.
+      selector_side_checks:
+        IM1: >-
+          Lock exists at the registration-resolved path; its declared
+          lock_version/map_version equal registration.identity_map_contract.active;
+          its recomputed lock_content_hash equals both its stored value and the
+          registration mirror. Version mismatch is IDENTITY_MAP_MISMATCH, absence
+          is IDENTITY_MAP_LOCK_MISSING, unparsable/wrong-schema is
+          IDENTITY_MAP_LOCK_CORRUPT.
+        IM2_IM3_IM5: >-
+          Delegated to load_integrity of load_identity_map; any AtlasIdentityMapError
+          it raises is caught and re-raised as AtlasIdentityMapBindingError with the
+          matching IM check_id and code IDENTITY_MAP_MISMATCH (or
+          IDENTITY_MAP_UNVERIFIED when the fault is that verification could not be
+          completed at all). The original exception is chained, never swallowed.
+        IM4: >-
+          Selector additionally asserts the map pack_binding equals the V4-verified
+          live pack hash AND the universe lock pack_binding; and that the map
+          reference_binding assembly/transcript equal the pack's pinned values.
+          The protein accession is accepted only as the loader's uniquely derived
+          value; the selector never supplies, defaults or infers one.
+        IM6: >-
+          Selector compares the universe lock's identity_map_binding field-by-field
+          (schema, map_id, map_version, lock_id, lock_version, map_content_hash,
+          lock_content_hash, response_bundle_hash, map_record_count) with the
+          verified lock. Any difference is IDENTITY_MAP_MISMATCH. If the active
+          universe lock declares universe_version >= 3 and carries NO
+          identity_map_binding, that is also IDENTITY_MAP_MISMATCH, never a waiver.
+      no_repair_rule: >-
+        No mismatch is ever auto-repaired, re-derived, downgraded to a warning, or
+        recorded as a candidate property. verify_identity_map either returns a
+        complete IdentityMapAttestation or raises.
+      IdentityMapAttestation:
+        frozen: true
+        fields:
+          lock_path: pathlib.Path
+          lock_version: str
+          map_version: str
+          lock_content_hash: str
+          map_content_hash: str
+          map_record_count: int
+          response_bundle_hash: str
+          response_file_count: int
+          response_byte_count: int
+          acquisition_tool_sha256: str
+          reference_assembly: str
+          reference_transcript: str
+          reference_protein: str
+          reference_page_count: int
+          checks_passed: 'tuple[str, ...]  # exactly ("IM1","IM2","IM3","IM4","IM5","IM6")'
+          mapper: 'RawIdentityMapper  # the verified instance handed to replay_normalization'
+        note: >-
+          Every scalar above is copied into the run record. The mapper field is the
+          ONLY channel by which a mapper reaches the replay.
     k5_admissibility: >-
       build_lock_delta populates all eight fields, sets differs, and validates
       admissibility against registration.amendment_log: the lock triple must equal
       the current values or appear as an entry version/digest pair or as an
       entry's supersedes_digests. Otherwise AtlasLockDeltaError
-      (UNIVERSE_LOCK_PROTOCOL_UNKNOWN). A delta NEVER short-circuits K2/K3/K4/K6:
-      those run unconditionally and before the delta is built.
+      (UNIVERSE_LOCK_PROTOCOL_UNKNOWN). The reconciliation chain must be COMPLETE
+      and gap-free ascending: every amendment_log version strictly greater than the
+      lock's protocol_version and <= the current protocol_version must appear
+      (for the active lock v4, exactly ('1.0.4',) -- the lock records the 1.0.3 bindings that
+      were genuinely in force at its created_at, so 1.0.4 is the only intervening amendment;
+      naming 1.0.2 or 1.0.3 as a traversed step for THIS lock is wrong, and omitting a genuinely
+      intervening version is UNIVERSE_LOCK_DELTA_INCOMPLETE). A lock flagged
+      invalid_binding in the registration superseded list (protocol 4.6.2) is NEVER admissible
+      and NEVER a chain step, whatever its digests match: a delta records an administrative
+      version difference and can never legitimize a false lock-time record. Digests appearing
+      only under an amendment entry's rejected_draft_digests are likewise inadmissible. A delta
+      NEVER short-circuits K2/K3/K4/K6:
+      those run unconditionally and before the delta is built. K5 applies to the
+      UNIVERSE lock only; the identity-map lock records no protocol version and is
+      verified by V7/IM1-IM6 instead, so no delta is defined or accepted for it.
   recomputation:
     functions:
       - 'def recompute_all_matched_strata(record: Mapping, *, omega: Sequence[str]) -> tuple[str, ...]  # section 6.2, Omega order'
@@ -524,6 +791,30 @@ missing_deterministic_mappers:
     reference sequence, NO codon table and NO protein translation. Therefore a
     general raw-string -> consequence mapper DOES NOT EXIST in this repository and
     cannot be derived from the pinned pack.
+  status_rev2: RESOLVED
+  resolution:
+    at: '2026-08-05T09:03:47Z'
+    artifact: >-
+      The blocker recorded above was resolved out of band by
+      docs/project/specs/atlas-raw-identity-mapper-v1.yaml and its implementation
+      src/raptor/atlas/identity_map.py, which builds the mapping from pinned
+      official public reference responses rather than from a codon table, a
+      translated sequence or residue arithmetic. The resulting map is locked as
+      map_version 4 by the candidate-free
+      configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v4.yaml.
+    consequence_for_this_spec: >-
+      (1) The rev-1 'injection' ruling below is SUPERSEDED: the mapper is no longer
+      an injected object. Core loads and verifies it in V7 from the
+      registration-resolved lock plus caller-supplied external map/response paths
+      (see verification.v7_contract and SelectionInputs.mapper_injection_prohibition).
+      (2) The two speculative admissible_mappers entries below are SUPERSEDED and
+      MUST NOT be implemented; the ONLY admissible mapper is the verified
+      OfflineRawIdentityMapper. (3) do_not_invent, fail_closed_rule,
+      critical_distinction and reporting_obligation are UNCHANGED and still binding.
+    retained_for_audit: >-
+      The rev-1 finding and ruling are kept verbatim so the reasoning that produced
+      the mapper prerequisite stays auditable. Where rev 1 and this resolution
+      differ, the resolution governs.
   ruling:
     do_not_invent: >-
       panel.py MUST NOT contain a codon table, a translation function, a residue
@@ -531,30 +822,42 @@ missing_deterministic_mappers:
       sequence. Inventing one would silently manufacture the very identity facts
       the replay exists to verify.
     injection: >-
-      The mapper is injected as SelectionInputs.raw_identity_mapper implementing
-      RawIdentityMapper. panel.py ships NO default and NO fallback.
+      SUPERSEDED IN REV 2 (see resolution above). Rev 1 said: "The mapper is
+      injected as SelectionInputs.raw_identity_mapper implementing
+      RawIdentityMapper. panel.py ships NO default and NO fallback." Rev 2 keeps
+      the no-default/no-fallback half and REMOVES the injection half: an
+      injectable mapper object is a hole through V7, so core constructs the
+      verified mapper itself via load_identity_map.
     admissible_mappers:
-      - id: canonical_spdi_echo
-        precondition: >-
-          every raw row's raw_identity_string is already a canonical SPDI (or
-          carries one in a declared field), so the mapping is a pure grammar +
-          pack-pin operation via validate_canonical_spdi_shape + admit_identity.
-        note: >-
-          Even then, consequence_class/residue_index/codon_index are only
-          replayable if the raw row itself carries them as immutable captured
-          fields; if it does not, this mapper returns resolvable=True for identity
-          but undecidable for consequence, which is a run-level failure below --
-          NOT a silent pass.
-      - id: pack_extension_mapper
-        precondition: >-
-          a future, separately reviewed pack amendment pins the reference protein
-          for the MANE-Select transcript, making consequence derivation
-          deterministic and auditable.
-        note: out of scope for this task; requires its own spec, ADR and hash repin.
+      rev2_ruling: >-
+        SUPERSEDED. The only admissible mapper is the verified
+        OfflineRawIdentityMapper returned by load_identity_map. The rev1_history
+        entries below are retained as audit history and MUST NOT be implemented.
+      rev1_history:
+        - id: canonical_spdi_echo
+          precondition: >-
+            every raw row's raw_identity_string is already a canonical SPDI (or
+            carries one in a declared field), so the mapping is a pure grammar +
+            pack-pin operation via validate_canonical_spdi_shape + admit_identity.
+          note: >-
+            Even then, consequence_class/residue_index/codon_index are only
+            replayable if the raw row itself carries them as immutable captured
+            fields; if it does not, this mapper returns resolvable=True for identity
+            but undecidable for consequence, which is a run-level failure below --
+            NOT a silent pass.
+        - id: pack_extension_mapper
+          precondition: >-
+            a future, separately reviewed pack amendment pins the reference protein
+            for the MANE-Select transcript, making consequence derivation
+            deterministic and auditable.
+          note: out of scope for this task; requires its own spec, ADR and hash repin.
     fail_closed_rule: >-
-      If the injected mapper cannot decide a field that RP4/RP5 require, the RUN
+      If the VERIFIED mapper cannot decide a field that RP4/RP5 require, the RUN
       fails closed with AtlasUniverseContractError(code=REPLAY_MAPPER_UNAVAILABLE,
-      check_id=RP5) naming the first offending raw_record_id.
+      check_id=RP5) naming the first offending raw_record_id. If the mapper cannot
+      be verified at all, the run fails earlier at V7 with
+      AtlasIdentityMapBindingError; it never degrades into a replay failure and
+      never proceeds with a partial map.
     critical_distinction: >-
       A missing MAPPER is a tool failure, not a candidate property. It must NEVER
       be recorded as identity_state=unresolved (X1) or as out_of_scope. Protocol
@@ -580,7 +883,18 @@ run_record:
       every field of PreconditionReport, including active_universe_lock and the
       complete eight-field lock_protocol_version_delta -- present even when
       differs is false.
-    normalization_replay: 'replayed row count, per-outcome counts, RP1-RP7 attestation.'
+    normalization_replay: >-
+      replayed row count, per-outcome counts, RP1-RP7 attestation, and the
+      identity_map_lock_content_hash the replay ran against (so a run can never be
+      re-attributed to a different mapper after the fact).
+    identity_map: >-
+      every scalar field of IdentityMapAttestation (active lock path,
+      lock_version, map_version, lock_content_hash, map_content_hash,
+      map_record_count, response_bundle_hash, response_file_count,
+      response_byte_count, acquisition_tool_sha256, reference assembly /
+      transcript / derived protein / page count) plus the IM1-IM6 all-pass
+      attestation. The external map and response-root PATHS are recorded; their
+      candidate-bearing CONTENT is never copied into the run record.
     procedure: >-
       selection_seed, search_scope, search_node_budget (and any lowered override),
       declared constraint set, attempt_log (per level and n with status and
@@ -616,12 +930,15 @@ cli_boundary:
   permitted_in_cli:
     - argparse over explicit flags
     - 'optional env read for the external content root (e.g. RAPTOR_ATLAS_CONTENT_ROOT), overridable by flag'
+    - 'resolving --identity-map / --identity-map-response-root (relative to the content root when not absolute) into explicit paths for SelectionInputs'
     - reading the wall clock ONCE to build run_started_at, then injecting it
     - writing the run record and printing a summary
   prohibited_in_cli:
     - any selection logic, constraint evaluation, ordering or tie-breaking
     - any repair, retry, relaxation, budget escalation or fallback path
     - suppressing or reformatting a typed error into a success exit code
+    - 'constructing, stubbing or substituting a RawIdentityMapper: the CLI passes PATHS only, and core loads/verifies the mapper under V7'
+    - 'defaulting the identity-map path: an absent --identity-map is an input fault, never a run without a mapper'
   exit_codes:
     0: 'PANEL_SELECTED, run record written'
     2: 'INFEASIBLE_PANEL or UNDETERMINED_SEARCH_INCOMPLETE -- run record still written'
@@ -748,10 +1065,42 @@ decision_cards:
       - 'A: refactor identity.py/pack.py to share helpers'
       - 'B: add panel.py; extend model.py and __init__.py additively only'
     chosen: B
-    rationale: 'Phase-1 behaviour and the 64 frozen tests must not move; a refactor would put unrelated risk in this change.'
+    rationale: 'Phase-1 behaviour and the 109 frozen tests must not move; a refactor would put unrelated risk in this change.'
     tradeoffs: 'a small amount of hash-helper duplication, covered by the metamorphic equivalence test.'
     inversion: '"harmless" tidying of pack.py that shifts a hash.'
     falsifier: 'PS-X-007 asserts pack/catalog/profile hashes are byte-identical before and after.'
+  - id: DC-11
+    added_in: rev2
+    title: How the verified raw identity mapper reaches the replay
+    options:
+      - 'A: keep rev-1 SelectionInputs.raw_identity_mapper (inject a ready-made mapper object)'
+      - 'B: inject a mapper FACTORY plus paths, so core controls construction but callers control the class'
+      - 'C: core takes only PATHS (external map manifest + response root) and constructs the mapper itself inside V7 via load_identity_map, with the LOCK path resolved from the registration pointer'
+    chosen: C
+    rationale: >-
+      A and B leave a hole straight through V7 and therefore through RP1-RP7: a
+      caller could pass an object that simply echoes the universe's declared
+      fields, and the whole replay would pass while proving nothing. Under C the
+      only way to satisfy the replay is a real, hash-verified, locked map built
+      from pinned official responses, and the lock cannot be redirected by an
+      operator any more than the universe lock can (same reasoning as DC-3).
+    tradeoffs: >-
+      Loses the convenient unit-test injection seam and couples panel.py to
+      raptor.atlas.identity_map. Accepted: tests build synthetic map manifests,
+      locks and response bundles under tmp_path -- the pattern already used by
+      tests/atlas/test_identity_map.py -- which additionally exercises IM1-IM6 for
+      real instead of stubbing them away. The coupling is one-directional and
+      acyclic (panel.py -> identity_map.py -> model.py).
+    inversion: >-
+      A "test-only" mapper keyword, module-level default, or monkeypatchable hook
+      is added back for convenience, and the real run silently accepts a fake
+      mapper.
+    falsifier: >-
+      PS-V-007 asserts SelectionInputs has no mapper field and that select_panel
+      rejects a mapper keyword; a static AST check asserts panel.py has no
+      module-level mapper default; PS-M-009 asserts a missing lock terminates the
+      run rather than degrading it; PS-R-009 asserts the replay compares against
+      the MAP, not the universe.
 
 # ---------------------------------------------------------------------------
 # K. Test contract (Gemini writes these RED, before implementation)
@@ -783,9 +1132,18 @@ test_contract:
       - id: PS-V-004
         asserts: 'live pack hash differing from ANY of the three comparands -> AtlasPanelPackDriftError(PACK_DRIFT, V4); three separate cases.'
       - id: PS-V-005
-        asserts: 'checks short-circuit in order V1..V6; a fixture broken at V2 and V4 reports V2.'
+        asserts: >-
+          checks short-circuit in the registration-pinned order V1,V2,V3,V4,V5,V7,V6;
+          a fixture broken at V2 and V4 reports V2; a fixture broken at V7 and V6
+          (RP) reports V7, proving the mapper is verified BEFORE the replay uses it.
       - id: PS-V-006
         asserts: 'PreconditionReport is produced only when all checks pass; no partial report object is constructible.'
+      - id: PS-V-007
+        asserts: >-
+          SelectionInputs has no raw_identity_mapper field and select_panel accepts
+          no mapper object/factory keyword; constructing SelectionInputs with one
+          raises TypeError. Static AST check: panel.py contains no module-level
+          mapper default and no monkeypatchable mapper hook.
     lock_and_delta:
       - id: PS-K-001
         asserts: 'lock resolved from the registration pointer; SelectionInputs exposes no lock path; a decoy lock elsewhere is ignored.'
@@ -809,6 +1167,82 @@ test_contract:
         asserts: 'lock triple absent from the amendment log -> AtlasLockDeltaError(UNIVERSE_LOCK_PROTOCOL_UNKNOWN, K5).'
       - id: PS-K-011
         asserts: 'ADVERSARIAL -- a valid delta does NOT waive K2/K3/K4/K6: a run with a reconcilable delta and a broken K3 still fails K3.'
+      - id: PS-K-012
+        asserts: >-
+          ADVERSARIAL -- chain completeness: a delta whose
+          reconciled_via_amendment_log_versions skips an intermediate amendment
+          version that lies strictly between the lock version and the current
+          version raises AtlasLockDeltaError(UNIVERSE_LOCK_DELTA_INCOMPLETE, K5),
+          even though every listed version exists in the log and the endpoints are
+          correct.
+      - id: PS-K-013
+        asserts: >-
+          K5 is universe-lock-only: an identity-map lock carrying no protocol
+          version never triggers a delta requirement, and injecting a
+          protocol_version key into the map lock does not make one admissible
+          (still verified by IM1-IM6 alone).
+    identity_map:
+      - id: PS-M-001
+        asserts: >-
+          map lock resolved from registration.identity_map_contract.active.path;
+          SelectionInputs exposes no map-lock path; a decoy lock beside the map is
+          ignored (IM1).
+      - id: PS-M-002
+        asserts: >-
+          absent lock -> AtlasIdentityMapBindingError(IDENTITY_MAP_LOCK_MISSING, IM1);
+          wrong schema id or unparsable YAML -> IDENTITY_MAP_LOCK_CORRUPT(IM1);
+          tampered lock self-hash -> IDENTITY_MAP_LOCK_CORRUPT(IM1); lock hash !=
+          registration mirror -> IDENTITY_MAP_LOCK_CORRUPT(IM1) even when the lock
+          self-verifies.
+      - id: PS-M-003
+        asserts: >-
+          STALE VERSION -- a lock that self-verifies perfectly but declares a
+          map_version/lock_version other than the registration-active one raises
+          IDENTITY_MAP_MISMATCH(IM1). Binding an older map is never a fallback.
+      - id: PS-M-004
+        asserts: >-
+          map manifest self-hash mismatch, or any lock<->map field disagreement
+          (map_id, map_version, map_content_hash, map_record_count,
+          raw_inventory_content_hash, raw_inventory_record_count,
+          response_bundle_hash, response_file_count, response_byte_count,
+          acquisition_tool_sha256) -> IDENTITY_MAP_MISMATCH(IM2); one case per field.
+      - id: PS-M-005
+        asserts: >-
+          response-bundle drift -> IDENTITY_MAP_MISMATCH(IM3): one flipped byte in a
+          single synthetic response file, a missing response file, an extra file,
+          and a modified acquisition-tool file are four separate failing cases. A
+          run must NOT pass when only the aggregate bundle hash is recomputed from
+          a stale manifest instead of from disk.
+      - id: PS-M-006
+        asserts: >-
+          map pack_binding != live pack -> PACK_DRIFT/IDENTITY_MAP_MISMATCH(IM4);
+          reference assembly or transcript differing from the pack pins ->
+          IDENTITY_MAP_MISMATCH(IM4); a protein accession that is asserted rather
+          than uniquely derivable from the complete synthetic reference page set ->
+          failure, never a default.
+      - id: PS-M-007
+        asserts: >-
+          map_record_count != raw record_count, a raw_identity_string differing by
+          one character, or a non-bijective raw<->map mapping ->
+          IDENTITY_MAP_MISMATCH(IM5).
+      - id: PS-M-008
+        asserts: >-
+          IM6 -- a universe lock whose identity_map_binding differs in any field
+          from the verified map lock fails; a universe lock declaring
+          universe_version >= 3 with NO identity_map_binding also fails; neither is
+          waivable by a K5 delta.
+      - id: PS-M-009
+        asserts: >-
+          CRITICAL FALSE-GREEN -- a mapper fault never becomes a candidate property:
+          with the map lock removed, the run raises AtlasIdentityMapBindingError and
+          writes NO run record; the universe records do NOT appear as
+          identity_state=unresolved, are NOT marked out_of_scope, and no
+          INFEASIBLE_PANEL is produced.
+      - id: PS-M-010
+        asserts: >-
+          ORDER -- a fixture that is simultaneously broken at IM2 and at RP4 reports
+          the IM2 failure; replay_normalization is never reached. Assert via a
+          spy/counter that the replay function was not invoked.
     conservation:
       - id: PS-U-001
         asserts: 'raw inventory hash or record_count mismatch -> UNIVERSE_CONTRACT_BREACH(U1).'
@@ -833,6 +1267,14 @@ test_contract:
         asserts: 'any of spdi/hgvs_c/hgvs_p/transcript/residue/codon differing after text_norm -> RP4.'
       - id: PS-R-005
         asserts: 'consequence_class/scope_decision differing, or derived from a custodian assertion rather than raw+pack -> RP5.'
+      - id: PS-R-009
+        asserts: >-
+          CRITICAL FALSE-GREEN -- the replay uses the VERIFIED mapper, never the
+          universe: a synthetic map whose replay tuple deliberately DISAGREES with
+          the universe's declared fields must produce an RP failure naming the
+          offending raw_record_id, proving the executor compared against the map
+          and not merely echoed the universe back to itself. A conforming
+          implementation cannot pass this test by copying declared fields.
       - id: PS-R-006
         asserts: 'ADVERSARIAL -- mapper returns undecidable: raises REPLAY_MAPPER_UNAVAILABLE(RP5); the record is NOT marked X1 and NOT out_of_scope.'
       - id: PS-R-007
@@ -977,10 +1419,47 @@ test_contract:
     file: tests/atlas/test_panel_selection_external.py
     marker: 'pytest.mark.external; SKIPPED by default via an explicit opt-in flag/env checked in the TEST, never in core.'
     scope: >-
-      Verifies only that the real registration, active lock and live pack
-      cross-verify (V1-V5 K1-K6) and that the delta is constructible. It performs
-      NO selection, asserts NO panel, and embeds NO candidate identity or count.
+      Verifies only that the real registration, active universe lock v4, active
+      identity-map lock v4 and live pack cross-verify (V1-V5 K1-K6, V7 IM1-IM6) and
+      that the delta is constructible. It performs NO selection, asserts NO panel,
+      and embeds NO candidate identity or count.
     prohibition: 'this file must never assert a specific panel, a candidate identity, or a universe count.'
+    cases:
+      - id: PS-I-001
+        asserts: >-
+          the tracked registration resolves to universe lock v4 and identity-map
+          lock v4, both self-verify, and the registration mirrors match the lock
+          records field for field. Runs WITHOUT the external map (tracked artifacts
+          only), so it stays runnable in CI.
+      - id: PS-I-002
+        asserts: >-
+          the real K5 delta for lock v4 is constructible and admissible, and its
+          reconciled_via_amendment_log_versions is the complete gap-free chain from
+          the lock-time protocol version to the current one.
+      - id: PS-I-005
+        asserts: >-
+          ADVERSARIAL, tracked artifacts only -- pointing the resolver at universe lock v3 (the
+          invalid-binding record) terminates with UNIVERSE_LOCK_PROTOCOL_UNKNOWN even though its
+          self-hash verifies and its 1.0.2 triple appears in the amendment log, and lock v3 never
+          appears as a chain step for lock v4. Asserts the error and the chain contents only.
+      - id: PS-I-003
+        marker: 'external + requires the external content root'
+        asserts: >-
+          load_identity_map succeeds against the real map, response bundle and lock
+          v4, and the resulting attestation's IM1-IM6 all pass. Asserts hashes and
+          counts only -- never a candidate identity, never a per-record field.
+      - id: PS-I-004
+        marker: 'external + requires the external content root'
+        asserts: >-
+          verify_preconditions completes V1-V5, V7, V6 against the real artifacts
+          and returns a PreconditionReport. It stops there: NO search is run and NO
+          run record is written by any test.
+    real_mapper_guard: >-
+      CRITICAL -- the synthetic suite must not be able to certify a real run. The
+      external cases are the ONLY place the real mapper is exercised, and the
+      stop/go gate requires PS-I-003/PS-I-004 to have passed on the real artifacts
+      before the real run is permitted. Passing PS-M-* with synthetic maps while the
+      real mapper is absent or unverifiable is explicitly NOT sufficient.
 
 # ---------------------------------------------------------------------------
 # L. Implementation files, allowlist, preservation set
@@ -994,7 +1473,7 @@ implementation_contract:
       change: 'ADDITIVE ONLY -- new frozen types and the AtlasPanelError family'
       forbidden: 'no edit to any existing class, field, docstring semantics or error base'
     - path: src/raptor/atlas/__init__.py
-      change: 'ADDITIVE ONLY -- import + __all__ entries for the 11 exported names'
+      change: 'ADDITIVE ONLY -- import + __all__ entries for the 12 exported names'
       forbidden: no reordering or removal of existing exports
     - path: scripts/run_panel_selection.py
       change: NEW
@@ -1009,16 +1488,22 @@ implementation_contract:
       - docs/project/atlas/atlas-phase2-panel-selection-registration-v1.yaml
       - configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v1.yaml
       - configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v2.yaml
+      - configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v3.yaml
+      - configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v4.yaml
+      - configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v4.yaml
+      - docs/project/specs/atlas-raw-identity-mapper-v1.yaml
+      - 'src/raptor/atlas/identity_map.py (READ-ONLY reuse surface; the selector calls load_identity_map and never re-implements or patches it)'
       - configs/atlas/packs/**
       - docs/project/specs/mechanism-atlas-starter.yaml
       - docs/project/specs/atlas-citation-resolver-v1.yaml
       - docs/project/TODOS.yaml
-      - 'the external candidate universe and raw inventory (read-only, always)'
-      - 'every existing tests/atlas/*.py file'
-      - 'src/raptor/atlas/{citation,promote,registry,profile,export,hashing,identity,pack,guards,ontology}.py behaviour'
+      - 'the external candidate universe, raw inventory, identity map and official response bundle (read-only, always)'
+      - 'every existing tests/atlas/*.py file, including tests/atlas/test_identity_map.py'
+      - 'src/raptor/atlas/{citation,promote,registry,profile,export,hashing,identity,identity_map,pack,guards,ontology}.py behaviour'
     behavioural_invariants:
-      - 'tests/atlas stays green at its existing count plus the new file; no existing test is edited, skipped or xfailed.'
+      - 'tests/atlas stays green at its existing count (109) plus the new files; no existing test is edited, skipped or xfailed.'
       - 'pack_content_hash, catalog_content_hash, evidence_core_hash, profile_envelope_hash all unchanged.'
+      - 'map_content_hash, identity-map lock_content_hash and response_bundle_hash unchanged; the selector never writes them.'
       - 'promotion Gate 1-8 order, error types and Gate 8 human review unchanged.'
       - 'no new runtime dependency; PyYAML + stdlib only.'
   forbidden_everywhere:
@@ -1028,6 +1513,7 @@ implementation_contract:
     - candidate identity, candidate count or functional result in any non-run-record artifact
     - auto-repair, auto-repin, retry loop, fallback ordering, heuristic shortlist
     - reading evidence content, spans, scores, ClinVar records or classifier output
+    - 'a stub, fake, echo or partial RawIdentityMapper anywhere outside a synthetic tmp_path test fixture'
 
 # ---------------------------------------------------------------------------
 # M. Workflow, RED expectation, GREEN commands
@@ -1035,7 +1521,7 @@ implementation_contract:
 workflow:
   order: 'PLAN (this file) -> Gemini RED tests -> Sonnet GREEN implementation -> GPT-5.4 checker -> real external run'
   red_expectation:
-    state: 'after Gemini, tests/atlas/test_panel_selection.py COLLECTS and FAILS with the RED sentinel; the existing 64 tests stay green.'
+    state: 'after Gemini, tests/atlas/test_panel_selection.py COLLECTS and FAILS with the RED sentinel; the existing 109 tests stay green.'
     command: 'python -m pytest tests/atlas -q'
     expected: 'existing tests pass; every new test fails with "RED: raptor.atlas panel selector not implemented"'
     prohibited: 'no xfail, no skip, no try/except that swallows the sentinel into a pass'
@@ -1056,6 +1542,11 @@ workflow:
       - 'Delta: exactly eight fields, all non-null, always present, admissibility checked against the amendment log, waives nothing? (must hold)'
       - 'Replay: is every RP1-RP7 field recomputed from raw + pack, with declared values used only as comparands? (must hold)'
       - 'Mapper: is there NO built-in codon/translation table and NO default mapper? Does undecidability raise REPLAY_MAPPER_UNAVAILABLE rather than marking rows X1/out_of_scope? (must hold)'
+      - 'Mapper injection: can any caller supply a RawIdentityMapper object, factory, or monkeypatchable default that bypasses load_identity_map? (must be NO)'
+      - 'V7 ordering: is verify_identity_map always executed before replay_normalization, and does a fixture broken at both report the IM failure? (must hold)'
+      - 'IM binding: are IM1-IM6 all enforced, including the universe lock identity_map_binding comparison and stale-map_version rejection? (must hold)'
+      - 'IM failure class: does an identity-map fault raise AtlasIdentityMapBindingError with no run record, never an unresolved/out_of_scope row and never INFEASIBLE_PANEL? (must hold)'
+      - 'K5 chain: is the reconciliation chain required to be complete and gap-free, and is K5 correctly NOT applied to the protocol-independent map lock? (must hold)'
       - 'Firewall: can spec_stratum, access_status, license or span_verifiable reach a stratum predicate by any path? (must be NO)'
       - 'Search completeness: is pruning restricted to hereditary constraints, and is there an oracle test proving SOLUTION iff a brute-force solution exists? (must hold)'
       - 'Budget: can UNDETERMINED ever produce relaxation or INFEASIBLE_PANEL, or can the budget escalate inside a run? (must be NO)'
@@ -1069,7 +1560,10 @@ workflow:
       - 'Scope guard: does the executor refuse to run when search_scope is not full_eligible_universe or a shortlist size reappears? (must hold)'
     verdict: CLEAN / REVISE / DO-NOT-MERGE
   real_run:
-    precondition: 'GPT-5.4 verdict CLEAN, tests/atlas fully green, and an admissible RawIdentityMapper exists (see missing_deterministic_mappers).'
+    precondition: >-
+      GPT-5.4 verdict CLEAN, tests/atlas fully green, AND the external integration
+      cases PS-I-003/PS-I-004 passing against the REAL identity map, response bundle
+      and lock v4. A green synthetic suite alone never authorizes the real run.
     command: >-
       python scripts/run_panel_selection.py
       --protocol docs/project/atlas/ATLAS_PHASE2_PANEL_SELECTION_PROTOCOL.md
@@ -1077,13 +1571,19 @@ workflow:
       --pack configs/atlas/packs/tsc2/pack.yaml
       --universe <EXTERNAL_UNIVERSE_ROOT>/candidate_universe.yaml
       --raw-inventory <EXTERNAL_UNIVERSE_ROOT>/discovery_inventory.raw.yaml
+      --identity-map <EXTERNAL_MAP_ROOT>/raw_identity_map.yaml
+      --identity-map-response-root <EXTERNAL_MAP_ROOT>/responses
       --anchor-spdi <ANCHOR_SPDI> --anchor-residue <ANCHOR_RESIDUE>
       --executor <EXECUTOR_ID>
       --out data/atlas/tsc2_phase2_panel_selection_run_<YYYY-MM-DD>.json
     note: >-
-      The universe lock path is NOT a flag: it is resolved from the registration
-      (DC-3). <EXTERNAL_UNIVERSE_ROOT> and the anchor are supplied by the operator
-      at run time and are deliberately absent from this spec.
+      Neither lock path is a flag: the universe lock is resolved from the
+      registration (DC-3) and the identity-map lock from
+      registration.identity_map_contract.active.path (DC-11). Only the EXTERNAL,
+      candidate-bearing map manifest and response-bundle roots are operator-supplied,
+      because they are untracked by design. <EXTERNAL_UNIVERSE_ROOT>,
+      <EXTERNAL_MAP_ROOT> and the anchor are supplied by the operator at run time
+      and are deliberately absent from this spec.
     after_the_run: >-
       The panel is PROVISIONAL. It goes to Gate 1-8 and named human-oracle review.
       It is not a result, is not citable as a finding, and does not change any
@@ -1109,6 +1609,14 @@ threat_model:
     mitigation: 'single LG:UNKNOWN-POOL; pooling never relaxed; PS-L-003.'
   - threat: A missing identity mapper is papered over by trusting the custodian or by marking rows unresolved.
     mitigation: 'DC-4 -- REPLAY_MAPPER_UNAVAILABLE is run-level and distinct from X1; PS-R-006.'
+  - threat: A fake, echoing or partial mapper is injected so RP1-RP7 pass vacuously.
+    mitigation: 'DC-11 -- no mapper argument exists; core loads it under V7 from the registration-resolved lock; PS-V-007, PS-M-009, PS-R-009.'
+  - threat: A stale or hand-built map is bound while every hash in it self-verifies.
+    mitigation: 'IM1 version pin + IM6 universe-lock cross-binding; PS-M-003, PS-M-008.'
+  - threat: The response bundle is edited after locking so the "official" evidence no longer matches.
+    mitigation: 'IM3 re-digests every response file and the acquisition tool from disk; PS-M-005.'
+  - threat: The synthetic suite certifies a real run in which the real mapper is absent or unverifiable.
+    mitigation: 'external PS-I-003/PS-I-004 gate the real run; stop_go requires them on the real artifacts.'
   - threat: Real candidate data leaks into the repository through fixtures.
     mitigation: 'DC-9 -- synthetic-only fixtures; PS-X-006 literal scan; external test asserts no panel.'
   - threat: Re-running until an attractive panel appears.
@@ -1125,17 +1633,20 @@ stop_go:
   implementation_passes_only_if:
     - Offline and pure; static guards CLEAN; no env/clock/global in core.
     - Every parameter read from the registration/lock/protocol; nothing hardcoded.
-    - V1-V6, K1-K6 (with the exact eight-field delta), U1-U7, RP1-RP7 all enforced, in order, fail-closed, with distinct typed errors.
+    - V1-V7, K1-K6 (with the exact eight-field delta and a gap-free chain), IM1-IM6, U1-U7, RP1-RP7 all enforced, in the registration-pinned order V1,V2,V3,V4,V5,V7,V6, fail-closed, with distinct typed errors.
+    - No mapper object/factory/default is accepted anywhere; the mapper is constructed and verified inside V7 and reaches the replay only through IdentityMapAttestation.mapper.
     - Strata, lineage, support_class and eligibility fully recomputed; declared values comparands only.
     - Search proved complete against a brute-force oracle; pruning hereditary-only; budget exhaustion UNDETERMINED with zero relaxation.
     - Terminal outcomes returned, never raised; a complete disposition table emitted in every case.
     - Fixtures fully synthetic; no candidate identity, count or expected real panel anywhere outside a run record.
     - tests/atlas green with no existing test edited; all existing hashes unchanged.
+    - 'External PS-I-001/002 green on tracked artifacts, and PS-I-003/004 green against the REAL map/response bundle/lock v4 before any real run.'
     - GPT-5.4 checker CLEAN.
   otherwise: 'REVISE or STOP. No real selection run, no partial "preview" panel, no manual panel.'
   blocked_is_a_valid_outcome: >-
-    If no admissible RawIdentityMapper exists, the correct deliverable is a
-    reported blocker plus a follow-up for a reviewed pack extension -- not a panel.
+    If the active identity map cannot be verified (absent, stale, corrupt or
+    mismatched), the correct deliverable is a reported blocker and NO run record --
+    not a panel, not a partial preview, and not a set of rows relabelled unresolved.
   next_after_clean: >-
     Real external run under the command above, then Gate 1-8 promotion and named
     human-oracle review of the provisional panel.
@@ -1175,16 +1686,31 @@ deliberate_action:
       mitigation: 'DC-2/DC-3/DC-4 forbid defaults; PS-K-001 and PS-X-001 assert their absence.'
     - inversion: A future registration narrows search_scope and the executor quietly honours or quietly ignores it.
       mitigation: 'search_scope_guard fails closed with UNSUPPORTED_SEARCH_SCOPE before any attempt; PS-A-008.'
+    - inversion: A mapper object is injected so RP1-RP7 pass against an echo of the universe.
+      mitigation: 'DC-11 -- no mapper argument exists; core loads it inside V7; PS-V-007, PS-M-009, PS-R-009.'
+    - inversion: V7 is implemented but reachable after the replay, so an unverified mapper is already used.
+      mitigation: 'registration-pinned execution_order V1..V5,V7,V6; PS-V-005 and PS-M-010 assert the IM failure preempts the RP failure.'
+    - inversion: A stale map version is accepted because it self-verifies.
+      mitigation: 'IM1 pins the registration-active version; IM6 cross-binds the universe lock; PS-M-003/008.'
+    - inversion: An identity-map failure is downgraded to unresolved rows or a partial panel.
+      mitigation: 'AtlasIdentityMapBindingError terminates with no run record; PS-M-009.'
+    - inversion: The K5 chain omits a genuinely intervening amendment version so a lock reconciles by endpoint match alone.
+      mitigation: 'chain completeness rule in k5_admissibility; PS-K-012.'
+    - inversion: An invalid-binding lock (false lock-time record) is admitted because its stale triple still appears in the amendment log.
+      mitigation: 'k5_admissibility rejects registration invalid_binding locks and rejected_draft_digests outright; PS-I-005.'
   verification_of_this_plan:
-    - 'This file is the ONLY file written in this worktree; git status shows exactly one untracked path.'
+    - 'This file is the ONLY file written in this worktree by the planner; git status shows exactly one modified path for rev 2.'
     - 'yaml.safe_load parses this file.'
     - 'The pinned protocol/registration digests recompute against the worktree artifacts.'
+    - 'The pinned universe-lock-v4 and identity-map-lock-v4 references match the tracked, unmodified lock records; universe lock v3 is referenced only as an inadmissible historical artifact.'
     - 'No candidate identity, candidate count or functional result appears anywhere in this file.'
     - 'No code, no test, no todo/status edit, no commit, no push, no selection run.'
   pm_sanity_check: >-
     One plan file; behaviour authority unchanged; no digests moved; no panel
-    produced. The only durable effect is that a separate agent can now implement
-    the frozen protocol mechanically instead of a human choosing variants by hand.
+    produced. Rev 2 adds only the identity-map binding the protocol now requires
+    and removes an injection seam that could have made the replay vacuous. The only
+    durable effect is that a separate agent can now implement the frozen protocol
+    mechanically instead of a human choosing variants by hand.
 
 commit_boundary:
   rule: >-

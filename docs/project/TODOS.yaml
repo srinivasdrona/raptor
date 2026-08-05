@@ -984,16 +984,25 @@ todos:
     verify the registration digest itself, confirm the recorded seed, fail closed on TSC2 pack
     drift against the registration snapshot, the universe pack binding and the universe lock
     record, verify the pre-selection universe lock record and every digest and count it pins,
-    resolving it from the registration pointer universe_lock.active.path (universe_version 2) and
+    resolving it from the registration pointer universe_lock.active.path (universe_version 4) and
     recording the complete eight-field lock_protocol_version_delta that reconciles the
-    protocol/registration bindings in force at lock time with the digests verified now,
-    then replay normalization and pack identity admission from every raw inventory row before
-    recomputing strata, lineage groups and support class. Run the fixed-size attempt schedule
+    protocol/registration bindings in force at lock time with the digests verified now through
+    the complete gap-free amendment chain, refusing any lock the registration marks
+    invalid_binding, verify the active raw identity map lock resolved from
+    identity_map_contract.active.path together with the external map manifest, official response
+    bundle, acquisition tool, raw-inventory binding, pack binding and the universe lock
+    identity_map_binding (precondition V7, checks IM1-IM6), then replay normalization and pack
+    identity admission from every raw inventory row through that verified mapper and no other
+    before recomputing strata, lineage groups and support class. An absent, stale, corrupt or
+    unverifiable identity map terminates the run with no result and is never recorded as an
+    unresolved identity, an out-of-scope row or an eligibility failure. Run the fixed-size attempt
+    schedule
     with the declared complete deterministic search over the full eligible universe; a
     budget-exhausted attempt is undetermined and must never license relaxation or an infeasible
     verdict. Emit the provisional 5-10 member panel plus a run record at
     data/atlas/tsc2_phase2_panel_selection_run_<date>.json containing every verified digest,
-    the replay attestation, the attempt log, every universe record disposition with its rule id,
+    the identity-map attestation, the replay attestation, the attempt log, every universe record
+    disposition with its rule id,
     per-stratum and spec-taxonomy coverage, access-attrition, unknown-lineage and discordant-label
     counts, any applied relaxation step and the independence status. Report empty strata, a
     missing abstention control, undetermined search or an infeasible panel honestly instead of
@@ -1005,6 +1014,9 @@ todos:
   - atlas-phase2-candidate-universe-lock
   - atlas-phase2-candidate-universe-enrichment
   - atlas-phase2-panel-registration-amendment
+  - atlas-phase2-raw-identity-map
+  - atlas-phase2-universe-identity-correction
+  - atlas-phase2-panel-registration-amendment-v2
   created: '2026-08-02'
 - id: grant-anthropic-atlas-readiness-fold-in
   title: Folding verified Atlas readiness into the application
@@ -1105,3 +1117,111 @@ todos:
   - atlas-phase2-panel-protocol-freeze
   - atlas-phase2-candidate-universe-enrichment
   created: '2026-08-03'
+- id: atlas-phase2-raw-identity-map
+  title: Building and locking the official offline raw identity map
+  description: 'Track: MECHANISM-ATLAS / PHASE-2 (identity infrastructure; asserts no
+    functional, scientific or clinical result and selects no variant). The protocol requires the
+    executor to replay every raw identity instead of trusting the candidate universe, but the
+    repository had no admissible deterministic mapper: the bound pack carries no reference
+    sequence, no codon table and no protein translation, and residue arithmetic between isoforms
+    is never acceptable. Specify, build and lock an offline raw identity map that resolves each
+    raw inventory row against pinned, lawfully accessible official public references, capturing
+    every response so the mapping can be re-derived byte for byte. Ambiguous rows stay
+    unresolved; unresolved rows are confirmed unresolved against a dated official snapshot
+    rather than assumed. The candidate-bearing map and response bundle stay external; only a
+    candidate-free lock is tracked. Completed 2026-08-05: spec
+    docs/project/specs/atlas-raw-identity-mapper-v1.yaml, implementation
+    src/raptor/atlas/identity_map.py (offline loader, no network, no environment read, no repair
+    path), and tracked candidate-free lock
+    configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v4.yaml (schema
+    atlas.raw_identity_map_lock.v2, lock_content_hash
+    85bc2b10e65bd8140a775537204f3c7c7048cd5444d7057fbea9501b7cd4b104, map_content_hash
+    3adbf3484de28607fa3c133b2bebc4a9d7926b4c2d5b3863b0634507c599cd26, 35 map records against 35
+    raw rows, response_bundle_hash
+    fbedf2aae5aa26936807f2d8f26389a18a861fc884b461fdd8ebaf6b7e9f96bc over 88 response files /
+    904564 bytes, acquisition tool 7c059395..., GRCh38 + MANE-Select transcript with the protein
+    accession uniquely derived from the complete page-verified reference response set, pack
+    1294478c...). The lock records no protocol version by design: it is verified against its own
+    self-hashes, the raw inventory, the response bundle, the acquisition tool and the pack, never
+    against the selection protocol. No selection, ranking or panel was produced.'
+  status: done
+  depends_on:
+  - atlas-phase2-candidate-universe-lock
+  created: '2026-08-05'
+- id: atlas-phase2-universe-identity-correction
+  title: Correcting and re-locking the candidate universe from the official identity replay
+  description: 'Track: MECHANISM-ATLAS / PHASE-2 (identity custody; asserts no functional,
+    scientific or clinical result and selects no variant). Replay every raw inventory row
+    through the locked official identity map and reconcile the result against the identity
+    determinations recorded in universe_version 2, correcting the universe wherever the custodian
+    and the official replay disagree. A correction is a version bump, never an in-place patch:
+    universe v2 and lock v2 stay tracked and byte-identical as superseded-not-replaced. Publish
+    the corrected external universe plus a new tracked candidate-free lock that additionally binds
+    the identity map, so a universe locked against one map can never be selected against another.
+    Completed 2026-08-05: universe_version 3 locked at
+    configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v3.yaml (lock_content_hash
+    64345984bcf45b87d9a89afc113b3cd3266559739abeb754fc331eaa421f4e38, universe_content_hash
+    a500efaff6540bc87442795d9c035a12e95e17a383d84889a7e35840e0b81ab0, normalization ledger
+    66fc1033... over 35 rows, discovery set 595e311a... over 35 entries, raw inventory
+    fee39ffa... unchanged at 35 rows / 6062 bytes, pack 1294478c..., identity_map_binding to map
+    lock v4). The official replay superseded exactly 3 of universe v2 own resolved-identity
+    determinations with zero unexplained mismatches; all 37 evidence observations are unchanged.
+    A corrected identity state is an identity fact, not a functional finding and not a panel. No
+    selection run has executed and no selection artifact exists.'
+  status: done
+  depends_on:
+  - atlas-phase2-candidate-universe-enrichment
+  - atlas-phase2-raw-identity-map
+  created: '2026-08-05'
+- id: atlas-phase2-panel-registration-amendment-v2
+  title: Binding the panel registration to universe lock v4 and identity map lock v4
+  description: 'Track: MECHANISM-ATLAS / PHASE-2 (governance/administrative; asserts no
+    scientific or clinical result and selects no variant). Amend the frozen panel-selection
+    protocol and its registration record a second time, still before any formal selection run has
+    ever executed, so the active universe lock is
+    configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v4.yaml and the active raw
+    identity map lock is configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v4.yaml.
+    Mirror every candidate-free aggregate hash and count from both locks, keep locks v1 and v2
+    tracked and byte-identical as superseded-not-replaced, and add a fail-closed executor
+    precondition V7 with checks IM1-IM6 requiring that the active map lock self-verifies and
+    binds the external map manifest, the official response bundle, the acquisition tool, the raw
+    inventory, the live pack and the universe lock identity_map_binding. Pin the precondition
+    execution order so the mapper is verified before the replay that uses it, bind the U7/RP1-RP7
+    replay to that verified mapper and no other, and record that an absent or unverifiable mapper
+    is a tool failure that stops the run rather than an unresolved identity, an out-of-scope row
+    or an eligibility failure. Strengthen K5 so the protocol bindings recorded inside the active
+    lock must reconcile through the complete gap-free amendment chain, and so that no delta can
+    ever legitimize a false lock-time record. Preserve the selection seed,
+    panel-size rule, every eligibility, stratum, coverage, diversity, concentration and firewall
+    rule, the relaxation ladder and the full-universe deterministic search exactly as frozen, and
+    perform no selection, ranking or candidate inspection. Completed 2026-08-05: protocol amended
+    to 1.0.4 (protocol_doc_hash
+    7b0596ab4a52601566c85a3a2c7ca42aead9c35916890397e58b3e11876e5823, registration_content_hash
+    5b8980024bd88f9f3c7269badf7fc3e709fef4ba135b3575a7513e5d17ad1653, superseding
+    df9b9a33.../d79486b3...); registration universe_lock now points at lock v4 and the new
+    identity_map_contract at map lock v4; the selector implementation spec
+    docs/project/specs/atlas-panel-selector-v1.yaml was realigned to rev 2 so the mapper is
+    loaded and verified by the executor instead of injected as an object. An independent review
+    rejected the first uncommitted v1.0.4 draft, which bound universe lock v3: that lock recorded
+    1.0.2 lock-time bindings although 1.0.3 was already frozen, so its lock-time claim was false
+    and the drafted K5 chain laundered it. The corrected universe lock v4 (parsed-data identical
+    identities and observations, honest 1.0.3 lock-time bindings, lock_content_hash f94ce81b...,
+    universe_content_hash 98edd3bf...) is now active, the K5 delta is the direct honest step
+    1.0.3 -> 1.0.4 reconciled via amendment-log version 1.0.4 alone, and new protocol section
+    4.6.2 retains lock v3 as an invalid-binding artifact that is never active, never a valid
+    selection input and never an admissible K5 predecessor. Because v1.0.4 was never committed,
+    never issued and never bound by a lock or read by a run, it was corrected in place rather
+    than re-numbered, with the rejected draft digests recorded as inadmissible audit history.
+    All five lock files
+    re-hashed byte-identical and untouched; the seed raptor-atlas-phase2-panel-v1, panel-size
+    rule, strata, eligibility, coverage, diversity, concentration, firewall, ladder and search
+    blocks show zero diff lines. Candidate-level discovery and identity results exist and are
+    disclosed in the amendment record, but no selection rule, seed, predicate, constraint, ladder
+    step or search algorithm changed, so the amendment cannot move any candidate into or out of
+    the panel. No selection run has executed and no selection artifact exists.'
+  status: done
+  depends_on:
+  - atlas-phase2-panel-registration-amendment
+  - atlas-phase2-raw-identity-map
+  - atlas-phase2-universe-identity-correction
+  created: '2026-08-05'
