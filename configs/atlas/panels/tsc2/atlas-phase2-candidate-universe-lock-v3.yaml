@@ -1,0 +1,60 @@
+schema: atlas.candidate_universe_lock.v1
+lock_id: tsc2-phase2-candidate-universe-lock
+lock_version: '3'
+universe_id: tsc2-phase2-contrast-panel-candidate-universe
+universe_version: '3'
+created_at: '2026-08-05T07:48:21Z'
+created_by_role: candidate_universe_custodian
+protocol_version: 1.0.2
+protocol_doc_hash: 685319b54d52183f44e6f98605b0a6d00a1348b8fc055c69b54d334872385efc
+registration_content_hash: 82261ab52ade28f35db35cfe569a6bbcb70b8bac24c46159352d40ce03bbe37e
+universe_content_hash: a500efaff6540bc87442795d9c035a12e95e17a383d84889a7e35840e0b81ab0
+universe_content_hash_algorithm: atlas.candidate_universe_content_hash.v1
+raw_inventory:
+  path: discovery_inventory.raw.yaml
+  content_hash: fee39ffa9c826b6e0ccb85ad583b09c2f81794036b115d91a91eab521365befb
+  content_hash_algorithm: atlas.raw_inventory_hash.v1
+  record_count: 35
+  normalized_byte_length: 6062
+  captured_at: '2026-08-02T19:25:56Z'
+normalization_ledger:
+  hash: 66fc103395f446d553ba9a370bea605ef80ffb5e9dfc8473c99cdc176162571f
+  hash_algorithm: atlas.normalization_ledger_hash.v1
+  row_count: 35
+discovery_set_commitment:
+  hash: 595e311a5c165607e2b8360c83353d1e5f2f11af17e65814480a36cdda890acb
+  hash_algorithm: atlas.discovery_set_commitment.v1
+  count: 35
+  committed_at: '2026-08-05T07:48:21Z'
+pack_binding:
+  pack_id: tsc2
+  pack_version: 1.0.0-phase1
+  pack_content_hash: 1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927
+identity_map_binding:
+  schema: atlas.raw_identity_map_lock.v2
+  map_id: atlas-raw-identity-map-tsc2
+  map_version: '4'
+  lock_id: atlas-raw-identity-map-lock-tsc2
+  lock_version: '4'
+  map_content_hash: 3adbf3484de28607fa3c133b2bebc4a9d7926b4c2d5b3863b0634507c599cd26
+  lock_content_hash: 85bc2b10e65bd8140a775537204f3c7c7048cd5444d7057fbea9501b7cd4b104
+  response_bundle_hash: fbedf2aae5aa26936807f2d8f26389a18a861fc884b461fdd8ebaf6b7e9f96bc
+  map_record_count: 35
+  pack_binding:
+    pack_id: tsc2
+    pack_version: 1.0.0-phase1
+    pack_content_hash: 1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927
+storage_location: external_content_root
+completeness_attestation_ref:
+  location: candidate_universe.yaml#completeness_attestation
+  attesting_role: candidate_universe_custodian
+  attested_at: '2026-08-05T07:48:21Z'
+predecessor_lock_ref:
+  lock_version: '2'
+  path: configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v2.yaml
+  note: 'Superseded, not replaced: lock v2 remains tracked, unchanged and valid for
+    universe_version 2. This lock covers only universe_version 3 (an additive identity
+    correction that supersedes exactly 3 of v2''s own resolved-identity determinations
+    with the official identity-map v4 replay result; all 37 evidence observations
+    are unchanged).'
+lock_content_hash: 64345984bcf45b87d9a89afc113b3cd3266559739abeb754fc331eaa421f4e38

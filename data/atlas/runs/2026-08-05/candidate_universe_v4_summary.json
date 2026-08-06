@@ -1,0 +1,18 @@
+{
+  "schema": "raptor.atlas_public_candidate_universe_summary.v1",
+  "universe_version": "4",
+  "generated_at": "2026-08-05T11:13:11Z",
+  "universe_content_hash": "98edd3bf3cef36b7a1231bc389a37be6efdae7deb2210c869c317dfb6e8bef30",
+  "lock_content_hash": "f94ce81b8633bac777fd667e26c7b8d3a726b7e4d7eed9f8ed2128f9ed32b50e",
+  "predecessor_universe_version": "3",
+  "predecessor_universe_content_hash": "a500efaff6540bc87442795d9c035a12e95e17a383d84889a7e35840e0b81ab0",
+  "protocol_version_at_lock": "1.0.3",
+  "protocol_doc_hash_at_lock": "df9b9a33a4343968c20993feaab6622d129118152cd0c90452936c4b5f81cfc0",
+  "registration_content_hash_at_lock": "d79486b3b74f81d87a3d25c10bd1f0eea31ada562a940d632f4a29ef8574b7b2",
+  "identity_map_lock_hash": "85bc2b10e65bd8140a775537204f3c7c7048cd5444d7057fbea9501b7cd4b104",
+  "records": 35,
+  "observations": 37,
+  "identity_or_observation_changes_from_v3": 0,
+  "no_selection_performed": true,
+  "reason": "Administrative re-lock under the protocol and registration actually in force at lock creation."
+}

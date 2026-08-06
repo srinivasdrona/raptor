@@ -1,0 +1,61 @@
+{
+  "schema": "atlas.panel_selection_precondition_attempt.v1",
+  "recorded_at": "2026-08-06T09:15:36.4184949Z",
+  "attempted_at": null,
+  "attempted_at_note": "The CLI did not emit an attempt timestamp because it failed before producing a run record.",
+  "git_head": "45d5222",
+  "command": [
+    "python",
+    "scripts/run_panel_selection.py",
+    "--repo-root",
+    "D:\\AIProjects\\raptor-worktrees\\atlas-panel-selection",
+    "--protocol",
+    "D:\\AIProjects\\raptor-worktrees\\atlas-panel-selection\\docs\\project\\atlas\\ATLAS_PHASE2_PANEL_SELECTION_PROTOCOL.md",
+    "--registration",
+    "D:\\AIProjects\\raptor-worktrees\\atlas-panel-selection\\docs\\project\\atlas\\atlas-phase2-panel-selection-registration-v1.yaml",
+    "--pack",
+    "D:\\AIProjects\\raptor-worktrees\\atlas-panel-selection\\configs\\atlas\\packs\\tsc2\\pack.yaml",
+    "--universe",
+    "D:\\AIProjects\\raptor-data\\atlas\\tsc2-phase2-panel-v4\\candidate_universe.yaml",
+    "--raw-inventory",
+    "D:\\AIProjects\\raptor-data\\atlas\\tsc2-phase2-panel-v4\\discovery_inventory.raw.yaml",
+    "--content-root",
+    "D:\\AIProjects\\raptor-data\\atlas",
+    "--identity-map",
+    "D:\\AIProjects\\raptor-data\\atlas\\tsc2-phase2-identity-map-v4\\raw_identity_map.yaml",
+    "--identity-map-response-root",
+    "D:\\AIProjects\\raptor-data\\atlas\\tsc2-phase2-identity-map-v4\\official_responses",
+    "--anchor-spdi",
+    "NC_000016.10:2070570:G:A",
+    "--anchor-residue",
+    "611",
+    "--executor-identity",
+    "sdrona_microsoft",
+    "--out",
+    "D:\\AIProjects\\raptor-worktrees\\atlas-panel-selection\\data\\atlas\\tsc2_phase2_panel_selection_run_2026-08-06.json"
+  ],
+  "node_budget_override_supplied": false,
+  "exit_code": 3,
+  "error": {
+    "code": "INPUT_FAULT",
+    "check_id": null,
+    "message": "registration has schema 'atlas.panel_selection_registration.v1', expected 'atlas.phase2_panel_selection_registration.v1'"
+  },
+  "registration": {
+    "path": "docs/project/atlas/atlas-phase2-panel-selection-registration-v1.yaml",
+    "observed_registration_content_hash": "5b8980024bd88f9f3c7269badf7fc3e709fef4ba135b3575a7513e5d17ad1653"
+  },
+  "output": {
+    "path": "data/atlas/tsc2_phase2_panel_selection_run_2026-08-06.json",
+    "written": false
+  },
+  "selection_result_emitted": false,
+  "panel_emitted": false,
+  "promotion_invoked": false,
+  "classification": "BLOCKED_PRECONDITION_ATTEMPT_NOT_A_SELECTION_RESULT",
+  "repair": {
+    "test_contract_commit": "212fa72",
+    "implementation_commit": "cb17117",
+    "frozen_registration_modified": false
+  }
+}

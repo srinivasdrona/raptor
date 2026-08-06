@@ -1,0 +1,373 @@
+schema: raptor-atlas-raw-identity-mapper-v1
+status: planner_contract_rev1
+task_id: atlas-phase2-raw-identity-mapper
+title: Offline raw-identity replay mapper for Atlas panel selection
+worktree: 'D:\AIProjects\raptor-worktrees\atlas-panel-selection'
+branch: track/atlas-panel-selection-2026-08
+base_commit: c12c06e
+
+contract: >-
+  Acquire immutable official NCBI ClinVar E-utilities responses out of process,
+  build a candidate-bearing external identity map, publish a candidate-free
+  tracked lock, and expose an offline deterministic RawIdentityMapper that
+  supplies the full RP1-RP7 replay tuple. The selector has no default mapper and
+  fails closed when the map, lock, response bundle, pack binding, or replay
+  result does not verify.
+
+authority:
+  - docs/project/atlas/ATLAS_PHASE2_PANEL_SELECTION_PROTOCOL.md
+  - docs/project/atlas/atlas-phase2-panel-selection-registration-v1.yaml
+  - docs/project/specs/atlas-panel-selector-v1.yaml
+  - configs/atlas/packs/tsc2/pack.yaml
+
+decision_ledger:
+  - id: IM-D1
+    question: How is a raw protein alias resolved?
+    options: [trust_universe, residue_arithmetic, official_exact_alias_query]
+    chosen: official_exact_alias_query
+    rationale: >-
+      Query the raw alias exactly as discovered, scoped to TSC2, then validate
+      returned official records against the pinned current transcript and
+      assembly. The universe is a comparand only. Residue-offset arithmetic is
+      prohibited.
+    inversion: A legacy alias is translated with an observed +23 pattern.
+    falsifier: Any resolved row lacks a pinned exact search response and unique verified summary.
+  - id: IM-D2
+    question: What constitutes a resolved official match?
+    options: [first_result, best_ranked_result, exactly_one_verified_result]
+    chosen: exactly_one_verified_result
+    rationale: >-
+      Resolution requires one and only one result whose summary identifies
+      TSC2, contains the queried protein alias in protein_change after a
+      deterministic three-letter-to-one-letter conversion, and supplies a
+      current NM_000548.5 title plus a current GRCh38 canonical_spdi.
+    inversion: ESearch returns several records and the builder chooses the first.
+    falsifier: A resolved record has search_count other than one.
+  - id: IM-D3
+    question: How are unresolved identities confirmed?
+    options: [copy_universe_state, infer_from_failed_search, pin_official_zero_or_ambiguous_response]
+    chosen: pin_official_zero_or_ambiguous_response
+    rationale: >-
+      Zero-match and multi-match ESearch responses are retained verbatim and
+      hashed. Multi-match results are never disambiguated by classification,
+      proximity, or prior universe values.
+    inversion: A transient network failure is recorded as an official zero match.
+    falsifier: An unresolved row lacks a successful HTTP response with parsed count.
+  - id: IM-D4
+    question: Where may network access occur?
+    options: [atlas_core, selector_runtime, separate_acquisition_script]
+    chosen: separate_acquisition_script
+    rationale: Core and selector remain offline; only the acquisition adapter fetches.
+    inversion: identity_map.py imports an HTTP, socket, Entrez, or browser module.
+    falsifier: Static Atlas network guard finds a forbidden import.
+  - id: IM-D5
+    question: Does adding the mapper require a selection-protocol amendment?
+    options: [amend_selection_semantics, implementation_precondition_only]
+    chosen: implementation_precondition_only
+    rationale: >-
+      RP1-RP7 already require independent replay. A verified mapper is the
+      implementation needed to satisfy that existing rule and changes no seed,
+      eligibility, stratum, constraint, relaxation, or search semantic.
+    inversion: The mapper changes a selection rule under an implementation label.
+    falsifier: Protocol/registration/lock or any selection parameter changes.
+
+official_source_contract:
+  provider: NCBI ClinVar E-utilities plus NLM Clinical Tables
+  database: clinvar
+  tool: raptor-atlas-identity-map
+  email: operator-supplied
+  rate_limit_without_api_key_per_second: 3
+  search:
+    endpoint: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi
+    term_template: '<raw_identity_string>[varname] AND TSC2[gene]'
+    parameters:
+      db: clinvar
+      retmode: json
+      retmax: 20
+  summary:
+    endpoint: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi
+    parameters: {db: clinvar, retmode: json}
+  protein_reference:
+    endpoint: https://clinicaltables.nlm.nih.gov/api/variants/v4/search
+    parameters:
+      terms: '<pinned-transcript>'
+      sf: HGVS_c
+      df: VariationID,Name,GeneSymbol,HGVS_c,HGVS_p
+      count: 500
+      offset: '<0,500,... until total_count rows are captured>'
+    rule: >-
+      Retain every raw page. Require page totals to agree, offsets to be
+      contiguous, returned VariationIDs to be unique, and the retrieved row
+      count to equal total_count. Require at least one row for the pinned gene
+      and transcript with a nonblank protein HGVS. Every qualifying row across
+      all pages must share exactly one protein accession prefix. The unique
+      prefix is stored in reference_binding.protein; disagreement or incomplete
+      pagination fails acquisition.
+  success_rule: HTTP 200 plus parseable E-utilities JSON with no error output.
+  network_failure_rule: >-
+    Timeout, HTTP error, rate limit, malformed JSON, or E-utilities error is an
+    acquisition failure. It is never a zero-match result and no map is published.
+
+external_response_bundle:
+  root: '<explicit-external-content-root>/official_responses'
+  per_raw_record:
+    search_path: 'search/<raw_record_id>.json'
+    summary_path: 'summary/<raw_record_id>/<clinvar_uid>.json'
+  bundle_hash_algorithm: >-
+    Sort relative POSIX paths; for each update SHA-256 with
+    path_utf8 + NUL + raw_file_bytes + NUL. Record file_count and byte_count.
+  immutability: Any corrected acquisition requires map_version and lock_version bump.
+
+map_schema:
+  id: atlas.raw_identity_map.v2
+  external_path: '<explicit-external-content-root>/raw_identity_map.yaml'
+  self_hash_field: map_content_hash
+  self_hash_algorithm: >-
+    yaml.safe_load; remove only top-level map_content_hash; canonical JSON
+    sort_keys=true, separators=(",",":"), ensure_ascii=false; lowercase SHA-256.
+  top_level_fields:
+    - schema
+    - map_id
+    - map_version
+    - map_content_hash
+    - created_at
+    - pack_binding
+    - reference_binding
+    - raw_inventory_binding
+    - response_bundle
+    - acquisition_tool
+    - records
+  record_fields:
+    - raw_record_id
+    - raw_identity_string
+    - source_reported_consequence_hint
+    - search_term
+    - search_response_relative_path
+    - search_response_sha256
+    - search_count
+    - summary_response_pins
+    - match_state
+    - normalization_outcome
+    - universe_key
+    - identity_state
+    - spdi_canonical
+    - hgvs_c
+    - hgvs_p
+    - transcript_pin
+    - residue_index
+    - codon_index
+    - consequence_class
+    - scope_decision
+    - exclusion_code
+  match_state_enum:
+    - resolved_unique_official_match
+    - unresolved_official_zero_match
+    - unresolved_official_ambiguous_match
+  resolved_rule:
+    - search_count == 1
+    - exactly one summary response is pinned
+    - summary gene_sort and genes symbol identify TSC2
+    - protein_change contains the queried alias after deterministic three-to-one conversion
+    - title identifies the pinned transcript and current protein change
+    - pinned Clinical Tables reference response supplies one protein accession for the transcript
+    - one current pinned-assembly variation_loc supplies canonical_spdi
+    - molecular_consequence_list and variant_type permit deterministic consequence/scope
+  unresolved_rule:
+    zero: search_count == 0 and successful pinned search response
+    ambiguous: search_count > 1; all returned summaries pinned; no result chosen
+    universe_key: "'UNRESOLVED:' + sha256(utf8(protocol_raw_identity_normalized(raw_identity_string)))"
+    exclusion_code: X1
+
+lock_schema:
+  id: atlas.raw_identity_map_lock.v2
+  tracked_path: configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v1.yaml
+  candidate_free: true
+  self_hash_field: lock_content_hash
+  self_hash_algorithm: >-
+    yaml.safe_load; remove only top-level lock_content_hash; canonical JSON
+    sort_keys=true, separators=(",",":"), ensure_ascii=false; lowercase SHA-256.
+  required_fields:
+    - schema
+    - lock_id
+    - lock_version
+    - created_at
+    - map_id
+    - map_version
+    - map_content_hash
+    - map_record_count
+    - raw_inventory_content_hash
+    - raw_inventory_record_count
+    - response_bundle_hash
+    - response_file_count
+    - response_byte_count
+    - pack_binding
+    - reference_binding
+    - acquisition_tool_sha256
+    - lock_content_hash
+  no_identity_rule: >-
+    Lock contains no raw identity, HGVS, SPDI, residue, ClinVar UID, query term,
+    candidate count beyond aggregate record counts, or selected result.
+  reference_binding_fields:
+    - provider
+    - database
+    - transcript
+    - protein
+    - assembly
+    - protein_reference_total_count
+    - protein_reference_page_size
+    - protein_reference_response_pins
+
+runtime_api:
+  model_additions:
+    - 'RawIdentityReplay(frozen dataclass with the RP tuple fields)'
+    - 'RawIdentityMapper(runtime_checkable Protocol: replay(raw_record_id, raw_identity_string, source_reported_consequence_hint) -> RawIdentityReplay)'
+    - 'AtlasIdentityMapError family with schema/hash/path/response/ambiguity subclasses'
+  module: src/raptor/atlas/identity_map.py
+  public_api:
+    - 'load_identity_map(map_path, *, response_root, lock_path, disease_pack) -> OfflineRawIdentityMapper'
+    - 'identity_map_content_hash(manifest) -> str'
+    - 'identity_map_lock_content_hash(manifest) -> str'
+  behavior:
+    - verify map and lock self-hashes
+    - verify every lock binding against map, raw inventory, responses, pack and tool hash
+    - reject traversal, absolute paths, symlink/junction escape, missing or non-regular response files
+    - recompute response bytes and bundle hash from disk
+    - deep-freeze loaded structures
+    - provide exact-key lookup by raw_record_id plus character-identical raw identity and hint
+    - perform no network, environment read, fallback, repair, search or ranking
+
+acquisition_adapter:
+  path: scripts/build_atlas_raw_identity_map.py
+  public_api: >-
+    build_identity_map(raw_inventory_path, pack_path, external_output_root,
+    tracked_lock_output, email, api_key=None, map_version="1", *, transport=None,
+    now_utc=None, sleep=None) -> tuple[Path, Path]. Tests inject transport,
+    clock and sleep; production defaults use the bounded NCBI transport.
+  transport_protocol: >-
+    get_json(endpoint: str, params: Mapping[str, str]) -> tuple[int, bytes].
+    The adapter interprets only HTTP 200 plus valid E-utilities JSON as a
+    response. Any exception, non-200 status, malformed body, or E-utilities
+    error aborts the complete acquisition and publishes nothing.
+  exclusive_publication_seam: >-
+    _publish_exclusive(staged_path: Path, final_path: Path) creates the final
+    path without overwrite. A competing path is preserved byte-for-byte and
+    the build fails closed with no lock publication.
+  inputs:
+    - --raw-inventory
+    - --pack
+    - --external-output-root
+    - --tracked-lock-output
+    - --email
+    - optional --api-key
+  rules:
+    - capture every raw HTTP response before interpretation
+    - enforce NCBI rate limits and retry only transient responses with bounded backoff
+    - publish map and lock only after all rows acquired and independently verified
+    - use per-invocation staging directory and exclusive final publication
+    - never overwrite an existing map, response bundle or lock
+
+selector_integration:
+  SelectionInputs_additions:
+    - identity_map_path
+    - identity_response_root
+    - identity_map_lock_path
+  load_order: >-
+    Verify registration/pack/active universe lock, then load and verify identity
+    mapper before U7/RP replay. Failure is REPLAY_MAPPER_UNAVAILABLE or a typed
+    identity-map fault; no panel output is emitted.
+  semantic_effect: none
+  required_selector_spec_revision: >-
+    Add the three explicit input paths, map-lock verification, typed mapper
+    error translation, tests, and real-run command. Do not change protocol or registration.
+
+test_contract:
+  file: tests/atlas/test_identity_map.py
+  synthetic_only: true
+  test_ids:
+    - IM-T001-map-and-lock-hash-happy-path
+    - IM-T002-response-bundle-hash-happy-path
+    - IM-T003-resolved-unique-official-record
+    - IM-T004-zero-match-confirmed-unresolved
+    - IM-T005-multi-match-remains-ambiguous
+    - IM-T006-first-result-is-never-selected
+    - IM-T007-three-to-one-alias-membership
+    - IM-T008-current-transcript-required
+    - IM-T009-tsc2-gene-required
+    - IM-T010-current-grch38-spdi-required
+    - IM-T011-consequence-and-scope-recomputed
+    - IM-T012-map-hash-drift
+    - IM-T013-lock-hash-drift
+    - IM-T014-response-file-drift
+    - IM-T015-response-bundle-omission
+    - IM-T016-raw-inventory-binding-drift
+    - IM-T017-pack-binding-drift
+    - IM-T018-tool-hash-drift
+    - IM-T019-path-traversal-and-absolute-path
+    - IM-T020-symlink-junction-escape
+    - IM-T021-non-utf8-or-malformed-json
+    - IM-T022-runtime-module-has-no-network-import
+    - IM-T023-lookup-raw-string-mismatch
+    - IM-T024-lookup-hint-mismatch
+    - IM-T025-map-deep-immutable
+    - IM-T026-candidate-free-lock
+    - IM-T027-acquisition-network-error-not-zero
+    - IM-T028-acquisition-rate-limit-fail-closed
+    - IM-T029-exclusive-publication-collision
+    - IM-T030-no-candidate-identity-in-unit-fixtures
+  red_expectation: imports collect and fail only on absent mapper implementation.
+
+implementation_scope:
+  gemini_authorized:
+    - tests/atlas/test_identity_map.py
+  sonnet_authorized:
+    - src/raptor/atlas/model.py
+    - src/raptor/atlas/identity_map.py
+    - src/raptor/atlas/__init__.py
+    - scripts/build_atlas_raw_identity_map.py
+    - tests/atlas/test_identity_map.py
+    - docs/project/specs/atlas-panel-selector-v1.yaml
+  preservation:
+    - selection protocol and registration
+    - universe locks v1/v2 and universes
+    - TSC2 pack and citation catalog
+    - panel selection seed and all selection semantics
+    - citation/promotion/profile/export behavior
+    - all existing Atlas tests
+
+validation:
+  focused:
+    - python -m pytest tests/atlas/test_identity_map.py -q
+    - python -m pytest tests/atlas/test_hashing_import_guards.py -q
+  full: python -m pytest tests/atlas -q
+  real_acquisition: >-
+    python scripts/build_atlas_raw_identity_map.py --raw-inventory <external>
+    --pack tsc2 --external-output-root <external> --tracked-lock-output
+    configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v1.yaml
+    --email <operator-email>
+
+stop_go:
+  go:
+    - Gemini tests are protected and RED for implementation absence only
+    - Sonnet makes tests green without editing protected assertions
+    - GPT checker returns CLEAN
+    - real acquisition completes for every raw row
+    - external map and response bundle plus tracked candidate-free lock verify independently
+    - selector integration tests pass before any selection run
+  stop:
+    - any row lacks a successful official response
+    - any unique mapping cannot be independently verified
+    - any network failure is represented as zero-match
+    - any map or lock drift
+    - runtime network import or fallback
+    - protocol/registration/selection semantic change
+
+threat_model:
+  - mapper copies universe output instead of replaying official responses
+  - result ordering chooses a preferred mapping
+  - transient 429 becomes unresolved
+  - legacy residue arithmetic creates a false alias
+  - official response bundle is incomplete or mutable
+  - current RefSeq/assembly version drifts
+  - candidate identities leak into tracked lock or unit tests
+  - fake synthetic mapper reaches a real selection run
+  - selector runs before mapper checker clean

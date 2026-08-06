@@ -19,14 +19,14 @@
 #
 schema: atlas.panel_selection_registration.v1
 registration_id: atlas-phase2-panel-selection
-protocol_version: 1.0.3
+protocol_version: 1.0.4
 protocol_path: docs/project/atlas/ATLAS_PHASE2_PANEL_SELECTION_PROTOCOL.md
 protocol_doc_hash_algorithm: atlas.protocol_doc_hash.v1
-protocol_doc_hash: df9b9a33a4343968c20993feaab6622d129118152cd0c90452936c4b5f81cfc0
+protocol_doc_hash: 7b0596ab4a52601566c85a3a2c7ca42aead9c35916890397e58b3e11876e5823
 registration_content_hash_algorithm: atlas.registration_content_hash.v1
-registration_content_hash: d79486b3b74f81d87a3d25c10bd1f0eea31ada562a940d632f4a29ef8574b7b2
-frozen_at: '2026-08-03T16:32:57+05:30'
-frozen_at_utc: '2026-08-03T11:02:57Z'
+registration_content_hash: 5b8980024bd88f9f3c7269badf7fc3e709fef4ba135b3575a7513e5d17ad1653
+frozen_at: '2026-08-05T16:53:52+05:30'
+frozen_at_utc: '2026-08-05T11:23:52Z'
 registrar_role: independent protocol planner (blinded to candidate discovery output)
 registration_class: post_discovery_pre_selection
 is_preregistration: false
@@ -132,46 +132,120 @@ candidate_universe_contract:
   universe_lock:
     required_before_selection: true
     active:
-      path: configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v2.yaml
-      lock_version: '2'
+      path: configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v4.yaml
+      lock_id: tsc2-phase2-candidate-universe-lock
+      lock_version: '4'
       universe_id: tsc2-phase2-contrast-panel-candidate-universe
-      universe_version: '2'
-      universe_label: evidence_enriched
-      created_at: '2026-08-03T10:23:40Z'
+      universe_version: '4'
+      universe_label: evidence_enriched_official_identity_corrected
+      universe_label_note: >-
+        Descriptive registration-side label only. It is not a field of the lock record, carries
+        no authority, and is never compared by any check; K1-K6 compare digests, counts and
+        versions, never labels.
+      created_at: '2026-08-05T11:13:11Z'
       created_by_role: candidate_universe_custodian
       storage_location: external_content_root
-      lock_content_hash: 014dedb3ec5006d0faecbf69b64a7676bcb3e256aa162758c33357c7eb805dfa
-      universe_content_hash: eba2708fb09f58dd1b237c33feedc70241a1a312cbb62380167e12c9a70c3c7e
+      lock_content_hash: f94ce81b8633bac777fd667e26c7b8d3a726b7e4d7eed9f8ed2128f9ed32b50e
+      universe_content_hash: 98edd3bf3cef36b7a1231bc389a37be6efdae7deb2210c869c317dfb6e8bef30
       raw_inventory_content_hash: fee39ffa9c826b6e0ccb85ad583b09c2f81794036b115d91a91eab521365befb
       raw_inventory_record_count: 35
       raw_inventory_normalized_byte_length: 6062
-      normalization_ledger_hash: 7c1e94938980199d7048f80c3a2f98058883cdb9de918e99fbbca2f707f6c834
+      raw_inventory_captured_at: '2026-08-02T19:25:56Z'
+      normalization_ledger_hash: 66fc103395f446d553ba9a370bea605ef80ffb5e9dfc8473c99cdc176162571f
       normalization_ledger_row_count: 35
-      discovery_set_hash: 0e33cebb4521b5ce94f592c73a508ee9cec0741cb5f1fa3c4de615a0de552c49
+      discovery_set_hash: 595e311a5c165607e2b8360c83353d1e5f2f11af17e65814480a36cdda890acb
       discovery_set_count: 35
+      discovery_set_committed_at: '2026-08-05T11:13:11Z'
       pack_binding:
         pack_id: tsc2
         pack_version: 1.0.0-phase1
         pack_content_hash: 1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927
+      identity_map_binding:
+        schema: atlas.raw_identity_map_lock.v2
+        map_id: atlas-raw-identity-map-tsc2
+        map_version: '4'
+        lock_id: atlas-raw-identity-map-lock-tsc2
+        lock_version: '4'
+        map_content_hash: 3adbf3484de28607fa3c133b2bebc4a9d7926b4c2d5b3863b0634507c599cd26
+        lock_content_hash: 85bc2b10e65bd8140a775537204f3c7c7048cd5444d7057fbea9501b7cd4b104
+        response_bundle_hash: fbedf2aae5aa26936807f2d8f26389a18a861fc884b461fdd8ebaf6b7e9f96bc
+        map_record_count: 35
+        pack_binding:
+          pack_id: tsc2
+          pack_version: 1.0.0-phase1
+          pack_content_hash: 1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927
+        binding_note: >-
+          Copied verbatim from the lock record. Check IM6 requires this block to equal the
+          active identity_map_contract entry field for field: a universe locked against one
+          identity map is never selectable against another.
+      predecessor_lock_ref:
+        lock_version: '3'
+        path: configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v3.yaml
+        lineage_only_note: >-
+          Copied verbatim from the lock record. Lineage documentation ONLY. Lock v3 is an
+          invalid-binding lock (protocol section 4.6.2) and being named here confers no
+          admissibility: it is never read as a selection input, never trusted, never re-hashed,
+          and never a step in any K5 reconciliation chain.
       bindings_in_force_at_lock_time:
-        protocol_version: 1.0.2
-        protocol_doc_hash: 685319b54d52183f44e6f98605b0a6d00a1348b8fc055c69b54d334872385efc
-        registration_content_hash: 82261ab52ade28f35db35cfe569a6bbcb70b8bac24c46159352d40ce03bbe37e
+        protocol_version: 1.0.3
+        protocol_doc_hash: df9b9a33a4343968c20993feaab6622d129118152cd0c90452936c4b5f81cfc0
+        registration_content_hash: d79486b3b74f81d87a3d25c10bd1f0eea31ada562a940d632f4a29ef8574b7b2
+        truthfulness_note: >-
+          Verified honest: lock v4 was created at 2026-08-05T11:13:11Z, when protocol v1.0.3
+          (frozen 2026-08-03T11:02:57Z) was the issued version. v1.0.4 was not frozen until
+          2026-08-05T11:23:52Z, i.e. after this lock was written, so recording 1.0.3 is correct
+          rather than stale. The difference from the current bindings is carried at run time by
+          the K5 lock_protocol_version_delta, never by editing the lock.
       counts_note: >-
         record_count / row_count / discovery_set_count are aggregate conservation totals copied
         verbatim from the lock record. They are not a panel, not a result and not evidence; they
         exist only so the executor can prove nothing was dropped between the raw inventory and
         the normalized universe.
     superseded:
+      - path: configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v3.yaml
+        lock_version: '3'
+        universe_version: '3'
+        created_at: '2026-08-05T07:48:21Z'
+        lock_content_hash: 64345984bcf45b87d9a89afc113b3cd3266559739abeb754fc331eaa421f4e38
+        universe_content_hash: a500efaff6540bc87442795d9c035a12e95e17a383d84889a7e35840e0b81ab0
+        status: invalid_binding
+        admissible_as_k5_predecessor: false
+        valid_for_selection: false
+        invalid_binding_reason: >-
+          Lock v3 was created at 2026-08-05T07:48:21Z but records protocol 1.0.2 /
+          685319b5... / 82261ab5... as the bindings in force at lock time. Protocol v1.0.3
+          (df9b9a33... / d79486b3...) had already been frozen at 2026-08-03T11:02:57Z, so v3's
+          lock-time record is false rather than merely stale. K5 reconciles administrative
+          version differences; it cannot legitimize a false lock-time claim.
+        disposition: >-
+          Retained tracked and byte-identical for audit, and never edited, re-hashed or deleted.
+          Invalid for selection (protocol section 4.6.2): it is never made active, is never an
+          admissible K5 predecessor, and never appears as a traversed step in any
+          reconciled_via_amendment_log_versions chain. Being named by lock v4's
+          predecessor_lock_ref is lineage documentation only and confers no admissibility. The
+          remedy applied was a NEW lock (v4) with honest lock-time bindings over the same
+          normalized content, not a correction of v3.
+      - path: configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v2.yaml
+        lock_version: '2'
+        universe_version: '2'
+        created_at: '2026-08-03T10:23:40Z'
+        lock_content_hash: 014dedb3ec5006d0faecbf69b64a7676bcb3e256aa162758c33357c7eb805dfa
+        universe_content_hash: eba2708fb09f58dd1b237c33feedc70241a1a312cbb62380167e12c9a70c3c7e
+        status: superseded
+        disposition: >-
+          Retained tracked and byte-identical for audit. Superseded, not replaced, and never the
+          selection input while universe_version 4 is active. Lock v2 predates the official
+          raw-identity-map replay and therefore carries no identity_map_binding.
       - path: configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v1.yaml
         lock_version: '1'
         universe_version: '1'
         created_at: '2026-08-02T19:25:56Z'
         lock_content_hash: fcceb1a8cc09b07378a6882c82a0f7199d4afb54d9d6782135297f3a0ee0178c
         universe_content_hash: 22b08a99fe56ac5c07798a27b7fc3abf9b6fa60985c99ad8ed4e3250f30e094b
+        status: superseded
         disposition: >-
           Retained tracked and byte-identical for audit. Superseded, not replaced, and never the
-          selection input while universe_version 2 is active.
+          selection input while universe_version 4 is active.
     schema: atlas.candidate_universe_lock.v1
     content_hash_algorithm: atlas.universe_lock_content_hash.v1
     self_hash_field: lock_content_hash
@@ -187,6 +261,9 @@ candidate_universe_contract:
       - normalization_ledger hash / row_count
       - discovery_set_commitment hash / count / committed_at
       - pack_binding pack_id / pack_version / pack_content_hash
+      - identity_map_binding schema / map_id / map_version / lock_id / lock_version /
+        map_content_hash / lock_content_hash / response_bundle_hash / map_record_count /
+        pack_binding -- required from universe_version 3 onward (see identity_map_contract)
       - protocol_version / protocol_doc_hash / registration_content_hash in force at lock time
       - universe_id / universe_version / created_at / created_by_role / storage_location
       - lock_content_hash (own non-circular content hash)
@@ -202,13 +279,23 @@ candidate_universe_contract:
       lock_protocol_version_delta.
   lock_status: locked
   lock_status_note: >-
-    universe_version 2 (evidence-enriched) was locked at 2026-08-03T10:23:40Z under protocol
-    1.0.2. Universe, raw-inventory, ledger and discovery-set digests live in the lock record and
-    are mirrored above so the executor can cross-check the lock it loads; they are re-verified
-    from the live artifacts and copied into every selection run record. The lock legitimately
-    records the protocol and registration digests in force at lock time; that difference from
-    the current 1.0.3 registration is carried by the run-time lock_protocol_version_delta (K5),
-    never by editing the lock.
+    universe_version 4 was locked at 2026-08-05T11:13:11Z. It is an additive ADMINISTRATIVE
+    correction of universe_version 3: the normalized identities and observations are identical
+    parsed data, and the only change is that lock v4 records honest lock-time bindings. Lock v3
+    recorded protocol 1.0.2 although v1.0.3 was already frozen, which made its lock-time claim
+    false; K5 reconciles administrative version differences and can never legitimize a false
+    lock-time record, so v3 was superseded by a NEW lock rather than corrected, and is retained
+    as an invalid-binding artifact (protocol section 4.6.2) that is never active and never an
+    admissible predecessor. universe_version 3 itself remains an additive identity correction of
+    universe_version 2 -- the official raw-identity-map v4 replay superseded exactly 3 of v2's own
+    resolved-identity determinations -- and lock v4 carries the identity_map_binding that check
+    IM6 enforces. Universe, raw-inventory, ledger and discovery-set digests live in the lock
+    record and are mirrored above so the executor can cross-check the lock it loads; they are
+    re-verified from the live artifacts and copied into every selection run record. The
+    difference between lock v4's in-force 1.0.3 bindings and the current 1.0.4 registration is
+    carried by the run-time lock_protocol_version_delta (K5) and reconciles through the single
+    amendment-log step 1.0.4, never by editing the lock. Locks v1, v2 and v3 remain tracked and
+    byte-identical.
   completeness_binding: >-
     The normalized universe must bind back to an immutable raw discovery inventory via a
     hash/count pin, a total normalization ledger (one row per raw row), and a pre-selection
@@ -216,6 +303,130 @@ candidate_universe_contract:
     identities are carried as surrogate-keyed records with exclusion X1 and are never
     dropped. Conservation checks U1-U7 -- including full executor replay of normalization and
     pack identity admission from every raw row -- fail closed.
+identity_map_contract:
+  required_before_selection: true
+  purpose: >-
+    The RP1-RP7 replay is only meaningful if the mapping from a raw identity string to a
+    canonical identity is independently derived rather than copied from the universe. The
+    executor therefore performs that replay through a verified offline raw identity map built
+    from immutable, hash-pinned official public reference responses, committed before selection
+    under the same "lock next door" discipline as the universe lock.
+  build_authority: docs/project/specs/atlas-raw-identity-mapper-v1.yaml
+  loader: raptor.atlas.identity_map.load_identity_map
+  loader_properties:
+    offline: true
+    network_access: false
+    environment_reads_in_core: false
+    repair_path: none
+  active:
+    path: configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v4.yaml
+    schema: atlas.raw_identity_map_lock.v2
+    map_schema: atlas.raw_identity_map.v2
+    lock_id: atlas-raw-identity-map-lock-tsc2
+    lock_version: '4'
+    map_id: atlas-raw-identity-map-tsc2
+    map_version: '4'
+    created_at: '2026-08-05T05:56:56Z'
+    lock_content_hash: 85bc2b10e65bd8140a775537204f3c7c7048cd5444d7057fbea9501b7cd4b104
+    map_content_hash: 3adbf3484de28607fa3c133b2bebc4a9d7926b4c2d5b3863b0634507c599cd26
+    map_record_count: 35
+    raw_inventory_content_hash: fee39ffa9c826b6e0ccb85ad583b09c2f81794036b115d91a91eab521365befb
+    raw_inventory_record_count: 35
+    response_bundle_hash: fbedf2aae5aa26936807f2d8f26389a18a861fc884b461fdd8ebaf6b7e9f96bc
+    response_file_count: 88
+    response_byte_count: 904564
+    acquisition_tool_sha256: 7c0593954f249e136a8690cd580f8bcdc40ebec1108a23f03626451bfd67251e
+    pack_binding:
+      pack_id: tsc2
+      pack_version: 1.0.0-phase1
+      pack_content_hash: 1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927
+    reference_binding:
+      provider: NCBI/NLM
+      database: clinvar+clinicaltables
+      assembly: GRCh38
+      transcript: NM_000548.5
+      protein: NP_000539.2
+      protein_derivation: >-
+        uniquely derived from the complete, page-verified official reference response set --
+        never asserted in the pack, never defaulted, never inferred from a codon table
+      protein_reference_total_count: 6428
+      protein_reference_page_size: 500
+      protein_reference_page_count: 13
+  map_storage:
+    tracked_in_repository: false
+    location: external_content_root
+    reason: >-
+      The map manifest and the official response bundle carry candidate identities, so they stay
+      under the external uncommitted content root. Their paths are supplied explicitly as run
+      arguments; core reads no environment variable and no default path. Only the candidate-free
+      lock is tracked, which is what makes the commitment durable.
+  lock_storage:
+    tracked_in_repository: true
+    candidate_free: true
+    status: locked
+  protocol_independence:
+    subject_to_K5: false
+    carries_protocol_version: false
+    rationale: >-
+      The identity map and its lock were built under the protocol-independent mapper spec and
+      deliberately record no selection-protocol version or digest. They are verified against
+      their own self-hashes, the live raw inventory, the official response bundle, the
+      acquisition tool and the bound pack -- never against this document's version. A selection
+      protocol amendment therefore never invalidates a map lock, and no lock_protocol_version
+      delta is defined or required for it.
+  superseded:
+    - map_version: '1-3'
+      disposition: >-
+        Earlier map versions and their locks, where they exist, remain tracked and unmodified for
+        audit. Only map_version 4 named in identity_map_contract.active is admissible; binding a
+        stale map version is an IDENTITY_MAP_MISMATCH, not a fallback.
+  checks:
+    IM1: >-
+      The active map lock resolved from identity_map_contract.active.path exists, declares
+      map_version / lock_version 4, and its recomputed lock_content_hash equals both its stored
+      value and the mirror above; otherwise IDENTITY_MAP_LOCK_MISSING /
+      IDENTITY_MAP_LOCK_CORRUPT and terminate
+    IM2: >-
+      The external map manifest self-verifies against map_content_hash and every lock<->map
+      binding agrees (map_id, map_version, map_content_hash, map_record_count,
+      raw_inventory_content_hash, raw_inventory_record_count, response_bundle_hash,
+      response_file_count, response_byte_count, acquisition_tool_sha256); otherwise
+      IDENTITY_MAP_MISMATCH and terminate
+    IM3: >-
+      Response-bundle hash, file count and byte count recomputed from the response root equal the
+      declared values; every per-record and per-reference-page response digest recomputed from
+      disk equals its declared digest; the acquisition-tool digest is recomputed from the pinned
+      tool file; otherwise IDENTITY_MAP_MISMATCH and terminate
+    IM4: >-
+      The map pack_binding equals the live pack hash (V4) and the universe lock pack_binding; the
+      reference_binding names exactly the pinned assembly and MANE-Select transcript of the bound
+      pack and a protein accession uniquely derived from the complete page-verified official
+      response set; otherwise IDENTITY_MAP_MISMATCH / PACK_DRIFT and terminate
+    IM5: >-
+      map_record_count equals raw_inventory.record_count, the map's raw-inventory binding equals
+      the live raw-inventory digest and row count, and the map records are in bijection with the
+      raw rows with character-identical raw_identity_string and source-reported consequence hint;
+      otherwise IDENTITY_MAP_MISMATCH and terminate
+    IM6: >-
+      The active universe lock's identity_map_binding names exactly this map_id, map_version,
+      lock_id, lock_version, map_content_hash, lock_content_hash, response_bundle_hash and
+      map_record_count; otherwise IDENTITY_MAP_MISMATCH and terminate
+  replay_binding: >-
+    U7 / RP1-RP7 are executed through this verified mapper and no other. The executor derives no
+    identity from a built-in codon table, a translated reference sequence, residue-offset
+    arithmetic between isoforms, or the universe's own declared fields, and accepts no injected
+    mapper object in place of loading and verifying the locked map.
+  fault_is_never_a_candidate_property: >-
+    An absent, stale, corrupt or version-mismatched map is IDENTITY_MAP_UNVERIFIED; a raw row the
+    verified mapper cannot answer for is REPLAY_MAPPER_UNAVAILABLE. Neither is ever recorded as
+    identity_state unresolved (X1), as out_of_scope, or as an eligibility failure, and neither
+    ever produces a partial run result. An unresolved identity is a conclusion the verified
+    mapper reached from official evidence; a missing mapper is a tool failure that stops the run.
+  versioning: >-
+    Exactly one lock record per map_version, written once and never rewritten. A corrected map
+    requires a map_version bump, a new lock record, retention of the superseded lock, and --
+    because the universe lock binds the map (IM6) -- a universe_version bump with a new universe
+    lock and a full deterministic re-run.
 lock_protocol_version_delta_contract:
   required_in_every_run: true
   waives_nothing: >-
@@ -235,21 +446,32 @@ lock_protocol_version_delta_contract:
       boolean; true iff any of the three lock values differs from its current counterpart
     reconciled_via_amendment_log_versions: >-
       ordered list of amendment_log versions traversed from the lock's protocol version to the
-      current one; empty list iff differs is false
+      current one; empty list iff differs is false. The chain must be COMPLETE and gap-free in
+      ascending order -- every amendment_log version strictly greater than the lock's
+      protocol_version and less than or equal to the current protocol_version must appear.
+      Skipping an intermediate version is UNIVERSE_LOCK_DELTA_INCOMPLETE and terminates the run.
   admissibility: >-
     admissible only if the lock's (protocol_version, protocol_doc_hash,
     registration_content_hash) triple equals the current values or appears in amendment_log as
-    an entry's own version/digests or as an entry's supersedes_digests; otherwise
-    UNIVERSE_LOCK_PROTOCOL_UNKNOWN and terminate. A missing, partial or free-text delta is
-    UNIVERSE_LOCK_DELTA_INCOMPLETE and terminates the run.
+    an entry's own version/digests or as an entry's supersedes_digests, AND the lock is not an
+    invalid-binding lock (protocol section 4.6.2); otherwise UNIVERSE_LOCK_PROTOCOL_UNKNOWN and
+    terminate. A missing, partial or free-text delta is UNIVERSE_LOCK_DELTA_INCOMPLETE and
+    terminates the run. Digests recorded only as rejected_draft_digests are audit history and are
+    never admissible.
   expected_delta_for_active_lock:
-    lock_protocol_version: 1.0.2
-    lock_protocol_doc_hash: 685319b54d52183f44e6f98605b0a6d00a1348b8fc055c69b54d334872385efc
-    lock_registration_content_hash: 82261ab52ade28f35db35cfe569a6bbcb70b8bac24c46159352d40ce03bbe37e
-    current_protocol_version: 1.0.3
+    lock_protocol_version: 1.0.3
+    lock_protocol_doc_hash: df9b9a33a4343968c20993feaab6622d129118152cd0c90452936c4b5f81cfc0
+    lock_registration_content_hash: d79486b3b74f81d87a3d25c10bd1f0eea31ada562a940d632f4a29ef8574b7b2
+    current_protocol_version: 1.0.4
     differs: true
     reconciled_via_amendment_log_versions:
-      - 1.0.3
+      - 1.0.4
+    chain_note: >-
+      Exactly one step. Lock v4 records the bindings that were genuinely in force at its
+      created_at (1.0.3), so the complete gap-free ascending chain of amendment_log versions
+      strictly greater than 1.0.3 and less than or equal to 1.0.4 is [1.0.4] alone. 1.0.2 is NOT
+      part of the active chain: it belongs to the superseded lock v3 lineage, and lock v3 is an
+      invalid-binding record that may never appear as a traversed step.
     note: >-
       current_protocol_doc_hash and current_registration_content_hash are intentionally not
       pre-stated here: the executor must recompute them in V1/V2 from the live files rather than
@@ -272,7 +494,27 @@ executor_preconditions:
     _DELTA_INCOMPLETE and terminate
   V6: >-
     universe conservation checks U1-U7 pass, including the mandatory normalization/admission
-    replay RP1-RP7 recomputed from the raw inventory (custodian outcomes are never trusted)
+    replay RP1-RP7 recomputed from the raw inventory THROUGH the V7-verified identity map
+    (custodian outcomes are never trusted, and no other mapping mechanism is admissible)
+  V7: >-
+    identity map lock resolved from identity_map_contract.active.path, present, self-verifying
+    against both its own lock_content_hash and the active mirror above, and binding the external
+    map manifest, the official response bundle, the acquisition tool, the live raw inventory,
+    the live pack and the universe lock identity_map_binding (IM1-IM6); otherwise
+    IDENTITY_MAP_LOCK_MISSING / IDENTITY_MAP_LOCK_CORRUPT / IDENTITY_MAP_MISMATCH /
+    IDENTITY_MAP_UNVERIFIED and terminate with no run result
+  execution_order:
+    - V1
+    - V2
+    - V3
+    - V4
+    - V5
+    - V7
+    - V6
+  execution_order_note: >-
+    The ids are stable names, not an ordering. V7 necessarily precedes V6 because the RP1-RP7
+    replay is performed through the mapper that V7 verifies; a replay run against an unverified
+    mapper would prove nothing. The executor short-circuits on the first failure.
 relaxation_ladder:
   - R1 C5 spec-taxonomy coverage becomes report-only
   - R2 P2 minimum established source groups 3 -> 2
@@ -422,3 +664,103 @@ amendment_log:
         universe lock v1 and lock v2, which is why every selection run must carry a
         lock_protocol_version_delta reconciling them with the current digests. No selection run
         ever executed under v1.0.2.
+  - version: 1.0.4
+    timestamp: '2026-08-05T16:53:52+05:30'
+    timestamp_utc: '2026-08-05T11:23:52Z'
+    change_class: administrative_binding_repoint_plus_fail_closed_precondition
+    reason: >-
+      Fourth pre-first-run correction, made before any selection run has ever executed. Two
+      things changed underneath this registration: (a) an offline raw identity map was built
+      from pinned official public reference responses and locked as map_version 4 at
+      2026-08-05T05:56:56Z, giving the RP1-RP7 replay an independent identity source instead of
+      a codon table, residue arithmetic or the universe's own declared fields; (b) replaying the
+      raw inventory through that official map superseded exactly 3 of universe_version 2's
+      resolved-identity determinations. That corrected content was first locked as
+      universe_version 3, but lock v3 recorded protocol 1.0.2 as in force at its 2026-08-05T07:48:21Z
+      creation although v1.0.3 had been frozen on 2026-08-03T11:02:57Z, making its lock-time
+      record false; it was therefore superseded by universe_version 4, locked at
+      2026-08-05T11:13:11Z over parsed-data-identical identities and observations with honest
+      1.0.3 lock-time bindings. This amendment therefore (1) repoints
+      candidate_universe_contract.universe_lock to the active v4 lock and mirrors its universe /
+      raw-inventory / ledger / discovery-set / pack / identity-map digests and counts verbatim,
+      retaining locks v1 and v2 as superseded-not-replaced and lock v3 as an invalid-binding
+      artifact that is never active and never an admissible predecessor; (2) adds the
+      identity_map_contract block naming the active map lock and its digests, counts, pack
+      binding and reference binding, and states that the map lock is protocol-independent and
+      therefore not subject to K5; (3) adds fail-closed executor precondition V7 with checks
+      IM1-IM6 and pins the execution order V1,V2,V3,V4,V5,V7,V6 so the mapper is verified before
+      the replay that uses it; (4) binds U7/RP1-RP7 to that verified mapper and no other,
+      forbidding an injected mapper object; (5) records that a mapper fault
+      (IDENTITY_MAP_UNVERIFIED / REPLAY_MAPPER_UNAVAILABLE) is a tool failure that stops the run
+      and is never recorded as an unresolved identity, an out-of-scope row or an eligibility
+      failure; (6) adds protocol section 4.6.2 (invalid-binding locks) and strengthens K5 so a
+      delta can never legitimize a false lock-time record, with the active chain being the single
+      honest step 1.0.3 -> 1.0.4. No lock, map, universe or response file was modified; locks v1,
+      v2, v3, v4 and identity-map lock v4 remain byte-identical.
+    correction_history: >-
+      An earlier draft of this same v1.0.4 entry bound the active universe lock to v3 and
+      declared a K5 chain of [1.0.3, 1.0.4] from lock-time 1.0.2 bindings. Independent review
+      rejected it: that chain laundered lock v3's false lock-time record through the amendment
+      log. The draft was never committed, never issued, never bound by any lock and never read by
+      any run, so it was corrected in place rather than re-numbered (protocol section 20.4).
+    rejected_draft_digests:
+      protocol_doc_hash: be1ef2bbedb6e8a2ecb6cca0505fca6b9d40f73a4ef2f72d9a4e560ba188c209
+      registration_content_hash: ee89ae13e0dd670be77e5414f472aa4ece97454776129910e65a9cddcf55e352
+      status: rejected_before_issue
+      note: >-
+        AUDIT HISTORY ONLY. These digests were never in force. They are NOT this entry's own
+        digests and NOT supersedes_digests, and they are explicitly inadmissible for K5: no lock
+        may reconcile against them and no delta may name them.
+    semantic_preservation_attestation: >-
+      selection_seed, panel_size_rule, attempt schedule, search_parameters (full_eligible_universe
+      scope, null shortlist, 5000000 resource-guard node budget), sampling_strata and Omega
+      precedence, eligibility rules E1-E8, coverage C1-C5, diversity D1-D2, source concentration
+      P1-P3, the metadata/evidence firewall, the taxonomy crosswalk, the relaxation ladder R1-R7,
+      the relaxation gate and never_relaxed are unchanged in this amendment. Only administrative
+      bindings, the new identity_map_contract, the V7/IM1-IM6 precondition, the invalid-binding
+      lock rule (section 4.6.2), the K5 chain completeness/admissibility rules and the
+      corresponding executor checklist / run-record fields changed. V7 and section 4.6.2 are pure
+      fail-closed gates: they can only terminate a run, never admit, re-rank or substitute a
+      candidate, so they cannot change any computed panel.
+    known_candidate_level_results_at_amendment: true
+    known_results_disclosure: >-
+      TRUE, and stated plainly. Candidate discovery, R611Q gate-smoke work and the official
+      identity replay have already run, and candidate-free aggregate summaries of the universe
+      and the identity map exist in-repo. No formal selection run has ever executed. The
+      registrar read only aggregate, candidate-free artifacts (the lock records, the map lock and
+      the public summary counts/digests); no candidate identity, no per-candidate finding and no
+      ranking was inspected. The official replay corrected 3 identity states, but a corrected
+      identity state is not a selected panel: no selection rule, seed, stratum predicate,
+      constraint, ladder step or search algorithm was changed, and the added preconditions can
+      only stop a run. Universe v4 is parsed-data identical to v3 in identities and observations,
+      so repointing the active lock cannot move any candidate either. This amendment therefore
+      tells the executor which locked universe and which verified mapper to read; it cannot move
+      any candidate into or out of the panel.
+    active_universe_lock_after_amendment:
+      path: configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v4.yaml
+      lock_content_hash: f94ce81b8633bac777fd667e26c7b8d3a726b7e4d7eed9f8ed2128f9ed32b50e
+      universe_content_hash: 98edd3bf3cef36b7a1231bc389a37be6efdae7deb2210c869c317dfb6e8bef30
+    inactive_universe_lock_after_amendment:
+      path: configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v3.yaml
+      lock_content_hash: 64345984bcf45b87d9a89afc113b3cd3266559739abeb754fc331eaa421f4e38
+      status: invalid_binding
+      admissible_as_k5_predecessor: false
+      note: >-
+        Retained tracked and byte-identical; never edited, re-hashed or deleted. Not a step in
+        the active K5 chain and not a valid selection input.
+    active_identity_map_lock_after_amendment:
+      path: configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v4.yaml
+      lock_content_hash: 85bc2b10e65bd8140a775537204f3c7c7048cd5444d7057fbea9501b7cd4b104
+      map_content_hash: 3adbf3484de28607fa3c133b2bebc4a9d7926b4c2d5b3863b0634507c599cd26
+      response_bundle_hash: fbedf2aae5aa26936807f2d8f26389a18a861fc884b461fdd8ebaf6b7e9f96bc
+      map_record_count: 35
+    pre_first_run_correction: true
+    first_selection_run_executed: false
+    supersedes_digests:
+      protocol_doc_hash: df9b9a33a4343968c20993feaab6622d129118152cd0c90452936c4b5f81cfc0
+      registration_content_hash: d79486b3b74f81d87a3d25c10bd1f0eea31ada562a940d632f4a29ef8574b7b2
+      note: >-
+        v1.0.3 digests, retained for audit. They are exactly the bindings recorded inside the
+        active lock v4 and therefore the single admissible starting point of its K5
+        reconciliation chain to the current 1.0.4 bindings. No selection run ever executed under
+        v1.0.3.
