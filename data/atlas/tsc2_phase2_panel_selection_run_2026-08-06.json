@@ -1,0 +1,1871 @@
+{
+  "dispositions": [
+    {
+      "all_matched_strata": [
+        "S6"
+      ],
+      "allocation_slot": null,
+      "disposition": "X3",
+      "draw_key": "63db2360e808e92a424d3e4a723455d27aff11f6de9943ac05b9eb02db85763d",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S6",
+      "record_id": "tsc2-cu-01",
+      "rule_id": "E3",
+      "source_group_keys": [],
+      "spec_stratum": "known_pathogenic",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": false,
+      "support_class": "evidence_absent",
+      "universe_key": "NC_000016.10:2070569:C:T"
+    },
+    {
+      "all_matched_strata": [
+        "S6"
+      ],
+      "allocation_slot": null,
+      "disposition": "NS_NOT_IN_SOLUTION",
+      "draw_key": "4c808806377beff4e864042418373be30e65b7537d661b645a99cd52eed679cf",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S6",
+      "record_id": "tsc2-cu-02",
+      "rule_id": "ELIGIBLE",
+      "source_group_keys": [],
+      "spec_stratum": "vus_without_functional_evidence",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": false,
+      "support_class": "evidence_absent",
+      "universe_key": "NC_000016.10:2086265:G:T"
+    },
+    {
+      "all_matched_strata": [
+        "S3"
+      ],
+      "allocation_slot": null,
+      "disposition": "X1",
+      "draw_key": null,
+      "identity_state": "unresolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S3",
+      "record_id": "tsc2-cu-03",
+      "rule_id": "E1",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "vus_with_functional_evidence",
+      "spec_stratum_derivation": "recomputed_from_locked_observations",
+      "stale_label_discordant": false,
+      "support_class": "single_low_throughput",
+      "universe_key": "UNRESOLVED:0325e26734c31c39aa35caad23f3d53b9f0098d55cdfdedd92c235e7201443df"
+    },
+    {
+      "all_matched_strata": [
+        "S3"
+      ],
+      "allocation_slot": null,
+      "disposition": "X1",
+      "draw_key": null,
+      "identity_state": "unresolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S3",
+      "record_id": "tsc2-cu-04",
+      "rule_id": "E1",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "vus_with_functional_evidence",
+      "spec_stratum_derivation": "recomputed_from_locked_observations",
+      "stale_label_discordant": false,
+      "support_class": "single_low_throughput",
+      "universe_key": "UNRESOLVED:4b804219f888b1f48db911c8a702ed26c64cad637a2a07717521ac808ddeeeee"
+    },
+    {
+      "all_matched_strata": [
+        "S2"
+      ],
+      "allocation_slot": null,
+      "disposition": "NS_NOT_IN_SOLUTION",
+      "draw_key": "830a4096e4cb50e8aade9a519ed1d92a09717432c03ee4df62bd8c6bd1cd216b",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S2",
+      "record_id": "tsc2-cu-05",
+      "rule_id": "ELIGIBLE",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "known_pathogenic",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": false,
+      "support_class": "single_low_throughput",
+      "universe_key": "NC_000016.10:2084714:G:T"
+    },
+    {
+      "all_matched_strata": [
+        "S2"
+      ],
+      "allocation_slot": null,
+      "disposition": "NS_NOT_IN_SOLUTION",
+      "draw_key": "c0b3958a5108344d877a84c313740665649244caef6b6ae55ca16ab781a1b236",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S2",
+      "record_id": "tsc2-cu-06",
+      "rule_id": "ELIGIBLE",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "conflicting",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": false,
+      "support_class": "single_low_throughput",
+      "universe_key": "NC_000016.10:2058819:C:T"
+    },
+    {
+      "all_matched_strata": [
+        "S1"
+      ],
+      "allocation_slot": null,
+      "disposition": "NS_NOT_IN_SOLUTION",
+      "draw_key": "a4aa2ee792cc3868d55767806100c709e3d01f4c6558280466f3842e181fce75",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S1",
+      "record_id": "tsc2-cu-07",
+      "rule_id": "ELIGIBLE",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "known_pathogenic",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": false,
+      "support_class": "single_low_throughput",
+      "universe_key": "NC_000016.10:2064352:A:C"
+    },
+    {
+      "all_matched_strata": [
+        "S1"
+      ],
+      "allocation_slot": null,
+      "disposition": "NS_NOT_IN_SOLUTION",
+      "draw_key": "390b583b31f4e0d65d05576ce82ce1da80629a69a660e1e741e1927c8c7729b1",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S1",
+      "record_id": "tsc2-cu-08",
+      "rule_id": "ELIGIBLE",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "vus_without_functional_evidence",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": true,
+      "support_class": "single_low_throughput",
+      "universe_key": "NC_000016.10:2074383:T:C"
+    },
+    {
+      "all_matched_strata": [
+        "S1"
+      ],
+      "allocation_slot": null,
+      "disposition": "NS_NOT_IN_SOLUTION",
+      "draw_key": "c66cd2549fbc549dfc289afb0f713c1a11ed2624919d7eac4235f9cf515b1cbe",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S1",
+      "record_id": "tsc2-cu-09",
+      "rule_id": "ELIGIBLE",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "known_pathogenic",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": false,
+      "support_class": "single_low_throughput",
+      "universe_key": "NC_000016.10:2088292:C:G"
+    },
+    {
+      "all_matched_strata": [
+        "S1"
+      ],
+      "allocation_slot": null,
+      "disposition": "NS_NOT_IN_SOLUTION",
+      "draw_key": "240f7261a36330a359a2198adddfe025fed2312c42dd5f4357b776f5083cf8b1",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S1",
+      "record_id": "tsc2-cu-10",
+      "rule_id": "ELIGIBLE",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "known_pathogenic",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": false,
+      "support_class": "single_low_throughput",
+      "universe_key": "NC_000016.10:2076494:T:C"
+    },
+    {
+      "all_matched_strata": [
+        "S3"
+      ],
+      "allocation_slot": null,
+      "disposition": "NS_NOT_IN_SOLUTION",
+      "draw_key": "cedd1c846110f95c36ca289ae94a3c793b73b57f016a0572a74c082c8f80b2fb",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S3",
+      "record_id": "tsc2-cu-11a",
+      "rule_id": "ELIGIBLE",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "known_benign",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": false,
+      "support_class": "single_low_throughput",
+      "universe_key": "NC_000016.10:2086847:G:A"
+    },
+    {
+      "all_matched_strata": [
+        "S5",
+        "S3",
+        "S1"
+      ],
+      "allocation_slot": null,
+      "disposition": "NS_NOT_IN_SOLUTION",
+      "draw_key": "423f841a8168c1765e5d1037e300941dd7f95f8d070d828611a35e5f85100eaa",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S5",
+      "record_id": "tsc2-cu-11b",
+      "rule_id": "ELIGIBLE",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "known_pathogenic",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": false,
+      "support_class": "single_low_throughput",
+      "universe_key": "NC_000016.10:2086847:G:T"
+    },
+    {
+      "all_matched_strata": [
+        "S6"
+      ],
+      "allocation_slot": null,
+      "disposition": "NS_NOT_IN_SOLUTION",
+      "draw_key": "b8289ce9004f142d6f1bbd3d31234d50e3665a795f79b798fbb6d8a852058093",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S6",
+      "record_id": "tsc2-cu-12",
+      "rule_id": "ELIGIBLE",
+      "source_group_keys": [],
+      "spec_stratum": "known_pathogenic",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": false,
+      "support_class": "evidence_absent",
+      "universe_key": "NC_000016.10:2063052:G:T"
+    },
+    {
+      "all_matched_strata": [
+        "S3"
+      ],
+      "allocation_slot": null,
+      "disposition": "NS_NOT_IN_SOLUTION",
+      "draw_key": "f0f18557c49989aeef7e66677c17031b2c98d5ae09f439db51663a8c9e40079a",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S3",
+      "record_id": "tsc2-cu-13",
+      "rule_id": "ELIGIBLE",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "conflicting",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": false,
+      "support_class": "single_low_throughput",
+      "universe_key": "NC_000016.10:2055418:T:C"
+    },
+    {
+      "all_matched_strata": [
+        "S3"
+      ],
+      "allocation_slot": null,
+      "disposition": "NS_NOT_IN_SOLUTION",
+      "draw_key": "2cd2ea263f6f792a9dd939b669549adc6edf5451d9441f8660f2d262c786b0b1",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S3",
+      "record_id": "tsc2-cu-14",
+      "rule_id": "ELIGIBLE",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "conflicting",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": false,
+      "support_class": "single_low_throughput",
+      "universe_key": "NC_000016.10:2072309:A:G"
+    },
+    {
+      "all_matched_strata": [
+        "S2"
+      ],
+      "allocation_slot": null,
+      "disposition": "X5",
+      "draw_key": "c63fbbe20e360b8facd62880799d216129929dde5bb34246bf6253b6f652d0b6",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S2",
+      "record_id": "tsc2-cu-15",
+      "rule_id": "E4",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "conflicting",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": false,
+      "support_class": "access_blocked",
+      "universe_key": "NC_000016.10:2053407:C:T"
+    },
+    {
+      "all_matched_strata": [
+        "S1"
+      ],
+      "allocation_slot": null,
+      "disposition": "X5",
+      "draw_key": "da477f8ae00efeee1d1b495892fdc2c6eb79deb5c8b88ff9fa143b7b872a6f32",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S1",
+      "record_id": "tsc2-cu-16",
+      "rule_id": "E4",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "vus_without_functional_evidence",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": true,
+      "support_class": "access_blocked",
+      "universe_key": "NC_000016.10:2070558:C:A"
+    },
+    {
+      "all_matched_strata": [
+        "S1"
+      ],
+      "allocation_slot": null,
+      "disposition": "X5",
+      "draw_key": "a7174b4e0232751eb822313878e032694bf9e09adcf179e8958e952c065263b4",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S1",
+      "record_id": "tsc2-cu-17",
+      "rule_id": "E4",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "known_pathogenic",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": false,
+      "support_class": "access_blocked",
+      "universe_key": "NC_000016.10:2079346:C:T"
+    },
+    {
+      "all_matched_strata": [
+        "S1"
+      ],
+      "allocation_slot": null,
+      "disposition": "X5",
+      "draw_key": "25f1413d5e93ca97b1c6966c1d326b7de178a5bb4cb2ba67a9623e1a4784ab71",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S1",
+      "record_id": "tsc2-cu-18",
+      "rule_id": "E4",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "vus_without_functional_evidence",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": true,
+      "support_class": "access_blocked",
+      "universe_key": "NC_000016.10:2080362:T:G"
+    },
+    {
+      "all_matched_strata": [
+        "S1"
+      ],
+      "allocation_slot": null,
+      "disposition": "X5",
+      "draw_key": "710ca3fb05bbfd2225abbbb0667f43f95c0e8c02a5b970b3073690ff4fa6b7ba",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S1",
+      "record_id": "tsc2-cu-19",
+      "rule_id": "E4",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "vus_without_functional_evidence",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": true,
+      "support_class": "access_blocked",
+      "universe_key": "NC_000016.10:2085263:A:C"
+    },
+    {
+      "all_matched_strata": [
+        "S1"
+      ],
+      "allocation_slot": null,
+      "disposition": "X5",
+      "draw_key": "b0ee142d716887d3aa7b4311bf60278cb4ad12ac842e715051a694f9b82489f6",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S1",
+      "record_id": "tsc2-cu-20",
+      "rule_id": "E4",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "known_pathogenic",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": false,
+      "support_class": "access_blocked",
+      "universe_key": "NC_000016.10:2086229:G:T"
+    },
+    {
+      "all_matched_strata": [
+        "S1"
+      ],
+      "allocation_slot": null,
+      "disposition": "X5",
+      "draw_key": "83089e03578dcc01d20253f4c99c751b2c599f01debdf673c11432138cd027e9",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S1",
+      "record_id": "tsc2-cu-21",
+      "rule_id": "E4",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "known_pathogenic",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": false,
+      "support_class": "access_blocked",
+      "universe_key": "NC_000016.10:2086799:C:T"
+    },
+    {
+      "all_matched_strata": [
+        "S1"
+      ],
+      "allocation_slot": null,
+      "disposition": "X5",
+      "draw_key": "3f95ec327f172b9b89225bd1eb50b42e1348aac8c798299df5290c2d06c70185",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S1",
+      "record_id": "tsc2-cu-22",
+      "rule_id": "E4",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "vus_without_functional_evidence",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": true,
+      "support_class": "access_blocked",
+      "universe_key": "NC_000016.10:2086818:T:G"
+    },
+    {
+      "all_matched_strata": [
+        "S1"
+      ],
+      "allocation_slot": null,
+      "disposition": "NS_NOT_IN_SOLUTION",
+      "draw_key": "04a60e99b84be05f7f9f8aa00e36852f27b93824f85320f064bb528e34855d56",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S1",
+      "record_id": "tsc2-cu-23",
+      "rule_id": "ELIGIBLE",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "known_pathogenic",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": false,
+      "support_class": "single_low_throughput",
+      "universe_key": "NC_000016.10:2088293:G:A"
+    },
+    {
+      "all_matched_strata": [
+        "S1"
+      ],
+      "allocation_slot": null,
+      "disposition": "NS_NOT_IN_SOLUTION",
+      "draw_key": "a9e27a3991b4e5ca195e0ce797162d16c82a900c8949afff7d550ef00e2ce877",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S1",
+      "record_id": "tsc2-cu-24",
+      "rule_id": "ELIGIBLE",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "known_pathogenic",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": false,
+      "support_class": "single_low_throughput",
+      "universe_key": "NC_000016.10:2088292:C:T"
+    },
+    {
+      "all_matched_strata": [
+        "S1"
+      ],
+      "allocation_slot": null,
+      "disposition": "X1",
+      "draw_key": null,
+      "identity_state": "unresolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S1",
+      "record_id": "tsc2-cu-25",
+      "rule_id": "E1",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "vus_with_functional_evidence",
+      "spec_stratum_derivation": "recomputed_from_locked_observations",
+      "stale_label_discordant": false,
+      "support_class": "access_blocked",
+      "universe_key": "UNRESOLVED:f086135997a271e78a4a0d22bf92cdf8a164c3cfabf46dda2cd688482d3f2213"
+    },
+    {
+      "all_matched_strata": [
+        "S1"
+      ],
+      "allocation_slot": null,
+      "disposition": "X1",
+      "draw_key": null,
+      "identity_state": "unresolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S1",
+      "record_id": "tsc2-cu-26",
+      "rule_id": "E1",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "vus_with_functional_evidence",
+      "spec_stratum_derivation": "recomputed_from_locked_observations",
+      "stale_label_discordant": false,
+      "support_class": "access_blocked",
+      "universe_key": "UNRESOLVED:97354d9996b5d82aa02362dc2fd1d899bd3280ce9b02777f774e6aecb0b787c5"
+    },
+    {
+      "all_matched_strata": [
+        "S1"
+      ],
+      "allocation_slot": null,
+      "disposition": "X1",
+      "draw_key": null,
+      "identity_state": "unresolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S1",
+      "record_id": "tsc2-cu-27",
+      "rule_id": "E1",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "vus_with_functional_evidence",
+      "spec_stratum_derivation": "recomputed_from_locked_observations",
+      "stale_label_discordant": false,
+      "support_class": "access_blocked",
+      "universe_key": "UNRESOLVED:3e53130abe4b9d239ff2553794c88278630031ab33566a5d5dd9aadc7a252717"
+    },
+    {
+      "all_matched_strata": [
+        "S3"
+      ],
+      "allocation_slot": null,
+      "disposition": "X1",
+      "draw_key": null,
+      "identity_state": "unresolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S3",
+      "record_id": "tsc2-cu-28",
+      "rule_id": "E1",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "vus_with_functional_evidence",
+      "spec_stratum_derivation": "recomputed_from_locked_observations",
+      "stale_label_discordant": false,
+      "support_class": "access_blocked",
+      "universe_key": "UNRESOLVED:5442e72eb728c50477304383afc98086475a6f90bfc5b2cf833e4f4159aa920f"
+    },
+    {
+      "all_matched_strata": [
+        "S3"
+      ],
+      "allocation_slot": null,
+      "disposition": "X5",
+      "draw_key": "7854129119c7afecdccf584995a131a07239b4ca48ce075fc12e77238a99f804",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S3",
+      "record_id": "tsc2-cu-29",
+      "rule_id": "E4",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "vus_without_functional_evidence",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": true,
+      "support_class": "access_blocked",
+      "universe_key": "NC_000016.10:2060811:A:C"
+    },
+    {
+      "all_matched_strata": [
+        "S3"
+      ],
+      "allocation_slot": null,
+      "disposition": "X5",
+      "draw_key": "bcd2713300a4b1722ac8ef1934a99358ad20d9b43038ac6ebf833e352cbe7b16",
+      "identity_state": "resolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S3",
+      "record_id": "tsc2-cu-30",
+      "rule_id": "E4",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "vus_without_functional_evidence",
+      "spec_stratum_derivation": "external_label",
+      "stale_label_discordant": true,
+      "support_class": "access_blocked",
+      "universe_key": "NC_000016.10:2079367:C:T"
+    },
+    {
+      "all_matched_strata": [
+        "S3"
+      ],
+      "allocation_slot": null,
+      "disposition": "X1",
+      "draw_key": null,
+      "identity_state": "unresolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S3",
+      "record_id": "tsc2-cu-31",
+      "rule_id": "E1",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "vus_with_functional_evidence",
+      "spec_stratum_derivation": "recomputed_from_locked_observations",
+      "stale_label_discordant": false,
+      "support_class": "access_blocked",
+      "universe_key": "UNRESOLVED:3b708fcc2a95e7b9104ff6f1656569ec24c38767fef7beb1bbb334e83d13b7bb"
+    },
+    {
+      "all_matched_strata": [
+        "S3"
+      ],
+      "allocation_slot": null,
+      "disposition": "X1",
+      "draw_key": null,
+      "identity_state": "unresolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S3",
+      "record_id": "tsc2-cu-32",
+      "rule_id": "E1",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "vus_with_functional_evidence",
+      "spec_stratum_derivation": "recomputed_from_locked_observations",
+      "stale_label_discordant": false,
+      "support_class": "access_blocked",
+      "universe_key": "UNRESOLVED:34a925d2d6f27037f346e262a759d37ba59cf55e9059c3e1a6ba1c8a963eb57c"
+    },
+    {
+      "all_matched_strata": [
+        "S3"
+      ],
+      "allocation_slot": null,
+      "disposition": "X1",
+      "draw_key": null,
+      "identity_state": "unresolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S3",
+      "record_id": "tsc2-cu-33",
+      "rule_id": "E1",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "vus_with_functional_evidence",
+      "spec_stratum_derivation": "recomputed_from_locked_observations",
+      "stale_label_discordant": false,
+      "support_class": "access_blocked",
+      "universe_key": "UNRESOLVED:4aaf5db4a644c5cb615617feb81bfd056730c438a5110f119f4b92121323acd6"
+    },
+    {
+      "all_matched_strata": [
+        "S3"
+      ],
+      "allocation_slot": null,
+      "disposition": "X1",
+      "draw_key": null,
+      "identity_state": "unresolved",
+      "label_function_discordant": false,
+      "primary_stratum": "S3",
+      "record_id": "tsc2-cu-34",
+      "rule_id": "E1",
+      "source_group_keys": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "spec_stratum": "vus_with_functional_evidence",
+      "spec_stratum_derivation": "recomputed_from_locked_observations",
+      "stale_label_discordant": false,
+      "support_class": "access_blocked",
+      "universe_key": "UNRESOLVED:5fbc5066282182f78c2e37d716338b06d6bf45e654cdb2b40674eba1cc0e4f94"
+    }
+  ],
+  "identity_map": {
+    "acquisition_tool_sha256": "7c0593954f249e136a8690cd580f8bcdc40ebec1108a23f03626451bfd67251e",
+    "checks_passed": [
+      "IM1",
+      "IM2",
+      "IM3",
+      "IM4",
+      "IM5",
+      "IM6"
+    ],
+    "lock_content_hash": "85bc2b10e65bd8140a775537204f3c7c7048cd5444d7057fbea9501b7cd4b104",
+    "lock_path": "D:\\AIProjects\\raptor-worktrees\\atlas-panel-selection\\configs\\atlas\\panels\\tsc2\\atlas-phase2-raw-identity-map-lock-v4.yaml",
+    "lock_version": "4",
+    "map_content_hash": "3adbf3484de28607fa3c133b2bebc4a9d7926b4c2d5b3863b0634507c599cd26",
+    "map_record_count": 35,
+    "map_version": "4",
+    "reference_assembly": "GRCh38",
+    "reference_page_count": 13,
+    "reference_protein": "NP_000539.2",
+    "reference_transcript": "NM_000548.5",
+    "response_bundle_hash": "fbedf2aae5aa26936807f2d8f26389a18a861fc884b461fdd8ebaf6b7e9f96bc",
+    "response_byte_count": 904564,
+    "response_file_count": 88
+  },
+  "normalization_replay": {
+    "checks_passed": [
+      "RP1",
+      "RP2",
+      "RP3",
+      "RP4",
+      "RP5",
+      "RP6",
+      "RP7"
+    ],
+    "outcome_counts": {
+      "resolved_identity": 25,
+      "unresolved_identity": 10
+    },
+    "replayed_row_count": 35,
+    "unresolved_confirmed_count": 10
+  },
+  "procedure": {
+    "applied_relaxation_steps": [],
+    "attempt_log": [
+      {
+        "level": "L0",
+        "n": 7,
+        "nodes_expanded": 714,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "L0",
+        "n": 6,
+        "nodes_expanded": 324,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "L0",
+        "n": 5,
+        "nodes_expanded": 72,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R1",
+        "n": 7,
+        "nodes_expanded": 714,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R1",
+        "n": 6,
+        "nodes_expanded": 324,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R1",
+        "n": 5,
+        "nodes_expanded": 72,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R2",
+        "n": 7,
+        "nodes_expanded": 714,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R2",
+        "n": 6,
+        "nodes_expanded": 324,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R2",
+        "n": 5,
+        "nodes_expanded": 72,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R3",
+        "n": 7,
+        "nodes_expanded": 714,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R3",
+        "n": 6,
+        "nodes_expanded": 324,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R3",
+        "n": 5,
+        "nodes_expanded": 72,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R4",
+        "n": 7,
+        "nodes_expanded": 714,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R4",
+        "n": 6,
+        "nodes_expanded": 324,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R4",
+        "n": 5,
+        "nodes_expanded": 72,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R5",
+        "n": 7,
+        "nodes_expanded": 714,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R5",
+        "n": 6,
+        "nodes_expanded": 324,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R5",
+        "n": 5,
+        "nodes_expanded": 72,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R6",
+        "n": 7,
+        "nodes_expanded": 714,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R6",
+        "n": 6,
+        "nodes_expanded": 324,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R6",
+        "n": 5,
+        "nodes_expanded": 72,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R7",
+        "n": 7,
+        "nodes_expanded": 714,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R7",
+        "n": 6,
+        "nodes_expanded": 324,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R7",
+        "n": 5,
+        "nodes_expanded": 72,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      }
+    ],
+    "attempts": [
+      {
+        "level": "L0",
+        "n": 7,
+        "nodes_expanded": 714,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "L0",
+        "n": 6,
+        "nodes_expanded": 324,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "L0",
+        "n": 5,
+        "nodes_expanded": 72,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R1",
+        "n": 7,
+        "nodes_expanded": 714,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R1",
+        "n": 6,
+        "nodes_expanded": 324,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R1",
+        "n": 5,
+        "nodes_expanded": 72,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R2",
+        "n": 7,
+        "nodes_expanded": 714,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R2",
+        "n": 6,
+        "nodes_expanded": 324,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R2",
+        "n": 5,
+        "nodes_expanded": 72,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R3",
+        "n": 7,
+        "nodes_expanded": 714,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R3",
+        "n": 6,
+        "nodes_expanded": 324,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R3",
+        "n": 5,
+        "nodes_expanded": 72,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R4",
+        "n": 7,
+        "nodes_expanded": 714,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R4",
+        "n": 6,
+        "nodes_expanded": 324,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R4",
+        "n": 5,
+        "nodes_expanded": 72,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R5",
+        "n": 7,
+        "nodes_expanded": 714,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R5",
+        "n": 6,
+        "nodes_expanded": 324,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R5",
+        "n": 5,
+        "nodes_expanded": 72,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R6",
+        "n": 7,
+        "nodes_expanded": 714,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R6",
+        "n": 6,
+        "nodes_expanded": 324,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R6",
+        "n": 5,
+        "nodes_expanded": 72,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R7",
+        "n": 7,
+        "nodes_expanded": 714,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R7",
+        "n": 6,
+        "nodes_expanded": 324,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      },
+      {
+        "level": "R7",
+        "n": 5,
+        "nodes_expanded": 72,
+        "solution": null,
+        "status": "INFEASIBLE_COMPLETE"
+      }
+    ],
+    "declared_constraints": {
+      "base_thresholds": {
+        "C3": "ceil(n/2)",
+        "D1": "3",
+        "D2": "2",
+        "D3": "ceil(n/2)",
+        "P1": "ceil(n/2)",
+        "P2": "3",
+        "P3": "2"
+      },
+      "declared_ladder": [
+        "R1 C5 spec-taxonomy coverage becomes report-only",
+        "R2 P2 minimum established source groups 3 -> 2",
+        "R3 P1 sole-support cap ceil(n/2) -> ceil(2n/3)",
+        "R4 D1 minimum assay kinds 3 -> 2",
+        "R5 P3 single-high-throughput cap 2 -> 3",
+        "R6 D2 minimum model systems 2 -> 1",
+        "R7 P2 minimum established source groups -> 1 (terminal)"
+      ],
+      "explicit_logic_constraints": [
+        "C1",
+        "C2",
+        "C4",
+        "C5",
+        "D4",
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "levels_evaluated": [
+        {
+          "applied_steps": [],
+          "c3_max_per_stratum": 4,
+          "c5_enforced": true,
+          "d1_min_assay_kinds": 3,
+          "d2_min_model_systems": 2,
+          "d3_max_per_assay_kind": 4,
+          "level": "L0",
+          "n": 7,
+          "p1_max_sole_support": 4,
+          "p2_min_established_groups": 3,
+          "p3_max_single_high_throughput": 2,
+          "rung": 0
+        },
+        {
+          "applied_steps": [],
+          "c3_max_per_stratum": 3,
+          "c5_enforced": true,
+          "d1_min_assay_kinds": 3,
+          "d2_min_model_systems": 2,
+          "d3_max_per_assay_kind": 3,
+          "level": "L0",
+          "n": 6,
+          "p1_max_sole_support": 3,
+          "p2_min_established_groups": 3,
+          "p3_max_single_high_throughput": 2,
+          "rung": 0
+        },
+        {
+          "applied_steps": [],
+          "c3_max_per_stratum": 3,
+          "c5_enforced": true,
+          "d1_min_assay_kinds": 3,
+          "d2_min_model_systems": 2,
+          "d3_max_per_assay_kind": 3,
+          "level": "L0",
+          "n": 5,
+          "p1_max_sole_support": 3,
+          "p2_min_established_groups": 3,
+          "p3_max_single_high_throughput": 2,
+          "rung": 0
+        },
+        {
+          "applied_steps": [
+            "R1"
+          ],
+          "c3_max_per_stratum": 4,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 3,
+          "d2_min_model_systems": 2,
+          "d3_max_per_assay_kind": 4,
+          "level": "R1",
+          "n": 7,
+          "p1_max_sole_support": 4,
+          "p2_min_established_groups": 3,
+          "p3_max_single_high_throughput": 2,
+          "rung": 1
+        },
+        {
+          "applied_steps": [
+            "R1"
+          ],
+          "c3_max_per_stratum": 3,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 3,
+          "d2_min_model_systems": 2,
+          "d3_max_per_assay_kind": 3,
+          "level": "R1",
+          "n": 6,
+          "p1_max_sole_support": 3,
+          "p2_min_established_groups": 3,
+          "p3_max_single_high_throughput": 2,
+          "rung": 1
+        },
+        {
+          "applied_steps": [
+            "R1"
+          ],
+          "c3_max_per_stratum": 3,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 3,
+          "d2_min_model_systems": 2,
+          "d3_max_per_assay_kind": 3,
+          "level": "R1",
+          "n": 5,
+          "p1_max_sole_support": 3,
+          "p2_min_established_groups": 3,
+          "p3_max_single_high_throughput": 2,
+          "rung": 1
+        },
+        {
+          "applied_steps": [
+            "R1",
+            "R2"
+          ],
+          "c3_max_per_stratum": 4,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 3,
+          "d2_min_model_systems": 2,
+          "d3_max_per_assay_kind": 4,
+          "level": "R2",
+          "n": 7,
+          "p1_max_sole_support": 4,
+          "p2_min_established_groups": 2,
+          "p3_max_single_high_throughput": 2,
+          "rung": 2
+        },
+        {
+          "applied_steps": [
+            "R1",
+            "R2"
+          ],
+          "c3_max_per_stratum": 3,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 3,
+          "d2_min_model_systems": 2,
+          "d3_max_per_assay_kind": 3,
+          "level": "R2",
+          "n": 6,
+          "p1_max_sole_support": 3,
+          "p2_min_established_groups": 2,
+          "p3_max_single_high_throughput": 2,
+          "rung": 2
+        },
+        {
+          "applied_steps": [
+            "R1",
+            "R2"
+          ],
+          "c3_max_per_stratum": 3,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 3,
+          "d2_min_model_systems": 2,
+          "d3_max_per_assay_kind": 3,
+          "level": "R2",
+          "n": 5,
+          "p1_max_sole_support": 3,
+          "p2_min_established_groups": 2,
+          "p3_max_single_high_throughput": 2,
+          "rung": 2
+        },
+        {
+          "applied_steps": [
+            "R1",
+            "R2",
+            "R3"
+          ],
+          "c3_max_per_stratum": 4,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 3,
+          "d2_min_model_systems": 2,
+          "d3_max_per_assay_kind": 4,
+          "level": "R3",
+          "n": 7,
+          "p1_max_sole_support": 5,
+          "p2_min_established_groups": 2,
+          "p3_max_single_high_throughput": 2,
+          "rung": 3
+        },
+        {
+          "applied_steps": [
+            "R1",
+            "R2",
+            "R3"
+          ],
+          "c3_max_per_stratum": 3,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 3,
+          "d2_min_model_systems": 2,
+          "d3_max_per_assay_kind": 3,
+          "level": "R3",
+          "n": 6,
+          "p1_max_sole_support": 4,
+          "p2_min_established_groups": 2,
+          "p3_max_single_high_throughput": 2,
+          "rung": 3
+        },
+        {
+          "applied_steps": [
+            "R1",
+            "R2",
+            "R3"
+          ],
+          "c3_max_per_stratum": 3,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 3,
+          "d2_min_model_systems": 2,
+          "d3_max_per_assay_kind": 3,
+          "level": "R3",
+          "n": 5,
+          "p1_max_sole_support": 4,
+          "p2_min_established_groups": 2,
+          "p3_max_single_high_throughput": 2,
+          "rung": 3
+        },
+        {
+          "applied_steps": [
+            "R1",
+            "R2",
+            "R3",
+            "R4"
+          ],
+          "c3_max_per_stratum": 4,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 2,
+          "d2_min_model_systems": 2,
+          "d3_max_per_assay_kind": 4,
+          "level": "R4",
+          "n": 7,
+          "p1_max_sole_support": 5,
+          "p2_min_established_groups": 2,
+          "p3_max_single_high_throughput": 2,
+          "rung": 4
+        },
+        {
+          "applied_steps": [
+            "R1",
+            "R2",
+            "R3",
+            "R4"
+          ],
+          "c3_max_per_stratum": 3,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 2,
+          "d2_min_model_systems": 2,
+          "d3_max_per_assay_kind": 3,
+          "level": "R4",
+          "n": 6,
+          "p1_max_sole_support": 4,
+          "p2_min_established_groups": 2,
+          "p3_max_single_high_throughput": 2,
+          "rung": 4
+        },
+        {
+          "applied_steps": [
+            "R1",
+            "R2",
+            "R3",
+            "R4"
+          ],
+          "c3_max_per_stratum": 3,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 2,
+          "d2_min_model_systems": 2,
+          "d3_max_per_assay_kind": 3,
+          "level": "R4",
+          "n": 5,
+          "p1_max_sole_support": 4,
+          "p2_min_established_groups": 2,
+          "p3_max_single_high_throughput": 2,
+          "rung": 4
+        },
+        {
+          "applied_steps": [
+            "R1",
+            "R2",
+            "R3",
+            "R4",
+            "R5"
+          ],
+          "c3_max_per_stratum": 4,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 2,
+          "d2_min_model_systems": 2,
+          "d3_max_per_assay_kind": 4,
+          "level": "R5",
+          "n": 7,
+          "p1_max_sole_support": 5,
+          "p2_min_established_groups": 2,
+          "p3_max_single_high_throughput": 3,
+          "rung": 5
+        },
+        {
+          "applied_steps": [
+            "R1",
+            "R2",
+            "R3",
+            "R4",
+            "R5"
+          ],
+          "c3_max_per_stratum": 3,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 2,
+          "d2_min_model_systems": 2,
+          "d3_max_per_assay_kind": 3,
+          "level": "R5",
+          "n": 6,
+          "p1_max_sole_support": 4,
+          "p2_min_established_groups": 2,
+          "p3_max_single_high_throughput": 3,
+          "rung": 5
+        },
+        {
+          "applied_steps": [
+            "R1",
+            "R2",
+            "R3",
+            "R4",
+            "R5"
+          ],
+          "c3_max_per_stratum": 3,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 2,
+          "d2_min_model_systems": 2,
+          "d3_max_per_assay_kind": 3,
+          "level": "R5",
+          "n": 5,
+          "p1_max_sole_support": 4,
+          "p2_min_established_groups": 2,
+          "p3_max_single_high_throughput": 3,
+          "rung": 5
+        },
+        {
+          "applied_steps": [
+            "R1",
+            "R2",
+            "R3",
+            "R4",
+            "R5",
+            "R6"
+          ],
+          "c3_max_per_stratum": 4,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 2,
+          "d2_min_model_systems": 1,
+          "d3_max_per_assay_kind": 4,
+          "level": "R6",
+          "n": 7,
+          "p1_max_sole_support": 5,
+          "p2_min_established_groups": 2,
+          "p3_max_single_high_throughput": 3,
+          "rung": 6
+        },
+        {
+          "applied_steps": [
+            "R1",
+            "R2",
+            "R3",
+            "R4",
+            "R5",
+            "R6"
+          ],
+          "c3_max_per_stratum": 3,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 2,
+          "d2_min_model_systems": 1,
+          "d3_max_per_assay_kind": 3,
+          "level": "R6",
+          "n": 6,
+          "p1_max_sole_support": 4,
+          "p2_min_established_groups": 2,
+          "p3_max_single_high_throughput": 3,
+          "rung": 6
+        },
+        {
+          "applied_steps": [
+            "R1",
+            "R2",
+            "R3",
+            "R4",
+            "R5",
+            "R6"
+          ],
+          "c3_max_per_stratum": 3,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 2,
+          "d2_min_model_systems": 1,
+          "d3_max_per_assay_kind": 3,
+          "level": "R6",
+          "n": 5,
+          "p1_max_sole_support": 4,
+          "p2_min_established_groups": 2,
+          "p3_max_single_high_throughput": 3,
+          "rung": 6
+        },
+        {
+          "applied_steps": [
+            "R1",
+            "R2",
+            "R3",
+            "R4",
+            "R5",
+            "R6",
+            "R7"
+          ],
+          "c3_max_per_stratum": 4,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 2,
+          "d2_min_model_systems": 1,
+          "d3_max_per_assay_kind": 4,
+          "level": "R7",
+          "n": 7,
+          "p1_max_sole_support": 5,
+          "p2_min_established_groups": 1,
+          "p3_max_single_high_throughput": 3,
+          "rung": 7
+        },
+        {
+          "applied_steps": [
+            "R1",
+            "R2",
+            "R3",
+            "R4",
+            "R5",
+            "R6",
+            "R7"
+          ],
+          "c3_max_per_stratum": 3,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 2,
+          "d2_min_model_systems": 1,
+          "d3_max_per_assay_kind": 3,
+          "level": "R7",
+          "n": 6,
+          "p1_max_sole_support": 4,
+          "p2_min_established_groups": 1,
+          "p3_max_single_high_throughput": 3,
+          "rung": 7
+        },
+        {
+          "applied_steps": [
+            "R1",
+            "R2",
+            "R3",
+            "R4",
+            "R5",
+            "R6",
+            "R7"
+          ],
+          "c3_max_per_stratum": 3,
+          "c5_enforced": false,
+          "d1_min_assay_kinds": 2,
+          "d2_min_model_systems": 1,
+          "d3_max_per_assay_kind": 3,
+          "level": "R7",
+          "n": 5,
+          "p1_max_sole_support": 4,
+          "p2_min_established_groups": 1,
+          "p3_max_single_high_throughput": 3,
+          "rung": 7
+        }
+      ],
+      "protocol_doc_hash": "7b0596ab4a52601566c85a3a2c7ca42aead9c35916890397e58b3e11876e5823",
+      "protocol_version": "1.0.4",
+      "relaxation_steps": [
+        {
+          "after": null,
+          "before": null,
+          "constraint_id": "C5",
+          "declared_text": "R1 C5 spec-taxonomy coverage becomes report-only",
+          "kind": "report_only",
+          "position": 1,
+          "step_id": "R1"
+        },
+        {
+          "after": "2",
+          "before": "3",
+          "constraint_id": "P2",
+          "declared_text": "R2 P2 minimum established source groups 3 -> 2",
+          "kind": "threshold",
+          "position": 2,
+          "step_id": "R2"
+        },
+        {
+          "after": "ceil(2n/3)",
+          "before": "ceil(n/2)",
+          "constraint_id": "P1",
+          "declared_text": "R3 P1 sole-support cap ceil(n/2) -> ceil(2n/3)",
+          "kind": "threshold",
+          "position": 3,
+          "step_id": "R3"
+        },
+        {
+          "after": "2",
+          "before": "3",
+          "constraint_id": "D1",
+          "declared_text": "R4 D1 minimum assay kinds 3 -> 2",
+          "kind": "threshold",
+          "position": 4,
+          "step_id": "R4"
+        },
+        {
+          "after": "3",
+          "before": "2",
+          "constraint_id": "P3",
+          "declared_text": "R5 P3 single-high-throughput cap 2 -> 3",
+          "kind": "threshold",
+          "position": 5,
+          "step_id": "R5"
+        },
+        {
+          "after": "1",
+          "before": "2",
+          "constraint_id": "D2",
+          "declared_text": "R6 D2 minimum model systems 2 -> 1",
+          "kind": "threshold",
+          "position": 6,
+          "step_id": "R6"
+        },
+        {
+          "after": "1",
+          "before": "2",
+          "constraint_id": "P2",
+          "declared_text": "R7 P2 minimum established source groups -> 1 (terminal)",
+          "kind": "threshold",
+          "position": 7,
+          "step_id": "R7"
+        }
+      ]
+    },
+    "independence_status": "DECLARED",
+    "max_nodes_expanded": 714,
+    "n_target": 7,
+    "node_budget": 5000000,
+    "node_budget_override": null,
+    "search_node_budget": 5000000,
+    "search_scope": "full_eligible_universe",
+    "selection_seed": "raptor-atlas-phase2-panel-v1",
+    "terminal_outcome": "INFEASIBLE_PANEL"
+  },
+  "provenance": {
+    "anchor": {
+      "residue_index": 611,
+      "spdi_canonical": "NC_000016.10:2070570:G:A"
+    },
+    "executor_identity": "sdrona_microsoft",
+    "repo_root": "D:\\AIProjects\\raptor-worktrees\\atlas-panel-selection",
+    "run_started_at": "2026-08-06T21:20:41.716315+00:00"
+  },
+  "result": {
+    "flags": {
+      "ABSTENTION_CONTROL_MISSING": false,
+      "INFEASIBLE_PANEL": true,
+      "UNDETERMINED_SEARCH_INCOMPLETE": false,
+      "independence_status": "DECLARED",
+      "label_function_discordant": false,
+      "lineage_unknown_observation_count": 37,
+      "lineage_unknown_record_count": 32,
+      "spec_taxonomy_coverage": "COMPLETE",
+      "stale_label_discordant": true,
+      "unresolved_identity_count": 10,
+      "x5_attrition_present": true
+    },
+    "label_function_discordant": {
+      "cells": [],
+      "count": 0
+    },
+    "lineage_groups": {
+      "LG:UNKNOWN-POOL": "unknown"
+    },
+    "lineage_unknown_observation_count": 37,
+    "lineage_unknown_record_count": 32,
+    "n_selected": null,
+    "n_target": 7,
+    "per_stratum_coverage": {
+      "S1": 0,
+      "S2": 0,
+      "S3": 0,
+      "S4": 0,
+      "S5": 0,
+      "S6": 0
+    },
+    "secondary_stratum_table": {
+      "S1": 0,
+      "S2": 0,
+      "S3": 0,
+      "S4": 0,
+      "S5": 0,
+      "S6": 0
+    },
+    "selected_record_ids": [],
+    "spec_taxonomy_coverage": "COMPLETE",
+    "stale_label_discordant": {
+      "cells": [
+        {
+          "primary_stratum": "S1",
+          "spec_stratum": "vus_without_functional_evidence"
+        },
+        {
+          "primary_stratum": "S3",
+          "spec_stratum": "vus_without_functional_evidence"
+        }
+      ],
+      "count": 7
+    },
+    "terminal_outcome": "INFEASIBLE_PANEL",
+    "unresolved_identity_count": 10,
+    "x5_attrition": {
+      "count": 10,
+      "distribution": {
+        "S1": 7,
+        "S2": 1,
+        "S3": 2
+      }
+    }
+  },
+  "verified_digests": {
+    "active_universe_lock": {
+      "bindings_in_force_at_lock_time": {
+        "protocol_doc_hash": "df9b9a33a4343968c20993feaab6622d129118152cd0c90452936c4b5f81cfc0",
+        "protocol_version": "1.0.3",
+        "registration_content_hash": "d79486b3b74f81d87a3d25c10bd1f0eea31ada562a940d632f4a29ef8574b7b2",
+        "truthfulness_note": "Verified honest: lock v4 was created at 2026-08-05T11:13:11Z, when protocol v1.0.3 (frozen 2026-08-03T11:02:57Z) was the issued version. v1.0.4 was not frozen until 2026-08-05T11:23:52Z, i.e. after this lock was written, so recording 1.0.3 is correct rather than stale. The difference from the current bindings is carried at run time by the K5 lock_protocol_version_delta, never by editing the lock."
+      },
+      "counts_note": "record_count / row_count / discovery_set_count are aggregate conservation totals copied verbatim from the lock record. They are not a panel, not a result and not evidence; they exist only so the executor can prove nothing was dropped between the raw inventory and the normalized universe.",
+      "created_at": "2026-08-05T11:13:11Z",
+      "created_by_role": "candidate_universe_custodian",
+      "discovery_set_committed_at": "2026-08-05T11:13:11Z",
+      "discovery_set_count": 35,
+      "discovery_set_hash": "595e311a5c165607e2b8360c83353d1e5f2f11af17e65814480a36cdda890acb",
+      "identity_map_binding": {
+        "binding_note": "Copied verbatim from the lock record. Check IM6 requires this block to equal the active identity_map_contract entry field for field: a universe locked against one identity map is never selectable against another.",
+        "lock_content_hash": "85bc2b10e65bd8140a775537204f3c7c7048cd5444d7057fbea9501b7cd4b104",
+        "lock_id": "atlas-raw-identity-map-lock-tsc2",
+        "lock_version": "4",
+        "map_content_hash": "3adbf3484de28607fa3c133b2bebc4a9d7926b4c2d5b3863b0634507c599cd26",
+        "map_id": "atlas-raw-identity-map-tsc2",
+        "map_record_count": 35,
+        "map_version": "4",
+        "pack_binding": {
+          "pack_content_hash": "1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927",
+          "pack_id": "tsc2",
+          "pack_version": "1.0.0-phase1"
+        },
+        "response_bundle_hash": "fbedf2aae5aa26936807f2d8f26389a18a861fc884b461fdd8ebaf6b7e9f96bc",
+        "schema": "atlas.raw_identity_map_lock.v2"
+      },
+      "lock_content_hash": "f94ce81b8633bac777fd667e26c7b8d3a726b7e4d7eed9f8ed2128f9ed32b50e",
+      "lock_id": "tsc2-phase2-candidate-universe-lock",
+      "lock_version": "4",
+      "normalization_ledger_hash": "66fc103395f446d553ba9a370bea605ef80ffb5e9dfc8473c99cdc176162571f",
+      "normalization_ledger_row_count": 35,
+      "pack_binding": {
+        "pack_content_hash": "1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927",
+        "pack_id": "tsc2",
+        "pack_version": "1.0.0-phase1"
+      },
+      "path": "configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v4.yaml",
+      "predecessor_lock_ref": {
+        "lineage_only_note": "Copied verbatim from the lock record. Lineage documentation ONLY. Lock v3 is an invalid-binding lock (protocol section 4.6.2) and being named here confers no admissibility: it is never read as a selection input, never trusted, never re-hashed, and never a step in any K5 reconciliation chain.",
+        "lock_version": "3",
+        "path": "configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v3.yaml"
+      },
+      "raw_inventory_captured_at": "2026-08-02T19:25:56Z",
+      "raw_inventory_content_hash": "fee39ffa9c826b6e0ccb85ad583b09c2f81794036b115d91a91eab521365befb",
+      "raw_inventory_normalized_byte_length": 6062,
+      "raw_inventory_record_count": 35,
+      "storage_location": "external_content_root",
+      "universe_content_hash": "98edd3bf3cef36b7a1231bc389a37be6efdae7deb2210c869c317dfb6e8bef30",
+      "universe_id": "tsc2-phase2-contrast-panel-candidate-universe",
+      "universe_label": "evidence_enriched_official_identity_corrected",
+      "universe_label_note": "Descriptive registration-side label only. It is not a field of the lock record, carries no authority, and is never compared by any check; K1-K6 compare digests, counts and versions, never labels.",
+      "universe_version": "4"
+    },
+    "checks_passed": [
+      "V1",
+      "V2",
+      "V3",
+      "V4",
+      "V5",
+      "V7",
+      "V6",
+      "K1",
+      "K2",
+      "K3",
+      "K4",
+      "K5",
+      "K6",
+      "IM1",
+      "IM2",
+      "IM3",
+      "IM4",
+      "IM5",
+      "IM6"
+    ],
+    "identity_map": {
+      "acquisition_tool_sha256": "7c0593954f249e136a8690cd580f8bcdc40ebec1108a23f03626451bfd67251e",
+      "checks_passed": [
+        "IM1",
+        "IM2",
+        "IM3",
+        "IM4",
+        "IM5",
+        "IM6"
+      ],
+      "lock_content_hash": "85bc2b10e65bd8140a775537204f3c7c7048cd5444d7057fbea9501b7cd4b104",
+      "lock_path": "D:\\AIProjects\\raptor-worktrees\\atlas-panel-selection\\configs\\atlas\\panels\\tsc2\\atlas-phase2-raw-identity-map-lock-v4.yaml",
+      "lock_version": "4",
+      "map_content_hash": "3adbf3484de28607fa3c133b2bebc4a9d7926b4c2d5b3863b0634507c599cd26",
+      "map_record_count": 35,
+      "map_version": "4",
+      "reference_assembly": "GRCh38",
+      "reference_page_count": 13,
+      "reference_protein": "NP_000539.2",
+      "reference_transcript": "NM_000548.5",
+      "response_bundle_hash": "fbedf2aae5aa26936807f2d8f26389a18a861fc884b461fdd8ebaf6b7e9f96bc",
+      "response_byte_count": 904564,
+      "response_file_count": 88
+    },
+    "lock_protocol_version_delta": {
+      "current_protocol_doc_hash": "7b0596ab4a52601566c85a3a2c7ca42aead9c35916890397e58b3e11876e5823",
+      "current_protocol_version": "1.0.4",
+      "current_registration_content_hash": "5b8980024bd88f9f3c7269badf7fc3e709fef4ba135b3575a7513e5d17ad1653",
+      "differs": true,
+      "lock_protocol_doc_hash": "df9b9a33a4343968c20993feaab6622d129118152cd0c90452936c4b5f81cfc0",
+      "lock_protocol_version": "1.0.3",
+      "lock_registration_content_hash": "d79486b3b74f81d87a3d25c10bd1f0eea31ada562a940d632f4a29ef8574b7b2",
+      "reconciled_via_amendment_log_versions": [
+        "1.0.4"
+      ]
+    },
+    "verified_discovery_set_count": 35,
+    "verified_discovery_set_hash": "595e311a5c165607e2b8360c83353d1e5f2f11af17e65814480a36cdda890acb",
+    "verified_live_pack_content_hash": "1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927",
+    "verified_lock_content_hash": "f94ce81b8633bac777fd667e26c7b8d3a726b7e4d7eed9f8ed2128f9ed32b50e",
+    "verified_normalization_ledger_hash": "66fc103395f446d553ba9a370bea605ef80ffb5e9dfc8473c99cdc176162571f",
+    "verified_normalization_ledger_row_count": 35,
+    "verified_protocol_doc_hash": "7b0596ab4a52601566c85a3a2c7ca42aead9c35916890397e58b3e11876e5823",
+    "verified_raw_inventory_hash": "fee39ffa9c826b6e0ccb85ad583b09c2f81794036b115d91a91eab521365befb",
+    "verified_raw_inventory_record_count": 35,
+    "verified_registration_content_hash": "5b8980024bd88f9f3c7269badf7fc3e709fef4ba135b3575a7513e5d17ad1653",
+    "verified_universe_content_hash": "98edd3bf3cef36b7a1231bc389a37be6efdae7deb2210c869c317dfb6e8bef30"
+  }
+}

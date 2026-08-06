@@ -154,16 +154,17 @@ pending `STRATEGY.md` Part II §10 — ADR-0003.)*
   engaged, and zero claims are accepted. A separate, hash-selected six-variant technical
   repeatability cohort also passed Gates 1-7 in all six cases and blocked only at Gate 8,
   with zero accepted claims; it is explicitly not the formal contrast panel or scientific
-  validation. Identity-custody universe v1 commits a 35-entry discovery frame (31 missense
-  alleles; 28 identities resolved, seven unresolved). Evidence-enriched universe v2 now
-  carries 37 attributable observations across 32 records (15 near-reference, three
-  intermediate and 19 substantial-deviation source categories), with three explicit
-  evidence-absent records and no manufactured cross-source independence. Its candidate-free
-  lock is committed, and administrative protocol/registration v1.0.3 now binds lock v2 while
-  preserving the original seed and all selection rules. Formal selection is ready but has not
-  run. Contradiction, context, gap synthesis, named human review, accepted Atlas profiles,
-  classifications and second-disease support all remain pending. Discovery remains an
-  optional out-of-process aid, never a runtime dependency of the core RAPTOR workflow.
+  validation. The active candidate universe v4 has 35 records: 25 resolved, 10 unresolved,
+  and 37 attributable observations, with no manufactured cross-source independence. Protocol
+  and registration v1.0.4 bind universe lock v4 and official identity-map lock v4. On
+  2026-08-06 the independently reviewed formal selector returned `INFEASIBLE_PANEL`: all 24
+  fixed-size attempts across L0–R7 completed exhaustively, none exhausted the node budget,
+  and no panel or candidate was selected. The complete 35-row disposition audit is committed
+  at `data/atlas/tsc2_phase2_panel_selection_run_2026-08-06.json`. The frozen protocol forbids
+  weakening constraints outside its ladder or substituting candidates after this result.
+  Named human review, accepted Atlas profiles, classifications and second-disease support
+  remain pending. Discovery remains an optional out-of-process aid, never a runtime
+  dependency of the core RAPTOR workflow.
 
 ## Source expansion roadmap — ordered and governed
 

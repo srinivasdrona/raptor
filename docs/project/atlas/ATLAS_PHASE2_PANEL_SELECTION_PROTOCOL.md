@@ -3,8 +3,8 @@
 | Field | Value |
 |---|---|
 | Status | **REGISTERED / FROZEN — post-discovery, pre-selection** |
-| Protocol version | `1.0.3` (pre-first-run correction of `1.0.2`; no selection run has ever executed) |
-| Freeze timestamp | `2026-08-03T16:32:57+05:30` (`2026-08-03T11:02:57Z`) |
+| Protocol version | `1.0.4` (pre-first-run correction of `1.0.3`; no selection run has ever executed) |
+| Freeze timestamp | `2026-08-05T16:53:52+05:30` (`2026-08-05T11:23:52Z`) |
 | Registration artifact | `docs/project/atlas/atlas-phase2-panel-selection-registration-v1.yaml` |
 | Scope | Selection of the TSC2 missense contrast panel for the bounded Phase 2 Atlas pilot |
 | Governs | Which already-discovered candidates enter the panel, and in what order |
@@ -100,7 +100,8 @@ amendment. Do not improvise.
 |---|---|
 | Raw discovery inventory | `configs/atlas/panels/tsc2/discovery_inventory.raw.yaml` (immutable once captured) |
 | Normalized universe | `configs/atlas/panels/tsc2/candidate_universe.yaml` |
-| Pre-selection universe lock | The record named by `candidate_universe_contract.universe_lock.active.path` in the registration artifact — currently `configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v2.yaml` (tracked, candidate-free; §4.6). Locks for superseded `universe_version`s stay tracked and unmodified |
+| Pre-selection universe lock | The record named by `candidate_universe_contract.universe_lock.active.path` in the registration artifact — currently `configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v4.yaml` (tracked, candidate-free; §4.6). Locks for superseded `universe_version`s stay tracked and unmodified |
+| Raw identity map | The external map manifest bound by the identity-map lock named by `identity_map_contract.active.path` — currently `configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v4.yaml` (tracked, candidate-free; §4.8). The map itself carries candidate identities and stays external |
 | Schema id | `atlas.candidate_universe.v1` |
 | Self-hash field | `universe_content_hash` |
 | Universe hash algorithm | `atlas.candidate_universe_content_hash.v1` — identical in construction to `atlas.pack_content_hash.v1`: `yaml.safe_load` the file, validate, strip **only** the top-level `universe_content_hash` key, serialize the remainder as canonical JSON (`sort_keys=True`, `separators=(",",":")`, `ensure_ascii=False`, sequence order preserved), lowercase SHA-256 hex |
@@ -233,8 +234,10 @@ Any failure ⇒ `UNIVERSE_CONTRACT_BREACH`: the run terminates, no panel is emit
 ### 4.5.5 Mandatory executor replay of normalization and admission (fail-closed)
 
 The executor **recomputes normalization from the raw inventory** and never trusts the custodian's
-recorded outcomes. For every raw row `r`, it applies the deterministic §5 rules and the bound pack's
-`raptor.atlas.identity.admit_identity` to `r.raw_identity_string`, obtaining a replayed tuple:
+recorded outcomes. For every raw row `r`, it applies the deterministic §5 rules through the
+**verified raw identity map of §4.8** — which independently derives each identity from immutable,
+hash-pinned official reference responses — together with the bound pack's
+`raptor.atlas.identity.admit_identity`, obtaining a replayed tuple:
 
 ```text
 replay(r) = ( normalization_outcome, universe_key, identity_state, spdi_canonical,
@@ -252,10 +255,12 @@ replay(r) = ( normalization_outcome, universe_key, identity_state, spdi_canonica
 | RP6 | Replayed eligibility exclusion code (§8.2) equals the declared `exclusion_flags` for every excluded record |
 | RP7 | The replayed ledger is a bijection onto the raw rows (`U2`) and its `universe_key` image equals the record set (`U3`); duplicate collapse (§5 rule 5) reproduces the same surviving `record_id` |
 
-Replay is **deterministic and offline**: it reads the raw inventory, the pinned pack and this
-protocol only. It never fetches sources, never consults evidence, and never repairs a mismatch — a
-mismatch is reported, not corrected. The run record carries a `normalization_replay` attestation
-with the replayed row count and the count of each `normalization_outcome`.
+Replay is **deterministic and offline**: it reads the raw inventory, the §4.8 verified identity map
+and its pinned official response bundle, the pinned pack and this protocol only. It never fetches
+sources, never consults evidence, and never repairs a mismatch — a mismatch is reported, not
+corrected. The run record carries a `normalization_replay` attestation with the replayed row count
+and the count of each `normalization_outcome`. An unverifiable or absent mapper is a **tool
+failure** (§4.8), never a candidate property.
 
 ### 4.6 Pre-selection universe lock record (mandatory, candidate-free)
 
@@ -265,8 +270,9 @@ a separate, tracked, candidate-free lock record that must exist **before** selec
 
 | Item | Value |
 |---|---|
-| Active lock path | Resolved from the registration artifact's `candidate_universe_contract.universe_lock.active.path`; currently `configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v2.yaml` |
-| Superseded locks | Remain tracked, unmodified and valid for their own `universe_version` (e.g. `…-lock-v1.yaml`). A superseded lock is never the selection input and is never edited to match a newer protocol |
+| Active lock path | Resolved from the registration artifact's `candidate_universe_contract.universe_lock.active.path`; currently `configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v4.yaml` |
+| Superseded locks | Remain tracked, unmodified and valid for their own `universe_version` (e.g. `…-lock-v1.yaml`, `…-lock-v2.yaml`). A superseded lock is never the selection input and is never edited to match a newer protocol |
+| Invalid-binding locks | A superseded lock whose recorded lock-time bindings are demonstrably false is retained tracked and unmodified for audit but is **invalid for selection** and is **never** an admissible predecessor (§4.6.2). `…-lock-v3.yaml` is currently in this state |
 | Schema id | `atlas.candidate_universe_lock.v1` |
 | Self-hash field | `lock_content_hash` |
 | Hash algorithm | `atlas.universe_lock_content_hash.v1` — `yaml.safe_load`, strip **only** the top-level `lock_content_hash` key, canonical JSON (`sort_keys=True`, `separators=(",",":")`, `ensure_ascii=False`), lowercase SHA-256 hex. Non-circular: the record never contains a digest of itself as input |
@@ -283,7 +289,10 @@ the aggregate counts below, no result of any kind):
 `content_hash_algorithm`, `record_count`, `normalized_byte_length`, `captured_at`),
 `normalization_ledger` (`hash`, `hash_algorithm`, `row_count`), `discovery_set_commitment`
 (`hash`, `hash_algorithm`, `count`, `committed_at`), `pack_binding` (`pack_id`, `pack_version`,
-`pack_content_hash`), `storage_location` (`repository` | `external_content_root`),
+`pack_content_hash`), `identity_map_binding` (§4.8; required from `universe_version` 3 onward —
+`schema`, `map_id`, `map_version`, `lock_id`, `lock_version`, `map_content_hash`,
+`lock_content_hash`, `response_bundle_hash`, `map_record_count`, `pack_binding`),
+`storage_location` (`repository` | `external_content_root`),
 `completeness_attestation_ref`, `lock_content_hash`.
 
 **Optional field:** `predecessor_lock_ref` (`lock_version`, `path`, note) — present when this lock
@@ -292,7 +301,9 @@ deleting or re-hashing the predecessor.
 
 **A lock record is written once and never rewritten.** It legitimately records the protocol and
 registration digests **in force at lock time**; when the protocol is later amended, the difference
-is carried by the run-time delta of `K5`, **never** by editing the lock.
+is carried by the run-time delta of `K5`, **never** by editing the lock. A lock whose lock-time
+record is false rather than merely stale is an *invalid-binding lock* and is handled by §4.6.2 — it
+is superseded by a new lock, never repaired.
 
 **Executor obligations (precondition `V5`, §17.1):**
 
@@ -302,7 +313,7 @@ is carried by the run-time delta of `K5`, **never** by editing the lock.
 | K2 | Recomputed `atlas.universe_lock_content_hash.v1` equals its stored `lock_content_hash`, **and** equals `universe_lock.active.lock_content_hash` in the registration ⇒ else `UNIVERSE_LOCK_CORRUPT`, terminate |
 | K3 | `universe_content_hash`, `raw_inventory.content_hash` + `record_count`, `normalization_ledger.hash` + `row_count`, and `discovery_set_commitment.hash` + `count` in the lock record equal the values recomputed from the live artifacts ⇒ else `UNIVERSE_LOCK_MISMATCH`, terminate |
 | K4 | `pack_binding.pack_content_hash` in the lock record equals the live pack hash and the registration snapshot (§17.1 `V4`) |
-| K5 | The run records a complete `lock_protocol_version_delta` object (§4.6.1) reconciling the lock's `protocol_version` / `protocol_doc_hash` / `registration_content_hash` with the digests verified in `V1`/`V2`. The object is mandatory whether or not the values differ. A delta is admissible only if the lock's triple matches either the current digests or a version recorded in the registration `amendment_log` (as that entry's own digests or its `supersedes_digests`); otherwise ⇒ `UNIVERSE_LOCK_PROTOCOL_UNKNOWN`, terminate. **A delta never waives `K2`, `K3`, `K4` or `K6`** — content, pack, uniqueness and timestamp checks are unconditional |
+| K5 | The run records a complete `lock_protocol_version_delta` object (§4.6.1) reconciling the lock's `protocol_version` / `protocol_doc_hash` / `registration_content_hash` with the digests verified in `V1`/`V2`. The object is mandatory whether or not the values differ. A delta is admissible only if the lock's triple matches either the current digests or a version recorded in the registration `amendment_log` (as that entry's own digests or its `supersedes_digests`), **and** the lock is not an invalid-binding lock (§4.6.2); otherwise ⇒ `UNIVERSE_LOCK_PROTOCOL_UNKNOWN`, terminate. **A delta never waives `K2`, `K3`, `K4` or `K6`** — content, pack, uniqueness and timestamp checks are unconditional, and a delta never legitimizes a false lock-time record |
 | K6 | Exactly one lock record exists for the cited `universe_version`, and its `created_at` is not later than the selection attempt; a duplicate for that version, or a future-dated lock, ⇒ `UNIVERSE_LOCK_INVALID`, terminate. Locks covering *other* `universe_version`s are not duplicates and do not violate uniqueness |
 
 A universe that is not locked is not selectable. There is no "unlocked run", no "provisional run",
@@ -322,11 +333,36 @@ free-text deltas ⇒ `UNIVERSE_LOCK_DELTA_INCOMPLETE`, terminate.
 | `current_protocol_doc_hash` | the digest verified in `V1` |
 | `current_registration_content_hash` | the digest recomputed and verified in `V2` (equals the registration's own stored value; nothing is self-referential because the lock pins the *earlier* registration digest) |
 | `differs` | boolean; `true` iff any of the three lock values differs from its current counterpart |
-| `reconciled_via_amendment_log_versions` | the ordered list of registration `amendment_log` versions traversed from the lock's protocol version to the current one; empty list iff `differs == false` |
+| `reconciled_via_amendment_log_versions` | the ordered list of registration `amendment_log` versions traversed from the lock's protocol version to the current one; empty list iff `differs == false`. The chain must be **complete and gap-free in ascending order**: every intermediate amendment between the lock's version and the current version is listed. A delta that names only the current version while intermediate amendments exist, or that skips any intermediate version, is `UNIVERSE_LOCK_DELTA_INCOMPLETE`, terminate |
 
 The delta is a **record of an administrative version difference only**. It never changes an
 eligibility rule, a stratum predicate, the seed, a constraint, the relaxation ladder or the search
 algorithm, and it never licenses proceeding past a failed `K2`/`K3`/`K4`/`K6`.
+
+### 4.6.2 Invalid-binding locks (never admissible, never repaired)
+
+A lock record's `protocol_version` / `protocol_doc_hash` / `registration_content_hash` must be the
+digests that were **actually in force at its own `created_at`**, as established by the registration
+`amendment_log` freeze timeline. A lock whose recorded lock-time bindings contradict that timeline —
+for example a lock created after version `vN` was frozen but recording `vN-1` — carries a **false**
+lock-time record.
+
+Such a lock is an **invalid-binding lock**:
+
+* It is **never** made active, and a run that resolves to one terminates with
+  `UNIVERSE_LOCK_PROTOCOL_UNKNOWN`.
+* It is **never** an admissible predecessor: it may not be used to satisfy `K5` admissibility, and it
+  may not appear as a traversed step in any `reconciled_via_amendment_log_versions` chain, for the
+  active lock or for any other lock.
+* Being named by another lock's `predecessor_lock_ref` confers **no** admissibility. That field is
+  lineage documentation only (§4.6) and never licenses reading, trusting or re-hashing the record it
+  names.
+* It is **never edited, re-hashed or deleted.** It stays tracked and byte-identical for audit, with
+  its disposition and the reason recorded in the registration `superseded` list.
+
+The remedy is always a **new** lock record with honest lock-time bindings over the same normalized
+content, never a correction of the invalid lock. `K5` records an administrative difference; it can
+never legitimize a false lock-time claim.
 
 ### 4.7 Immutability and the no-names rule
 
@@ -335,6 +371,57 @@ requires a `universe_version` bump, a recorded reason, a **new** lock record, re
 superseded lock and its audit, and a full deterministic re-run — never a patch to a live selection.
 This protocol deliberately contains no candidate identity; the universe file is the only place
 candidate identities are enumerated, and the lock record deliberately contains none.
+
+### 4.8 Pre-selection raw identity map lock (mandatory, candidate-free)
+
+§4.5.5 requires the executor to replay every identity from the raw inventory instead of trusting the
+custodian. That replay is only worth anything if the mapping from a raw identity string to a
+canonical identity is *itself* independently derived — not copied from the universe and not guessed
+from a codon table or residue arithmetic. The replay is therefore performed by a **verified offline
+raw identity map**, built from immutable, hash-pinned official public reference responses and
+committed before selection under the same "lock next door" discipline as §4.6.
+
+| Item | Value |
+|---|---|
+| Active lock path | Resolved from the registration artifact's `identity_map_contract.active.path`; currently `configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v4.yaml` |
+| Lock schema id | `atlas.raw_identity_map_lock.v2` |
+| Map schema id | `atlas.raw_identity_map.v2` |
+| Self-hash fields | `lock_content_hash` (lock) and `map_content_hash` (map); both non-circular, computed over the record with only its own self-hash key stripped |
+| Tracked | The **lock** is tracked and candidate-free. The **map** is candidate-bearing and stays under the external uncommitted content root; its manifest path and its official response-bundle root are supplied explicitly at run time and are deliberately absent from this document |
+| Loader | `raptor.atlas.identity_map.load_identity_map` — offline, no network, no environment read, no repair path |
+| Build authority | `docs/project/specs/atlas-raw-identity-mapper-v1.yaml` |
+| Protocol independence | The map and its lock record carry **no** selection-protocol version or digest. They are verified against their own self-hashes, the raw inventory, the official response bundle, the acquisition tool and the bound pack — never against this document's version. A map lock is therefore **not** subject to `K5`, and a protocol amendment never invalidates a map lock |
+
+**Executor obligations (precondition `V7`, §17.1). Every check fails closed; the run emits no panel
+and no partial result.**
+
+| Id | Identity-map check |
+|---|---|
+| IM1 | The active map lock, resolved from the registration's `identity_map_contract.active.path`, exists at that path, declares the `map_version` the registration marks active, and its recomputed `lock_content_hash` equals both its stored value and the registration mirror ⇒ else `IDENTITY_MAP_LOCK_MISSING` / `IDENTITY_MAP_LOCK_CORRUPT`, terminate |
+| IM2 | The external map manifest self-verifies (`map_content_hash`) and every lock↔map binding agrees: `map_id`, `map_version`, `map_content_hash`, `map_record_count`, `raw_inventory_content_hash`, `raw_inventory_record_count`, `response_bundle_hash`, `response_file_count`, `response_byte_count`, `acquisition_tool_sha256` ⇒ else `IDENTITY_MAP_MISMATCH`, terminate |
+| IM3 | The response-bundle hash, file count and byte count recomputed from the response root equal the declared values; every per-record and per-reference-page response file digest recomputed from disk equals its declared digest; the acquisition-tool digest is recomputed from the pinned tool file ⇒ else `IDENTITY_MAP_MISMATCH`, terminate |
+| IM4 | The map's `pack_binding` equals the live pack hash (§17.1 `V4`) **and** the §4.6 lock's `pack_binding`; the map's `reference_binding` names exactly the pinned assembly and MANE-Select transcript of the bound pack, and its protein accession is the one **uniquely derived** from the complete, page-verified official reference response set — never asserted, never defaulted ⇒ else `IDENTITY_MAP_MISMATCH` / `PACK_DRIFT`, terminate |
+| IM5 | `map_record_count` equals `raw_inventory.record_count`; the map's raw-inventory binding equals the live raw-inventory digest and row count; the map records are in bijection with the raw rows, with character-identical `raw_identity_string` and source-reported consequence hint per row ⇒ else `IDENTITY_MAP_MISMATCH`, terminate |
+| IM6 | The §4.6 universe lock's `identity_map_binding` names exactly this `map_id`, `map_version`, `lock_id`, `lock_version`, `map_content_hash`, `lock_content_hash`, `response_bundle_hash` and `map_record_count`. A universe locked against one map is never selectable against another ⇒ else `IDENTITY_MAP_MISMATCH`, terminate |
+
+**The §4.5.5 replay runs through this verified mapper and no other.** For every raw row the mapper
+returns the complete `RP1`–`RP7` tuple, each field independently derived from the pinned official
+responses. The executor supplies no substitute, no fallback, no partial mapper and no "identity
+echo" of universe-declared fields; a mapper that merely repeats what the universe asserts would make
+`RP1`–`RP7` vacuous.
+
+**A mapper fault is never a candidate property.** An absent, stale, corrupt or version-mismatched
+map ⇒ `IDENTITY_MAP_UNVERIFIED`; a raw row the verified mapper cannot answer for ⇒
+`REPLAY_MAPPER_UNAVAILABLE`. Neither is ever recorded as `identity_state: unresolved` (`X1`), as
+`out_of_scope`, or as an eligibility failure. Conflating the two would silently shrink the eligible
+universe and manufacture a spurious `INFEASIBLE_PANEL`. An `unresolved` identity is a **conclusion
+the verified mapper reached from official evidence**; a missing mapper is a **tool failure that stops
+the run**.
+
+**Versioning.** Exactly one lock record per `map_version`, written once and never rewritten. A
+corrected map requires a `map_version` bump, a new lock record, retention of the superseded lock,
+and — because the §4.6 universe lock binds the map (`IM6`) — a `universe_version` bump with a new
+§4.6 lock and a full deterministic re-run.
 
 ---
 
@@ -367,6 +454,12 @@ candidate identities are enumerated, and the lock record deliberately contains n
 9. These rules are a **total deterministic function** from a raw inventory row to a normalized
    record. The executor replays them for every raw row under §4.5.5 and fails closed on any
    disagreement; the custodian's recorded outcome carries no authority.
+10. The replay of rules 1–8 is executed **through the verified raw identity map of §4.8** and no
+    other mechanism. The executor derives no identity from a built-in codon table, a translated
+    reference sequence, residue-offset arithmetic between isoforms, or the universe's own declared
+    fields. If the verified map is absent, unverifiable or cannot answer for a raw row, the run
+    terminates (`IDENTITY_MAP_UNVERIFIED` / `REPLAY_MAPPER_UNAVAILABLE`); no row is ever recorded
+    `unresolved` or out of scope because the executor lacked a mapper.
 
 ---
 
@@ -788,13 +881,21 @@ as independent replication.
 | V2 | Recomputed `atlas.registration_content_hash.v1` of the registration artifact equals its stored `registration_content_hash` (self-verification; §20.3) |
 | V3 | `selection_seed` used equals the registration artifact's `selection_seed` |
 | V4 | **Pack binding**: `atlas.pack_content_hash.v1` recomputed from the live `configs/atlas/packs/tsc2/pack.yaml` equals **all three** of `pack_binding_observed_at_freeze.pack_content_hash` in the registration artifact, `pack_binding.pack_content_hash` in the locked universe, and `pack_binding.pack_content_hash` in the universe lock record. Any mismatch ⇒ `PACK_DRIFT`, terminate |
-| V5 | **Universe lock**: the §4.6 lock record named by the registration's `candidate_universe_contract.universe_lock.active.path` exists, self-verifies against both its own stored `lock_content_hash` and the registration's `universe_lock.active.lock_content_hash`, and binds the live universe, raw inventory, normalization ledger and discovery-set commitment (checks `K1`–`K6`, including the mandatory §4.6.1 `lock_protocol_version_delta`). Absence or mismatch ⇒ `UNIVERSE_LOCK_MISSING` / `UNIVERSE_LOCK_CORRUPT` / `UNIVERSE_LOCK_MISMATCH` / `UNIVERSE_LOCK_INVALID` / `UNIVERSE_LOCK_PROTOCOL_UNKNOWN` / `UNIVERSE_LOCK_DELTA_INCOMPLETE`, terminate |
+| V5 | **Universe lock**: the §4.6 lock record named by the registration's `candidate_universe_contract.universe_lock.active.path` exists, self-verifies against both its own stored `lock_content_hash` and the registration's `universe_lock.active.lock_content_hash`, is not an invalid-binding lock (§4.6.2), and binds the live universe, raw inventory, normalization ledger and discovery-set commitment (checks `K1`–`K6`, including the mandatory §4.6.1 `lock_protocol_version_delta`). Absence or mismatch ⇒ `UNIVERSE_LOCK_MISSING` / `UNIVERSE_LOCK_CORRUPT` / `UNIVERSE_LOCK_MISMATCH` / `UNIVERSE_LOCK_INVALID` / `UNIVERSE_LOCK_PROTOCOL_UNKNOWN` / `UNIVERSE_LOCK_DELTA_INCOMPLETE`, terminate |
 | V6 | All §4.5.4 conservation checks `U1`–`U7` pass, including the §4.5.5 normalization/admission replay (`RP1`–`RP7`) |
+| V7 | **Identity map binding**: the §4.8 raw identity map lock named by the registration's `identity_map_contract.active.path` exists, self-verifies against both its own stored `lock_content_hash` and the registration mirror, and binds the external map manifest, the official response bundle, the acquisition tool, the live raw inventory, the live pack and the §4.6 universe lock's `identity_map_binding` (checks `IM1`–`IM6`). Absence or mismatch ⇒ `IDENTITY_MAP_LOCK_MISSING` / `IDENTITY_MAP_LOCK_CORRUPT` / `IDENTITY_MAP_MISMATCH` / `IDENTITY_MAP_UNVERIFIED`, terminate |
+
+**Execution order.** The ids are stable names, not an ordering: the executor runs
+`V1` → `V2` → `V3` → `V4` → `V5` (`K1`–`K6`) → `V7` (`IM1`–`IM6`) → `V6` (`U1`–`U6`, then `U7` →
+`RP1`–`RP7`), short-circuiting on the first failure. `V7` necessarily precedes `V6` because the
+`RP1`–`RP7` replay is performed *through* the mapper that `V7` verifies; a replay run against an
+unverified mapper would prove nothing.
 
 Every verified digest (`protocol_doc_hash`, `registration_content_hash`, live
 `pack_content_hash`, `lock_content_hash`, `universe_content_hash`, `raw_inventory.content_hash`,
-`normalization_ledger.hash`, `discovery_set_hash`) is recorded in the run record (§18.1). A missing
-or unverifiable digest is never waived.
+`normalization_ledger.hash`, `discovery_set_hash`, and the §4.8 `map_content_hash`,
+identity-map `lock_content_hash`, `response_bundle_hash` and `acquisition_tool_sha256`) is recorded
+in the run record (§18.1). A missing or unverifiable digest is never waived.
 
 ### 17.2 Seed and draw key
 
@@ -886,6 +987,7 @@ narratives during selection. Selection completes before any source is read.
 |---|---|
 | Path | `data/atlas/tsc2_phase2_panel_selection_run_<YYYY-MM-DD>.json` |
 | Verified digests | `protocol_version`, `verified_protocol_doc_hash`, `verified_registration_content_hash`, `verified_live_pack_content_hash`, `active_universe_lock` (`path`, `lock_version`, `universe_version`), `verified_lock_content_hash`, `verified_universe_content_hash`, `verified_raw_inventory_hash` + `record_count`, `verified_normalization_ledger_hash` + `row_count`, `verified_discovery_set_hash` + `discovery_set_count`, `lock_protocol_version_delta` (the complete eight-field object of §4.6.1 — **always present**, never omitted when `differs == false`) |
+| Identity map (§4.8) | `active_identity_map_lock` (`path`, `lock_version`, `map_version`), `verified_identity_map_lock_content_hash`, `verified_map_content_hash`, `verified_map_record_count`, `verified_response_bundle_hash` + `response_file_count` + `response_byte_count`, `verified_acquisition_tool_sha256`, `identity_map_reference_binding` (assembly, transcript, derived protein accession, reference page count), `IM1`–`IM6` all-pass attestation |
 | Replay | `normalization_replay`: replayed row count, per-`normalization_outcome` counts, `RP1`–`RP7` all-pass attestation |
 | Procedure | `selection_seed`, `search_scope: full_eligible_universe`, `search_node_budget`, any proved candidate-subset optimization with its proof id, declared constraint set, `attempt_log` (per `(L, n)`: `SOLUTION` / `INFEASIBLE_COMPLETE` / `UNDETERMINED`), applied `relaxation_step`s, `independence_status`, `terminal_outcome` |
 | Result | `N_target`, `N_selected`, selected members, per-stratum coverage table, auxiliary (secondary) stratum-match table, `spec_taxonomy_coverage`, recomputed lineage groups with `lineage_confidence`, `label_function_discordant` and `stale_label_discordant` counts with the discordant `spec_stratum` × stratum cells named, `unresolved_identity_count`, `X5` access-attrition counts and distribution |
@@ -972,14 +1074,23 @@ python -c "import hashlib,json,yaml,pathlib;m=yaml.safe_load(pathlib.Path('docs/
   exists; **MINOR** = added constraint or clarification that cannot change an already-computed
   panel; **PATCH** = editorial, **or any correction made before the first selection run has ever
   executed** (`pre_first_run_correction: true` in the registration record), since no computed panel
-  can be affected. Versions `1.0.1`, `1.0.2` and `1.0.3` are such pre-first-run corrections of
-  `1.0.0`; each is recorded with `pre_first_run_correction: true` and
+  can be affected. Versions `1.0.1`, `1.0.2`, `1.0.3` and `1.0.4` are such pre-first-run corrections
+  of `1.0.0`; each is recorded with `pre_first_run_correction: true` and
   `first_selection_run_executed: false`.
 * An amendment that only **repoints administrative bindings** — the active universe lock path and
-  its pinned digests, or the reconciliation of a lock written under an earlier protocol version —
-  is a PATCH. It must leave the seed, panel-size rule, eligibility rules, stratum predicates,
-  constraints, relaxation ladder and search algorithm textually and semantically unchanged, and the
-  registration amendment entry must assert that preservation explicitly.
+  its pinned digests, the active §4.8 identity-map lock path and its pinned digests, or the
+  reconciliation of a lock written under an earlier protocol version — is a PATCH. It must leave the
+  seed, panel-size rule, eligibility rules, stratum predicates, constraints, relaxation ladder and
+  search algorithm textually and semantically unchanged, and the registration amendment entry must
+  assert that preservation explicitly. Adding a **fail-closed precondition** that can only ever
+  terminate a run (never admit, re-rank or substitute a candidate) — such as `V7` / `IM1`–`IM6` — is
+  likewise a PATCH when no run has executed, because it cannot change any computed panel.
+* **A version that was drafted but never issued is corrected in place, not re-numbered.** A version
+  is *issued* once it is committed to the repository and can therefore be cited, bound by a lock, or
+  read by a run. Correcting an unissued draft in place keeps the version line honest: minting a
+  successor would imply the rejected draft had once been in force. The registration amendment entry
+  for that version records the rejected draft digests under `rejected_draft_digests` with the reason;
+  those digests are **audit history only** and are never admissible for `K5` (§4.6.2).
 * **Every** content change to this file requires a new registration record with the new version, a
   new digest, a reason, and a timestamp. A stale digest is fail-closed for the executor (`V1`).
 * A panel already selected under `vN` is never silently re-derived under `vN+1`; a re-run is a new
@@ -995,22 +1106,28 @@ python -c "import hashlib,json,yaml,pathlib;m=yaml.safe_load(pathlib.Path('docs/
 2. Recompute §20.3 digest of the registration artifact and compare with its own stored value (`V2`). Mismatch ⇒ stop.
 3. Confirm the seed literal (`V3`). Mismatch ⇒ stop.
 4. Recompute the live pack hash and compare with the registration snapshot, the universe pack binding **and** the lock record (`V4`). Mismatch ⇒ `PACK_DRIFT`, stop.
-5. Resolve the active §4.6 universe lock record from the registration's `universe_lock.active.path`, verify its self-hash, every pinned digest/count and the mandatory §4.6.1 `lock_protocol_version_delta` (`V5`, `K1`–`K6`). Missing, corrupt, mismatched, duplicated, future-dated, or an incomplete/unreconcilable delta ⇒ stop.
-6. Verify the raw inventory hash/count, ledger hash/bijection, discovery-set commitment and universe hash (`U1`–`U6`), then **replay** normalization and pack admission for every raw row (`U7`, `RP1`–`RP7`). Any disagreement ⇒ `UNIVERSE_CONTRACT_BREACH`, stop.
-7. Recompute `all_matched_strata` / `primary_stratum` (§6) and lineage groups / `support_class` (§7, §14); disagreement with declared values ⇒ stop.
-8. Apply eligibility (§8) over every record, then run the §17.3 schedule with the §17.5 complete search over the **full eligible universe**; relax only after a level is proved `INFEASIBLE_COMPLETE`.
-9. Emit the run record with all verified digests, the replay attestation, the attempt log and the complete disposition table (§18).
-10. Report every flag plainly: `independence_status`, `spec_taxonomy_coverage`, `ABSTENTION_CONTROL_MISSING`, `UNDETERMINED_SEARCH_INCOMPLETE`, `INFEASIBLE_PANEL`, `X5` attrition, `lineage_unknown_*`, `label_function_discordant`, `stale_label_discordant`, `unresolved_identity_count`.
-11. Do **not** acquire, read, or reason about candidate evidence during selection.
-12. Hand the provisional panel to the Gate 1–8 pipeline and the named human-oracle review.
+5. Resolve the active §4.6 universe lock record from the registration's `universe_lock.active.path`, verify its self-hash, every pinned digest/count and the mandatory §4.6.1 `lock_protocol_version_delta` (`V5`, `K1`–`K6`). Missing, corrupt, mismatched, duplicated, future-dated, invalid-binding (§4.6.2), or an incomplete/unreconcilable delta ⇒ stop.
+6. Resolve the active §4.8 identity-map lock from the registration's `identity_map_contract.active.path`, verify its self-hash and the registration mirror, then load and verify the external map manifest, official response bundle, acquisition tool, raw-inventory binding, pack binding and the universe lock's `identity_map_binding` (`V7`, `IM1`–`IM6`). Missing, corrupt, mismatched, stale-versioned or unloadable ⇒ stop with no run result.
+7. Verify the raw inventory hash/count, ledger hash/bijection, discovery-set commitment and universe hash (`U1`–`U6`), then **replay** normalization and pack admission for every raw row **through the §4.8 verified mapper** (`U7`, `RP1`–`RP7`). Any disagreement ⇒ `UNIVERSE_CONTRACT_BREACH`, stop. A mapper that cannot answer ⇒ `IDENTITY_MAP_UNVERIFIED` / `REPLAY_MAPPER_UNAVAILABLE`, stop — never `unresolved`.
+8. Recompute `all_matched_strata` / `primary_stratum` (§6) and lineage groups / `support_class` (§7, §14); disagreement with declared values ⇒ stop.
+9. Apply eligibility (§8) over every record, then run the §17.3 schedule with the §17.5 complete search over the **full eligible universe**; relax only after a level is proved `INFEASIBLE_COMPLETE`.
+10. Emit the run record with all verified digests, the identity-map attestation, the replay attestation, the attempt log and the complete disposition table (§18).
+11. Report every flag plainly: `independence_status`, `spec_taxonomy_coverage`, `ABSTENTION_CONTROL_MISSING`, `UNDETERMINED_SEARCH_INCOMPLETE`, `INFEASIBLE_PANEL`, `X5` attrition, `lineage_unknown_*`, `label_function_discordant`, `stale_label_discordant`, `unresolved_identity_count`.
+12. Do **not** acquire, read, or reason about candidate evidence during selection.
+13. Hand the provisional panel to the Gate 1–8 pipeline and the named human-oracle review.
 
 ---
 
 ## Related artifacts
 
 * `docs/project/atlas/atlas-phase2-panel-selection-registration-v1.yaml` — freeze/registration record.
-* `configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v2.yaml` — **active** pre-selection universe lock record (§4.6) for `universe_version` 2, created by the universe custodian before selection.
+* `configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v4.yaml` — **active** pre-selection universe lock record (§4.6) for `universe_version` 4, created by the universe custodian before selection.
+* `configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v3.yaml` — **invalid-binding** lock record (§4.6.2) for `universe_version` 3: created after `1.0.3` was frozen but recording `1.0.2` bindings. Retained tracked and unmodified for audit; never the selection input and never an admissible predecessor.
+* `configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v2.yaml` — superseded lock record for `universe_version` 2; retained unmodified for audit, never the selection input.
 * `configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v1.yaml` — superseded lock record for `universe_version` 1; retained unmodified for audit, never the selection input.
+* `configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v4.yaml` — **active** candidate-free raw identity map lock (§4.8), `schema: atlas.raw_identity_map_lock.v2`; binds the external map manifest, the pinned official response bundle and the acquisition tool.
+* `docs/project/specs/atlas-raw-identity-mapper-v1.yaml` — build/runtime contract for the offline raw identity mapper whose lock §4.8 verifies.
+* `docs/project/specs/atlas-panel-selector-v1.yaml` — implementation/test contract for the executor that applies this protocol.
 * `docs/project/atlas/ATLAS_RUNBOOK.md` — Phase 1/2 operational guide and Phase 2 stop/go gate.
 * `docs/project/specs/mechanism-atlas-starter.yaml` — `panel_selection_contract` (size, spec strata; §10), unchanged by this protocol.
 * `docs/project/specs/atlas-citation-resolver-v1.yaml` — identifier normalization and span binding.

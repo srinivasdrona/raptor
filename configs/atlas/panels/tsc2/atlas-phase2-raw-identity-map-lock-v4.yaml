@@ -1,0 +1,93 @@
+schema: atlas.raw_identity_map_lock.v2
+lock_id: atlas-raw-identity-map-lock-tsc2
+lock_version: '4'
+created_at: '2026-08-05T05:56:56Z'
+map_id: atlas-raw-identity-map-tsc2
+map_version: '4'
+map_content_hash: 3adbf3484de28607fa3c133b2bebc4a9d7926b4c2d5b3863b0634507c599cd26
+map_record_count: 35
+raw_inventory_content_hash: fee39ffa9c826b6e0ccb85ad583b09c2f81794036b115d91a91eab521365befb
+raw_inventory_record_count: 35
+response_bundle_hash: fbedf2aae5aa26936807f2d8f26389a18a861fc884b461fdd8ebaf6b7e9f96bc
+response_file_count: 88
+response_byte_count: 904564
+pack_binding:
+  pack_id: tsc2
+  pack_version: 1.0.0-phase1
+  pack_content_hash: 1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927
+reference_binding:
+  provider: NCBI/NLM
+  database: clinvar+clinicaltables
+  transcript: NM_000548.5
+  protein: NP_000539.2
+  assembly: GRCh38
+  protein_reference_total_count: 6428
+  protein_reference_page_size: 500
+  protein_reference_response_pins:
+  - offset: 0
+    count: 500
+    relative_path: reference/protein-00000.json
+    sha256: b7fb356cdbb3342e18ddf3935a2b1bf7870b576708e055e6c1fada2bddf3caba
+    byte_length: 58623
+  - offset: 500
+    count: 500
+    relative_path: reference/protein-00500.json
+    sha256: 6cd8cbd69f7da7064edce87284418a1d521009bc63a8bfe6c792e427c52a4a7d
+    byte_length: 58808
+  - offset: 1000
+    count: 500
+    relative_path: reference/protein-01000.json
+    sha256: be9c567a1ac11ca036031003595984542ce15a1becc96afc90b9520ed9e6959f
+    byte_length: 58336
+  - offset: 1500
+    count: 500
+    relative_path: reference/protein-01500.json
+    sha256: bdcf9d1352e82c6fd24b258f94cf87a93ab30f9d2af33c77da2e66339595bc5b
+    byte_length: 58646
+  - offset: 2000
+    count: 500
+    relative_path: reference/protein-02000.json
+    sha256: 66c8b999b3f7f9c9351bd245a23031999e758184d7591da2f4f5db63738e49b8
+    byte_length: 57612
+  - offset: 2500
+    count: 500
+    relative_path: reference/protein-02500.json
+    sha256: 40bd7b14c5211b70160d64c5dbd5dbb8cc7f17f6fc65298fab613eb6f32925db
+    byte_length: 58301
+  - offset: 3000
+    count: 500
+    relative_path: reference/protein-03000.json
+    sha256: ccafd17c38561575111ee87d12f885f01ab9b2b431fd2936f210bbe0e6d385ef
+    byte_length: 57621
+  - offset: 3500
+    count: 500
+    relative_path: reference/protein-03500.json
+    sha256: 8c1a4634ae2308968d5ebda1a8bb5a80af0e035ebe4cbb7c44aa9cd226c2a7f5
+    byte_length: 55655
+  - offset: 4000
+    count: 500
+    relative_path: reference/protein-04000.json
+    sha256: 8d7333d2ea2cd7fdc8906850667116ec43f54c61a8096e50b80596c423839cbb
+    byte_length: 59489
+  - offset: 4500
+    count: 500
+    relative_path: reference/protein-04500.json
+    sha256: 0906dd8ffca9c7e21fe5ac057d0b26f762bdace135305a29ca5f3a88afefc08d
+    byte_length: 59520
+  - offset: 5000
+    count: 500
+    relative_path: reference/protein-05000.json
+    sha256: 50dbcf47a17dfbe0dd72ecba3ad8f6e2dc12dd19664382dcf4d110f7ca314455
+    byte_length: 58824
+  - offset: 5500
+    count: 500
+    relative_path: reference/protein-05500.json
+    sha256: 57ab68cdf462bed31889b704989b4152f40e0dbd1cb876fd2bb31a8e98b5925f
+    byte_length: 58640
+  - offset: 6000
+    count: 500
+    relative_path: reference/protein-06000.json
+    sha256: b84965a97649e0b987ee27b6a85b9fc857e2c97cb657ceabefc1497d8f04e308
+    byte_length: 49135
+acquisition_tool_sha256: 7c0593954f249e136a8690cd580f8bcdc40ebec1108a23f03626451bfd67251e
+lock_content_hash: 85bc2b10e65bd8140a775537204f3c7c7048cd5444d7057fbea9501b7cd4b104

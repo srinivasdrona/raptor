@@ -1,0 +1,2417 @@
+# RAPTOR Atlas Phase-2 contrast-panel SELECTOR -- binding planner design/
+# implementation spec.
+#
+# Planner: this document. Test author: Gemini (RED tests). Doer: Claude Sonnet
+# (GREEN skeleton). Checker: GPT-5.4. Loop order is fixed:
+# PLAN -> Gemini RED -> Sonnet GREEN -> GPT-5.4 checker -> real external run.
+#
+# This file is the PLAN. It contains NO code, NO tests, NO candidate identity,
+# NO candidate count, NO functional result, and it performs NO selection.
+#
+# Authority order for BEHAVIOUR:
+#   1. docs/project/atlas/ATLAS_PHASE2_PANEL_SELECTION_PROTOCOL.md  (v1.0.4)
+#   2. docs/project/atlas/atlas-phase2-panel-selection-registration-v1.yaml
+#   3. configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v4.yaml
+#   4. configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v4.yaml
+#   5. docs/DECISIONS.md (ADR-0014/0015/0016), docs/project/specs/
+#      mechanism-atlas-starter.yaml, tests/atlas/
+# This spec is subordinate to all of them. Where this spec and the protocol
+# appear to differ, the protocol governs and this spec is defective. Existing
+# code is NOT behaviour authority.
+
+schema: raptor-atlas-panel-selector-v1
+status: planner_contract_rev4_offline_deterministic_selector_version_pinned_constraint_contract
+task_id: atlas-phase2-panel-selection-run
+title: >-
+  RAPTOR Atlas Phase-2 offline deterministic contrast-panel selector
+  (fail-closed preconditions, full-universe complete search, no evidence reading)
+
+worktree: 'D:\AIProjects\raptor-worktrees\atlas-panel-selection'
+branch: track/atlas-panel-selection-2026-08
+base_commit: f92b9886f47629c52f81e2506c07ae5ddf54050d
+output: docs/project/specs/atlas-panel-selector-v1.yaml
+created_at: '2026-08-03T17:19:36+05:30'
+created_at_utc: '2026-08-03T11:49:36Z'
+
+revision_log:
+  - rev: 1
+    head: f92b9886f47629c52f81e2506c07ae5ddf54050d
+    trigger: >-
+      Protocol v1.0.3 is frozen and bound to universe lock v2, but no executor
+      exists, so the frozen rules are currently unexecutable and the panel could
+      only be produced by hand -- exactly the subjective path the protocol was
+      written to prevent. This plan defines the mechanical executor. Plan-only;
+      no code, no tests, no todo/status edit, no commit, no push, no selection run.
+    authors:
+      - 'docs/project/specs/atlas-panel-selector-v1.yaml   # this spec (NEW, only file written)'
+  - rev: 2
+    head: 13c0c3ba1f5f0bcefd60c1f92ceb678070026dfb
+    at: '2026-08-05T14:33:47+05:30'
+    at_utc: '2026-08-05T09:03:47Z'
+    trigger: >-
+      Two authorities moved under rev 1. (a) The offline raw identity mapper was
+      specified, implemented and locked as map_version 4
+      (src/raptor/atlas/identity_map.py, configs/atlas/panels/tsc2/
+      atlas-phase2-raw-identity-map-lock-v4.yaml), which resolves rev 1's
+      missing_deterministic_mappers blocker; its shipped API is
+      load_identity_map(...) -> OfflineRawIdentityMapper with
+      RawIdentityMapper.replay(...) -> RawIdentityReplay, NOT the placeholder
+      map(...) -> RawIdentityParse that rev 1 assumed. (b) Protocol v1.0.4 made
+      the verified map a fail-closed precondition (V7 / IM1-IM6), repointed the
+      active universe lock to v4 and pinned the precondition execution order.
+      Rev 2 realigns this spec with both. Selection semantics are untouched:
+      seed, panel size, strata, eligibility, constraints, ladder and the
+      full-universe complete search are unchanged.
+    changes:
+      - behaviour_authority updated to protocol 1.0.4 / registration 5b898002...,
+        universe lock v4, identity-map lock v4
+      - SelectionInputs gains identity_map_path + identity_map_response_root and
+        LOSES the injectable raw_identity_mapper object
+      - RawIdentityMapper protocol replaced with a NON-NORMATIVE sketch of the shipped
+        replay(...) shape; the shipped source is the sole API authority
+      - verification gains verify_identity_map (V7 / IM1-IM6) and the pinned
+        V1,V2,V3,V4,V5,V7,V6 order
+      - typed errors gain AtlasIdentityMapBindingError and four codes
+      - run record gains the identity-map attestation block
+      - test contract gains PS-M-001..008 (synthetic) and PS-I-001..005 (external)
+      - preservation set and RED baseline updated (64 -> 109 Atlas tests)
+    pre_commit_correction:
+      at: '2026-08-05T16:53:52+05:30'
+      at_utc: '2026-08-05T11:23:52Z'
+      trigger: >-
+        Independent review rejected the first uncommitted draft of protocol v1.0.4. Universe lock
+        v3 recorded 1.0.2 lock-time bindings although 1.0.3 was already frozen, so its lock-time
+        claim was false and the drafted K5 chain [1.0.3, 1.0.4] laundered it through the
+        amendment log. A corrected universe lock v4 (parsed-data identical identities and
+        observations, honest 1.0.3 lock-time bindings) replaced it, and v1.0.4 -- never committed,
+        never issued, never bound by a lock or read by a run -- was corrected in place.
+      changes:
+        - active universe lock repointed v3 -> v4 and the recomputed protocol/registration
+          digests re-mirrored
+        - K5 chain expectation for the active lock narrowed to ('1.0.4',) and extended to reject
+          invalid-binding locks and rejected_draft_digests as chain steps or admissibility
+          sources
+        - exact mapper API/loader-signature restatements de-authorized in favour of the shipped
+          source; replay's source_reported_consequence_hint corrected to a REQUIRED str
+        - identity-map lock path documented as registration-resolved at run time, never hardcoded
+        - PS-I-001/002 retargeted to lock v4; PS-I-005 added for the invalid-binding rejection
+      unchanged: >-
+        No selection semantics were touched: seed, panel size, strata, eligibility, constraints,
+        ladder, search, budget, evidence firewall and the no-selection boundary are byte- or
+        semantically identical to the rejected draft.
+    authors:
+      - 'docs/project/specs/atlas-panel-selector-v1.yaml   # this spec (only file written by this rev)'
+  - rev: 3
+    head: 736c7d6aeac1295203d60556295ccd7965c5ae4b
+    at: '2026-08-06T17:52:51+05:30'
+    at_utc: '2026-08-06T12:22:51Z'
+    trigger: >-
+      An execution attempt against the real frozen inputs hit a contract seam no
+      synthetic fixture had exercised. Protocol RP6 compares the replayed
+      ELIGIBILITY exclusion code (section 8.2, the X1-X10 space) with the declared
+      exclusion_flags, but rev 2 rendered RP6 as the single mapper field
+      RawIdentityReplay.exclusion_code. The shipped mapper is deliberately
+      selection-protocol independent: it is built from pinned official responses,
+      it emits identity/scope exclusions only (including unresolved X1), and it
+      cannot know the caller-supplied AnchorSpec, which arrives at run time and is
+      never locked. The real universe legitimately declares the anchor exclusion
+      X3 -- an eligibility fact selector-side E3 recomputes correctly later -- so a
+      mapper-only RP6 comparand turns a conforming frozen input into an
+      unresolvable V6 contradiction and makes the run unexecutable. Rev 3 restores
+      the protocol's meaning by defining the EFFECTIVE exclusion code:
+      mapper-owned identity/scope exclusion reconciled with the selector-owned,
+      anchor-derived X3, fail-closed on conflict, with the mapper still never told
+      the anchor. Where rev 2 and the protocol differed the protocol governed and
+      rev 2 was defective; nothing here is a new rule.
+    changes:
+      - replay_normalization gains a REQUIRED keyword-only AnchorSpec argument and
+        its pinned signature is restated exactly
+      - verification gains anchor_threading_rule (verify_preconditions supplies
+        inputs.anchor only AFTER V7 returned the attestation) and
+        rp6_effective_exclusion_contract (effective-code derivation, exact
+        singleton/empty equality, UNIVERSE_CONTRACT_BREACH(RP6) on disagreement,
+        fail-closed conflict precedence, anchor isolation)
+      - RawIdentityReplay rp_field_mapping RP6 re-scoped to MAPPER-OWNED only, with
+        rp6_note separating mapper-owned identity/scope exclusion from
+        selector-owned anchor exclusion
+      - RawIdentityMapper gains anchor_independence -- no anchor parameter, no
+        anchor-aware wrapper/subclass/adapter, no protocol coupling
+      - PS-R-007 expanded to four mandatory synthetic RP6 cases (mapper-owned X1,
+        anchor-derived X3 by identity and by residue, effective-None with spurious
+        declared flags, mapper/anchor conflict) alongside the RP7 case it already owned
+      - two beat4 inversions added for this seam
+    unchanged: >-
+      No selection semantics moved. selection_seed and its V3 literal comparison,
+      panel_size_rule, sampling strata S1-S6 and the Omega order, lineage L1-L6,
+      support_class, eligibility E1-E8 and the X1-X10 code space, constraints
+      C1-C5 / D1-D4 / P1-P3 / H1-H3, the relaxation ladder and its gate,
+      never_relaxed, the complete full-universe search, the node-budget rule, the
+      evidence firewall, the no-selection boundary and every frozen input binding
+      (protocol 1.0.4 digest, registration 5b898002..., universe lock v4,
+      identity-map lock v4) are byte-identical to rev 2. The registration-pinned
+      precondition order V1,V2,V3,V4,V5,V7,V6 is unchanged and V7 still precedes V6.
+    landed_as: >-
+      One planner-spec commit made under an explicit owner instruction that
+      supersedes commit_boundary for this revision only: no amend, no push, and no
+      other file touched.
+    authors:
+      - 'docs/project/specs/atlas-panel-selector-v1.yaml   # this spec (only file written by this rev)'
+  - rev: 4
+    head: ab8d04f2fe326503a62164bc3858891920ea9239
+    at: '2026-08-06T22:00:29+05:30'
+    at_utc: '2026-08-06T16:30:29Z'
+    trigger: >-
+      The fourth real execution attempt cleared every fail-closed precondition --
+      V1, V2, V3, V4, V5, V7, V6 and the full RP1-RP7 replay all passed -- and then
+      died in the FORMAL pre-search step with
+      AtlasPanelRegistrationError(INPUT_FAULT) "unrecognized constraint formula
+      None", before a single attempt ran and before any run record was written. The
+      cause is a spec gap, not a bad artifact: rev 3 named the Section-17
+      constraints C1-C5 / D1-D4 / P1-P3 / H1-H3 and required every parameter to be
+      READ from the registration, but never said WHERE the numeric thresholds live.
+      The frozen registration has no constraints mapping at all -- it carries the
+      relaxation ladder as seven prose strings and nothing else -- so an
+      implementation that follows the read-everything rule literally looks up a key
+      that does not exist, gets None, and fails. The protocol IS the threshold
+      authority (section 13.2 ladder, section 17.5 caps), but it is Markdown and
+      must never be parsed at run time. Rev 4 closes the seam with a CLOSED
+      canonical constraint contract keyed to the exact supported protocol version
+      AND its verified doc hash, plus exact-equality validation of the
+      registration's seven ladder strings. Three repairs were rejected: amending the
+      frozen registration to add a constraints block (edits a frozen artifact to
+      suit the executor), parsing the protocol Markdown at run time (makes selection
+      depend on prose formatting), and defaulting a missing threshold (fabricates a
+      rule). No threshold value, ladder order, gate, search rule or outcome
+      semantic changes; only their SOURCE and their drift detection are now defined.
+    changes:
+      - typed error code enum gains CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL and
+        RELAXATION_LADDER_DRIFT; AtlasPanelRegistrationError.means extended to name
+        the constraint-contract failures
+      - hardcoding_prohibition gains a single, explicitly scoped carve-out for
+        protocol constants that are pinned to the verified protocol version AND doc
+        hash and fail closed on any unrecognized binding
+      - three frozen types added -- RelaxationStep, ConstraintContract, ActiveConstraints
+      - module_api.search gains materialize_constraint_contract and
+        constraints_at_level, and the constraint_contract block defining the closed
+        canonical L0 base thresholds, the exact seven-string ladder comparand, the
+        cumulative rung transformations and the fail-closed validation rules
+      - complete_search and run_attempt_schedule signatures pinned to the
+        structured contract instead of an untyped constraints argument
+      - run_record procedure block pins the declared_constraints shape to the
+        canonical materialized set plus the validated ladder
+      - protected-test obligations extended inside existing ids PS-A-008, PS-O-001,
+        PS-O-004, PS-P-005, PS-X-001, PS-D-005 and PS-I-001; no new PS id is created
+      - DC-12 records the rejected alternatives; three beat4 inversions added
+    unchanged: >-
+      No selection semantics moved. Every threshold keeps its protocol value at
+      every rung, the ladder keeps its order and its terminal step, the gate keeps
+      INFEASIBLE_COMPLETE as the only advance condition, and UNDETERMINED still
+      terminates the run. selection_seed and its V3 literal comparison,
+      panel_size_rule and the attempt schedule, sampling strata S1-S6 and the Omega
+      order, lineage L1-L6, support_class, eligibility E1-E8, the X1-X10 code space,
+      RP1-RP7 including the rev-3 anchor-aware RP6 reconciliation, the pinned
+      precondition order V1,V2,V3,V4,V5,V7,V6, search scope, node budget, the
+      complete-search and hereditary-pruning rules, the evidence firewall, the
+      no-selection boundary and every frozen input binding are unchanged.
+    landed_as: >-
+      One planner-spec commit made under an explicit owner instruction that
+      supersedes commit_boundary for this revision only: no amend, no push, and no
+      other file touched. The protocol, the registration, every lock, all code,
+      all tests and all data records are untouched by this revision.
+    authors:
+      - 'docs/project/specs/atlas-panel-selector-v1.yaml   # this spec (only file written by this rev)'
+
+# ---------------------------------------------------------------------------
+# A. Authority, scope, non-authority
+# ---------------------------------------------------------------------------
+authority_and_scope:
+  behaviour_authority:
+    - path: docs/project/atlas/ATLAS_PHASE2_PANEL_SELECTION_PROTOCOL.md
+      protocol_version: 1.0.4
+      protocol_doc_hash: 7b0596ab4a52601566c85a3a2c7ca42aead9c35916890397e58b3e11876e5823
+      hash_algorithm: atlas.protocol_doc_hash.v1
+      role: >-
+        Sole source of selection semantics. This spec REFERENCES its rule ids
+        (V1-V7, K1-K6, IM1-IM6, U1-U7, RP1-RP7, E1-E8, X1-X10, S1-S6, C1-C5,
+        D1-D4, P1-P3, H1-H3, L1-L6, R1-R7, Omega, SEL/NS_*) and never restates,
+        paraphrases as authority, reorders, or weakens them.
+    - path: docs/project/atlas/atlas-phase2-panel-selection-registration-v1.yaml
+      registration_content_hash: 5b8980024bd88f9f3c7269badf7fc3e709fef4ba135b3575a7513e5d17ad1653
+      hash_algorithm: atlas.registration_content_hash.v1
+      role: >-
+        Machine-loadable parameter authority: selection_seed, panel_size_rule,
+        search_parameters, sampling_strata, taxonomy_governance,
+        relaxation_ladder, relaxation_gate, never_relaxed,
+        executor_preconditions (incl. V7 and execution_order),
+        pack_binding_observed_at_freeze, candidate_universe_contract (incl.
+        universe_lock.active), identity_map_contract (incl. active + IM1-IM6) and
+        lock_protocol_version_delta_contract. The implementation READS these at
+        run time; it never hardcodes their values.
+    - path: configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v4.yaml
+      role: >-
+        active pre-selection universe lock (candidate-free). Shown for orientation only: the
+        implementation ALWAYS resolves it from
+        registration.candidate_universe_contract.universe_lock.active.path and never from this
+        literal or any other hardcoded string.
+      inadmissible_predecessor_note: >-
+        Universe lock v3 is retained tracked but is an invalid-binding lock (protocol 4.6.2): it
+        recorded 1.0.2 lock-time bindings after 1.0.3 was frozen. It is never active, never a K5
+        predecessor and never a traversed chain step; a run that resolves to it terminates with
+        UNIVERSE_LOCK_PROTOCOL_UNKNOWN.
+    - path: configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v4.yaml
+      role: >-
+        active raw identity map lock (candidate-free), resolved at run time from the
+        registration identity_map_contract.active.path pointer; the path above is orientation
+        only and is never hardcoded. Protocol-independent: it records no protocol version/digest
+        and is NOT subject to K5.
+    - path: docs/project/specs/atlas-raw-identity-mapper-v1.yaml
+      role: >-
+        build/runtime authority for the offline mapper this selector loads. This spec never
+        re-derives identities; it loads and verifies that artifact.
+      non_authority_for_call_shape: >-
+        That spec governs the mapper's BUILD and VERIFICATION semantics, not this selector's call
+        shape. Its rendered signature summary has drifted from the shipped module in the past
+        (e.g. it omits the raw_inventory_path keyword that load_identity_map actually requires),
+        so the implementer MUST read src/raptor/atlas/identity_map.py and
+        src/raptor/atlas/model.py at implementation time for the exact API. Neither that spec nor
+        this one is authority for the signature.
+    - path: configs/atlas/packs/tsc2/pack.yaml
+      role: bound disease pack; identity admission + ontology authority (ADR-0014).
+  supporting_authority:
+    - 'docs/DECISIONS.md                              # ADR-0014/0015/0016'
+    - 'docs/project/specs/mechanism-atlas-starter.yaml # panel_selection_contract, spec strata (C5)'
+    - 'docs/project/specs/atlas-citation-resolver-v1.yaml # identifier normalization shapes (ADR-0016)'
+    - 'tests/atlas/                                    # frozen Phase-1/2 contract tests, never weakened'
+  explicitly_not_authority:
+    existing_code: >-
+      src/raptor/atlas/*.py is a REUSE surface, not a behaviour authority. Where
+      an existing helper does not implement a protocol rule, the rule wins and
+      the gap is reported (see missing_deterministic_mappers), never papered over
+      by adapting the rule to the code.
+    this_spec: >-
+      If a rule here contradicts the protocol, the protocol governs and this spec
+      must be revised before implementation.
+  hardcoding_prohibition: >-
+    The implementation MUST NOT embed the seed literal, panel size bounds, cap
+    formulae numerals, ladder order, node budget, strata list, Omega order, lock
+    path, or any digest as source constants. Every one is read from the
+    registration/lock/protocol at run time. Rule IDENTIFIERS and the fixed
+    ALGORITHM SHAPES (predicate forms, hash algorithms, Omega-as-declared-order)
+    may be coded, because they are the protocol's semantics, not its parameters.
+    Rationale: a hardcoded parameter silently survives a future amendment.
+  hardcoding_prohibition_scoped_exception:
+    added_in: rev4
+    rule: >-
+      EXACTLY ONE exception exists, and it is narrow. Protocol-owned values that
+      the registration does not carry -- today only the Section-17 numeric
+      constraint thresholds -- may live in source as a CLOSED canonical table
+      ONLY when that table is keyed by BOTH the exact supported protocol version
+      AND the verified protocol_doc_hash, and an unrecognized (version, hash) pair
+      fails closed before any attempt runs. See
+      module_api.search.constraint_contract.
+    why_this_is_not_the_prohibited_case: >-
+      The prohibition exists because "a hardcoded parameter silently survives a
+      future amendment". A version-and-hash-keyed table cannot: V1 recomputes the
+      protocol doc hash from disk, so a single changed byte in the protocol
+      retires the whole table and the run stops with
+      CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL. The failure mode the prohibition
+      targets is structurally unreachable, which is why the carve-out is safe and
+      why it is stated here rather than assumed.
+    still_prohibited: >-
+      The seed, panel size bounds, ladder ORDER as behaviour, node budget, strata
+      list, Omega order, lock paths and digests remain read-only-from-artifacts
+      with no exception. The seven ladder strings are embedded ONLY as an exact
+      comparand for drift detection, never as the source of the ladder's
+      behaviour, and the registration remains the authority for which steps exist
+      and in what order.
+
+# ---------------------------------------------------------------------------
+# B. Blinding and the no-selection boundary
+# ---------------------------------------------------------------------------
+blinding_and_no_selection_boundary:
+  spec_purity:
+    - This spec names no candidate, no variant, no residue, no count of candidates, and no result.
+    - >-
+      The Phase-2 anchor is referenced only as an INPUT parameter (anchor_spec)
+      supplied at run time, never as a literal in this spec or in panel.py.
+    - >-
+      Aggregate universe counts (record counts, ledger rows, discovery-set size)
+      are read from the lock at run time and echoed into the run record. They are
+      never written into this spec, panel.py, or any test fixture.
+  no_selection_until_clean: >-
+    No real selection run may execute until (1) the Gemini RED suite exists,
+    (2) the Sonnet implementation makes it GREEN with tests/atlas fully green,
+    and (3) the GPT-5.4 checker returns CLEAN. Running the selector against the
+    real external universe before that point would produce a panel whose
+    provenance is an unreviewed implementation -- indistinguishable, after the
+    fact, from a hand-picked panel.
+  evidence_firewall_at_runtime: >-
+    The selector reads the universe's enumerated sampling metadata only. It never
+    opens a source artifact, never calls the citation resolver, never reads
+    extracted text, never computes or consumes a score, and never ranks by any
+    reported outcome. Protocol section 9.1 is the highest-priority runtime rule.
+  selection_is_not_a_finding: >-
+    A produced panel is a sampling decision. The run record must not be cited as
+    evidence about any variant. Gate 1-8 promotion and named human-oracle review
+    remain the only path to an accepted claim.
+
+# ---------------------------------------------------------------------------
+# C. Scope boundary
+# ---------------------------------------------------------------------------
+scope_boundary:
+  in_scope:
+    - Load + verify registration, protocol digest, pack, active universe lock, universe, raw inventory.
+    - Enforce V1-V6, K1-K6 (incl. the exact K5 delta object), U1-U7, RP1-RP7.
+    - Replay normalization/admission from raw rows; recompute strata, lineage, support_class.
+    - Evaluate eligibility E1-E8, emit exclusion codes X1-X10 for every failing record.
+    - Run the attempt schedule with a COMPLETE deterministic search over the full eligible universe.
+    - Apply the relaxation ladder only through the declared gate; emit terminal outcomes honestly.
+    - Emit a complete run record with a disposition row for EVERY universe record.
+    - A thin CLI wrapper that resolves paths and writes the run record.
+  out_of_scope:
+    - No network, no acquisition, no download, no refresh, no DNS, no HTTP.
+    - No evidence reading, span verification, citation resolution or promotion.
+    - No universe construction, normalization authoring, enrichment, or lock creation.
+    - No editing of protocol, registration, lock, universe, raw inventory or pack.
+    - No scoring, ranking, prioritization, novelty or interestingness computation.
+    - No ClinVar/ACMG/PP3/BP4 coupling; no scorer/eval/packet imports.
+    - No repair, no auto-repin, no fallback, no "best effort" partial run.
+    - No mutation of any input file, ever, including on failure paths.
+
+# ---------------------------------------------------------------------------
+# D. Typed errors
+# ---------------------------------------------------------------------------
+typed_errors:
+  location: src/raptor/atlas/model.py (additive only, alongside the existing AtlasError family)
+  new_hierarchy:
+    AtlasPanelError:
+      base: AtlasError
+      note: >-
+        NEW base for the panel-selection subsystem; sibling of AtlasPackError and
+        AtlasCatalogError. Orthogonal to the Phase-1 gate errors: no panel error
+        subclasses AtlasSchemaError or AtlasProvenanceError.
+    AtlasPanelInputError:
+      base: AtlasPanelError
+      means: >-
+        caller/arg fault before any protocol check: missing/unreadable path,
+        non-regular file, symlink/junction or '..' escape, malformed YAML, wrong
+        schema id, absent required argument, non-quoted (type-coerced) timestamp.
+    AtlasPanelRegistrationError:
+      base: AtlasPanelError
+      means: >-
+        V1/V2/V3 failure (protocol digest mismatch, registration self-hash
+        mismatch, seed mismatch), or a registration parameter this implementation
+        cannot honour soundly (unsupported search scope / non-null shortlist), or
+        a Section-17 constraint-contract failure: an unsupported protocol
+        version/doc-hash binding, or a relaxation_ladder that is not exactly the
+        seven pinned strings in the pinned order.
+    AtlasPanelPackDriftError:
+      base: AtlasPanelError
+      means: 'V4 failure (PACK_DRIFT): live pack hash != any of the three required comparands.'
+    AtlasUniverseLockError:
+      base: AtlasPanelError
+      means: 'V5 failure via K1/K2/K3/K4/K6: lock missing, corrupt, mismatched, duplicated, or future-dated.'
+    AtlasLockDeltaError:
+      base: AtlasPanelError
+      means: 'V5 failure via K5: delta incomplete/partial/free-text, or lock triple not reconcilable to the amendment log.'
+    AtlasUniverseContractError:
+      base: AtlasPanelError
+      means: >-
+        V6 failure: U1-U7 conservation, RP1-RP7 replay, prohibited universe
+        content (protocol section 4.4), strata/lineage/support recompute
+        disagreement, or a contradictory recomputed-derivation crosswalk cell.
+    AtlasIdentityMapBindingError:
+      base: AtlasPanelError
+      means: >-
+        V7 failure via IM1-IM6: the active identity-map lock is absent, corrupt,
+        stale-versioned, or does not bind the map manifest, response bundle,
+        acquisition tool, raw inventory, pack or the universe lock's
+        identity_map_binding. This is a SELECTOR-side binding error and is
+        deliberately distinct from raptor.atlas.model.AtlasIdentityMapError,
+        which the mapper loader raises for its own artifact faults; the selector
+        catches the latter and re-raises as this class with the IM check id, so
+        the fail-closed reason stays attributable to a protocol rule.
+      never: >-
+        NEVER downgraded to an unresolved identity, an out_of_scope row, an
+        eligibility failure or a partial result. A mapper fault stops the run.
+  error_payload:
+    required_attributes:
+      code: >-
+        str from a CLOSED enum defined in panel.py; every raise site supplies one.
+        Enum members are exactly the protocol failure names plus the input faults:
+        PROTOCOL_DIGEST_MISMATCH, REGISTRATION_SELF_HASH_MISMATCH, SEED_MISMATCH,
+        PACK_DRIFT, UNIVERSE_LOCK_MISSING, UNIVERSE_LOCK_CORRUPT,
+        UNIVERSE_LOCK_MISMATCH, UNIVERSE_LOCK_INVALID,
+        UNIVERSE_LOCK_PROTOCOL_UNKNOWN, UNIVERSE_LOCK_DELTA_INCOMPLETE,
+        UNIVERSE_CONTRACT_BREACH, REPLAY_MAPPER_UNAVAILABLE,
+        IDENTITY_MAP_LOCK_MISSING, IDENTITY_MAP_LOCK_CORRUPT,
+        IDENTITY_MAP_MISMATCH, IDENTITY_MAP_UNVERIFIED,
+        UNSUPPORTED_SEARCH_SCOPE, CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL,
+        RELAXATION_LADDER_DRIFT, INPUT_FAULT.
+      check_id: 'str | None  # e.g. V4, K5, U3, RP4, E6, L2, C3 -- the exact protocol rule id'
+      locus: 'str | None  # record_id / raw_record_id / universe_key / path, whichever localizes the fault'
+    message_rule: >-
+      Messages state the recomputed value and the declared value. They never
+      contain a suggested repair, and the implementation never applies one.
+  discrimination_requirement: >-
+    Registration/digest, pack-drift, lock, delta, identity-map-binding and
+    universe-contract failures MUST be distinct catchable subclasses so tests and
+    the checker can assert the exact fail-closed reason. Catching AtlasPanelError
+    must never be sufficient to distinguish a pack drift from a replay breach, or
+    an identity-map binding fault from a universe-contract breach.
+  outcomes_are_not_errors:
+    rule: >-
+      SOLUTION / INFEASIBLE_COMPLETE / UNDETERMINED (per attempt) and
+      PANEL_SELECTED / INFEASIBLE_PANEL / UNDETERMINED_SEARCH_INCOMPLETE (terminal)
+      are RETURN VALUES, never exceptions.
+    rationale: >-
+      They are legitimate protocol results that must be published with a full
+      audit table. Raising them would make an honest "no panel" indistinguishable
+      from a crash and would tempt a caller to retry until a panel appears.
+    consequence: >-
+      A run that terminates INFEASIBLE_PANEL or UNDETERMINED_SEARCH_INCOMPLETE
+      STILL writes a complete run record with every disposition row.
+
+# ---------------------------------------------------------------------------
+# E. Frozen types
+# ---------------------------------------------------------------------------
+dataclass_contracts:
+  location_rule: >-
+    Frozen VALUE/RESULT types and the two Protocols live in
+    src/raptor/atlas/model.py; all LOGIC lives in src/raptor/atlas/panel.py.
+    Import direction stays acyclic: panel.py -> model.py, identity.py, pack.py;
+    model.py imports none of them. This mirrors the citation-resolver rule.
+  decorator: '@dataclass(frozen=True, eq=True)  # matches every existing atlas value type'
+  immutability_rule: >-
+    Every mapping/sequence loaded from disk is deep-frozen (Mapping ->
+    MappingProxyType, list -> tuple) before it is stored on a frozen type, using
+    the same deep-freeze principle already used by pack.py/citation.py. No loaded
+    input object is mutable anywhere in the selector.
+  types:
+    AnchorSpec:
+      fields:
+        spdi_canonical: str
+        residue_index: int
+      note: 'supplied by the caller; E3/section 16.3 input. Never a literal in code or spec.'
+    SelectionInputs:
+      fields:
+        repo_root: 'pathlib.Path  # explicit tracked-artifact containment root; no default'
+        protocol_path: pathlib.Path
+        registration_path: pathlib.Path
+        pack_path: pathlib.Path
+        universe_path: pathlib.Path
+        raw_inventory_path: pathlib.Path
+        anchor: AnchorSpec
+        run_started_at: 'datetime  # tz-aware; injected clock, never read inside core'
+        executor_identity: str
+        identity_map_path: 'pathlib.Path  # external candidate-bearing map manifest; explicit, no default, no env read'
+        identity_map_response_root: 'pathlib.Path  # external pinned official response bundle root; explicit, no default'
+        node_budget_override: 'int | None  # may only LOWER the registration budget; a higher value is an input fault'
+      note: >-
+        repo_root is explicit and every tracked protocol/registration/pack/lock
+        path must resolve beneath it. Core never searches parent directories,
+        inspects .git, or reads the process CWD/environment to infer a root.
+        universe_lock_path is deliberately ABSENT: the lock is resolved from the
+        registration pointer (K1). A caller-supplied lock path would let an
+        operator point the run at a stale or hand-made lock. The identity-map
+        LOCK path is absent for exactly the same reason (IM1: resolved from
+        registration identity_map_contract.active.path); only the EXTERNAL,
+        candidate-bearing map manifest and response-bundle roots are caller-supplied,
+        because they must not be tracked and must never be guessed from a default.
+      mapper_injection_prohibition:
+        rule: >-
+          A ready-made RawIdentityMapper OBJECT is NOT an input (rev-1 field
+          raw_identity_mapper is REMOVED). Core constructs the mapper itself
+          inside verify_identity_map by calling
+          raptor.atlas.identity_map.load_identity_map(...) against the
+          registration-resolved lock path and the caller's external map/response
+          paths.
+        rationale: >-
+          An injectable mapper is a hole straight through V7: a caller could pass
+          an object that echoes universe-declared fields, and RP1-RP7 would pass
+          vacuously while proving nothing. Making construction internal means the
+          only way to satisfy the replay is a real, hash-verified, locked map.
+        tradeoff: >-
+          Loses the convenient unit-test injection seam. Accepted: tests build
+          SYNTHETIC map manifests, locks and response bundles under tmp_path (the
+          pattern already used by tests/atlas/test_identity_map.py) rather than
+          stubbing the mapper protocol, which also exercises IM1-IM6 for real.
+        falsifier: >-
+          If SelectionInputs (or any keyword of select_panel) can accept a mapper
+          instance, callable factory, or monkeypatchable module-level default that
+          bypasses load_identity_map, the implementation violates this spec.
+    RelaxationStep:
+      added_in: rev4
+      fields:
+        step_id: 'str  # R1..R7, the protocol section 13.2 step name'
+        position: 'int  # 1..7, the 1-based index of this step in the declared ladder'
+        constraint_id: 'str  # the single constraint this step relaxes: C5, P2, P1, D1, P3, D2, P2'
+        kind: "str  # 'threshold' (numeric change) | 'report_only' (constraint stops gating)"
+        before: 'str | None  # canonical threshold expression in force at position-1; None when kind is report_only'
+        after: 'str | None  # canonical threshold expression in force from this step on; None when kind is report_only'
+        declared_text: 'str  # the EXACT registration relaxation_ladder string this entry validates against'
+      note: >-
+        A structured restatement of the ladder the registration declares, not a
+        second source of truth. before/after are canonical THRESHOLD EXPRESSIONS
+        in the closed grammar (a decimal integer, or ceil(<int>n/<int>)), never
+        prose and never a pre-evaluated integer, because every cap is a function
+        of the attempt size n.
+    ConstraintContract:
+      added_in: rev4
+      frozen: true
+      fields:
+        protocol_version: 'str  # the exact supported version this contract is keyed to'
+        protocol_doc_hash: 'str  # the V1-verified doc hash this contract is keyed to'
+        base_thresholds: 'Mapping[str, str]  # frozen; constraint id -> canonical L0 threshold expression'
+        explicit_logic_constraints: 'tuple[str, ...]  # constraints with no numeric threshold, evaluated as coded predicates'
+        relaxation_steps: 'tuple[RelaxationStep, ...]  # exactly seven, in declared order'
+        declared_ladder: 'tuple[str, ...]  # the seven registration strings, verbatim, as validated'
+      note: >-
+        The single object every Section-17 threshold is read from. It is
+        constructed only by materialize_constraint_contract, only after the
+        protocol binding and the ladder have both validated, and it is
+        deep-frozen. There is no partial contract and no mutable variant.
+    ActiveConstraints:
+      added_in: rev4
+      frozen: true
+      fields:
+        level: 'str  # L0 or R1..R7'
+        rung: 'int  # 0..7; LEVELS.index(level)'
+        n: 'int  # the attempt size these values were evaluated for'
+        c3_max_per_stratum: int
+        d1_min_assay_kinds: int
+        d2_min_model_systems: int
+        d3_max_per_assay_kind: int
+        p1_max_sole_support: int
+        p2_min_established_groups: int
+        p3_max_single_high_throughput: int
+        c5_enforced: 'bool  # False from R1 onward; C5 then reports without gating'
+        applied_steps: 'tuple[str, ...]  # exactly the step_ids with position <= rung, ascending'
+      note: >-
+        Every field is an EVALUATED integer for this (level, n) pair, so the
+        search never re-reads the registration, never re-parses an expression and
+        never sees a rung it did not ask for. H1 is not a field: protocol section
+        12 defines H1 as P3, so it reads p3_max_single_high_throughput and no
+        second value can drift from it.
+    LockProtocolVersionDelta:
+      fields:
+        lock_protocol_version: str
+        lock_protocol_doc_hash: str
+        lock_registration_content_hash: str
+        current_protocol_version: str
+        current_protocol_doc_hash: str
+        current_registration_content_hash: str
+        differs: bool
+        reconciled_via_amendment_log_versions: 'tuple[str, ...]'
+      note: >-
+        exactly the eight fields of protocol section 4.6.1; all non-null; no
+        extra field; no free text. Constructed only by build_lock_delta().
+    PreconditionReport:
+      fields:
+        verified_protocol_doc_hash: str
+        verified_registration_content_hash: str
+        verified_live_pack_content_hash: str
+        active_universe_lock: 'Mapping  # frozen: path, lock_version, universe_version'
+        verified_lock_content_hash: str
+        verified_universe_content_hash: str
+        verified_raw_inventory_hash: str
+        verified_raw_inventory_record_count: int
+        verified_normalization_ledger_hash: str
+        verified_normalization_ledger_row_count: int
+        verified_discovery_set_hash: str
+        verified_discovery_set_count: int
+        lock_protocol_version_delta: LockProtocolVersionDelta
+        checks_passed: 'tuple[str, ...]  # every V/K/U/RP id that ran and passed, in order'
+      note: 'constructed only when EVERY check passed; there is no partial report.'
+    NormalizationReplay:
+      fields:
+        replayed_row_count: int
+        outcome_counts: 'Mapping[str, int]  # per normalization_outcome'
+        unresolved_confirmed_count: int
+        checks_passed: 'tuple[str, ...]  # RP1..RP7'
+    LineageIndex:
+      fields:
+        group_of_observation: 'Mapping[str, str]  # observation_id -> lineage_group_key'
+        group_confidence: 'Mapping[str, str]      # lineage_group_key -> established | unknown'
+        unknown_observation_count: int
+        unknown_record_count: int
+    RecordDisposition:
+      fields:
+        record_id: str
+        universe_key: str
+        identity_state: str
+        all_matched_strata: 'tuple[str, ...]'
+        primary_stratum: 'str | None'
+        spec_stratum: str
+        spec_stratum_derivation: str
+        support_class: str
+        source_group_keys: 'tuple[str, ...]'
+        draw_key: 'str | None  # None iff unresolved (no spdi_canonical)'
+        disposition: 'str  # X1..X10 or SEL/NS_*'
+        rule_id: str
+        allocation_slot: 'str | None  # stratum slot filled, selected members only'
+        label_function_discordant: bool
+        stale_label_discordant: bool
+    AttemptOutcome:
+      fields:
+        level: 'str  # L0, R1..R7'
+        n: int
+        status: 'str  # SOLUTION | INFEASIBLE_COMPLETE | UNDETERMINED'
+        nodes_expanded: int
+        solution: 'tuple[str, ...] | None  # record_ids in Omega/allocation order'
+    SelectionRun:
+      fields:
+        terminal_outcome: 'str  # PANEL_SELECTED | INFEASIBLE_PANEL | UNDETERMINED_SEARCH_INCOMPLETE'
+        preconditions: PreconditionReport
+        replay: NormalizationReplay
+        n_target: int
+        n_selected: 'int | None'
+        selected_record_ids: 'tuple[str, ...]'
+        attempts: 'tuple[AttemptOutcome, ...]'
+        applied_relaxation_steps: 'tuple[str, ...]'
+        independence_status: 'str  # DECLARED | RELAXED'
+        dispositions: 'tuple[RecordDisposition, ...]  # EVERY universe record'
+        flags: 'Mapping[str, object]  # section 18.1 reported flags'
+  protocols:
+    api_authority_note: >-
+      DE-AUTHORIZED IN THE REV-2 CORRECTION. The signatures reproduced in this block are a
+      NON-NORMATIVE orientation sketch of already-shipped code. The sole authority for the exact
+      API is the shipped source: src/raptor/atlas/model.py (RawIdentityMapper, RawIdentityReplay)
+      and src/raptor/atlas/identity_map.py (load_identity_map, OfflineRawIdentityMapper). If this
+      sketch and the source disagree, the SOURCE wins and this spec is stale, never the reverse.
+      The implementer MUST read those modules rather than code against the text below, and MUST
+      NOT modify them to match it. Rationale: a rendered signature in a planning document has
+      already drifted once from the shipped keyword set.
+    RawIdentityMapper:
+      status: >-
+        SHIPPED in src/raptor/atlas/model.py (rev 2). This spec no longer defines
+        it; it consumes it. The rev-1 placeholder shape
+        'map(raw_identity_string, *, pack) -> RawIdentityParse' NEVER EXISTED and
+        must not be implemented.
+      runtime_checkable: true
+      method_sketch: >-
+        NON-NORMATIVE. As shipped, replay takes raw_record_id: str, raw_identity_string: str and
+        source_reported_consequence_hint: str -- the hint is a REQUIRED str, never optional and
+        never None -- and returns RawIdentityReplay. All three arguments are matched against the
+        pinned map record character-for-character; a mismatch on any of them is an
+        AtlasIdentityMapAmbiguityError, so passing None or a normalized/defaulted hint is a fault,
+        not a convenience.
+      construction: >-
+        The only admissible instance is the OfflineRawIdentityMapper returned by
+        raptor.atlas.identity_map.load_identity_map. The selector constructs it internally during
+        V7 and never accepts it as an argument. The loader's exact keyword set (which includes a
+        required raw_inventory_path in the shipped module) is read from the source at
+        implementation time; this spec pins the CALL SITE OBLIGATIONS, not the signature: every
+        path the loader needs is supplied explicitly, none is defaulted, none is read from the
+        environment in core, and the lock path is the registration-resolved one.
+      note: >-
+        The mapper carries no codon table and no reference sequence: every field
+        it returns is read from the pinned official response bundle that IM3
+        re-digests from disk.
+      anchor_independence: >-
+        The mapper is SELECTION-PROTOCOL INDEPENDENT by construction: it decides
+        identity and scope from the raw identity string plus the pinned pack, and
+        it has no AnchorSpec parameter, keyword, attribute or awareness of one.
+        The selector never passes the anchor to it, never wraps, subclasses or
+        adapts it to make it anchor-aware, and never re-locks a map per anchor.
+        Anchor-derived exclusion is computed SELECTOR-side during RP6 (see
+        verification.rp6_effective_exclusion_contract). Rationale: the anchor is a
+        run-time caller input, so a map whose content depended on it could not
+        have been locked before it was known -- which is exactly the hole V7
+        exists to close.
+    RawIdentityReplay:
+      status: SHIPPED frozen dataclass in src/raptor/atlas/model.py; fields are authority, not proposals.
+      frozen: true
+      fields:
+        normalization_outcome: str
+        universe_key: str
+        identity_state: str
+        spdi_canonical: 'str | None'
+        hgvs_c: 'str | None'
+        hgvs_p: 'str | None'
+        transcript_pin: 'str | None'
+        residue_index: 'int | None'
+        codon_index: 'int | None'
+        consequence_class: 'str | None'
+        scope_decision: 'str | None'
+        exclusion_code: 'str | None'
+      rp_field_mapping:
+        RP1: normalization_outcome
+        RP2: universe_key
+        RP3: identity_state
+        RP4: 'spdi_canonical + transcript_pin + hgvs_c + hgvs_p + residue_index + codon_index'
+        RP5: 'consequence_class + scope_decision'
+        RP6: >-
+          exclusion_code -- MAPPER-OWNED ONLY, and NOT the RP6 comparand by
+          itself. The selector reconciles it with the selector-owned,
+          anchor-derived exclusion into the single EFFECTIVE code that declared
+          exclusion_flags must equal; see
+          verification.rp6_effective_exclusion_contract.
+        RP7: 'ledger bijection -- recomputed by the selector from the full replay set, not a per-row field'
+      rp6_note: >-
+        Two different owners can legitimately exclude a record, and only one of
+        them is inside the locked map. The MAPPER owns identity/scope exclusion
+        (unresolved X1 and the out-of-scope decisions RP5 already checks): it can
+        decide these from raw + pack alone, and they are authoritative -- the
+        selector never overrides, re-derives, suppresses or re-codes them. The
+        SELECTOR owns the anchor exclusion X3, because it depends on the
+        caller-supplied AnchorSpec that an anchor-blind, pre-locked map cannot
+        contain. Comparing declared exclusion_flags against the mapper field alone
+        (the rev-2 rendering) is therefore narrower than protocol RP6 and rejects
+        conforming universes; comparing against the anchor alone would discard the
+        mapper's authority. RP6 compares against the reconciled effective code.
+      note: >-
+        A mapper that cannot decide returns the unresolved identity_state with its
+        exclusion code; it NEVER guesses a residue, codon or consequence. A mapper
+        that cannot answer AT ALL for a raw row is REPLAY_MAPPER_UNAVAILABLE and
+        stops the run -- it is never recorded as an unresolved identity.
+
+# ---------------------------------------------------------------------------
+# F. Module API
+# ---------------------------------------------------------------------------
+module_api:
+  new_module: src/raptor/atlas/panel.py
+  exported_from_package:
+    rationale: 'minimal public surface; everything else is importable for tests but not re-exported.'
+    names:
+      - select_panel
+      - SelectionInputs
+      - SelectionRun
+      - AnchorSpec
+      - AtlasPanelError
+      - AtlasPanelInputError
+      - AtlasPanelRegistrationError
+      - AtlasPanelPackDriftError
+      - AtlasUniverseLockError
+      - AtlasLockDeltaError
+      - AtlasUniverseContractError
+      - AtlasIdentityMapBindingError
+  canonicalization_and_hashing:
+    functions:
+      - 'def text_norm(text: str) -> str   # atlas.text_norm.v1: CRLF/CR -> LF, NFC, no case-fold, no whitespace collapse'
+      - 'def protocol_doc_hash(path: pathlib.Path) -> str   # atlas.protocol_doc_hash.v1'
+      - 'def canonical_content_hash(manifest: Mapping[str, Any], *, self_key: str) -> str'
+      - 'def registration_content_hash(manifest: Mapping[str, Any]) -> str'
+      - 'def universe_lock_content_hash(manifest: Mapping[str, Any]) -> str'
+      - 'def candidate_universe_content_hash(manifest: Mapping[str, Any]) -> str'
+      - 'def raw_inventory_hash(path: pathlib.Path) -> tuple[str, int]   # atlas.raw_inventory_hash.v1 over normalized UTF-8 file text'
+      - 'def normalization_ledger_hash(rows: Sequence[Mapping[str, Any]]) -> str'
+      - 'def discovery_set_commitment(universe_keys: Iterable[str]) -> tuple[int, str]   # (count, hash)'
+      - 'def raw_identity_normalized(raw: str) -> str   # NFC, strip, collapse internal whitespace runs; NO case-fold'
+      - 'def universe_key(*, identity_state: str, spdi_canonical: str | None, raw_identity_string: str) -> str'
+      - 'def draw_key(spdi_canonical: str, *, selection_seed: str) -> str'
+    canonical_json_rule: >-
+      canonical_content_hash serializes with sort_keys=True,
+      separators=(",",":"), ensure_ascii=False after removing ONLY the top-level
+      self_key, then sha256 -> lowercase hex. Identical in shape to
+      atlas.pack_content_hash.v1; a metamorphic test asserts
+      canonical_content_hash(pack_manifest, self_key="pack_content_hash") ==
+      pack.pack_content_hash(pack_manifest).
+    algorithm_binding_rule: >-
+      Every loaded artifact declares its *_hash_algorithm. The implementation
+      dispatches on the declared algorithm id and raises AtlasPanelInputError on
+      an unknown id. It never assumes an algorithm for an artifact that declares a
+      different one.
+  loaders:
+    functions:
+      - 'def load_selection_registration(path: pathlib.Path) -> Mapping[str, Any]'
+      - 'def load_universe_lock(path: pathlib.Path) -> Mapping[str, Any]'
+      - 'def load_candidate_universe(path: pathlib.Path) -> Mapping[str, Any]'
+      - 'def load_raw_inventory(path: pathlib.Path) -> Mapping[str, Any]'
+    rules:
+      - Every loader takes an EXPLICIT path; none has a default; none consults os.environ.
+      - >-
+        Path safety reuses the citation-resolver principle: resolve(strict=True),
+        reject '..', reject non-regular files, reject symlink/junction targets
+        outside the declared root -> AtlasPanelInputError. External universe/raw
+        paths are validated against an explicitly supplied external root only.
+      - Every loader validates schema id and required top-level fields, then deep-freezes.
+      - >-
+        Timestamps must be quoted strings; a value that yaml.safe_load returns as
+        datetime/date is an AtlasPanelInputError (it means the artifact would not
+        re-serialize to the same canonical JSON its own hash covers).
+  verification:
+    functions:
+      - 'def verify_registration(inputs: SelectionInputs) -> tuple[str, str, Mapping]  # V1, V2, V3'
+      - 'def verify_pack_binding(*, live_pack: Mapping, registration: Mapping, universe: Mapping, lock: Mapping) -> str  # V4'
+      - 'def resolve_active_lock(registration: Mapping, *, repo_root: pathlib.Path) -> tuple[pathlib.Path, Mapping]  # K1'
+      - 'def verify_universe_lock(lock, *, registration, universe, raw, ledger_rows, now) -> None  # K2,K3,K4,K6'
+      - 'def build_lock_delta(*, lock, registration, verified_protocol_doc_hash, verified_registration_content_hash) -> LockProtocolVersionDelta  # K5'
+      - 'def verify_conservation(universe, raw) -> None  # U1-U6'
+      - 'def verify_identity_map(inputs: SelectionInputs, *, registration, lock, live_pack, raw_inventory_path, repo_root) -> IdentityMapAttestation  # V7, IM1-IM6'
+      - 'def replay_normalization(raw: Mapping, universe: Mapping, *, pack: Mapping, mapper: RawIdentityMapper, anchor: AnchorSpec) -> NormalizationReplay  # U7, RP1-RP7'
+      - 'def verify_preconditions(inputs: SelectionInputs) -> PreconditionReport  # orchestrates V1-V5, V7, V6 in that order; hands attestation.mapper + inputs.anchor to the replay'
+    ordering_rule: >-
+      Checks run in the registration-pinned executor_preconditions.execution_order
+      V1, V2, V3, V4, V5 (K1..K6), V7 (IM1..IM6), V6 (U1..U6, U7 -> RP1..RP7) and
+      SHORT-CIRCUIT on the first failure. The ids are names, not an ordering: V7
+      MUST precede V6 because the RP1-RP7 replay runs through the mapper V7
+      verifies; replaying against an unverified mapper proves nothing. A later
+      check never "rescues" an earlier one and no check is skipped when an earlier
+      one passes.
+    ordering_falsifier: >-
+      If verify_preconditions can reach replay_normalization without
+      verify_identity_map having returned an attestation, the implementation
+      violates this spec.
+    anchor_threading_rule: >-
+      Both of replay_normalization's V7-dependent arguments are supplied by
+      verify_preconditions in the SAME call and only after verify_identity_map has
+      returned an IdentityMapAttestation: mapper=attestation.mapper and
+      anchor=inputs.anchor. The anchor is passed through unchanged -- never
+      re-derived, never defaulted, never normalized, never read from the
+      environment, never reconstructed from the universe -- and
+      replay_normalization has NO default for it, so a caller that omits it gets a
+      TypeError rather than an anchor-blind replay. The anchor NEVER travels to
+      verify_identity_map, load_identity_map, the map manifest, the response
+      bundle, the identity-map lock or any RawIdentityMapper method, so V7 stays
+      anchor-independent and the registration-pinned order V1,V2,V3,V4,V5,V7,V6 is
+      untouched by this threading: adding the anchor argument must not, and does
+      not, move any check.
+    anchor_threading_falsifier: >-
+      If verify_identity_map, load_identity_map or any mapper call site can be
+      shown to receive the anchor (as an argument, a wrapper closure, an attribute
+      or a constructed adapter), or if replay_normalization can be called with the
+      anchor defaulted or omitted, the implementation violates this spec.
+    v7_contract:
+      resolution: >-
+        The identity-map LOCK path is resolved from
+        registration.identity_map_contract.active.path relative to repo_root and
+        is NEVER caller-supplied (IM1), exactly as the universe lock is resolved
+        under K1. Only inputs.identity_map_path (external map manifest) and
+        inputs.identity_map_response_root (external response bundle root) come
+        from the caller, because they are untracked by design.
+      construction: >-
+        verify_identity_map constructs the mapper through
+        raptor.atlas.identity_map.load_identity_map, supplying inputs.identity_map_path as the
+        map manifest, inputs.identity_map_response_root as the response-bundle root, the
+        REGISTRATION-RESOLVED active lock path, the live V4-verified pack, and the live raw
+        inventory -- every one explicitly, none defaulted, none from the environment. The exact
+        keyword names are read from the shipped module (see api_authority_note). That loader
+        already recomputes every self-hash, the lock<->map binding, the pack binding, the
+        raw-inventory binding, the acquisition-tool digest, the response-bundle digest, every
+        per-file digest and every per-record classification from disk bytes, with no network and
+        no environment read; the selector does not re-implement it, does not patch it, and does
+        not accept a substitute.
+      selector_side_checks:
+        IM1: >-
+          Lock exists at the registration-resolved path; its declared
+          lock_version/map_version equal registration.identity_map_contract.active;
+          its recomputed lock_content_hash equals both its stored value and the
+          registration mirror. Version mismatch is IDENTITY_MAP_MISMATCH, absence
+          is IDENTITY_MAP_LOCK_MISSING, unparsable/wrong-schema is
+          IDENTITY_MAP_LOCK_CORRUPT.
+        IM2_IM3_IM5: >-
+          Delegated to load_integrity of load_identity_map; any AtlasIdentityMapError
+          it raises is caught and re-raised as AtlasIdentityMapBindingError with the
+          matching IM check_id and code IDENTITY_MAP_MISMATCH (or
+          IDENTITY_MAP_UNVERIFIED when the fault is that verification could not be
+          completed at all). The original exception is chained, never swallowed.
+        IM4: >-
+          Selector additionally asserts the map pack_binding equals the V4-verified
+          live pack hash AND the universe lock pack_binding; and that the map
+          reference_binding assembly/transcript equal the pack's pinned values.
+          The protein accession is accepted only as the loader's uniquely derived
+          value; the selector never supplies, defaults or infers one.
+        IM6: >-
+          Selector compares the universe lock's identity_map_binding field-by-field
+          (schema, map_id, map_version, lock_id, lock_version, map_content_hash,
+          lock_content_hash, response_bundle_hash, map_record_count) with the
+          verified lock. Any difference is IDENTITY_MAP_MISMATCH. If the active
+          universe lock declares universe_version >= 3 and carries NO
+          identity_map_binding, that is also IDENTITY_MAP_MISMATCH, never a waiver.
+      no_repair_rule: >-
+        No mismatch is ever auto-repaired, re-derived, downgraded to a warning, or
+        recorded as a candidate property. verify_identity_map either returns a
+        complete IdentityMapAttestation or raises.
+      IdentityMapAttestation:
+        frozen: true
+        fields:
+          lock_path: pathlib.Path
+          lock_version: str
+          map_version: str
+          lock_content_hash: str
+          map_content_hash: str
+          map_record_count: int
+          response_bundle_hash: str
+          response_file_count: int
+          response_byte_count: int
+          acquisition_tool_sha256: str
+          reference_assembly: str
+          reference_transcript: str
+          reference_protein: str
+          reference_page_count: int
+          checks_passed: 'tuple[str, ...]  # exactly ("IM1","IM2","IM3","IM4","IM5","IM6")'
+          mapper: 'RawIdentityMapper  # the verified instance handed to replay_normalization'
+        note: >-
+          Every scalar above is copied into the run record. The mapper field is the
+          ONLY channel by which a mapper reaches the replay.
+    rp6_effective_exclusion_contract:
+      protocol_basis: >-
+        Protocol RP6 compares the replayed ELIGIBILITY exclusion code (section
+        8.2, the X1-X10 space) with the declared exclusion_flags of every excluded
+        record. The mapper's exclusion_code is one INPUT to that comparand, not
+        the comparand itself. Rev 2 rendered RP6 as that single field; the
+        narrowing is WITHDRAWN. Where this spec and the protocol appeared to
+        differ, the protocol governed and this spec was defective.
+      effective_code_rule: >-
+        For every replayed row the selector computes exactly ONE effective
+        exclusion code, evaluated in this order.
+        (0) CONFLICT: if the mapper returned a non-null exclusion_code for a
+        RESOLVED replay that also matches the anchor under step (2), the two
+        owners disagree about a row only one of them can own -- see
+        conflict_precedence; no effective code is produced and the run fails.
+        (1) MAPPER-OWNED: otherwise, if the mapper returned a non-null
+        exclusion_code, the effective code IS that code, verbatim. This is how
+        unresolved rows keep X1 and how out-of-scope rows keep the code the map
+        decided. It is authoritative: the selector never overrides, re-derives,
+        re-codes, widens or suppresses it.
+        (2) SELECTOR-OWNED ANCHOR: otherwise, if the replay is RESOLVED and either
+        its spdi_canonical equals anchor.spdi_canonical, or its residue_index is
+        non-null and equals anchor.residue_index, the effective code is X3 -- the
+        anchor identity itself and any other substitution at the anchor residue,
+        exactly the two cases section 8.2 X3 and the same-residue constraint name.
+        (3) NONE: otherwise the effective code is None.
+        Step (2) is reachable only from a resolved replay, so an unresolved row is
+        never re-coded X3 by residue coincidence; an unresolved or out-of-scope
+        replay that carries no exclusion_code at all falls to (3) and its genuine
+        identity fault is caught by RP3/RP5, never papered over here.
+      comparison_rule: >-
+        Declared exclusion_flags must equal the EXACT list form of the effective
+        code: the one-element list holding it when it is not None, and the EMPTY
+        list when it is None. A superset, a subset, a reordering, a duplicate, a
+        differently-cased or differently-spelled code, or one extra "harmless"
+        flag is a mismatch. Disagreement raises
+        AtlasUniverseContractError(code=UNIVERSE_CONTRACT_BREACH, check_id=RP6)
+        naming the offending raw_record_id, the declared list and the effective
+        code. There is no repair, no union, no intersection, no "declared wins",
+        no warning-only path and no partial replay result; the declared value is a
+        comparand only, exactly as recomputation.distrust_rule requires.
+      conflict_precedence: >-
+        FAIL-CLOSED, never silent. Case (0) -- a mapper exclusion on a resolved
+        replay that also matches the anchor -- is treated as a
+        UNIVERSE_CONTRACT_BREACH(RP6) naming both codes, NOT as an override in
+        either direction and NOT as a merged two-element list. Preferring the
+        mapper would hide an anchor the universe disagrees about; preferring the
+        anchor would overrule the only owner that read the pinned responses;
+        merging would invent a multi-code disposition the protocol does not
+        define. The honest deliverable is a stopped run and a reported
+        contradiction between the locked map and the caller's anchor.
+      anchor_isolation: >-
+        The anchor enters this reconciliation ONLY as replay_normalization's
+        keyword-only anchor argument (see verification.anchor_threading_rule). The
+        mapper is never passed it, never taught it, never wrapped or subclassed to
+        infer it, and no anchor value is written into the map manifest, the
+        response bundle or the identity-map lock. V7 therefore verifies the same
+        artifacts for every anchor, and IM1-IM6 remain reproducible from disk bytes
+        alone.
+      not_an_eligibility_decision: >-
+        RP6 reconciliation is a REPLAY-level agreement check on declared universe
+        content. It selects nothing, excludes nothing, and neither pre-empts nor
+        short-circuits evaluate_eligibility: E1-E8 still recompute every
+        disposition independently from the section 4.3 primitives after
+        preconditions pass, and the X-code a record finally carries in its
+        RecordDisposition comes from THAT recomputation, never from this check.
+        The two are expected to agree -- RP6 is where a disagreement is caught,
+        not where it is resolved -- and no eligibility rule, code, order or
+        threshold is changed by this contract.
+    k5_admissibility: >-
+      build_lock_delta populates all eight fields, sets differs, and validates
+      admissibility against registration.amendment_log: the lock triple must equal
+      the current values or appear as an entry version/digest pair or as an
+      entry's supersedes_digests. Otherwise AtlasLockDeltaError
+      (UNIVERSE_LOCK_PROTOCOL_UNKNOWN). The reconciliation chain must be COMPLETE
+      and gap-free ascending: every amendment_log version strictly greater than the
+      lock's protocol_version and <= the current protocol_version must appear
+      (for the active lock v4, exactly ('1.0.4',) -- the lock records the 1.0.3 bindings that
+      were genuinely in force at its created_at, so 1.0.4 is the only intervening amendment;
+      naming 1.0.2 or 1.0.3 as a traversed step for THIS lock is wrong, and omitting a genuinely
+      intervening version is UNIVERSE_LOCK_DELTA_INCOMPLETE). A lock flagged
+      invalid_binding in the registration superseded list (protocol 4.6.2) is NEVER admissible
+      and NEVER a chain step, whatever its digests match: a delta records an administrative
+      version difference and can never legitimize a false lock-time record. Digests appearing
+      only under an amendment entry's rejected_draft_digests are likewise inadmissible. A delta
+      NEVER short-circuits K2/K3/K4/K6:
+      those run unconditionally and before the delta is built. K5 applies to the
+      UNIVERSE lock only; the identity-map lock records no protocol version and is
+      verified by V7/IM1-IM6 instead, so no delta is defined or accepted for it.
+  recomputation:
+    functions:
+      - 'def recompute_all_matched_strata(record: Mapping, *, omega: Sequence[str]) -> tuple[str, ...]  # section 6.2, Omega order'
+      - 'def recompute_primary_stratum(all_matched: Sequence[str]) -> str  # first under Omega'
+      - 'def recompute_lineage_index(universe: Mapping) -> LineageIndex  # L1-L6 union-find + unknown pooling'
+      - 'def recompute_support_class(record, *, lineage: LineageIndex) -> str  # section 14.1'
+      - 'def evaluate_eligibility(record, *, universe, lineage, anchor, pack) -> tuple[bool, str, str]  # (eligible, code, rule_id)'
+      - 'def crosswalk_cell(spec_stratum: str, primary: str, derivation: str) -> str  # permitted | discordant | contradictory'
+    distrust_rule: >-
+      Declared all_matched_strata, primary_stratum, support_source_groups,
+      lineage_confidence, support_class and exclusion_flags are read ONLY as
+      comparands. Every one is recomputed from the section 4.3 primitives;
+      disagreement raises AtlasUniverseContractError. No declared derived field is
+      ever used as an input to another computation.
+    firewall_rule: >-
+      recompute_all_matched_strata accepts ONLY functional_evidence_present and the
+      observations list. spec_stratum, spec_stratum_basis, access_status,
+      license_family and span_verifiable are not parameters of the stratum
+      function and must be structurally unreachable from it (enforced by signature,
+      not by discipline).
+  search:
+    functions:
+      - 'def materialize_constraint_contract(*, registration: Mapping, verified_protocol_version: str, verified_protocol_doc_hash: str) -> ConstraintContract  # protocol sections 13.2 + 17.5'
+      - 'def constraints_at_level(contract: ConstraintContract, *, level: str, n: int) -> ActiveConstraints'
+      - 'def enumerate_allocations(n: int, *, nonempty_strata: Sequence[str], pool_sizes: Mapping[str, int]) -> tuple[tuple[int, ...], ...]'
+      - 'def complete_search(n: int, *, pool, constraints: ActiveConstraints, node_budget: int) -> AttemptOutcome'
+      - 'def run_attempt_schedule(*, pool, contract: ConstraintContract, registration, node_budget) -> tuple[AttemptOutcome, ...]'
+    constraint_contract:
+      added_in: rev4
+      problem: >-
+        The Section-17 numeric thresholds have no home. The protocol defines them
+        (section 13.2 ladder, section 17.5 caps) but is Markdown. The frozen
+        registration carries the ladder as seven prose strings and has NO
+        constraints mapping, so registration["constraints"] resolves to nothing and
+        a run that follows the read-everything rule literally dies before its first
+        attempt with a None threshold. This block is the only admissible answer.
+      supported_protocol_binding:
+        protocol_version: 1.0.4
+        protocol_doc_hash: 7b0596ab4a52601566c85a3a2c7ca42aead9c35916890397e58b3e11876e5823
+        rule: >-
+          The canonical table below is keyed by BOTH values. materialize_constraint_contract
+          receives the V1-verified pair and matches it against this binding exactly
+          (case-sensitive, whitespace-sensitive, full 64-hex comparison). Any other
+          version, any other hash, or a missing registration.protocol_version raises
+          AtlasPanelRegistrationError(code=CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL)
+          BEFORE any attempt runs. There is no nearest-match, no major/minor
+          fallback, no "compatible enough" branch and no default table.
+        why_hash_and_not_version_alone: >-
+          A version string is an assertion; the doc hash is the artifact. Pinning
+          both means an edited protocol that keeps its version number retires the
+          table just as loudly as a version bump, so the thresholds can never
+          silently outlive the text that defines them. This is the whole reason the
+          carve-out in authority_and_scope.hardcoding_prohibition_scoped_exception
+          is sound.
+      base_thresholds:
+        note: >-
+          L0 (declared) values, as canonical THRESHOLD EXPRESSIONS in the closed
+          grammar. They are transcribed from protocol sections 17.5 and 12; they are
+          not re-derived, not configurable and not registration-sourced.
+        values:
+          C3: 'ceil(n/2)'
+          D1: '3'
+          D2: '2'
+          D3: 'ceil(n/2)'
+          P1: 'ceil(n/2)'
+          P2: '3'
+          P3: '2'
+      explicit_logic_constraints:
+        note: >-
+          These carry NO numeric threshold and are coded predicates, unchanged by
+          this revision. They are listed so that "absent from base_thresholds" can
+          never be read as "unspecified".
+        values:
+          C1: 'each non-empty stratum contributes at least one selected member'
+          C2: 'S6 contributes at least one member when non-empty (abstention control)'
+          C4: 'stratum assignment is recomputed, never re-labelled; residue/codon collisions rejected'
+          C5: 'spec-taxonomy coverage; GATING at L0, report-only from R1 onward via ActiveConstraints.c5_enforced'
+          D4: 'if any eligible candidate has >= 2 distinct assay kinds, at least one such candidate is selected'
+          H1: 'IS P3, not a separate value: it reads ActiveConstraints.p3_max_single_high_throughput'
+          H2: 'a stratum mandatory C1 member may not be single_high_throughput_only while a non-single_high_throughput_only eligible member exists in that stratum'
+          H3: 'every selected single_high_throughput_only member is flagged; a reporting obligation, not a search constraint'
+      threshold_expression_grammar:
+        closed_forms:
+          - 'a decimal integer literal, e.g. 3'
+          - 'ceil(<int>n/<int>), e.g. ceil(n/2) or ceil(2n/3); a missing coefficient means 1'
+        evaluation: 'ceil(a*n/b) computed in integer arithmetic; no float, no rounding mode choice, no locale.'
+        rejection: >-
+          Anything else -- an empty string, None, a bool, a float, a percentage, a
+          range, prose -- is AtlasPanelRegistrationError(INPUT_FAULT). A None
+          threshold is never defaulted, never treated as "no limit" and never
+          skipped; it is the exact fault that blocked attempt 4 and it must stay
+          loud.
+      declared_ladder_comparand:
+        rule: >-
+          registration.relaxation_ladder MUST equal this seven-element list EXACTLY
+          -- same seven strings, same order, character-for-character after
+          atlas.text_norm.v1 (CRLF/CR -> LF, NFC; no case-fold, no whitespace
+          collapse, no trimming, no punctuation normalization). Length, order and
+          content are all part of the comparison. No substring match, no regex, no
+          fuzzy match, no prefix-on-step-id match, and no parsing of these strings
+          for behaviour: they are a DRIFT DETECTOR, and the structured
+          relaxation_steps below are what the search executes.
+        strings:
+          - 'R1 C5 spec-taxonomy coverage becomes report-only'
+          - 'R2 P2 minimum established source groups 3 -> 2'
+          - 'R3 P1 sole-support cap ceil(n/2) -> ceil(2n/3)'
+          - 'R4 D1 minimum assay kinds 3 -> 2'
+          - 'R5 P3 single-high-throughput cap 2 -> 3'
+          - 'R6 D2 minimum model systems 2 -> 1'
+          - 'R7 P2 minimum established source groups -> 1 (terminal)'
+        drift_rule: >-
+          A missing string, an extra string, a reordering, an edited string (even by
+          one character or one space), a non-list value, or a list of non-strings
+          raises AtlasPanelRegistrationError(code=RELAXATION_LADDER_DRIFT) naming
+          the first differing position with both the expected and the declared text.
+          It is never repaired, never re-sorted, never partially honoured, and never
+          downgraded to a warning. If the registration is amended, this spec and its
+          table must be revised in the same review -- that is the intended cost.
+      relaxation_steps:
+        note: >-
+          The structured form of the ladder, one entry per declared string, in
+          declared order. before/after are threshold expressions; kind report_only
+          carries neither.
+        steps:
+          - step_id: R1
+            position: 1
+            constraint_id: C5
+            kind: report_only
+            before: null
+            after: null
+            declared_text: 'R1 C5 spec-taxonomy coverage becomes report-only'
+          - step_id: R2
+            position: 2
+            constraint_id: P2
+            kind: threshold
+            before: '3'
+            after: '2'
+            declared_text: 'R2 P2 minimum established source groups 3 -> 2'
+          - step_id: R3
+            position: 3
+            constraint_id: P1
+            kind: threshold
+            before: 'ceil(n/2)'
+            after: 'ceil(2n/3)'
+            declared_text: 'R3 P1 sole-support cap ceil(n/2) -> ceil(2n/3)'
+          - step_id: R4
+            position: 4
+            constraint_id: D1
+            kind: threshold
+            before: '3'
+            after: '2'
+            declared_text: 'R4 D1 minimum assay kinds 3 -> 2'
+          - step_id: R5
+            position: 5
+            constraint_id: P3
+            kind: threshold
+            before: '2'
+            after: '3'
+            declared_text: 'R5 P3 single-high-throughput cap 2 -> 3'
+          - step_id: R6
+            position: 6
+            constraint_id: D2
+            kind: threshold
+            before: '2'
+            after: '1'
+            declared_text: 'R6 D2 minimum model systems 2 -> 1'
+          - step_id: R7
+            position: 7
+            constraint_id: P2
+            kind: threshold
+            before: '2'
+            after: '1'
+            declared_text: 'R7 P2 minimum established source groups -> 1 (terminal)'
+      rung_evaluation:
+        rule: >-
+          constraints_at_level(contract, level=L, n=n) sets rung = LEVELS.index(L)
+          over LEVELS = (L0, R1, R2, R3, R4, R5, R6, R7), starts from
+          contract.base_thresholds, then applies EVERY relaxation_step whose
+          position <= rung in ascending position order, last-write-wins per
+          constraint_id, and finally evaluates each surviving expression at n. C5 is
+          gating iff rung == 0. applied_steps is exactly the step_ids with
+          position <= rung, ascending.
+        cumulative_not_exclusive: >-
+          Rungs are CUMULATIVE, never exclusive: at R7 every earlier concession is
+          still in force, which is why P2 goes 3 -> 2 (R2) -> 1 (R7) and both steps
+          appear in applied_steps. An implementation that applies only the newest
+          step, or that resets to the base at each level, produces a stricter panel
+          than the protocol allows and is wrong even though every individual value
+          it uses is a real protocol value.
+        constraints_never_relaxed_by_the_ladder: >-
+          C3 and D3 keep ceil(n/2) at EVERY rung; C1, C2, C4 and D4 keep their
+          declared logic at every rung; eligibility E1-E8 and the firewall are
+          outside the ladder entirely. No step may introduce a constraint id that is
+          not in base_thresholds.
+        expected_values:
+          note: >-
+            The complete evaluated table, as expressions. Every value is a function
+            of n only; nothing references N_selected. RED tests instantiate it at
+            several n rather than restating it.
+          L0: {C3: 'ceil(n/2)', D1: '3', D2: '2', D3: 'ceil(n/2)', P1: 'ceil(n/2)', P2: '3', P3: '2', c5_enforced: true}
+          R1: {C3: 'ceil(n/2)', D1: '3', D2: '2', D3: 'ceil(n/2)', P1: 'ceil(n/2)', P2: '3', P3: '2', c5_enforced: false}
+          R2: {C3: 'ceil(n/2)', D1: '3', D2: '2', D3: 'ceil(n/2)', P1: 'ceil(n/2)', P2: '2', P3: '2', c5_enforced: false}
+          R3: {C3: 'ceil(n/2)', D1: '3', D2: '2', D3: 'ceil(n/2)', P1: 'ceil(2n/3)', P2: '2', P3: '2', c5_enforced: false}
+          R4: {C3: 'ceil(n/2)', D1: '2', D2: '2', D3: 'ceil(n/2)', P1: 'ceil(2n/3)', P2: '2', P3: '2', c5_enforced: false}
+          R5: {C3: 'ceil(n/2)', D1: '2', D2: '2', D3: 'ceil(n/2)', P1: 'ceil(2n/3)', P2: '2', P3: '3', c5_enforced: false}
+          R6: {C3: 'ceil(n/2)', D1: '2', D2: '1', D3: 'ceil(n/2)', P1: 'ceil(2n/3)', P2: '2', P3: '3', c5_enforced: false}
+          R7: {C3: 'ceil(n/2)', D1: '2', D2: '1', D3: 'ceil(n/2)', P1: 'ceil(2n/3)', P2: '1', P3: '3', c5_enforced: false}
+      prohibitions:
+        no_registration_constraints_read: >-
+          NOTHING in the selector may read registration["constraints"],
+          registration.get("constraints") or any nested key beneath it. The frozen
+          registration has no such field; inventing one, defaulting it, or asking
+          for it to be added to the registration are all forbidden. A read of that
+          key anywhere in panel.py is a spec violation even if it is never reached.
+        no_runtime_markdown_parse: >-
+          The protocol Markdown is HASHED at run time (V1) and NEVER parsed. No
+          table scraper, no regex over section 13.2 or 17.5, no line splitting, no
+          heading walk. Selection must not depend on prose formatting that a
+          non-semantic edit could break -- and V1 already guarantees the bytes match
+          the version this table is pinned to.
+        no_frozen_artifact_edit: >-
+          This seam is closed in the SPEC and the implementation only. The protocol,
+          the registration, every lock and every data record stay byte-identical. A
+          repair that amends the frozen registration to add thresholds is explicitly
+          rejected: it would edit an authority to suit its executor.
+      call_site: >-
+        materialize_constraint_contract runs ONCE per run, inside select_panel,
+        AFTER verify_preconditions returns a PreconditionReport (so the protocol
+        hash it is keyed to is the verified one) and BEFORE the first attempt is
+        enumerated. run_attempt_schedule receives the resulting ConstraintContract
+        and calls constraints_at_level per (level, n); complete_search receives only
+        the evaluated ActiveConstraints and never sees the registration, the
+        contract or the protocol. The contract is threaded, never re-materialized
+        mid-run, so every attempt in a run provably shares one constraint source.
+    completeness_requirement: >-
+      complete_search is an EXHAUSTIVE depth-first search with backtracking over
+      the full eligible pool, pruning ONLY on hereditary constraints (C3, D3, P1,
+      P3, residue/codon collisions) and on remaining-pool-too-small. Non-hereditary
+      minimums (C2, C5, D1, D2, D4, P2) are evaluated on complete assignments only.
+      Greedy acceptance is prohibited. The returned solution is the
+      lexicographically first complete solution under the declared allocation order
+      and ascending draw order.
+    budget_rule: >-
+      node_budget counts search-state expansions per (level, n) attempt. On
+      exhaustion the attempt returns status=UNDETERMINED with nodes_expanded ==
+      budget. UNDETERMINED can NEVER be converted to INFEASIBLE_COMPLETE, can never
+      advance the ladder, and can never remove a candidate. run_attempt_schedule
+      terminates the whole run with UNDETERMINED_SEARCH_INCOMPLETE the moment any
+      level finishes with an undetermined attempt.
+    no_shortlist: >-
+      There is no shortlist, no top-k, no per-stratum cutoff and no heuristic
+      candidate ordering. The optional proved-subset optimization of protocol
+      section 17.4 is OUT OF SCOPE for this implementation; attempting it without a
+      machine-checked exchange-equivalence proof is a protocol violation.
+    search_scope_guard: >-
+      Before any attempt runs, the executor asserts
+      registration.search_parameters.search_scope == "full_eligible_universe" and
+      stratum_shortlist_size is null. Any other scope value, or a non-null
+      shortlist size, is an AtlasPanelRegistrationError
+      (UNSUPPORTED_SEARCH_SCOPE) -- never a silent narrowing and never a
+      best-effort run. This closes the upgrade hazard where a future registration
+      reintroduces a narrowed scope that this implementation cannot honour
+      soundly. Covered by PS-A-008.
+  orchestration:
+    functions:
+      - 'def select_panel(inputs: SelectionInputs) -> SelectionRun'
+      - 'def render_run_record(run: SelectionRun, *, inputs: SelectionInputs) -> dict'
+    purity: >-
+      select_panel is pure with respect to the filesystem after loading: it writes
+      nothing, mutates nothing, and consults no clock, no environment variable and
+      no global. Writing the run record is the CLI's job.
+
+# ---------------------------------------------------------------------------
+# G. The honest gap: missing deterministic mappers
+# ---------------------------------------------------------------------------
+missing_deterministic_mappers:
+  finding: >-
+    RP4/RP5 require the executor to replay spdi_canonical, hgvs_c, hgvs_p,
+    residue_index, codon_index, consequence_class and scope_decision from
+    raw_identity_string plus the pinned pack alone. The repository today provides
+    identity.admit_identity(record: Mapping, *, pack), which validates an ALREADY
+    canonical SPDI plus gene/assembly/transcript against pack pins, and
+    identity.validate_canonical_spdi_shape. The bound pack pins genes, assemblies,
+    transcripts, ontology extensions and source-register entries; it carries NO
+    reference sequence, NO codon table and NO protein translation. Therefore a
+    general raw-string -> consequence mapper DOES NOT EXIST in this repository and
+    cannot be derived from the pinned pack.
+  status_rev2: RESOLVED
+  resolution:
+    at: '2026-08-05T09:03:47Z'
+    artifact: >-
+      The blocker recorded above was resolved out of band by
+      docs/project/specs/atlas-raw-identity-mapper-v1.yaml and its implementation
+      src/raptor/atlas/identity_map.py, which builds the mapping from pinned
+      official public reference responses rather than from a codon table, a
+      translated sequence or residue arithmetic. The resulting map is locked as
+      map_version 4 by the candidate-free
+      configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v4.yaml.
+    consequence_for_this_spec: >-
+      (1) The rev-1 'injection' ruling below is SUPERSEDED: the mapper is no longer
+      an injected object. Core loads and verifies it in V7 from the
+      registration-resolved lock plus caller-supplied external map/response paths
+      (see verification.v7_contract and SelectionInputs.mapper_injection_prohibition).
+      (2) The two speculative admissible_mappers entries below are SUPERSEDED and
+      MUST NOT be implemented; the ONLY admissible mapper is the verified
+      OfflineRawIdentityMapper. (3) do_not_invent, fail_closed_rule,
+      critical_distinction and reporting_obligation are UNCHANGED and still binding.
+    retained_for_audit: >-
+      The rev-1 finding and ruling are kept verbatim so the reasoning that produced
+      the mapper prerequisite stays auditable. Where rev 1 and this resolution
+      differ, the resolution governs.
+  ruling:
+    do_not_invent: >-
+      panel.py MUST NOT contain a codon table, a translation function, a residue
+      lookup, an HGVS parser that infers a reference residue, or any hardcoded
+      sequence. Inventing one would silently manufacture the very identity facts
+      the replay exists to verify.
+    injection: >-
+      SUPERSEDED IN REV 2 (see resolution above). Rev 1 said: "The mapper is
+      injected as SelectionInputs.raw_identity_mapper implementing
+      RawIdentityMapper. panel.py ships NO default and NO fallback." Rev 2 keeps
+      the no-default/no-fallback half and REMOVES the injection half: an
+      injectable mapper object is a hole through V7, so core constructs the
+      verified mapper itself via load_identity_map.
+    admissible_mappers:
+      rev2_ruling: >-
+        SUPERSEDED. The only admissible mapper is the verified
+        OfflineRawIdentityMapper returned by load_identity_map. The rev1_history
+        entries below are retained as audit history and MUST NOT be implemented.
+      rev1_history:
+        - id: canonical_spdi_echo
+          precondition: >-
+            every raw row's raw_identity_string is already a canonical SPDI (or
+            carries one in a declared field), so the mapping is a pure grammar +
+            pack-pin operation via validate_canonical_spdi_shape + admit_identity.
+          note: >-
+            Even then, consequence_class/residue_index/codon_index are only
+            replayable if the raw row itself carries them as immutable captured
+            fields; if it does not, this mapper returns resolvable=True for identity
+            but undecidable for consequence, which is a run-level failure below --
+            NOT a silent pass.
+        - id: pack_extension_mapper
+          precondition: >-
+            a future, separately reviewed pack amendment pins the reference protein
+            for the MANE-Select transcript, making consequence derivation
+            deterministic and auditable.
+          note: out of scope for this task; requires its own spec, ADR and hash repin.
+    fail_closed_rule: >-
+      If the VERIFIED mapper cannot decide a field that RP4/RP5 require, the RUN
+      fails closed with AtlasUniverseContractError(code=REPLAY_MAPPER_UNAVAILABLE,
+      check_id=RP5) naming the first offending raw_record_id. If the mapper cannot
+      be verified at all, the run fails earlier at V7 with
+      AtlasIdentityMapBindingError; it never degrades into a replay failure and
+      never proceeds with a partial map.
+    critical_distinction: >-
+      A missing MAPPER is a tool failure, not a candidate property. It must NEVER
+      be recorded as identity_state=unresolved (X1) or as out_of_scope. Protocol
+      section 5 rule 8 makes undecidable ROWS unresolved; it does not license
+      declaring rows unresolved because the executor lacks a mapper. Conflating the
+      two would silently empty the eligible universe and produce a spurious
+      INFEASIBLE_PANEL.
+  reporting_obligation: >-
+    If the real run cannot proceed because no admissible mapper exists, that is the
+    honest deliverable: report the blocked precondition, do not select a panel, and
+    open a follow-up for the pack extension. A blocked run is a valid outcome; a
+    guessed mapping is not.
+
+# ---------------------------------------------------------------------------
+# H. Run record and audit
+# ---------------------------------------------------------------------------
+run_record:
+  path_pattern: 'data/atlas/tsc2_phase2_panel_selection_run_<YYYY-MM-DD>.json  # from registration.run_record_path_pattern'
+  written_by: 'scripts/run_panel_selection.py (CLI), never by panel.py'
+  serialization: 'json, sort_keys=True, indent=2, ensure_ascii=False, LF newlines, UTF-8'
+  required_blocks:
+    verified_digests: >-
+      every field of PreconditionReport, including active_universe_lock and the
+      complete eight-field lock_protocol_version_delta -- present even when
+      differs is false.
+    normalization_replay: >-
+      replayed row count, per-outcome counts, RP1-RP7 attestation, and the
+      identity_map_lock_content_hash the replay ran against (so a run can never be
+      re-attributed to a different mapper after the fact).
+    identity_map: >-
+      every scalar field of IdentityMapAttestation (active lock path,
+      lock_version, map_version, lock_content_hash, map_content_hash,
+      map_record_count, response_bundle_hash, response_file_count,
+      response_byte_count, acquisition_tool_sha256, reference assembly /
+      transcript / derived protein / page count) plus the IM1-IM6 all-pass
+      attestation. The external map and response-root PATHS are recorded; their
+      candidate-bearing CONTENT is never copied into the run record.
+    procedure: >-
+      selection_seed, search_scope, search_node_budget (and any lowered override),
+      declared_constraints (see declared_constraints_shape), attempt_log (per level
+      and n with status and nodes_expanded), applied relaxation steps,
+      independence_status, terminal_outcome.
+    declared_constraints_shape:
+      added_in: rev4
+      rule: >-
+        declared_constraints is the CANONICAL MATERIALIZED SET, rendered from the
+        ConstraintContract that the run actually used. It is NEVER
+        registration.get("constraints") -- that key does not exist, and rendering it
+        wrote a null "declared constraint set" into a run record that claimed to be
+        a complete audit. A run record whose declared_constraints is null, absent or
+        empty is invalid and the CLI refuses to write it.
+      fields:
+        protocol_version: 'the version the contract was keyed to'
+        protocol_doc_hash: 'the V1-verified doc hash the contract was keyed to'
+        base_thresholds: 'the L0 expressions, as expressions (C3, D1, D2, D3, P1, P2, P3)'
+        explicit_logic_constraints: 'the ids evaluated as coded predicates (C1, C2, C4, C5, D4, H1, H2, H3)'
+        declared_ladder: 'the seven registration strings verbatim, exactly as validated'
+        relaxation_steps: 'the structured entries (step_id, position, constraint_id, kind, before, after)'
+        levels_evaluated: 'per attempted (level, n): the full ActiveConstraints integer set actually enforced'
+      why_evaluated_values_too: >-
+        An auditor must be able to re-derive every attempt without re-running the
+        selector or re-reading this spec. Expressions alone would leave the reader
+        to recompute ceil() by hand; evaluated values alone would hide which rung
+        each number came from. Both are recorded, and they must agree.
+    result: >-
+      n_target, n_selected, selected members, per-stratum coverage, auxiliary
+      secondary-stratum table, spec_taxonomy_coverage, recomputed lineage groups
+      with confidence, label_function_discordant and stale_label_discordant counts
+      with the discordant cells named, unresolved_identity_count, X5 access
+      attrition counts and distribution.
+    dispositions: 'one row per universe record, no omissions (protocol section 18.2).'
+    provenance: 'executor identity, quoted ISO run timestamp, run flags, spec version.'
+  candidate_identity_rule: >-
+    Selected and non-selected candidate identities BELONG in the run record -- it
+    is the audit artifact. They must never be written back into the protocol, the
+    registration, the lock, this spec, or any test fixture.
+  completeness_falsifier: >-
+    A run record whose disposition row count differs from the universe record count
+    is invalid; the CLI recomputes and asserts this before writing, and refuses to
+    write on mismatch.
+  no_outcome_dependent_replacement: >-
+    There is exactly one run record per run. Re-running after seeing a result, with
+    any input changed, requires a new dated record and retention of the prior one.
+    The CLI refuses to overwrite an existing run-record path.
+
+# ---------------------------------------------------------------------------
+# I. CLI boundary
+# ---------------------------------------------------------------------------
+cli_boundary:
+  file: scripts/run_panel_selection.py
+  role: 'thin adapter only: argv/env -> explicit paths -> select_panel -> write run record.'
+  permitted_in_cli:
+    - argparse over explicit flags
+    - 'optional env read for the external content root (e.g. RAPTOR_ATLAS_CONTENT_ROOT), overridable by flag'
+    - 'resolving --identity-map / --identity-map-response-root (relative to the content root when not absolute) into explicit paths for SelectionInputs'
+    - reading the wall clock ONCE to build run_started_at, then injecting it
+    - writing the run record and printing a summary
+  prohibited_in_cli:
+    - any selection logic, constraint evaluation, ordering or tie-breaking
+    - any repair, retry, relaxation, budget escalation or fallback path
+    - suppressing or reformatting a typed error into a success exit code
+    - 'constructing, stubbing or substituting a RawIdentityMapper: the CLI passes PATHS only, and core loads/verifies the mapper under V7'
+    - 'defaulting the identity-map path: an absent --identity-map is an input fault, never a run without a mapper'
+  exit_codes:
+    0: 'PANEL_SELECTED, run record written'
+    2: 'INFEASIBLE_PANEL or UNDETERMINED_SEARCH_INCOMPLETE -- run record still written'
+    3: 'typed AtlasPanelError -- no panel, no run record with a panel; the error code is printed'
+  core_purity_rule: >-
+    src/raptor/atlas/panel.py must contain no os.environ, no os.getenv, no
+    datetime.now/utcnow, no time.time, no argparse, no print, no logging
+    configuration and no module-level mutable state. Enforced by a static AST test,
+    not by review.
+
+# ---------------------------------------------------------------------------
+# J. Decision cards
+# ---------------------------------------------------------------------------
+decision_cards:
+  - id: DC-1
+    title: Public API shape and import boundary
+    options:
+      - 'A: one god-function select_panel only'
+      - 'B: select_panel plus a small set of importable pure helpers'
+      - 'C: a class-based Selector with injected collaborators'
+    chosen: B
+    rationale: >-
+      Property and metamorphic tests must exercise draw_key, strata, lineage,
+      allocation enumeration and complete_search independently; a single opaque
+      entry point makes completeness untestable. A class adds hidden state, which
+      is precisely the risk here.
+    tradeoffs: 'wider import surface than A; mitigated by exporting only 11 names from the package.'
+    inversion: 'a reviewer could call a helper and claim it is "the selector" -- mitigated: only select_panel returns a SelectionRun.'
+    falsifier: 'if any helper mutates its arguments or reads a global, DC-1 is violated; asserted by PS-X-004.'
+  - id: DC-2
+    title: External path supply without environment reads in core
+    options:
+      - 'A: core reads RAPTOR_ATLAS_CONTENT_ROOT'
+      - 'B: core takes explicit pathlib.Path fields; CLI may read env'
+      - 'C: core reads a config file'
+    chosen: B
+    rationale: >-
+      An env-dependent core is untestable and lets an operator silently repoint the
+      universe between runs. Explicit paths make the input set visible in the run
+      record.
+    tradeoffs: 'callers must pass six paths; the CLI absorbs that ergonomics cost.'
+    inversion: '"just one convenience default" reintroduces ambient state.'
+    falsifier: 'PS-X-001 fails if any environ/getenv/config read appears in panel.py.'
+  - id: DC-3
+    title: Lock path is resolved, not supplied
+    options:
+      - 'A: caller passes --universe-lock'
+      - 'B: lock resolved from registration.candidate_universe_contract.universe_lock.active.path'
+    chosen: B
+    rationale: 'K1 binds the lock to the registration. A caller-supplied path is exactly the drift the amendment closed.'
+    tradeoffs: 'switching universes requires a registration amendment -- which is the intended cost.'
+    inversion: 'an operator points the run at a hand-made lock.'
+    falsifier: 'PS-K-001 asserts SelectionInputs has no lock-path field and that a stray lock file is ignored.'
+  - id: DC-4
+    title: Replay mapper injection versus built-in parser
+    options:
+      - 'A: implement an HGVS/codon parser in panel.py'
+      - 'B: inject RawIdentityMapper; no default; fail closed when undecidable'
+      - 'C: trust the custodian fields when replay is impossible'
+    chosen: B
+    rationale: 'see missing_deterministic_mappers. A is fabrication; C is exactly what RP1-RP7 exist to forbid.'
+    tradeoffs: 'the real run may be blocked until a mapper exists -- an honest blocker beats a fabricated identity.'
+    inversion: '"temporarily" trusting declared fields to unblock the run.'
+    falsifier: 'PS-R-006 asserts REPLAY_MAPPER_UNAVAILABLE is raised, not X1 and not out_of_scope.'
+  - id: DC-5
+    title: Outcomes as return values, exceptions for preconditions
+    options:
+      - 'A: raise on infeasible/undetermined'
+      - 'B: return terminal outcomes; raise only on precondition/contract failure'
+    chosen: B
+    rationale: 'an honest "no panel" must still publish a complete audit; an exception discards it and invites retry-until-panel.'
+    tradeoffs: 'callers must check terminal_outcome; the CLI maps it to exit code 2.'
+    inversion: 'a caller treats a returned SelectionRun as success and ships an empty panel.'
+    falsifier: 'PS-O-003 asserts exit code 2 and a written record with zero selected members.'
+  - id: DC-6
+    title: Complete backtracking search versus greedy fill
+    options:
+      - 'A: greedy per-stratum fill in draw order'
+      - 'B: exhaustive DFS with hereditary-only pruning and a node budget'
+    chosen: B
+    rationale: >-
+      Greedy is not complete for these constraints; it could report INFEASIBLE while
+      a valid panel exists, which would then be "fixed" by relaxation -- silently
+      converting an implementation bug into a claim about the literature.
+    tradeoffs: 'worst-case cost; bounded by the node budget, whose exhaustion is UNDETERMINED, never relaxation.'
+    inversion: 'pruning on a non-hereditary minimum (e.g. D1) discards valid solutions while looking complete.'
+    falsifier: 'PS-A-004 constructs a case whose only solution violates D1 partway and must still be found.'
+  - id: DC-7
+    title: Budget exhaustion semantics
+    options:
+      - 'A: treat as infeasible'
+      - 'B: raise'
+      - 'C: return UNDETERMINED and terminate the run without relaxing'
+    chosen: C
+    rationale: 'a resource limit is not evidence about the literature (protocol section 13.2/17.4).'
+    tradeoffs: 'a real run may end with no panel and a request for a larger budget.'
+    inversion: 'raising the budget silently inside the run until a panel appears.'
+    falsifier: 'PS-O-002 asserts no relaxation step is applied and node_budget_override cannot exceed the registration value.'
+  - id: DC-8
+    title: Declared derived fields are comparands only
+    options:
+      - 'A: trust declared primary_stratum/support_class/source groups'
+      - 'B: recompute everything; compare; fail closed on disagreement'
+    chosen: B
+    rationale: 'the custodian is untrusted by design; a declared derived field is an assertion, not a fact.'
+    tradeoffs: 'more computation and more test surface.'
+    inversion: 'using a declared field as an input "just for performance".'
+    falsifier: 'PS-S-005/PS-L-004 flip one declared value and require AtlasUniverseContractError with the exact check_id.'
+  - id: DC-9
+    title: Synthetic-only unit fixtures; real universe only in a separate external test
+    options:
+      - 'A: commit a trimmed real universe as a fixture'
+      - 'B: fully synthetic fixtures; a separate opt-in external integration test'
+    chosen: B
+    rationale: >-
+      A real fixture would embed candidate identities in the repo and would let a
+      test encode an expected panel -- the definition of cribbing the answer.
+    tradeoffs: 'unit tests cannot prove behaviour on the real universe; the external test and the checker cover that.'
+    inversion: 'a "small realistic" fixture copied from the external universe.'
+    falsifier: 'PS-X-006 scans test files for canonical SPDI/HGVS-shaped literals and fails on any match.'
+  - id: DC-10
+    title: Additive-only changes to existing modules
+    options:
+      - 'A: refactor identity.py/pack.py to share helpers'
+      - 'B: add panel.py; extend model.py and __init__.py additively only'
+    chosen: B
+    rationale: 'Phase-1 behaviour and the 109 frozen tests must not move; a refactor would put unrelated risk in this change.'
+    tradeoffs: 'a small amount of hash-helper duplication, covered by the metamorphic equivalence test.'
+    inversion: '"harmless" tidying of pack.py that shifts a hash.'
+    falsifier: 'PS-X-007 asserts pack/catalog/profile hashes are byte-identical before and after.'
+  - id: DC-11
+    added_in: rev2
+    title: How the verified raw identity mapper reaches the replay
+    options:
+      - 'A: keep rev-1 SelectionInputs.raw_identity_mapper (inject a ready-made mapper object)'
+      - 'B: inject a mapper FACTORY plus paths, so core controls construction but callers control the class'
+      - 'C: core takes only PATHS (external map manifest + response root) and constructs the mapper itself inside V7 via load_identity_map, with the LOCK path resolved from the registration pointer'
+    chosen: C
+    rationale: >-
+      A and B leave a hole straight through V7 and therefore through RP1-RP7: a
+      caller could pass an object that simply echoes the universe's declared
+      fields, and the whole replay would pass while proving nothing. Under C the
+      only way to satisfy the replay is a real, hash-verified, locked map built
+      from pinned official responses, and the lock cannot be redirected by an
+      operator any more than the universe lock can (same reasoning as DC-3).
+    tradeoffs: >-
+      Loses the convenient unit-test injection seam and couples panel.py to
+      raptor.atlas.identity_map. Accepted: tests build synthetic map manifests,
+      locks and response bundles under tmp_path -- the pattern already used by
+      tests/atlas/test_identity_map.py -- which additionally exercises IM1-IM6 for
+      real instead of stubbing them away. The coupling is one-directional and
+      acyclic (panel.py -> identity_map.py -> model.py).
+    inversion: >-
+      A "test-only" mapper keyword, module-level default, or monkeypatchable hook
+      is added back for convenience, and the real run silently accepts a fake
+      mapper.
+    falsifier: >-
+      PS-V-007 asserts SelectionInputs has no mapper field and that select_panel
+      rejects a mapper keyword; a static AST check asserts panel.py has no
+      module-level mapper default; PS-M-009 asserts a missing lock terminates the
+      run rather than degrading it; PS-R-009 asserts the replay compares against
+      the MAP, not the universe.
+  - id: DC-12
+    added_in: rev4
+    title: Where the Section-17 numeric thresholds come from
+    options:
+      - 'A: amend the frozen registration to add a constraints mapping and read it (what the code assumed existed)'
+      - 'B: parse the protocol Markdown tables (sections 13.2 / 17.5) at run time'
+      - 'C: default or skip a missing threshold so the search proceeds'
+      - 'D: a CLOSED canonical table in source, keyed by the exact supported protocol version AND the V1-verified protocol_doc_hash, with the registration ladder validated by exact seven-string equality'
+    chosen: D
+    rationale: >-
+      The thresholds are protocol-owned and the registration simply does not carry
+      them; the executor has to get them from somewhere, and three of the four
+      sources are corrupt. A edits an authority to suit its executor and silently
+      invalidates every run record produced before the amendment. B makes selection
+      depend on prose formatting, so a non-semantic edit to a Markdown table could
+      change a panel, and it re-reads bytes V1 has already proved. C fabricates a
+      rule -- and is exactly how attempt 4's None became a crash rather than a
+      silent wrong answer; the crash was the good outcome. D keeps the values where
+      the protocol put them while making them unable to outlive it: V1 recomputes
+      the doc hash from disk, so one changed byte retires the whole table and stops
+      the run.
+    tradeoffs: >-
+      A protocol amendment now requires a matching spec revision before any run can
+      execute -- deliberately, since that review is the thing that would have caught
+      this seam. The seven ladder strings must be kept in sync too, which is why
+      they are an exact comparand with a named error rather than a parsed input.
+    inversion: >-
+      Someone "simplifies" the table by dropping the hash key and keeping only the
+      version, or adds a nearest-version fallback, so an amended protocol keeps
+      running with retired caps.
+    falsifier: >-
+      PS-A-008(2) requires CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL for a bumped
+      version and for a single flipped hex digit; PS-A-008(3) requires
+      RELAXATION_LADDER_DRIFT for every drift shape; PS-X-001 requires that panel.py
+      never reads a registration constraints key and never parses the protocol
+      Markdown.
+
+# ---------------------------------------------------------------------------
+# K. Test contract (Gemini writes these RED, before implementation)
+# ---------------------------------------------------------------------------
+test_contract:
+  primary_file: tests/atlas/test_panel_selection.py
+  external_file: tests/atlas/test_panel_selection_external.py
+  collection_rule: >-
+    Guard planned imports in try/except and
+    pytest.fail("RED: raptor.atlas panel selector not implemented", pytrace=False)
+    so the suite COLLECTS before implementation exists.
+  fixture_rules:
+    - Every artifact is built under tmp_path by a helper that emits a minimal, schema-valid YAML.
+    - >-
+      Synthetic identities use an obviously fake, non-genomic shape (e.g.
+      "TESTSEQ:1:A:B"); no real gene symbol, no real transcript accession, no real
+      HGVS, no real PMID/DOI/accession, no residue number that could be read as a
+      claim.
+    - Self-hashes in fixtures are COMPUTED by the fixture helper, never pasted, so a rule change cannot be masked by a stale literal.
+    - No fixture encodes an expected panel derived from real data; expected panels are derived by hand from the synthetic constraint set and stated in the test.
+  suites:
+    preconditions:
+      - id: PS-V-001
+        asserts: 'protocol digest mismatch -> AtlasPanelRegistrationError(PROTOCOL_DIGEST_MISMATCH, V1); one changed byte suffices.'
+      - id: PS-V-002
+        asserts: 'registration self-hash mismatch -> AtlasPanelRegistrationError(REGISTRATION_SELF_HASH_MISMATCH, V2).'
+      - id: PS-V-003
+        asserts: 'seed literal differing from the registration -> AtlasPanelRegistrationError(SEED_MISMATCH, V3).'
+      - id: PS-V-004
+        asserts: 'live pack hash differing from ANY of the three comparands -> AtlasPanelPackDriftError(PACK_DRIFT, V4); three separate cases.'
+      - id: PS-V-005
+        asserts: >-
+          checks short-circuit in the registration-pinned order V1,V2,V3,V4,V5,V7,V6;
+          a fixture broken at V2 and V4 reports V2; a fixture broken at V7 and V6
+          (RP) reports V7, proving the mapper is verified BEFORE the replay uses it.
+      - id: PS-V-006
+        asserts: 'PreconditionReport is produced only when all checks pass; no partial report object is constructible.'
+      - id: PS-V-007
+        asserts: >-
+          SelectionInputs has no raw_identity_mapper field and select_panel accepts
+          no mapper object/factory keyword; constructing SelectionInputs with one
+          raises TypeError. Static AST check: panel.py contains no module-level
+          mapper default and no monkeypatchable mapper hook.
+    lock_and_delta:
+      - id: PS-K-001
+        asserts: 'lock resolved from the registration pointer; SelectionInputs exposes no lock path; a decoy lock elsewhere is ignored.'
+      - id: PS-K-002
+        asserts: 'missing lock -> UNIVERSE_LOCK_MISSING(K1); tampered lock self-hash -> UNIVERSE_LOCK_CORRUPT(K2).'
+      - id: PS-K-003
+        asserts: 'lock hash != registration active mirror -> UNIVERSE_LOCK_CORRUPT(K2), even when the lock self-verifies.'
+      - id: PS-K-004
+        asserts: 'any of universe/raw/ledger/discovery hash or count mismatching -> UNIVERSE_LOCK_MISMATCH(K3); one case per field.'
+      - id: PS-K-005
+        asserts: 'lock pack binding != live pack -> AtlasPanelPackDriftError(K4).'
+      - id: PS-K-006
+        asserts: 'two locks for the same universe_version -> UNIVERSE_LOCK_INVALID(K6); a lock for a DIFFERENT version is not a duplicate.'
+      - id: PS-K-007
+        asserts: 'lock created_at later than run_started_at -> UNIVERSE_LOCK_INVALID(K6).'
+      - id: PS-K-008
+        asserts: 'delta object has exactly the eight fields, all non-null, and is present even when differs is false.'
+      - id: PS-K-009
+        asserts: 'omitting any delta field -> AtlasLockDeltaError(UNIVERSE_LOCK_DELTA_INCOMPLETE, K5).'
+      - id: PS-K-010
+        asserts: 'lock triple absent from the amendment log -> AtlasLockDeltaError(UNIVERSE_LOCK_PROTOCOL_UNKNOWN, K5).'
+      - id: PS-K-011
+        asserts: 'ADVERSARIAL -- a valid delta does NOT waive K2/K3/K4/K6: a run with a reconcilable delta and a broken K3 still fails K3.'
+      - id: PS-K-012
+        asserts: >-
+          ADVERSARIAL -- chain completeness: a delta whose
+          reconciled_via_amendment_log_versions skips an intermediate amendment
+          version that lies strictly between the lock version and the current
+          version raises AtlasLockDeltaError(UNIVERSE_LOCK_DELTA_INCOMPLETE, K5),
+          even though every listed version exists in the log and the endpoints are
+          correct.
+      - id: PS-K-013
+        asserts: >-
+          K5 is universe-lock-only: an identity-map lock carrying no protocol
+          version never triggers a delta requirement, and injecting a
+          protocol_version key into the map lock does not make one admissible
+          (still verified by IM1-IM6 alone).
+    identity_map:
+      - id: PS-M-001
+        asserts: >-
+          map lock resolved from registration.identity_map_contract.active.path;
+          SelectionInputs exposes no map-lock path; a decoy lock beside the map is
+          ignored (IM1).
+      - id: PS-M-002
+        asserts: >-
+          absent lock -> AtlasIdentityMapBindingError(IDENTITY_MAP_LOCK_MISSING, IM1);
+          wrong schema id or unparsable YAML -> IDENTITY_MAP_LOCK_CORRUPT(IM1);
+          tampered lock self-hash -> IDENTITY_MAP_LOCK_CORRUPT(IM1); lock hash !=
+          registration mirror -> IDENTITY_MAP_LOCK_CORRUPT(IM1) even when the lock
+          self-verifies.
+      - id: PS-M-003
+        asserts: >-
+          STALE VERSION -- a lock that self-verifies perfectly but declares a
+          map_version/lock_version other than the registration-active one raises
+          IDENTITY_MAP_MISMATCH(IM1). Binding an older map is never a fallback.
+      - id: PS-M-004
+        asserts: >-
+          map manifest self-hash mismatch, or any lock<->map field disagreement
+          (map_id, map_version, map_content_hash, map_record_count,
+          raw_inventory_content_hash, raw_inventory_record_count,
+          response_bundle_hash, response_file_count, response_byte_count,
+          acquisition_tool_sha256) -> IDENTITY_MAP_MISMATCH(IM2); one case per field.
+      - id: PS-M-005
+        asserts: >-
+          response-bundle drift -> IDENTITY_MAP_MISMATCH(IM3): one flipped byte in a
+          single synthetic response file, a missing response file, an extra file,
+          and a modified acquisition-tool file are four separate failing cases. A
+          run must NOT pass when only the aggregate bundle hash is recomputed from
+          a stale manifest instead of from disk.
+      - id: PS-M-006
+        asserts: >-
+          map pack_binding != live pack -> PACK_DRIFT/IDENTITY_MAP_MISMATCH(IM4);
+          reference assembly or transcript differing from the pack pins ->
+          IDENTITY_MAP_MISMATCH(IM4); a protein accession that is asserted rather
+          than uniquely derivable from the complete synthetic reference page set ->
+          failure, never a default.
+      - id: PS-M-007
+        asserts: >-
+          map_record_count != raw record_count, a raw_identity_string differing by
+          one character, or a non-bijective raw<->map mapping ->
+          IDENTITY_MAP_MISMATCH(IM5).
+      - id: PS-M-008
+        asserts: >-
+          IM6 -- a universe lock whose identity_map_binding differs in any field
+          from the verified map lock fails; a universe lock declaring
+          universe_version >= 3 with NO identity_map_binding also fails; neither is
+          waivable by a K5 delta.
+      - id: PS-M-009
+        asserts: >-
+          CRITICAL FALSE-GREEN -- a mapper fault never becomes a candidate property:
+          with the map lock removed, the run raises AtlasIdentityMapBindingError and
+          writes NO run record; the universe records do NOT appear as
+          identity_state=unresolved, are NOT marked out_of_scope, and no
+          INFEASIBLE_PANEL is produced.
+      - id: PS-M-010
+        asserts: >-
+          ORDER -- a fixture that is simultaneously broken at IM2 and at RP4 reports
+          the IM2 failure; replay_normalization is never reached. Assert via a
+          spy/counter that the replay function was not invoked.
+    conservation:
+      - id: PS-U-001
+        asserts: 'raw inventory hash or record_count mismatch -> UNIVERSE_CONTRACT_BREACH(U1).'
+      - id: PS-U-002
+        asserts: 'ledger row count != raw count, or duplicate raw_record_id, or non-bijective mapping -> U2.'
+      - id: PS-U-003
+        asserts: 'ledger universe_key set != record universe_key set, or two records per key -> U3.'
+      - id: PS-U-004
+        asserts: 'recomputed discovery_set_count/hash != committed -> U4; hash is over sorted DISTINCT keys joined by newline.'
+      - id: PS-U-005
+        asserts: 'universe self-hash mismatch -> U5; completeness_attestation missing/roleless -> U6.'
+      - id: PS-U-006
+        asserts: 'prohibited universe content (effect size, score, p-value, ranking, "promising" field) -> UNIVERSE_CONTRACT_BREACH citing section 4.4.'
+    replay:
+      - id: PS-R-001
+        asserts: 'replayed normalization_outcome != ledger -> RP1 with the offending raw_record_id.'
+      - id: PS-R-002
+        asserts: 'replayed universe_key != ledger/record -> RP2; surrogate UNRESOLVED: key uses NFC+strip+whitespace-collapse and NO case-fold.'
+      - id: PS-R-003
+        asserts: 'row declared resolved that fails admission -> RP3; row declared unresolved that DOES admit -> RP3 (both directions).'
+      - id: PS-R-004
+        asserts: 'any of spdi/hgvs_c/hgvs_p/transcript/residue/codon differing after text_norm -> RP4.'
+      - id: PS-R-005
+        asserts: 'consequence_class/scope_decision differing, or derived from a custodian assertion rather than raw+pack -> RP5.'
+      - id: PS-R-009
+        asserts: >-
+          CRITICAL FALSE-GREEN -- the replay uses the VERIFIED mapper, never the
+          universe: a synthetic map whose replay tuple deliberately DISAGREES with
+          the universe's declared fields must produce an RP failure naming the
+          offending raw_record_id, proving the executor compared against the map
+          and not merely echoed the universe back to itself. A conforming
+          implementation cannot pass this test by copying declared fields.
+      - id: PS-R-006
+        asserts: 'ADVERSARIAL -- mapper returns undecidable: raises REPLAY_MAPPER_UNAVAILABLE(RP5); the record is NOT marked X1 and NOT out_of_scope.'
+      - id: PS-R-007
+        asserts: >-
+          declared exclusion_flags != the EFFECTIVE exclusion code ->
+          UNIVERSE_CONTRACT_BREACH(RP6) naming the offending raw_record_id;
+          duplicate collapse reproduces the same surviving record_id -> RP7. Four
+          RP6 cases are MANDATORY and every one uses a synthetic AnchorSpec the
+          fixture builds from its own fake identity shape, never a real anchor:
+          (a) MAPPER-OWNED -- an unresolved row whose mapper exclusion_code is X1
+          passes with declared ['X1'], and fails with declared [] or ['X3'],
+          proving the mapper's identity/scope code is authoritative and is not
+          overwritten by the anchor pass;
+          (b) SELECTOR-OWNED -- two resolved rows for which the mapper returns
+          exclusion_code None, one whose spdi_canonical equals the synthetic
+          anchor and one whose residue_index equals the synthetic anchor residue:
+          both have effective code X3, so declared ['X3'] passes and declared []
+          raises RP6. Re-running the SAME synthetic map bundle with a different
+          AnchorSpec flips which rows are X3 while the map bytes, map_content_hash
+          and every IM digest stay identical -- the falsifier for an
+          implementation that leaked the anchor into the map;
+          (c) EFFECTIVE-NONE -- a resolved non-anchor row has effective code None:
+          declared [] passes, and any spurious or wrong declared flag (['X3'],
+          ['X1'], ['X3','X1'], a duplicate, a case variant) raises RP6;
+          (d) CONFLICT -- a mapper that returns a non-null exclusion_code for a
+          resolved anchor-matching row raises RP6 naming both codes; it is NEVER
+          silently overridden in either direction and never merged into a
+          two-element list.
+          ORDER IS UNTOUCHED: these cases add no check and move none. V7 still
+          precedes V6, PS-V-005 and PS-M-010 remain the order falsifiers, and a
+          fixture broken at both IM and RP6 must still report the IM failure.
+      - id: PS-R-008
+        asserts: 'a replay mismatch is REPORTED, never repaired: the universe file bytes are unchanged after the failing call.'
+    strata:
+      - id: PS-S-001
+        asserts: 'each of S1..S6 fires from primitives alone; S4 requires same_context, S5 requires differing context.'
+      - id: PS-S-002
+        asserts: 'substantial vs intermediate counts as a differing pair (conservative routing to contested strata).'
+      - id: PS-S-003
+        asserts: 'multi-stratum matching is normal; all_matched_strata is emitted in Omega order read from the registration.'
+      - id: PS-S-004
+        asserts: 'primary_stratum is the first element under Omega; no other selection rule exists.'
+      - id: PS-S-005
+        asserts: 'declared primary_stratum flipped -> UNIVERSE_CONTRACT_BREACH; declared value never used as input.'
+      - id: PS-S-006
+        asserts: 'ADVERSARIAL -- changing spec_stratum, access_status, license_family or span_verifiable changes NO stratum; the stratum function does not accept them.'
+      - id: PS-S-007
+        asserts: 'functional_evidence_present true with zero observations (and the converse) -> contract breach.'
+    lineage:
+      - id: PS-L-001
+        asserts: 'each of L1..L6 forms an edge; groups are connected components; lineage_group_key = LG: + first16hex(sha256(sorted distinct identifiers)).'
+      - id: PS-L-002
+        asserts: 'group key is stable under renaming of custodian group ids and under observation reordering.'
+      - id: PS-L-003
+        asserts: 'ADVERSARIAL -- unknown lab/protocol lineage pools into a SINGLE LG:UNKNOWN-POOL; two unknown observations never count as two established groups for P2.'
+      - id: PS-L-004
+        asserts: 'declared support_source_groups differing from recomputation -> UNIVERSE_CONTRACT_BREACH.'
+      - id: PS-L-005
+        asserts: 'support_class recomputes per section 14.1 across all five values.'
+    eligibility:
+      - id: PS-E-001
+        asserts: 'each of E1..E8 failing yields the correct X-code and rule_id; one case per rule.'
+      - id: PS-E-002
+        asserts: 'anchor identity and any other substitution at the anchor residue -> X3, driven by the injected AnchorSpec.'
+      - id: PS-E-003
+        asserts: 'E4 -- an access-blocked record with evidence is X5, but a genuine S6 record with no evidence stays eligible.'
+      - id: PS-E-004
+        asserts: 'eligible-but-not-selected is NS_NOT_IN_SOLUTION, never an X-code.'
+      - id: PS-E-005
+        asserts: 'crosswalk: external_label contradictory cell -> stale_label_discordant, record stays eligible, no abort, no relabel.'
+      - id: PS-E-006
+        asserts: 'crosswalk: recomputed_from_locked_observations contradictory cell -> UNIVERSE_CONTRACT_BREACH.'
+    search:
+      - id: PS-A-001
+        asserts: 'allocation enumeration honours C1 (>=1 per non-empty stratum), C3 (<= ceil(n/2)), sum == n, and the declared balance-first ordering.'
+      - id: PS-A-002
+        asserts: 'draw_key = sha256(seed + "|" + spdi) lowercase hex; global order is ascending draw_key then ascending spdi.'
+      - id: PS-A-003
+        asserts: 'ADVERSARIAL -- completeness: a synthetic pool whose ONLY valid panel sits in the last lexicographic branch is still found.'
+      - id: PS-A-004
+        asserts: 'ADVERSARIAL -- non-hereditary minimums (C2, C5, D1, D2, D4, P2) are never used for pruning; a solution that violates D1 mid-assignment is still reachable.'
+      - id: PS-A-005
+        asserts: 'hereditary pruning is sound: C3/D3/P1/P3/residue/codon violations prune, and pruning never removes a complete solution (compared against a brute-force oracle over a tiny pool).'
+      - id: PS-A-006
+        asserts: 'residue and codon collisions resolve strictly by draw order, never by any observation field.'
+      - id: PS-A-007
+        asserts: 'INFEASIBLE_COMPLETE is returned only after the space is exhausted with nodes_expanded < budget.'
+      - id: PS-A-008
+        asserts: >-
+          ADVERSARIAL -- registration-shape guards, all fired BEFORE any attempt
+          runs. (1) SEARCH SCOPE: a registration fixture whose
+          search_parameters.search_scope is anything other than
+          "full_eligible_universe", or whose stratum_shortlist_size is non-null,
+          raises AtlasPanelRegistrationError(UNSUPPORTED_SEARCH_SCOPE). The executor
+          must not silently narrow the search space, and must not run a full search
+          while reporting a narrowed scope.
+          (2) PROTOCOL BINDING (rev 4): materialize_constraint_contract with a
+          protocol version or doc hash outside the supported binding raises
+          AtlasPanelRegistrationError(CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL);
+          separate cases for a bumped version with the pinned hash, the pinned
+          version with one flipped hex digit, and a missing
+          registration.protocol_version. No nearest-match or fallback table exists.
+          (3) LADDER DRIFT (rev 4): every drift shape raises
+          AtlasPanelRegistrationError(RELAXATION_LADDER_DRIFT) naming the first
+          differing position -- one string deleted, one appended, two swapped, the
+          whole list reversed, a single character edited, a single space added,
+          "->" respelled, case changed, the list emptied, the key absent, a
+          non-list value, and a list containing a non-string. None is repaired,
+          re-sorted or partially honoured. A drifted ladder must NEVER be
+          "corrected" to the pinned strings.
+          (4) NO SYNTHETIC FIELD: a fixture that ADDS a constraints mapping to the
+          registration must change nothing -- the contract is materialized
+          identically and the added field is never read.
+    outcomes:
+      - id: PS-O-001
+        asserts: >-
+          schedule order is level-major, size-descending; a smaller panel at L0
+          beats a larger relaxed one. REV 4 -- constraints_at_level is exercised
+          across the WHOLE table: for every level L0,R1..R7 and for several attempt
+          sizes n (at least the schedule's minimum, an odd n and an even n), every
+          ActiveConstraints field equals the protocol value, derived independently
+          in the test from base + cumulative steps rather than copied from the
+          implementation. Anchors the test must pin: C3 and D3 stay ceil(n/2) at
+          every rung; c5_enforced is true only at L0; P1 moves ceil(n/2) ->
+          ceil(2n/3) at R3 and stays; D1 3 -> 2 at R4; P3 2 -> 3 at R5; D2 2 -> 1 at
+          R6; and P2 is CUMULATIVE 3 -> 2 (R2) -> 1 (R7), with applied_steps at R7
+          containing all seven ids in ascending order.
+      - id: PS-O-002
+        asserts: 'ADVERSARIAL -- an UNDETERMINED attempt at L0 terminates the run UNDETERMINED_SEARCH_INCOMPLETE with ZERO relaxation steps applied.'
+      - id: PS-O-003
+        asserts: 'all attempts INFEASIBLE_COMPLETE at every level -> INFEASIBLE_PANEL, complete record still emitted, zero selected members.'
+      - id: PS-O-004
+        asserts: >-
+          any level > L0 stamps independence_status RELAXED and records the step
+          with before/after values. REV 4 -- the recorded before/after come from the
+          structured RelaxationStep entries, so a relaxed run records R3 as P1
+          ceil(n/2) -> ceil(2n/3) and not as prose; a run that reaches R7 records
+          BOTH P2 steps, proving cumulative application; and a step whose
+          before-value does not equal the value actually in force at position-1 is a
+          contract error, never silently accepted.
+      - id: PS-O-005
+        asserts: 'never_relaxed items (E1-E8, firewall, C1/C2/C4, anti-proxy, dedupe, unknown pooling, undetermined-relaxation) are unreachable by the ladder.'
+      - id: PS-O-006
+        asserts: 'N_selected is set only after a solution exists and is always within the registration size bounds.'
+      - id: PS-O-007
+        asserts: 'S6 non-empty forces an S6 member (C2); S6 empty stamps ABSTENTION_CONTROL_MISSING and no substitute is fabricated.'
+      - id: PS-O-008
+        asserts: 'an access_blocked record can never serve as the abstention control.'
+    audit:
+      - id: PS-D-001
+        asserts: 'ADVERSARIAL -- the disposition table has exactly one row per universe record, including unresolved and excluded ones; a selected-only record is rejected.'
+      - id: PS-D-002
+        asserts: 'every row carries the rule_id that produced its disposition; selected rows carry the allocation slot.'
+      - id: PS-D-003
+        asserts: 'the run record contains every PreconditionReport digest and the full delta object.'
+      - id: PS-D-004
+        asserts: 'the CLI refuses to overwrite an existing run-record path.'
+      - id: PS-D-005
+        asserts: >-
+          flags include independence_status, spec_taxonomy_coverage,
+          ABSTENTION_CONTROL_MISSING, UNDETERMINED_SEARCH_INCOMPLETE,
+          INFEASIBLE_PANEL, X5 attrition, lineage_unknown_*,
+          label_function_discordant, stale_label_discordant,
+          unresolved_identity_count. REV 4 -- the record's declared_constraints
+          block is present and complete for EVERY terminal outcome (including
+          INFEASIBLE_PANEL and UNDETERMINED_SEARCH_INCOMPLETE): non-null, carrying
+          the protocol version and doc hash, the base expressions, the seven
+          validated ladder strings, the structured steps, and the evaluated
+          ActiveConstraints of every attempted (level, n). A null or absent
+          declared_constraints is a hard failure, and its evaluated values must
+          agree with its expressions.
+    property_and_metamorphic:
+      - id: PS-P-001
+        kind: determinism
+        asserts: 'two runs over identical inputs produce byte-identical run records (excluding the injected timestamp and executor identity).'
+      - id: PS-P-002
+        kind: metamorphic
+        asserts: 'shuffling the order of records and observations in the universe file and repinning its hash yields the SAME panel, attempt log and dispositions.'
+      - id: PS-P-003
+        kind: metamorphic
+        asserts: 'renaming record_ids and custodian group ids (identity-preserving) changes group keys not at all and the panel not at all.'
+      - id: PS-P-004
+        kind: metamorphic
+        asserts: 'canonical_content_hash(pack_manifest, self_key="pack_content_hash") == pack.pack_content_hash(pack_manifest).'
+      - id: PS-P-005
+        kind: property
+        asserts: >-
+          for randomized synthetic pools, any returned solution satisfies every
+          active constraint (validated by an independent checker function). REV 4 --
+          the checker takes the ActiveConstraints object for the (level, n) the
+          solution was found at and re-derives its own thresholds from the protocol
+          values; it never calls constraints_at_level, so an implementation that
+          evaluates a rung wrongly cannot validate itself.
+      - id: PS-P-006
+        kind: property
+        asserts: 'for randomized tiny pools, complete_search returns SOLUTION iff a brute-force oracle finds one (completeness oracle).'
+      - id: PS-P-007
+        kind: metamorphic
+        asserts: 'lowering node_budget can only turn SOLUTION/INFEASIBLE_COMPLETE into UNDETERMINED, never flip a solution to infeasible.'
+      - id: PS-P-008
+        kind: property
+        asserts: 'the panel is invariant under permuting observation lists within a record and under reordering source_identifiers.'
+    purity_and_adversarial:
+      - id: PS-X-001
+        asserts: >-
+          static AST scan: panel.py imports no network module and contains no
+          os.environ/getenv, datetime.now/utcnow, time.time, input, print or
+          argparse. REV 4 -- the same scan additionally proves (a) the string
+          literal "constraints" never appears as a subscript or .get() key on the
+          registration anywhere in panel.py, so the non-existent field can never be
+          read again; and (b) panel.py never opens, reads, splits, regexes or
+          otherwise PARSES the protocol Markdown -- the protocol path reaches only
+          the V1 hasher. Both are AST/source assertions, not runtime ones, so a
+          dead-but-present code path still fails.
+      - id: PS-X-002
+        asserts: 'assert_no_network_imports() and assert_atlas_import_boundary() stay CLEAN with panel.py present.'
+      - id: PS-X-003
+        asserts: 'path safety: traversal, absolute/drive path, non-regular file and symlink/junction escape -> AtlasPanelInputError (symlink case skipped only where the OS forbids creation).'
+      - id: PS-X-004
+        asserts: 'no input object is mutated by any call; loaded structures are deep-frozen and reject assignment.'
+      - id: PS-X-005
+        asserts: 'ADVERSARIAL -- a mismatch is never auto-repaired: after every failure case, all input files are byte-identical.'
+      - id: PS-X-006
+        asserts: 'purity scan of the test module itself: no real gene symbol, transcript accession, HGVS, SPDI-shaped genomic literal, PMID/DOI, or expected real panel.'
+      - id: PS-X-007
+        asserts: 'regression -- pack, catalog and profile hashes are unchanged by this change set.'
+      - id: PS-X-008
+        asserts: 'ADVERSARIAL -- node_budget_override greater than the registration budget is an input fault, not a silent escalation.'
+      - id: PS-X-009
+        asserts: 'ADVERSARIAL -- a universe carrying a declared ranking/priority/"recommended" field is rejected even if every hash verifies.'
+  external_integration_test:
+    file: tests/atlas/test_panel_selection_external.py
+    marker: 'pytest.mark.external; SKIPPED by default via an explicit opt-in flag/env checked in the TEST, never in core.'
+    scope: >-
+      Verifies only that the real registration, active universe lock v4, active
+      identity-map lock v4 and live pack cross-verify (V1-V5 K1-K6, V7 IM1-IM6) and
+      that the delta is constructible. It performs NO selection, asserts NO panel,
+      and embeds NO candidate identity or count.
+    prohibition: 'this file must never assert a specific panel, a candidate identity, or a universe count.'
+    cases:
+      - id: PS-I-001
+        asserts: >-
+          the tracked registration resolves to universe lock v4 and identity-map
+          lock v4, both self-verify, and the registration mirrors match the lock
+          records field for field. Runs WITHOUT the external map (tracked artifacts
+          only), so it stays runnable in CI. REV 4 -- the same case pins the REAL
+          registration's constraint-relevant shape: registration.protocol_version
+          equals the supported binding; registration.relaxation_ladder is a list of
+          exactly seven strings equal, in order and character-for-character, to the
+          pinned comparand; the registration has NO constraints key at any depth;
+          and materialize_constraint_contract against the tracked registration plus
+          the recomputed protocol doc hash returns a complete ConstraintContract
+          whose declared_ladder round-trips to the registration's own list. This is
+          the case that would have caught the blocked attempt before it ran. It
+          asserts shape and equality only -- no candidate, no count, no panel, and
+          it still runs no search.
+      - id: PS-I-002
+        asserts: >-
+          the real K5 delta for lock v4 is constructible and admissible, and its
+          reconciled_via_amendment_log_versions is the complete gap-free chain from
+          the lock-time protocol version to the current one.
+      - id: PS-I-005
+        asserts: >-
+          ADVERSARIAL, tracked artifacts only -- pointing the resolver at universe lock v3 (the
+          invalid-binding record) terminates with UNIVERSE_LOCK_PROTOCOL_UNKNOWN even though its
+          self-hash verifies and its 1.0.2 triple appears in the amendment log, and lock v3 never
+          appears as a chain step for lock v4. Asserts the error and the chain contents only.
+      - id: PS-I-003
+        marker: 'external + requires the external content root'
+        asserts: >-
+          load_identity_map succeeds against the real map, response bundle and lock
+          v4, and the resulting attestation's IM1-IM6 all pass. Asserts hashes and
+          counts only -- never a candidate identity, never a per-record field.
+      - id: PS-I-004
+        marker: 'external + requires the external content root'
+        asserts: >-
+          verify_preconditions completes V1-V5, V7, V6 against the real artifacts
+          and returns a PreconditionReport. It stops there: NO search is run and NO
+          run record is written by any test.
+    real_mapper_guard: >-
+      CRITICAL -- the synthetic suite must not be able to certify a real run. The
+      external cases are the ONLY place the real mapper is exercised, and the
+      stop/go gate requires PS-I-003/PS-I-004 to have passed on the real artifacts
+      before the real run is permitted. Passing PS-M-* with synthetic maps while the
+      real mapper is absent or unverifiable is explicitly NOT sufficient.
+
+# ---------------------------------------------------------------------------
+# L. Implementation files, allowlist, preservation set
+# ---------------------------------------------------------------------------
+implementation_contract:
+  sonnet_authorized_files:
+    - path: src/raptor/atlas/panel.py
+      change: NEW
+      contents: all selector logic per module_api
+    - path: src/raptor/atlas/model.py
+      change: 'ADDITIVE ONLY -- new frozen types and the AtlasPanelError family'
+      forbidden: 'no edit to any existing class, field, docstring semantics or error base'
+    - path: src/raptor/atlas/__init__.py
+      change: 'ADDITIVE ONLY -- import + __all__ entries for the 12 exported names'
+      forbidden: no reordering or removal of existing exports
+    - path: scripts/run_panel_selection.py
+      change: NEW
+      contents: thin CLI per cli_boundary
+    - path: tests/atlas/test_panel_selection.py
+      change: 'Gemini NEW (RED); Sonnet may repair only to the contract, never relax'
+    - path: tests/atlas/test_panel_selection_external.py
+      change: 'Gemini NEW (RED, skipped by default)'
+  preservation_set:
+    never_modified:
+      - docs/project/atlas/ATLAS_PHASE2_PANEL_SELECTION_PROTOCOL.md
+      - docs/project/atlas/atlas-phase2-panel-selection-registration-v1.yaml
+      - configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v1.yaml
+      - configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v2.yaml
+      - configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v3.yaml
+      - configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v4.yaml
+      - configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v4.yaml
+      - docs/project/specs/atlas-raw-identity-mapper-v1.yaml
+      - 'src/raptor/atlas/identity_map.py (READ-ONLY reuse surface; the selector calls load_identity_map and never re-implements or patches it)'
+      - configs/atlas/packs/**
+      - docs/project/specs/mechanism-atlas-starter.yaml
+      - docs/project/specs/atlas-citation-resolver-v1.yaml
+      - docs/project/TODOS.yaml
+      - 'the external candidate universe, raw inventory, identity map and official response bundle (read-only, always)'
+      - 'every existing tests/atlas/*.py file, including tests/atlas/test_identity_map.py'
+      - 'src/raptor/atlas/{citation,promote,registry,profile,export,hashing,identity,identity_map,pack,guards,ontology}.py behaviour'
+    behavioural_invariants:
+      - 'tests/atlas stays green at its existing count (109) plus the new files; no existing test is edited, skipped or xfailed.'
+      - 'pack_content_hash, catalog_content_hash, evidence_core_hash, profile_envelope_hash all unchanged.'
+      - 'map_content_hash, identity-map lock_content_hash and response_bundle_hash unchanged; the selector never writes them.'
+      - 'promotion Gate 1-8 order, error types and Gate 8 human review unchanged.'
+      - 'no new runtime dependency; PyYAML + stdlib only.'
+  forbidden_everywhere:
+    - network client, socket, http, urllib, requests, DNS, or any acquisition path
+    - codon table, translation function, reference-sequence literal or residue lookup
+    - hardcoded seed, size bound, cap numeral, ladder order, budget, lock path or digest
+    - candidate identity, candidate count or functional result in any non-run-record artifact
+    - auto-repair, auto-repin, retry loop, fallback ordering, heuristic shortlist
+    - reading evidence content, spans, scores, ClinVar records or classifier output
+    - 'a stub, fake, echo or partial RawIdentityMapper anywhere outside a synthetic tmp_path test fixture'
+
+# ---------------------------------------------------------------------------
+# M. Workflow, RED expectation, GREEN commands
+# ---------------------------------------------------------------------------
+workflow:
+  order: 'PLAN (this file) -> Gemini RED tests -> Sonnet GREEN implementation -> GPT-5.4 checker -> real external run'
+  red_expectation:
+    state: 'after Gemini, tests/atlas/test_panel_selection.py COLLECTS and FAILS with the RED sentinel; the existing 109 tests stay green.'
+    command: 'python -m pytest tests/atlas -q'
+    expected: 'existing tests pass; every new test fails with "RED: raptor.atlas panel selector not implemented"'
+    prohibited: 'no xfail, no skip, no try/except that swallows the sentinel into a pass'
+  green_commands:
+    - "python -c \"import yaml; yaml.safe_load(open('docs/project/specs/atlas-panel-selector-v1.yaml', encoding='utf-8'))\""
+    - 'python -m pytest tests/atlas/test_panel_selection.py -q'
+    - 'python -m pytest tests/atlas -q'
+    - 'python -c "from raptor.atlas.guards import assert_no_network_imports, assert_atlas_import_boundary; assert_no_network_imports(); assert_atlas_import_boundary()"'
+    - 'python -c "from raptor.atlas import select_panel, SelectionInputs, SelectionRun, AtlasPanelError"'
+    - 'python scripts/sync_todos.py check --db .raptor/todos-validate.sqlite'
+    - 'git --no-pager diff --stat'
+    - 'git --no-pager diff --check'
+  gpt_checker_probes:
+    probes:
+      - 'Network/purity: does panel.py import any network module, read os.environ, or call a clock? (must be NO, proved by static AST test)'
+      - 'Hardcoding: are seed, size bounds, caps, ladder, budget, Omega, lock path and digests all READ from artifacts? (must hold)'
+      - 'Lock: is the lock resolved from the registration pointer with no caller override? Do K2/K3/K4/K6 run unconditionally before K5? (must hold)'
+      - 'Delta: exactly eight fields, all non-null, always present, admissibility checked against the amendment log, waives nothing? (must hold)'
+      - 'Replay: is every RP1-RP7 field recomputed from raw + pack, with declared values used only as comparands? (must hold)'
+      - 'Mapper: is there NO built-in codon/translation table and NO default mapper? Does undecidability raise REPLAY_MAPPER_UNAVAILABLE rather than marking rows X1/out_of_scope? (must hold)'
+      - 'Mapper injection: can any caller supply a RawIdentityMapper object, factory, or monkeypatchable default that bypasses load_identity_map? (must be NO)'
+      - 'V7 ordering: is verify_identity_map always executed before replay_normalization, and does a fixture broken at both report the IM failure? (must hold)'
+      - 'IM binding: are IM1-IM6 all enforced, including the universe lock identity_map_binding comparison and stale-map_version rejection? (must hold)'
+      - 'IM failure class: does an identity-map fault raise AtlasIdentityMapBindingError with no run record, never an unresolved/out_of_scope row and never INFEASIBLE_PANEL? (must hold)'
+      - 'K5 chain: is the reconciliation chain required to be complete and gap-free, and is K5 correctly NOT applied to the protocol-independent map lock? (must hold)'
+      - 'Firewall: can spec_stratum, access_status, license or span_verifiable reach a stratum predicate by any path? (must be NO)'
+      - 'Search completeness: is pruning restricted to hereditary constraints, and is there an oracle test proving SOLUTION iff a brute-force solution exists? (must hold)'
+      - 'Budget: can UNDETERMINED ever produce relaxation or INFEASIBLE_PANEL, or can the budget escalate inside a run? (must be NO)'
+      - 'Lineage: does unknown lineage pool into exactly one pseudo-group, and can pooling ever be relaxed? (pool yes / relax no)'
+      - 'Audit: one disposition row per universe record, with rule ids; is eligible-but-not-selected ever recorded as an exclusion? (must be NO)'
+      - 'Outcomes: are INFEASIBLE/UNDETERMINED returned with a complete record rather than raised? (must hold)'
+      - 'Immutability: after every failure path, are all input files byte-identical? (must hold)'
+      - 'Purity of tests: any real identity, transcript, HGVS, identifier, universe count or pre-known panel in fixtures? (must be NONE)'
+      - 'Preservation: are protocol/registration/locks/packs/existing tests untouched and all existing hashes unchanged? (must hold)'
+      - 'Test integrity: were RED tests repaired to the contract rather than relaxed to pass? (must hold)'
+      - 'Scope guard: does the executor refuse to run when search_scope is not full_eligible_universe or a shortlist size reappears? (must hold)'
+    verdict: CLEAN / REVISE / DO-NOT-MERGE
+  real_run:
+    precondition: >-
+      GPT-5.4 verdict CLEAN, tests/atlas fully green, AND the external integration
+      cases PS-I-003/PS-I-004 passing against the REAL identity map, response bundle
+      and lock v4. A green synthetic suite alone never authorizes the real run.
+    command: >-
+      python scripts/run_panel_selection.py
+      --protocol docs/project/atlas/ATLAS_PHASE2_PANEL_SELECTION_PROTOCOL.md
+      --registration docs/project/atlas/atlas-phase2-panel-selection-registration-v1.yaml
+      --pack configs/atlas/packs/tsc2/pack.yaml
+      --universe <EXTERNAL_UNIVERSE_ROOT>/candidate_universe.yaml
+      --raw-inventory <EXTERNAL_UNIVERSE_ROOT>/discovery_inventory.raw.yaml
+      --identity-map <EXTERNAL_MAP_ROOT>/raw_identity_map.yaml
+      --identity-map-response-root <EXTERNAL_MAP_ROOT>/responses
+      --anchor-spdi <ANCHOR_SPDI> --anchor-residue <ANCHOR_RESIDUE>
+      --executor <EXECUTOR_ID>
+      --out data/atlas/tsc2_phase2_panel_selection_run_<YYYY-MM-DD>.json
+    note: >-
+      Neither lock path is a flag: the universe lock is resolved from the
+      registration (DC-3) and the identity-map lock from
+      registration.identity_map_contract.active.path (DC-11). Only the EXTERNAL,
+      candidate-bearing map manifest and response-bundle roots are operator-supplied,
+      because they are untracked by design. <EXTERNAL_UNIVERSE_ROOT>,
+      <EXTERNAL_MAP_ROOT> and the anchor are supplied by the operator at run time
+      and are deliberately absent from this spec.
+    after_the_run: >-
+      The panel is PROVISIONAL. It goes to Gate 1-8 and named human-oracle review.
+      It is not a result, is not citable as a finding, and does not change any
+      todo status by itself.
+
+# ---------------------------------------------------------------------------
+# N. Threat model
+# ---------------------------------------------------------------------------
+threat_model:
+  - threat: Custodian omits or edits candidates between lock and run.
+    mitigation: 'K3 rebinds universe/raw/ledger/discovery digests and counts; U1-U4 recompute them; RP7 proves bijection.'
+  - threat: Operator points the run at a friendlier universe or a hand-made lock.
+    mitigation: 'DC-3 -- lock comes from the registration pointer; changing it requires an amendment with new digests and an amendment-log entry.'
+  - threat: Executor trusts declared derived fields, so a custodian steers strata or lineage.
+    mitigation: 'DC-8 -- everything recomputed; declared values are comparands; mismatch is fatal.'
+  - threat: Implementation quietly greedy, reports INFEASIBLE, and relaxation "fixes" it -- a bug becomes a claim about the literature.
+    mitigation: 'DC-6 + PS-A-003/004/005 + PS-P-006 oracle; relaxation gated on INFEASIBLE_COMPLETE only.'
+  - threat: Budget exhaustion silently read as infeasibility.
+    mitigation: 'DC-7 -- UNDETERMINED terminates the run; PS-O-002 asserts zero relaxation; override cannot raise the budget.'
+  - threat: Classification labels or access status leak into strata, turning metadata into mechanism.
+    mitigation: 'stratum function signature excludes them; PS-S-006 proves unreachability; crosswalk stays report-only for external labels.'
+  - threat: Unknown lineage counted as independence, manufacturing source diversity.
+    mitigation: 'single LG:UNKNOWN-POOL; pooling never relaxed; PS-L-003.'
+  - threat: A missing identity mapper is papered over by trusting the custodian or by marking rows unresolved.
+    mitigation: 'DC-4 -- REPLAY_MAPPER_UNAVAILABLE is run-level and distinct from X1; PS-R-006.'
+  - threat: A fake, echoing or partial mapper is injected so RP1-RP7 pass vacuously.
+    mitigation: 'DC-11 -- no mapper argument exists; core loads it under V7 from the registration-resolved lock; PS-V-007, PS-M-009, PS-R-009.'
+  - threat: A stale or hand-built map is bound while every hash in it self-verifies.
+    mitigation: 'IM1 version pin + IM6 universe-lock cross-binding; PS-M-003, PS-M-008.'
+  - threat: The response bundle is edited after locking so the "official" evidence no longer matches.
+    mitigation: 'IM3 re-digests every response file and the acquisition tool from disk; PS-M-005.'
+  - threat: The synthetic suite certifies a real run in which the real mapper is absent or unverifiable.
+    mitigation: 'external PS-I-003/PS-I-004 gate the real run; stop_go requires them on the real artifacts.'
+  - threat: Real candidate data leaks into the repository through fixtures.
+    mitigation: 'DC-9 -- synthetic-only fixtures; PS-X-006 literal scan; external test asserts no panel.'
+  - threat: Re-running until an attractive panel appears.
+    mitigation: 'determinism (PS-P-001) means re-runs are identical; CLI refuses to overwrite a record; any input change requires a new dated record and retention of the prior one.'
+  - threat: Selector silently repairs a mismatch to keep the pipeline moving.
+    mitigation: 'no repair path exists; PS-X-005 asserts byte-identical inputs after every failure.'
+  - threat: Network access sneaks in as a "convenience" lookup.
+    mitigation: 'static AST guard over all atlas modules; PS-X-001/002; no dependency added.'
+
+# ---------------------------------------------------------------------------
+# O. Stop / go
+# ---------------------------------------------------------------------------
+stop_go:
+  implementation_passes_only_if:
+    - Offline and pure; static guards CLEAN; no env/clock/global in core.
+    - Every parameter read from the registration/lock/protocol; nothing hardcoded.
+    - V1-V7, K1-K6 (with the exact eight-field delta and a gap-free chain), IM1-IM6, U1-U7, RP1-RP7 all enforced, in the registration-pinned order V1,V2,V3,V4,V5,V7,V6, fail-closed, with distinct typed errors.
+    - No mapper object/factory/default is accepted anywhere; the mapper is constructed and verified inside V7 and reaches the replay only through IdentityMapAttestation.mapper.
+    - Strata, lineage, support_class and eligibility fully recomputed; declared values comparands only.
+    - Search proved complete against a brute-force oracle; pruning hereditary-only; budget exhaustion UNDETERMINED with zero relaxation.
+    - Terminal outcomes returned, never raised; a complete disposition table emitted in every case.
+    - Fixtures fully synthetic; no candidate identity, count or expected real panel anywhere outside a run record.
+    - tests/atlas green with no existing test edited; all existing hashes unchanged.
+    - 'External PS-I-001/002 green on tracked artifacts, and PS-I-003/004 green against the REAL map/response bundle/lock v4 before any real run.'
+    - GPT-5.4 checker CLEAN.
+  otherwise: 'REVISE or STOP. No real selection run, no partial "preview" panel, no manual panel.'
+  blocked_is_a_valid_outcome: >-
+    If the active identity map cannot be verified (absent, stale, corrupt or
+    mismatched), the correct deliverable is a reported blocker and NO run record --
+    not a panel, not a partial preview, and not a set of rows relabelled unresolved.
+  next_after_clean: >-
+    Real external run under the command above, then Gate 1-8 promotion and named
+    human-oracle review of the provisional panel.
+
+# ---------------------------------------------------------------------------
+# P. Beat-4 audit: inversions and verification
+# ---------------------------------------------------------------------------
+deliberate_action:
+  beat4_inversions:
+    - inversion: Executor trusts universe-derived fields.
+      mitigation: 'DC-8 + RP1-RP7 + PS-S-005/PS-L-004; every derived field recomputed, declared values compared only.'
+    - inversion: K5 delta omitted or reduced to a note when versions match.
+      mitigation: 'delta mandatory even when differs is false; PS-K-008/009; incomplete -> AtlasLockDeltaError.'
+    - inversion: Delta used to wave through a content mismatch.
+      mitigation: 'K2/K3/K4/K6 run before and independently of K5; PS-K-011.'
+    - inversion: DFS silently greedy or pruned on a non-hereditary minimum.
+      mitigation: 'DC-6; PS-A-003/004/005; PS-P-006 brute-force oracle.'
+    - inversion: Budget exhaustion triggers relaxation or infeasibility.
+      mitigation: 'DC-7; PS-O-002; PS-P-007 monotonicity; override cannot raise the budget (PS-X-008).'
+    - inversion: Classification labels enter strata.
+      mitigation: 'stratum signature excludes them; PS-S-006; crosswalk report-only for external labels.'
+    - inversion: Unknown lineage split into several independent groups.
+      mitigation: 'single LG:UNKNOWN-POOL; PS-L-003; pooling in never_relaxed.'
+    - inversion: Seed changed or re-derived.
+      mitigation: 'V3 compares the literal against the registration; no seed derivation code exists; PS-V-003.'
+    - inversion: Real candidate fixtures crib the expected panel.
+      mitigation: 'DC-9; PS-X-006 literal scan; external test forbidden from asserting a panel.'
+    - inversion: Run record lists only selected rows.
+      mitigation: 'PS-D-001 one row per universe record; CLI refuses to write on a count mismatch.'
+    - inversion: Path or hash mismatch auto-repaired.
+      mitigation: 'no repair path; PS-X-005 byte-identity after every failure.'
+    - inversion: Implementation imports a network module.
+      mitigation: 'PS-X-001/002 static AST scan; no dependency added.'
+    - inversion: Tests assert a pre-known panel.
+      mitigation: 'expected panels derived only from synthetic constraint sets and justified in the test body.'
+    - inversion: A "temporary" convenience default (env root, default mapper, default lock path) reintroduces ambient state.
+      mitigation: 'DC-2/DC-3/DC-4 forbid defaults; PS-K-001 and PS-X-001 assert their absence.'
+    - inversion: A future registration narrows search_scope and the executor quietly honours or quietly ignores it.
+      mitigation: 'search_scope_guard fails closed with UNSUPPORTED_SEARCH_SCOPE before any attempt; PS-A-008.'
+    - inversion: A mapper object is injected so RP1-RP7 pass against an echo of the universe.
+      mitigation: 'DC-11 -- no mapper argument exists; core loads it inside V7; PS-V-007, PS-M-009, PS-R-009.'
+    - inversion: V7 is implemented but reachable after the replay, so an unverified mapper is already used.
+      mitigation: 'registration-pinned execution_order V1..V5,V7,V6; PS-V-005 and PS-M-010 assert the IM failure preempts the RP failure.'
+    - inversion: A stale map version is accepted because it self-verifies.
+      mitigation: 'IM1 pins the registration-active version; IM6 cross-binds the universe lock; PS-M-003/008.'
+    - inversion: An identity-map failure is downgraded to unresolved rows or a partial panel.
+      mitigation: 'AtlasIdentityMapBindingError terminates with no run record; PS-M-009.'
+    - inversion: The K5 chain omits a genuinely intervening amendment version so a lock reconciles by endpoint match alone.
+      mitigation: 'chain completeness rule in k5_admissibility; PS-K-012.'
+    - inversion: An invalid-binding lock (false lock-time record) is admitted because its stale triple still appears in the amendment log.
+      mitigation: 'k5_admissibility rejects registration invalid_binding locks and rejected_draft_digests outright; PS-I-005.'
+    - inversion: RP6 is "fixed" by teaching the mapper the anchor -- a wrapper, an extra keyword or an anchor-bearing map -- so the verified map becomes anchor-dependent and V7 verifies a different artifact per run.
+      mitigation: 'rp6_effective_exclusion_contract.anchor_isolation + anchor_threading_rule + anchor_threading_falsifier; PS-R-007(b) re-runs the SAME map bundle under a different AnchorSpec with identical IM digests.'
+    - inversion: RP6 accepts the declared exclusion_flags whenever the mapper code and the selector-derived anchor code disagree (override, union, or "declared wins"), so the check passes vacuously on the row it exists to catch.
+      mitigation: 'conflict_precedence is fail-closed with UNIVERSE_CONTRACT_BREACH(RP6); comparison_rule demands exact singleton/empty equality; PS-R-007(c)/(d).'
+    - inversion: The missing Section-17 thresholds are "restored" by amending the frozen registration to add a constraints block, or by parsing the protocol Markdown at run time -- either way an authority is bent to fit its executor and every prior run record becomes unreproducible.
+      mitigation: 'constraint_contract.prohibitions forbids both explicitly; DC-12 records the rejected options; PS-X-001 proves no Markdown parse and no registration constraints read; PS-A-008(4) proves an added constraints field changes nothing.'
+    - inversion: The canonical thresholds are embedded as plain source constants, so protocol v1.0.5 keeps v1.0.4 caps and the search silently enforces retired numbers -- exactly the failure hardcoding_prohibition exists to prevent.
+      mitigation: 'the table is keyed by version AND V1-verified doc hash and fails closed with CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL on any other binding; PS-A-008(2) flips one hex digit and one version.'
+    - inversion: Rungs are applied exclusively rather than cumulatively (or reset to base at each level), so R7 quietly enforces P2 >= 3 or drops an earlier concession -- every value used is a real protocol value, so nothing looks wrong.
+      mitigation: 'rung_evaluation.cumulative_not_exclusive; PS-O-001 pins the full table at several n and requires applied_steps to hold all seven ids at R7; PS-O-004 requires both P2 steps recorded.'
+  verification_of_this_plan:
+    - 'This file is the ONLY file written in this worktree by the planner; git status shows exactly one modified path for rev 2.'
+    - 'yaml.safe_load parses this file.'
+    - 'The pinned protocol/registration digests recompute against the worktree artifacts.'
+    - 'The pinned universe-lock-v4 and identity-map-lock-v4 references match the tracked, unmodified lock records; universe lock v3 is referenced only as an inadmissible historical artifact.'
+    - 'No candidate identity, candidate count or functional result appears anywhere in this file.'
+    - 'No code, no test, no todo/status edit, no commit, no push, no selection run.'
+  pm_sanity_check: >-
+    One plan file; behaviour authority unchanged; no digests moved; no panel
+    produced. Rev 2 adds only the identity-map binding the protocol now requires
+    and removes an injection seam that could have made the replay vacuous. The only
+    durable effect is that a separate agent can now implement the frozen protocol
+    mechanically instead of a human choosing variants by hand.
+
+commit_boundary:
+  rule: >-
+    The planner does NOT commit or push. This file is left uncommitted for owner
+    review. Implementation, tests and any todo/status change are separate,
+    later commits made by their own agents.

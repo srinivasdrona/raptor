@@ -1,0 +1,32 @@
+{
+  "schema": "raptor.atlas_public_candidate_universe_summary.v1",
+  "universe_id": "tsc2-phase2-contrast-panel-candidate-universe",
+  "universe_version": "3",
+  "generated_at": "2026-08-05T07:48:21Z",
+  "universe_content_hash": "a500efaff6540bc87442795d9c035a12e95e17a383d84889a7e35840e0b81ab0",
+  "lock_content_hash": "64345984bcf45b87d9a89afc113b3cd3266559739abeb754fc331eaa421f4e38",
+  "normalization_ledger_hash": "66fc103395f446d553ba9a370bea605ef80ffb5e9dfc8473c99cdc176162571f",
+  "discovery_set_hash": "595e311a5c165607e2b8360c83353d1e5f2f11af17e65814480a36cdda890acb",
+  "identity_map_lock_hash": "85bc2b10e65bd8140a775537204f3c7c7048cd5444d7057fbea9501b7cd4b104",
+  "counts": {
+    "raw_rows": 35,
+    "ledger_rows": 35,
+    "records": 35,
+    "resolved_identities": 25,
+    "unresolved_identities": 10,
+    "missense_hints": 31,
+    "non_missense_hints": 4,
+    "evidence_bearing_records": 32,
+    "evidence_absent_records": 3,
+    "observations": 37,
+    "resolved_to_unresolved_corrections": 3,
+    "official_replay_mismatches": 0
+  },
+  "reported_outcome_buckets": {
+    "near_reference": 15,
+    "intermediate_deviation": 3,
+    "substantial_deviation": 19
+  },
+  "no_selection_performed": true,
+  "next_gate": "registration_amendment_required_before_formal_selection"
+}

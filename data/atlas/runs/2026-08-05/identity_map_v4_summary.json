@@ -1,0 +1,28 @@
+{
+  "schema": "raptor.atlas_public_identity_map_summary.v1",
+  "map_schema": "atlas.raw_identity_map.v2",
+  "map_id": "atlas-raw-identity-map-tsc2",
+  "map_version": "4",
+  "map_content_hash": "3adbf3484de28607fa3c133b2bebc4a9d7926b4c2d5b3863b0634507c599cd26",
+  "lock_schema": "atlas.raw_identity_map_lock.v2",
+  "lock_version": "4",
+  "lock_content_hash": "85bc2b10e65bd8140a775537204f3c7c7048cd5444d7057fbea9501b7cd4b104",
+  "response_bundle_hash": "fbedf2aae5aa26936807f2d8f26389a18a861fc884b461fdd8ebaf6b7e9f96bc",
+  "response_file_count": 88,
+  "response_byte_count": 904564,
+  "raw_inventory_content_hash": "fee39ffa9c826b6e0ccb85ad583b09c2f81794036b115d91a91eab521365befb",
+  "record_count": 35,
+  "resolved_count": 25,
+  "unresolved_count": 10,
+  "reference_binding": {
+    "provider": "NCBI/NLM",
+    "database": "clinvar+clinicaltables",
+    "transcript": "NM_000548.5",
+    "protein": "NP_000539.2",
+    "assembly": "GRCh38",
+    "protein_reference_total_count": 6428,
+    "protein_reference_page_count": 13
+  },
+  "candidate_bearing_map_location": "external_content_root",
+  "selection_performed": false
+}
