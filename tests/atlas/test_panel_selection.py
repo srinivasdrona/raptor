@@ -511,7 +511,7 @@ def _rec(
         "spdi_canonical": _syn_spdi(position) if (resolved and position is not None) else None,
         "hgvs_c": f"{SYN_TRANSCRIPT}:c.{3 * residue - 2}A>G" if resolved and residue else None,
         "hgvs_p": f"{SYN_PROTEIN}:p.Lys{residue}Glu" if resolved and residue else None,
-        "transcript_pin": SYN_TRANSCRIPT if resolved else None,
+        "_transcript_pin": SYN_TRANSCRIPT if resolved else None,
         "residue_index": residue if resolved else None,
         "codon_index": residue if resolved else None,
         "consequence_class": consequence_class if resolved else None,
@@ -866,7 +866,7 @@ def build_world(
             "spdi_canonical": record["spdi_canonical"],
             "hgvs_c": record["hgvs_c"],
             "hgvs_p": record["hgvs_p"],
-            "transcript_pin": record["transcript_pin"],
+            "_transcript_pin": record["_transcript_pin"],
             "residue_index": record["residue_index"],
             "codon_index": record["codon_index"],
             "consequence_class": record["consequence_class"],
@@ -935,7 +935,7 @@ def build_world(
                 "spdi_canonical": record["spdi_canonical"],
                 "hgvs_c": record["hgvs_c"],
                 "hgvs_p": record["hgvs_p"],
-                "transcript_pin": record["transcript_pin"],
+                "transcript_pin": record["_transcript_pin"],
                 "residue_index": record["residue_index"],
                 "codon_index": record["codon_index"],
                 "consequence_class": record["consequence_class"],
@@ -1381,7 +1381,7 @@ def _check_constraints(
     residues = [r["residue_index"] for r in panel]
     if len(set(residues)) != len(residues):
         return False  # section 16 residue collision
-    codons = [(r["transcript_pin"], r["codon_index"]) for r in panel]
+    codons = [(r["_transcript_pin"], r["codon_index"]) for r in panel]
     if len(set(codons)) != len(codons):
         return False  # section 16 codon collision
     groups_per_record = [_record_groups(r, index) for r in panel]
@@ -2559,17 +2559,17 @@ def test_ps_r_004_identity_fields_are_character_identical(tmp_path: Path) -> Non
     """PS-R-004: any identity field differing after text_norm fails RP4."""
 
     mutations = {
-        "spdi_canonical": lambda r: r.__setitem__("spdi_canonical", _syn_spdi(88)),
-        "hgvs_c": lambda r: r.__setitem__("hgvs_c", f"{SYN_TRANSCRIPT}:c.{999}A>G"),
-        "hgvs_p": lambda r: r.__setitem__("hgvs_p", f"{SYN_PROTEIN}:p.Lys{888}Glu"),
-        "transcript_pin": lambda r: r.__setitem__("transcript_pin", "SYN_TX0009.9"),
-        "residue_index": lambda r: r.__setitem__("residue_index", 88),
-        "codon_index": lambda r: r.__setitem__("codon_index", 88),
+        "spdi_canonical": lambda u: u["records"][0].__setitem__("spdi_canonical", _syn_spdi(88)),
+        "hgvs_c": lambda u: u["records"][0].__setitem__("hgvs_c", f"{SYN_TRANSCRIPT}:c.{999}A>G"),
+        "hgvs_p": lambda u: u["records"][0].__setitem__("hgvs_p", f"{SYN_PROTEIN}:p.Lys{888}Glu"),
+        "transcript_pin": lambda u: u.__setitem__("transcript_pin", "SYN_TX0009.9"),
+        "residue_index": lambda u: u["records"][0].__setitem__("residue_index", 88),
+        "codon_index": lambda u: u["records"][0].__setitem__("codon_index", 88),
     }
     for name, mutate in mutations.items():
         world = build_world(
             tmp_path / f"rp4-{name}",
-            on_universe=lambda u, m=mutate: m(u["records"][0]),
+            on_universe=mutate,
         )
         _expect(
             world,
@@ -4758,7 +4758,7 @@ def test_ps_x_006_this_module_embeds_no_real_biological_entity(tmp_path: Path) -
     sample = _rec("rec-purity", residue=7)
     assert sample["hgvs_c"].startswith(SYN_TRANSCRIPT + ":"), sample["hgvs_c"]
     assert sample["hgvs_p"].startswith(SYN_PROTEIN + ":"), sample["hgvs_p"]
-    assert sample["transcript_pin"] == SYN_TRANSCRIPT
+    assert sample["_transcript_pin"] == SYN_TRANSCRIPT
     assert sample["spdi_canonical"].startswith(_SYN_SEQ_ACC + ":"), sample["spdi_canonical"]
     assert _rec("rec-purity-unresolved", residue=None)["hgvs_c"] is None
 
@@ -4912,6 +4912,13 @@ def test_ps_i_001_tracked_registration_resolves_and_mirrors_both_locks(tmp_path:
         assert str(map_lock[field]) == str(map_active[field]), field
     assert map_lock["lock_content_hash"] == lock["identity_map_binding"]["lock_content_hash"]
     assert registration["identity_map_contract"]["map_storage"]["tracked_in_repository"] is False
+
+    # Real universe-shape integration coverage (synthetic proxy)
+    world = build_world(tmp_path / "universe_shape")
+    universe = yaml.safe_load(world.universe_path.read_text(encoding="utf-8"))
+    assert "transcript_pin" in universe, "Universe v4 top-level transcript pin must be present"
+    for rec in universe["records"]:
+        assert "transcript_pin" not in rec, "Universe v4 records must omit per-record transcript_pin"
 
 
 @requires_impl
