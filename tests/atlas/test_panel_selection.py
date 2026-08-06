@@ -1142,7 +1142,7 @@ def build_world(
     # -- registration (two-pass: the lock mirrors the registration hash) --
     def _registration(lock_hash: str) -> dict[str, Any]:
         manifest: dict[str, Any] = {
-            "schema": "atlas.phase2_panel_selection_registration.v1",
+            "schema": "atlas.panel_selection_registration.v1",
             "registration_id": "synthetic-registration",
             "protocol_version": SYN_PROTOCOL_VERSION,
             "protocol_doc_path": str(
@@ -4875,6 +4875,9 @@ def test_ps_i_001_tracked_registration_resolves_and_mirrors_both_locks(tmp_path:
     """PS-I-001: registration -> universe lock v4 + identity-map lock v4, mirrored."""
 
     registration = _real_registration()
+    loaded_registration = _sut("load_selection_registration")(REGISTRATION_PATH)
+    assert loaded_registration["schema"] == "atlas.panel_selection_registration.v1"
+    
     assert _sut("protocol_doc_hash")(PROTOCOL_PATH) == registration["protocol_doc_hash"]
     assert _sut("registration_content_hash")(registration) == registration[
         "registration_content_hash"
