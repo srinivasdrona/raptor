@@ -2680,9 +2680,12 @@ def test_ps_r_007_exclusion_flags_and_duplicate_collapse(tmp_path: Path) -> None
         on_records=setup_anchors,
         on_universe=flags_anchors,
     )
-    _select(anchors)
-
     AnchorSpec = _sut("AnchorSpec")
+    matching_anchor = AnchorSpec(spdi_canonical=_syn_spdi(61), residue_index=61)
+    map_bytes_before = anchors.map_path.read_bytes()
+    _select(anchors, anchor=matching_anchor)
+    assert anchors.map_path.read_bytes() == map_bytes_before
+
     different_anchor = AnchorSpec(spdi_canonical=_syn_spdi(99), residue_index=99)
     _expect(
         anchors,
@@ -2691,26 +2694,22 @@ def test_ps_r_007_exclusion_flags_and_duplicate_collapse(tmp_path: Path) -> None
         code="UNIVERSE_CONTRACT_BREACH",
         check_id="RP6",
     )
-    assert _sha256_bytes(anchors.map_path.read_bytes()) == anchors.map_manifest["map_content_hash"]
+    assert anchors.map_path.read_bytes() == map_bytes_before
 
     def conflict_universe(universe: dict) -> None:
         r1 = universe["records"][0]
-        r1["residue_index"] = 61
-        r1["codon_index"] = 61
-        r1["spdi_canonical"] = _syn_spdi(61)
+        # Keep it resolved, but maliciously add multiple exclusion flags
         r1["exclusion_flags"] = ["X1", "X3"]
-
-    def conflict_map(map_manifest: dict) -> None:
-        map_manifest["records"][0]["exclusion_code"] = "X1"
 
     conflict_world = build_world(
         tmp_path / "conflict",
+        on_records=setup_anchors,
         on_universe=conflict_universe,
-        on_map=conflict_map,
     )
+
     _expect(
         conflict_world,
-        lambda: _select(conflict_world),
+        lambda: _select(conflict_world, anchor=matching_anchor),
         error="AtlasUniverseContractError",
         code="UNIVERSE_CONTRACT_BREACH",
         check_id="RP6",
@@ -4066,7 +4065,7 @@ def test_ps_d_001_one_disposition_row_per_universe_record(tmp_path: Path) -> Non
         _rec("rec-extra1", residue=98, spec_stratum="conflicting", observations=[
             _obs("obs-e1", bucket="substantial_deviation", assay=SYN_ASSAYS[0], model=SYN_MODELS[0])
         ]),
-        _rec("rec-extra2", residue=99, spec_stratum="conflicting", observations=[
+        _rec("rec-extra2", residue=101, spec_stratum="conflicting", observations=[
             _obs("obs-e2", bucket="substantial_deviation", assay=SYN_ASSAYS[0], model=SYN_MODELS[0])
         ]),
     ])
