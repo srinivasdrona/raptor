@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 
+@pytest.mark.requires_reference
 def test_ta1_dev_export_blocked_and_deterministic(tmp_path):
     """T-A1 dev export blocked.
 
@@ -24,9 +25,9 @@ def test_ta1_dev_export_blocked_and_deterministic(tmp_path):
     if not script_path.exists():
         pytest.fail(f"implementation missing: {script_path}")
 
-    from tests.eval.test_path_resolver import resolve_raptor_data_root
+    from tests.eval.test_path_resolver import require_raptor_data_root
     repo_root = Path(__file__).resolve().parents[2]
-    data_root = resolve_raptor_data_root(repo_root)
+    data_root = require_raptor_data_root(repo_root)
     real_benchmark = data_root / "clinvar" / "benchmark" / "benchmark.jsonl"
     if not real_benchmark.exists():
         pytest.fail(f"Missing real frozen benchmark: {real_benchmark}")
