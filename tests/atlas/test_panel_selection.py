@@ -1121,7 +1121,7 @@ def build_world(
         },
         "pack_binding": dict(map_manifest["pack_binding"]),
         "identity_map_binding": {
-            "schema": map_manifest["schema"],
+            "schema": map_lock["schema"],
             "map_id": map_manifest["map_id"],
             "map_version": map_manifest["map_version"],
             "lock_id": map_lock["lock_id"],
@@ -4111,7 +4111,7 @@ def test_ps_d_003_run_record_carries_every_digest_and_the_full_delta(tmp_path: P
     drift_reg = build_world(tmp_path / "drift_reg")
     drift_reg_run = _select(drift_reg)
     drift_reg.tamper_yaml(
-        drift_reg.registration_path, 
+        drift_reg.registration_path,
         lambda r: r.__setitem__("search_scope", "tampered_scope")
     )
     _expect(
@@ -4877,7 +4877,7 @@ def test_ps_i_001_tracked_registration_resolves_and_mirrors_both_locks(tmp_path:
     registration = _real_registration()
     loaded_registration = _sut("load_selection_registration")(REGISTRATION_PATH)
     assert loaded_registration["schema"] == "atlas.panel_selection_registration.v1"
-    
+
     assert _sut("protocol_doc_hash")(PROTOCOL_PATH) == registration["protocol_doc_hash"]
     assert _sut("registration_content_hash")(registration) == registration[
         "registration_content_hash"
@@ -4902,6 +4902,9 @@ def test_ps_i_001_tracked_registration_resolves_and_mirrors_both_locks(tmp_path:
 
     map_active = registration["identity_map_contract"]["active"]
     map_lock = _real_yaml(map_active["path"])
+
+    assert lock["identity_map_binding"]["schema"] == map_lock["schema"], "IM6 schema must bind to map_lock, not map_manifest"
+
     assert _atlas_pkg.identity_map_lock_content_hash(map_lock) == map_lock["lock_content_hash"]
     assert map_lock["lock_content_hash"] == map_active["lock_content_hash"]
     for field in ("lock_id", "lock_version", "map_id", "map_version", "map_content_hash",
