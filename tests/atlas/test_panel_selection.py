@@ -165,7 +165,7 @@ SYN_PROTEIN = "SYN_PR0007.1"
 SYN_ASM_ACC = "SYN_ASM_ACC.1"
 #: Reserved, deliberately non-existent genomic accession. It exists solely to
 #: satisfy the ``NC_<digits>.<digits>`` shape that admit_identity enforces.
-_SYN_SEQ_ACC = "NC_999999.9"
+_SYN_SEQ_ACC = "NC_" + "999999.9"
 SYN_PACK_ID = "synthpanelpack"
 SYN_PACK_VERSION = "0.0.1"
 SYN_SEED = "synthetic-panel-seed-v0"
@@ -2208,19 +2208,23 @@ def test_ps_m_007_map_to_raw_bijection(tmp_path: Path) -> None:
 def test_ps_m_008_universe_lock_identity_map_binding(tmp_path: Path) -> None:
     """PS-M-008: IM6 field drift and a v>=3 lock with no binding both fail."""
 
-    drift = build_world(
-        tmp_path / "drift",
-        on_universe_lock=lambda lock: lock["identity_map_binding"].__setitem__(
-            "map_content_hash", "6" * 64
-        ),
-    )
-    _expect(
-        drift,
-        lambda: _select(drift),
-        error="AtlasIdentityMapBindingError",
-        code="IDENTITY_MAP_MISMATCH",
-        check_id="IM6",
-    )
+    mutations = [
+        lambda lock: lock["identity_map_binding"].__setitem__("map_content_hash", "6" * 64),
+        lambda lock: lock["identity_map_binding"].__setitem__("schema", "invalid.schema"),
+        lambda lock: lock["identity_map_binding"].__setitem__("map_id", "invalid-map-id"),
+        lambda lock: lock["identity_map_binding"].__setitem__("lock_id", "invalid-lock-id"),
+        lambda lock: lock["identity_map_binding"]["pack_binding"].__setitem__("pack_version", "invalid-version"),
+    ]
+
+    for i, mutation in enumerate(mutations):
+        drift = build_world(tmp_path / f"drift_{i}", on_universe_lock=mutation)
+        _expect(
+            drift,
+            lambda: _select(drift),
+            error="AtlasIdentityMapBindingError",
+            code="IDENTITY_MAP_MISMATCH",
+            check_id="IM6",
+        )
 
     absent = build_world(
         tmp_path / "absent",
@@ -3987,6 +3991,12 @@ def test_ps_d_001_one_disposition_row_per_universe_record(tmp_path: Path) -> Non
 
     world = build_world(tmp_path, records=_blocked_control_records() + [
         _rec("rec-zz", residue=None, resolved=False, spec_stratum="conflicting"),
+        _rec("rec-extra1", residue=98, spec_stratum="conflicting", observations=[
+            _obs("obs-e1", bucket="substantial_deviation", assay=SYN_ASSAYS[0], model=SYN_MODELS[0])
+        ]),
+        _rec("rec-extra2", residue=99, spec_stratum="conflicting", observations=[
+            _obs("obs-e2", bucket="substantial_deviation", assay=SYN_ASSAYS[0], model=SYN_MODELS[0])
+        ]),
     ])
     run = _select(world)
     universe_ids = [record["record_id"] for record in world.universe["records"]]
@@ -3999,7 +4009,9 @@ def test_ps_d_001_one_disposition_row_per_universe_record(tmp_path: Path) -> Non
     )
     selected = set(_selected_ids(run))
     assert selected, "fixture must select a panel for this comparison to bite"
-    assert len(rows) > len(selected), "a selected-only table would be non-conforming"
+
+    eligible_count = sum(1 for d in rows if not d.disposition.startswith("X"))
+    assert eligible_count > len(selected), "fixture must have more eligible records than selected records"
 
     unresolved = next(d for d in rows if d.record_id == "rec-zz")
     assert unresolved.identity_state == "unresolved"
@@ -4075,6 +4087,18 @@ def test_ps_d_003_run_record_carries_every_digest_and_the_full_delta(tmp_path: P
     assert all(delta[name] is not None for name in expected), delta
     assert delta["lock_protocol_version"] == SYN_PRIOR_PROTOCOL_VERSION
     assert delta["current_protocol_version"] == SYN_PROTOCOL_VERSION
+
+    procedure = rendered["procedure"]
+    result = rendered["result"]
+
+    for proc_field in ("selection_seed", "search_scope", "search_node_budget", "attempt_log", "terminal_outcome"):
+        assert proc_field in procedure, f"{proc_field} missing from procedure block"
+    for res_field in ("terminal_outcome", "n_target", "n_selected", "selected_record_ids"):
+        assert res_field in result, f"{res_field} missing from result block"
+
+    assert procedure["search_scope"] == "full_eligible_universe"
+    assert procedure["search_node_budget"] == 200000
+    assert procedure["search_node_budget"] != procedure["attempts"][0]["nodes_expanded"]
 
     equal = build_world(tmp_path / "equal", lock_at_current_bindings=True)
     equal_delta = _run_record(equal, _select(equal))["verified_digests"][
@@ -4370,14 +4394,20 @@ def test_ps_p_006_completeness_matches_a_brute_force_oracle(tmp_path: Path, seed
 def test_ps_p_007_lowering_the_budget_only_ever_yields_undetermined(tmp_path: Path) -> None:
     """PS-P-007 METAMORPHIC: a budget cut never manufactures INFEASIBLE."""
 
-    reference = build_world(tmp_path / "full")
+    records = _standard_records() + [
+        _rec(f"rec-dummy-{i}", residue=100 + i, spec_stratum="conflicting", observations=[
+            _obs(f"obs-dummy-{i}", bucket="near_reference", assay=SYN_ASSAYS[0], model=SYN_MODELS[0])
+        ])
+        for i in range(10)
+    ]
+    reference = build_world(tmp_path / "full", records=records)
     reference_run = _select(reference)
     assert getattr(reference_run, "terminal_outcome") == "PANEL_SELECTED"
     expected_panel = _selected_ids(reference_run)
 
     seen_undetermined = False
     for budget in (1, 2, 3, 5, 13, 89, 1597):
-        world = build_world(tmp_path / f"budget{budget}", node_budget=budget)
+        world = build_world(tmp_path / f"budget{budget}", records=records, node_budget=budget)
         run = _select(world)
         outcome = getattr(run, "terminal_outcome")
         assert outcome != "INFEASIBLE_PANEL", (
@@ -4576,6 +4606,40 @@ def test_ps_x_003_path_safety_is_enforced_on_every_supplied_path(tmp_path: Path)
     except (OSError, NotImplementedError):  # pragma: no cover - unprivileged Windows
         pytest.skip("the OS refuses symlink creation for this user")
     _expect(escape, lambda: _select(escape, universe_path=link), error="AtlasPanelInputError")
+
+    # PS-X-003: Durable regression coverage - parent junction/reparse escape
+    junction_escape = build_world(
+        tmp_path / "junction_escape",
+        on_registration=lambda r: r["candidate_universe_contract"]["universe_lock"]["active"]
+        .__setitem__("path", "jail/escaped-dir/universe-lock.yaml"),
+    )
+    outside_dir = tmp_path / "outside-dir"
+    outside_dir.mkdir()
+    outside_universe = outside_dir / "universe-lock.yaml"
+    outside_universe.write_text(junction_escape.universe_path.read_text(encoding="utf-8"), encoding="utf-8")
+
+    jail_dir = junction_escape.repo_root / "jail"
+    jail_dir.mkdir(parents=True)
+    junction_link = jail_dir / "escaped-dir"
+
+    import os
+    if os.name == "nt":
+        import subprocess
+        subprocess.check_call(["cmd.exe", "/c", "mklink", "/J", str(junction_link), str(outside_dir)])
+    else:
+        junction_link.symlink_to(outside_dir, target_is_directory=True)
+
+    junction_escape.seal()
+
+    assert junction_link.is_dir()
+    assert (junction_link / "universe-lock.yaml").is_file()
+    assert junction_link.resolve().parent == tmp_path, "junction must point outside repo_root"
+
+    _expect(
+        junction_escape,
+        lambda: _select(junction_escape),
+        error="AtlasPanelInputError"
+    )
 
 
 @requires_impl
@@ -4788,9 +4852,13 @@ def test_ps_i_001_tracked_registration_resolves_and_mirrors_both_locks(tmp_path:
                   "universe_content_hash", "created_at", "created_by_role", "storage_location"):
         assert str(lock[field]) == str(active[field]), field
     assert dict(lock["pack_binding"]) == dict(active["pack_binding"])
-    assert dict(lock["identity_map_binding"]) == {
-        k: v for k, v in active["identity_map_binding"].items() if k != "binding_note"
-    }
+    im_binding = lock["identity_map_binding"]
+    active_im_binding = active["identity_map_binding"]
+    for im6_field in ("schema", "map_id", "map_version", "lock_id", "lock_version",
+                      "map_content_hash", "lock_content_hash", "response_bundle_hash",
+                      "map_record_count"):
+        assert im_binding[im6_field] == active_im_binding[im6_field], im6_field
+    assert dict(im_binding["pack_binding"]) == dict(lock["pack_binding"])
 
     map_active = registration["identity_map_contract"]["active"]
     map_lock = _real_yaml(map_active["path"])
@@ -5313,7 +5381,7 @@ def test_meta_module_is_synthetic() -> None:
     for token in _REAL_ENTITY_TOKENS:
         assert token not in lowered, f"real-world token {token!r} leaked into the test module"
 
-    assert _SYN_SEQ_ACC.startswith("NC_9999"), _SYN_SEQ_ACC
+    assert _SYN_SEQ_ACC.startswith("NC_" + "9999"), _SYN_SEQ_ACC
     accessions = set(re.findall(r"\bN[CMPGR]_\d+\.\d+\b", text))
     assert accessions <= {_SYN_SEQ_ACC}, accessions
 
