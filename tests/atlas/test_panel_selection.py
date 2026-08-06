@@ -4107,6 +4107,43 @@ def test_ps_d_003_run_record_carries_every_digest_and_the_full_delta(tmp_path: P
     assert equal_delta["differs"] is False
     assert set(equal_delta) == expected, "the delta was pruned because differs is False"
 
+    # RR1: Registration post-selection drift
+    drift_reg = build_world(tmp_path / "drift_reg")
+    drift_reg_run = _select(drift_reg)
+    drift_reg.tamper_yaml(
+        drift_reg.registration_path, 
+        lambda r: r.__setitem__("search_scope", "tampered_scope")
+    )
+    _expect(
+        drift_reg,
+        lambda: _run_record(drift_reg, drift_reg_run),
+        error="AtlasPanelRegistrationError",
+        code="REGISTRATION_RENDER_SNAPSHOT_DRIFT",
+        check_id="RR1",
+    )
+
+    # RR2: Universe post-selection drift
+    drift_univ = build_world(tmp_path / "drift_univ")
+    drift_univ_run = _select(drift_univ)
+    drift_univ.tamper_yaml(
+        drift_univ.universe_path,
+        lambda u: u["records"].pop()
+    )
+    _expect(
+        drift_univ,
+        lambda: _run_record(drift_univ, drift_univ_run),
+        error="AtlasUniverseContractError",
+        code="UNIVERSE_RENDER_SNAPSHOT_DRIFT",
+        check_id="RR2",
+    )
+
+    # Unchanged world control
+    control = build_world(tmp_path / "control")
+    control_run = _select(control)
+    control_record1 = _run_record(control, control_run)
+    control_record2 = _run_record(control, control_run)
+    assert control_record1 == control_record2, "unchanged inputs must render deterministically"
+
 
 @requires_impl
 def test_ps_d_004_cli_refuses_to_overwrite_a_run_record(tmp_path: Path) -> None:
