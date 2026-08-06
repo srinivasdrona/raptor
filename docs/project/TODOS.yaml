@@ -741,8 +741,12 @@ todos:
     ontology stability from the anchor alone. Panel membership is fixed upstream by
     atlas-phase2-panel-selection-run under the frozen selection protocol; this task executes
     the Atlas pipeline over that provisional panel and never re-selects members based on
-    observed mechanism direction.'
-  status: pending
+    observed mechanism direction. Blocked 2026-08-06: the formal upstream selector returned
+    INFEASIBLE_PANEL after all 24 frozen-ladder attempts completed exhaustively, so no
+    provisional contrast panel exists to execute. The task may resume only under a separately
+    reviewed future protocol/registration decision, never by substituting candidates or
+    weakening constraints after seeing this result.'
+  status: blocked
   depends_on:
   - atlas-phase2-panel-selection-run
   - atlas-phase2-r611q-anchor
@@ -762,8 +766,10 @@ todos:
   description: 'Track: MECHANISM-ATLAS / PHASE-2. Evaluate source recall, valid-span
     yield, contradiction capture, unsupported-claim rate, context completeness and
     reproducibility across the anchor and contrast panel. Discovery may be an optional
-    execution layer, not the benchmark or source of truth.'
-  status: pending
+    execution layer, not the benchmark or source of truth. Blocked 2026-08-06 because
+    atlas-phase2-panel-selection-run returned INFEASIBLE_PANEL and no contrast panel exists;
+    named anchor review also remains pending.'
+  status: blocked
   depends_on:
   - atlas-phase2-contrast-panel
   - atlas-phase2-human-span-review
@@ -1007,8 +1013,18 @@ todos:
     counts, any applied relaxation step and the independence status. Report empty strata, a
     missing abstention control, undetermined search or an infeasible panel honestly instead of
     substituting more attractive candidates, and perform no evidence reading during selection.
-    The panel stays provisional until named human-oracle review.'
-  status: pending
+    The panel stays provisional until named human-oracle review. Completed 2026-08-06: the
+    independently reviewed selector at code head daac13b verified protocol/registration v1.0.4,
+    universe lock v4, identity-map lock v4 and replay RP1-RP7, then exhaustively completed all
+    24 attempts across L0-R7 and n=7,6,5. Every attempt was INFEASIBLE_COMPLETE, maximum node
+    expansion was 714 against the fixed 5,000,000 budget, no override or UNDETERMINED attempt
+    occurred, and the terminal result was INFEASIBLE_PANEL. The CLEAN audit record is
+    data/atlas/tsc2_phase2_panel_selection_run_2026-08-06.json (SHA-256
+    5f5b0918a24fcaa737877a15e393773f20c584c531517133e9c8b7e7574cfffd; 35 complete
+    dispositions; zero selected members). Four earlier exit-3 precondition attempts are retained
+    separately as non-selection audit records. No evidence was read and no claim, classification
+    or promotion occurred.'
+  status: done
   depends_on:
   - atlas-phase2-panel-protocol-freeze
   - atlas-phase2-candidate-universe-lock
