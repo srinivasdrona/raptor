@@ -20,7 +20,7 @@
 # code is NOT behaviour authority.
 
 schema: raptor-atlas-panel-selector-v1
-status: planner_contract_rev2_offline_deterministic_selector_identity_map_bound
+status: planner_contract_rev3_offline_deterministic_selector_anchor_aware_rp6_reconciled
 task_id: atlas-phase2-panel-selection-run
 title: >-
   RAPTOR Atlas Phase-2 offline deterministic contrast-panel selector
@@ -99,6 +99,61 @@ revision_log:
         No selection semantics were touched: seed, panel size, strata, eligibility, constraints,
         ladder, search, budget, evidence firewall and the no-selection boundary are byte- or
         semantically identical to the rejected draft.
+    authors:
+      - 'docs/project/specs/atlas-panel-selector-v1.yaml   # this spec (only file written by this rev)'
+  - rev: 3
+    head: 736c7d6aeac1295203d60556295ccd7965c5ae4b
+    at: '2026-08-06T17:52:51+05:30'
+    at_utc: '2026-08-06T12:22:51Z'
+    trigger: >-
+      An execution attempt against the real frozen inputs hit a contract seam no
+      synthetic fixture had exercised. Protocol RP6 compares the replayed
+      ELIGIBILITY exclusion code (section 8.2, the X1-X10 space) with the declared
+      exclusion_flags, but rev 2 rendered RP6 as the single mapper field
+      RawIdentityReplay.exclusion_code. The shipped mapper is deliberately
+      selection-protocol independent: it is built from pinned official responses,
+      it emits identity/scope exclusions only (including unresolved X1), and it
+      cannot know the caller-supplied AnchorSpec, which arrives at run time and is
+      never locked. The real universe legitimately declares the anchor exclusion
+      X3 -- an eligibility fact selector-side E3 recomputes correctly later -- so a
+      mapper-only RP6 comparand turns a conforming frozen input into an
+      unresolvable V6 contradiction and makes the run unexecutable. Rev 3 restores
+      the protocol's meaning by defining the EFFECTIVE exclusion code:
+      mapper-owned identity/scope exclusion reconciled with the selector-owned,
+      anchor-derived X3, fail-closed on conflict, with the mapper still never told
+      the anchor. Where rev 2 and the protocol differed the protocol governed and
+      rev 2 was defective; nothing here is a new rule.
+    changes:
+      - replay_normalization gains a REQUIRED keyword-only AnchorSpec argument and
+        its pinned signature is restated exactly
+      - verification gains anchor_threading_rule (verify_preconditions supplies
+        inputs.anchor only AFTER V7 returned the attestation) and
+        rp6_effective_exclusion_contract (effective-code derivation, exact
+        singleton/empty equality, UNIVERSE_CONTRACT_BREACH(RP6) on disagreement,
+        fail-closed conflict precedence, anchor isolation)
+      - RawIdentityReplay rp_field_mapping RP6 re-scoped to MAPPER-OWNED only, with
+        rp6_note separating mapper-owned identity/scope exclusion from
+        selector-owned anchor exclusion
+      - RawIdentityMapper gains anchor_independence -- no anchor parameter, no
+        anchor-aware wrapper/subclass/adapter, no protocol coupling
+      - PS-R-007 expanded to four mandatory synthetic RP6 cases (mapper-owned X1,
+        anchor-derived X3 by identity and by residue, effective-None with spurious
+        declared flags, mapper/anchor conflict) alongside the RP7 case it already owned
+      - two beat4 inversions added for this seam
+    unchanged: >-
+      No selection semantics moved. selection_seed and its V3 literal comparison,
+      panel_size_rule, sampling strata S1-S6 and the Omega order, lineage L1-L6,
+      support_class, eligibility E1-E8 and the X1-X10 code space, constraints
+      C1-C5 / D1-D4 / P1-P3 / H1-H3, the relaxation ladder and its gate,
+      never_relaxed, the complete full-universe search, the node-budget rule, the
+      evidence firewall, the no-selection boundary and every frozen input binding
+      (protocol 1.0.4 digest, registration 5b898002..., universe lock v4,
+      identity-map lock v4) are byte-identical to rev 2. The registration-pinned
+      precondition order V1,V2,V3,V4,V5,V7,V6 is unchanged and V7 still precedes V6.
+    landed_as: >-
+      One planner-spec commit made under an explicit owner instruction that
+      supersedes commit_boundary for this revision only: no amend, no push, and no
+      other file touched.
     authors:
       - 'docs/project/specs/atlas-panel-selector-v1.yaml   # this spec (only file written by this rev)'
 
@@ -507,6 +562,17 @@ dataclass_contracts:
         The mapper carries no codon table and no reference sequence: every field
         it returns is read from the pinned official response bundle that IM3
         re-digests from disk.
+      anchor_independence: >-
+        The mapper is SELECTION-PROTOCOL INDEPENDENT by construction: it decides
+        identity and scope from the raw identity string plus the pinned pack, and
+        it has no AnchorSpec parameter, keyword, attribute or awareness of one.
+        The selector never passes the anchor to it, never wraps, subclasses or
+        adapts it to make it anchor-aware, and never re-locks a map per anchor.
+        Anchor-derived exclusion is computed SELECTOR-side during RP6 (see
+        verification.rp6_effective_exclusion_contract). Rationale: the anchor is a
+        run-time caller input, so a map whose content depended on it could not
+        have been locked before it was known -- which is exactly the hole V7
+        exists to close.
     RawIdentityReplay:
       status: SHIPPED frozen dataclass in src/raptor/atlas/model.py; fields are authority, not proposals.
       frozen: true
@@ -529,8 +595,25 @@ dataclass_contracts:
         RP3: identity_state
         RP4: 'spdi_canonical + transcript_pin + hgvs_c + hgvs_p + residue_index + codon_index'
         RP5: 'consequence_class + scope_decision'
-        RP6: exclusion_code
+        RP6: >-
+          exclusion_code -- MAPPER-OWNED ONLY, and NOT the RP6 comparand by
+          itself. The selector reconciles it with the selector-owned,
+          anchor-derived exclusion into the single EFFECTIVE code that declared
+          exclusion_flags must equal; see
+          verification.rp6_effective_exclusion_contract.
         RP7: 'ledger bijection -- recomputed by the selector from the full replay set, not a per-row field'
+      rp6_note: >-
+        Two different owners can legitimately exclude a record, and only one of
+        them is inside the locked map. The MAPPER owns identity/scope exclusion
+        (unresolved X1 and the out-of-scope decisions RP5 already checks): it can
+        decide these from raw + pack alone, and they are authoritative -- the
+        selector never overrides, re-derives, suppresses or re-codes them. The
+        SELECTOR owns the anchor exclusion X3, because it depends on the
+        caller-supplied AnchorSpec that an anchor-blind, pre-locked map cannot
+        contain. Comparing declared exclusion_flags against the mapper field alone
+        (the rev-2 rendering) is therefore narrower than protocol RP6 and rejects
+        conforming universes; comparing against the anchor alone would discard the
+        mapper's authority. RP6 compares against the reconciled effective code.
       note: >-
         A mapper that cannot decide returns the unresolved identity_state with its
         exclusion code; it NEVER guesses a residue, codon or consequence. A mapper
@@ -610,8 +693,8 @@ module_api:
       - 'def build_lock_delta(*, lock, registration, verified_protocol_doc_hash, verified_registration_content_hash) -> LockProtocolVersionDelta  # K5'
       - 'def verify_conservation(universe, raw) -> None  # U1-U6'
       - 'def verify_identity_map(inputs: SelectionInputs, *, registration, lock, live_pack, raw_inventory_path, repo_root) -> IdentityMapAttestation  # V7, IM1-IM6'
-      - 'def replay_normalization(raw, universe, *, pack, mapper) -> NormalizationReplay  # U7, RP1-RP7'
-      - 'def verify_preconditions(inputs: SelectionInputs) -> PreconditionReport  # orchestrates V1-V5, V7, V6 in that order'
+      - 'def replay_normalization(raw: Mapping, universe: Mapping, *, pack: Mapping, mapper: RawIdentityMapper, anchor: AnchorSpec) -> NormalizationReplay  # U7, RP1-RP7'
+      - 'def verify_preconditions(inputs: SelectionInputs) -> PreconditionReport  # orchestrates V1-V5, V7, V6 in that order; hands attestation.mapper + inputs.anchor to the replay'
     ordering_rule: >-
       Checks run in the registration-pinned executor_preconditions.execution_order
       V1, V2, V3, V4, V5 (K1..K6), V7 (IM1..IM6), V6 (U1..U6, U7 -> RP1..RP7) and
@@ -624,6 +707,25 @@ module_api:
       If verify_preconditions can reach replay_normalization without
       verify_identity_map having returned an attestation, the implementation
       violates this spec.
+    anchor_threading_rule: >-
+      Both of replay_normalization's V7-dependent arguments are supplied by
+      verify_preconditions in the SAME call and only after verify_identity_map has
+      returned an IdentityMapAttestation: mapper=attestation.mapper and
+      anchor=inputs.anchor. The anchor is passed through unchanged -- never
+      re-derived, never defaulted, never normalized, never read from the
+      environment, never reconstructed from the universe -- and
+      replay_normalization has NO default for it, so a caller that omits it gets a
+      TypeError rather than an anchor-blind replay. The anchor NEVER travels to
+      verify_identity_map, load_identity_map, the map manifest, the response
+      bundle, the identity-map lock or any RawIdentityMapper method, so V7 stays
+      anchor-independent and the registration-pinned order V1,V2,V3,V4,V5,V7,V6 is
+      untouched by this threading: adding the anchor argument must not, and does
+      not, move any check.
+    anchor_threading_falsifier: >-
+      If verify_identity_map, load_identity_map or any mapper call site can be
+      shown to receive the anchor (as an argument, a wrapper closure, an attribute
+      or a constructed adapter), or if replay_normalization can be called with the
+      anchor defaulted or omitted, the implementation violates this spec.
     v7_contract:
       resolution: >-
         The identity-map LOCK path is resolved from
@@ -697,6 +799,75 @@ module_api:
         note: >-
           Every scalar above is copied into the run record. The mapper field is the
           ONLY channel by which a mapper reaches the replay.
+    rp6_effective_exclusion_contract:
+      protocol_basis: >-
+        Protocol RP6 compares the replayed ELIGIBILITY exclusion code (section
+        8.2, the X1-X10 space) with the declared exclusion_flags of every excluded
+        record. The mapper's exclusion_code is one INPUT to that comparand, not
+        the comparand itself. Rev 2 rendered RP6 as that single field; the
+        narrowing is WITHDRAWN. Where this spec and the protocol appeared to
+        differ, the protocol governed and this spec was defective.
+      effective_code_rule: >-
+        For every replayed row the selector computes exactly ONE effective
+        exclusion code, evaluated in this order.
+        (0) CONFLICT: if the mapper returned a non-null exclusion_code for a
+        RESOLVED replay that also matches the anchor under step (2), the two
+        owners disagree about a row only one of them can own -- see
+        conflict_precedence; no effective code is produced and the run fails.
+        (1) MAPPER-OWNED: otherwise, if the mapper returned a non-null
+        exclusion_code, the effective code IS that code, verbatim. This is how
+        unresolved rows keep X1 and how out-of-scope rows keep the code the map
+        decided. It is authoritative: the selector never overrides, re-derives,
+        re-codes, widens or suppresses it.
+        (2) SELECTOR-OWNED ANCHOR: otherwise, if the replay is RESOLVED and either
+        its spdi_canonical equals anchor.spdi_canonical, or its residue_index is
+        non-null and equals anchor.residue_index, the effective code is X3 -- the
+        anchor identity itself and any other substitution at the anchor residue,
+        exactly the two cases section 8.2 X3 and the same-residue constraint name.
+        (3) NONE: otherwise the effective code is None.
+        Step (2) is reachable only from a resolved replay, so an unresolved row is
+        never re-coded X3 by residue coincidence; an unresolved or out-of-scope
+        replay that carries no exclusion_code at all falls to (3) and its genuine
+        identity fault is caught by RP3/RP5, never papered over here.
+      comparison_rule: >-
+        Declared exclusion_flags must equal the EXACT list form of the effective
+        code: the one-element list holding it when it is not None, and the EMPTY
+        list when it is None. A superset, a subset, a reordering, a duplicate, a
+        differently-cased or differently-spelled code, or one extra "harmless"
+        flag is a mismatch. Disagreement raises
+        AtlasUniverseContractError(code=UNIVERSE_CONTRACT_BREACH, check_id=RP6)
+        naming the offending raw_record_id, the declared list and the effective
+        code. There is no repair, no union, no intersection, no "declared wins",
+        no warning-only path and no partial replay result; the declared value is a
+        comparand only, exactly as recomputation.distrust_rule requires.
+      conflict_precedence: >-
+        FAIL-CLOSED, never silent. Case (0) -- a mapper exclusion on a resolved
+        replay that also matches the anchor -- is treated as a
+        UNIVERSE_CONTRACT_BREACH(RP6) naming both codes, NOT as an override in
+        either direction and NOT as a merged two-element list. Preferring the
+        mapper would hide an anchor the universe disagrees about; preferring the
+        anchor would overrule the only owner that read the pinned responses;
+        merging would invent a multi-code disposition the protocol does not
+        define. The honest deliverable is a stopped run and a reported
+        contradiction between the locked map and the caller's anchor.
+      anchor_isolation: >-
+        The anchor enters this reconciliation ONLY as replay_normalization's
+        keyword-only anchor argument (see verification.anchor_threading_rule). The
+        mapper is never passed it, never taught it, never wrapped or subclassed to
+        infer it, and no anchor value is written into the map manifest, the
+        response bundle or the identity-map lock. V7 therefore verifies the same
+        artifacts for every anchor, and IM1-IM6 remain reproducible from disk bytes
+        alone.
+      not_an_eligibility_decision: >-
+        RP6 reconciliation is a REPLAY-level agreement check on declared universe
+        content. It selects nothing, excludes nothing, and neither pre-empts nor
+        short-circuits evaluate_eligibility: E1-E8 still recompute every
+        disposition independently from the section 4.3 primitives after
+        preconditions pass, and the X-code a record finally carries in its
+        RecordDisposition comes from THAT recomputation, never from this check.
+        The two are expected to agree -- RP6 is where a disagreement is caught,
+        not where it is resolved -- and no eligibility rule, code, order or
+        threshold is changed by this contract.
     k5_admissibility: >-
       build_lock_delta populates all eight fields, sets differs, and validates
       admissibility against registration.amendment_log: the lock triple must equal
@@ -1282,7 +1453,34 @@ test_contract:
       - id: PS-R-006
         asserts: 'ADVERSARIAL -- mapper returns undecidable: raises REPLAY_MAPPER_UNAVAILABLE(RP5); the record is NOT marked X1 and NOT out_of_scope.'
       - id: PS-R-007
-        asserts: 'declared exclusion_flags != replayed exclusion code -> RP6; duplicate collapse reproduces the same surviving record_id -> RP7.'
+        asserts: >-
+          declared exclusion_flags != the EFFECTIVE exclusion code ->
+          UNIVERSE_CONTRACT_BREACH(RP6) naming the offending raw_record_id;
+          duplicate collapse reproduces the same surviving record_id -> RP7. Four
+          RP6 cases are MANDATORY and every one uses a synthetic AnchorSpec the
+          fixture builds from its own fake identity shape, never a real anchor:
+          (a) MAPPER-OWNED -- an unresolved row whose mapper exclusion_code is X1
+          passes with declared ['X1'], and fails with declared [] or ['X3'],
+          proving the mapper's identity/scope code is authoritative and is not
+          overwritten by the anchor pass;
+          (b) SELECTOR-OWNED -- two resolved rows for which the mapper returns
+          exclusion_code None, one whose spdi_canonical equals the synthetic
+          anchor and one whose residue_index equals the synthetic anchor residue:
+          both have effective code X3, so declared ['X3'] passes and declared []
+          raises RP6. Re-running the SAME synthetic map bundle with a different
+          AnchorSpec flips which rows are X3 while the map bytes, map_content_hash
+          and every IM digest stay identical -- the falsifier for an
+          implementation that leaked the anchor into the map;
+          (c) EFFECTIVE-NONE -- a resolved non-anchor row has effective code None:
+          declared [] passes, and any spurious or wrong declared flag (['X3'],
+          ['X1'], ['X3','X1'], a duplicate, a case variant) raises RP6;
+          (d) CONFLICT -- a mapper that returns a non-null exclusion_code for a
+          resolved anchor-matching row raises RP6 naming both codes; it is NEVER
+          silently overridden in either direction and never merged into a
+          two-element list.
+          ORDER IS UNTOUCHED: these cases add no check and move none. V7 still
+          precedes V6, PS-V-005 and PS-M-010 remain the order falsifiers, and a
+          fixture broken at both IM and RP6 must still report the IM failure.
       - id: PS-R-008
         asserts: 'a replay mismatch is REPORTED, never repaired: the universe file bytes are unchanged after the failing call.'
     strata:
@@ -1702,6 +1900,10 @@ deliberate_action:
       mitigation: 'chain completeness rule in k5_admissibility; PS-K-012.'
     - inversion: An invalid-binding lock (false lock-time record) is admitted because its stale triple still appears in the amendment log.
       mitigation: 'k5_admissibility rejects registration invalid_binding locks and rejected_draft_digests outright; PS-I-005.'
+    - inversion: RP6 is "fixed" by teaching the mapper the anchor -- a wrapper, an extra keyword or an anchor-bearing map -- so the verified map becomes anchor-dependent and V7 verifies a different artifact per run.
+      mitigation: 'rp6_effective_exclusion_contract.anchor_isolation + anchor_threading_rule + anchor_threading_falsifier; PS-R-007(b) re-runs the SAME map bundle under a different AnchorSpec with identical IM digests.'
+    - inversion: RP6 accepts the declared exclusion_flags whenever the mapper code and the selector-derived anchor code disagree (override, union, or "declared wins"), so the check passes vacuously on the row it exists to catch.
+      mitigation: 'conflict_precedence is fail-closed with UNIVERSE_CONTRACT_BREACH(RP6); comparison_rule demands exact singleton/empty equality; PS-R-007(c)/(d).'
   verification_of_this_plan:
     - 'This file is the ONLY file written in this worktree by the planner; git status shows exactly one modified path for rev 2.'
     - 'yaml.safe_load parses this file.'
