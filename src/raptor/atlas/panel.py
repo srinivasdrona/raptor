@@ -1991,6 +1991,37 @@ def _json_safe(value: Any) -> Any:
     return value
 
 
+def _bind_reloaded_snapshot_to_run(
+    *,
+    label: str,
+    recomputed_hash: str,
+    verified_hash: str,
+    error_cls: type[AtlasPanelError],
+    code: str,
+    check_id: str,
+) -> None:
+    """Bind an artifact re-loaded at render time back to the digest
+    ``run.preconditions`` actually verified during the selection run that
+    produced ``run`` -- never a re-check of the reloaded bytes' own
+    embedded self-hash against itself, which a replacement artifact that is
+    merely internally self-consistent (but different) would trivially
+    pass. ``recomputed_hash`` is the reloaded artifact's authoritative
+    content hash, computed by the same selector hash primitive used at
+    selection time; ``verified_hash`` is the digest ``report`` captured
+    when selection actually verified this exact artifact. Any difference
+    means the file on disk changed after selection but before rendering,
+    and the caller must fail closed before a single reloaded value reaches
+    the record -- no partial or success-shaped record is returned."""
+
+    if recomputed_hash != verified_hash:
+        raise error_cls(
+            f"{label} re-loaded for rendering does not match the content hash verified during the "
+            f"selection run that produced this record (post-selection drift): recomputed "
+            f"{recomputed_hash!r} != verified {verified_hash!r}",
+            code=code, check_id=check_id,
+        )
+
+
 def render_run_record(run: SelectionRun, *, inputs: SelectionInputs) -> dict:
     """Render a complete, JSON-safe run record for ``run``. Every
     :class:`~raptor.atlas.model.PreconditionReport` field name appears as a
@@ -2058,9 +2089,33 @@ def render_run_record(run: SelectionRun, *, inputs: SelectionInputs) -> dict:
     # hash-verified registration/universe artifacts ``run`` was produced
     # from, purely to recompute the full Section 18 procedure/result
     # surface. Both loaders read only the explicit paths on ``inputs``, so
-    # this remains free of any clock/env/argv/network access.
+    # this remains free of any clock/env/argv/network access. Each artifact
+    # is read exactly once here -- nothing below re-reads either path, so
+    # rendering itself never opens a second TOCTOU window. Immediately
+    # after each reload, the bytes are bound back to the digest ``report``
+    # verified at selection time (never merely re-checked against their
+    # own embedded self-hash): a file replaced on disk after selection but
+    # before this call -- even with an internally self-consistent
+    # replacement -- fails closed here before it can influence a single
+    # record field.
     registration = load_selection_registration(inputs.registration_path)
+    _bind_reloaded_snapshot_to_run(
+        label="registration",
+        recomputed_hash=registration_content_hash(registration),
+        verified_hash=report.verified_registration_content_hash,
+        error_cls=AtlasPanelRegistrationError,
+        code="REGISTRATION_RENDER_SNAPSHOT_DRIFT",
+        check_id="RR1",
+    )
     universe = load_candidate_universe(inputs.universe_path)
+    _bind_reloaded_snapshot_to_run(
+        label="candidate universe",
+        recomputed_hash=candidate_universe_content_hash(universe),
+        verified_hash=report.verified_universe_content_hash,
+        error_cls=AtlasUniverseContractError,
+        code="UNIVERSE_RENDER_SNAPSHOT_DRIFT",
+        check_id="RR2",
+    )
     lineage = recompute_lineage_index(universe)
 
     # The configured node budget (registration's base value, or the
