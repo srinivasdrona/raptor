@@ -612,8 +612,11 @@ todos:
     evidence instead. Do not publish before the registered outcome is determined, do not
     substitute a weekly XML release, and do not imply authorization beyond the recorded gate.
     The determined outcome is BLOCKED_DATA; publish the transport-evidence record and explicitly
-    state that the alternate live URL was not used and no archive bytes were accessed.'
-  status: in_progress
+    state that the alternate live URL was not used and no archive bytes were accessed. Completed
+    2026-08-06: published prerelease v0.2.0 at
+    https://github.com/srinivasdrona/raptor/releases/tag/v0.2.0 with the audited BLOCKED_DATA
+    outcome, unchanged authorization boundary and link to the committed transport record.'
+  status: done
   depends_on:
   - validate-tiered-gate-prospectively
   created: '2026-07-31'
