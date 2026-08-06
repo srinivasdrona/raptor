@@ -20,7 +20,7 @@
 # code is NOT behaviour authority.
 
 schema: raptor-atlas-panel-selector-v1
-status: planner_contract_rev3_offline_deterministic_selector_anchor_aware_rp6_reconciled
+status: planner_contract_rev4_offline_deterministic_selector_version_pinned_constraint_contract
 task_id: atlas-phase2-panel-selection-run
 title: >-
   RAPTOR Atlas Phase-2 offline deterministic contrast-panel selector
@@ -156,6 +156,70 @@ revision_log:
       other file touched.
     authors:
       - 'docs/project/specs/atlas-panel-selector-v1.yaml   # this spec (only file written by this rev)'
+  - rev: 4
+    head: ab8d04f2fe326503a62164bc3858891920ea9239
+    at: '2026-08-06T22:00:29+05:30'
+    at_utc: '2026-08-06T16:30:29Z'
+    trigger: >-
+      The fourth real execution attempt cleared every fail-closed precondition --
+      V1, V2, V3, V4, V5, V7, V6 and the full RP1-RP7 replay all passed -- and then
+      died in the FORMAL pre-search step with
+      AtlasPanelRegistrationError(INPUT_FAULT) "unrecognized constraint formula
+      None", before a single attempt ran and before any run record was written. The
+      cause is a spec gap, not a bad artifact: rev 3 named the Section-17
+      constraints C1-C5 / D1-D4 / P1-P3 / H1-H3 and required every parameter to be
+      READ from the registration, but never said WHERE the numeric thresholds live.
+      The frozen registration has no constraints mapping at all -- it carries the
+      relaxation ladder as seven prose strings and nothing else -- so an
+      implementation that follows the read-everything rule literally looks up a key
+      that does not exist, gets None, and fails. The protocol IS the threshold
+      authority (section 13.2 ladder, section 17.5 caps), but it is Markdown and
+      must never be parsed at run time. Rev 4 closes the seam with a CLOSED
+      canonical constraint contract keyed to the exact supported protocol version
+      AND its verified doc hash, plus exact-equality validation of the
+      registration's seven ladder strings. Three repairs were rejected: amending the
+      frozen registration to add a constraints block (edits a frozen artifact to
+      suit the executor), parsing the protocol Markdown at run time (makes selection
+      depend on prose formatting), and defaulting a missing threshold (fabricates a
+      rule). No threshold value, ladder order, gate, search rule or outcome
+      semantic changes; only their SOURCE and their drift detection are now defined.
+    changes:
+      - typed error code enum gains CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL and
+        RELAXATION_LADDER_DRIFT; AtlasPanelRegistrationError.means extended to name
+        the constraint-contract failures
+      - hardcoding_prohibition gains a single, explicitly scoped carve-out for
+        protocol constants that are pinned to the verified protocol version AND doc
+        hash and fail closed on any unrecognized binding
+      - three frozen types added -- RelaxationStep, ConstraintContract, ActiveConstraints
+      - module_api.search gains materialize_constraint_contract and
+        constraints_at_level, and the constraint_contract block defining the closed
+        canonical L0 base thresholds, the exact seven-string ladder comparand, the
+        cumulative rung transformations and the fail-closed validation rules
+      - complete_search and run_attempt_schedule signatures pinned to the
+        structured contract instead of an untyped constraints argument
+      - run_record procedure block pins the declared_constraints shape to the
+        canonical materialized set plus the validated ladder
+      - protected-test obligations extended inside existing ids PS-A-008, PS-O-001,
+        PS-O-004, PS-P-005, PS-X-001, PS-D-005 and PS-I-001; no new PS id is created
+      - DC-12 records the rejected alternatives; three beat4 inversions added
+    unchanged: >-
+      No selection semantics moved. Every threshold keeps its protocol value at
+      every rung, the ladder keeps its order and its terminal step, the gate keeps
+      INFEASIBLE_COMPLETE as the only advance condition, and UNDETERMINED still
+      terminates the run. selection_seed and its V3 literal comparison,
+      panel_size_rule and the attempt schedule, sampling strata S1-S6 and the Omega
+      order, lineage L1-L6, support_class, eligibility E1-E8, the X1-X10 code space,
+      RP1-RP7 including the rev-3 anchor-aware RP6 reconciliation, the pinned
+      precondition order V1,V2,V3,V4,V5,V7,V6, search scope, node budget, the
+      complete-search and hereditary-pruning rules, the evidence firewall, the
+      no-selection boundary and every frozen input binding are unchanged.
+    landed_as: >-
+      One planner-spec commit made under an explicit owner instruction that
+      supersedes commit_boundary for this revision only: no amend, no push, and no
+      other file touched. The protocol, the registration, every lock, all code,
+      all tests and all data records are untouched by this revision.
+    authors:
+      - 'docs/project/specs/atlas-panel-selector-v1.yaml   # this spec (only file written by this rev)'
 
 # ---------------------------------------------------------------------------
 # A. Authority, scope, non-authority
@@ -235,6 +299,31 @@ authority_and_scope:
     ALGORITHM SHAPES (predicate forms, hash algorithms, Omega-as-declared-order)
     may be coded, because they are the protocol's semantics, not its parameters.
     Rationale: a hardcoded parameter silently survives a future amendment.
+  hardcoding_prohibition_scoped_exception:
+    added_in: rev4
+    rule: >-
+      EXACTLY ONE exception exists, and it is narrow. Protocol-owned values that
+      the registration does not carry -- today only the Section-17 numeric
+      constraint thresholds -- may live in source as a CLOSED canonical table
+      ONLY when that table is keyed by BOTH the exact supported protocol version
+      AND the verified protocol_doc_hash, and an unrecognized (version, hash) pair
+      fails closed before any attempt runs. See
+      module_api.search.constraint_contract.
+    why_this_is_not_the_prohibited_case: >-
+      The prohibition exists because "a hardcoded parameter silently survives a
+      future amendment". A version-and-hash-keyed table cannot: V1 recomputes the
+      protocol doc hash from disk, so a single changed byte in the protocol
+      retires the whole table and the run stops with
+      CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL. The failure mode the prohibition
+      targets is structurally unreachable, which is why the carve-out is safe and
+      why it is stated here rather than assumed.
+    still_prohibited: >-
+      The seed, panel size bounds, ladder ORDER as behaviour, node budget, strata
+      list, Omega order, lock paths and digests remain read-only-from-artifacts
+      with no exception. The seven ladder strings are embedded ONLY as an exact
+      comparand for drift detection, never as the source of the ladder's
+      behaviour, and the registration remains the authority for which steps exist
+      and in what order.
 
 # ---------------------------------------------------------------------------
 # B. Blinding and the no-selection boundary
@@ -312,7 +401,10 @@ typed_errors:
       means: >-
         V1/V2/V3 failure (protocol digest mismatch, registration self-hash
         mismatch, seed mismatch), or a registration parameter this implementation
-        cannot honour soundly (unsupported search scope / non-null shortlist).
+        cannot honour soundly (unsupported search scope / non-null shortlist), or
+        a Section-17 constraint-contract failure: an unsupported protocol
+        version/doc-hash binding, or a relaxation_ladder that is not exactly the
+        seven pinned strings in the pinned order.
     AtlasPanelPackDriftError:
       base: AtlasPanelError
       means: 'V4 failure (PACK_DRIFT): live pack hash != any of the three required comparands.'
@@ -354,7 +446,8 @@ typed_errors:
         UNIVERSE_CONTRACT_BREACH, REPLAY_MAPPER_UNAVAILABLE,
         IDENTITY_MAP_LOCK_MISSING, IDENTITY_MAP_LOCK_CORRUPT,
         IDENTITY_MAP_MISMATCH, IDENTITY_MAP_UNVERIFIED,
-        UNSUPPORTED_SEARCH_SCOPE, INPUT_FAULT.
+        UNSUPPORTED_SEARCH_SCOPE, CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL,
+        RELAXATION_LADDER_DRIFT, INPUT_FAULT.
       check_id: 'str | None  # e.g. V4, K5, U3, RP4, E6, L2, C3 -- the exact protocol rule id'
       locus: 'str | None  # record_id / raw_record_id / universe_key / path, whichever localizes the fault'
     message_rule: >-
@@ -447,6 +540,59 @@ dataclass_contracts:
           If SelectionInputs (or any keyword of select_panel) can accept a mapper
           instance, callable factory, or monkeypatchable module-level default that
           bypasses load_identity_map, the implementation violates this spec.
+    RelaxationStep:
+      added_in: rev4
+      fields:
+        step_id: 'str  # R1..R7, the protocol section 13.2 step name'
+        position: 'int  # 1..7, the 1-based index of this step in the declared ladder'
+        constraint_id: 'str  # the single constraint this step relaxes: C5, P2, P1, D1, P3, D2, P2'
+        kind: "str  # 'threshold' (numeric change) | 'report_only' (constraint stops gating)"
+        before: 'str | None  # canonical threshold expression in force at position-1; None when kind is report_only'
+        after: 'str | None  # canonical threshold expression in force from this step on; None when kind is report_only'
+        declared_text: 'str  # the EXACT registration relaxation_ladder string this entry validates against'
+      note: >-
+        A structured restatement of the ladder the registration declares, not a
+        second source of truth. before/after are canonical THRESHOLD EXPRESSIONS
+        in the closed grammar (a decimal integer, or ceil(<int>n/<int>)), never
+        prose and never a pre-evaluated integer, because every cap is a function
+        of the attempt size n.
+    ConstraintContract:
+      added_in: rev4
+      frozen: true
+      fields:
+        protocol_version: 'str  # the exact supported version this contract is keyed to'
+        protocol_doc_hash: 'str  # the V1-verified doc hash this contract is keyed to'
+        base_thresholds: 'Mapping[str, str]  # frozen; constraint id -> canonical L0 threshold expression'
+        explicit_logic_constraints: 'tuple[str, ...]  # constraints with no numeric threshold, evaluated as coded predicates'
+        relaxation_steps: 'tuple[RelaxationStep, ...]  # exactly seven, in declared order'
+        declared_ladder: 'tuple[str, ...]  # the seven registration strings, verbatim, as validated'
+      note: >-
+        The single object every Section-17 threshold is read from. It is
+        constructed only by materialize_constraint_contract, only after the
+        protocol binding and the ladder have both validated, and it is
+        deep-frozen. There is no partial contract and no mutable variant.
+    ActiveConstraints:
+      added_in: rev4
+      frozen: true
+      fields:
+        level: 'str  # L0 or R1..R7'
+        rung: 'int  # 0..7; LEVELS.index(level)'
+        n: 'int  # the attempt size these values were evaluated for'
+        c3_max_per_stratum: int
+        d1_min_assay_kinds: int
+        d2_min_model_systems: int
+        d3_max_per_assay_kind: int
+        p1_max_sole_support: int
+        p2_min_established_groups: int
+        p3_max_single_high_throughput: int
+        c5_enforced: 'bool  # False from R1 onward; C5 then reports without gating'
+        applied_steps: 'tuple[str, ...]  # exactly the step_ids with position <= rung, ascending'
+      note: >-
+        Every field is an EVALUATED integer for this (level, n) pair, so the
+        search never re-reads the registration, never re-parses an expression and
+        never sees a rung it did not ask for. H1 is not a field: protocol section
+        12 defines H1 as P3, so it reads p3_max_single_high_throughput and no
+        second value can drift from it.
     LockProtocolVersionDelta:
       fields:
         lock_protocol_version: str
@@ -910,9 +1056,218 @@ module_api:
       not by discipline).
   search:
     functions:
+      - 'def materialize_constraint_contract(*, registration: Mapping, verified_protocol_version: str, verified_protocol_doc_hash: str) -> ConstraintContract  # protocol sections 13.2 + 17.5'
+      - 'def constraints_at_level(contract: ConstraintContract, *, level: str, n: int) -> ActiveConstraints'
       - 'def enumerate_allocations(n: int, *, nonempty_strata: Sequence[str], pool_sizes: Mapping[str, int]) -> tuple[tuple[int, ...], ...]'
-      - 'def complete_search(n: int, *, pool, constraints, node_budget: int) -> AttemptOutcome'
-      - 'def run_attempt_schedule(*, pool, registration, node_budget) -> tuple[AttemptOutcome, ...]'
+      - 'def complete_search(n: int, *, pool, constraints: ActiveConstraints, node_budget: int) -> AttemptOutcome'
+      - 'def run_attempt_schedule(*, pool, contract: ConstraintContract, registration, node_budget) -> tuple[AttemptOutcome, ...]'
+    constraint_contract:
+      added_in: rev4
+      problem: >-
+        The Section-17 numeric thresholds have no home. The protocol defines them
+        (section 13.2 ladder, section 17.5 caps) but is Markdown. The frozen
+        registration carries the ladder as seven prose strings and has NO
+        constraints mapping, so registration["constraints"] resolves to nothing and
+        a run that follows the read-everything rule literally dies before its first
+        attempt with a None threshold. This block is the only admissible answer.
+      supported_protocol_binding:
+        protocol_version: 1.0.4
+        protocol_doc_hash: 7b0596ab4a52601566c85a3a2c7ca42aead9c35916890397e58b3e11876e5823
+        rule: >-
+          The canonical table below is keyed by BOTH values. materialize_constraint_contract
+          receives the V1-verified pair and matches it against this binding exactly
+          (case-sensitive, whitespace-sensitive, full 64-hex comparison). Any other
+          version, any other hash, or a missing registration.protocol_version raises
+          AtlasPanelRegistrationError(code=CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL)
+          BEFORE any attempt runs. There is no nearest-match, no major/minor
+          fallback, no "compatible enough" branch and no default table.
+        why_hash_and_not_version_alone: >-
+          A version string is an assertion; the doc hash is the artifact. Pinning
+          both means an edited protocol that keeps its version number retires the
+          table just as loudly as a version bump, so the thresholds can never
+          silently outlive the text that defines them. This is the whole reason the
+          carve-out in authority_and_scope.hardcoding_prohibition_scoped_exception
+          is sound.
+      base_thresholds:
+        note: >-
+          L0 (declared) values, as canonical THRESHOLD EXPRESSIONS in the closed
+          grammar. They are transcribed from protocol sections 17.5 and 12; they are
+          not re-derived, not configurable and not registration-sourced.
+        values:
+          C3: 'ceil(n/2)'
+          D1: '3'
+          D2: '2'
+          D3: 'ceil(n/2)'
+          P1: 'ceil(n/2)'
+          P2: '3'
+          P3: '2'
+      explicit_logic_constraints:
+        note: >-
+          These carry NO numeric threshold and are coded predicates, unchanged by
+          this revision. They are listed so that "absent from base_thresholds" can
+          never be read as "unspecified".
+        values:
+          C1: 'each non-empty stratum contributes at least one selected member'
+          C2: 'S6 contributes at least one member when non-empty (abstention control)'
+          C4: 'stratum assignment is recomputed, never re-labelled; residue/codon collisions rejected'
+          C5: 'spec-taxonomy coverage; GATING at L0, report-only from R1 onward via ActiveConstraints.c5_enforced'
+          D4: 'if any eligible candidate has >= 2 distinct assay kinds, at least one such candidate is selected'
+          H1: 'IS P3, not a separate value: it reads ActiveConstraints.p3_max_single_high_throughput'
+          H2: 'a stratum mandatory C1 member may not be single_high_throughput_only while a non-single_high_throughput_only eligible member exists in that stratum'
+          H3: 'every selected single_high_throughput_only member is flagged; a reporting obligation, not a search constraint'
+      threshold_expression_grammar:
+        closed_forms:
+          - 'a decimal integer literal, e.g. 3'
+          - 'ceil(<int>n/<int>), e.g. ceil(n/2) or ceil(2n/3); a missing coefficient means 1'
+        evaluation: 'ceil(a*n/b) computed in integer arithmetic; no float, no rounding mode choice, no locale.'
+        rejection: >-
+          Anything else -- an empty string, None, a bool, a float, a percentage, a
+          range, prose -- is AtlasPanelRegistrationError(INPUT_FAULT). A None
+          threshold is never defaulted, never treated as "no limit" and never
+          skipped; it is the exact fault that blocked attempt 4 and it must stay
+          loud.
+      declared_ladder_comparand:
+        rule: >-
+          registration.relaxation_ladder MUST equal this seven-element list EXACTLY
+          -- same seven strings, same order, character-for-character after
+          atlas.text_norm.v1 (CRLF/CR -> LF, NFC; no case-fold, no whitespace
+          collapse, no trimming, no punctuation normalization). Length, order and
+          content are all part of the comparison. No substring match, no regex, no
+          fuzzy match, no prefix-on-step-id match, and no parsing of these strings
+          for behaviour: they are a DRIFT DETECTOR, and the structured
+          relaxation_steps below are what the search executes.
+        strings:
+          - 'R1 C5 spec-taxonomy coverage becomes report-only'
+          - 'R2 P2 minimum established source groups 3 -> 2'
+          - 'R3 P1 sole-support cap ceil(n/2) -> ceil(2n/3)'
+          - 'R4 D1 minimum assay kinds 3 -> 2'
+          - 'R5 P3 single-high-throughput cap 2 -> 3'
+          - 'R6 D2 minimum model systems 2 -> 1'
+          - 'R7 P2 minimum established source groups -> 1 (terminal)'
+        drift_rule: >-
+          A missing string, an extra string, a reordering, an edited string (even by
+          one character or one space), a non-list value, or a list of non-strings
+          raises AtlasPanelRegistrationError(code=RELAXATION_LADDER_DRIFT) naming
+          the first differing position with both the expected and the declared text.
+          It is never repaired, never re-sorted, never partially honoured, and never
+          downgraded to a warning. If the registration is amended, this spec and its
+          table must be revised in the same review -- that is the intended cost.
+      relaxation_steps:
+        note: >-
+          The structured form of the ladder, one entry per declared string, in
+          declared order. before/after are threshold expressions; kind report_only
+          carries neither.
+        steps:
+          - step_id: R1
+            position: 1
+            constraint_id: C5
+            kind: report_only
+            before: null
+            after: null
+            declared_text: 'R1 C5 spec-taxonomy coverage becomes report-only'
+          - step_id: R2
+            position: 2
+            constraint_id: P2
+            kind: threshold
+            before: '3'
+            after: '2'
+            declared_text: 'R2 P2 minimum established source groups 3 -> 2'
+          - step_id: R3
+            position: 3
+            constraint_id: P1
+            kind: threshold
+            before: 'ceil(n/2)'
+            after: 'ceil(2n/3)'
+            declared_text: 'R3 P1 sole-support cap ceil(n/2) -> ceil(2n/3)'
+          - step_id: R4
+            position: 4
+            constraint_id: D1
+            kind: threshold
+            before: '3'
+            after: '2'
+            declared_text: 'R4 D1 minimum assay kinds 3 -> 2'
+          - step_id: R5
+            position: 5
+            constraint_id: P3
+            kind: threshold
+            before: '2'
+            after: '3'
+            declared_text: 'R5 P3 single-high-throughput cap 2 -> 3'
+          - step_id: R6
+            position: 6
+            constraint_id: D2
+            kind: threshold
+            before: '2'
+            after: '1'
+            declared_text: 'R6 D2 minimum model systems 2 -> 1'
+          - step_id: R7
+            position: 7
+            constraint_id: P2
+            kind: threshold
+            before: '2'
+            after: '1'
+            declared_text: 'R7 P2 minimum established source groups -> 1 (terminal)'
+      rung_evaluation:
+        rule: >-
+          constraints_at_level(contract, level=L, n=n) sets rung = LEVELS.index(L)
+          over LEVELS = (L0, R1, R2, R3, R4, R5, R6, R7), starts from
+          contract.base_thresholds, then applies EVERY relaxation_step whose
+          position <= rung in ascending position order, last-write-wins per
+          constraint_id, and finally evaluates each surviving expression at n. C5 is
+          gating iff rung == 0. applied_steps is exactly the step_ids with
+          position <= rung, ascending.
+        cumulative_not_exclusive: >-
+          Rungs are CUMULATIVE, never exclusive: at R7 every earlier concession is
+          still in force, which is why P2 goes 3 -> 2 (R2) -> 1 (R7) and both steps
+          appear in applied_steps. An implementation that applies only the newest
+          step, or that resets to the base at each level, produces a stricter panel
+          than the protocol allows and is wrong even though every individual value
+          it uses is a real protocol value.
+        constraints_never_relaxed_by_the_ladder: >-
+          C3 and D3 keep ceil(n/2) at EVERY rung; C1, C2, C4 and D4 keep their
+          declared logic at every rung; eligibility E1-E8 and the firewall are
+          outside the ladder entirely. No step may introduce a constraint id that is
+          not in base_thresholds.
+        expected_values:
+          note: >-
+            The complete evaluated table, as expressions. Every value is a function
+            of n only; nothing references N_selected. RED tests instantiate it at
+            several n rather than restating it.
+          L0: {C3: 'ceil(n/2)', D1: '3', D2: '2', D3: 'ceil(n/2)', P1: 'ceil(n/2)', P2: '3', P3: '2', c5_enforced: true}
+          R1: {C3: 'ceil(n/2)', D1: '3', D2: '2', D3: 'ceil(n/2)', P1: 'ceil(n/2)', P2: '3', P3: '2', c5_enforced: false}
+          R2: {C3: 'ceil(n/2)', D1: '3', D2: '2', D3: 'ceil(n/2)', P1: 'ceil(n/2)', P2: '2', P3: '2', c5_enforced: false}
+          R3: {C3: 'ceil(n/2)', D1: '3', D2: '2', D3: 'ceil(n/2)', P1: 'ceil(2n/3)', P2: '2', P3: '2', c5_enforced: false}
+          R4: {C3: 'ceil(n/2)', D1: '2', D2: '2', D3: 'ceil(n/2)', P1: 'ceil(2n/3)', P2: '2', P3: '2', c5_enforced: false}
+          R5: {C3: 'ceil(n/2)', D1: '2', D2: '2', D3: 'ceil(n/2)', P1: 'ceil(2n/3)', P2: '2', P3: '3', c5_enforced: false}
+          R6: {C3: 'ceil(n/2)', D1: '2', D2: '1', D3: 'ceil(n/2)', P1: 'ceil(2n/3)', P2: '2', P3: '3', c5_enforced: false}
+          R7: {C3: 'ceil(n/2)', D1: '2', D2: '1', D3: 'ceil(n/2)', P1: 'ceil(2n/3)', P2: '1', P3: '3', c5_enforced: false}
+      prohibitions:
+        no_registration_constraints_read: >-
+          NOTHING in the selector may read registration["constraints"],
+          registration.get("constraints") or any nested key beneath it. The frozen
+          registration has no such field; inventing one, defaulting it, or asking
+          for it to be added to the registration are all forbidden. A read of that
+          key anywhere in panel.py is a spec violation even if it is never reached.
+        no_runtime_markdown_parse: >-
+          The protocol Markdown is HASHED at run time (V1) and NEVER parsed. No
+          table scraper, no regex over section 13.2 or 17.5, no line splitting, no
+          heading walk. Selection must not depend on prose formatting that a
+          non-semantic edit could break -- and V1 already guarantees the bytes match
+          the version this table is pinned to.
+        no_frozen_artifact_edit: >-
+          This seam is closed in the SPEC and the implementation only. The protocol,
+          the registration, every lock and every data record stay byte-identical. A
+          repair that amends the frozen registration to add thresholds is explicitly
+          rejected: it would edit an authority to suit its executor.
+      call_site: >-
+        materialize_constraint_contract runs ONCE per run, inside select_panel,
+        AFTER verify_preconditions returns a PreconditionReport (so the protocol
+        hash it is keyed to is the verified one) and BEFORE the first attempt is
+        enumerated. run_attempt_schedule receives the resulting ConstraintContract
+        and calls constraints_at_level per (level, n); complete_search receives only
+        the evaluated ActiveConstraints and never sees the registration, the
+        contract or the protocol. The contract is threaded, never re-materialized
+        mid-run, so every attempt in a run provably shares one constraint source.
     completeness_requirement: >-
       complete_search is an EXHAUSTIVE depth-first search with backtracking over
       the full eligible pool, pruning ONLY on hereditary constraints (C3, D3, P1,
@@ -1072,9 +1427,31 @@ run_record:
       candidate-bearing CONTENT is never copied into the run record.
     procedure: >-
       selection_seed, search_scope, search_node_budget (and any lowered override),
-      declared constraint set, attempt_log (per level and n with status and
-      nodes_expanded), applied relaxation steps, independence_status,
-      terminal_outcome.
+      declared_constraints (see declared_constraints_shape), attempt_log (per level
+      and n with status and nodes_expanded), applied relaxation steps,
+      independence_status, terminal_outcome.
+    declared_constraints_shape:
+      added_in: rev4
+      rule: >-
+        declared_constraints is the CANONICAL MATERIALIZED SET, rendered from the
+        ConstraintContract that the run actually used. It is NEVER
+        registration.get("constraints") -- that key does not exist, and rendering it
+        wrote a null "declared constraint set" into a run record that claimed to be
+        a complete audit. A run record whose declared_constraints is null, absent or
+        empty is invalid and the CLI refuses to write it.
+      fields:
+        protocol_version: 'the version the contract was keyed to'
+        protocol_doc_hash: 'the V1-verified doc hash the contract was keyed to'
+        base_thresholds: 'the L0 expressions, as expressions (C3, D1, D2, D3, P1, P2, P3)'
+        explicit_logic_constraints: 'the ids evaluated as coded predicates (C1, C2, C4, C5, D4, H1, H2, H3)'
+        declared_ladder: 'the seven registration strings verbatim, exactly as validated'
+        relaxation_steps: 'the structured entries (step_id, position, constraint_id, kind, before, after)'
+        levels_evaluated: 'per attempted (level, n): the full ActiveConstraints integer set actually enforced'
+      why_evaluated_values_too: >-
+        An auditor must be able to re-derive every attempt without re-running the
+        selector or re-reading this spec. Expressions alone would leave the reader
+        to recompute ceil() by hand; evaluated values alone would hide which rung
+        each number came from. Both are recorded, and they must agree.
     result: >-
       n_target, n_selected, selected members, per-stratum coverage, auxiliary
       secondary-stratum table, spec_taxonomy_coverage, recomputed lineage groups
@@ -1276,6 +1653,42 @@ decision_cards:
       module-level mapper default; PS-M-009 asserts a missing lock terminates the
       run rather than degrading it; PS-R-009 asserts the replay compares against
       the MAP, not the universe.
+  - id: DC-12
+    added_in: rev4
+    title: Where the Section-17 numeric thresholds come from
+    options:
+      - 'A: amend the frozen registration to add a constraints mapping and read it (what the code assumed existed)'
+      - 'B: parse the protocol Markdown tables (sections 13.2 / 17.5) at run time'
+      - 'C: default or skip a missing threshold so the search proceeds'
+      - 'D: a CLOSED canonical table in source, keyed by the exact supported protocol version AND the V1-verified protocol_doc_hash, with the registration ladder validated by exact seven-string equality'
+    chosen: D
+    rationale: >-
+      The thresholds are protocol-owned and the registration simply does not carry
+      them; the executor has to get them from somewhere, and three of the four
+      sources are corrupt. A edits an authority to suit its executor and silently
+      invalidates every run record produced before the amendment. B makes selection
+      depend on prose formatting, so a non-semantic edit to a Markdown table could
+      change a panel, and it re-reads bytes V1 has already proved. C fabricates a
+      rule -- and is exactly how attempt 4's None became a crash rather than a
+      silent wrong answer; the crash was the good outcome. D keeps the values where
+      the protocol put them while making them unable to outlive it: V1 recomputes
+      the doc hash from disk, so one changed byte retires the whole table and stops
+      the run.
+    tradeoffs: >-
+      A protocol amendment now requires a matching spec revision before any run can
+      execute -- deliberately, since that review is the thing that would have caught
+      this seam. The seven ladder strings must be kept in sync too, which is why
+      they are an exact comparand with a named error rather than a parsed input.
+    inversion: >-
+      Someone "simplifies" the table by dropping the hash key and keeping only the
+      version, or adds a nearest-version fallback, so an amended protocol keeps
+      running with retired caps.
+    falsifier: >-
+      PS-A-008(2) requires CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL for a bumped
+      version and for a single flipped hex digit; PS-A-008(3) requires
+      RELAXATION_LADDER_DRIFT for every drift shape; PS-X-001 requires that panel.py
+      never reads a registration constraints key and never parses the protocol
+      Markdown.
 
 # ---------------------------------------------------------------------------
 # K. Test contract (Gemini writes these RED, before implementation)
@@ -1539,21 +1952,57 @@ test_contract:
         asserts: 'INFEASIBLE_COMPLETE is returned only after the space is exhausted with nodes_expanded < budget.'
       - id: PS-A-008
         asserts: >-
-          ADVERSARIAL -- search-scope guard: a registration fixture whose
+          ADVERSARIAL -- registration-shape guards, all fired BEFORE any attempt
+          runs. (1) SEARCH SCOPE: a registration fixture whose
           search_parameters.search_scope is anything other than
           "full_eligible_universe", or whose stratum_shortlist_size is non-null,
-          raises AtlasPanelRegistrationError(UNSUPPORTED_SEARCH_SCOPE) before any
-          attempt runs. The executor must not silently narrow the search space,
-          and must not run a full search while reporting a narrowed scope.
+          raises AtlasPanelRegistrationError(UNSUPPORTED_SEARCH_SCOPE). The executor
+          must not silently narrow the search space, and must not run a full search
+          while reporting a narrowed scope.
+          (2) PROTOCOL BINDING (rev 4): materialize_constraint_contract with a
+          protocol version or doc hash outside the supported binding raises
+          AtlasPanelRegistrationError(CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL);
+          separate cases for a bumped version with the pinned hash, the pinned
+          version with one flipped hex digit, and a missing
+          registration.protocol_version. No nearest-match or fallback table exists.
+          (3) LADDER DRIFT (rev 4): every drift shape raises
+          AtlasPanelRegistrationError(RELAXATION_LADDER_DRIFT) naming the first
+          differing position -- one string deleted, one appended, two swapped, the
+          whole list reversed, a single character edited, a single space added,
+          "->" respelled, case changed, the list emptied, the key absent, a
+          non-list value, and a list containing a non-string. None is repaired,
+          re-sorted or partially honoured. A drifted ladder must NEVER be
+          "corrected" to the pinned strings.
+          (4) NO SYNTHETIC FIELD: a fixture that ADDS a constraints mapping to the
+          registration must change nothing -- the contract is materialized
+          identically and the added field is never read.
     outcomes:
       - id: PS-O-001
-        asserts: 'schedule order is level-major, size-descending; a smaller panel at L0 beats a larger relaxed one.'
+        asserts: >-
+          schedule order is level-major, size-descending; a smaller panel at L0
+          beats a larger relaxed one. REV 4 -- constraints_at_level is exercised
+          across the WHOLE table: for every level L0,R1..R7 and for several attempt
+          sizes n (at least the schedule's minimum, an odd n and an even n), every
+          ActiveConstraints field equals the protocol value, derived independently
+          in the test from base + cumulative steps rather than copied from the
+          implementation. Anchors the test must pin: C3 and D3 stay ceil(n/2) at
+          every rung; c5_enforced is true only at L0; P1 moves ceil(n/2) ->
+          ceil(2n/3) at R3 and stays; D1 3 -> 2 at R4; P3 2 -> 3 at R5; D2 2 -> 1 at
+          R6; and P2 is CUMULATIVE 3 -> 2 (R2) -> 1 (R7), with applied_steps at R7
+          containing all seven ids in ascending order.
       - id: PS-O-002
         asserts: 'ADVERSARIAL -- an UNDETERMINED attempt at L0 terminates the run UNDETERMINED_SEARCH_INCOMPLETE with ZERO relaxation steps applied.'
       - id: PS-O-003
         asserts: 'all attempts INFEASIBLE_COMPLETE at every level -> INFEASIBLE_PANEL, complete record still emitted, zero selected members.'
       - id: PS-O-004
-        asserts: 'any level > L0 stamps independence_status RELAXED and records the step with before/after values.'
+        asserts: >-
+          any level > L0 stamps independence_status RELAXED and records the step
+          with before/after values. REV 4 -- the recorded before/after come from the
+          structured RelaxationStep entries, so a relaxed run records R3 as P1
+          ceil(n/2) -> ceil(2n/3) and not as prose; a run that reaches R7 records
+          BOTH P2 steps, proving cumulative application; and a step whose
+          before-value does not equal the value actually in force at position-1 is a
+          contract error, never silently accepted.
       - id: PS-O-005
         asserts: 'never_relaxed items (E1-E8, firewall, C1/C2/C4, anti-proxy, dedupe, unknown pooling, undetermined-relaxation) are unreachable by the ladder.'
       - id: PS-O-006
@@ -1572,7 +2021,19 @@ test_contract:
       - id: PS-D-004
         asserts: 'the CLI refuses to overwrite an existing run-record path.'
       - id: PS-D-005
-        asserts: 'flags include independence_status, spec_taxonomy_coverage, ABSTENTION_CONTROL_MISSING, UNDETERMINED_SEARCH_INCOMPLETE, INFEASIBLE_PANEL, X5 attrition, lineage_unknown_*, label_function_discordant, stale_label_discordant, unresolved_identity_count.'
+        asserts: >-
+          flags include independence_status, spec_taxonomy_coverage,
+          ABSTENTION_CONTROL_MISSING, UNDETERMINED_SEARCH_INCOMPLETE,
+          INFEASIBLE_PANEL, X5 attrition, lineage_unknown_*,
+          label_function_discordant, stale_label_discordant,
+          unresolved_identity_count. REV 4 -- the record's declared_constraints
+          block is present and complete for EVERY terminal outcome (including
+          INFEASIBLE_PANEL and UNDETERMINED_SEARCH_INCOMPLETE): non-null, carrying
+          the protocol version and doc hash, the base expressions, the seven
+          validated ladder strings, the structured steps, and the evaluated
+          ActiveConstraints of every attempted (level, n). A null or absent
+          declared_constraints is a hard failure, and its evaluated values must
+          agree with its expressions.
     property_and_metamorphic:
       - id: PS-P-001
         kind: determinism
@@ -1588,7 +2049,13 @@ test_contract:
         asserts: 'canonical_content_hash(pack_manifest, self_key="pack_content_hash") == pack.pack_content_hash(pack_manifest).'
       - id: PS-P-005
         kind: property
-        asserts: 'for randomized synthetic pools, any returned solution satisfies every active constraint (validated by an independent checker function).'
+        asserts: >-
+          for randomized synthetic pools, any returned solution satisfies every
+          active constraint (validated by an independent checker function). REV 4 --
+          the checker takes the ActiveConstraints object for the (level, n) the
+          solution was found at and re-derives its own thresholds from the protocol
+          values; it never calls constraints_at_level, so an implementation that
+          evaluates a rung wrongly cannot validate itself.
       - id: PS-P-006
         kind: property
         asserts: 'for randomized tiny pools, complete_search returns SOLUTION iff a brute-force oracle finds one (completeness oracle).'
@@ -1600,7 +2067,16 @@ test_contract:
         asserts: 'the panel is invariant under permuting observation lists within a record and under reordering source_identifiers.'
     purity_and_adversarial:
       - id: PS-X-001
-        asserts: 'static AST scan: panel.py imports no network module and contains no os.environ/getenv, datetime.now/utcnow, time.time, input, print or argparse.'
+        asserts: >-
+          static AST scan: panel.py imports no network module and contains no
+          os.environ/getenv, datetime.now/utcnow, time.time, input, print or
+          argparse. REV 4 -- the same scan additionally proves (a) the string
+          literal "constraints" never appears as a subscript or .get() key on the
+          registration anywhere in panel.py, so the non-existent field can never be
+          read again; and (b) panel.py never opens, reads, splits, regexes or
+          otherwise PARSES the protocol Markdown -- the protocol path reaches only
+          the V1 hasher. Both are AST/source assertions, not runtime ones, so a
+          dead-but-present code path still fails.
       - id: PS-X-002
         asserts: 'assert_no_network_imports() and assert_atlas_import_boundary() stay CLEAN with panel.py present.'
       - id: PS-X-003
@@ -1632,7 +2108,17 @@ test_contract:
           the tracked registration resolves to universe lock v4 and identity-map
           lock v4, both self-verify, and the registration mirrors match the lock
           records field for field. Runs WITHOUT the external map (tracked artifacts
-          only), so it stays runnable in CI.
+          only), so it stays runnable in CI. REV 4 -- the same case pins the REAL
+          registration's constraint-relevant shape: registration.protocol_version
+          equals the supported binding; registration.relaxation_ladder is a list of
+          exactly seven strings equal, in order and character-for-character, to the
+          pinned comparand; the registration has NO constraints key at any depth;
+          and materialize_constraint_contract against the tracked registration plus
+          the recomputed protocol doc hash returns a complete ConstraintContract
+          whose declared_ladder round-trips to the registration's own list. This is
+          the case that would have caught the blocked attempt before it ran. It
+          asserts shape and equality only -- no candidate, no count, no panel, and
+          it still runs no search.
       - id: PS-I-002
         asserts: >-
           the real K5 delta for lock v4 is constructible and admissible, and its
@@ -1904,6 +2390,12 @@ deliberate_action:
       mitigation: 'rp6_effective_exclusion_contract.anchor_isolation + anchor_threading_rule + anchor_threading_falsifier; PS-R-007(b) re-runs the SAME map bundle under a different AnchorSpec with identical IM digests.'
     - inversion: RP6 accepts the declared exclusion_flags whenever the mapper code and the selector-derived anchor code disagree (override, union, or "declared wins"), so the check passes vacuously on the row it exists to catch.
       mitigation: 'conflict_precedence is fail-closed with UNIVERSE_CONTRACT_BREACH(RP6); comparison_rule demands exact singleton/empty equality; PS-R-007(c)/(d).'
+    - inversion: The missing Section-17 thresholds are "restored" by amending the frozen registration to add a constraints block, or by parsing the protocol Markdown at run time -- either way an authority is bent to fit its executor and every prior run record becomes unreproducible.
+      mitigation: 'constraint_contract.prohibitions forbids both explicitly; DC-12 records the rejected options; PS-X-001 proves no Markdown parse and no registration constraints read; PS-A-008(4) proves an added constraints field changes nothing.'
+    - inversion: The canonical thresholds are embedded as plain source constants, so protocol v1.0.5 keeps v1.0.4 caps and the search silently enforces retired numbers -- exactly the failure hardcoding_prohibition exists to prevent.
+      mitigation: 'the table is keyed by version AND V1-verified doc hash and fails closed with CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL on any other binding; PS-A-008(2) flips one hex digit and one version.'
+    - inversion: Rungs are applied exclusively rather than cumulatively (or reset to base at each level), so R7 quietly enforces P2 >= 3 or drops an earlier concession -- every value used is a real protocol value, so nothing looks wrong.
+      mitigation: 'rung_evaluation.cumulative_not_exclusive; PS-O-001 pins the full table at several n and requires applied_steps to hold all seven ids at R7; PS-O-004 requires both P2 steps recorded.'
   verification_of_this_plan:
     - 'This file is the ONLY file written in this worktree by the planner; git status shows exactly one modified path for rev 2.'
     - 'yaml.safe_load parses this file.'
