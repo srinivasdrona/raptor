@@ -2707,6 +2707,8 @@ def test_ps_r_007_exclusion_flags_and_duplicate_collapse(tmp_path: Path) -> None
         on_universe=conflict_universe,
     )
 
+    import copy
+
     class ConflictMapper:
         def __init__(self, real_mapper):
             self.real_mapper = real_mapper
@@ -2714,12 +2716,18 @@ def test_ps_r_007_exclusion_flags_and_duplicate_collapse(tmp_path: Path) -> None
         def replay(self, raw_record_id: str, *args, **kwargs):
             base_replay = self.real_mapper.replay(raw_record_id, *args, **kwargs)
             if raw_record_id == "raw-rec-a":
-                # Inject a mapper-owned exclusion_code into a resolved replay
-                object.__setattr__(base_replay, "exclusion_code", "X1")
+                # Inject a mapper-owned exclusion_code into a resolved replay using a fresh object
+                fresh = copy.copy(base_replay)
+                object.__setattr__(fresh, "exclusion_code", "X1")
+                return fresh
             return base_replay
 
     inputs = conflict_world.inputs(anchor=matching_anchor)
     _, _, universe, raw_manifest, pack, real_mapper = _sut("_run_preconditions")(inputs)
+
+    # Capture the underlying target replay before the production helper call
+    original_replay = real_mapper.replay("raw-rec-a", f"p.Lys{61}Glu", "missense_substitution")
+    assert original_replay.exclusion_code is None
 
     replay_normalization = _sut("replay_normalization")
     AtlasUniverseContractError = _sut("AtlasUniverseContractError")
@@ -2734,6 +2742,11 @@ def test_ps_r_007_exclusion_flags_and_duplicate_collapse(tmp_path: Path) -> None
     assert getattr(raised, "code", "") == "UNIVERSE_CONTRACT_BREACH"
     assert getattr(raised, "check_id", "") == "RP6"
     assert "conflicts with the anchor-derived exclusion 'X3'" in str(raised)
+
+    # Assert the real mapper returns an equal/original replay afterward
+    post_replay = real_mapper.replay("raw-rec-a", f"p.Lys{61}Glu", "missense_substitution")
+    assert post_replay == original_replay
+    assert post_replay.exclusion_code is None
 
     stable = build_world(tmp_path / "stable")
     first = _preconditions(stable)
