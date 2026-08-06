@@ -85,9 +85,15 @@ as `NO_CALLS`/`NOT_ESTIMABLE`, missense benign as
 The record SHA-256 is
 `1e36b2d07767fdd8e32fbf07dd42f60a2b4cae2ff9b21c7dfb9430d741c5bc5f`.
 Its external manifest is
-`tsc_tiered_readjudication_2026-07-21.sha256`. Prospective validation is
-registered—but not completed—against the first eligible NCBI ClinVar GRCh38
-monthly archive dated on or after 2026-08-01.
+`tsc_tiered_readjudication_2026-07-21.sha256`.
+
+`tsc_prospective_validation_2026-08_blocked_data.json` records the locked
+prospective outcome. The exact preregistered August URL returned HTTP 404.
+The same filename was visible at a different archive-root URL, but substituting
+that location is prohibited by ADR-0013. No archive GET occurred; no bytes,
+labels, rows or scores were inspected; MD5 and SHA-256 remain unfrozen. The
+terminal status is `BLOCKED_DATA`, and all research/clinical authorization
+remains false.
 
 `tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json` (ADR-0012) is the
 packet-free, non-identifying binding census aggregate over the same
