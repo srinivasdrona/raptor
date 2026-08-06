@@ -24,6 +24,7 @@ import itertools
 import json
 import math
 import re
+import stat
 import unicodedata
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -261,6 +262,48 @@ def _reject_datetime_leak(value: Any, *, what: str) -> None:
             _reject_datetime_leak(item, what=what)
 
 
+def _verify_real_containment(repo_root: Path, candidate: Path, *, what: str) -> Path:
+    """Reject a tracked repo-relative artifact whose leaf is itself a
+    symlink/junction/reparse point, or whose fully filesystem-resolved real
+    path -- every existing path component followed, not only the leaf --
+    escapes ``repo_root``. A syntactic (lexical) ``..``-free check is not
+    sufficient: a Windows directory junction planted anywhere beneath
+    ``repo_root`` carries the reparse point on the ANCESTOR directory, not
+    on the leaf file reached through it, so the leaf itself is an ordinary
+    file with no reparse bit. ``Path.resolve(strict=True)`` follows every
+    such ancestor junction (or symlink, on any platform) to the true
+    external real path, which is what must be checked against ``repo_root``.
+    This mirrors ``citation.py``'s realpath-containment principle. A
+    candidate that does not exist anywhere along its path is returned
+    unchanged so the caller's own existence check reports the distinct,
+    already-typed missing-artifact fault instead of this one."""
+
+    try:
+        leaf_lstat = candidate.lstat()
+    except OSError:
+        return candidate
+    if stat.S_ISLNK(leaf_lstat.st_mode):
+        raise AtlasPanelInputError(
+            f"{what} path {candidate} must not be a symlink or junction", code="INPUT_FAULT",
+        )
+    reparse_bit = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    if reparse_bit and (getattr(leaf_lstat, "st_file_attributes", 0) & reparse_bit):
+        raise AtlasPanelInputError(
+            f"{what} path {candidate} must not be a reparse point/junction", code="INPUT_FAULT",
+        )
+    try:
+        real_root = repo_root.resolve(strict=True)
+        real_candidate = candidate.resolve(strict=True)
+    except OSError:
+        return candidate
+    if real_candidate != real_root and real_root not in real_candidate.parents:
+        raise AtlasPanelInputError(
+            f"{what} path {candidate} resolves to {real_candidate}, which escapes repo_root {real_root}",
+            code="INPUT_FAULT",
+        )
+    return candidate
+
+
 def _repo_relative_path(repo_root: Path, relative: Any, *, what: str) -> Path:
     if not isinstance(relative, str) or not relative.strip():
         raise AtlasPanelInputError(f"{what} path must be a non-empty string, got {relative!r}", code="INPUT_FAULT")
@@ -273,7 +316,7 @@ def _repo_relative_path(repo_root: Path, relative: Any, *, what: str) -> Path:
         raise AtlasPanelInputError(
             f"{what} path {relative!r} must not contain a '..' traversal segment", code="INPUT_FAULT",
         )
-    return repo_root / candidate
+    return _verify_real_containment(repo_root, repo_root / candidate, what=what)
 
 
 def _load_yaml_mapping(path: Path, *, what: str, schema_id: Optional[str] = None) -> Mapping[str, Any]:
@@ -809,6 +852,7 @@ def verify_identity_map(
     pack: DiseasePack,
     raw_inventory_path: Path,
     registration_active: Mapping[str, Any],
+    universe_lock: Mapping[str, Any],
 ) -> IdentityMapAttestation:
     """V7 (IM2-IM5 delegated to :func:`raptor.atlas.identity_map.load_identity_map`,
     which independently recomputes every self-hash, binding, and per-record
@@ -816,7 +860,10 @@ def verify_identity_map(
     existence/shape/self-hash and its mirror agreement with the
     registration) is verified independently by :func:`_load_and_verify_map_lock`
     and the two mirror checks below, so a mapper fault can never be masked
-    by -- or confused with -- a downstream binding mismatch."""
+    by -- or confused with -- a downstream binding mismatch. IM6 (the
+    universe lock's own ``identity_map_binding`` mirror) is verified last,
+    against this same independently-loaded ``map_lock``, so it can never be
+    satisfied by a value this function already trusted for some other check."""
 
     map_lock = _load_and_verify_map_lock(lock_path)
     if registration_active.get("lock_content_hash") != map_lock.get("lock_content_hash"):
@@ -856,6 +903,8 @@ def verify_identity_map(
     reference_binding = map_manifest.get("reference_binding") or {}
     pins = reference_binding.get("protein_reference_response_pins") or ()
 
+    _verify_identity_map_binding_on_universe_lock(universe_lock, map_manifest=map_manifest, map_lock=map_lock)
+
     return IdentityMapAttestation(
         lock_path=lock_path,
         lock_version=str(map_lock.get("lock_version")),
@@ -871,16 +920,25 @@ def verify_identity_map(
         reference_transcript=reference_binding.get("transcript"),
         reference_protein=reference_binding.get("protein"),
         reference_page_count=len(pins),
-        checks_passed=("IM1", "IM2", "IM3", "IM4", "IM5"),
+        checks_passed=("IM1", "IM2", "IM3", "IM4", "IM5", "IM6"),
         mapper=mapper,
     )
 
 
 def _verify_identity_map_binding_on_universe_lock(
-    lock: Mapping[str, Any], attestation: IdentityMapAttestation,
+    lock: Mapping[str, Any], *, map_manifest: Mapping[str, Any], map_lock: Mapping[str, Any],
 ) -> None:
-    """IM6: the universe lock's own ``identity_map_binding`` sub-object
-    must agree with the independently verified identity map."""
+    """IM6: the universe lock's own ``identity_map_binding`` sub-object must
+    agree, field-by-field, with the independently verified identity map --
+    ``schema``, ``map_id``, ``map_version``, ``map_content_hash`` mirror the
+    map MANIFEST (the map lock carries its own, distinct lock schema id, so
+    the manifest is the only correct comparand for these four); ``lock_id``,
+    ``lock_version``, ``lock_content_hash``, ``response_bundle_hash``, and
+    ``map_record_count`` mirror the map LOCK -- and its nested
+    ``pack_binding`` copy must agree with the universe lock's own
+    (K2/V4-verified) top-level ``pack_binding``; the redundant binding is
+    never allowed to disagree silently. ``map_created_at`` is non-governing
+    metadata and is deliberately excluded from comparison."""
 
     binding = lock.get("identity_map_binding")
     if not isinstance(binding, Mapping):
@@ -888,18 +946,26 @@ def _verify_identity_map_binding_on_universe_lock(
             "universe lock is missing an identity_map_binding", code="IDENTITY_MAP_MISMATCH", check_id="IM6",
         )
     mismatches = []
-    if binding.get("map_content_hash") != attestation.map_content_hash:
-        mismatches.append("map_content_hash")
-    if binding.get("lock_content_hash") != attestation.lock_content_hash:
-        mismatches.append("lock_content_hash")
-    if str(binding.get("map_version")) != attestation.map_version:
+    if binding.get("schema") != map_manifest.get("schema"):
+        mismatches.append("schema")
+    if binding.get("map_id") != map_manifest.get("map_id"):
+        mismatches.append("map_id")
+    if str(binding.get("map_version")) != str(map_manifest.get("map_version")):
         mismatches.append("map_version")
-    if str(binding.get("lock_version")) != attestation.lock_version:
+    if binding.get("lock_id") != map_lock.get("lock_id"):
+        mismatches.append("lock_id")
+    if str(binding.get("lock_version")) != str(map_lock.get("lock_version")):
         mismatches.append("lock_version")
-    if binding.get("response_bundle_hash") != attestation.response_bundle_hash:
+    if binding.get("map_content_hash") != map_manifest.get("map_content_hash"):
+        mismatches.append("map_content_hash")
+    if binding.get("lock_content_hash") != map_lock.get("lock_content_hash"):
+        mismatches.append("lock_content_hash")
+    if binding.get("response_bundle_hash") != map_lock.get("response_bundle_hash"):
         mismatches.append("response_bundle_hash")
-    if binding.get("map_record_count") != attestation.map_record_count:
+    if binding.get("map_record_count") != map_lock.get("map_record_count"):
         mismatches.append("map_record_count")
+    if dict(binding.get("pack_binding") or {}) != dict(lock.get("pack_binding") or {}):
+        mismatches.append("pack_binding")
     if mismatches:
         raise AtlasIdentityMapBindingError(
             f"universe lock identity_map_binding disagrees with the verified identity map: "
@@ -960,8 +1026,8 @@ def _run_preconditions(
         pack=pack,
         raw_inventory_path=inputs.raw_inventory_path,
         registration_active=identity_map_active,
+        universe_lock=lock,
     )
-    _verify_identity_map_binding_on_universe_lock(lock, attestation)
 
     # V6/U1-U6: full conservation semantics, run only after V7 has verified
     # clean.
@@ -1744,6 +1810,60 @@ def _build_flags(
     }
 
 
+def _stratum_coverage_tables(
+    dispositions: Sequence[RecordDisposition], *, selected_ids: Iterable[str],
+) -> tuple[dict, dict]:
+    """Section 18/protocol Section 11.3: per-stratum coverage counts a
+    selected member under its ``primary_stratum`` ONLY; every other stratum
+    a selected member also matches is preserved in the auxiliary
+    (secondary) stratum-match table, and never fills a coverage slot. Both
+    tables always name every taxonomy stratum, zero-count strata included,
+    so the table itself is proof of completeness rather than an artifact
+    of which strata happened to be non-empty."""
+
+    selected = set(selected_ids)
+    coverage = {stratum: 0 for stratum in OMEGA}
+    secondary = {stratum: 0 for stratum in OMEGA}
+    for row in dispositions:
+        if row.record_id not in selected:
+            continue
+        if row.primary_stratum in coverage:
+            coverage[row.primary_stratum] += 1
+        for stratum in row.all_matched_strata or ():
+            if stratum != row.primary_stratum and stratum in secondary:
+                secondary[stratum] += 1
+    return coverage, secondary
+
+
+def _discordance_block(dispositions: Sequence[RecordDisposition], *, attr: str) -> dict:
+    """Section 18/Result: ``label_function_discordant``/``stale_label_discordant``
+    must be reported as a count WITH the discordant ``spec_stratum`` x
+    ``primary_stratum`` cells named, not a bare boolean/count."""
+
+    flagged = [row for row in dispositions if getattr(row, attr)]
+    cells = sorted(
+        {(row.spec_stratum, row.primary_stratum) for row in flagged},
+        key=lambda cell: (cell[0] or "", cell[1] or ""),
+    )
+    return {
+        "count": len(flagged),
+        "cells": [{"spec_stratum": spec_stratum, "primary_stratum": primary_stratum} for spec_stratum, primary_stratum in cells],
+    }
+
+
+def _x5_attrition_block(dispositions: Sequence[RecordDisposition]) -> dict:
+    """Section 18/Result: X5 access-attrition counts and distribution --
+    published so it reads as dropped for access reasons and never as an
+    evidential exclusion (protocol Section 15.3)."""
+
+    x5_rows = [row for row in dispositions if row.disposition == "X5"]
+    distribution: dict[str, int] = {}
+    for row in x5_rows:
+        key = row.primary_stratum or "UNSTRATIFIED"
+        distribution[key] = distribution.get(key, 0) + 1
+    return {"count": len(x5_rows), "distribution": distribution}
+
+
 # ---------------------------------------------------------------------------
 # Orchestration: select_panel and render_run_record.
 # ---------------------------------------------------------------------------
@@ -1875,7 +1995,15 @@ def render_run_record(run: SelectionRun, *, inputs: SelectionInputs) -> dict:
     """Render a complete, JSON-safe run record for ``run``. Every
     :class:`~raptor.atlas.model.PreconditionReport` field name appears as a
     key of ``verified_digests``; ``lock_protocol_version_delta`` is always
-    rendered as a fully populated mapping."""
+    rendered as a fully populated mapping. The full Section 18 procedure/
+    result surface (``selection_seed``, ``search_scope``, the *configured*
+    node budget kept distinct from nodes actually expanded, declared
+    constraints, coverage/lineage/discordance/attrition tables) is
+    reconstructed here by re-loading the same caller-supplied,
+    hash-verified registration and universe artifacts ``run`` was already
+    produced from -- never a fresh clock/env/argv/network read -- so this
+    function can recompute a complete record without ``SelectionRun``
+    itself having to carry every intermediate value."""
 
     report = run.preconditions
     delta = report.lock_protocol_version_delta
@@ -1926,32 +2054,66 @@ def render_run_record(run: SelectionRun, *, inputs: SelectionInputs) -> dict:
         "checks_passed": list(report.checks_passed),
     }
 
-    node_budget = inputs.node_budget_override
-    if node_budget is None:
-        node_budget = max((attempt.nodes_expanded for attempt in run.attempts), default=None)
+    # Re-load (never trust-and-carry) the same caller-supplied, already
+    # hash-verified registration/universe artifacts ``run`` was produced
+    # from, purely to recompute the full Section 18 procedure/result
+    # surface. Both loaders read only the explicit paths on ``inputs``, so
+    # this remains free of any clock/env/argv/network access.
+    registration = load_selection_registration(inputs.registration_path)
+    universe = load_candidate_universe(inputs.universe_path)
+    lineage = recompute_lineage_index(universe)
+
+    # The configured node budget (registration's base value, or the
+    # validated, lower override) is kept distinct from the largest
+    # nodes_expanded actually observed across attempts -- conflating the
+    # two was the Section 18 defect this function now closes.
+    search_node_budget = _resolve_node_budget(registration, inputs.node_budget_override)
+    max_nodes_expanded = max((attempt.nodes_expanded for attempt in run.attempts), default=None)
+    attempt_log = [
+        {
+            "level": attempt.level,
+            "n": attempt.n,
+            "status": attempt.status,
+            "nodes_expanded": attempt.nodes_expanded,
+            "solution": list(attempt.solution) if attempt.solution else None,
+        }
+        for attempt in run.attempts
+    ]
     procedure = {
         "n_target": run.n_target,
-        "node_budget": node_budget,
+        "selection_seed": registration.get("selection_seed"),
+        "search_scope": (registration.get("search_parameters") or {}).get("search_scope"),
+        "search_node_budget": search_node_budget,
+        "node_budget": search_node_budget,
         "node_budget_override": inputs.node_budget_override,
-        "attempts": [
-            {
-                "level": attempt.level,
-                "n": attempt.n,
-                "status": attempt.status,
-                "nodes_expanded": attempt.nodes_expanded,
-                "solution": list(attempt.solution) if attempt.solution else None,
-            }
-            for attempt in run.attempts
-        ],
+        "max_nodes_expanded": max_nodes_expanded,
+        "declared_constraints": registration.get("constraints"),
+        "attempt_log": attempt_log,
+        "attempts": attempt_log,
         "applied_relaxation_steps": list(run.applied_relaxation_steps),
         "independence_status": run.independence_status,
+        "terminal_outcome": run.terminal_outcome,
     }
+
+    per_stratum_coverage, secondary_stratum_table = _stratum_coverage_tables(
+        run.dispositions, selected_ids=run.selected_record_ids,
+    )
     result = {
         "terminal_outcome": run.terminal_outcome,
         "n_target": run.n_target,
         "n_selected": run.n_selected,
         "selected_record_ids": list(run.selected_record_ids),
         "flags": dict(run.flags),
+        "per_stratum_coverage": per_stratum_coverage,
+        "secondary_stratum_table": secondary_stratum_table,
+        "spec_taxonomy_coverage": run.flags.get("spec_taxonomy_coverage"),
+        "lineage_groups": dict(lineage.group_confidence),
+        "lineage_unknown_observation_count": lineage.unknown_observation_count,
+        "lineage_unknown_record_count": lineage.unknown_record_count,
+        "label_function_discordant": _discordance_block(run.dispositions, attr="label_function_discordant"),
+        "stale_label_discordant": _discordance_block(run.dispositions, attr="stale_label_discordant"),
+        "unresolved_identity_count": run.flags.get("unresolved_identity_count"),
+        "x5_attrition": _x5_attrition_block(run.dispositions),
     }
     dispositions = [
         {
