@@ -1093,9 +1093,10 @@ def verify_preconditions(inputs: SelectionInputs) -> PreconditionReport:
 
 
 def replay_normalization(
-    universe: Mapping[str, Any], *, raw_manifest: Mapping[str, Any], mapper: RawIdentityMapper,
+    raw: Mapping[str, Any], universe: Mapping[str, Any], *, pack: Mapping[str, Any], mapper: RawIdentityMapper,
+    anchor: AnchorSpec,
 ) -> NormalizationReplay:
-    raw_rows = list(raw_manifest.get("rows") or ())
+    raw_rows = list(raw.get("rows") or ())
     ledger_by_id = {row.get("raw_record_id"): row for row in (universe.get("normalization_ledger") or ())}
     records_by_universe_key = {record.get("universe_key"): record for record in (universe.get("records") or ())}
 
@@ -1173,11 +1174,36 @@ def replay_normalization(
                 "and the verified replay",
                 code="UNIVERSE_CONTRACT_BREACH", check_id="RP5",
             )
-        expected_flags = [replay.exclusion_code] if replay.exclusion_code else []
-        if list(record.get("exclusion_flags") or ()) != expected_flags:
+        # Two owners can legitimately exclude a record; only the mapper is
+        # inside the locked map. MAPPER-OWNED identity/scope exclusion
+        # (unresolved X1, out-of-scope codes) is authoritative and never
+        # overridden. SELECTOR-OWNED anchor exclusion X3 depends on the
+        # caller-supplied, run-time AnchorSpec that an anchor-blind, pre-locked
+        # map cannot contain, so it is computed here, never taught to the
+        # mapper. A mapper exclusion on a resolved, anchor-matching replay is a
+        # same-row conflict between the two owners and fails closed.
+        anchor_match = replay.identity_state == "resolved" and (
+            replay.spdi_canonical == anchor.spdi_canonical
+            or (replay.residue_index is not None and replay.residue_index == anchor.residue_index)
+        )
+        if replay.exclusion_code is not None and anchor_match:
             raise AtlasUniverseContractError(
-                f"raw record {raw_record_id!r} exclusion_flags disagrees with the verified replay's "
-                "exclusion_code",
+                f"raw record {raw_record_id!r} mapper exclusion_code {replay.exclusion_code!r} conflicts "
+                "with the anchor-derived exclusion 'X3' for the same resolved replay",
+                code="UNIVERSE_CONTRACT_BREACH", check_id="RP6",
+            )
+        if replay.exclusion_code is not None:
+            effective_exclusion_code = replay.exclusion_code
+        elif anchor_match:
+            effective_exclusion_code = "X3"
+        else:
+            effective_exclusion_code = None
+        expected_flags = [effective_exclusion_code] if effective_exclusion_code is not None else []
+        declared_flags = list(record.get("exclusion_flags") or ())
+        if declared_flags != expected_flags:
+            raise AtlasUniverseContractError(
+                f"raw record {raw_record_id!r} declared exclusion_flags {declared_flags!r} disagrees with "
+                f"the effective exclusion code {effective_exclusion_code!r}",
                 code="UNIVERSE_CONTRACT_BREACH", check_id="RP6",
             )
 
@@ -1897,7 +1923,7 @@ def select_panel(inputs: SelectionInputs) -> SelectionRun:
     or mutated."""
 
     report, registration, universe, raw_manifest, pack, mapper = _run_preconditions(inputs)
-    replay = replay_normalization(universe, raw_manifest=raw_manifest, mapper=mapper)
+    replay = replay_normalization(raw_manifest, universe, pack=pack, mapper=mapper, anchor=inputs.anchor)
 
     lineage = recompute_lineage_index(universe)
     selection_seed = registration.get("selection_seed")
