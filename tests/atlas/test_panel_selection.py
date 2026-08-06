@@ -2698,8 +2698,8 @@ def test_ps_r_007_exclusion_flags_and_duplicate_collapse(tmp_path: Path) -> None
 
     def conflict_universe(universe: dict) -> None:
         r1 = universe["records"][0]
-        # Keep it resolved, but maliciously add multiple exclusion flags
-        r1["exclusion_flags"] = ["X1", "X3"]
+        # X1 would match the effective_exclusion_code if the conflict guard were missing
+        r1["exclusion_flags"] = ["X1"]
 
     conflict_world = build_world(
         tmp_path / "conflict",
@@ -2707,13 +2707,33 @@ def test_ps_r_007_exclusion_flags_and_duplicate_collapse(tmp_path: Path) -> None
         on_universe=conflict_universe,
     )
 
-    _expect(
-        conflict_world,
-        lambda: _select(conflict_world, anchor=matching_anchor),
-        error="AtlasUniverseContractError",
-        code="UNIVERSE_CONTRACT_BREACH",
-        check_id="RP6",
-    )
+    class ConflictMapper:
+        def __init__(self, real_mapper):
+            self.real_mapper = real_mapper
+
+        def replay(self, raw_record_id: str, *args, **kwargs):
+            base_replay = self.real_mapper.replay(raw_record_id, *args, **kwargs)
+            if raw_record_id == "raw-rec-a":
+                # Inject a mapper-owned exclusion_code into a resolved replay
+                object.__setattr__(base_replay, "exclusion_code", "X1")
+            return base_replay
+
+    inputs = conflict_world.inputs(anchor=matching_anchor)
+    _, _, universe, raw_manifest, pack, real_mapper = _sut("_run_preconditions")(inputs)
+
+    replay_normalization = _sut("replay_normalization")
+    AtlasUniverseContractError = _sut("AtlasUniverseContractError")
+    
+    with pytest.raises(AtlasUniverseContractError) as excinfo:
+        replay_normalization(
+            raw_manifest, universe, pack=pack,
+            mapper=ConflictMapper(real_mapper), anchor=matching_anchor
+        )
+    
+    raised = excinfo.value
+    assert getattr(raised, "code", "") == "UNIVERSE_CONTRACT_BREACH"
+    assert getattr(raised, "check_id", "") == "RP6"
+    assert "conflicts with the anchor-derived exclusion 'X3'" in str(raised)
 
     stable = build_world(tmp_path / "stable")
     first = _preconditions(stable)
