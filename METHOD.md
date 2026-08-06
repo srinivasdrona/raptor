@@ -146,11 +146,18 @@ Some integration tests require external reference data or optional dependencies 
 fail or skip when those preconditions are absent. A green subset is not represented as a green
 full-system validation.
 
-## What remains manual
+## Control-plane status
 
 The core loop is enforced by convention, frozen artifacts, tests, and independent review rather
-than a fully automated orchestration service. The checker/doer family separation is live; much of
-the remaining control plane is not. Trace-cribbing lint, checker mutation probes, post-merge random
-audits, source refresh/drift invalidation, prospective validation, and molecular-geneticist
-adjudication are planned or pending, not live controls. Their absence is recorded explicitly rather
-than hidden behind a release label.
+than a fully automated orchestration service. Controls are reported in four distinct states:
+
+| Status | Controls |
+|---|---|
+| **Live** | Checker/doer family separation; protected acceptance tests and preservation checks; label-blind scoring with targeted forbidden-import and predictor-leakage audits; hash-bound drift detection that rejects changed registered sources, configs, and artifacts. |
+| **Pending execution** | Molecular-geneticist adjudication remains pending until a named qualified reviewer evaluates the prepared evidence. |
+| **Blocked outcome** | The ADR-0013 August prospective-validation contract resolved to `BLOCKED_DATA`: its exact frozen URL returned 404, no alternate URL was substituted, and no archive bytes, labels or scores were accessed. Any future attempt requires a new explicit preregistration. |
+| **Planned** | A generalized trace-cribbing lint beyond the targeted audits, checker mutation probes, post-merge random audits, automated source refresh, and a fully automated orchestration service. |
+
+“Pending execution” means a defined gate is waiting on its required actor. “Planned” means the
+control itself is not implemented. A blocked outcome is retained as a result rather than relabelled
+as pending, and none of these states is presented as a live release control.
