@@ -86,10 +86,10 @@
     `PENDING_PROSPECTIVE`.
   - `full_spectrum_status=NOT_VALIDATED`, `full_spectrum_authorization=NOT_AUTHORIZED`;
     `research_scope_flags.truncating_pathogenic_research_scope_validated=false`.
-- **Prospective validation (locked, not yet run):** the first eligible NCBI ClinVar GRCh38
-  `variant_summary` monthly archive dated on/after 2026-08-01, frozen (URL/date/MD5/SHA-256) before
-  labels or scoring. If unavailable/invalid, status is `BLOCKED_DATA` — no outcome-dependent
-  substitute. `prospective_validation_status=PENDING`.
+- **Prospective validation:** **`BLOCKED_DATA`**. The exact locked August ClinVar URL returned
+  404. The same filename existed at a different archive-root URL, but no outcome-dependent
+  substitute was permitted. No archive bytes, labels, rows, hashes or scores were accessed;
+  research-scope authorization remains `PENDING_PROSPECTIVE` and the validated flag remains false.
 - **What this does and does not authorize:** v3 corrects how the frozen R2 result is *described*
   (separating insufficient-data from failure from policy-exclusion); it authorizes no clinical
   classification, VUS worklist, ClinVar submission, or research scope. Only a future prospective run
@@ -129,11 +129,13 @@ pending `STRATEGY.md` Part II §10 — ADR-0003.)*
   (see census section above); candidate directions **not** classifications
 - Tier 3 (LLM Extraction): 🔴 NOT STARTED (Phase 2)
 - Consensus/Adjudication: 🔴 NOT STARTED
-- Validation Framework: 🟡 **EXECUTED — R2 FAIL/BLOCKED_POLICY; v3 POST-HOC RE-ADJUDICATED**
+- Validation Framework: 🟡 **EXECUTED — R2 FAIL/BLOCKED_POLICY; v3 PROSPECTIVE BLOCKED_DATA**
   (canonical BIAS adapter; ClinVar masker/auditor; exact 95% Clopper-Pearson lower-bound,
   per-direction/per-stratum gate; fail-closed predictor-policy prerequisite; ADR-0013 tiered axes) —
-  *masked resources scored once; v3 separates data sufficiency from failure but authorizes nothing;
-  prospective validation `PENDING`*
+  *masked resources scored once; v3 separates data sufficiency from failure but authorizes nothing.
+  The August prospective contract resolved to `BLOCKED_DATA` because its exact frozen URL returned
+  404; no archive content, labels or scores were accessed, and the alternate live URL was not
+  substituted.*
 - **Non-authoritative expert-review packet generation and molecular-geneticist recruitment:** 🟡
   **ACTIVE** — packet generation continues as internal review preparation only; oracle recruitment
   (GP-3) is open (see Active Decisions & Bottlenecks)

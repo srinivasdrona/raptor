@@ -128,6 +128,11 @@ scoring occur — this is a **pre-registration**, not a result. If that archive 
 invalid, status is `BLOCKED_DATA`; no outcome-dependent substitute is permitted. Until that run
 completes, every v3 scope's authorization remains `PENDING_PROSPECTIVE` or `NOT_AUTHORIZED`.
 
+**Prospective outcome (2026-08-06):** `BLOCKED_DATA`. The exact frozen August URL returned HTTP
+404. A same-named file existed at a different archive-root URL, but the locked contract forbids
+substitution. No archive bytes, labels, rows, hashes or scores were accessed. See
+[`data/census/tsc_prospective_validation_2026-08_blocked_data.json`](../data/census/tsc_prospective_validation_2026-08_blocked_data.json).
+
 <a id="evaluation-benchmark"></a>
 ### 2. The frozen benchmark (ground truth — honestly, *proxy* labels)
 
@@ -491,3 +496,7 @@ frozen *before* labels or scoring. Unavailable/invalid data yields `BLOCKED_DATA
 outcome-dependent substitute. Until that run completes and clears the unchanged §1 thresholds on
 unseen data, `research_scope_flags.truncating_pathogenic_research_scope_validated` remains `false`
 and no scope is authorized.
+
+That contract resolved to `BLOCKED_DATA` on 2026-08-06: the exact preregistered URL returned 404,
+and the same filename at a different URL was not substituted. No archive content or labels were
+downloaded.

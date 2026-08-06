@@ -174,8 +174,13 @@ todos:
   description: Freeze and evaluate the first NCBI ClinVar GRCh38 variant_summary monthly
     archive dated on or after 2026-08-01 under the locked ADR-0013 axes, thresholds, scope
     lattice and criterion map. Freeze URL/date/MD5/SHA-256 before labels or scoring; if
-    unavailable or invalid, record BLOCKED_DATA with no outcome-dependent fallback.
-  status: pending
+    unavailable or invalid, record BLOCKED_DATA with no outcome-dependent fallback. Completed
+    2026-08-06 as BLOCKED_DATA; the exact frozen URL returned HTTP 404. The same filename was
+    visible at a different archive-root URL, but it was not substituted. No archive GET, content
+    hash, label inspection, benchmark derivation or scoring occurred. Evidence is recorded in
+    data/census/tsc_prospective_validation_2026-08_blocked_data.json; all authorization remains
+    false.
+  status: done
   depends_on:
   - revise-tiered-gate-semantics
   created: '2026-07-22'
@@ -605,8 +610,10 @@ todos:
     policy/config hashes, evaluation artifact and limitations. If the registered archive is
     unavailable or invalid, link the attempted URL and recorded unavailability/invalidity
     evidence instead. Do not publish before the registered outcome is determined, do not
-    substitute a weekly XML release, and do not imply authorization beyond the recorded gate.'
-  status: pending
+    substitute a weekly XML release, and do not imply authorization beyond the recorded gate.
+    The determined outcome is BLOCKED_DATA; publish the transport-evidence record and explicitly
+    state that the alternate live URL was not used and no archive bytes were accessed.'
+  status: in_progress
   depends_on:
   - validate-tiered-gate-prospectively
   created: '2026-07-31'

@@ -381,6 +381,10 @@ official date, MD5 and SHA-256 must be frozen before labels or scoring. If that
 archive is unavailable or invalid, status is `BLOCKED_DATA`; no
 outcome-dependent substitute is allowed.
 
+**Recorded outcome (2026-08-06):** `BLOCKED_DATA`. The exact preregistered URL
+returned HTTP 404. A same-named archive at a different URL was not substituted.
+No archive bytes, labels, rows or scores were accessed.
+
 ### Consequences
 
 - R2 and all v1/v2 code and records remain byte-identical.

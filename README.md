@@ -28,7 +28,7 @@ Public progress posts:
 | R2 masked BIAS score (ADR-0012, `disabled_manual`) | 2,577 canonical rows; zero PP3/BP4 scored calls |
 | v1/v2 frozen interpretation | `FAIL` (coarse missense gate) / `BLOCKED_POLICY`; `vus_authorized=false` (immutable) |
 | v3 tiered re-adjudication (ADR-0013, post-hoc) | missense pathogenic `NO_CALLS`/`NOT_ESTIMABLE`; missense benign `UNDERPOWERED`/`NOT_ESTIMABLE`; truncating pathogenic `ADEQUATE`+`MET`/`SUPPORTED_POSTHOC`; full spectrum `NOT_VALIDATED`/`NOT_AUTHORIZED` |
-| Prospective validation | `PENDING` — locked to the first NCBI ClinVar GRCh38 monthly archive dated on/after 2026-08-01, frozen before labels/scoring |
+| Prospective validation | **`BLOCKED_DATA`** — the exact preregistered August archive URL returned 404; no archive bytes, labels, or scores were accessed, and the live alternate URL was not substituted |
 | VUS / research-scope authorization | **No** — canonical validated research-scope flag remains `false` |
 | Mechanism Atlas source catalog | Five resolver-verified grounding sources plus seven mechanically non-grounding leads; public identifiers, licences and hashes are committed |
 | `$TSC2$` `$p.\mathrm{Arg611Gln}$` deterministic pass | Two exact spans passed Gates 1–7; Gate 8 blocked for missing named review; zero accepted claims |

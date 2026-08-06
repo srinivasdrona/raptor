@@ -1,0 +1,57 @@
+{
+  "schema": "raptor.eval.prospective_validation_blocked.v1",
+  "recorded_at": "2026-08-06T22:05:31.2932371Z",
+  "status": "BLOCKED_DATA",
+  "reason": "The exact preregistered archive URL returned HTTP 404. The same filename was observed at a different URL, but the locked contract prohibits substituting or editing the registered dataset location after preregistration.",
+  "registered_dataset": {
+    "rule": "The first NCBI ClinVar GRCh38 variant_summary monthly archive whose official archive date is on or after 2026-08-01.",
+    "snapshot": "clinvar_2026-08-01",
+    "filename": "variant_summary_2026-08.txt.gz",
+    "frozen_url": "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary/variant_summary_2026-08.txt.gz",
+    "frozen_url_http_status": 404,
+    "official_md5": "UNFROZEN_BLOCKED_DATA",
+    "official_sha256": "UNFROZEN_BLOCKED_DATA"
+  },
+  "transport_evidence": {
+    "method": "FTP directory listing plus HTTP HEAD requests only",
+    "ftp_directory": "ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/",
+    "ftp_listing_contains_registered_filename": true,
+    "frozen_url_observed_at": "2026-08-06T22:05:31Z",
+    "frozen_url_http_status": 404,
+    "alternate_url": "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08.txt.gz",
+    "alternate_url_observed_at": "2026-08-06T22:05:32Z",
+    "alternate_url_http_status": 200,
+    "alternate_url_last_modified": "2026-08-06T04:05:02Z",
+    "alternate_url_content_length": 441792560,
+    "alternate_url_used_as_dataset": false
+  },
+  "data_access_attestation": {
+    "archive_get_requested": false,
+    "archive_content_downloaded": false,
+    "archive_bytes_hashed": false,
+    "labels_inspected": false,
+    "rows_inspected": false,
+    "benchmark_derived": false,
+    "scoring_performed": false,
+    "outcome_dependent_fallback_used": false
+  },
+  "contract_pins": {
+    "tiered_config_path": "configs/eval/tiered_gate_v3.yaml",
+    "tiered_config_canonical_sha256": "eb4fad80c5da514c61a3bb2fd426b0771142a2a3d582e8054971bbd7da62d840",
+    "prior_record_path": "data/census/tsc_tiered_readjudication_2026-07-21.json",
+    "prior_record_content_hash": "46e797d4a5db20eae8ff32d369b689ca8b6d63f5ef404b0bdde3edc3122ec7bc",
+    "source_content_hash": "2ead589d2f129f988d9932bb01153891902f0d675000554887a1524e567413b2",
+    "source_canonical_lf_sha256": "7c55cd4e3059713d1d53886d8893a3819153375b62ce9d37187d731132c6a77f"
+  },
+  "authorization": {
+    "full_spectrum_status": "NOT_VALIDATED",
+    "full_spectrum_authorization": "NOT_AUTHORIZED",
+    "research_scope_evidence_status": "SUPPORTED_POSTHOC",
+    "research_scope_authorization": "PENDING_PROSPECTIVE",
+    "research_scope_validated": false,
+    "clinical_classification_authorized": false,
+    "vus_worklist_authorized": false,
+    "clinvar_submission_authorized": false
+  },
+  "next_action_boundary": "The alternate root URL may be used only under a new explicit amendment and preregistration completed before any archive GET. It cannot repair or replace this blocked outcome."
+}
