@@ -1142,7 +1142,25 @@ def replay_normalization(
                 "and the verified replay",
                 code="UNIVERSE_CONTRACT_BREACH", check_id="RP3",
             )
-        for field in ("spdi_canonical", "hgvs_c", "hgvs_p", "transcript_pin", "residue_index", "codon_index"):
+        for field in ("spdi_canonical", "hgvs_c", "hgvs_p"):
+            if getattr(replay, field) != record.get(field):
+                raise AtlasUniverseContractError(
+                    f"raw record {raw_record_id!r} field {field!r} disagrees between the candidate "
+                    "universe and the verified replay",
+                    code="UNIVERSE_CONTRACT_BREACH", check_id="RP4",
+                )
+        # Transcript identity is pinned once, at the universe's top level, not
+        # per record -- a resolved record must replay the frozen universe-wide
+        # transcript_pin; an unresolved record must never carry a fabricated
+        # transcript identity and must replay as None.
+        expected_transcript_pin = universe.get("transcript_pin") if replay.identity_state == "resolved" else None
+        if replay.transcript_pin != expected_transcript_pin:
+            raise AtlasUniverseContractError(
+                f"raw record {raw_record_id!r} field 'transcript_pin' disagrees between the candidate "
+                "universe and the verified replay",
+                code="UNIVERSE_CONTRACT_BREACH", check_id="RP4",
+            )
+        for field in ("residue_index", "codon_index"):
             if getattr(replay, field) != record.get(field):
                 raise AtlasUniverseContractError(
                     f"raw record {raw_record_id!r} field {field!r} disagrees between the candidate "
