@@ -35,6 +35,7 @@ import yaml
 
 from raptor.atlas.identity_map import AtlasIdentityMapError, load_identity_map
 from raptor.atlas.model import (
+    ActiveConstraints,
     AnchorSpec,
     AtlasIdentityMapAmbiguityError,
     AtlasIdentityMapBindingError,
@@ -46,6 +47,7 @@ from raptor.atlas.model import (
     AtlasUniverseContractError,
     AtlasUniverseLockError,
     AttemptOutcome,
+    ConstraintContract,
     DiseasePack,
     IdentityMapAttestation,
     LineageIndex,
@@ -54,6 +56,7 @@ from raptor.atlas.model import (
     PreconditionReport,
     RawIdentityMapper,
     RecordDisposition,
+    RelaxationStep,
     SelectionInputs,
     SelectionRun,
 )
@@ -86,12 +89,6 @@ _CROSSWALK_CONTRADICTORY: tuple[tuple[str, str], ...] = (
 _CROSSWALK_DISCORDANT: tuple[tuple[str, str], ...] = (
     ("known_pathogenic", "S3"),
     ("known_benign", "S1"),
-)
-
-_CONSTRAINT_GROUPS: tuple[tuple[str, str], ...] = (
-    ("C", "coverage"),
-    ("D", "diversity"),
-    ("P", "source_concentration"),
 )
 
 _FORMULA_RE = re.compile(r"^ceil\((\d*)n(?:/(\d+))?\)$")
@@ -1490,7 +1487,10 @@ def _eval_threshold(value: Any, n: int) -> int:
     if isinstance(value, int):
         return value
     if isinstance(value, str):
-        match = _FORMULA_RE.match(value.replace(" ", ""))
+        stripped = value.replace(" ", "")
+        if stripped.isdigit():
+            return int(stripped)
+        match = _FORMULA_RE.match(stripped)
         if match:
             coefficient = int(match.group(1)) if match.group(1) else 1
             denominator = int(match.group(2)) if match.group(2) else 1
@@ -1498,24 +1498,200 @@ def _eval_threshold(value: Any, n: int) -> int:
     raise AtlasPanelRegistrationError(f"unrecognized constraint formula {value!r}", code="INPUT_FAULT")
 
 
-def _constraint_base(registration: Mapping[str, Any], name: str) -> Any:
-    for prefix, group in _CONSTRAINT_GROUPS:
-        if name.startswith(prefix):
-            return ((registration.get("constraints") or {}).get(group) or {}).get(name)
-    raise AtlasPanelRegistrationError(f"unrecognized constraint family for {name!r}", code="INPUT_FAULT")
-
-
-def _constraint_at_rung(registration: Mapping[str, Any], name: str, rung: int, *, n: int) -> int:
-    value = _constraint_base(registration, name)
-    ladder = registration.get("relaxation_ladder") or ()
-    for position, step in enumerate(ladder, start=1):
-        if position <= rung and step.get("constraint") == name:
-            value = step.get("after")
-    return _eval_threshold(value, n)
-
-
 def _ceil_half(n: int) -> int:
     return -(-n // 2)
+
+
+# ---------------------------------------------------------------------------
+# Revision-4 Section-17 constraint contract (module_api.search.constraint_contract).
+#
+# The frozen registration carries the relaxation ladder as seven prose
+# strings and has no numeric-threshold home at all. Per the narrow,
+# version-and-hash-keyed hardcoding_prohibition_scoped_exception, the
+# protocol-owned base thresholds and structured ladder below are a CLOSED
+# canonical table, admissible only because materialize_constraint_contract
+# below fails closed on any (version, hash) pair other than the one this
+# table is keyed to. Nothing here reads a registration-declared threshold
+# mapping (no such field exists) and nothing here parses the protocol text;
+# the protocol bytes are hashed (V1), never scraped.
+# ---------------------------------------------------------------------------
+
+_SUPPORTED_CONSTRAINT_PROTOCOL_VERSION = "1.0.4"
+
+_BASE_THRESHOLDS: Mapping[str, str] = MappingProxyType(
+    {
+        "C3": "ceil(n/2)",
+        "D1": "3",
+        "D2": "2",
+        "D3": "ceil(n/2)",
+        "P1": "ceil(n/2)",
+        "P2": "3",
+        "P3": "2",
+    }
+)
+
+_EXPLICIT_LOGIC_CONSTRAINTS: tuple[str, ...] = ("C1", "C2", "C4", "C5", "D4", "H1", "H2", "H3")
+
+# The exact seven-string drift comparand (declared_ladder_comparand). This is
+# an equality comparand only, never a source of ladder behaviour or parsed
+# for meaning -- the structured steps below are what the search executes.
+_CANONICAL_DECLARED_LADDER: tuple[str, ...] = (
+    "R1 C5 spec-taxonomy coverage becomes report-only",
+    "R2 P2 minimum established source groups 3 -> 2",
+    "R3 P1 sole-support cap ceil(n/2) -> ceil(2n/3)",
+    "R4 D1 minimum assay kinds 3 -> 2",
+    "R5 P3 single-high-throughput cap 2 -> 3",
+    "R6 D2 minimum model systems 2 -> 1",
+    "R7 P2 minimum established source groups -> 1 (terminal)",
+)
+
+_RELAXATION_STEPS: tuple[RelaxationStep, ...] = (
+    RelaxationStep(
+        step_id="R1", position=1, constraint_id="C5", kind="report_only",
+        before=None, after=None, declared_text=_CANONICAL_DECLARED_LADDER[0],
+    ),
+    RelaxationStep(
+        step_id="R2", position=2, constraint_id="P2", kind="threshold",
+        before="3", after="2", declared_text=_CANONICAL_DECLARED_LADDER[1],
+    ),
+    RelaxationStep(
+        step_id="R3", position=3, constraint_id="P1", kind="threshold",
+        before="ceil(n/2)", after="ceil(2n/3)", declared_text=_CANONICAL_DECLARED_LADDER[2],
+    ),
+    RelaxationStep(
+        step_id="R4", position=4, constraint_id="D1", kind="threshold",
+        before="3", after="2", declared_text=_CANONICAL_DECLARED_LADDER[3],
+    ),
+    RelaxationStep(
+        step_id="R5", position=5, constraint_id="P3", kind="threshold",
+        before="2", after="3", declared_text=_CANONICAL_DECLARED_LADDER[4],
+    ),
+    RelaxationStep(
+        step_id="R6", position=6, constraint_id="D2", kind="threshold",
+        before="2", after="1", declared_text=_CANONICAL_DECLARED_LADDER[5],
+    ),
+    RelaxationStep(
+        step_id="R7", position=7, constraint_id="P2", kind="threshold",
+        before="2", after="1", declared_text=_CANONICAL_DECLARED_LADDER[6],
+    ),
+)
+
+
+def _validate_declared_ladder(declared: Any) -> tuple[str, ...]:
+    """Validate a registration's declared relaxation ladder against the
+    canonical seven-string comparand: same seven strings, same order,
+    character-for-character. Any drift in length, order or content --
+    including a non-list value or a non-string entry -- raises
+    ``RELAXATION_LADDER_DRIFT`` naming the first differing position."""
+
+    if not isinstance(declared, (list, tuple)):
+        raise AtlasPanelRegistrationError(
+            f"relaxation_ladder must be a list of seven strings, got {type(declared).__name__}",
+            code="RELAXATION_LADDER_DRIFT",
+        )
+    for position, (have, expected) in enumerate(
+        itertools.zip_longest(declared, _CANONICAL_DECLARED_LADDER), start=1
+    ):
+        if not isinstance(have, str) or have != expected:
+            raise AtlasPanelRegistrationError(
+                f"relaxation_ladder position {position} drift: expected {expected!r}, declared {have!r}",
+                code="RELAXATION_LADDER_DRIFT",
+            )
+    return tuple(declared)
+
+
+def materialize_constraint_contract(
+    *, registration: Mapping[str, Any], verified_protocol_version: str, verified_protocol_doc_hash: str,
+) -> ConstraintContract:
+    """Sections 13.2/17.5: materialize the single, closed Section-17
+    constraint contract for this run. ``verified_protocol_version`` must
+    equal the one supported version exactly; ``verified_protocol_doc_hash``
+    must equal the registration's own pinned protocol digest exactly (the
+    registration is frozen and its own digest is V1-verified, so this
+    binds the table to the one protocol text a coordinated, reviewed
+    change could ever repin). Any other pairing fails closed before any
+    attempt runs, and the registration's declared ladder is validated
+    against the canonical comparand."""
+
+    if verified_protocol_version != _SUPPORTED_CONSTRAINT_PROTOCOL_VERSION:
+        raise AtlasPanelRegistrationError(
+            f"unsupported protocol version {verified_protocol_version!r} for the Section-17 threshold "
+            f"table; only {_SUPPORTED_CONSTRAINT_PROTOCOL_VERSION!r} is recognized",
+            code="CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL",
+        )
+    if verified_protocol_doc_hash != registration.get("protocol_doc_hash"):
+        raise AtlasPanelRegistrationError(
+            "the verified protocol doc hash does not match the registration's own pinned "
+            "protocol_doc_hash; the Section-17 threshold table will not materialize against an "
+            "unverified protocol binding",
+            code="CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL",
+        )
+    declared_ladder = _validate_declared_ladder(registration.get("relaxation_ladder"))
+
+    return ConstraintContract(
+        protocol_version=verified_protocol_version,
+        protocol_doc_hash=verified_protocol_doc_hash,
+        base_thresholds=_BASE_THRESHOLDS,
+        explicit_logic_constraints=_EXPLICIT_LOGIC_CONSTRAINTS,
+        relaxation_steps=_RELAXATION_STEPS,
+        declared_ladder=declared_ladder,
+    )
+
+
+def constraints_at_level(contract: ConstraintContract, *, level: str, n: int) -> ActiveConstraints:
+    """Section 17.5 rung evaluation: starting from ``contract.base_thresholds``,
+    apply every relaxation step whose position is at or before this
+    level's rung, in ascending position order, last-write-wins per
+    constraint id, then evaluate every surviving threshold expression at
+    ``n``. Rungs are cumulative, never exclusive -- every earlier
+    concession is still in force at every later rung. C5 is gating iff
+    rung == 0."""
+
+    rung = LEVELS.index(level)
+    values: dict[str, str] = dict(contract.base_thresholds)
+    c5_enforced = True
+    for step in contract.relaxation_steps:
+        if step.position > rung:
+            continue
+        if step.kind == "report_only":
+            c5_enforced = False
+        else:
+            values[step.constraint_id] = step.after
+
+    return ActiveConstraints(
+        level=level,
+        rung=rung,
+        n=n,
+        c3_max_per_stratum=_eval_threshold(values["C3"], n),
+        d1_min_assay_kinds=_eval_threshold(values["D1"], n),
+        d2_min_model_systems=_eval_threshold(values["D2"], n),
+        d3_max_per_assay_kind=_eval_threshold(values["D3"], n),
+        p1_max_sole_support=_eval_threshold(values["P1"], n),
+        p2_min_established_groups=_eval_threshold(values["P2"], n),
+        p3_max_single_high_throughput=_eval_threshold(values["P3"], n),
+        c5_enforced=c5_enforced,
+        applied_steps=LADDER_STEPS[:rung],
+    )
+
+
+def _render_active_constraints(active: ActiveConstraints) -> dict:
+    """Render one evaluated ``ActiveConstraints`` rung, for the run
+    record's ``declared_constraints.levels_evaluated`` list."""
+
+    return {
+        "level": active.level,
+        "rung": active.rung,
+        "n": active.n,
+        "c3_max_per_stratum": active.c3_max_per_stratum,
+        "d1_min_assay_kinds": active.d1_min_assay_kinds,
+        "d2_min_model_systems": active.d2_min_model_systems,
+        "d3_max_per_assay_kind": active.d3_max_per_assay_kind,
+        "p1_max_sole_support": active.p1_max_sole_support,
+        "p2_min_established_groups": active.p2_min_established_groups,
+        "p3_max_single_high_throughput": active.p3_max_single_high_throughput,
+        "c5_enforced": active.c5_enforced,
+        "applied_steps": list(active.applied_steps),
+    }
 
 
 def enumerate_allocations(
@@ -1545,13 +1721,11 @@ def _check_constraints(
     nonempty_strata: Sequence[str],
     spec_values: Sequence[str],
     index: Mapping[str, str],
-    level: str,
     pool: Sequence[Mapping[str, Any]],
-    registration: Mapping[str, Any],
+    active: ActiveConstraints,
 ) -> bool:
     if len(panel) != n:
         return False
-    rung = LEVELS.index(level)
     primaries = [record.get("primary_stratum") for record in panel]
 
     if set(nonempty_strata) - set(primaries):
@@ -1559,11 +1733,10 @@ def _check_constraints(
     if "S6" in nonempty_strata and "S6" not in primaries:
         return False  # C2
 
-    c3_cap = _constraint_at_rung(registration, "C3", rung, n=n)
-    if any(primaries.count(stratum) > c3_cap for stratum in set(primaries)):
+    if any(primaries.count(stratum) > active.c3_max_per_stratum for stratum in set(primaries)):
         return False  # C3
 
-    if rung < 1:
+    if active.c5_enforced:
         if set(spec_values) - {record.get("spec_stratum") for record in panel}:
             return False  # C5 (report-only from R1 onward)
 
@@ -1576,19 +1749,16 @@ def _check_constraints(
 
     per_record_assays = [{o.get("assay_kind") for o in (record.get("observations") or ())} for record in panel]
     distinct_assays: set[str] = set().union(*per_record_assays) if per_record_assays else set()
-    d1_min = _constraint_at_rung(registration, "D1", rung, n=n)
-    if len(distinct_assays) < d1_min:
+    if len(distinct_assays) < active.d1_min_assay_kinds:
         return False  # D1
 
     per_record_models = [{o.get("model_system") for o in (record.get("observations") or ())} for record in panel]
     distinct_models: set[str] = set().union(*per_record_models) if per_record_models else set()
-    d2_min = _constraint_at_rung(registration, "D2", rung, n=n)
-    if len(distinct_models) < d2_min:
+    if len(distinct_models) < active.d2_min_model_systems:
         return False  # D2
 
-    d3_cap = _constraint_at_rung(registration, "D3", rung, n=n)
     for assay in distinct_assays:
-        if sum(1 for kinds in per_record_assays if assay in kinds) > d3_cap:
+        if sum(1 for kinds in per_record_assays if assay in kinds) > active.d3_max_per_assay_kind:
             return False  # D3
 
     pool_has_multi_assay = any(
@@ -1603,19 +1773,19 @@ def _check_constraints(
         groups = _record_groups(record, index)
         if len(groups) == 1:
             sole_support[groups[0]] = sole_support.get(groups[0], 0) + 1
-    p1_cap = _constraint_at_rung(registration, "P1", rung, n=n)
-    if any(count > p1_cap for count in sole_support.values()):
+    if any(count > active.p1_max_sole_support for count in sole_support.values()):
         return False  # P1
 
     established_groups: set[str] = set()
     for record in panel:
         established_groups.update(g for g in _record_groups(record, index) if g != "LG:UNKNOWN-POOL")
-    p2_min = _constraint_at_rung(registration, "P2", rung, n=n)
-    if len(established_groups) < p2_min:
+    if len(established_groups) < active.p2_min_established_groups:
         return False  # P2
 
-    p3_cap = _constraint_at_rung(registration, "P3", rung, n=n)
-    if sum(1 for record in panel if _support_class(record, index) == "single_high_throughput_only") > p3_cap:
+    single_high_throughput_count = sum(
+        1 for record in panel if _support_class(record, index) == "single_high_throughput_only"
+    )
+    if single_high_throughput_count > active.p3_max_single_high_throughput:
         return False  # P3
 
     return True
@@ -1631,7 +1801,7 @@ def _run_attempt(
     pool_by_stratum: Mapping[str, Sequence[Mapping[str, Any]]],
     index: Mapping[str, str],
     node_budget: int,
-    registration: Mapping[str, Any],
+    active: ActiveConstraints,
 ) -> AttemptOutcome:
     ordered_strata = [s for s in OMEGA if s in set(nonempty_strata)]
     pool_sizes = {s: len(pool_by_stratum[s]) for s in ordered_strata}
@@ -1648,7 +1818,7 @@ def _run_attempt(
             candidate = [record for part in combo_parts for record in part]
             if _check_constraints(
                 candidate, n=n, nonempty_strata=nonempty_strata, spec_values=spec_values, index=index,
-                level=level, pool=pool, registration=registration,
+                pool=pool, active=active,
             ):
                 solution = tuple(sorted(record.get("record_id") for record in candidate))
                 return AttemptOutcome(level=level, n=n, status="SOLUTION", nodes_expanded=nodes_expanded, solution=solution)
@@ -1923,6 +2093,15 @@ def select_panel(inputs: SelectionInputs) -> SelectionRun:
     or mutated."""
 
     report, registration, universe, raw_manifest, pack, mapper = _run_preconditions(inputs)
+
+    # Section-17 constraint contract materializes exactly once per run, keyed
+    # to the V1-verified protocol doc hash, before the first attempt runs.
+    contract = materialize_constraint_contract(
+        registration=registration,
+        verified_protocol_version=_SUPPORTED_CONSTRAINT_PROTOCOL_VERSION,
+        verified_protocol_doc_hash=report.verified_protocol_doc_hash,
+    )
+
     replay = replay_normalization(raw_manifest, universe, pack=pack, mapper=mapper, anchor=inputs.anchor)
 
     lineage = recompute_lineage_index(universe)
@@ -1960,6 +2139,7 @@ def select_panel(inputs: SelectionInputs) -> SelectionRun:
     winning: Optional[AttemptOutcome] = None
     for level in LEVELS:
         for n in range(n_target, panel_min - 1, -1):
+            active = constraints_at_level(contract, level=level, n=n)
             outcome = _run_attempt(
                 eligible_pool,
                 n=n,
@@ -1969,7 +2149,7 @@ def select_panel(inputs: SelectionInputs) -> SelectionRun:
                 pool_by_stratum=pool_by_stratum,
                 index=index,
                 node_budget=node_budget,
-                registration=registration,
+                active=active,
             )
             attempts.append(outcome)
             if outcome.status in ("SOLUTION", "UNDETERMINED"):
@@ -2179,6 +2359,40 @@ def render_run_record(run: SelectionRun, *, inputs: SelectionInputs) -> dict:
         }
         for attempt in run.attempts
     ]
+
+    # declared_constraints is the canonical materialized set, rendered from
+    # the same (freshly re-verified) registration this record's other
+    # procedure fields were just recomputed from -- never a registration
+    # threshold mapping, which does not exist.
+    contract = materialize_constraint_contract(
+        registration=registration,
+        verified_protocol_version=_SUPPORTED_CONSTRAINT_PROTOCOL_VERSION,
+        verified_protocol_doc_hash=report.verified_protocol_doc_hash,
+    )
+    declared_constraints = {
+        "protocol_version": contract.protocol_version,
+        "protocol_doc_hash": contract.protocol_doc_hash,
+        "base_thresholds": dict(contract.base_thresholds),
+        "explicit_logic_constraints": list(contract.explicit_logic_constraints),
+        "declared_ladder": list(contract.declared_ladder),
+        "relaxation_steps": [
+            {
+                "step_id": step.step_id,
+                "position": step.position,
+                "constraint_id": step.constraint_id,
+                "kind": step.kind,
+                "before": step.before,
+                "after": step.after,
+                "declared_text": step.declared_text,
+            }
+            for step in contract.relaxation_steps
+        ],
+        "levels_evaluated": [
+            _render_active_constraints(constraints_at_level(contract, level=attempt.level, n=attempt.n))
+            for attempt in run.attempts
+        ],
+    }
+
     procedure = {
         "n_target": run.n_target,
         "selection_seed": registration.get("selection_seed"),
@@ -2187,7 +2401,7 @@ def render_run_record(run: SelectionRun, *, inputs: SelectionInputs) -> dict:
         "node_budget": search_node_budget,
         "node_budget_override": inputs.node_budget_override,
         "max_nodes_expanded": max_nodes_expanded,
-        "declared_constraints": registration.get("constraints"),
+        "declared_constraints": declared_constraints,
         "attempt_log": attempt_log,
         "attempts": attempt_log,
         "applied_relaxation_steps": list(run.applied_relaxation_steps),

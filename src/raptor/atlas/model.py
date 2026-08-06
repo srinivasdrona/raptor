@@ -927,6 +927,60 @@ class RecordDisposition:
 
 
 @dataclass(frozen=True, eq=True)
+class RelaxationStep:
+    """One structured entry of the Section 17.5 relaxation ladder,
+    corresponding one-to-one (in order) with the registration's seven
+    verbatim ``relaxation_ladder`` strings. ``before``/``after`` are
+    canonical threshold expressions; both are ``None`` when ``kind`` is
+    ``"report_only"``."""
+
+    step_id: str
+    position: int
+    constraint_id: str
+    kind: str
+    before: Optional[str]
+    after: Optional[str]
+    declared_text: str
+
+
+@dataclass(frozen=True, eq=True)
+class ConstraintContract:
+    """The materialized Section-17 constraint contract for one run: the
+    closed, protocol-owned base thresholds and relaxation ladder -- keyed
+    to the exact supported protocol version/doc-hash pair -- plus the
+    registration's own verbatim ladder strings, already validated to equal
+    the canonical comparand exactly."""
+
+    protocol_version: str
+    protocol_doc_hash: str
+    base_thresholds: Mapping[str, str]
+    explicit_logic_constraints: tuple[str, ...]
+    relaxation_steps: tuple[RelaxationStep, ...]
+    declared_ladder: tuple[str, ...]
+
+
+@dataclass(frozen=True, eq=True)
+class ActiveConstraints:
+    """The fully evaluated Section-17 constraint set actually enforced at
+    one ``(level, n)`` attempt: every numeric threshold already resolved
+    to an ``int`` at this ``n``, with cumulative, last-write-wins
+    relaxation applied through ``rung``."""
+
+    level: str
+    rung: int
+    n: int
+    c3_max_per_stratum: int
+    d1_min_assay_kinds: int
+    d2_min_model_systems: int
+    d3_max_per_assay_kind: int
+    p1_max_sole_support: int
+    p2_min_established_groups: int
+    p3_max_single_high_throughput: int
+    c5_enforced: bool
+    applied_steps: tuple[str, ...]
+
+
+@dataclass(frozen=True, eq=True)
 class AttemptOutcome:
     """One relaxation-level/panel-size attempt in the exhaustive search."""
 
