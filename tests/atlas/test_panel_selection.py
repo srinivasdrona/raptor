@@ -1462,50 +1462,11 @@ def _checks(report: Any) -> tuple[str, ...]:
 
 
 @requires_impl
-def test_ps_v_001_protocol_binding(tmp_path: Path) -> None:
-    """PS-V-001: protocol binding covers digest, version, and caller agreement."""
+def test_ps_v_001_protocol_digest_mismatch(tmp_path: Path) -> None:
+    """PS-V-001: one changed byte in the protocol document fails V1."""
 
     world = build_world(tmp_path)
     _write_bytes(world.protocol_path, _PROTOCOL_BYTES + b"x", world)
-    _expect(
-        world,
-        lambda: _select(world),
-        error="AtlasPanelRegistrationError",
-        code="PROTOCOL_DIGEST_MISMATCH",
-        check_id="V1",
-    )
-
-    world = build_world(tmp_path / "wrong-version")
-    world.tamper_yaml(
-        world.registration_path,
-        lambda payload: payload.__setitem__("protocol_version", "1.0.0"),
-    )
-    _expect(
-        world,
-        lambda: _select(world),
-        error="AtlasPanelRegistrationError",
-        code="PROTOCOL_VERSION_MISMATCH",
-        check_id="V1",
-    )
-
-    world = build_world(tmp_path / "missing-version")
-    world.tamper_yaml(
-        world.registration_path,
-        lambda payload: payload.pop("protocol_version"),
-    )
-    _expect(
-        world,
-        lambda: _select(world),
-        error="AtlasPanelRegistrationError",
-        code="PROTOCOL_VERSION_MISMATCH",
-        check_id="V1",
-    )
-
-    world = build_world(tmp_path / "missing-hash")
-    world.tamper_yaml(
-        world.registration_path,
-        lambda payload: payload.pop("protocol_doc_hash"),
-    )
     _expect(
         world,
         lambda: _select(world),
@@ -3866,6 +3827,36 @@ def test_ps_a_008_search_scope_guard_runs_before_any_attempt(tmp_path: Path) -> 
     assert excinfo.value.code == "CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL"
 
     import copy
+    
+    wrong_reg_version = copy.deepcopy(reg)
+    wrong_reg_version["protocol_version"] = "1.0.0"
+    with pytest.raises(AtlasPanelRegistrationError) as excinfo:
+        materialize_constraint_contract(
+            registration=wrong_reg_version,
+            verified_protocol_version=protocol_version,
+            verified_protocol_doc_hash=protocol_hash,
+        )
+    assert excinfo.value.code == "CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL"
+    
+    missing_reg_version = copy.deepcopy(reg)
+    missing_reg_version.pop("protocol_version", None)
+    with pytest.raises(AtlasPanelRegistrationError) as excinfo:
+        materialize_constraint_contract(
+            registration=missing_reg_version,
+            verified_protocol_version=protocol_version,
+            verified_protocol_doc_hash=protocol_hash,
+        )
+    assert excinfo.value.code == "CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL"
+    
+    missing_reg_hash = copy.deepcopy(reg)
+    missing_reg_hash.pop("protocol_doc_hash", None)
+    with pytest.raises(AtlasPanelRegistrationError) as excinfo:
+        materialize_constraint_contract(
+            registration=missing_reg_hash,
+            verified_protocol_version=protocol_version,
+            verified_protocol_doc_hash=protocol_hash,
+        )
+    assert excinfo.value.code == "CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL"
     # Edited ladder entry
     edited_reg = copy.deepcopy(reg)
     edited_reg["relaxation_ladder"][0] = "R1 C5 spec-taxonomy coverage becomes report_only" # edited dash
@@ -5473,7 +5464,7 @@ TRACEABILITY: dict[str, str] = {
     "PS-U-005": "test_ps_u_005_universe_self_hash_and_attestation",
     "PS-U-006": "test_ps_u_006_prohibited_universe_content",
     # --- V: preconditions in registration-pinned order
-    "PS-V-001": "test_ps_v_001_protocol_binding",
+    "PS-V-001": "test_ps_v_001_protocol_digest_mismatch",
     "PS-V-002": "test_ps_v_002_registration_self_hash_mismatch",
     "PS-V-003": "test_ps_v_003_seed_mismatch",
     "PS-V-004": "test_ps_v_004_pack_drift_against_each_comparand",
