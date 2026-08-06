@@ -169,8 +169,8 @@ _SYN_SEQ_ACC = "NC_" + "999999.9"
 SYN_PACK_ID = "synthpanelpack"
 SYN_PACK_VERSION = "0.0.1"
 SYN_SEED = "synthetic-panel-seed-v0"
-SYN_PROTOCOL_VERSION = "0.1.1"
-SYN_PRIOR_PROTOCOL_VERSION = "0.1.0"
+SYN_PROTOCOL_VERSION = "1.0.4"
+SYN_PRIOR_PROTOCOL_VERSION = "1.0.3"
 SYN_ASSAYS = ("synassay_alpha", "synassay_beta", "synassay_gamma", "synassay_delta")
 SYN_MODELS = ("synmodel_one", "synmodel_two", "synmodel_three")
 RUN_STARTED_AT = datetime(2026, 6, 1, 12, 0, 0, tzinfo=timezone.utc)
@@ -620,11 +620,7 @@ def _pack_manifest() -> dict[str, Any]:
     return manifest
 
 
-_PROTOCOL_TEXT = (
-    "# Synthetic panel selection protocol (fixture)\n\n"
-    "This file exists only so the fixture has a hashable protocol document.\n"
-    "It carries no rules; the rules under test are the real protocol's.\n"
-)
+_PROTOCOL_BYTES = PROTOCOL_PATH.read_bytes()
 
 
 class _World:
@@ -843,7 +839,7 @@ def build_world(
 
     # -- protocol document ----------------------------------------------
     world.protocol_path.parent.mkdir(parents=True, exist_ok=True)
-    world.protocol_path.write_text(_PROTOCOL_TEXT, encoding="utf-8")
+    world.protocol_path.write_bytes(_PROTOCOL_BYTES)
 
     # -- derived record fields ------------------------------------------
     all_observations = [o for r in raw_records for o in r["observations"]]
@@ -1445,6 +1441,11 @@ def _function_nodes(tree: ast.Module) -> dict[str, ast.FunctionDef]:
     }
 
 
+def _write_bytes(path: Path, b: bytes, world: _World | None = None) -> None:
+    path.write_bytes(b)
+    if world is not None:
+        world._baseline[path] = path.read_bytes()
+
 def _write_text(path: Path, text: str, world: _World | None = None) -> None:
     path.write_text(text, encoding="utf-8")
     if world is not None:
@@ -1461,11 +1462,50 @@ def _checks(report: Any) -> tuple[str, ...]:
 
 
 @requires_impl
-def test_ps_v_001_protocol_digest_mismatch(tmp_path: Path) -> None:
-    """PS-V-001: one changed byte in the protocol document fails V1."""
+def test_ps_v_001_protocol_binding(tmp_path: Path) -> None:
+    """PS-V-001: protocol binding covers digest, version, and caller agreement."""
 
     world = build_world(tmp_path)
-    _write_text(world.protocol_path, _PROTOCOL_TEXT + "x", world)
+    _write_bytes(world.protocol_path, _PROTOCOL_BYTES + b"x", world)
+    _expect(
+        world,
+        lambda: _select(world),
+        error="AtlasPanelRegistrationError",
+        code="PROTOCOL_DIGEST_MISMATCH",
+        check_id="V1",
+    )
+
+    world = build_world(tmp_path / "wrong-version")
+    world.tamper_yaml(
+        world.registration_path,
+        lambda payload: payload.__setitem__("protocol_version", "1.0.0"),
+    )
+    _expect(
+        world,
+        lambda: _select(world),
+        error="AtlasPanelRegistrationError",
+        code="PROTOCOL_VERSION_MISMATCH",
+        check_id="V1",
+    )
+
+    world = build_world(tmp_path / "missing-version")
+    world.tamper_yaml(
+        world.registration_path,
+        lambda payload: payload.pop("protocol_version"),
+    )
+    _expect(
+        world,
+        lambda: _select(world),
+        error="AtlasPanelRegistrationError",
+        code="PROTOCOL_VERSION_MISMATCH",
+        check_id="V1",
+    )
+
+    world = build_world(tmp_path / "missing-hash")
+    world.tamper_yaml(
+        world.registration_path,
+        lambda payload: payload.pop("protocol_doc_hash"),
+    )
     _expect(
         world,
         lambda: _select(world),
@@ -5433,7 +5473,7 @@ TRACEABILITY: dict[str, str] = {
     "PS-U-005": "test_ps_u_005_universe_self_hash_and_attestation",
     "PS-U-006": "test_ps_u_006_prohibited_universe_content",
     # --- V: preconditions in registration-pinned order
-    "PS-V-001": "test_ps_v_001_protocol_digest_mismatch",
+    "PS-V-001": "test_ps_v_001_protocol_binding",
     "PS-V-002": "test_ps_v_002_registration_self_hash_mismatch",
     "PS-V-003": "test_ps_v_003_seed_mismatch",
     "PS-V-004": "test_ps_v_004_pack_drift_against_each_comparand",
