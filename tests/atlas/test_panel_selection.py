@@ -178,8 +178,8 @@ LOCK_CREATED_AT = "2026-05-01T00:00:00Z"
 EXECUTOR_IDENTITY = "synthetic-executor"
 
 
-def _syn_spdi(position: int) -> str:
-    return f"{_SYN_SEQ_ACC}:{position}:A:G"
+def _syn_spdi(position: int, alt: str = "G") -> str:
+    return f"{_SYN_SEQ_ACC}:{position}:A:{alt}"
 
 
 # ---------------------------------------------------------------------------
@@ -745,7 +745,7 @@ def _write_responses(world: _World, records: Sequence[Mapping[str, Any]]) -> dic
                                 "variation_set": [
                                     {
                                         "variant_type": "single nucleotide variant",
-                                        "canonical_spdi": _syn_spdi(record["_spdi_position"]),
+                                        "canonical_spdi": record.get("_mock_spdi") or _syn_spdi(record["_spdi_position"]),
                                         "variation_loc": [
                                             {
                                                 "status": "current",
@@ -881,6 +881,7 @@ def build_world(
             "lineage_confidence": "unknown" if unknown else "established",
             "support_class": _support_class(record, index),
             "exclusion_flags": [] if resolved else ["X1"],
+            "_mock_spdi": record.get("_mock_spdi"),
             "_raw_identity_string": record["_raw_identity_string"],
             "_residue": record["_residue"],
             "_spdi_position": record["_spdi_position"],
@@ -2642,6 +2643,77 @@ def test_ps_r_007_exclusion_flags_and_duplicate_collapse(tmp_path: Path) -> None
         lambda: _select(spurious),
         error="AtlasUniverseContractError",
         code="UNIVERSE_CONTRACT_BREACH",
+        check_id="RP6",
+    )
+
+    def setup_anchors(raw_records: list) -> None:
+        r1 = raw_records[0]
+        r1["_residue"] = 61
+        r1["_spdi_position"] = 61
+        r1["spdi_canonical"] = _syn_spdi(61)
+        r1["hgvs_c"] = f"{SYN_TRANSCRIPT}:c.{3 * 61 - 2}A>G"
+        r1["hgvs_p"] = f"{SYN_PROTEIN}:p.Lys{61}Glu"
+        r1["_raw_identity_string"] = f"p.Lys{61}Glu"
+        r1["residue_index"] = 61
+        r1["codon_index"] = 61
+        
+        r2 = raw_records[1]
+        r2["_residue"] = 61
+        r2["_spdi_position"] = 61
+        r2["_mock_spdi"] = _syn_spdi(61, alt="C")
+        r2["spdi_canonical"] = _syn_spdi(61, alt="C")
+        r2["hgvs_c"] = f"{SYN_TRANSCRIPT}:c.{3 * 61 - 2}A>G"
+        r2["hgvs_p"] = f"{SYN_PROTEIN}:p.Lys{61}Glu"
+        r2["_raw_identity_string"] = f"p.Lys{61}Glu"
+        r2["residue_index"] = 61
+        r2["codon_index"] = 61
+
+    def flags_anchors(universe: dict) -> None:
+        r1 = universe["records"][0]
+        r1["exclusion_flags"] = ["X3"]
+
+        r2 = universe["records"][1]
+        r2["exclusion_flags"] = ["X3"]
+
+    anchors = build_world(
+        tmp_path / "anchors",
+        on_records=setup_anchors,
+        on_universe=flags_anchors,
+    )
+    _select(anchors)
+
+    AnchorSpec = _sut("AnchorSpec")
+    different_anchor = AnchorSpec(spdi_canonical=_syn_spdi(99), residue_index=99)
+    _expect(
+        anchors,
+        lambda: _select(anchors, anchor=different_anchor),
+        error="AtlasUniverseContractError",
+        code="UNIVERSE_CONTRACT_BREACH",
+        check_id="RP6",
+    )
+    assert _sha256_bytes(anchors.map_path.read_bytes()) == anchors.map_manifest["map_content_hash"]
+
+    def conflict_universe(universe: dict) -> None:
+        r1 = universe["records"][0]
+        r1["residue_index"] = 61
+        r1["codon_index"] = 61
+        r1["spdi_canonical"] = _syn_spdi(61)
+        r1["exclusion_flags"] = ["X1", "X3"]
+
+    def conflict_map(map_manifest: dict) -> None:
+        map_manifest["records"][0]["exclusion_code"] = "X1"
+
+    conflict_world = build_world(
+        tmp_path / "conflict",
+        on_universe=conflict_universe,
+        on_map=conflict_map,
+    )
+    _expect(
+        conflict_world,
+        lambda: _select(conflict_world),
+        error="AtlasUniverseContractError",
+        code="UNIVERSE_CONTRACT_BREACH",
+        check_id="RP6",
     )
 
     stable = build_world(tmp_path / "stable")
