@@ -1517,6 +1517,7 @@ def _ceil_half(n: int) -> int:
 # ---------------------------------------------------------------------------
 
 _SUPPORTED_CONSTRAINT_PROTOCOL_VERSION = "1.0.4"
+_SUPPORTED_CONSTRAINT_PROTOCOL_DOC_HASH = "7b0596ab4a52601566c85a3a2c7ca42aead9c35916890397e58b3e11876e5823"
 
 _BASE_THRESHOLDS: Mapping[str, str] = MappingProxyType(
     {
@@ -1604,26 +1605,32 @@ def materialize_constraint_contract(
     *, registration: Mapping[str, Any], verified_protocol_version: str, verified_protocol_doc_hash: str,
 ) -> ConstraintContract:
     """Sections 13.2/17.5: materialize the single, closed Section-17
-    constraint contract for this run. ``verified_protocol_version`` must
-    equal the one supported version exactly; ``verified_protocol_doc_hash``
-    must equal the registration's own pinned protocol digest exactly (the
-    registration is frozen and its own digest is V1-verified, so this
-    binds the table to the one protocol text a coordinated, reviewed
-    change could ever repin). Any other pairing fails closed before any
-    attempt runs, and the registration's declared ladder is validated
-    against the canonical comparand."""
+    constraint contract for this run. All four of the caller-attested
+    ``verified_protocol_version``/``verified_protocol_doc_hash`` pair AND
+    the registration's own declared ``protocol_version``/``protocol_doc_hash``
+    fields must equal the one supported version/hash pair exactly --
+    string equality, no normalization, no self-consistency-only
+    acceptance. A caller attestation that disagrees with what the
+    registration itself declares (or either one drifting from the single
+    supported pair) fails closed before any attempt runs, identically to a
+    missing value on either side. Only once all four agree is the
+    registration's declared ladder validated against the canonical
+    comparand."""
 
-    if verified_protocol_version != _SUPPORTED_CONSTRAINT_PROTOCOL_VERSION:
+    if (
+        verified_protocol_version != _SUPPORTED_CONSTRAINT_PROTOCOL_VERSION
+        or verified_protocol_doc_hash != _SUPPORTED_CONSTRAINT_PROTOCOL_DOC_HASH
+        or registration.get("protocol_version") != _SUPPORTED_CONSTRAINT_PROTOCOL_VERSION
+        or registration.get("protocol_doc_hash") != _SUPPORTED_CONSTRAINT_PROTOCOL_DOC_HASH
+    ):
         raise AtlasPanelRegistrationError(
-            f"unsupported protocol version {verified_protocol_version!r} for the Section-17 threshold "
-            f"table; only {_SUPPORTED_CONSTRAINT_PROTOCOL_VERSION!r} is recognized",
-            code="CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL",
-        )
-    if verified_protocol_doc_hash != registration.get("protocol_doc_hash"):
-        raise AtlasPanelRegistrationError(
-            "the verified protocol doc hash does not match the registration's own pinned "
-            "protocol_doc_hash; the Section-17 threshold table will not materialize against an "
-            "unverified protocol binding",
+            "the Section-17 threshold table requires the caller-verified protocol version/doc-hash "
+            "and the registration's own declared protocol_version/protocol_doc_hash to all equal the "
+            f"one supported pair ({_SUPPORTED_CONSTRAINT_PROTOCOL_VERSION!r}, "
+            f"{_SUPPORTED_CONSTRAINT_PROTOCOL_DOC_HASH!r}) exactly; got verified_protocol_version="
+            f"{verified_protocol_version!r}, verified_protocol_doc_hash={verified_protocol_doc_hash!r}, "
+            f"registration.protocol_version={registration.get('protocol_version')!r}, "
+            f"registration.protocol_doc_hash={registration.get('protocol_doc_hash')!r}",
             code="CONSTRAINT_CONTRACT_UNSUPPORTED_PROTOCOL",
         )
     declared_ladder = _validate_declared_ladder(registration.get("relaxation_ladder"))
@@ -2095,10 +2102,16 @@ def select_panel(inputs: SelectionInputs) -> SelectionRun:
     report, registration, universe, raw_manifest, pack, mapper = _run_preconditions(inputs)
 
     # Section-17 constraint contract materializes exactly once per run, keyed
-    # to the V1-verified protocol doc hash, before the first attempt runs.
+    # to the registration's own V1-verified protocol binding, before the
+    # first attempt runs. The registration-declared protocol_version is
+    # passed through as the caller's attestation -- never an unconditional
+    # supported-version constant -- so a registration whose declared version
+    # has drifted from the one supported pair fails closed here rather than
+    # silently materializing against a caller-asserted value the
+    # registration itself disagrees with.
     contract = materialize_constraint_contract(
         registration=registration,
-        verified_protocol_version=_SUPPORTED_CONSTRAINT_PROTOCOL_VERSION,
+        verified_protocol_version=registration.get("protocol_version"),
         verified_protocol_doc_hash=report.verified_protocol_doc_hash,
     )
 
@@ -2363,10 +2376,12 @@ def render_run_record(run: SelectionRun, *, inputs: SelectionInputs) -> dict:
     # declared_constraints is the canonical materialized set, rendered from
     # the same (freshly re-verified) registration this record's other
     # procedure fields were just recomputed from -- never a registration
-    # threshold mapping, which does not exist.
+    # threshold mapping, which does not exist. The registration-declared
+    # protocol_version is passed through as the caller's attestation here
+    # too, matching select_panel's binding exactly.
     contract = materialize_constraint_contract(
         registration=registration,
-        verified_protocol_version=_SUPPORTED_CONSTRAINT_PROTOCOL_VERSION,
+        verified_protocol_version=registration.get("protocol_version"),
         verified_protocol_doc_hash=report.verified_protocol_doc_hash,
     )
     declared_constraints = {

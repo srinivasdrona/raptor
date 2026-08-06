@@ -7,6 +7,7 @@ SDK (enforced by :func:`raptor.atlas.guards.assert_atlas_import_boundary`).
 """
 
 from raptor.atlas.model import (
+    ActiveConstraints,
     AnchorSpec,
     AtlasCandidateImport,
     AtlasCatalogError,
@@ -43,6 +44,7 @@ from raptor.atlas.model import (
     CatalogSource,
     CitationIdentifier,
     CitationResolver,
+    ConstraintContract,
     ContentVerification,
     ContextRecord,
     DisMechRecord,
@@ -57,6 +59,7 @@ from raptor.atlas.model import (
     PromotionContext,
     RawIdentityMapper,
     RawIdentityReplay,
+    RelaxationStep,
     ResolvedCitation,
     RunMetadata,
     SelectionInputs,
@@ -93,6 +96,7 @@ from raptor.atlas.guards import (
 )
 
 __all__ = [
+    "ActiveConstraints",
     "AnchorSpec",
     "AtlasCandidateImport",
     "AtlasCatalogError",
@@ -130,6 +134,7 @@ __all__ = [
     "CitationCatalog",
     "CitationIdentifier",
     "CitationResolver",
+    "ConstraintContract",
     "ContentVerification",
     "ContextRecord",
     "DisMechRecord",
@@ -145,6 +150,7 @@ __all__ = [
     "PromotionContext",
     "RawIdentityMapper",
     "RawIdentityReplay",
+    "RelaxationStep",
     "ResolvedCitation",
     "RunMetadata",
     "SelectionInputs",
