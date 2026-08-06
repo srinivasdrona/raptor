@@ -362,7 +362,7 @@ def load_selection_registration(path: Path) -> Mapping[str, Any]:
     registration. Does not verify its self-hash -- see
     :func:`verify_registration`."""
 
-    return _load_yaml_mapping(path, what="registration", schema_id="atlas.phase2_panel_selection_registration.v1")
+    return _load_yaml_mapping(path, what="registration", schema_id="atlas.panel_selection_registration.v1")
 
 
 def load_candidate_universe(path: Path) -> Mapping[str, Any]:
