@@ -4619,32 +4619,29 @@ def test_ps_p_005_returned_solutions_satisfy_every_active_constraint(
     reg = world.registration
     protocol_version = getattr(world, "protocol_version", "1.0.4")
     protocol_hash = world.protocol_doc_hash
-    # We use try/except block to handle the RED test (function will be missing or raise)
-    try:
-        contract = materialize_constraint_contract(
-            registration=reg,
-            verified_protocol_version=protocol_version,
-            verified_protocol_doc_hash=protocol_hash,
-        )
 
-        for n in (5, 8, 12):
-            for level in ("L0", "R1", "R2", "R3", "R4", "R5", "R6", "R7"):
-                rung = (["L0", "R1", "R2", "R3", "R4", "R5", "R6", "R7"]).index(level)
-                c = constraints_at_level(contract, level=level, n=n)
-                assert getattr(c, "c3_max_per_stratum") == ceil_half(n)
-                assert getattr(c, "d3_max_per_assay_kind") == ceil_half(n)
-                assert getattr(c, "d1_min_assay_kinds") == (3 if rung < 4 else 2)
-                assert getattr(c, "d2_min_model_systems") == (2 if rung < 6 else 1)
-                assert getattr(c, "p1_max_sole_support") == (ceil_half(n) if rung < 3 else ceil_two_thirds(n))
-                assert getattr(c, "p2_min_established_groups") == (3 if rung < 2 else 2 if rung < 7 else 1)
-                assert getattr(c, "p3_max_single_high_throughput") == (2 if rung < 5 else 3)
-                assert getattr(c, "c5_enforced") is (rung == 0)
-                assert getattr(c, "level") == level
-                assert getattr(c, "rung") == rung
-                assert getattr(c, "n") == n
-                assert getattr(c, "applied_steps") == tuple(reg["relaxation_ladder"][:rung])
-    except Exception:
-        pass # will fail downstream because production lacks these APIs
+    contract = materialize_constraint_contract(
+        registration=reg,
+        verified_protocol_version=protocol_version,
+        verified_protocol_doc_hash=protocol_hash,
+    )
+
+    for n in (5, 8, 12):
+        for level in ("L0", "R1", "R2", "R3", "R4", "R5", "R6", "R7"):
+            rung = (["L0", "R1", "R2", "R3", "R4", "R5", "R6", "R7"]).index(level)
+            c = constraints_at_level(contract, level=level, n=n)
+            assert getattr(c, "c3_max_per_stratum") == ceil_half(n)
+            assert getattr(c, "d3_max_per_assay_kind") == ceil_half(n)
+            assert getattr(c, "d1_min_assay_kinds") == (3 if rung < 4 else 2)
+            assert getattr(c, "d2_min_model_systems") == (2 if rung < 6 else 1)
+            assert getattr(c, "p1_max_sole_support") == (ceil_half(n) if rung < 3 else ceil_two_thirds(n))
+            assert getattr(c, "p2_min_established_groups") == (3 if rung < 2 else 2 if rung < 7 else 1)
+            assert getattr(c, "p3_max_single_high_throughput") == (2 if rung < 5 else 3)
+            assert getattr(c, "c5_enforced") is (rung == 0)
+            assert getattr(c, "level") == level
+            assert getattr(c, "rung") == rung
+            assert getattr(c, "n") == n
+            assert getattr(c, "applied_steps") == tuple(s.split()[0] for s in reg["relaxation_ladder"][:rung])
 
     run = _select(world)
     outcome = getattr(run, "terminal_outcome")
@@ -4667,24 +4664,6 @@ def test_ps_p_005_returned_solutions_satisfy_every_active_constraint(
         level=accepted.level,
         pool=pool,
     ), f"seed {seed}: the returned panel violates a constraint active at {accepted.level}"
-
-    # 3. constraints_at_level produces the exact L0/R1..R7 table
-    constraints_at_level = _sut("constraints_at_level")
-    def ceil_half(x: int) -> int: return (x + 1) // 2
-    def ceil_two_thirds(x: int) -> int: return (2 * x + 2) // 3
-
-    for n in (5, 8, 12):
-        for level in ("L0", "R1", "R2", "R3", "R4", "R5", "R6", "R7"):
-            rung = (["L0", "R1", "R2", "R3", "R4", "R5", "R6", "R7"]).index(level)
-            c = constraints_at_level(level, n)
-            assert c["C3"] == ceil_half(n)
-            assert c["D3"] == ceil_half(n)
-            assert c["D1"] == (3 if rung < 4 else 2)
-            assert c["D2"] == (2 if rung < 6 else 1)
-            assert c["P1"] == (ceil_half(n) if rung < 3 else ceil_two_thirds(n))
-            assert c["P2"] == (3 if rung < 2 else 2 if rung < 7 else 1)
-            assert c["P3"] == (2 if rung < 5 else 3)
-            assert c["C5_spec_taxonomy_coverage_is_gating"] is (rung == 0)
 
 
 @requires_impl
