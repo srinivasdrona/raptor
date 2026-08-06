@@ -1198,19 +1198,14 @@ def build_world(
                 "stratum_shortlist_size": stratum_shortlist_size,
                 "search_node_budget": node_budget,
             },
-            "constraints": {
-                "coverage": {"C1": True, "C2": True, "C3": "ceil(n/2)", "C4": True, "C5": True},
-                "diversity": {"D1": 3, "D2": 2, "D3": "ceil(n/2)", "D4": True},
-                "source_concentration": {"P1": "ceil(n/2)", "P2": 3, "P3": 2},
-            },
             "relaxation_ladder": [
-                {"step": "R1", "constraint": "C5", "before": True, "after": "report_only"},
-                {"step": "R2", "constraint": "P2", "before": 3, "after": 2},
-                {"step": "R3", "constraint": "P1", "before": "ceil(n/2)", "after": "ceil(2n/3)"},
-                {"step": "R4", "constraint": "D1", "before": 3, "after": 2},
-                {"step": "R5", "constraint": "P3", "before": 2, "after": 3},
-                {"step": "R6", "constraint": "D2", "before": 2, "after": 1},
-                {"step": "R7", "constraint": "P2", "before": 2, "after": 1},
+                "R1 C5 spec-taxonomy coverage becomes report-only",
+                "R2 P2 minimum established source groups 3 -> 2",
+                "R3 P1 sole-support cap ceil(n/2) -> ceil(2n/3)",
+                "R4 D1 minimum assay kinds 3 -> 2",
+                "R5 P3 single-high-throughput cap 2 -> 3",
+                "R6 D2 minimum model systems 2 -> 1",
+                "R7 P2 minimum established source groups -> 1 (terminal)",
             ],
             "never_relaxed": [
                 "E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8",
@@ -3796,6 +3791,50 @@ def test_ps_a_008_search_scope_guard_runs_before_any_attempt(tmp_path: Path) -> 
         code="UNSUPPORTED_SEARCH_SCOPE",
     )
 
+    # Revision-4 constraint materialization contract:
+    # 1. materialize_constraint_contract accepts exact supported version/hash and real-shaped registration
+    materialize_constraint_contract = _sut("materialize_constraint_contract")
+    AtlasPanelRegistrationError = _sut("AtlasPanelRegistrationError")
+    
+    reg = narrowed.registration
+    protocol_version = narrowed.protocol_version if hasattr(narrowed, "protocol_version") else "1.0.4"
+    protocol_hash = narrowed.protocol_doc_hash
+    
+    # Happy path
+    contract = materialize_constraint_contract(protocol_version, protocol_hash, reg)
+    assert contract is not None
+
+    # 2. Wrong version, wrong hash, missing/extra/reordered/edited ladder entry fail with revision-4 typed codes
+    with pytest.raises(AtlasPanelRegistrationError) as excinfo:
+        materialize_constraint_contract("1.0.0", protocol_hash, reg)
+    assert excinfo.value.code == "UNSUPPORTED_PROTOCOL_VERSION"
+
+    with pytest.raises(AtlasPanelRegistrationError) as excinfo:
+        materialize_constraint_contract(protocol_version, "0"*64, reg)
+    assert excinfo.value.code == "UNSUPPORTED_PROTOCOL_HASH"
+
+    import copy
+    # Edited ladder entry
+    edited_reg = copy.deepcopy(reg)
+    edited_reg["relaxation_ladder"][0] = "R1 C5 spec-taxonomy coverage becomes report_only" # edited dash
+    with pytest.raises(AtlasPanelRegistrationError) as excinfo:
+        materialize_constraint_contract(protocol_version, protocol_hash, edited_reg)
+    assert excinfo.value.code == "INVALID_RELAXATION_LADDER"
+
+    # Missing ladder entry
+    missing_reg = copy.deepcopy(reg)
+    missing_reg["relaxation_ladder"].pop()
+    with pytest.raises(AtlasPanelRegistrationError) as excinfo:
+        materialize_constraint_contract(protocol_version, protocol_hash, missing_reg)
+    assert excinfo.value.code == "INVALID_RELAXATION_LADDER"
+
+    # Reordered ladder entry
+    reordered_reg = copy.deepcopy(reg)
+    reordered_reg["relaxation_ladder"] = reordered_reg["relaxation_ladder"][::-1]
+    with pytest.raises(AtlasPanelRegistrationError) as excinfo:
+        materialize_constraint_contract(protocol_version, protocol_hash, reordered_reg)
+    assert excinfo.value.code == "INVALID_RELAXATION_LADDER"
+
 
 # ---------------------------------------------------------------------------
 # PS-O-* schedule, relaxation and terminal outcomes
@@ -3879,9 +3918,8 @@ def test_ps_o_004_relaxed_levels_are_stamped_and_recorded(tmp_path: Path) -> Non
     assert getattr(run, "independence_status") == "RELAXED"
     flags = dict(getattr(run, "flags"))
     assert flags.get("spec_taxonomy_coverage") == "PARTIAL"
-    ladder = {s["step"]: s for s in world.registration["relaxation_ladder"]}
-    assert "before" in ladder["R1"] and "after" in ladder["R1"]
-
+    ladder = world.registration["relaxation_ladder"]
+    assert ladder[0] == "R1 C5 spec-taxonomy coverage becomes report-only"
 
 @requires_impl
 def test_ps_o_005_never_relaxed_items_are_unreachable(tmp_path: Path) -> None:
@@ -3889,7 +3927,7 @@ def test_ps_o_005_never_relaxed_items_are_unreachable(tmp_path: Path) -> None:
 
     world = build_world(tmp_path, records=_single_assay_records())
     never = set(world.registration["never_relaxed"])
-    ladder_targets = {step["constraint"] for step in world.registration["relaxation_ladder"]}
+    ladder_targets = {step.split()[1] for step in world.registration["relaxation_ladder"]}
     assert ladder_targets & never == set(), ladder_targets & never
     for mandatory in ("C1", "C2", "C4", "E1", "E8", "firewall", "undetermined_relaxation"):
         assert mandatory in never
@@ -4174,8 +4212,40 @@ def test_ps_d_003_run_record_carries_every_digest_and_the_full_delta(tmp_path: P
         "result",
         "dispositions",
         "provenance",
+        "declared_constraints",
     }
     assert required_blocks <= set(rendered), sorted(required_blocks - set(rendered))
+    
+    # 5. Run-record declared_constraints is non-null
+    dc = rendered["declared_constraints"]
+    assert dc is not None
+    assert "protocol_version" in dc
+    assert "protocol_doc_hash" in dc
+    assert "base_expressions" in dc
+    assert "declared_ladder" in dc
+    assert dc["declared_ladder"] == world.registration["relaxation_ladder"]
+    assert "structured_steps" in dc
+    assert "evaluated_levels" in dc
+
+    # 6. Prove selection does not parse constraint semantics from Markdown
+    import inspect
+    panel_source = inspect.getsource(_panel)
+    assert "markdown" not in panel_source.lower(), "Selection parses constraint semantics from Markdown"
+    
+    # Prove it never reads registration["constraints"]
+    class TrapDict(dict):
+        def __getitem__(self, key):
+            if key == "constraints":
+                raise KeyError("Selection must not read registration['constraints']")
+            return super().__init__(key)
+        def get(self, key, default=None):
+            if key == "constraints":
+                raise KeyError("Selection must not read registration['constraints']")
+            return super().get(key, default)
+            
+    # We can't easily replace registration with TrapDict in the frozen run,
+    # but we can statically check that "constraints" is not hardcoded as a literal key access:
+    assert '"constraints"' not in panel_source and "'constraints'" not in panel_source, "Selection reads registration['constraints']"
 
     report = getattr(run, "preconditions")
     digests = rendered["verified_digests"]
@@ -4481,6 +4551,24 @@ def test_ps_p_005_returned_solutions_satisfy_every_active_constraint(
 ) -> None:
     """PS-P-005 PROPERTY: an independent checker validates whatever comes back."""
 
+    # 3. constraints_at_level produces the exact L0/R1..R7 table
+    constraints_at_level = _sut("constraints_at_level")
+    def ceil_half(x: int) -> int: return (x + 1) // 2
+    def ceil_two_thirds(x: int) -> int: return (2 * x + 2) // 3
+
+    for n in (5, 8, 12):
+        for level in ("L0", "R1", "R2", "R3", "R4", "R5", "R6", "R7"):
+            rung = (["L0", "R1", "R2", "R3", "R4", "R5", "R6", "R7"]).index(level)
+            c = constraints_at_level(level, n)
+            assert c["C3"] == ceil_half(n)
+            assert c["D3"] == ceil_half(n)
+            assert c["D1"] == (3 if rung < 4 else 2)
+            assert c["D2"] == (2 if rung < 6 else 1)
+            assert c["P1"] == (ceil_half(n) if rung < 3 else ceil_two_thirds(n))
+            assert c["P2"] == (3 if rung < 2 else 2 if rung < 7 else 1)
+            assert c["P3"] == (2 if rung < 5 else 3)
+            assert c["C5_spec_taxonomy_coverage_is_gating"] is (rung == 0)
+
     world = build_world(tmp_path / f"seed{seed}", records=_random_records(seed, size=7))
     run = _select(world)
     outcome = getattr(run, "terminal_outcome")
@@ -4503,6 +4591,24 @@ def test_ps_p_005_returned_solutions_satisfy_every_active_constraint(
         level=accepted.level,
         pool=pool,
     ), f"seed {seed}: the returned panel violates a constraint active at {accepted.level}"
+
+    # 3. constraints_at_level produces the exact L0/R1..R7 table
+    constraints_at_level = _sut("constraints_at_level")
+    def ceil_half(x: int) -> int: return (x + 1) // 2
+    def ceil_two_thirds(x: int) -> int: return (2 * x + 2) // 3
+
+    for n in (5, 8, 12):
+        for level in ("L0", "R1", "R2", "R3", "R4", "R5", "R6", "R7"):
+            rung = (["L0", "R1", "R2", "R3", "R4", "R5", "R6", "R7"]).index(level)
+            c = constraints_at_level(level, n)
+            assert c["C3"] == ceil_half(n)
+            assert c["D3"] == ceil_half(n)
+            assert c["D1"] == (3 if rung < 4 else 2)
+            assert c["D2"] == (2 if rung < 6 else 1)
+            assert c["P1"] == (ceil_half(n) if rung < 3 else ceil_two_thirds(n))
+            assert c["P2"] == (3 if rung < 2 else 2 if rung < 7 else 1)
+            assert c["P3"] == (2 if rung < 5 else 3)
+            assert c["C5_spec_taxonomy_coverage_is_gating"] is (rung == 0)
 
 
 @requires_impl
