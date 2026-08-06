@@ -930,10 +930,11 @@ def _verify_identity_map_binding_on_universe_lock(
 ) -> None:
     """IM6: the universe lock's own ``identity_map_binding`` sub-object must
     agree, field-by-field, with the independently verified identity map --
-    ``schema``, ``map_id``, ``map_version``, ``map_content_hash`` mirror the
-    map MANIFEST (the map lock carries its own, distinct lock schema id, so
-    the manifest is the only correct comparand for these four); ``lock_id``,
-    ``lock_version``, ``lock_content_hash``, ``response_bundle_hash``, and
+    ``schema`` mirrors the map LOCK (the map manifest carries its own,
+    distinct raw-map schema id, so the lock is the only correct comparand
+    for this field); ``map_id``, ``map_version``, ``map_content_hash``
+    mirror the map MANIFEST; ``lock_id``, ``lock_version``,
+    ``lock_content_hash``, ``response_bundle_hash``, and
     ``map_record_count`` mirror the map LOCK -- and its nested
     ``pack_binding`` copy must agree with the universe lock's own
     (K2/V4-verified) top-level ``pack_binding``; the redundant binding is
@@ -946,7 +947,7 @@ def _verify_identity_map_binding_on_universe_lock(
             "universe lock is missing an identity_map_binding", code="IDENTITY_MAP_MISMATCH", check_id="IM6",
         )
     mismatches = []
-    if binding.get("schema") != map_manifest.get("schema"):
+    if binding.get("schema") != map_lock.get("schema"):
         mismatches.append("schema")
     if binding.get("map_id") != map_manifest.get("map_id"):
         mismatches.append("map_id")
