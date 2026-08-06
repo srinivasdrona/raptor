@@ -7,6 +7,7 @@ SDK (enforced by :func:`raptor.atlas.guards.assert_atlas_import_boundary`).
 """
 
 from raptor.atlas.model import (
+    AnchorSpec,
     AtlasCandidateImport,
     AtlasCatalogError,
     AtlasCatalogHashError,
@@ -19,17 +20,25 @@ from raptor.atlas.model import (
     AtlasIdentity,
     AtlasIdentityError,
     AtlasIdentityMapAmbiguityError,
+    AtlasIdentityMapBindingError,
     AtlasIdentityMapError,
     AtlasIdentityMapHashError,
     AtlasIdentityMapPathError,
     AtlasIdentityMapResponseError,
     AtlasIdentityMapSchemaError,
     AtlasLeakageError,
+    AtlasLockDeltaError,
     AtlasPackError,
+    AtlasPanelError,
+    AtlasPanelInputError,
+    AtlasPanelPackDriftError,
+    AtlasPanelRegistrationError,
     AtlasProvenanceError,
     AtlasSchemaError,
     AtlasSourceVerificationError,
     AtlasSpanMismatchError,
+    AtlasUniverseContractError,
+    AtlasUniverseLockError,
     CandidateClass,
     CatalogSource,
     CitationIdentifier,
@@ -50,6 +59,8 @@ from raptor.atlas.model import (
     RawIdentityReplay,
     ResolvedCitation,
     RunMetadata,
+    SelectionInputs,
+    SelectionRun,
     SourceRegisterEntry,
     Span,
     VerifiedSpan,
@@ -61,6 +72,7 @@ from raptor.atlas.identity_map import (
     load_identity_map,
 )
 from raptor.atlas.pack import load_disease_pack, pack_content_hash, validate_disease_pack
+from raptor.atlas.panel import select_panel
 from raptor.atlas.hashing import evidence_core_hash, profile_envelope_hash
 from raptor.atlas.registry import validate_claim_grounding, verify_source
 from raptor.atlas.profile import build_mechanism_profile
@@ -81,6 +93,7 @@ from raptor.atlas.guards import (
 )
 
 __all__ = [
+    "AnchorSpec",
     "AtlasCandidateImport",
     "AtlasCatalogError",
     "AtlasCatalogHashError",
@@ -93,17 +106,25 @@ __all__ = [
     "AtlasIdentity",
     "AtlasIdentityError",
     "AtlasIdentityMapAmbiguityError",
+    "AtlasIdentityMapBindingError",
     "AtlasIdentityMapError",
     "AtlasIdentityMapHashError",
     "AtlasIdentityMapPathError",
     "AtlasIdentityMapResponseError",
     "AtlasIdentityMapSchemaError",
     "AtlasLeakageError",
+    "AtlasLockDeltaError",
     "AtlasPackError",
+    "AtlasPanelError",
+    "AtlasPanelInputError",
+    "AtlasPanelPackDriftError",
+    "AtlasPanelRegistrationError",
     "AtlasProvenanceError",
     "AtlasSchemaError",
     "AtlasSourceVerificationError",
     "AtlasSpanMismatchError",
+    "AtlasUniverseContractError",
+    "AtlasUniverseLockError",
     "CandidateClass",
     "CatalogSource",
     "CitationCatalog",
@@ -126,6 +147,8 @@ __all__ = [
     "RawIdentityReplay",
     "ResolvedCitation",
     "RunMetadata",
+    "SelectionInputs",
+    "SelectionRun",
     "SourceRegisterEntry",
     "Span",
     "VerifiedSpan",
@@ -137,6 +160,7 @@ __all__ = [
     "load_disease_pack",
     "pack_content_hash",
     "validate_disease_pack",
+    "select_panel",
     "evidence_core_hash",
     "profile_envelope_hash",
     "validate_claim_grounding",

@@ -20,6 +20,8 @@ core model.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Callable, Mapping, Optional, Protocol, Tuple, runtime_checkable
 
 
@@ -702,3 +704,279 @@ class RawIdentityMapper(Protocol):
         source_reported_consequence_hint: str,
     ) -> RawIdentityReplay:
         ...
+
+
+# ---------------------------------------------------------------------------
+# Atlas Phase-2 contrast-panel selector: typed errors
+# ---------------------------------------------------------------------------
+#
+# These are raised ONLY by ``raptor.atlas.panel``. ``AtlasPanelError`` is a
+# new sibling of ``AtlasPackError``/``AtlasCatalogError``/
+# ``AtlasIdentityMapError`` (it is not a supertype of any of them). Terminal
+# selection outcomes (SOLUTION/INFEASIBLE_COMPLETE/UNDETERMINED per attempt;
+# PANEL_SELECTED/INFEASIBLE_PANEL/UNDETERMINED_SEARCH_INCOMPLETE overall) are
+# ordinary return values, never exceptions -- only a precondition/protocol
+# fault raises one of the classes below.
+
+
+class AtlasPanelError(AtlasError):
+    """Base of the Atlas Phase-2 contrast-panel selector error family.
+
+    Every instance carries a ``code`` (a string drawn from a closed enum of
+    protocol-failure/input-fault names), an optional ``check_id`` (e.g.
+    ``"V1"``, ``"K5"``, ``"U3"``, ``"RP4"``, ``"IM2"``, ``"E6"``) naming the
+    specific rule that failed, and an optional ``locus`` describing where in
+    the input the fault was found.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: Optional[str] = None,
+        check_id: Optional[str] = None,
+        locus: Optional[str] = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.check_id = check_id
+        self.locus = locus
+
+
+class AtlasPanelInputError(AtlasPanelError):
+    """A caller/argument fault before any protocol check: a missing or
+    unreadable path, a non-regular file, a symlink/junction or a '..'
+    escape, malformed YAML, a wrong schema id, an absent required argument,
+    or a timestamp that ``yaml.safe_load`` coerced into a ``date``/
+    ``datetime`` instead of leaving as a quoted string."""
+
+
+class AtlasPanelRegistrationError(AtlasPanelError):
+    """A V1/V2/V3 failure (protocol digest mismatch, registration self-hash
+    mismatch, seed literal mismatch), or a registration parameter this
+    implementation cannot honour soundly (an unsupported ``search_scope`` or
+    a non-null ``stratum_shortlist_size``)."""
+
+
+class AtlasPanelPackDriftError(AtlasPanelError):
+    """A V4 failure (``PACK_DRIFT``): the live disease-pack content hash
+    does not equal one (or more) of the three required comparands (the
+    registration's freeze-time snapshot, the candidate universe's pack
+    binding, and the universe lock's pack binding)."""
+
+
+class AtlasUniverseLockError(AtlasPanelError):
+    """A V5 failure via K1/K2/K3/K4/K6: the registration-active universe
+    lock is missing, corrupt, mismatched against the universe/raw
+    inventory/ledger/discovery-set, duplicated, invalid-binding, of an
+    unknown protocol version, or future-dated relative to the run."""
+
+
+class AtlasLockDeltaError(AtlasPanelError):
+    """A V5 failure via K5: the mandatory ``lock_protocol_version_delta`` is
+    missing, partial, free-text, or its protocol/registration digests are
+    not reconcilable to the registration's amendment log (a gap in the
+    amendment chain, or reconciliation against a rejected/invalid-binding
+    digest)."""
+
+
+class AtlasUniverseContractError(AtlasPanelError):
+    """A V6 failure: U1-U7 candidate-universe conservation, RP1-RP7
+    normalization replay disagreement, prohibited universe content, a
+    strata/lineage/support-class recomputation disagreement, or a
+    contradictory recomputed-derivation crosswalk cell."""
+
+
+class AtlasIdentityMapBindingError(AtlasPanelError):
+    """A V7 failure via IM1-IM6: the active identity-map lock is absent,
+    corrupt, stale-versioned, or fails to bind the map manifest, response
+    bundle, acquisition tool, raw inventory, disease pack, or the universe
+    lock's own ``identity_map_binding``.
+
+    Deliberately distinct from :class:`AtlasIdentityMapError` (which
+    ``raptor.atlas.identity_map`` raises for its own artifact-level faults):
+    the selector catches that error and re-raises it as this class, tagged
+    with the offending IM check id, so a mapper fault always stays
+    attributable to a protocol rule and is NEVER downgraded to an unresolved
+    identity, an out-of-scope row, an eligibility failure, or a partial
+    result. A mapper fault stops the run with no run record.
+    """
+
+
+# ---------------------------------------------------------------------------
+# Atlas Phase-2 contrast-panel selector: frozen result types
+# ---------------------------------------------------------------------------
+#
+# Every mapping/sequence loaded from disk that ends up on one of these
+# dataclasses is deep-frozen (``MappingProxyType``/``tuple``), mirroring the
+# same deep-freeze principle already used by ``pack.py``/``citation.py``.
+
+
+@dataclass(frozen=True, eq=True)
+class AnchorSpec:
+    """The caller-supplied anchor used by E3 (anchor residue/identity
+    collision). Never a literal baked into core; always injected by the
+    caller (CLI or test) via :class:`SelectionInputs`."""
+
+    spdi_canonical: str
+    residue_index: int
+
+
+@dataclass(frozen=True, eq=True)
+class SelectionInputs:
+    """The complete, explicit input surface to :func:`select_panel`. No
+    field has a default sourced from an environment variable, a wall clock
+    read (other than the caller-supplied ``run_started_at``), or a global --
+    every path is explicit and caller-supplied."""
+
+    repo_root: Path
+    protocol_path: Path
+    registration_path: Path
+    pack_path: Path
+    universe_path: Path
+    raw_inventory_path: Path
+    anchor: AnchorSpec
+    run_started_at: datetime
+    executor_identity: str
+    identity_map_path: Path
+    identity_map_response_root: Path
+    node_budget_override: Optional[int] = None
+
+
+@dataclass(frozen=True, eq=True)
+class LockProtocolVersionDelta:
+    """The mandatory K5 protocol-version delta, always fully populated even
+    when ``differs`` is ``False`` (never pruned/omitted on a match)."""
+
+    lock_protocol_version: str
+    lock_protocol_doc_hash: str
+    lock_registration_content_hash: str
+    current_protocol_version: str
+    current_protocol_doc_hash: str
+    current_registration_content_hash: str
+    differs: bool
+    reconciled_via_amendment_log_versions: tuple[str, ...]
+
+
+@dataclass(frozen=True, eq=True)
+class PreconditionReport:
+    """The complete V1-V7 precondition attestation. Constructed only when
+    every check has passed; there is no partial/default-filled construction
+    path."""
+
+    verified_protocol_doc_hash: str
+    verified_registration_content_hash: str
+    verified_live_pack_content_hash: str
+    active_universe_lock: Mapping[str, Any]
+    verified_lock_content_hash: str
+    verified_universe_content_hash: str
+    verified_raw_inventory_hash: str
+    verified_raw_inventory_record_count: int
+    verified_normalization_ledger_hash: str
+    verified_normalization_ledger_row_count: int
+    verified_discovery_set_hash: str
+    verified_discovery_set_count: int
+    lock_protocol_version_delta: LockProtocolVersionDelta
+    identity_map: "IdentityMapAttestation"
+    checks_passed: tuple[str, ...]
+
+
+@dataclass(frozen=True, eq=True)
+class NormalizationReplay:
+    """The U7/RP1-RP7 normalization replay result, recomputed end-to-end
+    from the raw inventory through the verified identity-map mapper."""
+
+    replayed_row_count: int
+    outcome_counts: Mapping[str, int]
+    unresolved_confirmed_count: int
+    checks_passed: tuple[str, ...]
+
+
+@dataclass(frozen=True, eq=True)
+class LineageIndex:
+    """The recomputed source-lineage grouping over the candidate universe.
+    Unknown lineage is always pooled into the single
+    ``"LG:UNKNOWN-POOL"`` group -- never split, never relaxed."""
+
+    group_of_observation: Mapping[str, str]
+    group_confidence: Mapping[str, str]
+    unknown_observation_count: int
+    unknown_record_count: int
+
+
+@dataclass(frozen=True, eq=True)
+class RecordDisposition:
+    """One row of the mandatory, one-row-per-universe-record disposition
+    table (protocol Section 18)."""
+
+    record_id: str
+    universe_key: str
+    identity_state: str
+    all_matched_strata: tuple[str, ...]
+    primary_stratum: Optional[str]
+    spec_stratum: str
+    spec_stratum_derivation: str
+    support_class: str
+    source_group_keys: tuple[str, ...]
+    draw_key: Optional[str]
+    disposition: str
+    rule_id: str
+    allocation_slot: Optional[str]
+    label_function_discordant: bool
+    stale_label_discordant: bool
+
+
+@dataclass(frozen=True, eq=True)
+class AttemptOutcome:
+    """One relaxation-level/panel-size attempt in the exhaustive search."""
+
+    level: str
+    n: int
+    status: str
+    nodes_expanded: int
+    solution: Optional[tuple[str, ...]]
+
+
+@dataclass(frozen=True, eq=True)
+class SelectionRun:
+    """The complete, pure result of :func:`select_panel`. Nothing is
+    written to disk or mutated by producing this object."""
+
+    terminal_outcome: str
+    preconditions: PreconditionReport
+    replay: NormalizationReplay
+    n_target: int
+    n_selected: Optional[int]
+    selected_record_ids: tuple[str, ...]
+    attempts: tuple[AttemptOutcome, ...]
+    applied_relaxation_steps: tuple[str, ...]
+    independence_status: str
+    dispositions: tuple[RecordDisposition, ...]
+    flags: Mapping[str, Any]
+
+
+@dataclass(frozen=True, eq=True)
+class IdentityMapAttestation:
+    """The V7/IM1-IM6 identity-map attestation. ``mapper`` is the ONLY
+    channel by which a verified :class:`RawIdentityMapper` reaches the
+    RP1-RP7 replay -- there is no injectable mapper argument anywhere in
+    :class:`SelectionInputs`, and ``mapper`` is never itself compared,
+    hashed, or rendered (it is dropped before anything is written to a
+    run record)."""
+
+    lock_path: Path
+    lock_version: str
+    map_version: str
+    lock_content_hash: str
+    map_content_hash: str
+    map_record_count: int
+    response_bundle_hash: str
+    response_file_count: int
+    response_byte_count: int
+    acquisition_tool_sha256: str
+    reference_assembly: str
+    reference_transcript: str
+    reference_protein: str
+    reference_page_count: int
+    checks_passed: tuple[str, ...]
+    mapper: RawIdentityMapper
