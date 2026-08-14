@@ -58,13 +58,19 @@ scope_boundary:
 
 # ---------------------------------------------------------------------------
 # 1. Mechanism evidence ledger.
-#    Three-valued and machine-checkable. OBSERVED entries carry accepted /
-#    reviewed primary evidence. UNSUPPORTED entries are recorded precisely so
-#    that they can never be silently upgraded. HYPOTHESIS entries are the
-#    lane's inputs, not its findings.
+#    Four-valued and machine-checkable. SOURCE_REPORTED entries are narrow
+#    statements found in cited sources but not yet accepted by RAPTOR's human
+#    review gate. OBSERVED is reserved for accepted/reviewed primary evidence.
+#    UNSUPPORTED and HYPOTHESIS cannot be silently upgraded by computation.
 # ---------------------------------------------------------------------------
 mechanism_evidence_ledger:
   status_vocabulary:
+    SOURCE_REPORTED: >-
+      A narrow, context-bound statement reported in a cited primary source or
+      authoritative structure resource. It has not yet passed the complete
+      RAPTOR acceptance path, including named-human Gate 8, and may not be used
+      as an accepted mechanism premise. The exact span/source/context must be
+      resolved before Gate 8 can promote it to OBSERVED.
     OBSERVED: >-
       Supported by accepted/reviewed primary evidence with an exact verified
       span in its stated experimental context. Still context-bound: an OBSERVED
@@ -78,8 +84,9 @@ mechanism_evidence_ledger:
       A proposition this lane may design experiments to falsify. Never an input
       premise treated as true, never a result.
 
-  observed:
+  source_reported:
     - id: MECH-O1
+      status: SOURCE_REPORTED
       statement: >-
         TSC2 p.Arg611Gln loses hamartin (TSC1) complex formation in the reported
         experimental system.
@@ -90,6 +97,7 @@ mechanism_evidence_ledger:
         Assay type, construct, expression system, tag and detection method must
         be recorded with the finding; the finding is not restated context-free.
     - id: MECH-O2
+      status: SOURCE_REPORTED
       statement: >-
         TSC2 p.Arg611Gln is susceptible to enhanced Pam/MYCBP2-associated
         ubiquitination and is incapable of hamartin binding in that system.
@@ -100,6 +108,7 @@ mechanism_evidence_ledger:
       context_required: >-
         "In that system" is part of the claim and must travel with it.
     - id: MECH-O3
+      status: SOURCE_REPORTED
       statement: >-
         TSC1 generally stabilizes TSC2; HERC1 and Hsp70/Hsp90 proteostasis
         evidence for TSC2 handling exists.
@@ -111,6 +120,7 @@ mechanism_evidence_ledger:
         General TSC2 stabilization/proteostasis evidence is not, by itself,
         evidence about the R611Q allele. Do not transfer it to the variant.
     - id: MECH-O4
+      status: SOURCE_REPORTED
       statement: >-
         TSC2 residue 611 is resolved in experimental structure PDB 9CE3.
       citations:
@@ -175,8 +185,13 @@ mechanism_evidence_ledger:
         skipping a gate.
 
   ledger_rules:
-    - A mechanism representation may enter the lane only if its OBSERVED entries
-      are accepted/reviewed under the Atlas gates, including named-human Gate 8.
+    - The current MECH-O1..MECH-O4 entries remain SOURCE_REPORTED while the
+      accepted Atlas claim count is zero. They are not accepted mechanism
+      premises and do not satisfy EG-1.
+    - A mechanism representation may enter the lane only after the relevant
+      SOURCE_REPORTED entries are promoted to OBSERVED through the Atlas gates,
+      including named-human Gate 8. Promotion records exact spans, source roles
+      and assay/model context; it is never inferred from the citations here.
     - An UNSUPPORTED entry that a stage requires is a hard stop for that stage,
       recorded as MECHANISM_UNVERIFIED. It is never worked around by assumption,
       by prediction, or by citing a general finding about a different system.
@@ -200,7 +215,8 @@ entry_gates:
     current_status: NOT_SATISFIED
     current_note: >-
       No named human reviewer is engaged and the accepted Atlas claim count is
-      zero; the R611Q spans pass Gates 1-7 and block at Gate 8.
+      zero; the R611Q spans pass Gates 1-7 and block at Gate 8. MECH-O1..MECH-O4
+      therefore remain SOURCE_REPORTED, not OBSERVED.
 
   - id: EG-2
     name: exact transcript, residue and structure mapping
@@ -634,7 +650,11 @@ tool_and_data_licence_registry:
         redistributable by default.
     - id: LR-6
       artifact: ChEMBL
-      fact: CC BY-SA 3.0; share-alike obligations propagate to derived datasets.
+      fact: >-
+        ChEMBL states CC BY-SA 3.0 for its data. Whether a particular combined
+        or derived artifact is an adaptation subject to share-alike must be
+        assessed and recorded for that artifact; this design does not make a
+        blanket legal conclusion.
     - id: LR-7
       artifact: pocket detection tools (e.g. fpocket, P2Rank, DeepPocket)
       fact: >-
@@ -659,8 +679,10 @@ tool_and_data_licence_registry:
   registry_rules:
     - An unverified or unverifiable entry is LICENCE_INCOMPATIBLE by default.
     - 'Fail closed: absence of evidence of permission is not permission.'
-    - Share-alike or non-commercial terms propagate to every derived artifact and
-      are recorded on that artifact.
+    - The applicability of share-alike, attribution, non-commercial,
+      redistribution or model-output restrictions to each derived artifact is
+      assessed and recorded individually. Neither propagation nor
+      non-propagation is assumed.
     - The registry is versioned and hash-bound; a licence change is a material
       drift event requiring re-review of anything built on it.
 
@@ -781,8 +803,9 @@ artifact_schemas_required:
 acceptance_criteria:
   - id: RA-1
     check: >-
-      Every mechanism statement carries OBSERVED / UNSUPPORTED / HYPOTHESIS
-      status, and no UNSUPPORTED statement is used as a premise anywhere.
+      Every mechanism statement carries SOURCE_REPORTED / OBSERVED /
+      UNSUPPORTED / HYPOTHESIS status; current source-reported statements cannot
+      satisfy EG-1, and no UNSUPPORTED statement is used as a premise anywhere.
   - id: RA-2
     check: >-
       All five entry gates are present with explicit fail states, and the lane's

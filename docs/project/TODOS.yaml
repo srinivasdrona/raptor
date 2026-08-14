@@ -1274,8 +1274,9 @@ todos:
     retained as hard gates at the frozen base thresholds; six entry requirements IV-E1..IV-E6),
     plus six separation rules PS-1..PS-6 forbidding any evidence flow from the engineering
     product to the scientific one. docs/project/specs/structural-rescue-screen-v1.yaml defines
-    RAPTOR RescueScreen: a three-valued mechanism ledger (four OBSERVED, four UNSUPPORTED,
-    one HYPOTHESIS), five entry gates EG-1..EG-5 all NOT_SATISFIED, seven ordered stages S1..S7,
+    RAPTOR RescueScreen: a four-valued mechanism ledger (four SOURCE_REPORTED pending Gate 8,
+    zero OBSERVED, four UNSUPPORTED, one HYPOTHESIS), five entry gates EG-1..EG-5 all
+    NOT_SATISFIED, seven ordered stages S1..S7,
     a closed seven-term earned output vocabulary with thirteen forbidden terms, seven terminal
     no-go states, a six-tier assay cascade AC-1..AC-6, a per-artifact tool/data/licence registry
     with ten recorded licence facts LR-1..LR-10, a threshold policy rejecting five commonly
@@ -1440,9 +1441,10 @@ todos:
     minimum that AlphaFold 3 code is Apache-2.0 while its weights and outputs carry separate
     restricted terms, that ColabFold is not AF3, that FoldX is registration/licence controlled,
     that PremPS is a third-party web server, that Enamine REAL is commercial vendor data,
-    that ChEMBL is CC BY-SA 3.0 with propagating share-alike obligations, that pocket, docking,
-    cheminformatics and molecular-dynamics tooling each carry differing licences to be pinned
-    individually, and that ZINC and UniProt terms require re-verification at time of use.
+    that ChEMBL states CC BY-SA 3.0 and the applicability of its terms to each derived artifact
+    must be assessed rather than assumed, that pocket, docking, cheminformatics and
+    molecular-dynamics tooling each carry differing licences to be pinned individually, and that
+    ZINC and UniProt terms require re-verification at time of use.
     No library is downloaded, no compound is enumerated and no vendor is contacted. Not started.'
   status: pending
   depends_on:

@@ -319,10 +319,11 @@ products:
     independent_validation: false
     disclosed_as_post_result: true
     disclosure_text: >-
-      Designed and executed AFTER the 2026-08-06 INFEASIBLE_PANEL result, with
-      full knowledge of it. This product tests RAPTOR's machinery, not TSC2
-      biology, and provides no evidence about the feasibility of the
-      independent-validation panel.
+      Designed AFTER the 2026-08-06 INFEASIBLE_PANEL result, with full
+      knowledge of it. If later executed, that execution is necessarily
+      post-result and must repeat this disclosure. This product tests RAPTOR's
+      machinery, not TSC2 biology, and provides no evidence about the
+      feasibility of the independent-validation panel.
 
     objective: >-
       Exercise the identity -> source -> span -> context -> abstention pipeline

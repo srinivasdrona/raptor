@@ -122,11 +122,13 @@ ad hoc, ungoverned, under deadline pressure.
 Adopt **option 3** as **RAPTOR RescueScreen**, specified in
 `docs/project/specs/structural-rescue-screen-v1.yaml`.
 
-1. **Three-valued mechanism ledger.** Every mechanism statement is `OBSERVED` (accepted/reviewed
-   primary evidence with an exact verified span and its experimental context), `UNSUPPORTED`, or
-   `HYPOTHESIS`. An `UNSUPPORTED` entry may never be assumed, used as a modelling premise, or
-   upgraded by computation — only new reviewed primary evidence changes a status. Context travels
-   with the claim: "in that system" is part of the finding.
+1. **Four-valued mechanism ledger.** `SOURCE_REPORTED` records a narrow statement found in a
+   cited source but not yet accepted by RAPTOR; `OBSERVED` is reserved for accepted/reviewed
+   primary evidence with an exact verified span and its experimental context; the other states
+   are `UNSUPPORTED` and `HYPOTHESIS`. The current $R611Q$ statements remain
+   `SOURCE_REPORTED` because Gate 8 is blocked and the accepted-claim count is zero.
+   `SOURCE_REPORTED` and `UNSUPPORTED` entries may not be used as accepted mechanism premises or
+   upgraded by computation. Context travels with the statement: "in that system" is part of it.
 2. **Five entry gates, all required, all currently `NOT_SATISFIED`.** A Gate 8-reviewed mechanism
    representation (else an explicit `MECHANISM_UNVERIFIED` stop); exact transcript/residue/structure
    mapping with residue arithmetic prohibited; experimental-structure coverage and uncertainty;
@@ -162,7 +164,9 @@ Adopt **option 3** as **RAPTOR RescueScreen**, specified in
 8. **Licence registry, fail-closed.** Every tool, model, weight set, structure, library and derived
    dataset is registered and individually verified with version, licence, permitted use,
    redistribution/commercial status, locator and retrieval date. Absence of evidence of permission
-   is not permission; share-alike and non-commercial terms propagate to derived artifacts.
+   is not permission. Applicability of attribution, share-alike, non-commercial, redistribution and
+   output restrictions is assessed per derived artifact; propagation is not assumed as a blanket
+   legal rule.
 9. **Eight firewalls.** RescueScreen may not alter or inform any ACMG evidence item or
    classification; may not promote or corroborate an Atlas claim; may not recommend a compound,
    treatment, therapy, dose or combination; may not report a docking, rescoring or simulation value

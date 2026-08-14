@@ -228,12 +228,14 @@ cases count toward no coverage metric.
 
 **RAPTOR RescueScreen** is a separate, downstream, separately versioned **research-only** lane that
 turns reviewed mechanism hypotheses into experimentally testable ones. Its mechanism ledger is
-three-valued: complex-formation loss and enhanced Pam/MYCBP2 ubiquitination in the reported systems,
+four-valued. Complex-formation loss and enhanced Pam/MYCBP2 ubiquitination in the reported systems,
 general TSC1-dependent TSC2 stabilization/proteostasis evidence, and residue-611 coverage in an
-experimental structure are `OBSERVED`; a defined Arg611 salt bridge, endogenous misfolding/turnover
-kinetics, reliable AF3 prediction of the mutation-induced shift, and any everolimus-combination dose
-or toxicity benefit are `UNSUPPORTED`; a stabilizing pocket compound is a `HYPOTHESIS`. `UNSUPPORTED`
-statements may never be assumed as premises and are never upgraded by computation.
+experimental structure are currently `SOURCE_REPORTED`, not accepted `OBSERVED` claims, because
+Gate 8 is blocked and the accepted-claim count is zero. A defined Arg611 salt bridge, endogenous
+misfolding/turnover kinetics, reliable AF3 prediction of the mutation-induced shift, and any
+everolimus-combination dose or toxicity benefit are `UNSUPPORTED`; a stabilizing pocket compound is
+a `HYPOTHESIS`. `SOURCE_REPORTED` and `UNSUPPORTED` statements may never be assumed as accepted
+premises or upgraded by computation.
 
 All five entry gates are **`NOT_SATISFIED`** — chiefly because no named human reviewer is engaged
 and the accepted Atlas claim count is zero — so no stage is reachable:
