@@ -1,0 +1,867 @@
+# RAPTOR RescueScreen -- structural-rescue screening track design spec.
+#
+# RESEARCH ONLY. This file is a PLAN. It contains NO code, NO tests, NO
+# compound, NO SMILES/InChI/CAS/catalogue identifier, NO vendor list, NO
+# screening result, NO docking score and NO treatment recommendation.
+# It selects nothing, screens nothing and recommends nothing.
+#
+# RescueScreen is a SEPARATE, DOWNSTREAM, SEPARATELY VERSIONED lane. It is not
+# part of the Atlas evidence pipeline, not part of the ACMG scorer, and not part
+# of either panel product. It consumes reviewed mechanism representations and
+# produces experimentally testable HYPOTHESES.
+#
+# Authority order for BEHAVIOUR (this spec is subordinate to all of them):
+#   1. docs/DECISIONS.md (ADR-0009/0010/0011/0014/0015/0016/0018)
+#   2. docs/project/specs/mechanism-atlas-starter.yaml
+#   3. docs/project/specs/atlas-panel-products-v1.yaml
+#   4. docs/RISK_REGISTER.md, docs/EVALUATION.md Part II
+
+schema: raptor-structural-rescue-screen-v1
+status: planner_contract_rev1_research_only_no_execution
+task_id: rescuescreen-track-design
+title: >-
+  RAPTOR RescueScreen: a gated, research-only structural-rescue screening track
+  that converts reviewed mechanism hypotheses into experimentally testable
+  compound hypotheses
+worktree: 'D:\AIProjects\raptor-worktrees\panel-products-rescue-screen'
+branch: design/panel-products-rescue-screen-2026-08
+base_commit: 5704c63a786ff06313fbbf79fb2e5ff5a05ed63c
+output: docs/project/specs/structural-rescue-screen-v1.yaml
+created_at: '2026-08-15T04:20:11+05:30'
+created_at_utc: '2026-08-14T22:50:11Z'
+binds_adr: ADR-0018
+lane_name: RAPTOR RescueScreen
+lane_kind: research_only_downstream_track
+lane_version: v1 (design only; nothing executed)
+lane_status: DESIGN_ONLY_ENTRY_GATES_UNSATISFIED
+
+contract: >-
+  Define a lane in which a reviewed, span-grounded mechanism representation can
+  become a falsifiable structural hypothesis, then a pocket hypothesis, then a
+  small calibrated computational pilot, then -- only through orthogonal
+  computation and then wet-lab assays -- an experimentally confirmed binder and
+  a measured complex/functional rescue observation. Every stage output is a
+  hypothesis until its next gate passes. The lane may terminate at any stage
+  with a no-go, and terminating is a successful outcome.
+
+scope_boundary:
+  is: >-
+    A design for generating and falsifying testable hypotheses about whether a
+    small molecule can stabilize a protein complex, in a research setting.
+  is_not:
+    - a drug-discovery programme
+    - a therapy, treatment, intervention or clinical development plan
+    - a source of medical, clinical or patient-management advice
+    - an input to variant classification or to any ACMG criterion
+    - a promotion path for any Atlas claim
+    - a procurement or vendor-selection process
+
+# ---------------------------------------------------------------------------
+# 1. Mechanism evidence ledger.
+#    Four-valued and machine-checkable. SOURCE_REPORTED entries are narrow
+#    statements found in cited sources but not yet accepted by RAPTOR's human
+#    review gate. OBSERVED is reserved for accepted/reviewed primary evidence.
+#    UNSUPPORTED and HYPOTHESIS cannot be silently upgraded by computation.
+# ---------------------------------------------------------------------------
+mechanism_evidence_ledger:
+  status_vocabulary:
+    SOURCE_REPORTED: >-
+      A narrow, context-bound statement reported in a cited primary source or
+      authoritative structure resource. It has not yet passed the complete
+      RAPTOR acceptance path, including named-human Gate 8, and may not be used
+      as an accepted mechanism premise. The exact span/source/context must be
+      resolved before Gate 8 can promote it to OBSERVED.
+    OBSERVED: >-
+      Supported by accepted/reviewed primary evidence with an exact verified
+      span in its stated experimental context. Still context-bound: an OBSERVED
+      finding is a finding about the system in which it was measured.
+    UNSUPPORTED: >-
+      Not established by reviewed evidence available to this lane. An
+      UNSUPPORTED entry may not be assumed, asserted, used as a modelling
+      premise, or converted to OBSERVED by computation. It becomes OBSERVED only
+      via new reviewed primary evidence recorded through the normal Atlas gates.
+    HYPOTHESIS: >-
+      A proposition this lane may design experiments to falsify. Never an input
+      premise treated as true, never a result.
+
+  source_reported:
+    - id: MECH-O1
+      status: SOURCE_REPORTED
+      statement: >-
+        TSC2 p.Arg611Gln loses hamartin (TSC1) complex formation in the reported
+        experimental system.
+      citations:
+        - {type: PMID, value: '18230340'}
+        - {type: DOI, value: 10.1016/j.bbrc.2008.01.077}
+      context_required: >-
+        Assay type, construct, expression system, tag and detection method must
+        be recorded with the finding; the finding is not restated context-free.
+    - id: MECH-O2
+      status: SOURCE_REPORTED
+      statement: >-
+        TSC2 p.Arg611Gln is susceptible to enhanced Pam/MYCBP2-associated
+        ubiquitination and is incapable of hamartin binding in that system.
+      citations:
+        - {type: PMCID, value: PMC2435383}
+        - {type: PMID, value: '18308511'}
+        - {type: DOI, value: 10.1016/j.cellsig.2008.01.020}
+      context_required: >-
+        "In that system" is part of the claim and must travel with it.
+    - id: MECH-O3
+      status: SOURCE_REPORTED
+      statement: >-
+        TSC1 generally stabilizes TSC2; HERC1 and Hsp70/Hsp90 proteostasis
+        evidence for TSC2 handling exists.
+      citations:
+        - {type: PMID, value: '16464865'}
+        - {type: PMCID, value: PMC5730846}
+        - {type: PMID, value: '29127155'}
+      context_required: >-
+        General TSC2 stabilization/proteostasis evidence is not, by itself,
+        evidence about the R611Q allele. Do not transfer it to the variant.
+    - id: MECH-O4
+      status: SOURCE_REPORTED
+      statement: >-
+        TSC2 residue 611 is resolved in experimental structure PDB 9CE3.
+      citations:
+        - {type: PDB, value: 9CE3}
+        - {type: RESOURCE, value: PDBe residue-level UniProt mapping}
+        - {type: PMID, value: '39565846'}
+        - {type: DOI, value: 10.1126/sciadv.adr5807}
+      context_required: >-
+        Record the exact chain, residue numbering scheme, modelled/unmodelled
+        status, local resolution and any alternate conformer before using the
+        residue environment for anything.
+
+  unsupported:
+    - id: MECH-U1
+      statement: >-
+        A defined Arg611-TSC1 salt bridge or specific electrostatic contact.
+      consequence: >-
+        No pocket, interface or scoring rationale may assume a specific Arg611
+        ionic contact partner. A model that requires one is blocked until such a
+        contact is independently established.
+    - id: MECH-U2
+      statement: >-
+        Direct endogenous R611Q misfolding or rapid-degradation kinetics.
+      consequence: >-
+        Statements about the variant's endogenous folding state or turnover rate
+        are prohibited. Turnover is something the assay cascade MEASURES, never
+        something the design ASSUMES.
+    - id: MECH-U3
+      statement: >-
+        That AlphaFold 3 reliably predicts the mutation-induced structural shift
+        for this substitution.
+      consequence: >-
+        Predicted-model deltas are not evidence of a structural shift.
+        Model-vs-model differences are reported as model disagreement, and a
+        prediction may not stand in for experimental structure coverage.
+    - id: MECH-U4
+      statement: >-
+        That a stabilizing compound combined with everolimus reduces dose,
+        reduces toxicity, or mitigates feedback.
+      consequence: >-
+        This is recorded ONLY as a prohibited claim. No combination benefit,
+        synergy, sparing, tolerability or clinical statement may be made. See
+        firewalls FW-3 and the assay-cascade combination rule.
+
+  hypotheses:
+    - id: MECH-H1
+      statement: >-
+        A small molecule binding a pocket at or near the relevant interface
+        might stabilize the mutant protein or restore complex formation.
+      status: HYPOTHESIS
+      falsifiers:
+        - no ligandable pocket is identified in the experimental structure
+          ensemble with acceptable confidence
+        - a compound binds but produces no measurable change in abundance,
+          turnover, ubiquitination or complex formation
+        - an apparent effect does not reproduce with an inactive structural
+          analog, or is explained by aggregation, assay interference or
+          cytotoxicity
+      note: >-
+        This hypothesis motivates the lane. It is never reported as a finding,
+        never described as a therapeutic rationale, and never used to justify
+        skipping a gate.
+
+  ledger_rules:
+    - The current MECH-O1..MECH-O4 entries remain SOURCE_REPORTED while the
+      accepted Atlas claim count is zero. They are not accepted mechanism
+      premises and do not satisfy EG-1.
+    - A mechanism representation may enter the lane only after the relevant
+      SOURCE_REPORTED entries are promoted to OBSERVED through the Atlas gates,
+      including named-human Gate 8. Promotion records exact spans, source roles
+      and assay/model context; it is never inferred from the citations here.
+    - An UNSUPPORTED entry that a stage requires is a hard stop for that stage,
+      recorded as MECHANISM_UNVERIFIED. It is never worked around by assumption,
+      by prediction, or by citing a general finding about a different system.
+    - Computation never changes a ledger status. Only new reviewed primary
+      evidence does.
+
+# ---------------------------------------------------------------------------
+# 2. Entry gates. ALL must pass before stage 1 may start.
+# ---------------------------------------------------------------------------
+entry_gates:
+  - id: EG-1
+    name: reviewed mechanism representation
+    requirement: >-
+      A Gate 8-reviewed mechanism representation exists for the target allele,
+      with each supporting claim carrying an exact verified span and its
+      assay/model context.
+    fail_state: MECHANISM_UNVERIFIED
+    fail_behaviour: >-
+      Explicit stop. The lane does not start, does not "start provisionally",
+      and does not proceed on unreviewed or self-generated mechanism text.
+    current_status: NOT_SATISFIED
+    current_note: >-
+      No named human reviewer is engaged and the accepted Atlas claim count is
+      zero; the R611Q spans pass Gates 1-7 and block at Gate 8. MECH-O1..MECH-O4
+      therefore remain SOURCE_REPORTED, not OBSERVED.
+
+  - id: EG-2
+    name: exact transcript, residue and structure mapping
+    requirement: >-
+      An explicit, verified mapping across the reference transcript, the protein
+      accession, the residue index, the structure entry, the structure chain and
+      the structure residue numbering, including insertion/offset handling and
+      any construct-specific numbering. Residue-offset arithmetic is prohibited;
+      mappings must be resolved against an authoritative residue-level mapping
+      resource and pinned with a retrieval date.
+    fail_state: MAPPING_UNVERIFIED
+    current_status: NOT_SATISFIED
+
+  - id: EG-3
+    name: experimental-structure coverage and uncertainty
+    requirement: >-
+      A recorded assessment of what the experimental structure ensemble actually
+      resolves at and around the residue and the candidate interface: modelled
+      versus unmodelled regions, local resolution or equivalent local quality
+      metric, alternate conformers, ligands/ions/detergents present, the
+      construct and any truncation, and the biological-assembly assumption.
+      Uncertainty is reported, not averaged away.
+    fail_state: STRUCTURE_COVERAGE_INSUFFICIENT
+    current_status: NOT_SATISFIED
+
+  - id: EG-4
+    name: lawful tool, data and licence registry
+    requirement: >-
+      Every tool, model, model weight set, structure source, chemical library
+      and derived dataset the lane intends to touch is registered with its
+      licence, permitted use, version, retrieval date and any commercial or
+      redistribution restriction, verified individually rather than assumed.
+    fail_state: LICENCE_INCOMPATIBLE
+    current_status: NOT_SATISFIED
+    see: tool_and_data_licence_registry
+
+  - id: EG-5
+    name: tractable construct and assay plan
+    requirement: >-
+      A written, reviewed plan showing that the protein construct is expressible
+      and behaves acceptably, and that at least one orthogonal direct-binding
+      assay, one complex-formation readout and one functional readout are
+      realistically executable with named controls -- before any screening
+      compute is spent.
+    fail_state: NO_TRACTABLE_ASSAY
+    current_status: NOT_SATISFIED
+
+gate_semantics:
+  conjunction: all_must_pass
+  ordering: EG-1 then EG-2 then EG-3 then EG-4 then EG-5
+  partial_pass_rule: >-
+    There is no partial entry. A failed gate stops the lane and is recorded
+    with its fail_state; downstream stages remain unreachable.
+  re_entry_rule: >-
+    Re-entry requires the failed gate to be satisfied by new evidence or a new
+    registered artifact, recorded with its own version and hash.
+
+# ---------------------------------------------------------------------------
+# 3. Stages. Strictly ordered. Each stage has an output artifact, a required
+#    falsifier and an explicit no-go route.
+# ---------------------------------------------------------------------------
+stages:
+  - id: S1
+    name: target and mechanism hypothesis
+    depends_on: [EG-1, EG-2, EG-3, EG-4, EG-5]
+    does: >-
+      State precisely which molecular event is hypothesized to be rescuable,
+      which OBSERVED ledger entries support that framing, and which UNSUPPORTED
+      entries are deliberately NOT assumed.
+    output: STRUCTURAL_HYPOTHESIS
+    required_falsifier: >-
+      A stated observation that, if made, would retire the hypothesis.
+    no_go_route: MECHANISM_UNVERIFIED
+
+  - id: S2
+    name: structure ensemble and provenance
+    depends_on: [S1]
+    does: >-
+      Assemble the experimental structure ensemble with full provenance:
+      entries, chains, residue ranges, quality metrics, ligands, construct
+      boundaries, assemblies, retrieval dates and licences. Predicted models may
+      be included ONLY as separately labelled, non-authoritative comparators
+      with their confidence metrics carried, never as substitutes for
+      experimental coverage (MECH-U3).
+    output: structure_ensemble_record
+    required_falsifier: >-
+      A declared coverage threshold at the residue/interface below which the
+      lane stops.
+    no_go_route: RESIDUE_OR_INTERFACE_UNRESOLVED
+
+  - id: S3
+    name: pocket hypothesis and falsifier
+    depends_on: [S2]
+    does: >-
+      Identify candidate pockets with at least two independent detection methods
+      across the ensemble (not a single method on a single frame), record
+      per-method agreement and disagreement, and state what would falsify each
+      pocket.
+    output: POCKET_HYPOTHESIS
+    required_falsifier: >-
+      Pocket absent, non-persistent across the ensemble, or method-disagreed
+      beyond the preregistered agreement threshold.
+    no_go_route: NO_PLAUSIBLE_POCKET
+    constraints:
+      - Pocket definition may not assume MECH-U1.
+      - Pocket persistence across ensemble members is reported, not asserted.
+
+  - id: S4
+    name: calibrated pilot docking
+    depends_on: [S3]
+    does: >-
+      Run a SMALL pilot with preregistered parameters, a preregistered
+      decoy/property-matched negative set, and, where lawfully available, known
+      actives or a control system, so that enrichment can be measured rather
+      than assumed. Calibration precedes any scale-up. A default large-library
+      screen is prohibited.
+    output: COMPUTATIONAL_SCREENING_HIT (calibrated pilot only)
+    required_falsifier: >-
+      Enrichment over the property-matched decoy set is not distinguishable from
+      chance under the preregistered metric.
+    no_go_route: UNCALIBRATED_DOCKING
+    constraints:
+      - No fixed uncalibrated numeric threshold is a universal gate; see
+        threshold_policy.
+      - Pilot size, pose count, exhaustiveness, protonation/tautomer handling and
+        random seeds are preregistered and recorded.
+      - Scores are reported as ranks with their calibration context, never as
+        affinities and never converted to a predicted binding constant.
+
+  - id: S5
+    name: orthogonal rescoring and molecular dynamics with convergence controls
+    depends_on: [S4]
+    does: >-
+      Re-evaluate surviving pilot hypotheses with methods that are independent
+      of the pilot scoring function, and assess pose/complex stability with
+      replicate simulations that carry explicit convergence diagnostics and
+      declared uncertainty.
+    output: ORTHOGONALLY_REPLICATED_HIT
+    required_falsifier: >-
+      Orthogonal methods disagree beyond the preregistered agreement threshold,
+      or replicate simulations fail their convergence criteria.
+    no_go_route: MODEL_DISAGREEMENT
+    constraints:
+      - Replicate count and simulation length are justified by observed
+        convergence, not by a fixed protocol number copied from elsewhere.
+      - Non-convergence is reported as non-convergence, never as a weak result.
+      - Agreement between two methods that share a scoring lineage is not
+        orthogonality.
+
+  - id: S6
+    name: compound hypothesis package
+    depends_on: [S5]
+    does: >-
+      Assemble, for each surviving hypothesis, a package containing full
+      computational provenance, the licence and permitted-use record of every
+      data source used, the availability pin (source, identifier as held in the
+      registered library, version and retrieval date), the declared assay plan
+      with its controls, and the explicit statement that the package is a
+      HYPOTHESIS requiring experimental testing.
+    output: compound_hypothesis_package
+    required_falsifier: >-
+      Any package element missing means the package is incomplete and does not
+      progress.
+    no_go_route: LICENCE_INCOMPATIBLE
+    constraints:
+      - A package is not a recommendation, a shortlist, a lead series or a
+        purchase list.
+      - No package may be produced before S5 completes.
+      - No vendor purchase link, order form, quote or basket is generated at any
+        point before an assay-gated, lawfully cleared package exists, and never
+        as an output of this lane's computational stages.
+
+  - id: S7
+    name: experimental assay cascade
+    depends_on: [S6]
+    does: >-
+      Execute the ordered wet-lab cascade with its controls. Only this stage can
+      produce EXPERIMENTALLY_CONFIRMED_BINDER, COMPLEX_RESCUE_OBSERVED or
+      FUNCTIONAL_RESCUE_OBSERVED.
+    output: experimental_result_record
+    required_falsifier: see assay_cascade controls
+    no_go_route: AGGREGATION_INTERFERENCE_OR_TOXICITY
+    constraints:
+      - Computation alone can never emit an S7 output term.
+      - A negative cascade result is a complete and reportable outcome.
+
+stage_rules:
+  - Stages are strictly ordered; no stage may be skipped, merged or run
+    speculatively "to see what happens".
+  - Each stage emits exactly one artifact with its own schema, version and
+    content hash, and records the hashes of its inputs.
+  - Every stage output is a HYPOTHESIS until the next gate passes.
+  - A no-go at any stage terminates the lane for that hypothesis and is
+    recorded, not retried with adjusted parameters.
+
+# ---------------------------------------------------------------------------
+# 4. Output vocabulary. Closed set. Terms are earned, never assigned.
+# ---------------------------------------------------------------------------
+output_vocabulary:
+  permitted:
+    - term: STRUCTURAL_HYPOTHESIS
+      earned_by: S1
+      means: a stated, falsifiable structural proposition
+    - term: POCKET_HYPOTHESIS
+      earned_by: S3
+      means: a candidate pocket with multi-method support and a stated falsifier
+    - term: COMPUTATIONAL_SCREENING_HIT
+      earned_by: S4
+      means: >-
+        ranked well in a CALIBRATED pilot. Not a binder, not affinity, not
+        potency, not activity.
+    - term: ORTHOGONALLY_REPLICATED_HIT
+      earned_by: S5
+      means: >-
+        survived independent rescoring and convergence-controlled simulation.
+        Still purely computational.
+    - term: EXPERIMENTALLY_CONFIRMED_BINDER
+      earned_by: S7
+      means: >-
+        direct binding demonstrated by at least two orthogonal experimental
+        methods with the required controls.
+    - term: COMPLEX_RESCUE_OBSERVED
+      earned_by: S7
+      means: >-
+        measured restoration of complex formation in the stated system, with
+        controls; a system-bound observation, not a general property.
+    - term: FUNCTIONAL_RESCUE_OBSERVED
+      earned_by: S7
+      means: >-
+        measured functional/pathway-state change consistent with rescue in the
+        stated system, with controls; not efficacy and not benefit.
+  forbidden_without_separately_specified_evidence:
+    - lead
+    - lead series
+    - drug
+    - drug candidate
+    - therapy
+    - therapeutic
+    - treatment candidate
+    - predicted Kd
+    - predicted binding affinity
+    - potency
+    - efficacy
+    - clinically relevant
+    - patient benefit
+  vocabulary_rules:
+    - A term is earned only at its stage. Assigning a later term to an earlier
+      artifact is a reporting failure, not a shorthand.
+    - Docking scores, rescoring values and simulation observables are never
+      restated as affinity, potency, efficacy, or evidence of benefit.
+    - No term in this vocabulary constitutes evidence about any patient, any
+      treatment or any clinical decision.
+
+# ---------------------------------------------------------------------------
+# 5. No-go states. Terminal for the affected hypothesis.
+# ---------------------------------------------------------------------------
+no_go_states:
+  - code: RESIDUE_OR_INTERFACE_UNRESOLVED
+    trigger: >-
+      The residue or the candidate interface is unmodelled, poorly resolved, or
+      only present in a predicted model.
+    action: stop; record; do not substitute a prediction (MECH-U3)
+  - code: NO_PLAUSIBLE_POCKET
+    trigger: >-
+      No pocket is detected with acceptable multi-method agreement and
+      persistence across the ensemble.
+    action: stop; record; do not lower the detection threshold to find one
+  - code: MODEL_DISAGREEMENT
+    trigger: >-
+      Independent methods or replicate simulations disagree beyond the
+      preregistered threshold, or convergence criteria are unmet.
+    action: stop; report the disagreement as the result
+  - code: UNCALIBRATED_DOCKING
+    trigger: >-
+      No decoy/control calibration exists, or enrichment is indistinguishable
+      from chance.
+    action: stop; a ranking without calibration carries no information
+  - code: LICENCE_INCOMPATIBLE
+    trigger: >-
+      Any tool, model weight, structure, library or derived dataset lacks a
+      verified licence permitting the intended use.
+    action: stop for that resource; no "assume open" fallback
+  - code: NO_TRACTABLE_ASSAY
+    trigger: >-
+      No executable orthogonal binding, complex-formation or functional assay
+      exists for the construct and system.
+    action: >-
+      stop; a hypothesis that cannot be experimentally falsified does not
+      justify screening compute
+  - code: AGGREGATION_INTERFERENCE_OR_TOXICITY
+    trigger: >-
+      An apparent effect is attributable to colloidal aggregation, assay
+      interference, redox/reactive behaviour, or cytotoxicity.
+    action: >-
+      stop; the observation is an artifact result and is reported as such
+no_go_rules:
+  - A no-go is a legitimate, publishable outcome of this lane.
+  - A no-go is never resolved by re-running with looser parameters, by
+    switching to a method that gives a friendlier answer, or by narrowing the
+    reported set post hoc.
+  - MECHANISM_UNVERIFIED and MAPPING_UNVERIFIED and
+    STRUCTURE_COVERAGE_INSUFFICIENT are entry-gate stops with the same force.
+
+# ---------------------------------------------------------------------------
+# 6. Assay cascade. Ordered. Controls are part of the assay, not an extra.
+# ---------------------------------------------------------------------------
+assay_cascade:
+  ordering_principle: >-
+    Measure what the mechanism ledger says is actually OBSERVED before measuring
+    what is merely hypothesized. Abundance, turnover and ubiquitination come
+    first because they are the proximal, ledger-supported readouts; complex and
+    function come later because they carry heavier claims.
+  tiers:
+    - id: AC-1
+      name: abundance, turnover and degradation-pathway controls
+      measures:
+        - steady-state protein abundance for mutant and wild-type constructs
+        - turnover/half-life under a declared, controlled protocol
+        - ubiquitination readout
+        - proteasome-dependence controls
+      rule: >-
+        Establishes the baseline the lane claims to modulate. Note MECH-U2:
+        endogenous R611Q folding/turnover kinetics are UNSUPPORTED and are
+        measured here, never assumed upstream.
+    - id: AC-2
+      name: orthogonal direct-binding confirmation
+      measures:
+        - at least two methodologically orthogonal direct-binding measurements
+      rule: >-
+        A thermal-shift or cellular thermal-stability readout ALONE is
+        insufficient. Orthogonality means independent physical principles, not
+        two variants of the same principle.
+    - id: AC-3
+      name: specificity, artifact and dose controls
+      measures:
+        - wild-type versus mutant comparison
+        - selectivity against declared off-target/counter-screen panels
+        - a structurally related inactive analog
+        - colloidal-aggregation and assay-interference counter-screens
+        - cytotoxicity/viability counter-screen
+        - dose-response with a declared model and reported uncertainty
+        - independent replicates and independent compound lots
+      rule: >-
+        An effect that survives none of these is an artifact. An effect that
+        survives some is reported with exactly which controls it survived.
+    - id: AC-4
+      name: complex-formation rescue
+      measures:
+        - co-immunoprecipitation or an equivalent native-complex readout showing
+          restored complex formation
+      rule: >-
+        Only this tier can yield COMPLEX_RESCUE_OBSERVED, and only in the stated
+        system, with AC-3 controls satisfied.
+    - id: AC-5
+      name: functional/pathway readout
+      measures:
+        - a proximal complex-state or Rheb-GAP-proximal readout where technically
+          feasible
+        - plus downstream p-S6K/p-S6 pathway readouts
+      rule: >-
+        Downstream pathway readouts alone are not rescue evidence; they are
+        confounded by many upstream causes. A proximal readout is preferred and
+        its absence is disclosed.
+    - id: AC-6
+      name: optional exploratory combination matrix
+      preconditions:
+        - single-agent rescue must first be observed and controlled (AC-4 and
+          AC-5 satisfied)
+      measures:
+        - an exploratory combination matrix that may include everolimus
+      rule: >-
+        EXPLORATORY ONLY. No synergy claim, no additivity claim, no dose-sparing
+        claim, no toxicity-reduction claim, no feedback-mitigation claim, and no
+        clinical or treatment statement of any kind. MECH-U4 records that the
+        combination benefit is UNSUPPORTED; this tier does not change that and
+        may not be presented as testing a therapeutic strategy.
+  cascade_rules:
+    - Tiers are ordered; a later tier's result is uninterpretable without the
+      earlier tiers' controls.
+    - Every reported effect names its system, construct, concentration range,
+      replicate structure and lot provenance.
+    - Negative results are recorded with the same rigour as positive ones.
+
+# ---------------------------------------------------------------------------
+# 7. Tool and data licence registry requirement.
+#    The lane asserts NOTHING about openness. Each entry is verified, pinned and
+#    dated individually before use.
+# ---------------------------------------------------------------------------
+tool_and_data_licence_registry:
+  principle: >-
+    "Open source" is not a property of a stack; it is a property of an
+    individual artifact under an individual licence at an individual version.
+    Code licence and model-weight/output terms can differ, and a permissive code
+    licence does not license the weights or the outputs. Nothing is used until
+    its own entry is verified.
+  required_fields_per_entry:
+    - artifact name and exact version or release
+    - artifact kind (code, model weights, model outputs, structure, dataset,
+      chemical library, web service)
+    - licence identifier and licence text locator
+    - permitted use, including commercial and redistribution status
+    - whether derived outputs inherit restrictions
+    - authoritative locator and retrieval date
+    - registration or access requirement, if any
+    - verification evidence and the person or role who verified it
+  known_licence_facts_to_encode:
+    - id: LR-1
+      artifact: AlphaFold 3
+      fact: >-
+        The code is Apache-2.0, but the model weights and their outputs carry
+        separate non-commercial/restricted terms. Code licence must not be cited
+        as covering weights or outputs.
+    - id: LR-2
+      artifact: ColabFold
+      fact: >-
+        ColabFold is a distinct tool and is not AlphaFold 3. It may not be
+        described as, substituted for, or cited as AF3.
+    - id: LR-3
+      artifact: FoldX
+      fact: registration/licence controlled; terms verified before any use.
+    - id: LR-4
+      artifact: PremPS
+      fact: >-
+        a web server; server terms, availability and data-submission policy must
+        be checked, and submitting content to a third-party server is itself a
+        data-handling decision.
+    - id: LR-5
+      artifact: Enamine REAL
+      fact: >-
+        commercial vendor data with vendor terms; not an open library and not
+        redistributable by default.
+    - id: LR-6
+      artifact: ChEMBL
+      fact: >-
+        ChEMBL states CC BY-SA 3.0 for its data. Whether a particular combined
+        or derived artifact is an adaptation subject to share-alike must be
+        assessed and recorded for that artifact; this design does not make a
+        blanket legal conclusion.
+    - id: LR-7
+      artifact: pocket detection tools (e.g. fpocket, P2Rank, DeepPocket)
+      fact: >-
+        differing open licences; each pinned individually, including any
+        bundled model weights.
+    - id: LR-8
+      artifact: docking, generative-docking and cheminformatics tools (e.g.
+        AutoDock Vina, GNINA, DiffDock, RDKit)
+      fact: >-
+        differing open licences, some with distinct terms for bundled weights or
+        for commercial use; each pinned individually.
+    - id: LR-9
+      artifact: major molecular-dynamics engines
+      fact: >-
+        differing open licences and differing force-field terms; engine and
+        force field are registered separately.
+    - id: LR-10
+      artifact: ZINC and UniProt
+      fact: >-
+        current terms of use must be re-verified at the time of use rather than
+        assumed from prior practice.
+  registry_rules:
+    - An unverified or unverifiable entry is LICENCE_INCOMPATIBLE by default.
+    - 'Fail closed: absence of evidence of permission is not permission.'
+    - The applicability of share-alike, attribution, non-commercial,
+      redistribution or model-output restrictions to each derived artifact is
+      assessed and recorded individually. Neither propagation nor
+      non-propagation is assumed.
+    - The registry is versioned and hash-bound; a licence change is a material
+      drift event requiring re-review of anything built on it.
+
+# ---------------------------------------------------------------------------
+# 8. Threshold and compute policy.
+# ---------------------------------------------------------------------------
+threshold_policy:
+  rejected_as_universal_gates_note: >-
+    These commonly quoted numbers are REJECTED as universal thresholds. They
+    encode assumptions about a system, a scoring function and a library that
+    do not transfer. Using them as gates manufactures false confidence.
+  rejected_as_universal_gates:
+    - a fixed distance cutoff such as 15 angstrom for interface or site definition
+    - a fixed pocket-volume window such as 300-1000 cubic angstrom
+    - a fixed top fraction such as the top 0.1 percent of a ranked library
+    - a fixed docking-score cutoff such as -8.5 kcal/mol
+    - a fixed simulation protocol such as 20 replicates of 100 nanoseconds
+  permitted_use: >-
+    Any of these may be used ONLY as a preregistered PILOT PARAMETER, declared
+    before execution, accompanied by a sensitivity analysis over a declared
+    range, and reported with the sensitivity result. A parameter that changes
+    the conclusion across its plausible range is reported as unstable, and the
+    conclusion does not survive.
+  required_for_every_numeric_parameter:
+    - preregistered value and rationale
+    - declared sensitivity range and the analysis result
+    - the calibration evidence that justifies it for THIS system
+    - what observation would invalidate it
+  compute_budget_policy:
+    rule: >-
+      A large-library screen (for example on the order of 10 million compounds)
+      or a full-complex screen requires an explicit, approved compute and
+      storage budget and a staged funnel with predeclared stage sizes and
+      pass criteria, agreed BEFORE any large run starts.
+    default: >-
+      The default is the small calibrated pilot at S4. Scale-up is a separate,
+      explicitly approved decision, never an implicit consequence of a
+      successful pilot.
+    staged_funnel_requirement: >-
+      Each funnel stage declares its input size, output size, selection
+      criterion, and the calibration evidence for that criterion, before the
+      stage runs.
+
+# ---------------------------------------------------------------------------
+# 9. Firewalls. Non-negotiable.
+# ---------------------------------------------------------------------------
+firewalls:
+  - id: FW-1
+    rule: no ACMG or classification effect
+    detail: >-
+      RescueScreen never alters, creates, strengthens, weakens or informs any
+      ACMG evidence item, criterion or classification. It is not an input to the
+      scorer, the census, the packets or any benchmark, in either direction.
+  - id: FW-2
+    rule: no Atlas claim promotion
+    detail: >-
+      RescueScreen never promotes, accepts, upgrades or corroborates an Atlas
+      claim. It CONSUMES reviewed claims; it never feeds status back into the
+      Atlas evidence graph.
+  - id: FW-3
+    rule: no compound, treatment or combination recommendation
+    detail: >-
+      No output recommends a compound, a treatment, a therapy, a dose, a
+      regimen, a combination, or a course of action for any person. Statements
+      about combinations exist only as the explicit prohibitions and UNSUPPORTED
+      entries recorded in this file.
+  - id: FW-4
+    rule: docking scores are not affinity or efficacy
+    detail: >-
+      A docking score, a rescoring value or a simulation observable is a ranking
+      artifact of a scoring function under stated conditions. It is never
+      reported as, converted to, or discussed as binding affinity, potency,
+      activity, efficacy or benefit.
+  - id: FW-5
+    rule: no procurement before a lawful, assay-gated package
+    detail: >-
+      No vendor purchase link, catalogue basket, order form or quote is
+      generated before an S6 package exists that is complete, licence-cleared
+      and assay-gated. Availability is recorded as a registry pin, not as a
+      shopping action.
+  - id: FW-6
+    rule: running is not validating
+    detail: >-
+      An LLM-generated or LLM-assisted pipeline is not validated because it
+      executes without error. Validation requires calibration against controls,
+      orthogonal replication, and -- for any experimental claim -- wet-lab
+      evidence. Absence of a crash is not evidence.
+  - id: FW-7
+    rule: hypothesis persistence
+    detail: >-
+      Every computational result remains a hypothesis until its next gate
+      passes. There is no stage at which a computational output becomes a fact
+      about the world.
+  - id: FW-8
+    rule: no clinical or patient-directed content
+    detail: >-
+      Nothing in this lane is medical advice, is directed at any patient, or may
+      be presented as informing care. This holds even for FUNCTIONAL_RESCUE_
+      OBSERVED, which is a bounded observation in a stated experimental system.
+
+# ---------------------------------------------------------------------------
+# 10. Artifacts, acceptance, open questions.
+# ---------------------------------------------------------------------------
+artifact_schemas_required_note: >-
+  Schemas are to be DEFINED before any execution; none is implemented here.
+  Each carries a schema id, a version, its input hashes and a self-excluding
+  content hash, following the existing RAPTOR hash-binding convention.
+artifact_schemas_required:
+  - rescuescreen.structure_ensemble.v1
+  - rescuescreen.pocket_hypothesis.v1
+  - rescuescreen.docking_pilot.v1
+  - rescuescreen.orthogonal_rescoring.v1
+  - rescuescreen.md_convergence.v1
+  - rescuescreen.compound_hypothesis_package.v1
+  - rescuescreen.assay_plan.v1
+  - rescuescreen.tool_licence_registry.v1
+
+acceptance_criteria:
+  - id: RA-1
+    check: >-
+      Every mechanism statement carries SOURCE_REPORTED / OBSERVED /
+      UNSUPPORTED / HYPOTHESIS status; current source-reported statements cannot
+      satisfy EG-1, and no UNSUPPORTED statement is used as a premise anywhere.
+  - id: RA-2
+    check: >-
+      All five entry gates are present with explicit fail states, and the lane's
+      current status records them as NOT_SATISFIED.
+  - id: RA-3
+    check: >-
+      Seven ordered stages exist, each with an output artifact, a required
+      falsifier and a no-go route.
+  - id: RA-4
+    check: >-
+      The output vocabulary is a closed set of seven earned terms with an
+      explicit forbidden list.
+  - id: RA-5
+    check: >-
+      Seven no-go states exist and none is resolvable by parameter loosening.
+  - id: RA-6
+    check: >-
+      The assay cascade orders abundance/turnover/ubiquitination before binding,
+      binding before complex, complex before function, and gates the exploratory
+      combination matrix behind observed single-agent rescue with no synergy or
+      clinical claim.
+  - id: RA-7
+    check: >-
+      The licence registry requires per-artifact verification and encodes the
+      AF3 code-versus-weights distinction and the ColabFold-is-not-AF3 fact.
+  - id: RA-8
+    check: >-
+      Every listed fixed threshold is rejected as a universal gate and permitted
+      only as a preregistered pilot parameter with sensitivity analysis.
+  - id: RA-9
+    check: >-
+      No compound, SMILES, InChI, CAS, catalogue identifier, vendor list,
+      screening result, docking score or treatment statement appears anywhere in
+      this file.
+  - id: RA-10
+    check: >-
+      All eight firewalls are present, and no rule anywhere permits a
+      computational result to be treated as established fact.
+
+open_questions:
+  - id: RQ-1
+    question: >-
+      Can EG-1 ever be satisfied for this anchor? It requires a named human
+      reviewer who is not yet engaged. Until then the lane is designed but
+      unreachable, which is the intended state.
+  - id: RQ-2
+    question: >-
+      Does the experimental structure ensemble actually resolve the relevant
+      interface well enough for S3? Unknown; EG-3/S2 are where that is decided,
+      and STRUCTURE_COVERAGE_INSUFFICIENT is an acceptable answer.
+  - id: RQ-3
+    question: >-
+      Is a tractable orthogonal binding and complex-rescue assay pair realistic
+      for this construct? If not, EG-5 fails and no screening compute is spent,
+      which is the correct outcome rather than a disappointment.
+  - id: RQ-4
+    question: >-
+      What calibration control system is lawfully available for S4? Without one,
+      UNCALIBRATED_DOCKING applies and the pilot does not proceed.

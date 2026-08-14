@@ -13,6 +13,8 @@
 
 | ID | Title | Status | Date |
 |----|-------|--------|------|
+| [ADR-0018](#adr-0018--raptor-rescuescreen-a-gated-research-only-structural-rescue-track-downstream-of-reviewed-mechanism-evidence) | RAPTOR RescueScreen: a gated, research-only structural-rescue track downstream of reviewed mechanism evidence | Accepted | 2026-08-15 |
+| [ADR-0017](#adr-0017--dual-atlas-panel-products-a-post-result-technical-coverage-panel-separated-from-a-still-blocked-independent-validation-panel) | Dual Atlas panel products: a post-result technical-coverage panel separated from a still-blocked independent-validation panel | Accepted | 2026-08-15 |
 | [ADR-0016](#adr-0016--deterministic-offline-citation-resolver-and-phase-2-promotion-span-verification) | Deterministic offline citation resolver and Phase 2 promotion span verification | Accepted | 2026-07-27 |
 | [ADR-0015](#adr-0015--atlas-internal-summaries-are-context-only-and-r611q-is-the-first-phase-2-anchor) | Atlas internal summaries are context-only and R611Q is the first Phase 2 anchor | Accepted | 2026-07-27 |
 | [ADR-0014](#adr-0014--generic-mechanism-atlas-core-with-a-versioned-disease-pack-boundary) | Generic Mechanism Atlas core with a versioned disease-pack boundary | Accepted | 2026-07-22 |
@@ -38,6 +40,8 @@
 
 | ADR | Current risk linkage | Basis in current repo |
 |---|---|---|
+| **ADR-0018** | R-G1, R-G2, R-A6, R-B2, R-D7 | RescueScreen is a separately versioned, research-only lane whose entry gates, closed output vocabulary, no-go states and eight firewalls keep every computational output a hypothesis, forbid compound/treatment/combination recommendation and vendor procurement, bar docking scores from being read as affinity or efficacy, and require per-artifact licence verification instead of an "everything is open" assumption; the ACMG/classification and Atlas-promotion firewalls preserve ADR-0009/ADR-0015 and the ADR-0010 vertical boundary. |
+| **ADR-0017** | R-A13, R-A15, R-A2, R-A14 | Splitting the technical-coverage engineering product from the independent-validation scientific product prevents post-result reinterpretation of the audited `INFEASIBLE_PANEL` run (R-A13), fixes an explicit machine-readable claim ceiling per product against authorization overclaim (R-A15), blocks the "relax P2/D3 after seeing the answer" validation mirage (R-A2), and records source scarcity as `BLOCKED_SOURCE_DIVERSITY` rather than as a failure or a licence to weaken constraints (R-A14). |
 | **ADR-0016** | R-A2, R-A6, H1 | Deterministic offline resolver enforces ADR-0015 grounding: primary-source/dataset direct-leaf resolution + exact normalized-slice span verification with from-disk hash recompute, closing presence-only Gate 4 and truthy-boolean Gate 3 laundering while keeping acquisition out of scope (no network). |
 | **ADR-0015** | R-A2, R-A6, H1 | Internal summaries may guide searches but cannot ground claims; primary-source exact-span admission prevents circular citation laundering while preserving unknown/conflicting/empty outcomes. |
 | **ADR-0014** | R-A2, R-A12 | Generic-core / versioned-disease-pack boundary keeps mechanism evidence classification-free (R-A2 circularity) and preserves ADR-0010's vertical TSC/mTOR scope discipline (R-A12) while enabling internal cross-condition amortization; no second-disease claim until a portability experiment passes. |
@@ -54,6 +58,260 @@
 | **ADR-0003** | R-D1 | Explicitly cited in the checker rubber-stamp / skipped-loop risk row. |
 | **ADR-0002** | — | Document-format ADR only; no direct current risk row cites it. |
 | **ADR-0001** | — *(partially superseded by ADR-0010)* | Historical strategy framing record; current linked risks are carried by ADR-0010 instead. |
+
+---
+
+## ADR-0018 — RAPTOR RescueScreen: a gated, research-only structural-rescue track downstream of reviewed mechanism evidence
+
+- **Status:** Accepted
+- **Date:** 2026-08-15
+- **Deciders:** @dronasrinivas (operator, acting domain owner)
+- **Track:** `design/panel-products-rescue-screen-2026-08`
+- **Supersedes:** none. Additive and strictly downstream. Preserves ADR-0009 (no ClinVar/classifier
+  leakage), ADR-0010 (vertical, non-clinical scope), ADR-0011 (scope-authorization boundary),
+  ADR-0014 (generic core / disease-pack boundary), ADR-0015 (internal summaries are context-only;
+  reported rescue observations are research evidence in their exact experimental context, never
+  treatment advice) and ADR-0016 (exact-span grounding). Binds
+  `docs/project/specs/structural-rescue-screen-v1.yaml` (rev 1).
+
+### Context
+
+Phase 2 grounding produced reviewed-in-principle mechanism statements about a TSC2 missense allele:
+loss of hamartin/TSC1 complex formation in a reported system (PMID 18230340, DOI
+10.1016/j.bbrc.2008.01.077); susceptibility to enhanced Pam/MYCBP2 ubiquitination with inability to
+bind hamartin in that system (PMCID PMC2435383, PMID 18308511, DOI 10.1016/j.cellsig.2008.01.020);
+general TSC1-dependent TSC2 stabilization plus HERC1 and Hsp70/Hsp90 proteostasis evidence (PMID
+16464865; PMCID PMC5730846 / PMID 29127155); and residue-level coverage of position 611 in
+experimental structure PDB 9CE3 (PDBe residue mapping; PMID 39565846, DOI 10.1126/sciadv.adr5807).
+
+Those facts invite an obvious next question — could a small molecule stabilize the complex? — and
+that question is exactly where a research-evidence project fails catastrophically if it is answered
+casually. The available material does **not** support a defined Arg611–TSC1 salt bridge, does
+**not** establish endogenous misfolding or rapid-degradation kinetics for the allele, and does
+**not** establish that AlphaFold 3 reliably predicts the mutation-induced shift. A stabilizing
+compound is a **hypothesis**. A stabilizer-plus-everolimus dose or toxicity benefit is
+**unsupported** and would be a treatment claim.
+
+The concrete failure modes are well known and mutually reinforcing: docking scores reported as
+affinity; an uncalibrated ranking presented as a hit list; fixed thresholds copied from unrelated
+papers (a 15 Å site radius, a 300–1000 Å³ pocket window, a top-0.1% cut, a −8.5 kcal/mol cutoff,
+20×100 ns of simulation) used as if they were universal gates; a 10M-compound screen launched
+because the library exists; "everything is open source" asserted over a stack whose licences
+materially differ (AlphaFold 3's Apache-2.0 **code** does not license its **weights or outputs**;
+ColabFold is not AF3; FoldX is licence-controlled; PremPS is a third-party web server; Enamine REAL
+is commercial vendor data; ChEMBL is CC BY-SA 3.0; pocket, docking and MD tooling each carry
+different terms; ZINC and UniProt terms need re-verification); vendor purchase links produced before
+any assay gate; and an LLM-assembled pipeline called validated because it ran without crashing.
+
+The alternative failure is equally real: refusing to plan this work at all, so it later happens
+ad hoc, ungoverned, under deadline pressure.
+
+### Considered options
+
+1. **Do the screening work inside the Atlas pipeline.** Rejected: it would let computational
+   structural output flow back into evidence status and, through it, toward classification —
+   precisely the circularity ADR-0009/ADR-0015 exist to prevent.
+2. **Refuse the direction entirely.** Rejected: the mechanism evidence legitimately raises a
+   falsifiable question, and an unplanned lane is more dangerous than a gated one.
+3. **Define a separate, separately versioned, research-only lane with hard entry gates, an ordered
+   stage ladder, a closed earned-term vocabulary, explicit no-go states and non-negotiable
+   firewalls.** Adopted.
+
+### Decision
+
+Adopt **option 3** as **RAPTOR RescueScreen**, specified in
+`docs/project/specs/structural-rescue-screen-v1.yaml`.
+
+1. **Four-valued mechanism ledger.** `SOURCE_REPORTED` records a narrow statement found in a
+   cited source but not yet accepted by RAPTOR; `OBSERVED` is reserved for accepted/reviewed
+   primary evidence with an exact verified span and its experimental context; the other states
+   are `UNSUPPORTED` and `HYPOTHESIS`. The current $R611Q$ statements remain
+   `SOURCE_REPORTED` because Gate 8 is blocked and the accepted-claim count is zero.
+   `SOURCE_REPORTED` and `UNSUPPORTED` entries may not be used as accepted mechanism premises or
+   upgraded by computation. Context travels with the statement: "in that system" is part of it.
+2. **Five entry gates, all required, all currently `NOT_SATISFIED`.** A Gate 8-reviewed mechanism
+   representation (else an explicit `MECHANISM_UNVERIFIED` stop); exact transcript/residue/structure
+   mapping with residue arithmetic prohibited; experimental-structure coverage and uncertainty;
+   a lawful per-artifact tool/data/licence registry; and a tractable construct and assay plan. There
+   is no partial entry.
+3. **Seven ordered stages.** Target/mechanism hypothesis → structure ensemble and provenance →
+   pocket hypothesis and falsifier → **small calibrated pilot** docking → orthogonal rescoring and
+   MD with convergence controls → compound hypothesis package → experimental assay cascade. A
+   large-library or full-complex screen is never the default; it requires an explicit compute and
+   storage budget plus a staged funnel with predeclared stage sizes and pass criteria.
+4. **Closed, earned output vocabulary.** `STRUCTURAL_HYPOTHESIS`, `POCKET_HYPOTHESIS`,
+   `COMPUTATIONAL_SCREENING_HIT`, `ORTHOGONALLY_REPLICATED_HIT`, `EXPERIMENTALLY_CONFIRMED_BINDER`,
+   `COMPLEX_RESCUE_OBSERVED`, `FUNCTIONAL_RESCUE_OBSERVED` — each earned only at its stage, with the
+   last three reachable only from wet-lab work. `lead`, `drug`, `therapy`, `predicted Kd` and
+   `treatment candidate` are forbidden without separately specified evidence.
+5. **Seven no-go states**, each terminal and each a legitimate publishable outcome: residue/interface
+   unresolved, no plausible pocket, model disagreement, uncalibrated docking, licence incompatible,
+   no tractable orthogonal assay, and aggregation/interference/toxicity. A no-go is never resolved
+   by loosening parameters or switching to a friendlier method.
+6. **Ordered assay cascade.** Abundance/turnover, ubiquitination and proteasome controls first;
+   then at least two methodologically orthogonal direct-binding measurements (a thermal-shift or
+   cellular thermal-stability readout alone is insufficient); then WT/mutant and selectivity
+   comparisons, an inactive structural analog, aggregation/interference and cytotoxicity
+   counter-screens, dose-response, and replicate and lot controls; then co-IP or an equivalent
+   native-complex rescue readout; then a proximal Rheb-GAP/complex-state readout where feasible plus
+   downstream p-S6K/p-S6. An everolimus combination matrix is **optional, exploratory, and only
+   after single-agent rescue is observed and controlled**, with no synergy, dose-sparing,
+   toxicity-reduction, feedback or clinical claim of any kind.
+7. **Threshold discipline.** The quoted fixed numbers above are **rejected as universal gates**.
+   They are admissible only as preregistered pilot parameters accompanied by a declared sensitivity
+   range and its result; a parameter whose plausible range changes the conclusion means the
+   conclusion does not survive.
+8. **Licence registry, fail-closed.** Every tool, model, weight set, structure, library and derived
+   dataset is registered and individually verified with version, licence, permitted use,
+   redistribution/commercial status, locator and retrieval date. Absence of evidence of permission
+   is not permission. Applicability of attribution, share-alike, non-commercial, redistribution and
+   output restrictions is assessed per derived artifact; propagation is not assumed as a blanket
+   legal rule.
+9. **Eight firewalls.** RescueScreen may not alter or inform any ACMG evidence item or
+   classification; may not promote or corroborate an Atlas claim; may not recommend a compound,
+   treatment, therapy, dose or combination; may not report a docking, rescoring or simulation value
+   as affinity, potency or efficacy; may not generate vendor purchase links before a complete,
+   licence-cleared, assay-gated package; may not treat "it ran" as validation; must keep every
+   computational result a hypothesis until its next gate; and may not produce clinical or
+   patient-directed content.
+
+### Consequences
+
+- The lane is **designed and unreachable**: all five entry gates are `NOT_SATISFIED` today, chiefly
+  because no named human reviewer is engaged and the accepted Atlas claim count is zero. That is the
+  intended state, and it is visible rather than implicit.
+- The durable task graph orders mechanism verification, structure/interface verification, the
+  licence registry and assay feasibility strictly **before** any pilot docking, so screening cannot
+  start early by accident. No task in the graph is marked complete.
+- Honest negative outcomes become reportable products of the lane: no plausible pocket, model
+  disagreement, insufficient structure coverage or no tractable assay each terminate the lane
+  cleanly instead of being engineered around.
+- The cost is deliberate slowness. Several gates may never open — for example if the interface is
+  not resolvable at the needed quality, or if no orthogonal binding and complex-rescue assay pair is
+  realistic for the construct. Not opening is the correct outcome, not a project failure.
+- Backout is a straight revert of the spec, the ADR and its todos; nothing is implemented, and no
+  code, data, protocol, registration, universe, map or run record is touched.
+
+---
+
+## ADR-0017 — Dual Atlas panel products: a post-result technical-coverage panel separated from a still-blocked independent-validation panel
+
+- **Status:** Accepted
+- **Date:** 2026-08-15
+- **Deciders:** @dronasrinivas (operator, acting domain owner)
+- **Track:** `design/panel-products-rescue-screen-2026-08`
+- **Supersedes:** none. Additive. Preserves the audited 2026-08-06 `INFEASIBLE_PANEL` result and the
+  frozen panel-selection protocol v1.0.4, its registration, universe lock v4 and identity-map lock
+  v4 unchanged. Complements ADR-0014/ADR-0015/ADR-0016. Binds
+  `docs/project/specs/atlas-panel-products-v1.yaml` (rev 1).
+
+### Context
+
+On 2026-08-06 the independently reviewed formal selector returned `INFEASIBLE_PANEL`
+(`data/atlas/tsc2_phase2_panel_selection_run_2026-08-06.json`, SHA-256
+`5f5b0918a24fcaa737877a15e393773f20c584c531517133e9c8b7e7574cfffd`). All 24 fixed-size attempts
+across ladder levels L0–R7 completed **exhaustively** — maximum 714 nodes expanded against a
+5,000,000 budget, no attempt `UNDETERMINED`, no relaxation step applied, zero members selected, and
+a complete 35-row disposition audit. The infeasibility is therefore a property of the **substrate**,
+not of the search: 32 of 35 records and all 37 attributable observations carried unknown lineage
+and collapsed into a single `LG:UNKNOWN-POOL`, 10 of 35 identities were unresolved, and every
+stratum had zero coverage at every attempted size.
+
+That result blocked two different things at once, because one artifact had been asked to serve two
+incompatible purposes. The **engineering** purpose was to exercise identity → source → span →
+context → abstention across diverse situations and show the machinery behaves — including that it
+abstains, blocks and reports contradictions correctly. The **scientific** purpose was to show the
+mechanism ontology generalizes beyond the R611Q anchor on independently sourced, assay-diverse
+evidence. Only the second needs source independence, because only the second makes a
+generalization claim.
+
+Bundling them created direct pressure to relax P2 (minimum established independent source groups)
+and D3 (assay-kind concentration cap) so that "the panel" could exist. Doing that **after** seeing
+the negative result would be outcome-dependent constraint selection: it converts a scientific gate
+into a convenience knob and makes the original result unfalsifiable in retrospect. The frozen
+protocol already forbids weakening constraints outside its ladder or substituting candidates after
+this result.
+
+Separately, a hash-selected six-variant technical repeatability cohort (`tsc2-gate-smoke-v1`,
+`cohort_content_hash` `99462b30…9832388`) had already reproduced a deterministic Gates 1–7 pass and
+a Gate 8 block in all six cases, with zero accepted claims and eight false-green inversion probes
+each behaving as required. That is genuine engineering evidence, and the temptation to relabel it
+as "the panel" is exactly the laundering this ADR must prevent.
+
+### Considered options
+
+1. **Re-run the frozen selector with P2/D3 relaxed.** Rejected: outcome-dependent constraint
+   selection; destroys the evidential value of the negative result.
+2. **Abandon panel work until sources expand.** Rejected: it needlessly blocks legitimate
+   engineering verification that does not depend on source independence at all.
+3. **Define two separately named, separately versioned products with different claim ceilings, one
+   executable now and one explicitly blocked.** Adopted.
+
+### Decision
+
+Adopt **option 3**, specified in `docs/project/specs/atlas-panel-products-v1.yaml`.
+
+- **Preserved result.** The 2026-08-06 run record, its dispositions and its digests are immutable.
+  No product may edit, re-sign, re-hash or reinterpret it, reuse its run-record id, its selection
+  seed `raptor-atlas-phase2-panel-v1`, or its protocol/registration pair; and no product may re-run
+  the frozen selector or substitute candidates after this result.
+- **Product 1 — `atlas-technical-coverage-panel`** (engineering). Claim ceiling
+  `ENGINEERING_PIPELINE_BEHAVIOUR`, with machine-readable `generalization_claim: false` and
+  `independent_validation: false`, and a mandatory disclosure that it was designed after, and with
+  knowledge of, `INFEASIBLE_PANEL`. **P2 and D3 become measured-and-reported limitations rather than
+  gates** — permitted *only* because the product disclaims independence and generalization — and
+  silently dropping them is prohibited: every run must report actual source-group counts, lineage
+  unknowns, per-assay-kind distribution and the two mandatory disclaimers. Nine controls remain
+  fail-closed (TC-F1…TC-F9): identity resolution/replay, source access and licence admissibility,
+  exact-span verification with from-disk hash recompute, R611Q anchor exclusion, dedupe/collision
+  detection, complete disposition accounting, abstention fidelity, the named-human Gate 8, and the
+  classification/leakage firewall. Membership is fixed **mechanically and pre-execution** under a
+  new coverage protocol, new registration, new frame lock and a **new seed**, with no
+  outcome-dependent replacement afterwards; seven situation strata (TCS-1…TCS-7) target what the
+  machinery must do rather than evidence strength, and an unpopulated stratum is reported with its
+  reason rather than filled by relabelling. Success is measured only as execution completeness,
+  exact-span yield (reported jointly with the access/licence-blocked share), context completeness,
+  contradiction handling, abstention fidelity and reproducibility; precision/recall/concordance
+  against any label is a forbidden metric. The six-variant cohort is **cited as prior repeatability
+  evidence and not relabelled**, and its six cases do not count toward any coverage metric.
+- **Product 2 — `atlas-independent-validation-panel`** (scientific). Retains P1/P2/P3/D1/D2/D3/C3/C5
+  at the frozen base thresholds as hard gates, plus multi-model-system and multi-assay-kind
+  expectations, with lineage determined by verified mapping rather than by distinct author lists,
+  journals or PMIDs, and unknown-lineage records excluded from independence accounting. Status is
+  **`BLOCKED_SOURCE_DIVERSITY`**. Entry requires all of: a new frozen source registry with per-source
+  licence and checksum pins; established lineage mapping; sufficient lawfully accessible,
+  span-verifiable records; a new universe, protocol and registration; pre-registration before
+  selection; and a candidate-free feasibility pre-check. Even a feasible panel remains research-only
+  and Gate 8 reviewed, and authorizes no criterion, classification, worklist, submission or
+  second-disease claim.
+- **Firewall between the products (PS-1…PS-6).** Separate names — neither is "the contrast panel"
+  and the unqualified phrase is not used — separate protocols, registrations, frame locks, seeds and
+  run records; separate version namespaces; no claim inheritance; mandatory post-result disclosure;
+  and, critically, **no evidence flow from the technical product to the scientific one**: a
+  technical-panel artifact may not satisfy any independent-validation entry gate.
+- **The asymmetry is recorded explicitly.** A green technical panel is fully consistent with the
+  scientific panel remaining infeasible, because the two propositions are logically independent —
+  the technical product is deliberately allowed to draw on concentrated, single-lineage substrate,
+  and its membership is chosen *after* the negative result is known. Reading technical success as
+  feasibility evidence is affirming the consequent. The spec names the prohibited sentences,
+  including "the coverage panel succeeded, so the contrast panel is feasible" and
+  "`INFEASIBLE_PANEL` was superseded".
+
+### Consequences
+
+- Engineering verification can proceed without touching a scientific gate, and the pressure to
+  weaken P2/D3 is removed rather than resisted case by case.
+- `INFEASIBLE_PANEL` keeps its full evidential force. The remedy it points at — registered,
+  lineage-mapped, span-verifiable source expansion — is now a named prerequisite in the durable task
+  graph rather than an aspiration.
+- Every future citation of a panel metric must carry its product id and claim ceiling, which makes
+  overclaim visible in review instead of plausible in prose.
+- The cost is duplication: two protocols, two registrations, two frame locks and two run-record
+  lineages, plus the discipline of never letting one product's artifact satisfy the other's gate.
+  That duplication is the control, not an accident of it.
+- Nothing is executed by this decision. Both products are design-only, no membership exists, no
+  candidate is named, and `atlas-phase2-contrast-panel` remains blocked. Backout is a straight
+  revert of the spec, the ADR and its todos.
 
 ---
 

@@ -167,6 +167,118 @@ pending `STRATEGY.md` Part II §10 — ADR-0003.)*
   Named human review, accepted Atlas profiles, classifications and second-disease support
   remain pending. Discovery remains an optional out-of-process aid, never a runtime
   dependency of the core RAPTOR workflow.
+- **Atlas panel products (ADR-0017):** 🟡 **DESIGNED — NOT EXECUTED.** The single overloaded
+  "contrast panel" is split into `atlas-technical-coverage-panel` (engineering; claim ceiling
+  `ENGINEERING_PIPELINE_BEHAVIOUR`; `DESIGN_ONLY_NOT_EXECUTED`) and
+  `atlas-independent-validation-panel` (scientific; `BLOCKED_SOURCE_DIVERSITY`). No membership, no
+  candidate, no run.
+- **RAPTOR RescueScreen (ADR-0018):** 🔴 **DESIGNED — ENTRY GATES UNSATISFIED.** Research-only,
+  separately versioned structural-rescue lane; all five entry gates are `NOT_SATISFIED`, so no
+  stage is reachable. No compound, no screen, no docking, no recommendation.
+
+## Atlas panel products and RAPTOR RescueScreen — designed, not executed (ADR-0017 / ADR-0018)
+
+> **Nothing in this section has been executed.** No panel membership exists, no candidate or
+> compound is named or selected, no screening has been run, no docking score exists, and no
+> treatment, therapy or combination is recommended, evaluated or implied. Machine-readable designs:
+> [`atlas-panel-products-v1.yaml`](project/specs/atlas-panel-products-v1.yaml) and
+> [`structural-rescue-screen-v1.yaml`](project/specs/structural-rescue-screen-v1.yaml).
+
+**The preserved result is unchanged.** `data/atlas/tsc2_phase2_panel_selection_run_2026-08-06.json`
+(committed-blob SHA-256 `5f5b0918a24fcaa737877a15e393773f20c584c531517133e9c8b7e7574cfffd`) still
+reads `INFEASIBLE_PANEL`: 24/24 fixed-size attempts across L0–R7 completed exhaustively (max 714
+nodes against a 5,000,000 budget), zero relaxation steps applied, zero members selected, 35 complete
+dispositions. Protocol v1.0.4, its registration, universe lock v4 and identity-map lock v4 are
+untouched. Nothing below edits, re-runs, reinterprets or supersedes that run.
+
+**Why the infeasibility is a source problem.** 32 of 35 records and all 37 attributable
+observations carried unknown lineage, collapsing into one `LG:UNKNOWN-POOL`; 10 of 35 identities
+were unresolved; every stratum had zero coverage at every attempted size. Because the search
+completed exhaustively and well inside budget, the shortage is in the **substrate**, not the
+algorithm — and the remedy is registered, lineage-mapped, span-verifiable source expansion, not
+weaker constraints.
+
+| | **Technical Coverage Panel** | **Independent Validation Panel** |
+|---|---|---|
+| Product id | `atlas-technical-coverage-panel` | `atlas-independent-validation-panel` |
+| Kind | engineering | scientific |
+| Status | `DESIGN_ONLY_NOT_EXECUTED` | **`BLOCKED_SOURCE_DIVERSITY`** |
+| Claim ceiling | `ENGINEERING_PIPELINE_BEHAVIOUR` | research-only ontology/pipeline generalization |
+| Generalization claim | **no** | yes (research-only) |
+| P2 lineage independence | measured + reported, **not a gate** | **hard gate** at the frozen threshold |
+| D3 assay concentration | measured + reported, **not a gate** | **hard gate** at the frozen threshold |
+| Fail-closed controls | all retained (identity replay, access/licence, exact span, anchor exclusion, dedupe, complete dispositions, abstention, Gate 8, leakage firewall) | all retained |
+| Unblocked by | a new coverage protocol/registration/frame lock and a **new seed**, fixed pre-execution | a new frozen source registry, lineage mapping, enough open span-verifiable records, and a new universe/protocol/registration |
+
+**The technical panel is allowed to soften P2/D3 only because it claims nothing scientific.** Its
+success metrics are properties of the machinery — execution completeness, exact-span yield (reported
+jointly with the access/licence-blocked share), context completeness, contradiction handling,
+abstention fidelity and reproducibility. Precision, recall and concordance against any label are
+**forbidden metrics**. Membership is fixed mechanically before execution and may not be replaced
+afterwards for any outcome-related reason. The existing hash-selected six-variant technical
+repeatability cohort is cited as **prior** evidence and is **not** relabelled as a panel; its six
+cases count toward no coverage metric.
+
+> **A green technical panel would not mean the contrast panel is feasible.** The two products answer
+> logically independent questions, the technical product may draw on concentrated single-lineage
+> substrate, and its membership is chosen *after* the negative result is known — so reading its
+> success as feasibility evidence is affirming the consequent. A technical-panel artifact may never
+> satisfy an independent-validation entry gate. The independent panel remains
+> `BLOCKED_SOURCE_DIVERSITY` until sources expand.
+
+**RAPTOR RescueScreen** is a separate, downstream, separately versioned **research-only** lane that
+turns reviewed mechanism hypotheses into experimentally testable ones. Its mechanism ledger is
+four-valued. Complex-formation loss and enhanced Pam/MYCBP2 ubiquitination in the reported systems,
+general TSC1-dependent TSC2 stabilization/proteostasis evidence, and residue-611 coverage in an
+experimental structure are currently `SOURCE_REPORTED`, not accepted `OBSERVED` claims, because
+Gate 8 is blocked and the accepted-claim count is zero. A defined Arg611 salt bridge, endogenous
+misfolding/turnover kinetics, reliable AF3 prediction of the mutation-induced shift, and any
+everolimus-combination dose or toxicity benefit are `UNSUPPORTED`; a stabilizing pocket compound is
+a `HYPOTHESIS`. `SOURCE_REPORTED` and `UNSUPPORTED` statements may never be assumed as accepted
+premises or upgraded by computation.
+
+All five entry gates are **`NOT_SATISFIED`** — chiefly because no named human reviewer is engaged
+and the accepted Atlas claim count is zero — so no stage is reachable:
+
+| Gate | Requirement | Fail state |
+|---|---|---|
+| EG-1 | Gate 8-reviewed mechanism representation | `MECHANISM_UNVERIFIED` |
+| EG-2 | exact transcript/residue/structure mapping | `MAPPING_UNVERIFIED` |
+| EG-3 | experimental-structure coverage + uncertainty | `STRUCTURE_COVERAGE_INSUFFICIENT` |
+| EG-4 | verified per-artifact tool/data/licence registry | `LICENCE_INCOMPATIBLE` |
+| EG-5 | tractable construct and assay plan | `NO_TRACTABLE_ASSAY` |
+
+Stages run S1 hypothesis → S2 structure ensemble → S3 pocket hypothesis → **S4 small calibrated
+pilot** → S5 orthogonal rescoring/MD with convergence controls → S6 compound hypothesis package →
+S7 assay cascade, and outputs use a closed earned vocabulary (`STRUCTURAL_HYPOTHESIS`,
+`POCKET_HYPOTHESIS`, `COMPUTATIONAL_SCREENING_HIT`, `ORTHOGONALLY_REPLICATED_HIT`,
+`EXPERIMENTALLY_CONFIRMED_BINDER`, `COMPLEX_RESCUE_OBSERVED`, `FUNCTIONAL_RESCUE_OBSERVED`) — the
+last three reachable only from wet-lab work. `lead`, `drug`, `therapy`, `predicted Kd` and
+`treatment candidate` are forbidden terms. The assay cascade measures abundance/turnover,
+ubiquitination and proteasome controls first, requires two methodologically orthogonal direct-binding
+methods (thermal-shift/CETSA alone is insufficient), then specificity/inactive-analog/aggregation/
+cytotoxicity/dose/replicate controls, then complex rescue, then a proximal complex-state readout
+where feasible plus downstream p-S6K/p-S6.
+
+> **Firewalls (non-negotiable).** RescueScreen never alters or informs an ACMG criterion or
+> classification, never promotes an Atlas claim, never recommends a compound, treatment, dose or
+> combination, never reports a docking or simulation value as affinity or efficacy, never generates
+> a vendor purchase link before a complete licence-cleared assay-gated package, and never treats
+> "the pipeline ran" as validation. Every computational result stays a hypothesis until its next
+> gate. Fixed thresholds quoted in the literature (15 Å, 300–1000 Å³, top 0.1%, −8.5 kcal/mol,
+> 20×100 ns) are **rejected as universal gates** and admissible only as preregistered pilot
+> parameters with sensitivity analysis; a 10M-compound or full-complex screen requires an explicit
+> compute/storage budget and a staged funnel. Licences are verified per artifact — AlphaFold 3's
+> Apache-2.0 *code* does not license its weights or outputs, ColabFold is not AF3, FoldX is
+> licence-controlled, PremPS is a third-party web server, Enamine REAL is commercial vendor data,
+> ChEMBL is CC BY-SA 3.0, and ZINC/UniProt terms need re-verification. An everolimus combination
+> matrix is exploratory only, after observed single-agent rescue, with **no** synergy, dose-sparing,
+> toxicity or clinical claim.
+
+**Durable task graph.** `docs/project/TODOS.yaml` carries the dependency-safe DAG for both tracks
+(`panel-products-*`, `rescuescreen-*`). Dependencies make screening unreachable before mechanism,
+structure, licence and assay gates pass. **No implementation or screening task is complete**, and
+`atlas-phase2-contrast-panel` and `atlas-phase2-pilot-evaluation` remain blocked.
 
 ## Source expansion roadmap — ordered and governed
 
