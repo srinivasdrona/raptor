@@ -1,0 +1,805 @@
+# RAPTOR Atlas panel PRODUCTS -- dual-product design spec.
+#
+# This file is a PLAN. It contains NO code, NO tests, NO candidate identity,
+# NO candidate count, NO functional result, NO selection and NO classification.
+# It does not execute, re-execute, reinterpret or supersede any run.
+#
+# It defines TWO separately named, separately versioned panel products that
+# both sit DOWNSTREAM of the audited 2026-08-06 INFEASIBLE_PANEL result:
+#
+#   P1  atlas-technical-coverage-panel     -- engineering product; pipeline
+#                                             behaviour only; explicitly not
+#                                             scientific generalization.
+#   P2  atlas-independent-validation-panel -- scientific product; retains the
+#                                             full independence/diversity bar;
+#                                             currently BLOCKED_SOURCE_DIVERSITY.
+#
+# Authority order for BEHAVIOUR (this spec is subordinate to all of them):
+#   1. docs/project/atlas/ATLAS_PHASE2_PANEL_SELECTION_PROTOCOL.md  (v1.0.4, frozen)
+#   2. docs/project/atlas/atlas-phase2-panel-selection-registration-v1.yaml
+#   3. configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v4.yaml
+#   4. configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v4.yaml
+#   5. docs/DECISIONS.md (ADR-0014/0015/0016/0017), docs/project/specs/
+#      atlas-panel-selector-v1.yaml, docs/project/specs/mechanism-atlas-starter.yaml
+# Where this spec and the frozen protocol appear to differ, the protocol governs
+# and this spec is defective. Existing code is NOT behaviour authority.
+
+schema: raptor-atlas-panel-products-v1
+status: planner_contract_rev1_dual_product_boundary_no_selection
+task_id: atlas-panel-products-design
+title: >-
+  Dual Atlas panel products: a post-result technical-coverage engineering panel
+  and a still-blocked independent-validation scientific panel
+worktree: 'D:\AIProjects\raptor-worktrees\panel-products-rescue-screen'
+branch: design/panel-products-rescue-screen-2026-08
+base_commit: 5704c63a786ff06313fbbf79fb2e5ff5a05ed63c
+output: docs/project/specs/atlas-panel-products-v1.yaml
+created_at: '2026-08-15T04:20:11+05:30'
+created_at_utc: '2026-08-14T22:50:11Z'
+binds_adr: ADR-0017
+
+contract: >-
+  Split the single overloaded notion of "the Atlas Phase 2 contrast panel" into
+  two products with different claim ceilings, different gates and different
+  admissible evidence. The technical-coverage panel may proceed now because it
+  claims nothing scientific; the independent-validation panel may not proceed
+  now because the claim it would support requires source diversity that does
+  not yet exist. Neither product edits, reinterprets, reruns or supersedes the
+  audited INFEASIBLE_PANEL run. Both require their own name, protocol,
+  registration and run record before any execution.
+
+authority:
+  - docs/project/atlas/ATLAS_PHASE2_PANEL_SELECTION_PROTOCOL.md
+  - docs/project/atlas/atlas-phase2-panel-selection-registration-v1.yaml
+  - configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v4.yaml
+  - configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v4.yaml
+  - configs/atlas/packs/tsc2/pack.yaml
+  - docs/DECISIONS.md
+
+# ---------------------------------------------------------------------------
+# 0. The preserved result. Read-only. Never edited by this or any downstream
+#    product. Reproduced here as a binding comparand, not as a new claim.
+# ---------------------------------------------------------------------------
+preserved_result:
+  status: FROZEN_IMMUTABLE_AUDITED
+  run_record: data/atlas/tsc2_phase2_panel_selection_run_2026-08-06.json
+  run_record_sha256: 5f5b0918a24fcaa737877a15e393773f20c584c531517133e9c8b7e7574cfffd
+  run_record_sha256_basis: >-
+    SHA-256 of the committed (LF) blob content, matching the value recorded by
+    the atlas-phase2-panel-selection-run todo. A Windows checkout with
+    core.autocrlf=true expands line endings in the working copy and therefore
+    hashes differently on disk; compare against `git show
+    HEAD:data/atlas/tsc2_phase2_panel_selection_run_2026-08-06.json`.
+  terminal_outcome: INFEASIBLE_PANEL
+  n_target: 7
+  n_selected: null
+  selected_record_ids_count: 0
+  dispositions_recorded: 35
+  attempts_completed: 24
+  attempt_status_all: INFEASIBLE_COMPLETE
+  node_budget: 5000000
+  max_nodes_expanded: 714
+  budget_exhausted: false
+  undetermined_search_incomplete: false
+  applied_relaxation_steps: []
+  selection_seed: raptor-atlas-phase2-panel-v1
+  search_scope: full_eligible_universe
+  independence_status: DECLARED
+  bound_versions:
+    protocol_version: '1.0.4'
+    protocol_doc_hash: 7b0596ab4a52601566c85a3a2c7ca42aead9c35916890397e58b3e11876e5823
+    registration_content_hash: 5b8980024bd88f9f3c7269badf7fc3e709fef4ba135b3575a7513e5d17ad1653
+    universe_id: tsc2-phase2-contrast-panel-candidate-universe
+    universe_version: '4'
+    universe_content_hash: 98edd3bf3cef36b7a1231bc389a37be6efdae7deb2210c869c317dfb6e8bef30
+    lock_content_hash: f94ce81b8633bac777fd667e26c7b8d3a726b7e4d7eed9f8ed2128f9ed32b50e
+    identity_map_version: '4'
+    identity_map_content_hash: 3adbf3484de28607fa3c133b2bebc4a9d7926b4c2d5b3863b0634507c599cd26
+    pack_content_hash: 1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927
+  binding_scarcity_facts:
+    note: >-
+      Copied verbatim from the audited run record. These are the reasons the
+      panel was infeasible. They are inputs to product design, never a licence
+      to weaken the frozen ladder.
+    universe_records: 35
+    unresolved_identity_count: 10
+    lineage_unknown_record_count: 32
+    lineage_unknown_observation_count: 37
+    lineage_groups: {'LG:UNKNOWN-POOL': unknown}
+    per_stratum_coverage: {S1: 0, S2: 0, S3: 0, S4: 0, S5: 0, S6: 0}
+    x5_attrition_count: 10
+    stale_label_discordant_count: 7
+    spec_taxonomy_coverage: COMPLETE
+  immutability_rules:
+    - The run record, its dispositions and its digests are never edited, moved,
+      re-signed, re-hashed or "corrected" by any product defined here.
+    - No product may reuse this run record id, this selection seed, or this
+      protocol/registration pair for a new execution.
+    - No product may substitute candidates, weaken a constraint outside the
+      frozen ladder, or re-run the frozen selector after seeing this result.
+    - Any future change to the frozen protocol requires a separately reviewed
+      protocol/registration decision recorded in docs/DECISIONS.md, never an
+      edit made under the label of an "engineering product".
+
+# ---------------------------------------------------------------------------
+# 1. Why two products. Recorded so the boundary cannot be quietly re-merged.
+# ---------------------------------------------------------------------------
+problem_statement: >-
+  INFEASIBLE_PANEL is a true and useful result: under the frozen independence
+  and assay-diversity constraints, the locked 35-record universe cannot yield a
+  panel. Two distinct needs were previously bundled into that single artifact.
+  (a) An ENGINEERING need: exercise identity -> source -> span -> context ->
+  abstention across diverse fixture situations and prove the pipeline behaves.
+  (b) A SCIENTIFIC need: show the mechanism ontology generalizes beyond the
+  R611Q anchor on independently sourced, assay-diverse evidence. Need (a) does
+  not require source independence, because it makes no generalization claim.
+  Need (b) does. Bundling them created pressure to relax P2/D3 -- which would
+  have converted a scientific gate into a convenience knob and laundered a
+  negative result. Splitting them removes that pressure entirely.
+
+constraint_glossary:
+  note: >-
+    Constraint ids and base thresholds are copied from the frozen protocol's
+    declared_constraints block for readability. The protocol remains the sole
+    authority for their semantics.
+  P1:
+    name: sole-support cap
+    base_threshold: ceil(n/2)
+  P2:
+    name: minimum established independent source groups
+    base_threshold: '3'
+  P3:
+    name: single-high-throughput-source cap
+    base_threshold: '2'
+  D1:
+    name: minimum distinct assay kinds
+    base_threshold: '3'
+  D2:
+    name: minimum distinct model systems
+    base_threshold: '2'
+  D3:
+    name: maximum members per assay kind (assay-concentration cap)
+    base_threshold: ceil(n/2)
+  C3:
+    name: maximum members per stratum
+    base_threshold: ceil(n/2)
+  C5:
+    name: spec-taxonomy coverage requirement
+    base_threshold: enforced
+
+decision_ledger:
+  - id: PP-D1
+    question: >-
+      Should the existing INFEASIBLE_PANEL run be re-executed with relaxed P2/D3
+      so that a panel exists?
+    options: [rerun_relaxed, new_named_products, abandon_panel_work]
+    chosen: new_named_products
+    rationale: >-
+      Re-running the same protocol with weaker constraints after seeing the
+      negative result is outcome-dependent constraint selection. It would make
+      the original result unfalsifiable in retrospect. Two new products with
+      their own names, protocols, registrations and run records preserve the
+      original result intact and make each claim ceiling explicit.
+    inversion: >-
+      A "technical coverage panel" is defined that is the independent panel with
+      P2 and D3 turned down, and its output is later cited as evidence that a
+      contrast panel exists.
+    falsifier: >-
+      Any product artifact reuses the frozen protocol version, the frozen
+      registration hash, the selection seed raptor-atlas-phase2-panel-v1, or the
+      run-record id of the 2026-08-06 run; or any product's success metric is
+      phrased as a scientific finding about TSC2 biology.
+
+  - id: PP-D2
+    question: For the technical panel, are P2 and D3 gates or reported limitations?
+    options: [gates, reported_limitations, silently_dropped]
+    chosen: reported_limitations
+    rationale: >-
+      The technical panel's claim ceiling is "the pipeline executed correctly on
+      a diverse fixture set". Lineage independence and assay spread are not
+      preconditions for that claim, so enforcing them as gates would be
+      cargo-cult rigour. They are still MEASURED and REPORTED on every run,
+      because a reader must be able to see exactly how concentrated the
+      substrate was. Silently dropping them is prohibited.
+    inversion: >-
+      P2/D3 are dropped from the report as well as from the gate, so a reader
+      cannot tell the technical panel drew on a single lineage pool.
+    falsifier: >-
+      A technical-panel run record lacks measured established_source_groups,
+      per_assay_kind distribution, lineage_unknown counts, or the mandatory
+      non-independence disclaimer.
+
+  - id: PP-D3
+    question: What stops the technical panel from becoming a scientific claim later?
+    options: [reviewer_discretion, naming_convention, structural_claim_ceiling]
+    chosen: structural_claim_ceiling
+    rationale: >-
+      Naming alone is not a control. Every technical-panel artifact carries a
+      machine-readable claim_ceiling field whose only permitted value is
+      ENGINEERING_PIPELINE_BEHAVIOUR, plus an explicit
+      generalization_claim=false and independent_validation=false. Any consumer
+      that reads a technical-panel artifact while asserting a scientific claim
+      fails closed.
+    inversion: >-
+      A grant, README or program note cites technical-panel completeness as
+      evidence that the Atlas ontology generalizes.
+    falsifier: >-
+      Any document cites a technical-panel metric without the accompanying
+      claim_ceiling and the not-independent-validation disclaimer.
+
+  - id: PP-D4
+    question: How is technical-panel membership fixed?
+    options: [analyst_choice, outcome_dependent_swap, mechanical_new_seed_pre_execution]
+    chosen: mechanical_new_seed_pre_execution
+    rationale: >-
+      Membership is derived mechanically from a NEW, separately versioned
+      coverage protocol and a NEW selection seed, committed and hash-bound
+      BEFORE execution. It is disclosed as post-INFEASIBLE_PANEL. Once
+      execution starts, no member may be replaced for any reason related to an
+      observed outcome; an unusable member is recorded as a disposition, not
+      swapped.
+    inversion: >-
+      A member that produces an inconvenient abstention is quietly replaced and
+      the run is re-executed, so the reported exact-span yield is a survivor
+      statistic.
+    falsifier: >-
+      Any post-execution membership delta exists without a new version bump and
+      a recorded, reviewed amendment; or any member appears in a run record
+      whose membership hash differs from the pre-execution committed hash.
+
+  - id: PP-D5
+    question: >-
+      Does the existing six-variant gate-smoke cohort become the technical panel?
+    options: [relabel_as_panel, discard, incorporate_as_prior_evidence]
+    chosen: incorporate_as_prior_evidence
+    rationale: >-
+      The cohort (todo atlas-phase2-gate-smoke-cohort, cohort_content_hash
+      99462b3064a8bc53737ac3dc22c0d2c07e87d999cc429a1ebde2aadb09832388)
+      independently reproduced a Gate 1-7 pass and a Gate 8 block with zero
+      accepted claims. That is genuine prior repeatability evidence and is cited
+      as such. It is NOT relabelled as a panel: it was hash-selected for smoke
+      coverage, not for the coverage strata defined here, and its records stay
+      under their original name and status.
+    inversion: >-
+      The six-variant cohort is renamed "technical coverage panel v0" so the
+      product looks already-executed and the real coverage run is skipped.
+    falsifier: >-
+      Any artifact restates the six-variant cohort under a panel-product name,
+      or counts its six cases toward this product's coverage metrics.
+
+  - id: PP-D6
+    question: >-
+      What is the independent-validation panel's status while source diversity
+      is missing?
+    options: [proceed_relaxed, BLOCKED_SOURCE_DIVERSITY, cancelled]
+    chosen: BLOCKED_SOURCE_DIVERSITY
+    rationale: >-
+      The scarcity is in the SOURCES, not in the constraints. The correct
+      response to "not enough independent lineages and assay kinds" is to
+      expand and register sources, not to lower the bar. BLOCKED is an honest,
+      resumable state that names its own unblocking condition.
+    inversion: >-
+      BLOCKED_SOURCE_DIVERSITY is quietly downgraded to "pending" and the panel
+      is run against the same 35-record universe with the R2/R4/R6 rungs
+      pre-applied.
+    falsifier: >-
+      An independent-validation artifact exists whose universe lock is v4, or
+      whose P2/D3 thresholds are below the frozen base thresholds, or whose
+      entry_gate_evidence block is absent.
+
+  - id: PP-D7
+    question: Can the technical panel unblock the independent panel?
+    options: [yes_if_metrics_good, partially, never]
+    chosen: never
+    rationale: >-
+      The technical panel is executed AFTER and WITH KNOWLEDGE OF the negative
+      result, on a substrate selected for pipeline coverage rather than source
+      independence. Its success says the machinery works; it is silent on
+      whether independently sourced, assay-diverse evidence exists. Treating it
+      as feasibility evidence would be affirming the consequent.
+    inversion: >-
+      A status note reads "coverage panel completed, therefore the contrast
+      panel is feasible after all".
+    falsifier: >-
+      Any independent-validation entry gate is satisfied by citing a
+      technical-panel artifact.
+
+# ---------------------------------------------------------------------------
+# 2. PRODUCT 1 -- technical coverage panel (engineering)
+# ---------------------------------------------------------------------------
+products:
+  technical_coverage_panel:
+    product_id: atlas-technical-coverage-panel
+    product_name: RAPTOR Atlas Technical Coverage Panel
+    product_kind: engineering_product
+    version: v1 (design only; not executed)
+    status: DESIGN_ONLY_NOT_EXECUTED
+    claim_ceiling: ENGINEERING_PIPELINE_BEHAVIOUR
+    generalization_claim: false
+    independent_validation: false
+    disclosed_as_post_result: true
+    disclosure_text: >-
+      Designed and executed AFTER the 2026-08-06 INFEASIBLE_PANEL result, with
+      full knowledge of it. This product tests RAPTOR's machinery, not TSC2
+      biology, and provides no evidence about the feasibility of the
+      independent-validation panel.
+
+    objective: >-
+      Exercise the identity -> source -> span -> context -> abstention pipeline
+      across deliberately diverse fixture situations, and demonstrate that each
+      stage behaves as specified -- including when it must abstain, block or
+      report a contradiction.
+
+    explicitly_not:
+      - scientific generalization of the mechanism ontology
+      - independent validation of any Atlas claim
+      - evidence of efficacy, function, penetrance or mechanism
+      - variant classification or any ACMG criterion, in whole or in part
+      - clinical evidence, clinical utility or clinical decision support
+      - evidence that the independent-validation panel is feasible
+      - a replacement, correction or reinterpretation of INFEASIBLE_PANEL
+      - a benchmark of retrieval quality against an external gold standard
+
+    reported_limitations_note: >-
+      MEASURED and REPORTED on every run; NOT gates. Their presence in the
+      report is mandatory. Their thresholds are not enforced. This softening
+      is admissible only because the product disclaims independence and
+      generalization (PP-D2).
+    reported_limitations:
+      - id: P2
+        treatment: report_only
+        must_report:
+          - established_source_group_count_actual
+          - source_group_membership_map
+          - lineage_unknown_record_count
+          - lineage_unknown_observation_count
+        mandatory_disclaimer: >-
+          Source-lineage independence was not enforced for this product. Any
+          apparent agreement between members may be a single-lineage artifact
+          and must not be read as corroboration.
+      - id: D3
+        treatment: report_only
+        must_report:
+          - per_assay_kind_distribution
+          - assay_kind_count_actual
+          - model_system_count_actual
+          - max_share_single_assay_kind
+        mandatory_disclaimer: >-
+          Assay-kind concentration was not capped for this product. Coverage of
+          an assay kind here reflects fixture availability, not the state of the
+          published evidence base.
+
+    retained_fail_closed_controls_note: >-
+      NON-NEGOTIABLE. These are correctness controls, not scientific-strength
+      controls, and softening any of them would invalidate the only claim the
+      product makes. Each remains fail-closed exactly as in the frozen
+      pipeline.
+    retained_fail_closed_controls:
+      - id: TC-F1
+        control: official identity resolution and replay
+        requirement: >-
+          Every member resolves through the official identity map with the full
+          replay tuple verified. Unresolved identities are recorded as
+          unresolved dispositions and are never inferred, back-computed by
+          residue arithmetic, or filled from the universe.
+      - id: TC-F2
+        control: source access and licence admissibility
+        requirement: >-
+          A source may ground a span only if it is lawfully held and its
+          permitted use covers grounding and quotation. Paywalled or
+          non-derivative-licensed content fails closed and is recorded as an
+          access/licence disposition.
+      - id: TC-F3
+        control: exact-span verification
+        requirement: >-
+          Spans are verified by exact normalized-slice match with a from-disk
+          hash recompute (ADR-0016). No fuzzy match, no re-typing, no
+          normalization of the quote to fit.
+      - id: TC-F4
+        control: anchor exclusion
+        requirement: >-
+          The R611Q anchor is excluded from membership. Coverage metrics may
+          never be inflated by the anchor's already-verified spans.
+      - id: TC-F5
+        control: dedupe and collision detection
+        requirement: >-
+          Duplicate identities, duplicate spans and shared joint-statement
+          quotes are detected and recorded. A shared joint statement is reported
+          as shared, never split into fabricated per-variant magnitudes.
+      - id: TC-F6
+        control: complete disposition accounting
+        requirement: >-
+          Every candidate considered has exactly one recorded terminal
+          disposition. Record counts must conserve from input frame to output
+          ledger with zero silent drops.
+      - id: TC-F7
+        control: abstention fidelity
+        requirement: >-
+          Abstention, unknown, conflicting and empty are first-class successful
+          outcomes. A run that manufactures a claim to avoid abstaining is a
+          failure of this product even if every other metric is green.
+      - id: TC-F8
+        control: named-human Gate 8
+        requirement: >-
+          Deterministic Gates 1-7 never substitute for Gate 8. With no named
+          reviewer engaged, terminal status is BLOCKED_HUMAN_REVIEW and the
+          accepted-claim count is zero. That is the expected, passing shape.
+      - id: TC-F9
+        control: classification and leakage firewall
+        requirement: >-
+          No ClinVar-derived or classifier-derived signal enters membership,
+          scoring or reporting (ADR-0009). No output is an ACMG criterion, a
+          classification, or an input to one.
+
+    membership_fixing:
+      method: mechanical_pre_execution
+      requires_new_artifacts:
+        - a new, separately versioned coverage protocol document (not an
+          amendment to the frozen selection protocol)
+        - a new registration record with its own content hash
+        - a new coverage frame lock with its own id, version and content hash
+        - a new selection seed distinct from raptor-atlas-phase2-panel-v1
+        - a new run-record path distinct from the 2026-08-06 run record
+      pre_execution_freeze: >-
+        Membership, strata, coverage targets, metric definitions and the seed
+        are committed and hash-bound before the first execution. The committed
+        membership hash is echoed in the run record and must match.
+      post_execution_rule: >-
+        No outcome-dependent replacement. An unusable member yields a recorded
+        disposition. Any membership change requires a version bump, a written
+        pre-registered rationale that does not reference an observed result, and
+        a fresh run; the superseded run record is retained, not deleted.
+      coverage_strata_note: >-
+        Strata are SITUATION classes for the pipeline, deliberately not
+        evidence-strength classes. They are defined by what the machinery must
+        do, so that satisfying them cannot be mistaken for a scientific
+        sampling design. No candidate is named here.
+      coverage_strata:
+        - id: TCS-1
+          situation: resolvable identity with at least one lawfully accessible source
+          exercises: identity replay, catalog resolution, exact-span verification
+        - id: TCS-2
+          situation: unresolvable or ambiguous raw identity
+          exercises: fail-closed identity handling and unresolved disposition
+        - id: TCS-3
+          situation: source exists but access or licence forbids grounding
+          exercises: access/licence fail-closed path and honest gap reporting
+        - id: TCS-4
+          situation: joint or multi-variant statement covering the member
+          exercises: shared-quote handling without magnitude fabrication
+        - id: TCS-5
+          situation: internally discordant or contradictory source statements
+          exercises: contradiction capture without premature reconciliation
+        - id: TCS-6
+          situation: source with incomplete assay or model-system context
+          exercises: context-completeness reporting and abstention
+        - id: TCS-7
+          situation: no admissible source at all
+          exercises: empty-result path; proves the pipeline can return nothing
+      strata_rule: >-
+        Coverage targets are per-situation minimum counts fixed in the coverage
+        protocol. A stratum that cannot be populated from the available frame is
+        reported UNPOPULATED with its reason; it is never filled by relabelling
+        a member from another stratum.
+
+    success_metrics_note: >-
+      All metrics are properties of the MACHINERY. None is a statement about
+      TSC2, about any variant, or about the published evidence base.
+    success_metrics:
+      - id: TCM-1
+        metric: execution completeness
+        definition: >-
+          share of frame members reaching exactly one recorded terminal
+          disposition, with input/output record-count conservation proven.
+        target_form: preregistered numeric target in the coverage protocol
+      - id: TCM-2
+        metric: exact-span yield
+        definition: >-
+          share of members with at least one span passing exact normalized-slice
+          verification with from-disk hash recompute, reported jointly with the
+          access/licence-blocked share so a low yield cannot be read as a
+          pipeline defect when it is an access limitation.
+      - id: TCM-3
+        metric: context completeness
+        definition: >-
+          share of verified spans carrying a complete assay/model-system context
+          record, with incompleteness reasons enumerated.
+      - id: TCM-4
+        metric: contradiction handling
+        definition: >-
+          share of injected or naturally occurring discordant situations
+          captured as contradictions rather than silently reconciled or dropped.
+      - id: TCM-5
+        metric: abstention fidelity
+        definition: >-
+          share of situations with no admissible evidence that terminate as
+          abstention/unknown/empty rather than as a manufactured claim.
+          A false claim counts as a failure regardless of any other metric.
+      - id: TCM-6
+        metric: reproducibility
+        definition: >-
+          byte-identical run record (modulo declared timestamp and executor
+          fields) across two independent executions from the same committed
+          membership hash, protocol hash, catalog hash and pack hash.
+    forbidden_metrics:
+      - precision, recall, accuracy or F1 against any classification label
+      - concordance with ClinVar, with any classifier, or with any predictor
+      - any measure framed as scientific validity, generalization or efficacy
+
+    prior_repeatability_evidence:
+      - artifact: six-variant technical repeatability cohort (tsc2-gate-smoke-v1)
+        cohort_content_hash: 99462b3064a8bc53737ac3dc22c0d2c07e87d999cc429a1ebde2aadb09832388
+        recorded_by_todo: atlas-phase2-gate-smoke-cohort
+        what_it_showed: >-
+          Six independent AtlasCandidateImport packages each verified one exact
+          source span, passed Gates 1-7, terminated at Gate 8
+          (BLOCKED_HUMAN_REVIEW), accepted zero claims, and never invoked the
+          promotion API; eight false-green inversion probes each behaved as
+          required.
+        how_it_is_used: >-
+          Cited as PRIOR EVIDENCE that the deterministic gate chain is
+          repeatable. It is not relabelled, not renamed, not restated as a panel
+          product, and its six cases do not count toward TCM-1..TCM-6.
+        status_unchanged: true
+
+  # -------------------------------------------------------------------------
+  # 3. PRODUCT 2 -- independent validation panel (scientific)
+  # -------------------------------------------------------------------------
+  independent_validation_panel:
+    product_id: atlas-independent-validation-panel
+    product_name: RAPTOR Atlas Independent Validation Panel
+    product_kind: scientific_product
+    version: v1 (design only; blocked)
+    status: BLOCKED_SOURCE_DIVERSITY
+    claim_ceiling: RESEARCH_ONLY_ONTOLOGY_GENERALIZATION_EVIDENCE
+    generalization_claim: true
+    independent_validation: true
+
+    objective: >-
+      Provide evidence that the Atlas mechanism ontology and extraction pipeline
+      generalize beyond the R611Q anchor, on evidence drawn from genuinely
+      independent source lineages and multiple assay kinds and model systems.
+
+    retained_constraints_note: >-
+      Retained at the frozen base thresholds. Not softened, not reported-only,
+      not laddered down by this design. Any change is a separately reviewed
+      protocol decision, never a product-design decision.
+    retained_constraints:
+      - id: P2
+        treatment: hard_gate
+        threshold: '3'
+        meaning: minimum established independent source groups
+      - id: P1
+        treatment: hard_gate
+        threshold: ceil(n/2)
+      - id: P3
+        treatment: hard_gate
+        threshold: '2'
+      - id: D1
+        treatment: hard_gate
+        threshold: '3'
+      - id: D2
+        treatment: hard_gate
+        threshold: '2'
+      - id: D3
+        treatment: hard_gate
+        threshold: ceil(n/2)
+      - id: C3
+        treatment: hard_gate
+        threshold: ceil(n/2)
+      - id: C5
+        treatment: hard_gate
+        threshold: enforced
+    additional_expectations:
+      - multiple distinct model systems represented, with the model system
+        recorded per observation rather than per publication
+      - multiple distinct assay kinds represented, with high-throughput and
+        low-throughput evidence distinguished
+      - established source groups determined by verified lineage mapping, never
+        by distinct author lists, distinct journals or distinct PMIDs alone
+      - lineage_unknown records may not be counted toward independence
+
+    blocking_reason:
+      code: BLOCKED_SOURCE_DIVERSITY
+      evidence:
+        - the audited run recorded 32 of 35 records and 37 of 37 attributable
+          observations with unknown lineage, collapsed into a single
+          LG:UNKNOWN-POOL group
+        - 10 of 35 identities were unresolved
+        - all six strata had zero coverage at every attempted panel size
+        - all 24 attempts across L0-R7 completed exhaustively within budget, so
+          the infeasibility is a property of the substrate, not of the search
+      interpretation: >-
+        The binding shortage is independent, lineage-attributable, assay-diverse
+        source coverage. That is a SOURCE problem with a SOURCE remedy.
+      not_an_interpretation:
+        - it is not evidence that the constraints are wrong
+        - it is not evidence that no such panel could ever exist
+        - it is not evidence about any variant's mechanism, function or
+          classification
+
+    entry_requirements_note: >-
+      ALL must hold before any selection run. Each is independently
+      verifiable; none may be satisfied by citing a technical-panel artifact
+      (PP-D7).
+    entry_requirements:
+      - id: IV-E1
+        requirement: a new frozen source registry
+        detail: >-
+          Every admitted source pinned with owner, authoritative locator,
+          licence and permitted use, release/version, checksum, acquisition
+          method and retrieval date. Registry has its own content hash and is
+          frozen before the frame is built.
+      - id: IV-E2
+        requirement: established lineage mapping
+        detail: >-
+          A verified mapping from source to established research group/lineage,
+          derived from stated evidence rather than assumed from authorship
+          strings. Every record used for independence must have a KNOWN lineage;
+          unknown-lineage records are excluded from independence accounting.
+      - id: IV-E3
+        requirement: sufficient open, span-verifiable records
+        detail: >-
+          Enough lawfully accessible full-text or direct-dataset records that
+          exact-span verification is possible for the candidate frame -- not
+          merely enough abstracts or enough titles.
+      - id: IV-E4
+        requirement: new universe, protocol and registration
+        detail: >-
+          A new candidate universe with its own id/version/content hash, a new
+          panel protocol document, and a new registration record. The v4 lock
+          and the v1.0.4 protocol/registration pair are never reused for this
+          product.
+      - id: IV-E5
+        requirement: pre-registration before selection
+        detail: >-
+          Strata, thresholds, seed, ladder (if any) and success criteria are
+          committed and hash-bound before the first execution and are never
+          adjusted after an observed outcome.
+      - id: IV-E6
+        requirement: feasibility pre-check on the new frame
+        detail: >-
+          A candidate-free feasibility check demonstrating that the new frame
+          can in principle satisfy P1/P2/P3/D1/D2/D3/C3/C5 at the target size,
+          run before -- and separately from -- the selection run itself.
+
+    claim_boundary:
+      even_if_feasible:
+        - the result remains RESEARCH-ONLY
+        - every claim still requires the named-human Gate 8 review; deterministic
+          verification never substitutes for the human oracle
+        - a passing panel evidences ONTOLOGY AND PIPELINE GENERALIZATION on the
+          sampled evidence, not variant pathogenicity, not variant function, not
+          penetrance, and not clinical utility
+        - no ACMG criterion, classification, worklist or submission is
+          authorized by this or any panel result
+        - no second-disease support is implied; portability remains the separate
+          ADR-0014 hypothesis
+      failure_is_informative: >-
+        A second INFEASIBLE outcome on a properly expanded frame is a publishable
+        negative result about evidence availability and is recorded as such.
+
+# ---------------------------------------------------------------------------
+# 4. The firewall between the two products.
+# ---------------------------------------------------------------------------
+product_separation_rules:
+  - id: PS-1
+    rule: separate names
+    detail: >-
+      atlas-technical-coverage-panel and atlas-independent-validation-panel are
+      distinct products. Neither is "the contrast panel". The unqualified phrase
+      "the panel" is not used in any artifact of either product.
+  - id: PS-2
+    rule: separate protocols, registrations and run records
+    detail: >-
+      No shared protocol document, registration hash, frame lock, selection seed
+      or run-record path between the two products, or with the frozen 2026-08-06
+      run.
+  - id: PS-3
+    rule: separate version namespaces
+    detail: Each product versions independently; neither version implies the other.
+  - id: PS-4
+    rule: no evidence flow from technical to scientific
+    detail: >-
+      A technical-panel artifact may not satisfy any independent-validation
+      entry gate, may not appear in its source registry as evidence of
+      diversity, and may not be cited in support of its feasibility.
+  - id: PS-5
+    rule: no claim inheritance
+    detail: >-
+      Metrics, disclaimers and claim ceilings do not transfer between products.
+      Every citation of a metric carries its product id and claim ceiling.
+  - id: PS-6
+    rule: mandatory post-result disclosure
+    detail: >-
+      Every technical-panel artifact states that it was designed after, and with
+      knowledge of, INFEASIBLE_PANEL.
+
+why_a_post_result_technical_product_is_not_feasibility_evidence:
+  argument: >-
+    The independent-validation panel asks: "does independently sourced,
+    assay-diverse evidence exist for a contrast set?" The audited selector
+    answered NO for the locked v4 frame, exhaustively and within budget. The
+    technical coverage panel asks a different question: "does the machinery
+    behave correctly across situations?" It is deliberately allowed to draw on
+    concentrated, single-lineage, single-assay substrate, because concentration
+    does not impair a machinery claim. Therefore a green technical panel is
+    fully consistent with the scientific panel remaining infeasible -- the two
+    propositions are logically independent. Reading technical success as
+    feasibility evidence is affirming the consequent, and is additionally
+    contaminated by the fact that technical membership is chosen AFTER the
+    negative result is known. The only thing that can change the
+    independent-validation verdict is a new frame built on new, registered,
+    lineage-mapped, span-verifiable sources.
+  prohibited_sentences:
+    - "the coverage panel succeeded, so the contrast panel is feasible"
+    - "we did run a Phase 2 panel"
+    - "INFEASIBLE_PANEL was superseded"
+    - "the panel was infeasible only because the constraints were too strict"
+  required_phrasing_when_both_are_mentioned: >-
+    The independent-validation panel remains BLOCKED_SOURCE_DIVERSITY; the
+    technical coverage panel is an engineering product that makes no scientific
+    generalization claim and provides no evidence about that block.
+
+# ---------------------------------------------------------------------------
+# 5. Prohibitions and acceptance.
+# ---------------------------------------------------------------------------
+prohibitions:
+  - No candidate, variant identity, candidate count or panel membership appears
+    in this spec or in any artifact produced by designing it.
+  - No ACMG criterion is emitted, implied, weakened or strengthened.
+  - No classification, worklist, ClinVar submission or clinical advice.
+  - No treatment, therapy, dosing or patient-management statement of any kind.
+  - 'No automatic promotion: Gate 8 named-human review is never bypassed,
+    defaulted, or satisfied by a deterministic pass.'
+  - No edit to the frozen protocol, registration, universe lock, identity-map
+    lock, pack or the 2026-08-06 run record.
+  - No re-execution of the frozen selector.
+  - No second-disease claim.
+
+acceptance_criteria:
+  - id: A1
+    check: >-
+      Both products have distinct ids, names, claim ceilings, statuses and
+      artifact sets, and neither is referred to as "the contrast panel".
+  - id: A2
+    check: >-
+      The technical panel's P2/D3 treatment is report_only with mandatory
+      measured fields and disclaimers, and every TC-F1..TC-F9 control is
+      retained fail-closed.
+  - id: A3
+    check: >-
+      The independent panel retains all frozen base thresholds as hard gates and
+      carries status BLOCKED_SOURCE_DIVERSITY with named entry requirements.
+  - id: A4
+    check: >-
+      The preserved_result block matches the audited run record field for field,
+      and no rule in this spec permits editing it.
+  - id: A5
+    check: >-
+      No candidate, compound, count or membership appears anywhere in this file.
+  - id: A6
+    check: >-
+      Every success metric is a property of the machinery; no forbidden metric
+      is defined.
+  - id: A7
+    check: >-
+      A reader can state, from this file alone, why a green technical panel does
+      not unblock the independent panel.
+
+open_questions:
+  - id: OQ-1
+    question: >-
+      Which coverage strata can actually be populated from lawfully accessible
+      sources today? Unknown until the source registry work lands; the design
+      permits UNPOPULATED with a reason rather than forcing coverage.
+  - id: OQ-2
+    question: >-
+      What preregistered numeric targets should TCM-1..TCM-6 carry? Deferred to
+      the coverage protocol so that targets are set with the frame in view and
+      before execution, not inside this design document.
+  - id: OQ-3
+    question: >-
+      Is lineage mapping resolvable at all for the historical TSC2 functional
+      literature? If not, the independent panel may stay blocked indefinitely,
+      which is an honest outcome and not a reason to relax P2.

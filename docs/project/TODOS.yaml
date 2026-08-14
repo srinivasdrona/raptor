@@ -755,7 +755,12 @@ todos:
     INFEASIBLE_PANEL after all 24 frozen-ladder attempts completed exhaustively, so no
     provisional contrast panel exists to execute. The task may resume only under a separately
     reviewed future protocol/registration decision, never by substituting candidates or
-    weakening constraints after seeing this result.'
+    weakening constraints after seeing this result. Superseded in scope 2026-08-15 by
+    ADR-0017: the engineering half of this task moves to the separately named
+    atlas-technical-coverage-panel product (panel-products-technical-* tasks) and the
+    scientific half to atlas-independent-validation-panel (panel-products-independent-*
+    tasks, BLOCKED_SOURCE_DIVERSITY). This task stays blocked and is never satisfied by a
+    technical-coverage-panel artifact.'
   status: blocked
   depends_on:
   - atlas-phase2-panel-selection-run
@@ -778,7 +783,10 @@ todos:
     reproducibility across the anchor and contrast panel. Discovery may be an optional
     execution layer, not the benchmark or source of truth. Blocked 2026-08-06 because
     atlas-phase2-panel-selection-run returned INFEASIBLE_PANEL and no contrast panel exists;
-    named anchor review also remains pending.'
+    named anchor review also remains pending. Per ADR-0017 (2026-08-15), technical execution
+    metrics from the atlas-technical-coverage-panel product carry claim ceiling
+    ENGINEERING_PIPELINE_BEHAVIOUR and may not be used to evaluate ontology generalization
+    here.'
   status: blocked
   depends_on:
   - atlas-phase2-contrast-panel
@@ -1251,3 +1259,305 @@ todos:
   - atlas-phase2-raw-identity-map
   - atlas-phase2-universe-identity-correction
   created: '2026-08-05'
+- id: panel-products-rescuescreen-design
+  title: Designing dual Atlas panel products and RAPTOR RescueScreen
+  description: 'Track: MECHANISM-ATLAS / PHASE-2 + RESCUESCREEN (design/governance; asserts
+    no scientific or clinical result, selects no variant and screens no compound). Split the
+    overloaded Atlas Phase 2 contrast panel into two separately named, separately versioned
+    products with different claim ceilings, and define a separate research-only structural-rescue
+    lane. Completed 2026-08-15 on branch design/panel-products-rescue-screen-2026-08 from
+    clean head 5704c63: docs/project/specs/atlas-panel-products-v1.yaml defines atlas-technical-coverage-panel
+    (engineering; claim ceiling ENGINEERING_PIPELINE_BEHAVIOUR; P2/D3 measured and reported
+    rather than gated; nine fail-closed controls TC-F1..TC-F9 retained; seven situation strata
+    TCS-1..TCS-7; six machinery metrics TCM-1..TCM-6 with precision/recall/concordance forbidden)
+    and atlas-independent-validation-panel (scientific; BLOCKED_SOURCE_DIVERSITY; P1/P2/P3/D1/D2/D3/C3/C5
+    retained as hard gates at the frozen base thresholds; six entry requirements IV-E1..IV-E6),
+    plus six separation rules PS-1..PS-6 forbidding any evidence flow from the engineering
+    product to the scientific one. docs/project/specs/structural-rescue-screen-v1.yaml defines
+    RAPTOR RescueScreen: a three-valued mechanism ledger (four OBSERVED, four UNSUPPORTED,
+    one HYPOTHESIS), five entry gates EG-1..EG-5 all NOT_SATISFIED, seven ordered stages S1..S7,
+    a closed seven-term earned output vocabulary with thirteen forbidden terms, seven terminal
+    no-go states, a six-tier assay cascade AC-1..AC-6, a per-artifact tool/data/licence registry
+    with ten recorded licence facts LR-1..LR-10, a threshold policy rejecting five commonly
+    quoted fixed cutoffs as universal gates, and eight firewalls FW-1..FW-8. ADR-0017 and
+    ADR-0018 record both decisions; docs/PROGRAM.md carries a candidate-free status section.
+    The audited data/atlas/tsc2_phase2_panel_selection_run_2026-08-06.json INFEASIBLE_PANEL
+    result and the frozen protocol v1.0.4, registration, universe lock v4 and identity-map
+    lock v4 are unchanged. Design only: no code, no test, no protocol, no registration, no
+    universe, no map, no run record, no data and no dependency was created or edited.'
+  status: done
+  depends_on:
+  - atlas-phase2-panel-selection-run
+  created: '2026-08-15'
+- id: panel-products-technical-protocol-freeze
+  title: Freezing the technical coverage panel protocol and registration
+  description: 'Track: ATLAS-PANEL-PRODUCTS / TECHNICAL (engineering governance; asserts no
+    scientific or clinical result). Author and freeze a NEW coverage protocol document, a
+    NEW registration record with its own content hash, a NEW coverage frame lock, and a NEW
+    selection seed distinct from raptor-atlas-phase2-panel-v1, per PP-D4 of docs/project/specs/atlas-panel-products-v1.yaml.
+    The frozen Phase 2 selection protocol v1.0.4, its registration, universe lock v4, identity-map
+    lock v4 and the 2026-08-06 run record must not be edited, amended, re-signed or reused.
+    Fix membership, coverage strata TCS-1..TCS-7, per-stratum targets, metric definitions
+    TCM-1..TCM-6 and their preregistered numeric targets BEFORE any execution, and bind the
+    committed membership hash so the run record can prove it. Record the mandatory post-INFEASIBLE_PANEL
+    disclosure, the P2/D3 report-only treatment with its two mandatory disclaimers, and the
+    claim ceiling ENGINEERING_PIPELINE_BEHAVIOUR with generalization_claim false and independent_validation
+    false. Not started.'
+  status: pending
+  depends_on:
+  - panel-products-rescuescreen-design
+  created: '2026-08-15'
+- id: panel-products-technical-implement
+  title: Implementing and testing the technical coverage panel executor
+  description: 'Track: ATLAS-PANEL-PRODUCTS / TECHNICAL (engineering). Implement the executor
+    for the frozen coverage protocol under the standard loop (planner spec, separated RED
+    test authorship, doer implementation, cross-family checker). Every one of the nine fail-closed
+    controls must be enforced and independently tested: TC-F1 official identity resolution
+    and replay with no residue arithmetic, TC-F2 source access and licence admissibility,
+    TC-F3 exact normalized-slice span verification with from-disk hash recompute, TC-F4 R611Q
+    anchor exclusion, TC-F5 dedupe/collision and shared joint-statement handling without magnitude
+    fabrication, TC-F6 complete disposition accounting with record-count conservation, TC-F7
+    abstention fidelity, TC-F8 the named-human Gate 8 which deterministic gates never replace,
+    and TC-F9 the classification/leakage firewall. P2 and D3 must be MEASURED and REPORTED,
+    never enforced and never omitted. Include false-green inversion probes for each control.
+    No execution against real sources in this task. Not started.'
+  status: pending
+  depends_on:
+  - panel-products-technical-protocol-freeze
+  created: '2026-08-15'
+- id: panel-products-technical-run
+  title: Running the technical coverage panel
+  description: 'Track: ATLAS-PANEL-PRODUCTS / TECHNICAL (engineering execution; asserts no
+    scientific or clinical result and provides no evidence about independent-panel feasibility).
+    Execute the checker-clean executor exactly once per frozen membership, twice in total
+    to evidence TCM-6 reproducibility, and record execution completeness, exact-span yield
+    reported jointly with the access/licence-blocked share, context completeness, contradiction
+    handling and abstention fidelity. Expect terminal BLOCKED_HUMAN_REVIEW with zero accepted
+    claims while no named reviewer is engaged; that is the passing shape, not a defect. No
+    member may be replaced after execution for any outcome-related reason; an unusable member
+    is a recorded disposition. The six-variant tsc2-gate-smoke-v1 cohort is cited as prior
+    repeatability evidence only and its cases count toward no metric. Every reported metric
+    carries the product id and claim ceiling. Not started.'
+  status: pending
+  depends_on:
+  - panel-products-technical-implement
+  created: '2026-08-15'
+- id: panel-products-source-lineage-registry
+  title: Building the frozen source registry and lineage mapping
+  description: 'Track: ATLAS-PANEL-PRODUCTS / INDEPENDENT (source coverage; prerequisite IV-E1
+    and IV-E2). Build a new frozen source registry pinning owner, authoritative locator, licence
+    and permitted use, release/version, checksum, acquisition method and retrieval date for
+    every admitted source, with its own content hash. Then establish a verified source-to-established-group
+    lineage mapping derived from stated evidence, never inferred from distinct author lists,
+    journals or PMIDs alone. The audited run collapsed 32 of 35 records and all 37 attributable
+    observations into a single LG:UNKNOWN-POOL and left 10 of 35 identities unresolved; unknown-lineage
+    records remain excluded from independence accounting rather than being counted optimistically.
+    This never modifies the frozen R2 result, the ADR-0013 prospective dataset rule or any
+    ACMG policy. Not started.'
+  status: pending
+  depends_on:
+  - panel-products-rescuescreen-design
+  - sourceops-version-refresh-registry
+  - governance-data-rights-privacy
+  created: '2026-08-15'
+- id: panel-products-assay-diversity-expansion
+  title: Expanding assay-kind and model-system source diversity
+  description: 'Track: ATLAS-PANEL-PRODUCTS / INDEPENDENT (source coverage; prerequisite IV-E3).
+    Expand lawfully accessible, span-verifiable source coverage until enough distinct assay
+    kinds and model systems exist for D1/D2/D3 to be satisfiable at the target panel size,
+    recording model system per observation rather than per publication and distinguishing
+    high-throughput from low-throughput evidence. Access and licence gaps fail closed and
+    are reported as gaps; abstracts and titles do not count as span-verifiable records. If
+    diversity cannot be achieved, the honest outcome is that the independent validation panel
+    stays blocked - not a relaxation of P2 or D3. Not started.'
+  status: pending
+  depends_on:
+  - panel-products-source-lineage-registry
+  - sources-add-literature-stack
+  created: '2026-08-15'
+- id: panel-products-independent-freeze
+  title: Freezing the independent validation panel universe and protocol
+  description: 'Track: ATLAS-PANEL-PRODUCTS / INDEPENDENT (scientific governance; prerequisites
+    IV-E4, IV-E5, IV-E6). BLOCKED under BLOCKED_SOURCE_DIVERSITY until the source registry,
+    lineage mapping and assay-diversity expansion complete. Then build a NEW candidate universe
+    with its own id/version/content hash, a NEW panel protocol and a NEW registration record;
+    universe lock v4 and the v1.0.4 protocol/registration pair are never reused. Retain P1/P2/P3/D1/D2/D3/C3/C5
+    at the frozen base thresholds as hard gates. Pre-register strata, thresholds, seed, ladder
+    and success criteria before the first execution and never adjust them after an observed
+    outcome. Run a candidate-free feasibility pre-check separately from and before the selection
+    run. Not started; entry gates unmet.'
+  status: blocked
+  depends_on:
+  - panel-products-source-lineage-registry
+  - panel-products-assay-diversity-expansion
+  created: '2026-08-15'
+- id: panel-products-independent-run
+  title: Running the independent validation panel selection
+  description: 'Track: ATLAS-PANEL-PRODUCTS / INDEPENDENT (scientific execution). BLOCKED.
+    Execute the new frozen independent-validation protocol over the new frame, writing a new
+    run record that never reuses the 2026-08-06 run-record id, seed or protocol/registration
+    pair and never weakens the original result. A second INFEASIBLE outcome is a legitimate,
+    reportable negative result about evidence availability. Even a feasible panel remains
+    research-only and Gate 8 reviewed, evidences ontology and pipeline generalization on the
+    sampled evidence only, and authorizes no ACMG criterion, classification, worklist, submission,
+    clinical use or second-disease claim. No technical-coverage-panel artifact may satisfy
+    any entry gate here (PS-4/PP-D7). Not started.'
+  status: blocked
+  depends_on:
+  - panel-products-independent-freeze
+  - atlas-phase2-human-span-review
+  created: '2026-08-15'
+- id: rescuescreen-mechanism-structure-gate
+  title: Verifying the RescueScreen mechanism and structure entry gate
+  description: 'Track: RESCUESCREEN / ENTRY (research-only; asserts no clinical result and
+    screens no compound). BLOCKED. Satisfy EG-1, EG-2 and EG-3 of docs/project/specs/structural-rescue-screen-v1.yaml:
+    a Gate 8-reviewed mechanism representation whose claims carry exact verified spans and
+    assay/model context, else an explicit MECHANISM_UNVERIFIED stop; an exact transcript,
+    protein accession, residue index, structure entry, chain and structure-numbering mapping
+    resolved against an authoritative residue-level mapping resource with residue-offset arithmetic
+    prohibited; and a recorded assessment of experimental-structure coverage and uncertainty
+    covering modelled versus unmodelled regions, local quality, alternate conformers, bound
+    ligands, construct boundaries and the biological-assembly assumption. OBSERVED ledger
+    entries stay bound to the systems in which they were measured. The UNSUPPORTED entries
+    - a defined Arg611 salt bridge, endogenous misfolding/turnover kinetics and reliable AF3
+    prediction of the mutation-induced shift - may not be assumed as premises or upgraded
+    by computation. Currently blocked because no named human reviewer is engaged and the accepted
+    Atlas claim count is zero. Not started.'
+  status: blocked
+  depends_on:
+  - panel-products-rescuescreen-design
+  - atlas-phase2-human-span-review
+  created: '2026-08-15'
+- id: rescuescreen-tool-licence-registry
+  title: Building the RescueScreen tool and data licence registry
+  description: 'Track: RESCUESCREEN / ENTRY (governance; prerequisite EG-4). Register every
+    tool, model, model weight set, structure source, chemical library and derived dataset
+    the lane may touch with its exact version, licence identifier and text locator, permitted
+    use including commercial and redistribution status, whether derived outputs inherit restrictions,
+    authoritative locator, retrieval date, registration/access requirement and verification
+    evidence. Assert nothing about openness collectively: verify each artifact individually
+    and fail closed, because absence of evidence of permission is not permission. Record at
+    minimum that AlphaFold 3 code is Apache-2.0 while its weights and outputs carry separate
+    restricted terms, that ColabFold is not AF3, that FoldX is registration/licence controlled,
+    that PremPS is a third-party web server, that Enamine REAL is commercial vendor data,
+    that ChEMBL is CC BY-SA 3.0 with propagating share-alike obligations, that pocket, docking,
+    cheminformatics and molecular-dynamics tooling each carry differing licences to be pinned
+    individually, and that ZINC and UniProt terms require re-verification at time of use.
+    No library is downloaded, no compound is enumerated and no vendor is contacted. Not started.'
+  status: pending
+  depends_on:
+  - panel-products-rescuescreen-design
+  - governance-data-rights-privacy
+  created: '2026-08-15'
+- id: rescuescreen-construct-assay-feasibility
+  title: Defining RescueScreen construct and assay feasibility
+  description: 'Track: RESCUESCREEN / ENTRY (prerequisite EG-5). Establish, in writing and
+    under review, that the protein construct is expressible and behaves acceptably and that
+    the ordered assay cascade is realistically executable with named controls BEFORE any screening
+    compute is spent: AC-1 abundance, turnover, ubiquitination and proteasome controls; AC-2
+    at least two methodologically orthogonal direct-binding methods, where a thermal-shift
+    or cellular thermal-stability readout alone is insufficient; AC-3 wild-type versus mutant,
+    selectivity, an inactive structural analog, aggregation and assay-interference counter-screens,
+    cytotoxicity, dose-response and replicate/lot controls; AC-4 co-immunoprecipitation or
+    an equivalent native-complex rescue readout; AC-5 a proximal Rheb-GAP or complex-state
+    readout where technically feasible plus downstream p-S6K/p-S6. If no tractable orthogonal
+    binding, complex or functional assay exists the outcome is NO_TRACTABLE_ASSAY and the
+    lane stops, which is correct rather than a failure. Not started.'
+  status: pending
+  depends_on:
+  - rescuescreen-mechanism-structure-gate
+  created: '2026-08-15'
+- id: rescuescreen-artifact-schemas
+  title: Implementing RescueScreen structure, pocket, docking and MD artifact schemas
+  description: 'Track: RESCUESCREEN / PLATFORM (schemas only; runs nothing). Define and implement
+    the artifact schemas rescuescreen.structure_ensemble.v1, rescuescreen.pocket_hypothesis.v1,
+    rescuescreen.docking_pilot.v1, rescuescreen.orthogonal_rescoring.v1, rescuescreen.md_convergence.v1,
+    rescuescreen.compound_hypothesis_package.v1, rescuescreen.assay_plan.v1 and rescuescreen.tool_licence_registry.v1.
+    Each carries a schema id, a version, its input hashes and a self-excluding content hash
+    following the existing RAPTOR hash-binding convention, and each records the licence and
+    provenance of every input. Schemas must make the closed output vocabulary structurally
+    enforceable so that a later stage term cannot be attached to an earlier artifact, must
+    require preregistered parameters and their sensitivity results alongside any numeric threshold,
+    and must forbid a score field from being labelled as affinity, potency or efficacy. No
+    screening, no docking, no simulation and no compound enumeration in this task. Not started.'
+  status: pending
+  depends_on:
+  - rescuescreen-mechanism-structure-gate
+  - rescuescreen-tool-licence-registry
+  created: '2026-08-15'
+- id: rescuescreen-pocket-hypothesis
+  title: Producing the RescueScreen pocket hypothesis and falsifier
+  description: 'Track: RESCUESCREEN / S2-S3 (research-only). Assemble the experimental structure
+    ensemble with full provenance, including predicted models only as separately labelled
+    non-authoritative comparators carrying their confidence metrics, then identify candidate
+    pockets using at least two independent detection methods across the ensemble rather than
+    one method on one frame, record per-method agreement and disagreement and pocket persistence,
+    and state what would falsify each pocket. Pocket definition may not assume the UNSUPPORTED
+    Arg611 salt bridge. Fixed pocket-volume windows and fixed site radii are not universal
+    gates and are admissible only as preregistered parameters with a declared sensitivity
+    range and its reported result. Legitimate terminal outcomes include RESIDUE_OR_INTERFACE_UNRESOLVED
+    and NO_PLAUSIBLE_POCKET; neither is resolved by lowering a detection threshold. Output
+    is a POCKET_HYPOTHESIS, never a binding site of record. Not started.'
+  status: pending
+  depends_on:
+  - rescuescreen-mechanism-structure-gate
+  - rescuescreen-artifact-schemas
+  created: '2026-08-15'
+- id: rescuescreen-calibrated-pilot
+  title: Running the small calibrated RescueScreen docking pilot
+  description: 'Track: RESCUESCREEN / S4 (research-only computational pilot). BLOCKED until
+    the mechanism and structure gate, the licence registry, the construct/assay feasibility
+    plan, the artifact schemas and a non-falsified pocket hypothesis are all complete. Run
+    a SMALL pilot with preregistered parameters, a preregistered property-matched decoy set
+    and, where lawfully available, a control system, so that enrichment is measured rather
+    than assumed. Report ranks with their calibration context; never report or convert a score
+    to an affinity, a predicted binding constant, potency or efficacy. If enrichment is indistinguishable
+    from chance the outcome is UNCALIBRATED_DOCKING and the lane stops. A large-library or
+    full-complex screen is not authorized by a successful pilot and requires a separate approved
+    compute and storage budget with a staged funnel whose stage sizes and pass criteria are
+    declared in advance. Output is a COMPUTATIONAL_SCREENING_HIT, which is not a binder, not
+    a lead and not a treatment candidate. Not started.'
+  status: blocked
+  depends_on:
+  - rescuescreen-pocket-hypothesis
+  - rescuescreen-tool-licence-registry
+  - rescuescreen-construct-assay-feasibility
+  - rescuescreen-artifact-schemas
+  created: '2026-08-15'
+- id: rescuescreen-orthogonal-replication
+  title: Replicating RescueScreen hits with orthogonal rescoring and MD
+  description: 'Track: RESCUESCREEN / S5 (research-only). Re-evaluate surviving pilot hypotheses
+    with methods independent of the pilot scoring function - agreement between methods sharing
+    a scoring lineage is not orthogonality - and assess pose and complex stability with replicate
+    simulations carrying explicit convergence diagnostics and declared uncertainty. Replicate
+    count and simulation length are justified by observed convergence, not by a protocol number
+    copied from elsewhere; a fixed 20x100 ns recipe is not a universal gate. Non-convergence
+    is reported as non-convergence, and disagreement beyond the preregistered threshold is
+    MODEL_DISAGREEMENT and stops the lane. Output is an ORTHOGONALLY_REPLICATED_HIT, which
+    remains purely computational and remains a hypothesis. Not started.'
+  status: pending
+  depends_on:
+  - rescuescreen-calibrated-pilot
+  created: '2026-08-15'
+- id: rescuescreen-wetlab-handoff
+  title: Preparing the assay-gated RescueScreen wet-lab handoff
+  description: 'Track: RESCUESCREEN / S6-S7 (research-only handoff preparation). Assemble
+    compound hypothesis packages only from orthogonally replicated hypotheses, each containing
+    full computational provenance, the licence and permitted-use record of every data source
+    used, an availability pin recorded as a registry entry with source, identifier as held
+    in the registered library, version and retrieval date, the declared assay plan with its
+    controls, and an explicit statement that the package is a hypothesis requiring experimental
+    testing. A package is not a recommendation, a shortlist, a lead series or a purchase list,
+    and no vendor purchase link, order form, quote or basket is generated at any point before
+    a complete, licence-cleared, assay-gated package exists. Only the wet-lab cascade can
+    yield EXPERIMENTALLY_CONFIRMED_BINDER, COMPLEX_RESCUE_OBSERVED or FUNCTIONAL_RESCUE_OBSERVED,
+    each bounded to the system in which it was measured. An everolimus combination matrix
+    is exploratory only, permitted after observed and controlled single-agent rescue, and
+    carries no synergy, additivity, dose-sparing, toxicity-reduction, feedback or clinical
+    claim. Negative results are reported with the same rigour as positive ones. Not started.'
+  status: pending
+  depends_on:
+  - rescuescreen-orthogonal-replication
+  - rescuescreen-construct-assay-feasibility
+  - rescuescreen-tool-licence-registry
+  created: '2026-08-15'
