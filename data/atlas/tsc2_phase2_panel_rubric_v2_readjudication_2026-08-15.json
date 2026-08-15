@@ -69,7 +69,7 @@
     "contradiction_and_null_result_disclosure": "DISCLOSED",
     "dedupe_and_disposition_accounting": "COMPLETE",
     "expert_adjudication_status": "PENDING",
-    "functional_evidence_situation_coverage": "ZERO_AT_ALL_ATTEMPTED_SIZES",
+    "functional_evidence_situation_coverage": "NO_FEASIBLE_PANEL_SATISFYING_COVERAGE",
     "identity_sufficiency": "PARTIAL",
     "independent_validation_status": "NOT_ESTABLISHED",
     "model_system_diversity": "SINGLE_BROAD_CATEGORY",
@@ -90,7 +90,7 @@
   "candidate_free": true,
   "claim_ceiling": "NONE_NO_PANEL_EXISTS",
   "contains_candidate_identity": false,
-  "content_sha256": "bf043a2cb1f195bcf82c412e008862e46565b64bf227db7c679bac9d099d88dc",
+  "content_sha256": "5fad899e1ab915d9b3564d871e0ed37d355492402b08153f375e75a281287d44",
   "content_sha256_basis": "SHA-256 over the canonical JSON serialization of this record with the content_sha256 key removed: json.dumps(record, sort_keys=True, indent=2) encoded UTF-8 plus exactly one terminal LF, LF-only on every platform. Self-excluding: the hash field itself is never part of its own preimage.",
   "contextually_adjudicable_dimensions": [
     "minimum number of independent laboratories or source lineages (P2)",
@@ -99,9 +99,10 @@
     "panel balance and size (C3 / n_target)"
   ],
   "diagnostic_counterfactual": {
-    "basis": "post_hoc_diagnostic_analysis_NOT_A_FIELD_OF_THE_SOURCE_RUN",
-    "finding": "Removing the P2 established-source-group minimum alone left the problem infeasible, and removing the D3 assay-concentration cap alone left the problem infeasible. Feasible subsets appeared only when BOTH were removed together, so P2 and D3 interact rather than acting as independent binding constraints.",
-    "interpretation_limit": "This is a diagnostic statement about which constraints bind, produced with full knowledge of the negative outcome. It is not a relaxation proposal, not an authorization to weaken P2 or D3, and not evidence that a panel exists. Weakening a constraint after seeing the answer is outcome-dependent constraint selection and remains prohibited by the frozen protocol and ADR-0017.",
+    "basis": "data/atlas/tsc2_phase2_panel_constraint_diagnostic_2026-08-15.json",
+    "diagnostic_content_sha256": "32f085ccf7ee9236a5fda48e7877bd282e137cc679faf3492f70f123f94ab696",
+    "finding": "Across every registered level and size, removing P2 alone or D3 alone left the problem infeasible. Removing both was also insufficient at L0-R5. Feasible subsets appeared only at R6/R7, after the preregistered ladder had already relaxed C5, P1, D1, P3 and D2.",
+    "interpretation_limit": "This is a diagnostic statement about an explicitly modified constraint set at each registered ladder level, produced with full knowledge of the negative outcome. It is not a relaxation proposal, not an authorization to weaken P2 or D3, and not evidence that a panel exists. The original machine result and all registered constraints remain unchanged.",
     "is_a_candidate_set": false,
     "is_a_panel": false,
     "is_a_rerun_of_the_frozen_selector": false,
@@ -182,7 +183,7 @@
     "profile": "rare-disease-specialist-literature-v1",
     "rubric_id": "atlas-panel-rubric",
     "spec_path": "docs/project/specs/atlas-panel-rubric-v2.yaml",
-    "spec_sha256": "1422c7b1d7c39064349604b1ad9a3128a5ad83646ac1d22b180e6c529a196ba7",
+    "spec_sha256": "b7a642c94486fcaf7ee33639f72d8075dde183754dfc7b7e6fbcdb38d7213d05",
     "spec_sha256_basis": "SHA-256 of the LF-normalized (committed-blob) spec bytes.",
     "status": "POST_HOC_INTERPRETATION_ONLY",
     "version": "2.0.0"
@@ -205,8 +206,8 @@
     "universe_lock_content_hash": "f94ce81b8633bac777fd667e26c7b8d3a726b7e4d7eed9f8ed2128f9ed32b50e"
   },
   "substrate_characterization": {
-    "basis": "post_hoc_substrate_characterization_NOT_A_FIELD_OF_THE_SOURCE_RUN",
-    "basis_note": "The frozen run record carries the D1/D2/D3 thresholds and their infeasibility, not an assay-kind or model-system inventory. These three values are supplied by the readjudication task as a characterization of the eligible evidence and are labelled as such so they are never mistaken for verified run outputs.",
+    "basis": "data/atlas/tsc2_phase2_panel_constraint_diagnostic_2026-08-15.json",
+    "basis_note": "The candidate-free diagnostic recomputes these aggregates over the 14 eligible universe records and binds the external universe/map plus selector implementation by hash.",
     "dominant_assay_readout": "mTORC1 reporter assay",
     "eligible_assay_kinds": 2,
     "eligible_model_system_categories": 1,

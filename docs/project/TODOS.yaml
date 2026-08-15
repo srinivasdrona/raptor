@@ -1594,7 +1594,7 @@ todos:
     selection, no approval). Completed 2026-08-15:
     data/atlas/tsc2_phase2_panel_rubric_v2_readjudication_2026-08-15.json is a candidate-free
     record with a self-excluding canonical content hash
-    bf043a2cb1f195bcf82c412e008862e46565b64bf227db7c679bac9d099d88dc, binding the source run
+    5fad899e1ab915d9b3564d871e0ed37d355492402b08153f375e75a281287d44, binding the source run
     data/atlas/tsc2_phase2_panel_selection_run_2026-08-06.json at committed-blob SHA-256
     5f5b0918a24fcaa737877a15e393773f20c584c531517133e9c8b7e7574cfffd and copying only
     aggregate facts (35 records, 25 resolved / 10 unresolved, 10 access-blocked X5, 1 anchor

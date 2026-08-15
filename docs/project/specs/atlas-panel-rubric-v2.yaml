@@ -174,7 +174,7 @@ axes:
   - id: AX-6
     axis: assay_concentration_diversity
     question: How many distinct assay kinds carry the evidence, and how concentrated are they?
-    values: [DIVERSE, LIMITED, CONCENTRATED_SINGLE_DOMINANT, NOT_ASSESSED]
+    values: [DIVERSE, LIMITED, CONCENTRATED_LIMITED, CONCENTRATED_SINGLE_DOMINANT, NOT_ASSESSED]
     observed_2026_08_06: CONCENTRATED_LIMITED
     basis: >-
       Post-hoc substrate characterization, not a field of the frozen run
@@ -197,12 +197,14 @@ axes:
   - id: AX-8
     axis: functional_evidence_situation_coverage
     question: Which evidence situations could actually be populated at the attempted sizes?
-    values: [COMPLETE, PARTIAL, ZERO_AT_ALL_ATTEMPTED_SIZES, NOT_ASSESSED]
-    observed_2026_08_06: ZERO_AT_ALL_ATTEMPTED_SIZES
+    values: [COMPLETE, PARTIAL, NO_FEASIBLE_PANEL_SATISFYING_COVERAGE, NOT_ASSESSED]
+    observed_2026_08_06: NO_FEASIBLE_PANEL_SATISFYING_COVERAGE
     basis: >-
-      per_stratum_coverage S1-S6 all zero at every attempted size (7, 6, 5)
-      across every ladder level L0-R7, with spec_taxonomy_coverage COMPLETE for
-      the frame itself.
+      The eligible pool contained records in S1, S2, S3, S5 and S6 (S4 was
+      empty), but no size-7, size-6 or size-5 combination satisfied the complete
+      active constraint set at any ladder level. The source run's zero
+      per_stratum_coverage values reflect that no panel was selected; they do
+      not mean the eligible strata themselves were empty.
     waivable: false
   - id: AX-9
     axis: independent_validation_status

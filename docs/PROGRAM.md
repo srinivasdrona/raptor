@@ -219,19 +219,20 @@ edit, re-run, reinterpret in place or supersede the machine column.
 | Claim ceiling | not expressible | **`NONE_NO_PANEL_EXISTS`** |
 | Evidence-package verdict | not expressible | **`NOT_FAILED`** — the Gate 1–7 packages did not fail; the panel-level independence constraint was unsatisfiable |
 | Prospective state | `PROSPECTIVE_REGISTERED` | **`POST_HOC`** — the genuine downgrade; the interpretation is weaker evidence than the run it describes |
-| Record | [`tsc2_phase2_panel_selection_run_2026-08-06.json`](../data/atlas/tsc2_phase2_panel_selection_run_2026-08-06.json) · `5f5b0918…cfffd` | [`tsc2_phase2_panel_rubric_v2_readjudication_2026-08-15.json`](../data/atlas/tsc2_phase2_panel_rubric_v2_readjudication_2026-08-15.json) · content `bf043a2c…d88dc` |
+| Record | [`tsc2_phase2_panel_selection_run_2026-08-06.json`](../data/atlas/tsc2_phase2_panel_selection_run_2026-08-06.json) · `5f5b0918…cfffd` | [`tsc2_phase2_panel_rubric_v2_readjudication_2026-08-15.json`](../data/atlas/tsc2_phase2_panel_rubric_v2_readjudication_2026-08-15.json) · content `5fad899e…87d44` |
 
 Rubric v2 ([`atlas-panel-rubric-v2.yaml`](project/specs/atlas-panel-rubric-v2.yaml), SHA-256
-`1422c7b1…96ba7`) reports fifteen independent axes instead of one verdict, fixes nine
+`b7a642c9…13d05`) reports fifteen independent axes instead of one verdict, fixes nine
 non-waivable dimensions (identity/replay, provenance and lawful access, exact spans, assay and
 model context, contradiction disclosure, dedupe, complete dispositions, the leakage firewall,
 immutable records) and four contextually adjudicable ones (lineage minimum P2, assay
 concentration D3, model-system diversity D2, panel balance/size). **Scarcity lowers claim
 ceilings; it never strengthens evidence, and no adjudication can convert dependent evidence into
-independent replication.** A recorded post-hoc *diagnostic* counterfactual — removing P2 alone or
-D3 alone left the problem infeasible; feasible subsets appeared only when both were removed — is
-labelled diagnostic with empty membership and is **not** a selection, a panel or authorization to
-weaken either constraint. Public write-up:
+independent replication.** A hash-bound post-hoc diagnostic shows that removing P2 alone or D3
+alone left all levels infeasible; removing both was still insufficient at L0-R5 and produced
+feasible subsets only at R6/R7, after the registered ladder's earlier relaxations were active.
+The diagnostic has empty membership and is **not** a selection, a panel or authorization to weaken
+any constraint. Public write-up:
 [*Seven $TSC2$ Variants Reached the Human-Review Boundary*](blog/2026-08-15-seven-variants-human-review-boundary.md).
 
 | | **Technical Coverage Panel** | **Independent Validation Panel** |

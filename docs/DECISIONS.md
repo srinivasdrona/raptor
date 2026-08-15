@@ -200,15 +200,16 @@ Adopt **option 4**, specified in `docs/project/specs/atlas-panel-rubric-v2.yaml`
 - The 2026-08-06 run, protocol v1.0.4, its registration, universe lock v4 and identity-map lock
   v4 remain byte-identical. The readjudication artifact is a *separate* candidate-free record
   with its own self-excluding content hash
-  (`bf043a2cb1f195bcf82c412e008862e46565b64bf227db7c679bac9d099d88dc`) that binds the source run
+  (`5fad899e1ab915d9b3564d871e0ed37d355492402b08153f375e75a281287d44`) that binds the source run
   by path and hash and copies only aggregate facts.
 - The public record now distinguishes four things that v1.0.4 collapsed: individual Gate 1–7
   packages (which did not fail), technical repeatability, independent validation (not
   established), and expert-adjudicated rare-disease use (pending, unreached).
-- A post-hoc diagnostic counterfactual — that removing P2 alone or D3 alone left the problem
-  infeasible, and feasible subsets appeared only when both were removed — is recorded explicitly
-  as **diagnostic and post-hoc**, with empty membership. It is not a selection, not a panel, not
-  a relaxation proposal and not authorization to weaken either constraint.
+- A hash-bound post-hoc diagnostic records the exact interaction: removing P2 alone or D3 alone
+  left every level infeasible; removing both was still insufficient at L0-R5 and produced feasible
+  subsets only at R6/R7, after the registered ladder had already relaxed C5, P1, D1, P3 and D2.
+  It has empty membership and is not a selection, panel, relaxation proposal or authorization to
+  weaken any constraint.
 - The interpretation layer is deliberately the *weaker* artifact: on the prospective/post-hoc
   axis it downgrades from `PROSPECTIVE_REGISTERED` to `POST_HOC`, and that downgrade is not
   removable by review, agreement or elapsed time.

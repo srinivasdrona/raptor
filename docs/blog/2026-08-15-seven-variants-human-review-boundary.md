@@ -129,11 +129,12 @@ disposition audit is committed. The cause is specific:
   author lists, journals or PMIDs — and unknown lineage is pooled, not optimistically split.
 - **The eligible evidence was narrow**: two assay kinds, one broad model-system category, and
   a dominant mTORC1 reporter readout.
-- **P2 and D3 interacted.** A post-hoc diagnostic check found that removing the minimum
-  established-source-group constraint (P2) alone left the problem infeasible, and removing the
-  assay-concentration cap (D3) alone left it infeasible; feasible subsets appeared only when
-  both were removed together. That is a statement about which constraints bind — *not* a
-  relaxation proposal, not a selection, and not a panel.
+- **P2 and D3 interacted, but they were not the only strict-level limitations.** A hash-bound
+  post-hoc diagnostic found that removing the minimum established-source-group constraint (P2)
+  alone or the assay-concentration cap (D3) alone left every level infeasible. Removing both
+  was still insufficient at L0-R5. Feasible subsets appeared only at R6/R7, after the
+  preregistered ladder had also relaxed C5, P1, D1, P3 and D2. This names an exact modified
+  constraint set — it is *not* a relaxation proposal, not a selection, and not a panel.
 - **The search completed.** All **24** fixed-size attempts (sizes 7, 6 and 5 across ladder
   levels L0–R7) terminated `INFEASIBLE_COMPLETE`, with a maximum of **714** nodes expanded
   against a **5,000,000** budget and zero relaxation steps applied.
@@ -233,11 +234,15 @@ in this program constitutes a treatment, therapy, dose or combination claim of a
   [`tsc2_phase2_panel_selection_run_2026-08-06.json`](../../data/atlas/tsc2_phase2_panel_selection_run_2026-08-06.json)
   — SHA-256 `5f5b0918a24fcaa737877a15e393773f20c584c531517133e9c8b7e7574cfffd`
 - Rubric v2: [`atlas-panel-rubric-v2.yaml`](../project/specs/atlas-panel-rubric-v2.yaml)
-  — SHA-256 `1422c7b1d7c39064349604b1ad9a3128a5ad83646ac1d22b180e6c529a196ba7`
+  — SHA-256 `b7a642c94486fcaf7ee33639f72d8075dde183754dfc7b7e6fbcdb38d7213d05`
 - Post-hoc readjudication artifact:
   [`tsc2_phase2_panel_rubric_v2_readjudication_2026-08-15.json`](../../data/atlas/tsc2_phase2_panel_rubric_v2_readjudication_2026-08-15.json)
   — self-excluding content SHA-256
-  `bf043a2cb1f195bcf82c412e008862e46565b64bf227db7c679bac9d099d88dc`
+  `5fad899e1ab915d9b3564d871e0ed37d355492402b08153f375e75a281287d44`
+- Constraint-interaction diagnostic:
+  [`tsc2_phase2_panel_constraint_diagnostic_2026-08-15.json`](../../data/atlas/tsc2_phase2_panel_constraint_diagnostic_2026-08-15.json)
+  — self-excluding content SHA-256
+  `32f085ccf7ee9236a5fda48e7877bd282e137cc679faf3492f70f123f94ab696`
 - Decision record: [ADR-0019](../DECISIONS.md#adr-0019--versioned-atlas-interpretation-rubrics-a-scarcity-aware-post-hoc-contextual-layer-over-an-immutable-machine-result)
 - Public source, span and gate manifests: [`data/atlas/runs/2026-08-03/`](../../data/atlas/runs/2026-08-03/)
   — catalogue hash `5d83d8b5e7c3c4923dc6dae038530360db47760abe8c3f86fbc26f3d5821b22e`,
