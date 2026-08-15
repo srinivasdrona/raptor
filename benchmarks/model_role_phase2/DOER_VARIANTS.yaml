@@ -13,6 +13,14 @@ variants:
 scenarios: [registry-bridge, snapshot-publisher, workspace-boundary]
 runs_per_variant_scenario: 5
 expected_stack_runs: 30
+paired_artifact_reuse:
+  planner:
+    source: PC-GEMINI matching scenario and run
+    rule: Reuse the exact Gemini planner artifact in both variants.
+  test_author:
+    source: One Codex test-author execution per matching scenario and run
+    rule: Reuse the exact Codex tests in both variants.
+  fork_point: doer
 authority_order: [SPEC, candidate_visible_fixtures, PLAN, tests, implementation]
 ranking:
   - stack hard-gate pass rate
