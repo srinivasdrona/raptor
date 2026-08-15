@@ -41,9 +41,9 @@ The benchmark also records scope compliance, maintainability, tool/finish reliab
 
 No selection-grade tournament composite is reported because mutation scores, hidden-task results, checker false-positive adjudication, human minutes and repeat-run variance were not collected consistently. The proxy below summarizes only the recoverable historical evidence.
 
-## Retrospective proxy score
+## Deprecated expert-coded historical proxy
 
-The incumbent process scores **69/100** as a historical maturity proxy (**low-to-medium confidence**). This is not a tournament score or model-selection result.
+The earlier **69/100** was an expert-coded historical maturity rubric, not a quantitatively measured baseline. The weighted arithmetic is reproducible, but most component inputs were qualitative judgments informed by evidence rather than observed rates with standardized denominators. It is retained for audit history and must not be compared with tournament scores.
 
 | Dimension | Weight | Score |
 |---|---:|---:|
@@ -58,6 +58,18 @@ The incumbent process scores **69/100** as a historical maturity proxy (**low-to
 
 The result says the process is strong at eventually producing safe, audited artifacts, but pays for that result through substantial repair loops and weak first-pass fidelity to real inputs.
 
+The backing for each input was:
+
+| Input | Evidence backing | Measurement status |
+|---|---|---|
+| Eventual correctness 90 | Completed audited workflows eventually reached green terminal artifacts | Qualitative; no frozen task denominator |
+| First-pass quality 50 | Repeated repair chains; four blocked Atlas attempts before the valid run | Qualitative; not a 50% rate |
+| Real-fixture robustness 45 | At least nine named real-input/schema/path/audit defect classes in the Atlas case | Qualitative; not normalized |
+| Review effectiveness 80 | Many findings reproduced and fixed; recall and wrong-CLEAN rates absent | Qualitative |
+| Auditability 72 | **38/53 manifests had explicit model ids = 71.7%, rounded to 72**; telemetry linkage remained incomplete | Partly quantitative |
+| Efficiency 45 | Large repair and usage burden without accepted-task cost denominator | Qualitative |
+| Governance 90 | No known reviewed boundary breach; fail-closed/non-clinical rules preserved | Qualitative; no opportunity denominator |
+
 Role-specific maturity proxies are:
 
 | Role | Score | Reading |
@@ -68,6 +80,8 @@ Role-specific maturity proxies are:
 | Checker — GPT | **72** | High-value findings; unmeasured recall and wrong-CLEAN risk |
 
 These scores are **not comparable across roles**, because each role uses different dimensions.
+
+The role values—planner 69, test author 59, doer 78 and checker 72—were created the same way: weighted expert judgments over role-specific dimensions. They are useful as a structured narrative of historical strengths and weaknesses, but they are not measured model-performance scores. Prospective task scores replace them for every comparison.
 
 Four historical hard gates pass on reviewed evidence, but `no_wrong_clean` remains **indeterminate** and reproducibility is only **partial** because several model manifests and task-level telemetry links are missing. Therefore the score cannot qualify the incumbent as the winner; that requires the prospective tournament.
 

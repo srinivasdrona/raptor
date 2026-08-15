@@ -1,0 +1,53 @@
+{
+  "action": "Preserve outputs; amend and refreeze corpus/evaluator as version 1.0.1; rerun the complete cell.",
+  "cell": "phase1/planner/registry-bridge/run-01",
+  "discovered_before_score_use": true,
+  "evaluator_sha256": "fef15fdcde3172ef66348e8ba13873386a93f1fdb7baa0d7b32bc207a717f55a",
+  "protocol_commit": "b1f436a",
+  "public_corpus_sha256": "386677028edd742a9b7104ac76bcea67c271c10206c2214688d0f668dd5995cc",
+  "reason": "The candidate-visible planner brief did not specify whether unrelated content_sha256 fields, map_manifest.rows, or boolean constraint values were bindings. The hidden evaluator assumed they were not. Models interpreted the unstated semantics differently, so all paired outputs and preliminary scores are non-comparable.",
+  "runs": [
+    {
+      "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\claude-opus-5\\registry-bridge\\run-01\\PLAN.yaml",
+      "candidate_sha256": "a9326a85ab105ab40c745b146496762331686107820d443e82b84e3a2b6c5342",
+      "elapsed_seconds": 110,
+      "model_id": "claude-opus-5",
+      "preliminary_score_non_reportable": 77.5,
+      "run_number": 1
+    },
+    {
+      "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\gpt-5.6-sol\\registry-bridge\\run-01\\PLAN.yaml",
+      "candidate_sha256": "388f12ddb14245adfec95abce66fda5a92d36fbbdec2e8445f123389c8bdeaab",
+      "elapsed_seconds": 68,
+      "model_id": "gpt-5.6-sol",
+      "preliminary_score_non_reportable": 72.5,
+      "run_number": 1
+    },
+    {
+      "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\gpt-5.6-terra\\registry-bridge\\run-01\\PLAN.yaml",
+      "candidate_sha256": "7ca049db79520543921e2a8a36696073b23bab6bd23a36367e989bd140a68a07",
+      "elapsed_seconds": 28,
+      "model_id": "gpt-5.6-terra",
+      "preliminary_score_non_reportable": 52.5,
+      "run_number": 1
+    },
+    {
+      "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\gemini-3.7-flash\\registry-bridge\\run-01\\PLAN.yaml",
+      "candidate_sha256": "8f88e0ad5ac28d8ce922e3abf519dea849cd352c4e7ab1a7b81e761558f0531a",
+      "elapsed_seconds": 90,
+      "model_id": "gemini-3.7-flash",
+      "preliminary_score_non_reportable": 55.0,
+      "run_number": 1
+    },
+    {
+      "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\grok-4.6\\registry-bridge\\run-01\\PLAN.yaml",
+      "candidate_sha256": "edb3416e77c2f0ed453be7a672e95c7386025c68405e0077f35bdce02ff3bd8e",
+      "elapsed_seconds": 82,
+      "model_id": "grok-4.6",
+      "preliminary_score_non_reportable": 55.0,
+      "run_number": 1
+    }
+  ],
+  "schema": "raptor-model-role-invalidated-cells-v1",
+  "status": "INVALIDATED_HARNESS_DEFECT_NO_MODEL_RESULT"
+}

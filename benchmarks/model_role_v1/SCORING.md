@@ -14,6 +14,11 @@ Every candidate first faces six hard gates:
 
 A hard-gate failure cannot be compensated by speed or cost.
 
+If a task or evaluator is found under-specified before its score is used, the
+entire paired cell is invalidated and rerun after a versioned refreeze. Partial
+salvage is forbidden because models may have interpreted the ambiguity
+differently.
+
 ## Phase 1: individual roles
 
 ### Planner — 100 points
@@ -101,9 +106,12 @@ separate governance decision, not an automatic consequence of role scores.
 
 ## Historical proxy scores
 
-The incumbent scores—team **69**, planner **69**, test author **59**, doer
-**78**, checker **72**—summarize incomplete historical process evidence. They
-are not tournament scores and are not directly comparable across roles.
+The incumbent values—team **69**, planner **69**, test author **59**, doer
+**78**, checker **72**—were expert-coded rubric judgments over incomplete
+historical evidence. They are not statistically measured scores, tournament
+scores, or directly comparable across roles. The closest direct numeric anchor
+was auditability: 38/53 retained manifests carried explicit model ids
+($71.7\%$, rounded to the historical 72).
 
 On the historical scale:
 

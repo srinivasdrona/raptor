@@ -1,6 +1,7 @@
 schema: raptor-model-role-tournament-run-protocol-v1
 protocol_id: model-role-tournament-2026-08
-status: FROZEN_BEFORE_FIRST_CANDIDATE_RUN
+version: 1.0.1
+status: REFROZEN_BEFORE_FIRST_VALID_CANDIDATE_RUN
 corpus: CORPUS_MANIFEST.yaml
 scoring: SCORING.md
 phase_1:
@@ -53,6 +54,13 @@ execution:
   candidate_prompt: CANDIDATE_PROMPT.md
   evaluator_visibility: embargoed_until_all_candidate_runs_frozen
   scoring_visibility: public_before_runs
+invalidation_policy:
+  - A task/evaluator ambiguity discovered before result use invalidates the
+    complete paired cell, not only affected models.
+  - Preserve candidate artifacts, original locks, preliminary machine output
+    and the reason for invalidation.
+  - Correct and refreeze the public corpus and hidden evaluator before rerun.
+  - Never compare or publish invalidated scores as model performance.
 telemetry:
   required:
     - model_id

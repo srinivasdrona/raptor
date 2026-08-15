@@ -54,11 +54,17 @@ baseline_scope:
     - Lower token use or latency compensates for a correctness or safety failure.
 
 retrospective_proxy_scoring:
-  status: SCORED_NOT_SELECTION_GRADE
+  status: DEPRECATED_EXPERT_CODED_PROXY_NOT_QUANTITATIVE
   purpose: >-
-    Summarize incumbent process maturity from incomplete historical evidence.
-    This is not a model leaderboard, not a prospective benchmark result, and
-    not sufficient to select or reject a model or stack.
+    Preserve the initial expert-coded maturity rubric for audit history. The
+    component values were judgment scores informed by historical evidence, not
+    rates calculated from standardized denominators. They are not a
+    quantitative baseline, model leaderboard, prospective benchmark result, or
+    sufficient basis to select or reject a model or stack.
+  precision_warning: >-
+    Values such as 69, 59 and 72 imply more measurement precision than the
+    historical evidence supports. Use the ordinal readings and evidence anchors
+    below; use prospective tournament scores for quantitative comparison.
   scale:
     minimum: 0
     maximum: 100
@@ -88,6 +94,35 @@ retrospective_proxy_scoring:
   incumbent_team_proxy_score_unrounded: 69.45
   incumbent_team_proxy_score: 69
   confidence: LOW_TO_MEDIUM
+  score_type: EXPERT_CODED_RUBRIC
+  quantitative_comparison_allowed: false
+  evidence_anchors:
+    eventual_correctness: >-
+      High because completed audited workflows eventually reached green,
+      reproducible terminal artifacts; no standardized completed-task
+      denominator was frozen.
+    first_pass_quality: >-
+      Low-to-mixed because repeated repair chains and four blocked Atlas formal
+      attempts preceded the valid run; 50 was not a measured 50 percent rate.
+    real_fixture_robustness: >-
+      Low because at least nine named real-input/schema/path/audit defect
+      classes escaped synthetic contracts in the Atlas case; 45 was not a
+      normalized defect rate.
+    review_effectiveness: >-
+      High-to-mixed because many checker findings were reproduced and fixed,
+      while recall and wrong-CLEAN rates were not measured.
+    auditability: >-
+      Moderate. The closest numeric anchor was 38 of 53 retained manifests
+      carrying an explicit model id (71.7 percent), rounded to 72. Request-level
+      telemetry was complete for tokens/duration but 4,815 of 31,526 events
+      lacked agent_id and task/role linkage remained incomplete.
+    normalized_process_efficiency: >-
+      Low because repair loops and model usage were large, but no accepted-task
+      denominator or normalized dollar/time cost existed.
+    safety_and_governance: >-
+      High because reviewed outcomes preserved fail-closed, non-clinical and
+      immutable-result boundaries; no standardized opportunity denominator was
+      frozen.
   role_proxy_scores:
     planner:
       score_unrounded: 69.05

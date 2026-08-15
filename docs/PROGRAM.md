@@ -124,10 +124,11 @@ doer screen compares Sonnet 5, GPT-5.3-Codex, GPT-5.6 Terra and MAI-Code-1.1-Fla
 blinded tasks, with separately reported high-reasoning and efficiency supplements. The benchmark
 must finish, publish negative and positive results, and record an owner-selected stack before RAPTOR
 v2 or RescueScreen implementation starts. ADR-0003/ADR-0005 remain binding until then.
-The evidence-constrained retrospective maturity proxy is **69/100** (low-to-medium confidence):
-high eventual correctness and governance, but weak first-pass/real-fixture efficiency. This score is
-not selection-grade because the historical wrong-CLEAN gate is indeterminate and reproducibility is
-partial.
+The earlier retrospective **69/100** is retained only as a deprecated expert-coded rubric:
+the arithmetic is reproducible, but most inputs were qualitative judgments rather than measured
+rates. It is not a quantitative baseline and cannot be compared with prospective tournament scores.
+The closest direct anchor was auditability: 38/53 retained manifests carried explicit model ids
+(71.7%, rounded to the historical 72), while task/role telemetry linkage remained incomplete.
 
 The Phase-1 public task corpus and scoring mechanism are now frozen at
 [`benchmarks/model_role_v1`](../benchmarks/model_role_v1). It contains three role-isolation probe
@@ -135,6 +136,13 @@ families, the repeated-run protocol, candidate prompt, public corpus lock and em
 hash lock. Gold-reference smoke evaluation reached the designed maximum for every role/scenario
 (doer quality subtotal 90/90 before telemetry). The evaluator content remains withheld until all
 candidate outputs are frozen, preventing benchmark contamination.
+
+The first `registry-bridge` planner cell under corpus v1.0.0 was invalidated before score use:
+the public brief left unrelated digest/row binding semantics unstated while the hidden key assumed
+they were non-bindings. All five outputs and preliminary machine values are preserved in
+`INVALIDATED_CELLS.json` but are not model results. Corpus/evaluator v1.0.1 make those semantics
+explicit and are refrozen at public hash `a3148ddb…50b269` and evaluator hash
+`682d3816…3573af`.
 
 ## Health Rollup
 

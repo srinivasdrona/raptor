@@ -1671,10 +1671,12 @@ todos:
     publication and resolved workspace boundaries), with role-specific public packets, real-shape
     fixtures, mutation operators, repeated-run protocol and exact scoring. The public corpus is
     committed under benchmarks/model_role_v1. Reference implementations, mutants, answer keys and
-    evaluator remain embargoed outside the repository at aggregate SHA-256
-    fef15fdcde3172ef66348e8ba13873386a93f1fdb7baa0d7b32bc207a717f55a until every candidate
-    run is frozen, then will be published. Gold references reached the designed maxima on all
-    scenarios.'
+    evaluator remain embargoed outside the repository. The first registry-planner cell exposed
+    unstated hash/row binding semantics before any score was used, so all five outputs were
+    preserved and invalidated. Corpus/evaluator v1.0.1 were corrected and refrozen at public
+    SHA-256 a3148ddbc8b8e2362aeaf77be60d3c53ecd87cb5e2cc5c384eac0ef75a50b269 and embargoed
+    evaluator SHA-256 682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af.
+    Gold references again reached the designed maxima on all scenarios.'
   status: done
   depends_on:
   - compose-model-role-baseline

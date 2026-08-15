@@ -1,14 +1,16 @@
 {
   "aggregate_basis": "SHA-256 of compact sorted JSON mapping relative path to file SHA-256; lock files excluded.",
-  "aggregate_sha256": "386677028edd742a9b7104ac76bcea67c271c10206c2214688d0f668dd5995cc",
-  "file_count": 46,
+  "aggregate_sha256": "a3148ddbc8b8e2362aeaf77be60d3c53ecd87cb5e2cc5c384eac0ef75a50b269",
+  "corpus_version": "1.0.1",
+  "file_count": 47,
   "files": {
     "CANDIDATE_PROMPT.md": "b1ac41594f4d0bf8b296e139bb160cc7fa3beceefddd21950cffb08757e8c30c",
-    "CORPUS_MANIFEST.yaml": "08e68d44fe8ecf875364a59516f92381958d0a13d110c3f96ec93c03bd1accfb",
+    "CORPUS_MANIFEST.yaml": "169015680fa388d63d59f5214dee86ca28fd01f2650afee7e881dbfa3c6e33c5",
     "GOLD_SMOKE_RESULT.json": "1598b68e3fc34610905ada02877131a12e833d5e4d603fe59b48ef96234e1fe3",
+    "INVALIDATED_CELLS.json": "c5fbac66f805ba1a712e5ade6764dbded881dca0aee9f3b689f8ed8e262f046e",
     "README.md": "0478aafc731a0b835141cc22e6f5f9eda3ffd3156919432ed57f62eb46dc89cb",
-    "RUN_PROTOCOL.yaml": "01dc428ef5b6c77ae64c9160c46cb9af7d848fa2d54ab9ba7dd74ce3c2c85055",
-    "SCORING.md": "88c768e7c612eb557f837f9983a7f9af4b6469e2f27385996c5376f5bede6241",
+    "RUN_PROTOCOL.yaml": "52ac753be7100a86129537c1a7181a843df0ae112d261c4c073cd3a7cc82b6b4",
+    "SCORING.md": "bc5d588305c200e22a319f6a1d2640e4ea9afdff2e185b076ff74a14f41e78e8",
     "materialize_task.py": "20ad0666044a19f79626159f5ae06d52a0ebecb14642af57a54ecbd66ad19581",
     "scenarios/registry-bridge/artifacts/map_lock.yaml": "645b48ec9c39a62963488ea9bf98bbb17ec7bbb2769420e0ec531fd92c906f7c",
     "scenarios/registry-bridge/artifacts/map_manifest.yaml": "55ec896e003a45812a37b603dfc4152087bde089653456fafac35d33857902fc",
@@ -20,8 +22,8 @@
     "scenarios/registry-bridge/checker/tests/test_visible.py": "65a4fc723bfdee8b245e9fa71581a6e18ee6a2275b561fb09380bc9ae097bb45",
     "scenarios/registry-bridge/common/SPEC.yaml": "945833652b14e16c5279788fae2107d86501abd81577721da1db319ea880e3c9",
     "scenarios/registry-bridge/doer/TASK.md": "d253a45486081617ac0b87b7468d7c4ddba5013dc03a12741280244e79c3dc15",
-    "scenarios/registry-bridge/planner/BRIEF.md": "44f3b164f8995950968a2fd8ae57474eab946e8ce9c3767726e0c078991b834e",
-    "scenarios/registry-bridge/planner/OUTPUT_SCHEMA.yaml": "959b91619d6387b4ea58d33456656c705108270ebf2a9683f3debe82bb3ccff9",
+    "scenarios/registry-bridge/planner/BRIEF.md": "f4e1b67efbe5096ad2ce3677f2999054b1badbe6fa0244cfe58ebd837e6b6c9b",
+    "scenarios/registry-bridge/planner/OUTPUT_SCHEMA.yaml": "10685d88862934c6c9195b599921f94750a6267093b278cd23c6fc172f1b54e2",
     "scenarios/registry-bridge/starter/src/solution.py": "6dd4bbeff1c101014f784e1388413fd4de70c54e481b1a5b84ec0f423bac77d4",
     "scenarios/registry-bridge/test_author/TASK.md": "8ee9bb242851eb5f72abb09aeabfdafda0fef3222e6e039992f62a98f5398d7f",
     "scenarios/registry-bridge/visible_tests/tests/test_visible.py": "84f7f57035b95999b9323db0350df60547ae4e339f25d3a6088ee73bbd42c8cd",
@@ -50,7 +52,7 @@
     "scenarios/workspace-boundary/test_author/TASK.md": "727507591dcbab3777687abe6b4300a09a95ee175f095ccbbdf00155ad8d5f58",
     "scenarios/workspace-boundary/visible_tests/tests/test_visible.py": "c906bb732afd6d2851b5c9ccb09e0f3a2599bd5cf0a2de80f9eb997acd182672"
   },
-  "generated_at_utc": "2026-08-15T11:24:48.392806Z",
+  "generated_at_utc": "2026-08-15T11:32:50.793867Z",
   "schema": "raptor-model-role-public-corpus-lock-v1",
-  "status": "FROZEN_BEFORE_FIRST_CANDIDATE_RUN"
+  "status": "FROZEN_BEFORE_FIRST_VALID_CANDIDATE_RUN"
 }

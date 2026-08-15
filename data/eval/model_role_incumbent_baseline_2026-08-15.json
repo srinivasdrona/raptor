@@ -328,6 +328,9 @@
     }
   },
   "retrospective_proxy_score": {
+    "score_type": "EXPERT_CODED_RUBRIC",
+    "deprecated_as_quantitative_baseline": true,
+    "quantitative_comparison_allowed": false,
     "selection_grade": false,
     "incumbent_team_score": 69,
     "incumbent_team_score_unrounded": 69.45,
@@ -336,6 +339,16 @@
       "primary_metrics_with_any_historical_evidence": 11,
       "primary_metrics_total": 17,
       "primary_metrics_with_strong_normalized_evidence": 3
+    },
+    "precision_warning": "The component values were judgment scores informed by evidence, not standardized observed rates. The weighted arithmetic is reproducible, but the inputs are not quantitative estimates.",
+    "evidence_anchors": {
+      "eventual_correctness": "High because completed audited workflows eventually reached green terminal artifacts; no standardized completed-task denominator.",
+      "first_pass_quality": "Low-to-mixed because repeated repair chains and four blocked Atlas attempts preceded the valid run; 50 is not a 50 percent measured rate.",
+      "real_fixture_robustness": "Low because at least nine named real-input defect classes escaped synthetic contracts in the Atlas case; 45 is not a normalized rate.",
+      "review_effectiveness": "High-to-mixed because many findings were reproduced and fixed, while recall and wrong-CLEAN rates were not measured.",
+      "auditability": "The closest numeric anchor is 38 of 53 retained manifests with explicit model ids, or 71.7 percent rounded to 72. Telemetry task-role linkage remained incomplete.",
+      "normalized_process_efficiency": "Low based on repair and usage burden, without an accepted-task cost denominator.",
+      "safety_and_governance": "High based on preserved fail-closed and non-clinical boundaries, without a standardized opportunity denominator."
     },
     "team_dimensions": {
       "eventual_correctness": {"weight": 0.25, "score": 90},

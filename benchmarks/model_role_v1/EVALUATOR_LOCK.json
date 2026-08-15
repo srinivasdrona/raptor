@@ -1,20 +1,21 @@
 {
   "aggregate_basis": "SHA-256 of compact sorted JSON mapping embargoed relative path to file SHA-256; __pycache__ and pyc excluded.",
-  "aggregate_sha256": "fef15fdcde3172ef66348e8ba13873386a93f1fdb7baa0d7b32bc207a717f55a",
+  "aggregate_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
   "content_location": "WITHHELD_FROM_REPOSITORY_AND_CANDIDATE_WORKSPACES",
+  "evaluator_version": "1.0.1",
   "file_count": 9,
   "files": {
     "checker_keys.yaml": "a64dfc2b604f1e6ab246f1597639fd58735e5305a3786aea8f6cf8f8c0324eef",
-    "evaluate.py": "36e28dfb032fe987185ba00b4eca602be6aee58568752655df33ffd6ed23f7a3",
+    "evaluate.py": "0f46b335e2b391a07014fb25111c3f54d35bbc5a301ab56103378d2c9cf062cc",
     "gold_tests/registry-bridge.py": "45e3bffe2e2619e516af2f3c9dee854f2d3872f61364fd3ea5cc2d5ae8688c9b",
     "gold_tests/snapshot-publisher.py": "0fff6c62623281f440e6accf9bcab7bfdf01213976935a14e835ebe526cbe134",
     "gold_tests/workspace-boundary.py": "025e870609a96f7bcce819f850bba3f1d960d959afcaaa259490d15774438034",
     "implementations.py": "68a868f5bd8636f45ded65dea6415a852d93b539691167e1bc4b406675e46274",
-    "planner_keys.yaml": "e2c07e7b188a107bddb12e2b19fdf0dc2047827b861bf27236c97aa28288934a",
-    "smoke_gold.py": "211a51284f7e5d75b457fef58d0a7163d1aa9a65e4087c712274c3c212da4fc1",
+    "planner_keys.yaml": "067ad957a75b7b57abfc14b56727b91517d04939e9b491ce5e15523742dcac3b",
+    "smoke_gold.py": "b16dcd089792c7c83ce6e1383c1be0107425d86318fb1fb57a982155e38307f3",
     "test_author_keys.yaml": "43f5a3994ef9927f00686ec3742814191b675235ec1b6b1145531bfcd5181b5a"
   },
-  "generated_at_utc": "2026-08-15T11:24:48.392806Z",
+  "generated_at_utc": "2026-08-15T11:32:50.793867Z",
   "schema": "raptor-model-role-embargoed-evaluator-lock-v1",
   "status": "CONTENT_EMBARGOED_UNTIL_ALL_CANDIDATE_RUNS_FROZEN"
 }
