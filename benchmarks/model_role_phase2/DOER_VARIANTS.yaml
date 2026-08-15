@@ -1,0 +1,26 @@
+schema: raptor-model-role-doer-variants-v1
+status: FROZEN_BEFORE_FIRST_RUN
+purpose: Compare Sonnet 5 and MAI-Code-1.1-Flash with planner/test/checker fixed.
+fixed_roles:
+  planner: {model: gemini-3.7-flash, family: Gemini}
+  test_author: {model: gpt-5.3-codex, family: GPT}
+  checker: {model: grok-4.6, family: Grok}
+variants:
+  - id: DV-SONNET
+    doer: {model: claude-sonnet-5, family: Claude}
+  - id: DV-MAI
+    doer: {model: mai-code-1.1-flash, family: MAI}
+scenarios: [registry-bridge, snapshot-publisher, workspace-boundary]
+runs_per_variant_scenario: 5
+expected_stack_runs: 30
+authority_order: [SPEC, candidate_visible_fixtures, PLAN, tests, implementation]
+ranking:
+  - stack hard-gate pass rate
+  - hidden implementation correctness
+  - checker terminal outcome
+  - worst-run result
+  - normalized efficiency when attributable
+boundaries:
+  - These variants compare doers only.
+  - Results do not alter the planner comparison.
+  - A PLAN/SPEC conflict is attributed to the planner and cannot be charged to the doer.

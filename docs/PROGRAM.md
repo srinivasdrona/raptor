@@ -200,6 +200,12 @@ Gemini 3.7 Flash and GPT-5.6 Sol planners, with Gemini test author, Sonnet 5 doe
 held fixed across three scenarios. S1 supplies the Opus arm; only Gemini and Sol are newly run,
 five repeats per scenario, concurrently (30 new stack runs).
 
+A separate doer-sensitivity comparison is frozen in
+[`DOER_VARIANTS.yaml`](../benchmarks/model_role_phase2/DOER_VARIANTS.yaml): Gemini planner,
+GPT-5.3-Codex test author and Grok checker held fixed while Sonnet 5 and MAI-Code-1.1-Flash doers
+are compared across the same three scenarios and five repeats (30 stack runs). It is reported
+separately from the planner comparison.
+
 ## Health Rollup
 
 > *Module built ≠ live run executed.* The Tier-1/2 code path and the validation harness are **built
