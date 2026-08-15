@@ -1,6 +1,6 @@
 # RAPTOR model-role benchmark: incumbent baseline
 
-**Status:** proposed internal baseline; prospective tournament not run  
+**Status:** proposed internal baseline; prospective tournament not run
 **Machine-readable sources:** [`model-role-benchmark-v1.yaml`](../project/specs/model-role-benchmark-v1.yaml) and [`model_role_incumbent_baseline_2026-08-15.json`](../../data/eval/model_role_incumbent_baseline_2026-08-15.json)
 
 The historical record is sufficient to describe the incumbent stack and design a fair tournament, but not to name a winning model family. The current Opus → Gemini → Sonnet 5 → GPT process remains binding until prospective paired runs, publication of the results and an owner decision.
