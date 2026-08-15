@@ -193,6 +193,13 @@ five registry failures are re-attributed to planner contract expansion and check
 enforcement rather than doer/test failure. Record:
 [`model_role_s1_readjudication_2026-08-15.json`](../data/eval/model_role_s1_readjudication_2026-08-15.json).
 
+The exhaustive eight-stack Phase 2 execution is abandoned as disproportionate. A bounded planner
+comparison is frozen in
+[`PLANNER_COMPARISON.yaml`](../benchmarks/model_role_phase2/PLANNER_COMPARISON.yaml): Opus 5,
+Gemini 3.7 Flash and GPT-5.6 Sol planners, with Gemini test author, Sonnet 5 doer and Sol checker
+held fixed across three scenarios. S1 supplies the Opus arm; only Gemini and Sol are newly run,
+five repeats per scenario, concurrently (30 new stack runs).
+
 ## Health Rollup
 
 > *Module built ≠ live run executed.* The Tier-1/2 code path and the validation harness are **built

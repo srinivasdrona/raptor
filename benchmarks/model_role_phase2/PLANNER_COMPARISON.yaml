@@ -1,0 +1,35 @@
+schema: raptor-model-role-planner-comparison-v1
+status: FROZEN_BEFORE_FIRST_RUN
+purpose: Isolate planner effects after S1 authority-order re-adjudication.
+fixed_roles:
+  test_author: {model: gemini-3.7-flash, family: Gemini}
+  doer: {model: claude-sonnet-5, family: Claude}
+  checker: {model: gpt-5.6-sol, family: GPT}
+planner_arms:
+  - id: PC-OPUS
+    model: claude-opus-5
+    family: Claude
+    execution: REUSE_S1
+    source: data/eval/model_role_s1_readjudication_2026-08-15.json
+  - {id: PC-GEMINI, model: gemini-3.7-flash, family: Gemini}
+  - {id: PC-SOL, model: gpt-5.6-sol, family: GPT}
+scenarios: [registry-bridge, snapshot-publisher, workspace-boundary]
+runs_per_arm_scenario: 5
+new_stack_runs: 30
+comparison_stack_runs_including_reused_s1: 45
+authority_order: [SPEC, candidate_visible_fixtures, PLAN, tests, implementation]
+planner_rules:
+  - PLAN may clarify mechanics but may not add or contradict a binding SPEC requirement.
+  - Any unauthorized requirement is a planner hard-gate failure.
+  - Test author, doer and checker must follow SPEC over a conflicting PLAN.
+ranking:
+  - stack hard-gate pass rate
+  - number of clean terminal verdicts
+  - planner authority compliance
+  - hidden implementation correctness
+  - test mutation quality
+  - worst-run result
+boundaries:
+  - This comparison selects a planner only.
+  - It does not select the final test-author, doer, checker or stack.
+  - S1 is the PC-OPUS arm; no duplicate Opus runs are launched.
