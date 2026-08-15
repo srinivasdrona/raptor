@@ -124,6 +124,10 @@ doer screen compares Sonnet 5, GPT-5.3-Codex, GPT-5.6 Terra and MAI-Code-1.1-Fla
 blinded tasks, with separately reported high-reasoning and efficiency supplements. The benchmark
 must finish, publish negative and positive results, and record an owner-selected stack before RAPTOR
 v2 or RescueScreen implementation starts. ADR-0003/ADR-0005 remain binding until then.
+The evidence-constrained retrospective maturity proxy is **69/100** (low-to-medium confidence):
+high eventual correctness and governance, but weak first-pass/real-fixture efficiency. This score is
+not selection-grade because the historical wrong-CLEAN gate is indeterminate and reproducibility is
+partial.
 
 ## Health Rollup
 

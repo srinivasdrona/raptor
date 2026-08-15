@@ -39,7 +39,37 @@ The benchmark also records scope compliance, maintainability, tool/finish reliab
 | **Checker — GPT** | High-value reproducible findings and strong provenance/TOCTOU review | Recall and false-positive rates were not measured; some real-input defects appeared after CLEAN | Medium-low |
 | **Whole stack** | High eventual quality on completed audited cases | Low-to-moderate first-pass efficiency and substantial repair burden | Medium |
 
-No numeric composite is reported because mutation scores, hidden-task results, checker false-positive adjudication, human minutes and repeat-run variance were not collected consistently.
+No selection-grade tournament composite is reported because mutation scores, hidden-task results, checker false-positive adjudication, human minutes and repeat-run variance were not collected consistently. The proxy below summarizes only the recoverable historical evidence.
+
+## Retrospective proxy score
+
+The incumbent process scores **69/100** as a historical maturity proxy (**low-to-medium confidence**). This is not a tournament score or model-selection result.
+
+| Dimension | Weight | Score |
+|---|---:|---:|
+| Eventual correctness | 25% | 90 |
+| First-pass quality | 15% | 50 |
+| Real-fixture robustness | 15% | 45 |
+| Review effectiveness | 15% | 80 |
+| Auditability | 10% | 72 |
+| Process efficiency | 10% | 45 |
+| Safety and governance | 10% | 90 |
+| **Weighted total** | **100%** | **69.45 → 69** |
+
+The result says the process is strong at eventually producing safe, audited artifacts, but pays for that result through substantial repair loops and weak first-pass fidelity to real inputs.
+
+Role-specific maturity proxies are:
+
+| Role | Score | Reading |
+|---|---:|---|
+| Planner — Opus | **69** | Strong governance; mixed executable and real-shape completeness |
+| Test author — Gemini | **59** | Strong adversarial breadth; weak nonvacuity and fixture fidelity |
+| Doer — Sonnet 5 | **78** | Strong eventual implementation and repair; moderate first-pass robustness |
+| Checker — GPT | **72** | High-value findings; unmeasured recall and wrong-CLEAN risk |
+
+These scores are **not comparable across roles**, because each role uses different dimensions.
+
+Four historical hard gates pass on reviewed evidence, but `no_wrong_clean` remains **indeterminate** and reproducibility is only **partial** because several model manifests and task-level telemetry links are missing. Therefore the score cannot qualify the incumbent as the winner; that requires the prospective tournament.
 
 ## How candidates will be compared
 

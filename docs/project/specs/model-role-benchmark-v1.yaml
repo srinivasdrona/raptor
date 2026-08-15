@@ -53,6 +53,99 @@ baseline_scope:
     - More tests prove stronger tests.
     - Lower token use or latency compensates for a correctness or safety failure.
 
+retrospective_proxy_scoring:
+  status: SCORED_NOT_SELECTION_GRADE
+  purpose: >-
+    Summarize incumbent process maturity from incomplete historical evidence.
+    This is not a model leaderboard, not a prospective benchmark result, and
+    not sufficient to select or reject a model or stack.
+  scale:
+    minimum: 0
+    maximum: 100
+    interpretation:
+      90_to_100: strong and consistently demonstrated
+      75_to_89: generally strong with bounded deficiencies
+      60_to_74: mixed; material repair or evidence gaps
+      40_to_59: weak or repeatedly unreliable
+      0_to_39: unacceptable for high-assurance use
+  evidence_coverage:
+    primary_metrics_with_any_historical_evidence: 11
+    primary_metrics_total: 17
+    primary_metrics_with_strong_normalized_evidence: 3
+    note: >-
+      Partial evidence includes non-standardized proxies. Only repair loops,
+      request-level telemetry completeness, and final persisted outcomes have
+      relatively strong historical records; even these are not randomized.
+  team_dimensions:
+    - {id: RP-1, name: eventual_correctness, weight: 0.25, score: 90}
+    - {id: RP-2, name: first_pass_quality, weight: 0.15, score: 50}
+    - {id: RP-3, name: real_fixture_robustness, weight: 0.15, score: 45}
+    - {id: RP-4, name: review_effectiveness, weight: 0.15, score: 80}
+    - {id: RP-5, name: auditability, weight: 0.10, score: 72}
+    - {id: RP-6, name: normalized_process_efficiency, weight: 0.10, score: 45}
+    - {id: RP-7, name: safety_and_governance, weight: 0.10, score: 90}
+  formula: sum(team_dimension.score * team_dimension.weight)
+  incumbent_team_proxy_score_unrounded: 69.45
+  incumbent_team_proxy_score: 69
+  confidence: LOW_TO_MEDIUM
+  role_proxy_scores:
+    planner:
+      score_unrounded: 69.05
+      score: 69
+      confidence: MEDIUM
+      dimensions:
+        - {name: governance_and_scope, weight: 0.25, score: 90}
+        - {name: executable_contract_completeness, weight: 0.25, score: 65}
+        - {name: real_artifact_shape_anticipation, weight: 0.20, score: 45}
+        - {name: failure_mode_anticipation, weight: 0.15, score: 70}
+        - {name: auditability, weight: 0.15, score: 72}
+    test_author:
+      score_unrounded: 59.20
+      score: 59
+      confidence: MEDIUM
+      dimensions:
+        - {name: acceptance_criterion_coverage, weight: 0.20, score: 80}
+        - {name: nonvacuity_and_mutation_evidence, weight: 0.20, score: 35}
+        - {name: real_fixture_fidelity, weight: 0.20, score: 40}
+        - {name: negative_path_coverage, weight: 0.15, score: 85}
+        - {name: protected_test_stability, weight: 0.15, score: 55}
+        - {name: auditability, weight: 0.10, score: 72}
+    doer:
+      score_unrounded: 78.00
+      score: 78
+      confidence: MEDIUM
+      dimensions:
+        - {name: eventual_correctness, weight: 0.25, score: 90}
+        - {name: first_pass_robustness, weight: 0.20, score: 55}
+        - {name: repair_effectiveness, weight: 0.20, score: 90}
+        - {name: scope_compliance, weight: 0.15, score: 80}
+        - {name: fail_fast_and_error_surfaces, weight: 0.10, score: 70}
+        - {name: maintainability, weight: 0.10, score: 75}
+    checker:
+      score_unrounded: 72.25
+      score: 72
+      confidence: LOW_TO_MEDIUM
+      dimensions:
+        - {name: adjudicated_true_defect_yield, weight: 0.20, score: 90}
+        - {name: observed_finding_precision, weight: 0.20, score: 80}
+        - {name: inferred_recall, weight: 0.20, score: 60}
+        - {name: independent_reproduction, weight: 0.15, score: 85}
+        - {name: wrong_clean_control, weight: 0.15, score: 50}
+        - {name: auditability, weight: 0.10, score: 60}
+  role_comparison_forbidden: >-
+    Role scores use different dimensions and cannot be compared as if 78 for a
+    doer means the doer model is intrinsically better than a test author at 59.
+  hard_gate_reading:
+    HG-1_no_critical_escape: PASS_ON_FINAL_AUDITED_ARTIFACTS
+    HG-2_no_wrong_clean: INDETERMINATE
+    HG-3_no_test_weakening: PASS_ON_REVIEWED_CASES
+    HG-4_no_safety_or_grounding_breach: PASS_ON_REVIEWED_CASES
+    HG-5_reproducible_artifact: PARTIAL
+    HG-6_honest_failure: PASS
+  selection_barrier: >-
+    HG-2 is indeterminate and HG-5 is partial; therefore this score cannot
+    qualify the incumbent or any challenger as a tournament winner.
+
 measurement_principles:
   - Compare models on the same frozen task, prompt slots, tools, permissions,
     time budget, context budget, base commit, hidden evaluator, and seed policy.

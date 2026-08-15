@@ -1,7 +1,7 @@
 {
   "schema": "raptor.model_role_incumbent_baseline.v1",
   "record_id": "model-role-incumbent-baseline-2026-08-15",
-  "status": "RETROSPECTIVE_BASELINE_NO_COMPARATIVE_WINNER",
+  "status": "RETROSPECTIVE_PROXY_SCORED_NO_COMPARATIVE_WINNER",
   "generated_at": "2026-08-15T15:20:52+05:30",
   "benchmark_spec": "docs/project/specs/model-role-benchmark-v1.yaml",
   "governance": {
@@ -266,7 +266,8 @@
         "synthetic contracts occasionally remained executable only against synthetic fixtures",
         "later planner revisions were needed for anchor exclusion and constraint materialization"
       ],
-      "numeric_role_score": null
+      "numeric_role_score": 69,
+      "numeric_role_score_kind": "RETROSPECTIVE_PROXY"
     },
     "test_author_gemini": {
       "evidence_confidence": "MEDIUM",
@@ -281,7 +282,8 @@
         "synthetic fixtures diverged from real artifact shapes",
         "test repairs were repeatedly required"
       ],
-      "numeric_role_score": null
+      "numeric_role_score": 59,
+      "numeric_role_score_kind": "RETROSPECTIVE_PROXY"
     },
     "doer_sonnet5": {
       "evidence_confidence": "MEDIUM",
@@ -296,7 +298,8 @@
         "path, snapshot, and schema edge cases escaped initial builds",
         "quality depended materially on specification and fixture realism"
       ],
-      "numeric_role_score": null
+      "numeric_role_score": 78,
+      "numeric_role_score_kind": "RETROSPECTIVE_PROXY"
     },
     "checker_gpt": {
       "evidence_confidence": "MEDIUM_LOW",
@@ -311,7 +314,8 @@
         "seeded-defect recall was not measured",
         "several historical checker manifests did not record the model"
       ],
-      "numeric_role_score": null
+      "numeric_role_score": 72,
+      "numeric_role_score_kind": "RETROSPECTIVE_PROXY"
     },
     "incumbent_team": {
       "evidence_confidence": "MEDIUM",
@@ -319,8 +323,45 @@
       "first_pass_efficiency": "LOW_TO_MODERATE",
       "auditability": "MODERATE",
       "comparative_superiority": "NOT_ESTABLISHED",
-      "numeric_team_score": null
+      "numeric_team_score": 69,
+      "numeric_team_score_kind": "RETROSPECTIVE_PROXY_NOT_SELECTION_GRADE"
     }
+  },
+  "retrospective_proxy_score": {
+    "selection_grade": false,
+    "incumbent_team_score": 69,
+    "incumbent_team_score_unrounded": 69.45,
+    "confidence": "LOW_TO_MEDIUM",
+    "evidence_coverage": {
+      "primary_metrics_with_any_historical_evidence": 11,
+      "primary_metrics_total": 17,
+      "primary_metrics_with_strong_normalized_evidence": 3
+    },
+    "team_dimensions": {
+      "eventual_correctness": {"weight": 0.25, "score": 90},
+      "first_pass_quality": {"weight": 0.15, "score": 50},
+      "real_fixture_robustness": {"weight": 0.15, "score": 45},
+      "review_effectiveness": {"weight": 0.15, "score": 80},
+      "auditability": {"weight": 0.1, "score": 72},
+      "normalized_process_efficiency": {"weight": 0.1, "score": 45},
+      "safety_and_governance": {"weight": 0.1, "score": 90}
+    },
+    "role_scores": {
+      "planner_opus": {"score": 69, "score_unrounded": 69.05, "confidence": "MEDIUM"},
+      "test_author_gemini": {"score": 59, "score_unrounded": 59.2, "confidence": "MEDIUM"},
+      "doer_sonnet5": {"score": 78, "score_unrounded": 78.0, "confidence": "MEDIUM"},
+      "checker_gpt": {"score": 72, "score_unrounded": 72.25, "confidence": "LOW_TO_MEDIUM"}
+    },
+    "role_score_comparison_forbidden": "Each role uses different dimensions. Role scores are maturity summaries, not a cross-role model ranking.",
+    "hard_gate_reading": {
+      "HG-1_no_critical_escape": "PASS_ON_FINAL_AUDITED_ARTIFACTS",
+      "HG-2_no_wrong_clean": "INDETERMINATE",
+      "HG-3_no_test_weakening": "PASS_ON_REVIEWED_CASES",
+      "HG-4_no_safety_or_grounding_breach": "PASS_ON_REVIEWED_CASES",
+      "HG-5_reproducible_artifact": "PARTIAL",
+      "HG-6_honest_failure": "PASS"
+    },
+    "selection_barrier": "The wrong-CLEAN gate is indeterminate and reproducibility is partial, so the score cannot select a stack."
   },
   "important_missing_metrics": [
     {
