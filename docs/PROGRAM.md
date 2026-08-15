@@ -187,6 +187,12 @@ Phase 2 protocol is now frozen under
 families, five repeats per stack/task, 120 chained runs. Stages within a run are sequential;
 independent cells are parallel. No Phase 2 score exists yet.
 
+S1 has been re-adjudicated under explicit authority order
+`SPEC → fixtures → PLAN → tests → implementation`. It remains ineligible (2/15 clean), but all
+five registry failures are re-attributed to planner contract expansion and checker wrong-authority
+enforcement rather than doer/test failure. Record:
+[`model_role_s1_readjudication_2026-08-15.json`](../data/eval/model_role_s1_readjudication_2026-08-15.json).
+
 ## Health Rollup
 
 > *Module built ≠ live run executed.* The Tier-1/2 code path and the validation harness are **built

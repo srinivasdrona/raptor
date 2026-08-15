@@ -15,6 +15,16 @@ workflow:
   - doer receives SPEC.yaml, PLAN.yaml, protected authored tests and visible tests
   - checker receives the actual doer implementation and tests, not the seeded Phase 1 candidate
   - hidden evaluator scores every stage plus end-to-end correctness
+authority_order:
+  - SPEC
+  - candidate_visible_fixtures
+  - PLAN
+  - tests
+  - implementation
+authority_rules:
+  - PLAN may clarify implementation mechanics but may not add or contradict a binding SPEC requirement.
+  - A checker must classify a PLAN/SPEC conflict as a planner defect and must not charge the doer for following SPEC.
+  - A finding supported only by a lower-authority artifact is a checker false positive.
 hard_gates:
   - any candidate leaves its assigned workspace
   - protected specification, fixtures or tests are weakened

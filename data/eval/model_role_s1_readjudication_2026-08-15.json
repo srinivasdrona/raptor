@@ -1,0 +1,405 @@
+{
+  "authority_order": [
+    "SPEC",
+    "candidate_visible_fixtures",
+    "PLAN",
+    "tests",
+    "implementation"
+  ],
+  "cells": [
+    {
+      "checker_verdict_sha256": "4b85bc1ad9e1a0ce5b070d40869ebdea434c7efae442b38d65eadd36c84071b8",
+      "finding_adjudications": [
+        {
+          "category": "MISSING_CONTRACT_CHECK",
+          "classification": "PLANNER_UNAUTHORIZED_EXPANSION_CHECKER_WRONG_AUTHORITY",
+          "evidence": "registration.required_constraints is checked only as a list before being passed to set(). A bounded probe using a list containing a nested list raised raw TypeError (\"unhashable type: 'list'\") instead of the required BundleValidationError(code), violating the fail-closed malformed-field contract.",
+          "index": 1,
+          "severity": "HIGH"
+        },
+        {
+          "category": "TEST_GAP",
+          "classification": "PLANNER_UNAUTHORIZED_EXPANSION_CHECKER_WRONG_AUTHORITY",
+          "evidence": "The tests cover a non-list required_constraints value but not malformed members within a list, so the raw TypeError escape is not detected.",
+          "index": 2,
+          "severity": "MEDIUM"
+        }
+      ],
+      "original_outcome": "WITH_CHANGES",
+      "planner_sha256": "8b97bcacba79704186380f7b9bf4b86871e57df02050ee7c5236f65af57230a2",
+      "primary_failure_owners": [
+        "planner",
+        "checker"
+      ],
+      "readjudicated_outcome": "STACK_FAIL",
+      "run_number": 1,
+      "scenario": "registry-bridge"
+    },
+    {
+      "checker_verdict_sha256": "5b0f795df75326f884902efc2c3aba3f275377441edb40870aebcdbc38739d92",
+      "finding_adjudications": [
+        {
+          "category": "INCOMPLETE_AUDIT",
+          "classification": "PLANNER_UNAUTHORIZED_EXPANSION_CHECKER_WRONG_AUTHORITY",
+          "evidence": "The success result emits checks as six bare ID strings. PLAN AC-4 requires every check to report its name, observed value, expected comparand, and pass/fail outcome, so the returned value is not the required compact audit.",
+          "index": 1,
+          "severity": "HIGH"
+        },
+        {
+          "category": "MISSING_CONTRACT_CHECK",
+          "classification": "PLANNER_UNAUTHORIZED_EXPANSION_CHECKER_WRONG_AUTHORITY",
+          "evidence": "Missing records and non-list records values ({}, ()) all return a success-shaped result with record_count 0. PLAN requires record_count from len(universe.records) and fail-closed behavior for missing or malformed authoritative artifact shapes.",
+          "index": 2,
+          "severity": "HIGH"
+        },
+        {
+          "category": "TEST_GAP",
+          "classification": "PLANNER_UNAUTHORIZED_EXPANSION_CHECKER_WRONG_AUTHORITY",
+          "evidence": "The suite asserts that checks equals a list of IDs and tests only list-valued records, allowing both the incomplete audit and malformed-record acceptance to pass. The configured suite reports 37 passed.",
+          "index": 3,
+          "severity": "MEDIUM"
+        }
+      ],
+      "original_outcome": "WITH_CHANGES",
+      "planner_sha256": "f880e994a30e4d7da9c9538f8cec59ea3227e2c8f1c7646792a5c80306d46aa4",
+      "primary_failure_owners": [
+        "planner",
+        "checker"
+      ],
+      "readjudicated_outcome": "STACK_FAIL",
+      "run_number": 2,
+      "scenario": "registry-bridge"
+    },
+    {
+      "checker_verdict_sha256": "db97dbe0a319f62c2400f93e4407a1a8f5622140b940ddff90921ff7f6489d48",
+      "finding_adjudications": [
+        {
+          "category": "MISSING_CONTRACT_CHECK",
+          "classification": "PLANNER_UNAUTHORIZED_EXPANSION_CHECKER_WRONG_AUTHORITY",
+          "evidence": "The PLAN requires malformed records values to fail closed, but the implementation calls len() without first requiring a list. Missing or null records raise an uncoded TypeError, while records: \"ab\" returns a success result with record_count 2. This violates the declared BundleValidationError(code) error shape and permits a malformed universe.",
+          "index": 1,
+          "severity": "HIGH"
+        },
+        {
+          "category": "TEST_GAP",
+          "classification": "PLANNER_UNAUTHORIZED_EXPANSION_CHECKER_WRONG_AUTHORITY",
+          "evidence": "Record-count tests cover only valid list values (seven records and an empty list). They do not exercise missing, null, or non-list records, so the malformed-record defect remains undetected while all 59 tests pass.",
+          "index": 2,
+          "severity": "MEDIUM"
+        }
+      ],
+      "original_outcome": "WITH_CHANGES",
+      "planner_sha256": "f19c1b2bbbf19608701852ed06a3d184f6adbfea4a49d15b8abb67805815bb9f",
+      "primary_failure_owners": [
+        "planner",
+        "checker"
+      ],
+      "readjudicated_outcome": "STACK_FAIL",
+      "run_number": 3,
+      "scenario": "registry-bridge"
+    },
+    {
+      "checker_verdict_sha256": "b89b12b54ed53e8ff96ab2145d546bd1923f0290a77053a1acd4db25390e39d7",
+      "finding_adjudications": [
+        {
+          "category": "MISSING_CONTRACT_CHECK",
+          "classification": "PLANNER_UNAUTHORIZED_EXPANSION_CHECKER_WRONG_AUTHORITY",
+          "evidence": "registration.required_constraints is converted with set() without validating that every member is hashable. A value such as [{\"bad\": \"key\"}] raises a native TypeError instead of the required BundleValidationError(\"CONSTRAINT_SET\").",
+          "index": 1,
+          "severity": "MEDIUM"
+        },
+        {
+          "category": "TEST_GAP",
+          "classification": "PLANNER_UNAUTHORIZED_EXPANSION_CHECKER_WRONG_AUTHORITY",
+          "evidence": "The negative suite covers missing and empty required_constraints but not malformed members, so the native TypeError path is undetected.",
+          "index": 2,
+          "severity": "LOW"
+        }
+      ],
+      "original_outcome": "WITH_CHANGES",
+      "planner_sha256": "04859ea3c874a6c78dcfd9706ca86c19b0660cab22635cee1897371b8a06d521",
+      "primary_failure_owners": [
+        "planner",
+        "checker"
+      ],
+      "readjudicated_outcome": "STACK_FAIL",
+      "run_number": 4,
+      "scenario": "registry-bridge"
+    },
+    {
+      "checker_verdict_sha256": "c26f77e142ecaaa64a7c14ea6f46a3fbd73d69ca44bcbc7e7c56dd97e49d9f27",
+      "finding_adjudications": [
+        {
+          "category": "MISSING_CONTRACT_CHECK",
+          "classification": "PLANNER_UNAUTHORIZED_EXPANSION_CHECKER_WRONG_AUTHORITY",
+          "evidence": "required_constraints is only checked as a container before set conversion. A declaration containing an unhashable member, such as [\"exact_identity\", [\"lawful_source\"], \"complete_audit\"], leaks TypeError(\"unhashable type: 'list'\") instead of the required BundleValidationError with code CONSTRAINT_SET.",
+          "index": 1,
+          "severity": "MEDIUM"
+        }
+      ],
+      "original_outcome": "WITH_CHANGES",
+      "planner_sha256": "81844a2bb990ea9aaebe1f7781d739c451b4610923ee2019375a1b998bd2aeab",
+      "primary_failure_owners": [
+        "planner",
+        "checker"
+      ],
+      "readjudicated_outcome": "STACK_FAIL",
+      "run_number": 5,
+      "scenario": "registry-bridge"
+    },
+    {
+      "checker_verdict_sha256": "7c0060b549d0a500b90349bf70828595dec8d0460f62260fd4104b6fbf681c47",
+      "finding_adjudications": [
+        {
+          "category": "FAILURE_STATE_CORRUPTION",
+          "classification": "VALID_DOER_DEFECT",
+          "evidence": "Temporary-file cleanup is unconditional even when os.open(..., O_EXCL) fails before this invocation creates the file. A bounded collision probe made os.open create a sentinel sibling and raise FileExistsError; publish_verified_snapshot then deleted that unrelated file (collision_file_exists=False), violating parent-directory preservation.",
+          "index": 1,
+          "severity": "HIGH"
+        },
+        {
+          "category": "FAILURE_STATE_CORRUPTION",
+          "classification": "VALID_DOER_DEFECT",
+          "evidence": "No alias check prevents source_path and output_path from naming the same file. A bounded probe passed the same Path for both and returned success with source_modified=True, violating the explicit requirement not to modify the source.",
+          "index": 2,
+          "severity": "HIGH"
+        }
+      ],
+      "original_outcome": "WITH_CHANGES",
+      "planner_sha256": "f245db9bf7605810592ca718b9947c1e20c8e0032e9778a2da3b21992d80577f",
+      "primary_failure_owners": [
+        "doer"
+      ],
+      "readjudicated_outcome": "STACK_FAIL",
+      "run_number": 1,
+      "scenario": "snapshot-publisher"
+    },
+    {
+      "checker_verdict_sha256": "5eb56cfb8f711c54ff6d7808e3d557071a140f5d2fa0f80254040598459188cb",
+      "finding_adjudications": [
+        {
+          "category": "FAILURE_STATE_CORRUPTION",
+          "classification": "VALID_DOER_DEFECT",
+          "evidence": "A valid JSON source with {\"records\": 7} is atomically published over an existing destination before len(records) raises TypeError. The probe observed the prior bytes replaced by the new snapshot despite the call failing, violating failure-state preservation and the typed error contract.",
+          "index": 1,
+          "severity": "HIGH"
+        },
+        {
+          "category": "FAILURE_STATE_CORRUPTION",
+          "classification": "VALID_DOER_DEFECT",
+          "evidence": "When source_path and output_path are the same existing file, the function succeeds and replaces the source with the generated snapshot. The probe reported source_unchanged=false, directly violating \"Do not modify source.\"",
+          "index": 2,
+          "severity": "HIGH"
+        },
+        {
+          "category": "TEST_GAP",
+          "classification": "VALID_DOER_DEFECT_AND_TEST_GAP",
+          "evidence": "An existing directory used as output_path causes os.replace to raise a raw PermissionError with no code. The specification requires SnapshotPublishError(code) and provides OUTPUT_PATH, but the visible suite tests only invalid parents and misses invalid destination objects.",
+          "index": 3,
+          "severity": "MEDIUM"
+        }
+      ],
+      "original_outcome": "DO_NOT_MERGE",
+      "planner_sha256": "046b1f0e6987d157dfc58c1e60e2fb373d5ed7cf77d79a59def4da28af243732",
+      "primary_failure_owners": [
+        "doer",
+        "test_author"
+      ],
+      "readjudicated_outcome": "STACK_FAIL",
+      "run_number": 2,
+      "scenario": "snapshot-publisher"
+    },
+    {
+      "checker_verdict_sha256": null,
+      "finding_adjudications": [],
+      "original_outcome": "HARD_FAIL_MISSING_TESTS",
+      "planner_sha256": "d932a49f0c9c38a965df7c61620dddb84b4f28568413a09e1ff515b76cb11e6f",
+      "primary_failure_owners": [
+        "test_author"
+      ],
+      "readjudicated_outcome": "STACK_FAIL",
+      "run_number": 3,
+      "scenario": "snapshot-publisher"
+    },
+    {
+      "checker_verdict_sha256": "52d56dfbdfcea87e865d6dcd80eff95286b58922f371f450b89c78f920618256",
+      "finding_adjudications": [
+        {
+          "category": "FAILURE_STATE_CORRUPTION",
+          "classification": "VALID_DOER_DEFECT",
+          "evidence": "The function validates only output_path.parent. When output_path already exists as a directory, it writes and fsyncs a temporary sibling and then os.replace raises a raw PermissionError instead of the required SnapshotPublishError(\"OUTPUT_PATH\"). A bounded probe observed \"PermissionError None [WinError 5]\" for this case.",
+          "index": 1,
+          "severity": "MEDIUM"
+        },
+        {
+          "category": "INCOMPLETE_AUDIT",
+          "classification": "PLANNER_UNAUTHORIZED_EXPANSION_CHECKER_FALSE_POSITIVE",
+          "evidence": "SnapshotPublishError initializes RuntimeError with only the error code, and every typed-error raise supplies only that code. Consequently error messages are values such as \"SOURCE_HASH\" and never name the offending source or output path, contrary to AC-TYPED-ERRORS. A missing-source probe confirmed the message was exactly \"SOURCE_HASH\".",
+          "index": 2,
+          "severity": "MEDIUM"
+        }
+      ],
+      "original_outcome": "WITH_CHANGES",
+      "planner_sha256": "1d17cd985db831a2bac063742f55d34e98b0647f2e2da877b608e8cc76e8fe45",
+      "primary_failure_owners": [
+        "doer",
+        "planner",
+        "checker"
+      ],
+      "readjudicated_outcome": "STACK_FAIL",
+      "run_number": 4,
+      "scenario": "snapshot-publisher"
+    },
+    {
+      "checker_verdict_sha256": null,
+      "finding_adjudications": [],
+      "original_outcome": "HARD_FAIL_MISSING_TESTS",
+      "planner_sha256": "eaa0f5a09a5783d6717273a2fee09910e0f67ac576e35ec7da3edcd41a1b3a2b",
+      "primary_failure_owners": [
+        "test_author"
+      ],
+      "readjudicated_outcome": "STACK_FAIL",
+      "run_number": 5,
+      "scenario": "snapshot-publisher"
+    },
+    {
+      "checker_verdict_sha256": "e7b0d0780daa1e5820f5e1a133f384ea26ecf106303e0c27f93e4f06cd00221f",
+      "finding_adjudications": [
+        {
+          "category": "WRONG_RESOLVED_PATH",
+          "classification": "VALID_DOER_DEFECT",
+          "evidence": "The implementation joins `stripped` instead of the verbatim surviving request. A probe with request ` reports/summary.json ` called the resolver for `workspace\\reports\\summary.json`, silently selecting a different path from `workspace\\ reports\\summary.json `. Whitespace-only validation may inspect a stripped value, but valid path whitespace is not declared removable.",
+          "index": 1,
+          "severity": "MEDIUM"
+        }
+      ],
+      "original_outcome": "WITH_CHANGES",
+      "planner_sha256": "53c558e09842d92265a5067f86707e382c19edb25b55d13147a1282dd1ea3f9b",
+      "primary_failure_owners": [
+        "doer"
+      ],
+      "readjudicated_outcome": "STACK_FAIL",
+      "run_number": 1,
+      "scenario": "workspace-boundary"
+    },
+    {
+      "checker_verdict_sha256": "6d7efa7cb48bb407af509e0ac6a9ddebe8023d1fe3ef9b2568c1314e67fa7711",
+      "finding_adjudications": [],
+      "original_outcome": "CLEAN",
+      "planner_sha256": "33ed63ac740f4eb35b96833c949802d08ae61b3f4c532e4bc263cef3e4c5e491",
+      "primary_failure_owners": [],
+      "readjudicated_outcome": "CLEAN",
+      "run_number": 2,
+      "scenario": "workspace-boundary"
+    },
+    {
+      "checker_verdict_sha256": "4523b3ae4904edb56d6a49e3c9c7df89e8cbb3271de54c977baefcc8cdbcb3cc",
+      "finding_adjudications": [
+        {
+          "category": "WRONG_RESOLVED_PATH",
+          "classification": "VALID_DOER_DEFECT",
+          "evidence": "The implementation uses raw.strip() for absolute-path and parent-segment validation, although surrounding whitespace is only permitted for emptiness detection. Probes rejected ' /etc/passwd ' as ABSOLUTE_PATH and ' ../outside.json ' as PARENT_SEGMENT even though the verbatim requests are relative paths whose leading/trailing spaces are filename characters.",
+          "index": 1,
+          "severity": "MEDIUM"
+        },
+        {
+          "category": "TEST_GAP",
+          "classification": "VALID_TEST_GAP",
+          "evidence": "Tests cover whitespace-only requests but not valid relative requests with leading or trailing whitespace, so the over-rejection above is not detected.",
+          "index": 2,
+          "severity": "LOW"
+        }
+      ],
+      "original_outcome": "WITH_CHANGES",
+      "planner_sha256": "ab7fb8f5747a81a855b4c562a5114996f2bee89da553d2badf70e446a3750fa6",
+      "primary_failure_owners": [
+        "doer",
+        "test_author"
+      ],
+      "readjudicated_outcome": "STACK_FAIL",
+      "run_number": 3,
+      "scenario": "workspace-boundary"
+    },
+    {
+      "checker_verdict_sha256": "fd4db2be5c05a16aa0d2eb39809c22eb0c5062917f5dad506cc0aeaef92632b0",
+      "finding_adjudications": [],
+      "original_outcome": "CLEAN",
+      "planner_sha256": "df5e8c81c16c4dd4e69b3fc9273ff959bc8d1cc461d6b78a15d6fdda07b9e49c",
+      "primary_failure_owners": [],
+      "readjudicated_outcome": "CLEAN",
+      "run_number": 4,
+      "scenario": "workspace-boundary"
+    },
+    {
+      "checker_verdict_sha256": "034a1a7a71a2ecf80b9b87170e55b9b3b5f8d0ae3af0bed937f3a35f01a1c916",
+      "finding_adjudications": [
+        {
+          "category": "TEST_GAP",
+          "classification": "VALID_DOER_DEFECT_AND_TEST_GAP",
+          "evidence": "_check_empty recognizes only a single \".\" after removing trailing separators. Probes showed \"././\", \".\\\\.\\\\\", and \"./.\\\\\" are accepted and resolve to the workspace root, although they are dot-only paths and the specification requires dot-only requests to raise EMPTY_PATH. The tests cover \".\", \"./\", and \".\\\\\" but omit repeated current-directory segments.",
+          "index": 1,
+          "severity": "MEDIUM"
+        }
+      ],
+      "original_outcome": "WITH_CHANGES",
+      "planner_sha256": "e82a885f5d1d464094ff8b5174859f6136de36188c5bc82121d525afff503690",
+      "primary_failure_owners": [
+        "doer",
+        "test_author"
+      ],
+      "readjudicated_outcome": "STACK_FAIL",
+      "run_number": 5,
+      "scenario": "workspace-boundary"
+    }
+  ],
+  "generated_at_utc": "2026-08-15T18:10:02.279686Z",
+  "record_id": "model-role-s1-readjudication-2026-08-15",
+  "rules": [
+    "A PLAN may clarify implementation mechanics but may not add or contradict binding requirements in SPEC.",
+    "A checker finding supported only by a PLAN addition is a checker false positive and a planner unauthorized-expansion failure.",
+    "A test or implementation is not defective for following SPEC instead of a conflicting PLAN.",
+    "Missing required artifacts remain stage failures."
+  ],
+  "schema": "raptor.model_role_s1_readjudication.v1",
+  "selection_effect": "S1 remains ineligible as a winning stack. The corrected reason is distributed failure across planner/checker authority handling plus genuine snapshot/boundary doer and test-author defects.",
+  "spec_bindings": {
+    "registry-bridge": {
+      "path": "benchmarks/model_role_v1/scenarios/registry-bridge/common/SPEC.yaml",
+      "sha256": "945833652b14e16c5279788fae2107d86501abd81577721da1db319ea880e3c9"
+    },
+    "snapshot-publisher": {
+      "path": "benchmarks/model_role_v1/scenarios/snapshot-publisher/common/SPEC.yaml",
+      "sha256": "cc960374e9ebcd3874cbe25c6b0207f834014ed71f37263232a358f6f645336c"
+    },
+    "workspace-boundary": {
+      "path": "benchmarks/model_role_v1/scenarios/workspace-boundary/common/SPEC.yaml",
+      "sha256": "3e7a35c3b57908b600f7c5e78cfd8667b144e03a212fe6647ce42cac6a4d11e5"
+    }
+  },
+  "stack": {
+    "checker": "gpt-5.6-sol",
+    "doer": "claude-sonnet-5",
+    "id": "S1",
+    "planner": "claude-opus-5",
+    "test_author": "gemini-3.7-flash"
+  },
+  "status": "POST_HOC_AUTHORITY_ORDER_CORRECTION",
+  "summary": {
+    "cells_total": 15,
+    "clean_cells": 2,
+    "failed_cells": 13,
+    "failure_owner_cell_counts": {
+      "checker": 6,
+      "doer": 6,
+      "planner": 6,
+      "test_author": 5
+    },
+    "original_terminal_counts": {
+      "CLEAN": 2,
+      "DO_NOT_MERGE": 1,
+      "HARD_FAIL_MISSING_TESTS": 2,
+      "WITH_CHANGES": 10
+    },
+    "registry_reattribution": "All five registry cells remain stack failures, but primary ownership moves to planner unauthorized expansion and checker wrong-authority enforcement; test-author and doer outputs are spec-conformant for the adjudicated findings."
+  }
+}
