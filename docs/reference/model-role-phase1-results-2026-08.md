@@ -1,7 +1,9 @@
 # RAPTOR model-role tournament: Phase 1 results
 
-**Status:** Phase 1 individual-role evaluation complete; Phase 2 stack evaluation not started
+**Status:** Phase 1 individual-role evaluation complete; bounded Phase 2 role comparisons later
+completed with no full stack selected
 **Machine record:** [`model_role_phase1_result_2026-08-15.json`](../../data/eval/model_role_phase1_result_2026-08-15.json)
+**Subsequent result:** [Phase 2 report](model-role-phase2-results-2026-08.md)
 
 Phase 1 evaluated models independently in planner, test-author, doer and checker roles. Each finalist completed three task families with five valid independent runs per task. No stack was evaluated or selected.
 

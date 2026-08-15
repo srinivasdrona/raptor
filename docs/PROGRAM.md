@@ -112,18 +112,19 @@ Rule: the **checker is always a different model family from the doer**; nothing 
 checker passes it against pre-stated acceptance criteria. *(Spec/verdict schema + gate automation are
 pending `STRATEGY.md` Part II §10 — ADR-0003.)*
 
-## Model-role benchmark — PHASE 1 COMPLETE / PHASE 2 NOT STARTED
+## Model-role benchmark — PHASE 2 ROLE COMPARISONS COMPLETE / NO STACK SELECTED
 
 The incumbent Opus → Gemini → Sonnet 5 → GPT stack now has a versioned retrospective baseline and a
-prospective tournament contract:
+completed two-phase tournament record:
 [`model-role-benchmark-v1.yaml`](project/specs/model-role-benchmark-v1.yaml),
 [`model_role_incumbent_baseline_2026-08-15.json`](../data/eval/model_role_incumbent_baseline_2026-08-15.json)
-and the [human-readable baseline](reference/model-role-benchmark-baseline-2026-08.md). Historical
-evidence supports an incumbent process assessment but **no comparative winner**. The first isolated
-doer screen compares Sonnet 5, GPT-5.3-Codex, GPT-5.6 Terra and MAI-Code-1.1-Flash on identical
-blinded tasks, with separately reported high-reasoning and efficiency supplements. The benchmark
-must finish, publish negative and positive results, and record an owner-selected stack before RAPTOR
-v2 or RescueScreen implementation starts. ADR-0003/ADR-0005 remain binding until then.
+and the [human-readable baseline](reference/model-role-benchmark-baseline-2026-08.md). Phase 1
+isolated individual roles; Phase 2 then ran bounded planner and paired-doer comparisons under
+SPEC-first attribution. The final machine record is
+[`model_role_phase2_result_2026-08-16.json`](../data/eval/model_role_phase2_result_2026-08-16.json)
+with a [human-readable Phase 2 report](reference/model-role-phase2-results-2026-08.md).
+Phase 2 ranks Sol first among planners and MAI-Code first in the paired-doer comparison, but
+**qualifies neither as a replacement and selects no full stack**. ADR-0003/ADR-0005 remain binding.
 The earlier retrospective **69/100** is retained only as a deprecated expert-coded rubric:
 the arithmetic is reproducible, but most inputs were qualitative judgments rather than measured
 rates. It is not a quantitative baseline and cannot be compared with prospective tournament scores.
@@ -179,13 +180,14 @@ model, and eight benchmark-defect cells invalidated before score use and rerun. 
 [human-readable report](reference/model-role-phase1-results-2026-08.md). Leaders by the
 preregistered role rules are Opus 5 for planning, GPT-5.3-Codex for test authorship, GPT-5.6 Terra
 for doer quality/stability, and a four-way checker score tie led by Opus 5 on worst-run stability.
-No stack has been evaluated or selected. Phase 2 remains required before the benchmark blog, stack
-selection, RAPTOR v2 or RescueScreen.
+Those isolated-role results did not select a stack.
 
-Phase 2 protocol is now frozen under
-[`benchmarks/model_role_phase2`](../benchmarks/model_role_phase2): eight stacks, three task
-families, five repeats per stack/task, 120 chained runs. Stages within a run are sequential;
-independent cells are parallel. No Phase 2 score exists yet.
+The original exhaustive Phase 2 protocol remains frozen under
+[`benchmarks/model_role_phase2`](../benchmarks/model_role_phase2), but its eight-stack, 120-run
+execution was abandoned as disproportionate before launch. It was replaced prospectively by a
+bounded planner comparison and a separate byte-identical paired-doer comparison. Together they
+ranked 75 candidate cells: 60 new stack runs plus the 15-cell reused S1 planner arm. The execution
+inventory tracked 90 materialized cells when 15 shared upstream plan/test cells are included.
 
 S1 has been re-adjudicated under explicit authority order
 `SPEC → fixtures → PLAN → tests → implementation`. It remains ineligible (2/15 clean), but all
@@ -197,14 +199,22 @@ The exhaustive eight-stack Phase 2 execution is abandoned as disproportionate. A
 comparison is frozen in
 [`PLANNER_COMPARISON.yaml`](../benchmarks/model_role_phase2/PLANNER_COMPARISON.yaml): Opus 5,
 Gemini 3.7 Flash and GPT-5.6 Sol planners, with Gemini test author, Sonnet 5 doer and Sol checker
-held fixed across three scenarios. S1 supplies the Opus arm; only Gemini and Sol are newly run,
-five repeats per scenario, concurrently (30 new stack runs).
+held fixed across three scenarios. S1 supplies the Opus arm. Corrected planner eligibility ranks
+Sol **10/15**, Opus **9/15**, and Gemini **4/15**. No planner qualifies: all three fail the
+registry authority hard gate in **5/5** runs. Sol is the planner leader, not an authorized
+replacement.
 
 A separate doer-sensitivity comparison is frozen in
 [`DOER_VARIANTS.yaml`](../benchmarks/model_role_phase2/DOER_VARIANTS.yaml): Gemini planner,
 GPT-5.3-Codex test author and Grok checker held fixed while Sonnet 5 and MAI-Code-1.1-Flash doers
-are compared across the same three scenarios and five repeats (30 stack runs). It is reported
-separately from the planner comparison.
+are compared across the same three scenarios and five repeats. MAI-Code leads corrected doer
+eligibility **10/15** to **7/15**, but both variants fail every snapshot-publisher run with retained
+HIGH defects. MAI-Code is therefore the pre-efficiency doer leader, not an authorized replacement.
+
+The preregistered ten efficiency points are `PENDING_UNAWARDABLE`: there is no frozen deterministic
+formula or attributable candidate-run telemetry, so no points are guessed. Test-author and checker
+selection were not isolated in Phase 2. No planner replacement, doer replacement, full stack,
+operating-model change, RAPTOR v2 launch, or RescueScreen launch is authorized by these results.
 
 ## Health Rollup
 

@@ -1,0 +1,281 @@
+{
+  "schema": "raptor-model-role-phase2-result-v1",
+  "status": "FINAL",
+  "generated_at_utc": "2026-08-15T20:56:10.5610396Z",
+  "protocol": {
+    "authority_order": [
+      "SPEC",
+      "candidate_visible_fixtures",
+      "PLAN",
+      "tests",
+      "implementation"
+    ],
+    "corpus_version": "1.0.8",
+    "evaluator_version": "1.0.6",
+    "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+    "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+    "planner_comparison": "benchmarks/model_role_phase2/PLANNER_COMPARISON.yaml",
+    "doer_variants": "benchmarks/model_role_phase2/DOER_VARIANTS.yaml",
+    "run_protocol": "benchmarks/model_role_phase2/RUN_PROTOCOL.yaml"
+  },
+  "scope": {
+    "scenarios": [
+      "registry-bridge",
+      "snapshot-publisher",
+      "workspace-boundary"
+    ],
+    "runs_per_arm_scenario": 5,
+    "planner_cells_analyzed": 45,
+    "planner_new_cells": 30,
+    "planner_reused_cells": 15,
+    "doer_cells_analyzed": 30,
+    "ranked_candidate_cells": 75,
+    "shared_upstream_doer_cells": 15,
+    "inventory_materialized_cells": 90,
+    "total_new_stack_runs": 60,
+    "exhaustive_eight_stack_tournament_executed": false,
+    "comparison_design": "Bounded planner isolation plus a separate byte-identical paired doer comparison."
+  },
+  "planner_comparison": {
+    "fixed_roles": {
+      "test_author": "gemini-3.7-flash",
+      "doer": "claude-sonnet-5",
+      "checker": "gpt-5.6-sol"
+    },
+    "primary_metric": "Runs without a planner-attributable SPEC-authority failure.",
+    "ranking": [
+      {
+        "rank": 1,
+        "arm": "PC-SOL",
+        "model": "gpt-5.6-sol",
+        "corrected_planner_eligible_runs": 10,
+        "total_runs": 15,
+        "planner_attributable_failure_runs": 5,
+        "scenario_results": {
+          "registry-bridge": {
+            "eligible": 0,
+            "total": 5,
+            "note": "Planner authority hard gate failed in all runs."
+          },
+          "snapshot-publisher": {
+            "eligible": 5,
+            "total": 5,
+            "note": "The missing run-05 authored-test artifact is test-author/execution attributable, not planner attributable."
+          },
+          "workspace-boundary": {
+            "eligible": 5,
+            "total": 5,
+            "note": "The missing run-03 authored-test artifact is test-author/execution attributable, not planner attributable."
+          }
+        }
+      },
+      {
+        "rank": 2,
+        "arm": "PC-OPUS",
+        "model": "claude-opus-5",
+        "execution": "REUSE_S1",
+        "corrected_planner_eligible_runs": 9,
+        "total_runs": 15,
+        "planner_attributable_failure_runs": 6,
+        "scenario_results": {
+          "registry-bridge": {
+            "eligible": 0,
+            "total": 5,
+            "note": "Planner authority hard gate failed in all runs."
+          },
+          "snapshot-publisher": {
+            "eligible": 4,
+            "total": 5,
+            "note": "One planner-attributable PLAN/SPEC expansion; remaining failures were downstream."
+          },
+          "workspace-boundary": {
+            "eligible": 5,
+            "total": 5,
+            "note": "Observed failures were downstream; two complete stack cells were clean."
+          }
+        }
+      },
+      {
+        "rank": 3,
+        "arm": "PC-GEMINI",
+        "model": "gemini-3.7-flash",
+        "corrected_planner_eligible_runs": 4,
+        "total_runs": 15,
+        "planner_attributable_failure_runs": 11,
+        "scenario_results": {
+          "registry-bridge": {
+            "eligible": 0,
+            "total": 5,
+            "note": "Planner authority hard gate failed in all runs."
+          },
+          "snapshot-publisher": {
+            "eligible": 0,
+            "total": 5,
+            "note": "All plans incompletely transmitted the binding typed publication-error surface."
+          },
+          "workspace-boundary": {
+            "eligible": 4,
+            "total": 5,
+            "note": "Run-03 omitted binding separator-bearing dot-only forms and added unsupported behavior."
+          }
+        }
+      }
+    ],
+    "decision": {
+      "leader": "PC-SOL",
+      "leader_model": "gpt-5.6-sol",
+      "result": "RANKED_NO_QUALIFIED_WINNER",
+      "planner_replacement_authorized": false,
+      "reason": "PC-SOL leads 10/15 to PC-OPUS 9/15 and PC-GEMINI 4/15, but every planner failed the registry-bridge planner-authority hard gate in 5/5 runs. A partial aggregate lead cannot override a scenario-wide hard-gate failure."
+    },
+    "sensitivity": {
+      "snapshot_alternative_attribution": "Giving PC-GEMINI snapshot run-04 to the fixed test author changes that scenario to 1/5 versus PC-SOL 5/5 and does not change the aggregate order.",
+      "boundary_single_charge_waiver": "Waiving PC-GEMINI boundary run-03 makes boundary 5/5 versus 5/5 but leaves the aggregate order unchanged.",
+      "registry": "The scenario remains non-discriminating at the hard gate; its advisory shipped-artifact ordering is PC-GEMINI, PC-SOL, PC-OPUS."
+    }
+  },
+  "doer_comparison": {
+    "fixed_roles": {
+      "planner": "gemini-3.7-flash",
+      "test_author": "gpt-5.3-codex",
+      "checker": "grok-4.6"
+    },
+    "paired_artifacts": "Matching PLAN.yaml and authored tests were byte-identical between doer variants; the comparison forked at the doer.",
+    "ranking": [
+      {
+        "rank": 1,
+        "arm": "DV-MAI",
+        "model": "mai-code-1.1-flash",
+        "corrected_doer_eligible_runs": 10,
+        "total_runs": 15,
+        "scenario_results": {
+          "registry-bridge": {
+            "eligible": 5,
+            "total": 5
+          },
+          "snapshot-publisher": {
+            "eligible": 0,
+            "total": 5
+          },
+          "workspace-boundary": {
+            "eligible": 5,
+            "total": 5
+          }
+        },
+        "descriptive_hidden_quality_mean_before_efficiency": 77.33333333333333
+      },
+      {
+        "rank": 2,
+        "arm": "DV-SONNET",
+        "model": "claude-sonnet-5",
+        "corrected_doer_eligible_runs": 7,
+        "total_runs": 15,
+        "scenario_results": {
+          "registry-bridge": {
+            "eligible": 5,
+            "total": 5
+          },
+          "snapshot-publisher": {
+            "eligible": 0,
+            "total": 5
+          },
+          "workspace-boundary": {
+            "eligible": 2,
+            "total": 5
+          }
+        },
+        "descriptive_hidden_quality_mean_before_efficiency": 79.0
+      }
+    ],
+    "decision": {
+      "leader": "DV-MAI",
+      "leader_model": "mai-code-1.1-flash",
+      "result": "PRE_EFFICIENCY_DOER_LEADER_NO_QUALIFIED_WINNER",
+      "doer_replacement_authorized": false,
+      "reason": "DV-MAI leads corrected SPEC-first eligibility 10/15 to 7/15, but both variants failed all five snapshot-publisher runs with retained HIGH implementation defects and normalized efficiency is unawardable."
+    },
+    "snapshot_robustness": "The 0/5 versus 0/5 result does not depend on disputed source/output alias behavior; non-finite JSON acceptance and unchecked short writes independently retain HIGH defects in every run."
+  },
+  "efficiency": {
+    "status": "PENDING_UNAWARDABLE",
+    "points_awarded": null,
+    "reason": "No frozen deterministic formula or attributable per-run telemetry exists.",
+    "treatment": "The ten-point component is neutrally excluded, not guessed or assigned equally."
+  },
+  "artifact_integrity": {
+    "inventory_summary": {
+      "cells_ready_for_adjudication": 87,
+      "cells_with_raw_gaps": 3,
+      "stages_with_valid_required_artifacts": 267,
+      "stages_expected": 270,
+      "hidden_evaluation_files_parseable": 120,
+      "hidden_evaluation_files_expected": 120,
+      "hidden_gate_pass": 110,
+      "hidden_gate_fail": 10,
+      "raw_gap_cells_planner_attributable": 0
+    },
+    "issues": [
+      {
+        "cell": "DV-MAI/registry-bridge/run-03",
+        "artifact": "VERDICT.yaml",
+        "issue": "Invalid YAML because ModuleNotFoundError: solution is unquoted.",
+        "raw_protocol_effect": "Required-artifact hard-gate failure.",
+        "attribution": "checker",
+        "doer_eligibility_effect": "none"
+      },
+      {
+        "cell": "PC-SOL/snapshot-publisher/run-05",
+        "artifact": "test_author/tests/test_*.py",
+        "issue": "No authored test artifact.",
+        "raw_protocol_effect": "Required-artifact hard-gate failure.",
+        "attribution": "test_author/execution",
+        "planner_eligibility_effect": "none"
+      },
+      {
+        "cell": "PC-SOL/workspace-boundary/run-03",
+        "artifact": "test_author/tests/test_*.py",
+        "issue": "No authored test artifact.",
+        "raw_protocol_effect": "Required-artifact hard-gate failure.",
+        "attribution": "test_author/execution",
+        "planner_eligibility_effect": "none"
+      }
+    ],
+    "frozen_artifacts_repaired": false
+  },
+  "authorization": {
+    "planner_rank_authorized": true,
+    "doer_rank_authorized": true,
+    "planner_replacement_authorized": false,
+    "doer_replacement_authorized": false,
+    "test_author_selection_authorized": false,
+    "checker_selection_authorized": false,
+    "full_stack_selection_authorized": false,
+    "operating_model_change_authorized": false,
+    "incumbent_adrs_remain_binding": [
+      "ADR-0003",
+      "ADR-0005"
+    ],
+    "required_before_stack_selection": [
+      "A planner candidate must clear a corrected registry-bridge authority test.",
+      "A doer candidate must clear corrected snapshot-publisher HIGH-defect tests.",
+      "Test-author and checker choices must be isolated rather than inferred from fixed-role behavior.",
+      "Efficiency needs a frozen deterministic formula and attributable telemetry, or must be formally removed before a new tournament."
+    ]
+  },
+  "source_records": {
+    "s1_readjudication": "data/eval/model_role_s1_readjudication_2026-08-15.json",
+    "phase1_result": "data/eval/model_role_phase1_result_2026-08-15.json",
+    "supporting_adjudications_location": "Private frozen session evidence; summarized in this record and the public report.",
+    "supporting_adjudication_sha256": {
+      "pc-registry.json": "d47afffb419dc9ec56ea301f8be03cbd40590e93aa7b72c87c2dee369ad8b636",
+      "planner-snapshot.json": "1e252c0f1be337ddfa3f1922d6ef1a39abb515d25170047761234220b837d28e",
+      "planner-boundary.json": "ac8f47226d3d08cf116014eab44518ff7bb33d6d20eb9def2753cdc09776de60",
+      "paired-registry.json": "8ba45e015081db8472141f7081067e8af67f3675f1ecf9d9bb78c12f45f45321",
+      "paired-snapshot.json": "85612d618c647d05674068cd1470471fdfa7c1c235c036363624cd0727a1ccc5",
+      "paired-boundary.json": "9e5dfb2173790b435def94a8a64b73b427f804353f8f02bb0dd805da985181bb",
+      "paired-final.json": "ba99b584ca56a170aa18ef96440b2bf76b14c5a09cd2d3974fa5c917317953e9",
+      "efficiency-audit.json": "65847454e8e8980cea682393f23ea396ebd115f3666f8811c6dd4731bd97c53e",
+      "execution-inventory-final.json": "fb410ca5913225659e79173a7cea97a37854b4547760653cf7c8105b878c6d09"
+    }
+  }
+}
