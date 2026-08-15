@@ -1,6 +1,6 @@
 schema: raptor-model-role-tournament-run-protocol-v1
 protocol_id: model-role-tournament-2026-08
-version: 1.0.2
+version: 1.0.3
 status: REFROZEN_BEFORE_FIRST_VALID_CANDIDATE_RUN
 corpus: CORPUS_MANIFEST.yaml
 scoring: SCORING.md

@@ -181,6 +181,171 @@
           "run_number": 3
         }
       ]
+    },
+    {
+      "action": "Preserve outputs; correct evaluator layout; refreeze evaluator; rerun complete cell.",
+      "cell": "phase1/test-author/registry-bridge/runs-01-03",
+      "discovered_before_score_use": true,
+      "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+      "protocol_commit": "b731964",
+      "public_corpus_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
+      "reason": "Evaluator v1.0.1 injected solution.py at workspace root instead of the public src/solution.py layout, penalizing legitimate src.solution imports.",
+      "runs": [
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\gemini-3.7-flash\\registry-bridge\\run-01\\tests\\test_registry_bridge.py"
+          ],
+          "candidate_sha256": {
+            "test_registry_bridge.py": "41b1d09efd4f3d681bffa068fd8c75f66feb0e25ad971c2fba3d7ba6d9a781fa"
+          },
+          "elapsed_seconds": 416,
+          "model_id": "gemini-3.7-flash",
+          "preliminary_score_non_reportable": null,
+          "run_number": 1
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\gemini-3.7-flash\\registry-bridge\\run-02\\tests\\test_solution.py"
+          ],
+          "candidate_sha256": {
+            "test_solution.py": "c0bff97b1be48b1f118701358fa396211f2a69d1d6cbaab0c91b39052e4fb7df"
+          },
+          "elapsed_seconds": 353,
+          "model_id": "gemini-3.7-flash",
+          "preliminary_score_non_reportable": null,
+          "run_number": 2
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\gemini-3.7-flash\\registry-bridge\\run-03\\tests\\test_solution.py"
+          ],
+          "candidate_sha256": {
+            "test_solution.py": "a9422caf3f0f5a0143696e16312bdc12528e4b1f5aabcde4b789a6786e7b2fd0"
+          },
+          "elapsed_seconds": 145,
+          "model_id": "gemini-3.7-flash",
+          "preliminary_score_non_reportable": null,
+          "run_number": 3
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\mai-code-1.1-flash\\registry-bridge\\run-01\\tests\\test_registry_bridge.py"
+          ],
+          "candidate_sha256": {
+            "test_registry_bridge.py": "8e3d258c3236944ee5175f28b178101d5eb6299641be6b9e9e8e730e259aca26"
+          },
+          "elapsed_seconds": 80,
+          "model_id": "mai-code-1.1-flash",
+          "preliminary_score_non_reportable": null,
+          "run_number": 1
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\mai-code-1.1-flash\\registry-bridge\\run-02\\tests\\test_registry_bridge.py"
+          ],
+          "candidate_sha256": {
+            "test_registry_bridge.py": "47c5fa96ab0fd7d12ea9be3fb8985a393779a3924f1ba2f3f711d3f8e5e1922b"
+          },
+          "elapsed_seconds": 96,
+          "model_id": "mai-code-1.1-flash",
+          "preliminary_score_non_reportable": null,
+          "run_number": 2
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\mai-code-1.1-flash\\registry-bridge\\run-03\\tests\\test_registry_bridge.py"
+          ],
+          "candidate_sha256": {
+            "test_registry_bridge.py": "672c5939f34bb1cf3a955c9e88e0ea0b64234210d92f82018ff9de4b16af77b6"
+          },
+          "elapsed_seconds": 90,
+          "model_id": "mai-code-1.1-flash",
+          "preliminary_score_non_reportable": null,
+          "run_number": 3
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\gpt-5.3-codex\\registry-bridge\\run-01\\tests\\test_registry_bridge.py"
+          ],
+          "candidate_sha256": {
+            "test_registry_bridge.py": "59901a80b8834737b124417a58ddf9f8fe60b847db09e3affd4d2153d3660797"
+          },
+          "elapsed_seconds": 63,
+          "model_id": "gpt-5.3-codex",
+          "preliminary_score_non_reportable": null,
+          "run_number": 1
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\gpt-5.3-codex\\registry-bridge\\run-02\\tests\\test_registry_bridge_acceptance.py"
+          ],
+          "candidate_sha256": {
+            "test_registry_bridge_acceptance.py": "1a5482e2a7197322cad211c173d58c8b7e90dde462b804136c10cc542da5f51d"
+          },
+          "elapsed_seconds": 64,
+          "model_id": "gpt-5.3-codex",
+          "preliminary_score_non_reportable": null,
+          "run_number": 2
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\gpt-5.3-codex\\registry-bridge\\run-03\\tests\\test_validate_release_bundle.py"
+          ],
+          "candidate_sha256": {
+            "test_validate_release_bundle.py": "9ff93c7b7e8881ade9d47bb79d86fd3cc0a63d656cde0a772e2198bb0dc53406"
+          },
+          "elapsed_seconds": 71,
+          "model_id": "gpt-5.3-codex",
+          "preliminary_score_non_reportable": null,
+          "run_number": 3
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\registry-bridge\\run-01\\tests\\conftest.py",
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\registry-bridge\\run-01\\tests\\test_registry_bridge.py"
+          ],
+          "candidate_sha256": {
+            "conftest.py": "b037ff199991cd438e9cda0398c470be3241447ad3f191c86fc7d9b41e037df5",
+            "test_registry_bridge.py": "87be03ca6caadb0dc92d5ae9628bb73cec1c783073c3dadcadbd521d068021cc"
+          },
+          "elapsed_seconds": 184,
+          "model_id": "claude-opus-5",
+          "preliminary_score_non_reportable": null,
+          "run_number": 1
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\registry-bridge\\run-02\\tests\\conftest.py",
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\registry-bridge\\run-02\\tests\\test_check_precedence.py",
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\registry-bridge\\run-02\\tests\\test_error_codes.py",
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\registry-bridge\\run-02\\tests\\test_success_contract.py"
+          ],
+          "candidate_sha256": {
+            "conftest.py": "8cb00fe873e07d9b644286e9b68506c6a2578fe3a7a4e2ada7d288b258710bd6",
+            "test_check_precedence.py": "62f31f9f0fdc26f42e73e5706a9fc523cac94f0617395de592f140e5a7d1f2f2",
+            "test_error_codes.py": "14e831630c5ad6f226f8d7cae4f4f097a7fa9754361345905ee520c78607340a",
+            "test_success_contract.py": "3e6d7ed4d08b006e3d4f67eb1f99b3c63731ecf6aba9805b0b3755dc71c291cd"
+          },
+          "elapsed_seconds": 186,
+          "model_id": "claude-opus-5",
+          "preliminary_score_non_reportable": null,
+          "run_number": 2
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\registry-bridge\\run-03\\tests\\conftest.py",
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\registry-bridge\\run-03\\tests\\test_registry_bridge.py"
+          ],
+          "candidate_sha256": {
+            "conftest.py": "89e60941f317c260f655feb39b0a032d406b245ed0c19fcceb524e9365d96e88",
+            "test_registry_bridge.py": "a4664f073de10961969aa230b8f252269a7209da1576a277ae793ba316076777"
+          },
+          "elapsed_seconds": 164,
+          "model_id": "claude-opus-5",
+          "preliminary_score_non_reportable": null,
+          "run_number": 3
+        }
+      ]
     }
   ],
   "schema": "raptor-model-role-invalidated-cells-v1",

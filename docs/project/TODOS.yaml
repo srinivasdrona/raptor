@@ -1676,9 +1676,12 @@ todos:
     preserved and invalidated. The first snapshot-planner cell was likewise invalidated before
     score use because exact canonical/audit values were requested but not supplied. Corpus v1.0.2
     now makes all planner semantics explicit and is refrozen at public SHA-256
-    d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81; evaluator v1.0.1 remains
-    at SHA-256 682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af.
-    Gold references again reached the designed maxima on all scenarios.'
+    d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81. The first registry
+    test-author cell was invalidated before scoring because evaluator v1.0.1 used the wrong module
+    layout for legitimate src.solution imports. Corpus v1.0.3 / evaluator v1.0.2 are refrozen at
+    public SHA-256 4992b090fecc22278c0451506b92ebe91cd930ed2e973629cbab2cfcb59565b0
+    and evaluator SHA-256 ba4fc301064e2acfd6c78d427782a45700e7bca5896baac6f79bfab80cb3d94e.
+    Gold references, including both solution and src.solution import styles, reach their maxima.'
   status: done
   depends_on:
   - compose-model-role-baseline

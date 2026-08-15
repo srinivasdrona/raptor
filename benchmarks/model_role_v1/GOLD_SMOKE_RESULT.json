@@ -15,6 +15,10 @@
     "test_author": {
       "hard_gate": "PASS",
       "score": 100.0
+    },
+    "test_author_src_import": {
+      "hard_gate": "PASS",
+      "score": 100.0
     }
   },
   "snapshot-publisher": {

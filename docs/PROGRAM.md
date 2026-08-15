@@ -149,6 +149,11 @@ and audit values were scored without being candidate-visible. Corpus v1.0.2 now 
 planner requirements before execution and is frozen at `d6cfd77b…fffe81`; the evaluator remains
 v1.0.1 at `682d3816…3573af`.
 
+The first registry test-author cell was invalidated before score use because evaluator v1.0.1
+injected `solution.py` at workspace root rather than the public `src/solution.py` layout, which
+would penalize legitimate `src.solution` imports. Corpus v1.0.3 / evaluator v1.0.2 are frozen at
+`4992b090…9565b0` / `ba4fc301…b3d94e`; gold smoke covers both import styles.
+
 ## Health Rollup
 
 > *Module built ≠ live run executed.* The Tier-1/2 code path and the validation harness are **built

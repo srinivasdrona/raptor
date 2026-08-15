@@ -1,15 +1,15 @@
 {
   "aggregate_basis": "SHA-256 of compact sorted JSON mapping relative path to file SHA-256; lock files excluded.",
-  "aggregate_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
-  "corpus_version": "1.0.2",
+  "aggregate_sha256": "4992b090fecc22278c0451506b92ebe91cd930ed2e973629cbab2cfcb59565b0",
+  "corpus_version": "1.0.3",
   "file_count": 47,
   "files": {
     "CANDIDATE_PROMPT.md": "b1ac41594f4d0bf8b296e139bb160cc7fa3beceefddd21950cffb08757e8c30c",
-    "CORPUS_MANIFEST.yaml": "073c7c44d7e29b2617901d104f3ca820c1449b2b63bd46631dca52419655727e",
-    "GOLD_SMOKE_RESULT.json": "1598b68e3fc34610905ada02877131a12e833d5e4d603fe59b48ef96234e1fe3",
-    "INVALIDATED_CELLS.json": "e5f454688cb2e81c30fceb46fc5f67312fd0004e394dad1b9b41dea033b8e97b",
+    "CORPUS_MANIFEST.yaml": "f64132c28f9a356fb0a02b23af52a8b38fcc1ee7f78225cbf12c4509e47d7aaa",
+    "GOLD_SMOKE_RESULT.json": "f1adb9b51e1f71b203979a1f26f1e985afecb669e629362886e13fa5322efb45",
+    "INVALIDATED_CELLS.json": "fc4f5c2219bd32ad7c3917c1e114ca096e1d84e57ff252067f6092a7ad6382de",
     "README.md": "0478aafc731a0b835141cc22e6f5f9eda3ffd3156919432ed57f62eb46dc89cb",
-    "RUN_PROTOCOL.yaml": "716d3a9a5559f2683438ff542f3f4e1b4e2f18d2344d1f7c1955f237198bdc39",
+    "RUN_PROTOCOL.yaml": "2d59a36c3d9d2f7630b264b98c7c5ffb5aa185c48a043742033d9057bff54d1d",
     "SCORING.md": "bc5d588305c200e22a319f6a1d2640e4ea9afdff2e185b076ff74a14f41e78e8",
     "materialize_task.py": "20ad0666044a19f79626159f5ae06d52a0ebecb14642af57a54ecbd66ad19581",
     "scenarios/registry-bridge/artifacts/map_lock.yaml": "645b48ec9c39a62963488ea9bf98bbb17ec7bbb2769420e0ec531fd92c906f7c",
@@ -52,7 +52,7 @@
     "scenarios/workspace-boundary/test_author/TASK.md": "727507591dcbab3777687abe6b4300a09a95ee175f095ccbbdf00155ad8d5f58",
     "scenarios/workspace-boundary/visible_tests/tests/test_visible.py": "c906bb732afd6d2851b5c9ccb09e0f3a2599bd5cf0a2de80f9eb997acd182672"
   },
-  "generated_at_utc": "2026-08-15T11:44:31.523290Z",
+  "generated_at_utc": "2026-08-15T11:59:12.636293Z",
   "schema": "raptor-model-role-public-corpus-lock-v1",
-  "status": "FROZEN_BEFORE_FIRST_VALID_SNAPSHOT_AND_BOUNDARY_PLANNER_RUN"
+  "status": "FROZEN_BEFORE_FIRST_VALID_TEST_AUTHOR_RUN"
 }
