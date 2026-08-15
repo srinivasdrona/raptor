@@ -1,8 +1,8 @@
 {
   "aggregate_basis": "SHA-256 of compact sorted JSON mapping embargoed relative path to file SHA-256; __pycache__ and pyc excluded.",
-  "aggregate_sha256": "ba4fc301064e2acfd6c78d427782a45700e7bca5896baac6f79bfab80cb3d94e",
+  "aggregate_sha256": "8924e344dc77e2d1eaefc0191480504cfde3cdd97fc9a761a151516f06b652bb",
   "content_location": "WITHHELD_FROM_REPOSITORY_AND_CANDIDATE_WORKSPACES",
-  "evaluator_version": "1.0.2",
+  "evaluator_version": "1.0.3",
   "file_count": 9,
   "files": {
     "checker_keys.yaml": "a64dfc2b604f1e6ab246f1597639fd58735e5305a3786aea8f6cf8f8c0324eef",
@@ -10,12 +10,12 @@
     "gold_tests/registry-bridge.py": "45e3bffe2e2619e516af2f3c9dee854f2d3872f61364fd3ea5cc2d5ae8688c9b",
     "gold_tests/snapshot-publisher.py": "0fff6c62623281f440e6accf9bcab7bfdf01213976935a14e835ebe526cbe134",
     "gold_tests/workspace-boundary.py": "025e870609a96f7bcce819f850bba3f1d960d959afcaaa259490d15774438034",
-    "implementations.py": "68a868f5bd8636f45ded65dea6415a852d93b539691167e1bc4b406675e46274",
+    "implementations.py": "960bf831b337a603f19d6cf27e32a9a35f2abb36b4da305d3f83a3478a4f5f53",
     "planner_keys.yaml": "067ad957a75b7b57abfc14b56727b91517d04939e9b491ce5e15523742dcac3b",
     "smoke_gold.py": "4cb51fdbcba99921eae1ab0cc8313d002ba7a5ddb343755fbda370d0584accdb",
     "test_author_keys.yaml": "43f5a3994ef9927f00686ec3742814191b675235ec1b6b1145531bfcd5181b5a"
   },
-  "generated_at_utc": "2026-08-15T11:59:12.636293Z",
+  "generated_at_utc": "2026-08-15T12:21:02.579323Z",
   "schema": "raptor-model-role-embargoed-evaluator-lock-v1",
   "status": "CONTENT_EMBARGOED_UNTIL_ALL_CANDIDATE_RUNS_FROZEN"
 }

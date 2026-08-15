@@ -1681,7 +1681,12 @@ todos:
     layout for legitimate src.solution imports. Corpus v1.0.3 / evaluator v1.0.2 are refrozen at
     public SHA-256 4992b090fecc22278c0451506b92ebe91cd930ed2e973629cbab2cfcb59565b0
     and evaluator SHA-256 ba4fc301064e2acfd6c78d427782a45700e7bca5896baac6f79bfab80cb3d94e.
-    Gold references, including both solution and src.solution import styles, reach their maxima.'
+    Snapshot test-author runs 04-06 were also invalidated before score use because callback path
+    type, output-parent policy and Unicode canonicalization were not explicit; a stale mutant was
+    found by gold smoke and repaired. Corpus v1.0.4 / evaluator v1.0.3 are frozen at
+    fcc13f6dd2cfeff35c0ae57e8acc8aca8b3dcd596731eba1994f0daa4d73b664 /
+    8924e344dc77e2d1eaefc0191480504cfde3cdd97fc9a761a151516f06b652bb.
+    Gold references reach their designed maxima.'
   status: done
   depends_on:
   - compose-model-role-baseline

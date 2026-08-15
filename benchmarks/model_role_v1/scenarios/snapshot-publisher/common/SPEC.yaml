@@ -9,10 +9,12 @@ requirements:
   - Read source bytes and require SHA-256 equality with expected_sha256 before parsing.
   - Parse JSON only after the initial hash check.
   - Snapshot content is schema verified-snapshot-v1 plus the initial source records.
-  - If before_publish is provided, call it with source_path after initial verification and before publication.
+  - Normalize source_path and output_path to pathlib.Path at function entry.
+  - If before_publish is provided, call it with the normalized pathlib.Path source_path after initial verification and before publication.
   - Re-read source bytes after before_publish and require the same SHA-256 before writing output.
-  - Canonical JSON is sort_keys=true, indent=2, UTF-8, LF-only, exactly one terminal LF.
+  - Canonical JSON is sort_keys=true, indent=2, ensure_ascii=false, UTF-8, LF-only, exactly one terminal LF.
   - Publish through a temporary sibling file followed by os.replace; never write output directly.
+  - output_path.parent must already exist and be a directory; do not create it.
   - Success returns an audit mapping with exactly:
     schema, source_sha256, source_size, output_sha256, record_count, checks.
   - Audit schema is snapshot-publish-audit-v1.

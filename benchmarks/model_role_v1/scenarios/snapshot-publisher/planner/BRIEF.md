@@ -11,12 +11,15 @@ The authoritative contract is:
 - read source bytes and require SHA-256 equality before parsing;
 - parse JSON only after that initial hash check;
 - snapshot content is `{"schema": "verified-snapshot-v1", "records": ...}`;
-- call `before_publish(source_path)` after initial verification when provided;
+- normalize both path arguments to `pathlib.Path`;
+- call `before_publish(source_path)` with that normalized `Path` after initial
+  verification when provided;
 - re-read the source after the callback and require the same SHA-256 before any
   destination write;
-- canonical JSON uses `sort_keys=true`, `indent=2`, UTF-8, LF-only, and exactly
-  one terminal LF;
+- canonical JSON uses `sort_keys=true`, `indent=2`, `ensure_ascii=false`,
+  UTF-8, LF-only, and exactly one terminal LF;
 - write a temporary sibling file and publish only with `os.replace`;
+- require `output_path.parent` to exist as a directory; never create it;
 - return exactly `schema`, `source_sha256`, `source_size`, `output_sha256`,
   `record_count`, and `checks`;
 - audit schema is `snapshot-publish-audit-v1`;

@@ -154,6 +154,11 @@ injected `solution.py` at workspace root rather than the public `src/solution.py
 would penalize legitimate `src.solution` imports. Corpus v1.0.3 / evaluator v1.0.2 are frozen at
 `4992b090…9565b0` / `ba4fc301…b3d94e`; gold smoke covers both import styles.
 
+Snapshot test-author runs 04-06 were invalidated before score use because callback path type,
+output-parent behavior and Unicode canonicalization remained implicit. Gold smoke also detected a
+stale noncanonical mutant. Corpus v1.0.4 / evaluator v1.0.3 make the behavior explicit and are
+frozen at `fcc13f6d…73b664` / `8924e344…b652bb`.
+
 ## Health Rollup
 
 > *Module built ≠ live run executed.* The Tier-1/2 code path and the validation harness are **built

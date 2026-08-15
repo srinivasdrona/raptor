@@ -346,6 +346,183 @@
           "run_number": 3
         }
       ]
+    },
+    {
+      "action": "Preserve outputs; make semantics explicit; refreeze corpus/evaluator; rerun complete cell.",
+      "cell": "phase1/test-author/snapshot-publisher/runs-04-06",
+      "discovered_before_score_use": true,
+      "evaluator_sha256": "ba4fc301064e2acfd6c78d427782a45700e7bca5896baac6f79bfab80cb3d94e",
+      "protocol_commit": "a488d98",
+      "public_corpus_sha256": "4992b090fecc22278c0451506b92ebe91cd930ed2e973629cbab2cfcb59565b0",
+      "reason": "Public spec omitted callback path type, output parent creation behavior, and ensure_ascii canonicalization behavior.",
+      "runs": [
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\gemini-3.7-flash\\snapshot-publisher\\run-04\\tests\\test_snapshot_publisher.py"
+          ],
+          "candidate_sha256": {
+            "test_snapshot_publisher.py": "99d9acd35d71e882c2c917d3b3c96b07904e1fab83ad21e2fcf036cc815be52e"
+          },
+          "elapsed_seconds": 174,
+          "model_id": "gemini-3.7-flash",
+          "preliminary_score_non_reportable": null,
+          "run_number": 4
+        },
+        {
+          "candidate_artifacts": [],
+          "candidate_sha256": {},
+          "elapsed_seconds": 292,
+          "model_id": "gemini-3.7-flash",
+          "preliminary_score_non_reportable": null,
+          "run_number": 5
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\gemini-3.7-flash\\snapshot-publisher\\run-06\\tests\\test_snapshot_publisher.py"
+          ],
+          "candidate_sha256": {
+            "test_snapshot_publisher.py": "cdd7fbaeec6bf6bbb977149a4fb7e1479c422732c759b8f2f118f10df669037f"
+          },
+          "elapsed_seconds": 357,
+          "model_id": "gemini-3.7-flash",
+          "preliminary_score_non_reportable": null,
+          "run_number": 6
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\mai-code-1.1-flash\\snapshot-publisher\\run-04\\tests\\test_snapshot_publisher.py"
+          ],
+          "candidate_sha256": {
+            "test_snapshot_publisher.py": "2ef9c2d98ace4bceb1b142e44ee37b8b2c9b00e724d32100dcaac34e5052a181"
+          },
+          "elapsed_seconds": 107,
+          "model_id": "mai-code-1.1-flash",
+          "preliminary_score_non_reportable": null,
+          "run_number": 4
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\mai-code-1.1-flash\\snapshot-publisher\\run-05\\tests\\test_snapshot_publisher.py"
+          ],
+          "candidate_sha256": {
+            "test_snapshot_publisher.py": "71d3c5f5e1ee0a1a2b7cf4d030ad7615f48ebfcdd884b633632f0d55beb06367"
+          },
+          "elapsed_seconds": 97,
+          "model_id": "mai-code-1.1-flash",
+          "preliminary_score_non_reportable": null,
+          "run_number": 5
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\mai-code-1.1-flash\\snapshot-publisher\\run-06\\tests\\test_snapshot_publisher.py"
+          ],
+          "candidate_sha256": {
+            "test_snapshot_publisher.py": "0f6b46174fd62b083ea29ef9fdb21a01b3b4cea99d7b879b56c6a91b0ce83b4d"
+          },
+          "elapsed_seconds": 90,
+          "model_id": "mai-code-1.1-flash",
+          "preliminary_score_non_reportable": null,
+          "run_number": 6
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\gpt-5.3-codex\\snapshot-publisher\\run-04\\tests\\test_snapshot_publisher.py"
+          ],
+          "candidate_sha256": {
+            "test_snapshot_publisher.py": "cebe7ae6584461b737a94a74fcfaa82f2f0db665422c2406578e2ac710a217fc"
+          },
+          "elapsed_seconds": 73,
+          "model_id": "gpt-5.3-codex",
+          "preliminary_score_non_reportable": null,
+          "run_number": 4
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\gpt-5.3-codex\\snapshot-publisher\\run-05\\tests\\test_snapshot_publisher.py"
+          ],
+          "candidate_sha256": {
+            "test_snapshot_publisher.py": "b4eb999be60f9419fc35e611b926e9a63b17deaf893985b26ddbab3276bb87ad"
+          },
+          "elapsed_seconds": 63,
+          "model_id": "gpt-5.3-codex",
+          "preliminary_score_non_reportable": null,
+          "run_number": 5
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\gpt-5.3-codex\\snapshot-publisher\\run-06\\tests\\test_snapshot_publisher.py"
+          ],
+          "candidate_sha256": {
+            "test_snapshot_publisher.py": "0c39ad4c09c0a3f7261e4e18f619be2057d7449cbc94b19b2fa06dee27e72706"
+          },
+          "elapsed_seconds": 80,
+          "model_id": "gpt-5.3-codex",
+          "preliminary_score_non_reportable": null,
+          "run_number": 6
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\snapshot-publisher\\run-04\\tests\\conftest.py",
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\snapshot-publisher\\run-04\\tests\\test_atomic_preservation.py",
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\snapshot-publisher\\run-04\\tests\\test_canonical_output.py",
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\snapshot-publisher\\run-04\\tests\\test_success_audit.py",
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\snapshot-publisher\\run-04\\tests\\test_verification_errors.py"
+          ],
+          "candidate_sha256": {
+            "conftest.py": "d24208f4d2c4426caa9f2d92088e11146233b706978b790ba7695d554fe34705",
+            "test_atomic_preservation.py": "8b43234ad28d1a8cd7b6aaa216f28e2bcc7db4cfce6fffab770ba1899297b2dd",
+            "test_canonical_output.py": "cc76a569a85c763b81fe8966f3af1be1fb296ccb332a5450a46bfcea9c09ada9",
+            "test_success_audit.py": "7dffbe74240a37665b55cd26dcee0a12c8d098fb83bea257f3ca0dbed2cedff8",
+            "test_verification_errors.py": "feb23af813c4b170aea966c3b73c0909a056d7f6883c734801e7124f9a058495"
+          },
+          "elapsed_seconds": 252,
+          "model_id": "claude-opus-5",
+          "preliminary_score_non_reportable": null,
+          "run_number": 4
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\snapshot-publisher\\run-05\\tests\\conftest.py",
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\snapshot-publisher\\run-05\\tests\\test_atomic_publish.py",
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\snapshot-publisher\\run-05\\tests\\test_audit.py",
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\snapshot-publisher\\run-05\\tests\\test_canonical_snapshot.py",
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\snapshot-publisher\\run-05\\tests\\test_preservation.py",
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\snapshot-publisher\\run-05\\tests\\test_source_verification.py"
+          ],
+          "candidate_sha256": {
+            "conftest.py": "0dfa1a6916ebc0ac7c0d6006fb55da46f4cb1b1cf454d249e61cd45cd7524aa2",
+            "test_atomic_publish.py": "5d9a9c4114d78b1f8487a36166b65a740e0836023eb126ea44c23235f7e679c3",
+            "test_audit.py": "cedafd1fca5a20fc1e04b62af28c760fdad60dabea05844b268bfba0097938e5",
+            "test_canonical_snapshot.py": "5b7d5618a1bcedb3dfed87eabec8de2ceea1be1ca52094b9b5a9dc3673a37b1d",
+            "test_preservation.py": "d8ff5861e260dd1ce3bbf52a8b8c28199bf87a4cbba55e2a82b74a82777157ef",
+            "test_source_verification.py": "918730507e4f88bd45e0f4dd83de2bd3130857431c30872c605ff5fe47149dd2"
+          },
+          "elapsed_seconds": 244,
+          "model_id": "claude-opus-5",
+          "preliminary_score_non_reportable": null,
+          "run_number": 5
+        },
+        {
+          "candidate_artifacts": [
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\snapshot-publisher\\run-06\\tests\\conftest.py",
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\snapshot-publisher\\run-06\\tests\\test_atomic_publish.py",
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\snapshot-publisher\\run-06\\tests\\test_before_publish_and_drift.py",
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\snapshot-publisher\\run-06\\tests\\test_failures_and_preservation.py",
+            "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\test_author\\claude-opus-5\\snapshot-publisher\\run-06\\tests\\test_publish_success.py"
+          ],
+          "candidate_sha256": {
+            "conftest.py": "f87ea84a7b75ee3eeca19d910de8aced84feb644e4eb16fee85490f286ebcacb",
+            "test_atomic_publish.py": "969d88589e697598c4604d2b17d647f929e46fd166a0700e5e0cc974aa184b7b",
+            "test_before_publish_and_drift.py": "28c401bf9070834031a20850a52fe232ecae1948b94dac06e5288ca2992d9676",
+            "test_failures_and_preservation.py": "aea7b7a2244e3ad25e4004aacb836418ff0784277e75ad30fcd04c27dccb6a55",
+            "test_publish_success.py": "fc89079d85817f54585b4557efc617da849e04fbb5f2f6401da7dafb11854077"
+          },
+          "elapsed_seconds": 244,
+          "model_id": "claude-opus-5",
+          "preliminary_score_non_reportable": null,
+          "run_number": 6
+        }
+      ]
     }
   ],
   "schema": "raptor-model-role-invalidated-cells-v1",
