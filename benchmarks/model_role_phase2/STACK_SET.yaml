@@ -1,0 +1,56 @@
+schema: raptor-model-role-phase2-stack-set-v1
+status: FROZEN_BEFORE_FIRST_STACK_RUN
+phase1_result: data/eval/model_role_phase1_result_2026-08-15.json
+eligibility:
+  test_author_family_must_differ_from_doer_family: true
+  checker_family_must_differ_from_doer_family: true
+  codex_doer_sensitivity_control: excluded_from_winner_set
+stacks:
+  - id: S1
+    planner: {model: claude-opus-5, family: Claude}
+    test_author: {model: gemini-3.7-flash, family: Gemini}
+    doer: {model: claude-sonnet-5, family: Claude}
+    checker: {model: gpt-5.6-sol, family: GPT}
+    purpose: incumbent_like
+  - id: S2
+    planner: {model: claude-opus-5, family: Claude}
+    test_author: {model: gpt-5.3-codex, family: GPT}
+    doer: {model: claude-sonnet-5, family: Claude}
+    checker: {model: gpt-5.6-sol, family: GPT}
+    purpose: codex_test_author
+  - id: S3
+    planner: {model: gemini-3.7-flash, family: Gemini}
+    test_author: {model: gpt-5.3-codex, family: GPT}
+    doer: {model: claude-sonnet-5, family: Claude}
+    checker: {model: grok-4.6, family: Grok}
+    purpose: four_family_sonnet
+  - id: S4
+    planner: {model: claude-opus-5, family: Claude}
+    test_author: {model: claude-opus-5, family: Claude}
+    doer: {model: gpt-5.6-terra, family: GPT}
+    checker: {model: gemini-3.7-flash, family: Gemini}
+    purpose: same_family_plan_test
+  - id: S5
+    planner: {model: gpt-5.6-sol, family: GPT}
+    test_author: {model: gemini-3.7-flash, family: Gemini}
+    doer: {model: gpt-5.6-terra, family: GPT}
+    checker: {model: grok-4.6, family: Grok}
+    purpose: gpt_plan_doer
+  - id: S6
+    planner: {model: claude-opus-5, family: Claude}
+    test_author: {model: gpt-5.3-codex, family: GPT}
+    doer: {model: mai-code-1.1-flash, family: MAI}
+    checker: {model: grok-4.6, family: Grok}
+    purpose: four_family_mai
+  - id: S7
+    planner: {model: gemini-3.7-flash, family: Gemini}
+    test_author: {model: claude-opus-5, family: Claude}
+    doer: {model: mai-code-1.1-flash, family: MAI}
+    checker: {model: gpt-5.6-sol, family: GPT}
+    purpose: four_family_mai_opus_tests
+  - id: S8
+    planner: {model: gpt-5.6-sol, family: GPT}
+    test_author: {model: gemini-3.7-flash, family: Gemini}
+    doer: {model: mai-code-1.1-flash, family: MAI}
+    checker: {model: claude-opus-5, family: Claude}
+    purpose: four_family_mai_opus_checker

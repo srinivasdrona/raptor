@@ -1715,7 +1715,8 @@ todos:
     individual-role evaluation completed 2026-08-15 with 15 valid finalist runs per model and
     eight invalidated harness-defect cells preserved outside scoring. Result:
     data/eval/model_role_phase1_result_2026-08-15.json. Phase 2 stack evaluation has not started;
-    no stack is selected.'
+    no stack is selected. Phase 2 protocol is now frozen at benchmarks/model_role_phase2 with eight
+    stacks and 120 expected chained runs; execution has started.'
   status: in_progress
   depends_on:
   - build-model-role-probe-corpus

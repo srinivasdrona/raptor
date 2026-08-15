@@ -182,6 +182,11 @@ for doer quality/stability, and a four-way checker score tie led by Opus 5 on wo
 No stack has been evaluated or selected. Phase 2 remains required before the benchmark blog, stack
 selection, RAPTOR v2 or RescueScreen.
 
+Phase 2 protocol is now frozen under
+[`benchmarks/model_role_phase2`](../benchmarks/model_role_phase2): eight stacks, three task
+families, five repeats per stack/task, 120 chained runs. Stages within a run are sequential;
+independent cells are parallel. No Phase 2 score exists yet.
+
 ## Health Rollup
 
 > *Module built ≠ live run executed.* The Tier-1/2 code path and the validation harness are **built
