@@ -1,0 +1,406 @@
+{
+  "schema": "raptor.model_role_incumbent_baseline.v1",
+  "record_id": "model-role-incumbent-baseline-2026-08-15",
+  "status": "RETROSPECTIVE_BASELINE_NO_COMPARATIVE_WINNER",
+  "generated_at": "2026-08-15T15:20:52+05:30",
+  "benchmark_spec": "docs/project/specs/model-role-benchmark-v1.yaml",
+  "governance": {
+    "current_operating_model_remains_binding": true,
+    "model_or_stack_selected": false,
+    "production_routing_change_authorized": false,
+    "raptor_v2_start_authorized": false,
+    "rescuescreen_start_authorized": false,
+    "composite_score": null,
+    "composite_score_status": "NOT_COMPUTED_MISSING_STANDARDIZED_DENOMINATORS"
+  },
+  "source_window": {
+    "start": "2026-07-07",
+    "end": "2026-08-15",
+    "source_session_id": "90703341-0147-4b5c-9939-42be522500b1",
+    "repository_baseline_commit": "286124d"
+  },
+  "evidence_inventory": {
+    "conversation_turns": 349,
+    "three_slot_manifests_total": 53,
+    "manifest_schema_groups": {
+      "planning": 8,
+      "test_authoring": 17,
+      "implementation": 13,
+      "formal_execution": 5,
+      "composition_review_research_or_other": 10
+    },
+    "explicit_manifest_model_counts": {
+      "claude-opus-4.8": 1,
+      "claude-opus-5": 4,
+      "gemini-3.1-pro-preview": 14,
+      "gemini-3.5-flash": 3,
+      "claude-sonnet-5": 13,
+      "gpt-5.4": 3,
+      "unspecified": 15
+    },
+    "workflow_manifest_counts": {
+      "atlas-panel-selector-3slot": 31,
+      "pp3-bp4-policy-loop": 5,
+      "pp3bp4-resolution-3slot": 4,
+      "annotation-bundle-3slot": 3,
+      "panel-products-rescue-screen-3slot": 3,
+      "predictor-matrix-3slot": 3,
+      "atlas-rubric-blog-3slot": 2,
+      "orchestration-contract-3slot": 1,
+      "prospective-clinvar-3slot": 1
+    },
+    "git_non_merge_commits_since_2026_07_01": 412,
+    "git_commit_type_counts": {
+      "plan": 6,
+      "test": 92,
+      "feat": 28,
+      "fix": 55,
+      "data": 11,
+      "docs": 105,
+      "chore": 11,
+      "other": 104
+    },
+    "local_usage_events": 31526,
+    "usage_events_missing_agent_id": 4815,
+    "usage_events_missing_input_tokens": 0,
+    "usage_events_missing_output_tokens": 0,
+    "usage_events_missing_duration": 0,
+    "usage_events_missing_ai_usage": 0,
+    "usage_interpretation_limit": "Usage events are request-level and often contain repeated context. They are not task counts, accepted-output counts, or clean role assignments."
+  },
+  "session_wide_subagent_telemetry": {
+    "interpretation": "Confounded descriptive telemetry only. Agent IDs are not fully mapped to benchmark task and role records.",
+    "models": {
+      "claude-opus-4.8": {
+        "distinct_agents": 53,
+        "requests": 2828,
+        "input_tokens": 349306415,
+        "output_tokens": 4229828,
+        "reasoning_tokens": 1782958,
+        "duration_seconds": 58633.9,
+        "total_nano_aiu": 40328550300000,
+        "average_request_duration_ms": 20733.3,
+        "average_time_to_first_token_ms": 11618.5
+      },
+      "claude-opus-5": {
+        "distinct_agents": 9,
+        "requests": 1010,
+        "input_tokens": 104368560,
+        "output_tokens": 1185152,
+        "reasoning_tokens": 328998,
+        "duration_seconds": 17644.7,
+        "total_nano_aiu": 10557962375000,
+        "average_request_duration_ms": 17470.0,
+        "average_time_to_first_token_ms": 6248.4
+      },
+      "gemini-3.1-pro-preview": {
+        "distinct_agents": 32,
+        "requests": 1551,
+        "input_tokens": 90415222,
+        "output_tokens": 371493,
+        "reasoning_tokens": 332390,
+        "duration_seconds": 14576.1,
+        "total_nano_aiu": 4301142980000,
+        "average_request_duration_ms": 9397.9,
+        "average_time_to_first_token_ms": 7025.2
+      },
+      "gemini-3.5-flash": {
+        "distinct_agents": 58,
+        "requests": 3732,
+        "input_tokens": 371702623,
+        "output_tokens": 1394743,
+        "reasoning_tokens": 1699300,
+        "duration_seconds": 25647.2,
+        "total_nano_aiu": 10582510290000,
+        "average_request_duration_ms": 6872.2,
+        "average_time_to_first_token_ms": 4606.5
+      },
+      "claude-sonnet-5": {
+        "distinct_agents": 141,
+        "requests": 10786,
+        "input_tokens": 1160155126,
+        "output_tokens": 10076481,
+        "reasoning_tokens": 5961252,
+        "duration_seconds": 128676.3,
+        "total_nano_aiu": 41071911470000,
+        "average_request_duration_ms": 11929.9,
+        "average_time_to_first_token_ms": 6824.5
+      },
+      "gpt-5.4": {
+        "distinct_agents": 129,
+        "requests": 4786,
+        "input_tokens": 403121586,
+        "output_tokens": 4043846,
+        "reasoning_tokens": 2778807,
+        "duration_seconds": 46818.4,
+        "total_nano_aiu": 21083423100000,
+        "average_request_duration_ms": 9782.4,
+        "average_time_to_first_token_ms": 8328.8
+      }
+    }
+  },
+  "historical_casebook": [
+    {
+      "case_id": "prd03-kb-confirmation-bias",
+      "artifact_type": "CODE",
+      "risk_tier": "FOUNDATIONAL_HIGH_ASSURANCE",
+      "evidence_grade": "A",
+      "observed": "Seventy-eight green tests hid five real bugs when the doer authored both code and tests.",
+      "source": "docs/DECISIONS.md ADR-0005",
+      "benchmark_value": "Canonical confirmation-bias and hollow-green probe.",
+      "limitation": "Predates the four-family process and lacks normalized per-role telemetry."
+    },
+    {
+      "case_id": "scope-gate-v2",
+      "artifact_type": "CODE",
+      "risk_tier": "FOUNDATIONAL_HIGH_ASSURANCE",
+      "evidence_grade": "B",
+      "observed": "Repeated review closed retargetable scopes, malformed metrics, aggregate tampering, pooled pseudo-scopes, parity blockers, threshold publication, and report-compatibility defects before approval.",
+      "source": "checkpoint 007 and role-labelled git history",
+      "benchmark_value": "Cross-module policy, schema, and report-fidelity probe.",
+      "limitation": "No standardized hidden-test or defect-attribution record."
+    },
+    {
+      "case_id": "pp3bp4-shadow-policy",
+      "artifact_type": "CODE",
+      "risk_tier": "FOUNDATIONAL_HIGH_ASSURANCE",
+      "evidence_grade": "B",
+      "observed": "The checker blocked wrong-predictor rows, missing-row conservation, and omitted training manifests; subsequent tests and fixes produced an approved shadow-only implementation.",
+      "source": "checkpoint 007 and commits 6ad7776, 446a06f",
+      "benchmark_value": "Source registry, leakage, exact-set, and blocked-data probe.",
+      "limitation": "Prompt manifests exist but several model fields are unspecified."
+    },
+    {
+      "case_id": "core-annotation-bundle",
+      "artifact_type": "CONFIG",
+      "risk_tier": "FOUNDATIONAL_HIGH_ASSURANCE",
+      "evidence_grade": "A",
+      "observed": "One explicit Opus planner, Gemini test-author, and Sonnet doer manifest set; the plan required revision after a DO-NOT-MERGE.",
+      "source": "annotation-bundle-3slot manifests and commits c041234, 4e3ed7c, e08a17e, bc071b7",
+      "benchmark_value": "Pinned manifest and deployment-contract probe.",
+      "limitation": "No standardized checker precision or human-minute record."
+    },
+    {
+      "case_id": "pp3bp4-predictor-matrix",
+      "artifact_type": "DATA_OR_CONFIG",
+      "risk_tier": "STANDARD",
+      "evidence_grade": "A",
+      "observed": "Explicit Gemini tests and Sonnet implementation required a later exact tool-kind and source-semantics correction.",
+      "source": "predictor-matrix-3slot manifests and commits 166b552, 925beb3, 3b0128b, 816c8b6",
+      "benchmark_value": "Taxonomy, source semantics, and matrix completeness probe.",
+      "limitation": "Planner model was not recorded in its manifest."
+    },
+    {
+      "case_id": "pp3bp4-disabled-manual",
+      "artifact_type": "CODE",
+      "risk_tier": "FOUNDATIONAL_HIGH_ASSURANCE",
+      "evidence_grade": "A",
+      "observed": "The contract evolved through multiple revisions and two implementation packets before final policy/hash propagation was complete.",
+      "source": "pp3bp4-resolution-3slot manifests and role-labelled git history",
+      "benchmark_value": "Versioned policy, packet propagation, and preservation probe.",
+      "limitation": "Repair ownership is shared among specification, tests, and implementation."
+    },
+    {
+      "case_id": "tiered-gate-v3",
+      "artifact_type": "CODE",
+      "risk_tier": "FOUNDATIONAL_HIGH_ASSURANCE",
+      "evidence_grade": "B",
+      "observed": "Multiple RED/fix cycles closed config placement, malformed confidence bounds, pooled scopes, publication TOCTOU, provenance, and oracle-drift defects.",
+      "source": "docs/project/specs/tiered-gate-v3-posthoc.yaml and role-labelled git history",
+      "benchmark_value": "Immutable-source, post-hoc governance, and fail-closed publication probe.",
+      "limitation": "No complete per-agent prompt-manifest mapping in the retained session set."
+    },
+    {
+      "case_id": "corrected-review-packets",
+      "artifact_type": "CODE",
+      "risk_tier": "FOUNDATIONAL_HIGH_ASSURANCE",
+      "evidence_grade": "B",
+      "observed": "The test suite needed repeated interface and fixture corrections; checker findings later required standalone CLI and provenance fixes.",
+      "source": "role-labelled commits 9325dc5 through 74a37d1",
+      "benchmark_value": "Real-data recomputation, packet fingerprint, CLI, and provenance probe.",
+      "limitation": "Historical task-level token and elapsed-time attribution is incomplete."
+    },
+    {
+      "case_id": "mechanism-atlas-phase1",
+      "artifact_type": "CODE",
+      "risk_tier": "FOUNDATIONAL_HIGH_ASSURANCE",
+      "evidence_grade": "B",
+      "observed": "The plan required six revisions, tests required alignment, and a checker-driven remediation followed the first implementation.",
+      "source": "role-labelled commits e55f9e6 through cdfaf70",
+      "benchmark_value": "Generic-core/disease-pack boundary, leakage guard, and hash-binding probe.",
+      "limitation": "The retained manifest inventory does not cover every early phase packet."
+    },
+    {
+      "case_id": "atlas-panel-selector",
+      "artifact_type": "CODE",
+      "risk_tier": "FOUNDATIONAL_HIGH_ASSURANCE",
+      "evidence_grade": "A",
+      "observed": "Thirty-one manifests, five formal execution packets, four blocked precondition attempts, and at least nine named real-input or audit defect classes preceded the authoritative deterministic run.",
+      "source": "atlas-panel-selector-3slot manifests, checkpoint 012, and role-labelled git history",
+      "benchmark_value": "Primary end-to-end benchmark for planning, test realism, implementation robustness, checker recall, and repair burden.",
+      "named_defect_classes": [
+        "registration schema mismatch",
+        "map-lock versus map-manifest schema mismatch",
+        "top-level versus per-record transcript pin",
+        "mapper-owned versus anchor-derived exclusion",
+        "missing real registration constraint structure",
+        "run-record snapshot or TOCTOU drift",
+        "Windows junction escape",
+        "incomplete IM6 validation",
+        "incomplete audit-record fields"
+      ],
+      "limitation": "Defects have mixed primary and contributing ownership; no randomized challenger ran the same task."
+    }
+  ],
+  "incumbent_role_assessment": {
+    "planner_opus": {
+      "evidence_confidence": "MEDIUM",
+      "observed_strengths": [
+        "governance and boundary definition",
+        "risk inversion and leakage awareness",
+        "machine-readable contracts",
+        "long-range decomposition"
+      ],
+      "observed_weaknesses": [
+        "real artifact shapes were sometimes omitted",
+        "synthetic contracts occasionally remained executable only against synthetic fixtures",
+        "later planner revisions were needed for anchor exclusion and constraint materialization"
+      ],
+      "numeric_role_score": null
+    },
+    "test_author_gemini": {
+      "evidence_confidence": "MEDIUM",
+      "observed_strengths": [
+        "broad adversarial and negative-path coverage",
+        "large protected contract suites",
+        "ability to expose underspecified APIs"
+      ],
+      "observed_weaknesses": [
+        "hollow or vacuous tests occurred",
+        "some fixtures were impossible or self-triggering",
+        "synthetic fixtures diverged from real artifact shapes",
+        "test repairs were repeatedly required"
+      ],
+      "numeric_role_score": null
+    },
+    "doer_sonnet5": {
+      "evidence_confidence": "MEDIUM",
+      "observed_strengths": [
+        "large typed implementations",
+        "effective narrow repairs",
+        "scope discipline",
+        "eventual deterministic and regression-clean outcomes"
+      ],
+      "observed_weaknesses": [
+        "first green implementations retained real-input and audit defects",
+        "path, snapshot, and schema edge cases escaped initial builds",
+        "quality depended materially on specification and fixture realism"
+      ],
+      "numeric_role_score": null
+    },
+    "checker_gpt": {
+      "evidence_confidence": "MEDIUM_LOW",
+      "observed_strengths": [
+        "high-value reproducible findings",
+        "strong provenance, path, schema, and TOCTOU detection",
+        "generally actionable ownership and repair routing"
+      ],
+      "observed_weaknesses": [
+        "some later real-input defects followed earlier CLEAN reviews",
+        "false-positive adjudication was not recorded systematically",
+        "seeded-defect recall was not measured",
+        "several historical checker manifests did not record the model"
+      ],
+      "numeric_role_score": null
+    },
+    "incumbent_team": {
+      "evidence_confidence": "MEDIUM",
+      "eventual_correctness": "HIGH_ON_COMPLETED_AUDITED_CASES",
+      "first_pass_efficiency": "LOW_TO_MODERATE",
+      "auditability": "MODERATE",
+      "comparative_superiority": "NOT_ESTABLISHED",
+      "numeric_team_score": null
+    }
+  },
+  "important_missing_metrics": [
+    {
+      "metric": "standardized_mutation_score",
+      "historically_recoverable": "LIMITED",
+      "collection_plan": "Run a frozen mutation set on each prospective test suite."
+    },
+    {
+      "metric": "blinded_hidden_task_outcome",
+      "historically_recoverable": "NO",
+      "collection_plan": "Use novel analogues of historical defect classes with a withheld evaluator."
+    },
+    {
+      "metric": "checker_false_positive_rate",
+      "historically_recoverable": "PARTIAL",
+      "collection_plan": "Adjudicate every prospective finding as true, false, duplicate, or unverifiable."
+    },
+    {
+      "metric": "severity_weighted_checker_recall",
+      "historically_recoverable": "NO",
+      "collection_plan": "Seed a known defect corpus and preserve the hidden answer key."
+    },
+    {
+      "metric": "defect_role_attribution_confidence",
+      "historically_recoverable": "PARTIAL",
+      "collection_plan": "Adjudicate primary and contributing owners under the benchmark attribution contract."
+    },
+    {
+      "metric": "real_fixture_fidelity",
+      "historically_recoverable": "PARTIAL",
+      "collection_plan": "Require paired synthetic and real-shape fixtures and score disagreement."
+    },
+    {
+      "metric": "run_to_run_reproducibility",
+      "historically_recoverable": "NO",
+      "collection_plan": "Run at least three independent repeats per screening cell and five for finalists."
+    },
+    {
+      "metric": "human_review_minutes",
+      "historically_recoverable": "NO",
+      "collection_plan": "Time operator adjudication, prompt repair, and manual cleanup separately."
+    },
+    {
+      "metric": "confidence_calibration",
+      "historically_recoverable": "NO",
+      "collection_plan": "Require confidence on plans, implementations, and findings; score against adjudicated outcomes."
+    },
+    {
+      "metric": "maintainability_and_complexity_delta",
+      "historically_recoverable": "PARTIAL",
+      "collection_plan": "Run static metrics plus blinded human maintainability review."
+    },
+    {
+      "metric": "post_merge_escape_rate",
+      "historically_recoverable": "PARTIAL",
+      "collection_plan": "Audit a fixed percentage of CLEAN units after merge and reopen wrong CLEAN records."
+    },
+    {
+      "metric": "tool_and_finish_reliability",
+      "historically_recoverable": "PARTIAL",
+      "collection_plan": "Record every timeout, error, length stop, content filter, retry, and unrecovered tool failure per run."
+    }
+  ],
+  "prospective_model_pool_validation": {
+    "vendor_positioning_is_score": false,
+    "doer_primary_peer_pool": [
+      "Claude Sonnet 5",
+      "GPT-5.3-Codex",
+      "GPT-5.6 Terra",
+      "MAI-Code-1.1-Flash"
+    ],
+    "doer_high_reasoning_supplement": [
+      "GPT-5.6 Sol",
+      "Claude Opus 5"
+    ],
+    "doer_efficiency_supplement": [
+      "GPT-5.6 Luna",
+      "MAI-Code-1-Flash"
+    ],
+    "validation": "Official sources position GPT-5.3-Codex as an agentic coding model, MAI-Code-1.1-Flash as a small-tier coding model, Sonnet 5 for strong everyday/CLI agentic coding, Terra as a balanced agentic-coding default, Sol for high-ceiling large-codebase reasoning, and Luna for smaller cost-efficient tasks."
+  },
+  "baseline_conclusion": "The incumbent stack has strong eventual quality on audited tasks but substantial repair burden and incomplete first-pass realism. Historical evidence is sufficient to define probes and a baseline, not to rank model families. The prospective comparison is multi-model and role-matched; no winner is selected."
+}

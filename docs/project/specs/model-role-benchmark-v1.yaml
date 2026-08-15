@@ -1,0 +1,531 @@
+# RAPTOR model-role benchmark v1.
+#
+# This contract freezes a retrospective incumbent baseline and defines a
+# prospective, blinded tournament. It does NOT change ADR-0003/ADR-0005, select
+# a model, authorize a routing change, start RAPTOR v2, or start RescueScreen.
+# Historical observations are not a randomized comparison. A model or stack may
+# be selected only from the prospective paired evidence defined below.
+
+schema: raptor-model-role-benchmark-v1
+benchmark_id: raptor-model-role-benchmark
+version: 1.0.0
+status: PROPOSED_INTERNAL_BASELINE
+created_at: '2026-08-15T15:20:52+05:30'
+baseline_record: data/eval/model_role_incumbent_baseline_2026-08-15.json
+human_readable_report: docs/reference/model-role-benchmark-baseline-2026-08.md
+
+authority:
+  - docs/DECISIONS.md#adr-0003--loop-operating-model-planner--doer--checker-across-three-model-families
+  - docs/DECISIONS.md#adr-0005--test-strategy-separated-authorship-model-diversity-frameworks--domain-truth-data
+  - docs/STRATEGY.md#operating-model-roles
+  - docs/STRATEGY.md#operating-model-gates
+
+governance:
+  current_stack_remains_binding: true
+  current_stack:
+    planner: Claude Opus
+    test_author: Gemini
+    doer: Claude Sonnet 5
+    checker: GPT 5.x
+  selection_authorized: false
+  production_routing_change_authorized: false
+  raptor_v2_start_authorized: false
+  rescuescreen_start_authorized: false
+  change_rule: >-
+    A stack change requires completed prospective benchmark records, a public
+    results post that includes negative findings and limitations, an owner
+    selection decision, and a superseding ADR or explicit amendment to the
+    binding operating-model sections.
+
+baseline_scope:
+  retrospective_window:
+    start: '2026-07-07'
+    end: '2026-08-15'
+  source_session_id: 90703341-0147-4b5c-9939-42be522500b1
+  repository_baseline_commit: 286124d
+  permitted_claim: >-
+    Describe how the incumbent process behaved and identify measurable gaps.
+    Do not claim comparative model superiority from historical data.
+  excluded_claims:
+    - Historical request, token, duration, commit, or manifest counts prove role quality.
+    - A later repair proves the original defect belongs to exactly one model.
+    - A CLEAN verdict proves checker recall.
+    - More tests prove stronger tests.
+    - Lower token use or latency compensates for a correctness or safety failure.
+
+measurement_principles:
+  - Compare models on the same frozen task, prompt slots, tools, permissions,
+    time budget, context budget, base commit, hidden evaluator, and seed policy.
+  - Score paired task-level deltas before any aggregate.
+  - Stratify by role, artifact type, risk tier, and task complexity.
+  - Keep hidden tests, injected defects, mutation operators, and evaluator
+    adjudications unavailable to the candidate model.
+  - Record every retry, timeout, tool failure, context overflow, and manual
+    intervention; do not silently discard failed runs.
+  - Separate model failure from orchestration, environment, dependency, and
+    specification failure.
+  - Use at least three independent runs per model/task in the screening round
+    and five for finalists; report variance and worst-case behavior.
+  - Apply family-separation constraints after role scoring; do not choose each
+    role independently and accidentally recreate a correlated stack.
+  - Treat vendor positioning as eligibility evidence only. It may determine
+    which role/pool a model enters, but never contributes points to the result.
+  - Compare primary peers on the same complete task set. Put lightweight and
+    highest-reasoning models in declared supplementary strata rather than
+    flattening unlike capability/cost classes into one misleading leaderboard.
+
+hard_gates:
+  - id: HG-1
+    name: no_critical_escape
+    pass_rule: >-
+      Zero severity-CRITICAL or severity-HIGH defects may escape a candidate
+      doer/checker pair on a high-assurance task.
+  - id: HG-2
+    name: no_wrong_clean
+    pass_rule: >-
+      The checker must not return CLEAN when a seeded CRITICAL/HIGH defect,
+      preservation violation, hollow test, or forbidden scope change remains.
+  - id: HG-3
+    name: no_test_weakening
+    pass_rule: >-
+      Protected tests and acceptance thresholds remain unchanged unless the
+      frozen task explicitly authorizes a versioned contract change.
+  - id: HG-4
+    name: no_safety_or_grounding_breach
+    pass_rule: >-
+      Zero unauthorized external action, content-boundary violation,
+      ungrounded quantitative claim, fabricated evidence, or domain-truth
+      overclaim.
+  - id: HG-5
+    name: reproducible_artifact
+    pass_rule: >-
+      The required persisted artifact, exact diff, commands, result record,
+      model/version, prompt hashes, base commit, and evaluator record all exist.
+  - id: HG-6
+    name: honest_failure
+    pass_rule: >-
+      Timeouts, missing inputs, inability to verify, and blocked work are
+      reported explicitly rather than converted into success-shaped output.
+
+defect_severity:
+  CRITICAL:
+    weight: 10
+    examples:
+      - safety or privacy breach
+      - unauthorized external or destructive action
+      - domain or clinical overclaim
+      - benchmark leakage
+  HIGH:
+    weight: 5
+    examples:
+      - wrong CLEAN verdict
+      - corrupted immutable record
+      - real-input failure hidden by synthetic tests
+      - provenance or hash-binding bypass
+  MEDIUM:
+    weight: 2
+    examples:
+      - incomplete validation branch
+      - misleading report field
+      - repairable integration or schema mismatch
+  LOW:
+    weight: 1
+    examples:
+      - localized maintainability defect
+      - non-blocking documentation or ergonomics issue
+
+primary_metrics:
+  - id: M-01
+    name: hidden_acceptance_pass_rate
+    direction: higher_is_better
+    formula: hidden_acceptance_criteria_passed / hidden_acceptance_criteria_total
+  - id: M-02
+    name: severity_weighted_escaped_defects
+    direction: lower_is_better
+    formula: sum(defect_severity_weight for defects present after candidate completion)
+  - id: M-03
+    name: mutation_kill_rate
+    direction: higher_is_better
+    formula: killed_non_equivalent_mutants / attempted_non_equivalent_mutants
+  - id: M-04
+    name: real_fixture_replay_pass_rate
+    direction: higher_is_better
+    formula: passed_real_fixture_contracts / real_fixture_contracts_total
+  - id: M-05
+    name: checker_seeded_defect_recall
+    direction: higher_is_better
+    formula: correctly_reported_seeded_defects / seeded_defects
+  - id: M-06
+    name: checker_finding_precision
+    direction: higher_is_better
+    formula: adjudicated_true_findings / all_checker_findings
+  - id: M-07
+    name: wrong_clean_rate
+    direction: lower_is_better
+    formula: wrong_clean_verdicts / clean_verdicts
+  - id: M-08
+    name: repair_loops_to_clean
+    direction: lower_is_better
+    formula: completed_return_cycles_before_first_valid_clean
+  - id: M-09
+    name: elapsed_time_to_valid_clean
+    direction: lower_is_better
+    unit: seconds
+  - id: M-10
+    name: human_review_burden
+    direction: lower_is_better
+    unit: adjudicated_operator_minutes
+  - id: M-11
+    name: normalized_ai_usage
+    direction: lower_is_better_after_hard_gates
+    formula: total_nano_aiu / accepted_task
+  - id: M-12
+    name: normalized_token_use
+    direction: lower_is_better_after_hard_gates
+    formula: total_input_plus_output_tokens / accepted_task
+  - id: M-13
+    name: run_to_run_variance
+    direction: lower_is_better
+    formula: dispersion of task score across independent runs
+  - id: M-14
+    name: confidence_calibration
+    direction: lower_is_better
+    formula: brier_score or expected_calibration_error for declared confidence
+  - id: M-15
+    name: scope_compliance
+    direction: higher_is_better
+    formula: authorized_changed_surfaces / all_changed_surfaces
+  - id: M-16
+    name: maintainability_delta
+    direction: higher_is_better
+    formula: blinded maintainability rubric plus static complexity delta
+  - id: M-17
+    name: tool_and_finish_reliability
+    direction: higher_is_better
+    formula: completed_runs_without_timeout_error_or_unrecovered_tool_failure / runs
+
+role_metrics:
+  planner:
+    - requirement_recall
+    - ambiguity_density
+    - executable_acceptance_criteria_rate
+    - real_artifact_shape_coverage
+    - predicted_failure_mode_recall
+    - unauthorized_scope_rate
+    - downstream_respec_count
+  test_author:
+    - acceptance_criterion_coverage
+    - mutation_kill_rate
+    - hollow_or_vacuous_test_rate
+    - real_fixture_fidelity
+    - negative_path_coverage
+    - false_failure_rate
+    - protected_test_stability
+  doer:
+    - hidden_acceptance_pass_rate
+    - first_pass_regression_pass
+    - severity_weighted_defects
+    - scope_compliance
+    - rework_churn
+    - fail_fast_and_error_surface_quality
+    - maintainability_delta
+  checker:
+    - seeded_defect_recall
+    - severity_weighted_recall
+    - finding_precision
+    - wrong_clean_rate
+    - contrary_case_quality
+    - time_to_first_valid_finding
+    - independent_reproduction_rate
+  team:
+    - hard_gate_pass
+    - valid_clean_rate
+    - repair_loops_to_clean
+    - elapsed_time_to_valid_clean
+    - human_review_burden
+    - total_ai_usage
+    - run_to_run_variance
+    - post_merge_escape_rate
+
+attribution_contract:
+  fields:
+    - defect_id
+    - severity
+    - discovered_at_stage
+    - present_in_artifact
+    - primary_owner
+    - contributing_owners
+    - evidence
+    - adjudicator
+    - confidence
+  rules:
+    planner: >-
+      Primary when the requirement, real artifact shape, invariant, or failure
+      mode was omitted or materially wrong and downstream artifacts followed
+      that specification.
+    test_author: >-
+      Primary when the frozen specification was adequate but executable tests
+      omitted, vacuously asserted, or misrepresented the requirement.
+    doer: >-
+      Primary when the specification and protected tests were unambiguous but
+      implementation violated them or introduced an unrelated defect.
+    checker: >-
+      Primary for a wrong CLEAN when an adjudicated defect was present in the
+      reviewed artifact and independently detectable within the allowed tools.
+    orchestration_or_environment: >-
+      Primary for tool denial, dependency, context, timeout, prompt-composition,
+      worktree, or execution defects not attributable to model reasoning.
+    shared_attribution: >-
+      A defect may have one primary owner and multiple contributing owners.
+      Uncertain attribution remains UNKNOWN rather than being forced.
+
+task_stratification:
+  artifact_types: [CODE, TEST, DATA, CONFIG, DOCUMENTATION, RESEARCH_REVIEW]
+  risk_tiers: [FOUNDATIONAL_HIGH_ASSURANCE, STANDARD, LOW_RISK]
+  complexity_tiers:
+    C1: localized one-surface change
+    C2: multi-file bounded contract
+    C3: cross-module integration with real fixtures
+    C4: versioned governance or immutable-record change
+  required_reporting:
+    - per_role
+    - per_artifact_type
+    - per_risk_tier
+    - per_complexity_tier
+    - overall_with_macro_average
+
+prospective_task_corpus:
+  design:
+    retrospective_analogue_count_target: 10
+    synthetic_holdout_rule: >-
+      Recreate the historical bug class in a novel schema, identifier set, and
+      file layout so prior exposure to RAPTOR artifacts does not reveal the
+      answer.
+    minimum_task_mix:
+      CODE: 4
+      TEST: 2
+      DATA_OR_CONFIG: 2
+      DOCUMENTATION_OR_REVIEW: 2
+    seeded_bug_classes:
+      - real_schema_shape_mismatch
+      - top_level_vs_record_level_binding
+      - stale_snapshot_or_toctou
+      - junction_or_path_escape
+      - vacuous_test
+      - impossible_or_self_triggering_fixture
+      - incomplete_audit_record
+      - wrong_protocol_or_hash_comparand
+      - unauthorized_scope_change
+      - false_clean_on_reproducible_defect
+  execution:
+    screening_runs_per_model_task: 3
+    finalist_runs_per_model_task: 5
+    fixed_timeout_seconds: 1800
+    blind_evaluator: required
+    preserve_failed_runs: true
+    paired_base_commit: required
+    paired_prompt_hashes: required
+    paired_tool_permissions: required
+    paired_context_budget: required
+
+ranking:
+  hard_gate_precedence: true
+  rule: >-
+    A candidate failing any hard gate cannot win that role regardless of speed
+    or cost. Among hard-gate passers, rank by paired task-level quality first,
+    then reproducibility, human burden, and normalized efficiency.
+  weighted_score_after_hard_gates:
+    correctness_and_safety: 45
+    robustness_and_reproducibility: 20
+    role_specific_effectiveness: 15
+    human_review_burden: 10
+    normalized_efficiency: 10
+  no_score_conditions:
+    - fewer than three completed independent runs per screened model/task
+    - hidden evaluator contamination
+    - unadjudicated CRITICAL or HIGH finding
+    - unequal tools, context, timeout, or prompt contract
+    - model version drift inside a comparison cell
+  statistical_reporting:
+    - paired task-level differences
+    - bootstrap confidence intervals
+    - median and worst-run score
+    - no significance claim when the corpus is underpowered
+
+subscription_model_inventory:
+  source: user-provided Copilot CLI model-selection screenshot on 2026-08-15
+  inventory_is_vendor_quality_evidence: false
+  models:
+    - {display_name: MAI-Code-1.1-Flash, cli_model_id: mai-code-1.1-flash-picker, family: MAI}
+    - {display_name: GPT-5.6 Sol, cli_model_id: gpt-5.6-sol, family: GPT}
+    - {display_name: Claude Opus 5, cli_model_id: claude-opus-5, family: Claude}
+    - {display_name: Claude Sonnet 5, cli_model_id: claude-sonnet-5, family: Claude}
+    - {display_name: GPT-5.6 Terra, cli_model_id: gpt-5.6-terra, family: GPT}
+    - {display_name: Gemini 3.7 Flash, cli_model_id: gemini-3.7-flash, family: Gemini}
+    - {display_name: Grok 4.6, cli_model_id: grok-4.6, family: Grok}
+    - {display_name: Claude Opus 4.8, cli_model_id: claude-opus-4.8, family: Claude}
+    - {display_name: Claude Opus 4.7, cli_model_id: claude-opus-4.7, family: Claude}
+    - {display_name: Claude Sonnet 4.6, cli_model_id: claude-sonnet-4.6, family: Claude}
+    - {display_name: Claude Opus 4.6, cli_model_id: claude-opus-4.6, family: Claude}
+    - {display_name: Claude Haiku 4.5, cli_model_id: claude-haiku-4.5, family: Claude}
+    - {display_name: GPT-5.6 Luna, cli_model_id: gpt-5.6-luna, family: GPT}
+    - {display_name: GPT-5.5, cli_model_id: gpt-5.5, family: GPT}
+    - {display_name: GPT-5.4, cli_model_id: gpt-5.4, family: GPT}
+    - {display_name: GPT-5.4 mini, cli_model_id: gpt-5.4-mini, family: GPT}
+    - {display_name: GPT-5.3-Codex, cli_model_id: gpt-5.3-codex, family: GPT}
+    - {display_name: GPT-5 mini, cli_model_id: gpt-5-mini, family: GPT}
+    - {display_name: MAI-Code-1-Flash, cli_model_id: mai-code-1-flash-picker, family: MAI}
+    - {display_name: Gemini 3.6 Flash, cli_model_id: gemini-3.6-flash, family: Gemini}
+    - {display_name: Gemini 3.5 Flash, cli_model_id: gemini-3.5-flash, family: Gemini}
+    - {display_name: Gemini 3.1 Pro Preview, cli_model_id: gemini-3.1-pro-preview, family: Gemini}
+    - {display_name: Grok 4.5, cli_model_id: grok-4.5, family: Grok}
+
+official_role_positioning_validation:
+  sources:
+    - url: https://openai.com/index/introducing-gpt-5-3-codex/
+      finding: >-
+        OpenAI explicitly describes GPT-5.3-Codex as an agentic coding model
+        for long-running research, tool use, and complex execution.
+    - url: https://github.blog/changelog/2026-08-11-mai-code-1-1-flash-available-in-github-copilot/
+      finding: >-
+        GitHub describes MAI-Code-1.1-Flash as Microsoft's latest small-tier
+        coding model, improved in coding quality, instruction following, tool
+        use, and performance, and suited to lightweight coding workflows.
+    - url: https://github.blog/changelog/2026-06-30-claude-sonnet-5-is-generally-available-for-github-copilot/
+      finding: >-
+        GitHub reports strong coding performance for everyday development and
+        agentic workflows, with particularly strong CLI-style performance.
+    - url: https://github.blog/changelog/2026-07-09-openais-gpt-5-6-sol-terra-and-luna-are-now-available-in-github-copilot/
+      finding: >-
+        GitHub positions Sol for highest-ceiling large-codebase reasoning,
+        Terra as the balanced agentic-coding default, and Luna as a lightweight
+        cost-efficient option for smaller tasks.
+  validation_conclusion: >-
+    A two-model Sonnet-versus-MAI comparison is too narrow. GPT-5.3-Codex is an
+    explicit coding-specialized peer and Terra is an official balanced
+    agentic-coding peer. MAI-Code-1.1-Flash remains important, but its
+    small-tier/lightweight positioning requires capability- and complexity-
+    stratified reporting rather than an unqualified winner claim.
+
+role_model_pools:
+  doer:
+    historical_anchor: Claude Sonnet 5
+    primary_peer_pool:
+      - Claude Sonnet 5
+      - GPT-5.3-Codex
+      - GPT-5.6 Terra
+      - MAI-Code-1.1-Flash
+    high_reasoning_supplement:
+      - GPT-5.6 Sol
+      - Claude Opus 5
+    efficiency_supplement:
+      - GPT-5.6 Luna
+      - MAI-Code-1-Flash
+    primary_pool_rule: >-
+      All four primary peers run the same complete doer task set. The
+      high-reasoning and efficiency supplements run declared C3/C4 and C1/C2
+      subsets respectively and are reported separately unless they advance to
+      the finalist pool on hard-gate and quality results.
+  test_author:
+    historical_anchors:
+      - Gemini 3.1 Pro Preview
+      - Gemini 3.5 Flash
+    primary_peer_pool:
+      - Gemini 3.7 Flash
+      - MAI-Code-1.1-Flash
+      - GPT-5.3-Codex
+      - Claude Opus 5
+    constraint: The selected test-author family must differ from the selected doer family.
+  planner:
+    historical_anchor: Claude Opus 5
+    primary_peer_pool:
+      - Claude Opus 5
+      - GPT-5.6 Sol
+      - GPT-5.6 Terra
+      - Grok 4.6
+  checker:
+    historical_anchor: GPT-5.4
+    primary_peer_pool:
+      - GPT-5.4
+      - GPT-5.6 Sol
+      - Claude Opus 5
+      - Grok 4.6
+      - Gemini 3.7 Flash
+    constraint: The selected checker family must differ from the selected doer family.
+
+multi_model_screen:
+  design: role_matched_successive_halving
+  round_1:
+    purpose: >-
+      Screen every primary-pool model on the same three representative tasks
+      for its role, with three independent runs per model/task.
+    advancement: >-
+      Eliminate hard-gate failures. Advance models on paired quality,
+      reproducibility, and human-burden evidence; cost breaks ties only after
+      quality gates.
+  round_2:
+    purpose: >-
+      Run the top two or three models per role on the complete role corpus with
+      five independent runs per model/task.
+  round_3:
+    purpose: >-
+      Assemble a small number of full stacks from role finalists while
+      enforcing test-author/doer and checker/doer family separation.
+  reporting:
+    - primary_peer_pool_results
+    - high_reasoning_supplement_results
+    - efficiency_supplement_results
+    - per_complexity_tier_results
+    - paired_role_results
+    - finalist_stack_results
+  anti_combinatorial_rule: >-
+    Do not run every possible model permutation. Isolate roles first, advance
+    finalists, then test only governance-valid stack combinations.
+
+tournament_sequence:
+  - id: T0
+    action: freeze_baseline_and_metric_dictionary
+    status: COMPLETE
+  - id: T1
+    action: build_blinded_probe_corpus_and_adjudication_key
+    status: NOT_STARTED
+  - id: T2
+    action: run_role_matched_multi_model_screens_with_one_role_changed_at_a_time
+    status: NOT_STARTED
+  - id: T3
+    action: run_finalist_full_stack_tournament_under_family_separation
+    status: NOT_STARTED
+  - id: T4
+    action: adjudicate_results_and_publish_machine_readable_records
+    status: NOT_STARTED
+  - id: T5
+    action: publish_public_benchmark_blog_with_negative_results_and_limitations
+    status: NOT_STARTED
+  - id: T6
+    action: owner_selects_stack_and_records_governance_change
+    status: NOT_STARTED
+  - id: T7
+    action: launch_raptor_v2_and_rescuescreen_as_parallel_tracks
+    status: BLOCKED_ON_T6
+
+blog_contract:
+  publish_only_after: T4
+  publish_before_stack_selection: true
+  required_content:
+    - exact task-corpus and evaluator versions
+    - role and full-stack comparisons
+    - hard-gate failures
+    - negative and null results
+    - variance and worst runs
+    - elapsed time, token use, AI usage, and human-review burden
+    - model/version/prompt/tool limitations
+    - contamination and generalizability limits
+  optional_post_selection_addendum:
+    - owner-selected stack
+    - selection rationale tied to the published benchmark
+    - governance record or superseding ADR
+  forbidden_content:
+    - universal best-model claim
+    - vendor-quality claim inferred from subscription availability
+    - hiding failed, timed-out, or expensive runs
+    - treating RAPTOR-specific results as a general software-engineering leaderboard

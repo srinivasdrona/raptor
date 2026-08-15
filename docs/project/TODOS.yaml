@@ -1431,6 +1431,7 @@ todos:
   depends_on:
   - panel-products-rescuescreen-design
   - atlas-phase2-human-span-review
+  - launch-rescuescreen-foundation
   created: '2026-08-15'
 - id: rescuescreen-tool-licence-registry
   title: Building the RescueScreen tool and data licence registry
@@ -1453,6 +1454,7 @@ todos:
   depends_on:
   - panel-products-rescuescreen-design
   - governance-data-rights-privacy
+  - launch-rescuescreen-foundation
   created: '2026-08-15'
 - id: rescuescreen-construct-assay-feasibility
   title: Defining RescueScreen construct and assay feasibility
@@ -1471,6 +1473,7 @@ todos:
   status: pending
   depends_on:
   - rescuescreen-mechanism-structure-gate
+  - launch-rescuescreen-foundation
   created: '2026-08-15'
 - id: rescuescreen-artifact-schemas
   title: Implementing RescueScreen structure, pocket, docking and MD artifact schemas
@@ -1649,4 +1652,77 @@ todos:
   depends_on:
   - atlas-rubric-v2-readjudication
   - engagement-recruit-molecular-geneticist
+  created: '2026-08-15'
+- id: compose-model-role-baseline
+  title: Composing the model-role benchmark baseline
+  description: 'Track: DEVELOPMENT-ASSURANCE / MODEL-ROLE BENCHMARK. Completed 2026-08-15:
+    froze the retrospective incumbent evidence record; defined hard failure gates, severity
+    and attribution rules, role/team metrics, real-fixture and mutation requirements, repeat-run
+    variance, confidence calibration, human-review burden and normalized efficiency; validated
+    role eligibility against official model descriptions; and defined role-matched multi-model
+    pools. Historical evidence supports no comparative winner. ADR-0003/ADR-0005 remain binding.'
+  status: done
+  depends_on: []
+  created: '2026-08-15'
+- id: build-model-role-probe-corpus
+  title: Building the blinded model-role probe corpus
+  description: 'Track: DEVELOPMENT-ASSURANCE / MODEL-ROLE BENCHMARK. Build novel, hidden
+    analogues of historical RAPTOR defect classes with a withheld adjudication key, real-shape
+    fixtures, mutation operators, fixed prompts/tools/context/timeouts and no evaluator
+    contamination. Preserve failed runs and evaluator evidence.'
+  status: pending
+  depends_on:
+  - compose-model-role-baseline
+  created: '2026-08-15'
+- id: run-model-role-tournament
+  title: Running the paired multi-model role tournament
+  description: 'Track: DEVELOPMENT-ASSURANCE / MODEL-ROLE BENCHMARK. Run role-matched,
+    one-role-at-a-time screens with successive halving, followed by a small finalist full-stack
+    tournament. The primary doer pool is Sonnet 5, GPT-5.3-Codex, GPT-5.6 Terra and
+    MAI-Code-1.1-Flash, with separately reported high-reasoning and efficiency supplements.
+    Use at least three independent screening runs and five finalist runs per model/task; apply
+    hard gates before quality, reproducibility, human-burden and efficiency scoring.'
+  status: pending
+  depends_on:
+  - build-model-role-probe-corpus
+  created: '2026-08-15'
+- id: publish-model-role-benchmark-blog
+  title: Publishing the model-role benchmark results
+  description: 'Track: DEVELOPMENT-ASSURANCE / COMMUNICATION. Publish the complete RAPTOR-specific
+    benchmark method and results, including exact model versions, task corpus, hard-gate failures,
+    negative/null results, variance, worst runs, elapsed time, token/AI usage, human-review burden,
+    contamination limits and generalizability limits. Do not claim a universally best model or
+    hide failed or expensive runs.'
+  status: pending
+  depends_on:
+  - run-model-role-tournament
+  created: '2026-08-15'
+- id: select-model-role-stack
+  title: Selecting and governing the model-role stack
+  description: 'Track: DEVELOPMENT-ASSURANCE / GOVERNANCE. After the benchmark results are
+    published, select the planner, test-author, doer and checker under the required family-separation
+    constraints. Record the owner decision and superseding ADR or operating-model amendment before
+    changing routing.'
+  status: pending
+  depends_on:
+  - publish-model-role-benchmark-blog
+  created: '2026-08-15'
+- id: launch-raptor-v2-foundation
+  title: Launching the RAPTOR v2 MAVE foundation track
+  description: 'Track: RAPTOR-V2 / FOUNDATION. After stack selection, start the separately
+    versioned source freeze, source-admission contract, MAVE reproduction, leakage audit, overlap
+    analysis and shadow packet refresh. Preserve v1 and do not activate classifications.'
+  status: pending
+  depends_on:
+  - select-model-role-stack
+  created: '2026-08-15'
+- id: launch-rescuescreen-foundation
+  title: Launching the generic RescueScreen foundation track
+  description: 'Track: RESCUESCREEN / FOUNDATION. After stack selection, start the generic
+    target-dossier interface and first target pack, structure mapping, licence registry, assay
+    feasibility and artifact-schema work. No large screen, compound nomination, purchase or
+    treatment claim.'
+  status: pending
+  depends_on:
+  - select-model-role-stack
   created: '2026-08-15'

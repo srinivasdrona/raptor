@@ -112,6 +112,19 @@ Rule: the **checker is always a different model family from the doer**; nothing 
 checker passes it against pre-stated acceptance criteria. *(Spec/verdict schema + gate automation are
 pending `STRATEGY.md` Part II §10 — ADR-0003.)*
 
+## Model-role benchmark — BASELINE COMPOSED / TOURNAMENT NOT RUN
+
+The incumbent Opus → Gemini → Sonnet 5 → GPT stack now has a versioned retrospective baseline and a
+prospective tournament contract:
+[`model-role-benchmark-v1.yaml`](project/specs/model-role-benchmark-v1.yaml),
+[`model_role_incumbent_baseline_2026-08-15.json`](../data/eval/model_role_incumbent_baseline_2026-08-15.json)
+and the [human-readable baseline](reference/model-role-benchmark-baseline-2026-08.md). Historical
+evidence supports an incumbent process assessment but **no comparative winner**. The first isolated
+doer screen compares Sonnet 5, GPT-5.3-Codex, GPT-5.6 Terra and MAI-Code-1.1-Flash on identical
+blinded tasks, with separately reported high-reasoning and efficiency supplements. The benchmark
+must finish, publish negative and positive results, and record an owner-selected stack before RAPTOR
+v2 or RescueScreen implementation starts. ADR-0003/ADR-0005 remain binding until then.
+
 ## Health Rollup
 
 > *Module built ≠ live run executed.* The Tier-1/2 code path and the validation harness are **built
