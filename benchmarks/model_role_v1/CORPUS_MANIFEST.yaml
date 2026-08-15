@@ -1,6 +1,6 @@
 schema: raptor-model-role-probe-corpus-v1
 corpus_id: model-role-tournament-screen-v1
-version: 1.0.7
+version: 1.0.8
 status: REFROZEN_AFTER_PRE_SCORE_HARNESS_INVALIDATION
 created_at: '2026-08-15T16:45:17+05:30'
 candidate_workspace_root: 'D:\AIProjects\raptor-benchmark-runs'
@@ -101,6 +101,12 @@ invalidated_cells:
       v1.0.4 omitted TEST_GAP from the expected finding set and penalized
       correct checker reports as false positives. Outputs are preserved and
       non-reportable.
+  - record: INVALIDATED_CELLS.json
+    cell: phase1/checker/snapshot-publisher/runs-04-06
+    reason: >-
+      Evaluator v1.0.5 omitted two intentionally seeded defect categories,
+      FAILURE_STATE_CORRUPTION and CANONICALIZATION_ERROR, penalizing correct
+      reports as false positives. Outputs are preserved and non-reportable.
 hidden_material_rule: >-
   Candidate workspaces contain only the selected role packet. Reference
   implementations, mutants, hidden tests, answer keys, and evaluator code

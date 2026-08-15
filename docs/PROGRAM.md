@@ -169,6 +169,10 @@ The first registry checker cell was invalidated because `TEST_GAP` was intention
 omitted from the expected finding set, penalizing correct reports as false positives. Corpus
 v1.0.7 / evaluator v1.0.5 are frozen at `f7e90c81…f08368` / `33a9aefe…3cd6de`.
 
+The first snapshot checker cell was invalidated because two deliberately seeded categories—
+failure-state corruption and canonicalization error—were absent from the expected set. Corpus
+v1.0.8 / evaluator v1.0.6 are frozen at `5bb92d97…54b731` / `cbaba289…f2599b`.
+
 ## Health Rollup
 
 > *Module built ≠ live run executed.* The Tier-1/2 code path and the validation harness are **built

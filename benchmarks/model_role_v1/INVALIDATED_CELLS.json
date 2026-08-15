@@ -901,6 +901,122 @@
           "run_number": 3
         }
       ]
+    },
+    {
+      "action": "Preserve outputs; add categories to expected set; refreeze; rerun complete cell.",
+      "cell": "phase1/checker/snapshot-publisher/runs-04-06",
+      "discovered_before_score_use": true,
+      "evaluator_sha256": "33a9aefe16955ef6a4fd387d10db860ed94ab4c2c5af20db184f3732ff3cd6de",
+      "protocol_commit": "f70ca11",
+      "public_corpus_sha256": "f7e90c81c9f2ecf02f51f32abb10e9f3025db657acde311765a26ff5dff08368",
+      "reason": "Evaluator omitted intentionally seeded FAILURE_STATE_CORRUPTION and CANONICALIZATION_ERROR categories.",
+      "runs": [
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\checker\\gpt-5.4\\snapshot-publisher\\run-04\\VERDICT.yaml",
+          "candidate_sha256": "1a998c363109b7c13b5b60376126c6b82d83d301dc2761f08f79f2335e4cca9e",
+          "model_id": "gpt-5.4",
+          "preliminary_score_non_reportable": null,
+          "run_number": 4
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\checker\\gpt-5.4\\snapshot-publisher\\run-05\\VERDICT.yaml",
+          "candidate_sha256": "2826cf8933debc23d11a86d302a8fb44a3cd57e497d9010eb49918e9f412fb54",
+          "model_id": "gpt-5.4",
+          "preliminary_score_non_reportable": null,
+          "run_number": 5
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\checker\\gpt-5.4\\snapshot-publisher\\run-06\\VERDICT.yaml",
+          "candidate_sha256": "6665cad094f0a2dcbd754849cb9b52b9a59b372a4d638b2516d1d6068725ff89",
+          "model_id": "gpt-5.4",
+          "preliminary_score_non_reportable": null,
+          "run_number": 6
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\checker\\gpt-5.6-sol\\snapshot-publisher\\run-04\\VERDICT.yaml",
+          "candidate_sha256": "77272d7271b4800a33ebbd4b39871fa7f0e2aba8dc364380c096f401346ea53a",
+          "model_id": "gpt-5.6-sol",
+          "preliminary_score_non_reportable": null,
+          "run_number": 4
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\checker\\gpt-5.6-sol\\snapshot-publisher\\run-05\\VERDICT.yaml",
+          "candidate_sha256": "f17c958f2cd569de36ae59f74c6fa3dc5cf28c8cf9ce1cb027c7f1ae2dbc44ae",
+          "model_id": "gpt-5.6-sol",
+          "preliminary_score_non_reportable": null,
+          "run_number": 5
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\checker\\gpt-5.6-sol\\snapshot-publisher\\run-06\\VERDICT.yaml",
+          "candidate_sha256": "a5a444e0423d114665419638a615eadb304a2102b80060e8d966a83b02c3b0af",
+          "model_id": "gpt-5.6-sol",
+          "preliminary_score_non_reportable": null,
+          "run_number": 6
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\checker\\claude-opus-5\\snapshot-publisher\\run-04\\VERDICT.yaml",
+          "candidate_sha256": "f6441281b77c90303275f3811ce92a6f2b731a4cd65fcf0d5aaf259a55ecfbea",
+          "model_id": "claude-opus-5",
+          "preliminary_score_non_reportable": null,
+          "run_number": 4
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\checker\\claude-opus-5\\snapshot-publisher\\run-05\\VERDICT.yaml",
+          "candidate_sha256": "e0d1556a0bd11a48e168ead68b286d5a58dc5a30833f0e78110f81510f48a80c",
+          "model_id": "claude-opus-5",
+          "preliminary_score_non_reportable": null,
+          "run_number": 5
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\checker\\claude-opus-5\\snapshot-publisher\\run-06\\VERDICT.yaml",
+          "candidate_sha256": "933f191d0d36dae96f160715f05be9baf6ea2b5646a663d9e372c4f4765ae948",
+          "model_id": "claude-opus-5",
+          "preliminary_score_non_reportable": null,
+          "run_number": 6
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\checker\\grok-4.6\\snapshot-publisher\\run-04\\VERDICT.yaml",
+          "candidate_sha256": "af433201bb4dd1e8b852bd6dcf98384cbe57b7e0261a62cf532efc42c7609c0a",
+          "model_id": "grok-4.6",
+          "preliminary_score_non_reportable": null,
+          "run_number": 4
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\checker\\grok-4.6\\snapshot-publisher\\run-05\\VERDICT.yaml",
+          "candidate_sha256": "933f58cdb9b76ca08440ebaecd9dee987f0361e9b38a7979ca2f57699aba85d4",
+          "model_id": "grok-4.6",
+          "preliminary_score_non_reportable": null,
+          "run_number": 5
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\checker\\grok-4.6\\snapshot-publisher\\run-06\\VERDICT.yaml",
+          "candidate_sha256": "63fb46f6319c8319c503f277229d3c3d06d21e4bb51ad98aec0bc8a2e28c3aa4",
+          "model_id": "grok-4.6",
+          "preliminary_score_non_reportable": null,
+          "run_number": 6
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\checker\\gemini-3.7-flash\\snapshot-publisher\\run-04\\VERDICT.yaml",
+          "candidate_sha256": "47a6696dcf6637f0b81e65c92eb16cfba24361cf4dbb876d3f6676ca35f4d517",
+          "model_id": "gemini-3.7-flash",
+          "preliminary_score_non_reportable": null,
+          "run_number": 4
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\checker\\gemini-3.7-flash\\snapshot-publisher\\run-05\\VERDICT.yaml",
+          "candidate_sha256": "d7c930816f63c566ebfaecaf700346150eff825a95b51274258466ea04613bea",
+          "model_id": "gemini-3.7-flash",
+          "preliminary_score_non_reportable": null,
+          "run_number": 5
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\checker\\gemini-3.7-flash\\snapshot-publisher\\run-06\\VERDICT.yaml",
+          "candidate_sha256": "1c83eea4a7c0dd3b27c2510586f05d7087c3520d6c9cb806437df32501b9a18e",
+          "model_id": "gemini-3.7-flash",
+          "preliminary_score_non_reportable": null,
+          "run_number": 6
+        }
+      ]
     }
   ],
   "schema": "raptor-model-role-invalidated-cells-v1",

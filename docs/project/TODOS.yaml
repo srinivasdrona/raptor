@@ -1695,6 +1695,10 @@ todos:
     the expected set. Corpus v1.0.7 / evaluator v1.0.5 are frozen at
     f7e90c81c9f2ecf02f51f32abb10e9f3025db657acde311765a26ff5dff08368 /
     33a9aefe16955ef6a4fd387d10db860ed94ab4c2c5af20db184f3732ff3cd6de.
+    The first snapshot checker cell was invalidated because two seeded categories were absent from
+    the expected set. Corpus v1.0.8 / evaluator v1.0.6 are frozen at
+    5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731 /
+    cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b.
     Gold references reach their designed maxima.'
   status: done
   depends_on:

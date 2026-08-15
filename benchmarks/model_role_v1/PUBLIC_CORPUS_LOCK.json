@@ -1,15 +1,15 @@
 {
   "aggregate_basis": "SHA-256 of compact sorted JSON mapping relative path to file SHA-256; lock files excluded.",
-  "aggregate_sha256": "f7e90c81c9f2ecf02f51f32abb10e9f3025db657acde311765a26ff5dff08368",
-  "corpus_version": "1.0.7",
+  "aggregate_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+  "corpus_version": "1.0.8",
   "file_count": 47,
   "files": {
     "CANDIDATE_PROMPT.md": "b1ac41594f4d0bf8b296e139bb160cc7fa3beceefddd21950cffb08757e8c30c",
-    "CORPUS_MANIFEST.yaml": "72a6d4b2c263521cca7330ac6f9c31905fe8db04244dfaf02b4e42ffaf07cf9b",
+    "CORPUS_MANIFEST.yaml": "23e987b2f132f3434a7891db5a14a102b0c591bf68a57b034a0b8e70b86e09fd",
     "GOLD_SMOKE_RESULT.json": "f1adb9b51e1f71b203979a1f26f1e985afecb669e629362886e13fa5322efb45",
-    "INVALIDATED_CELLS.json": "04c0a58200c4e000398c05ebbec10d766a63a58a11986a2be3c020769fb1c5ca",
+    "INVALIDATED_CELLS.json": "9defbd15b429098c7e7d3d693a654cb4a82cec872d17e8d1fe412deae896b660",
     "README.md": "0478aafc731a0b835141cc22e6f5f9eda3ffd3156919432ed57f62eb46dc89cb",
-    "RUN_PROTOCOL.yaml": "a36f9a97000dc8d9264a9f6c306575a25e561cba7dd5f0e0fe21e8e29e1852da",
+    "RUN_PROTOCOL.yaml": "b8eb8e8a0c88f52bfaf16dc60be37d5d91422936820d3e065a0bd8f7c9e39f8a",
     "SCORING.md": "bc5d588305c200e22a319f6a1d2640e4ea9afdff2e185b076ff74a14f41e78e8",
     "materialize_task.py": "df242b9b79e1f8d5b2dfec2c611f2587c50e02a9e888f3a41227c9620ad69e48",
     "scenarios/registry-bridge/artifacts/map_lock.yaml": "645b48ec9c39a62963488ea9bf98bbb17ec7bbb2769420e0ec531fd92c906f7c",
@@ -52,7 +52,7 @@
     "scenarios/workspace-boundary/test_author/TASK.md": "727507591dcbab3777687abe6b4300a09a95ee175f095ccbbdf00155ad8d5f58",
     "scenarios/workspace-boundary/visible_tests/tests/test_visible.py": "c906bb732afd6d2851b5c9ccb09e0f3a2599bd5cf0a2de80f9eb997acd182672"
   },
-  "generated_at_utc": "2026-08-15T13:00:08.941789Z",
+  "generated_at_utc": "2026-08-15T13:09:10.877905Z",
   "schema": "raptor-model-role-public-corpus-lock-v1",
-  "status": "FROZEN_BEFORE_FIRST_VALID_CHECKER_RUN"
+  "status": "FROZEN_BEFORE_FIRST_VALID_SNAPSHOT_CHECKER_RUN"
 }
