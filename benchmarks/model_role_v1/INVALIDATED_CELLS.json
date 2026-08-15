@@ -1,51 +1,186 @@
 {
-  "action": "Preserve outputs; amend and refreeze corpus/evaluator as version 1.0.1; rerun the complete cell.",
-  "cell": "phase1/planner/registry-bridge/run-01",
-  "discovered_before_score_use": true,
-  "evaluator_sha256": "fef15fdcde3172ef66348e8ba13873386a93f1fdb7baa0d7b32bc207a717f55a",
-  "protocol_commit": "b1f436a",
-  "public_corpus_sha256": "386677028edd742a9b7104ac76bcea67c271c10206c2214688d0f668dd5995cc",
-  "reason": "The candidate-visible planner brief did not specify whether unrelated content_sha256 fields, map_manifest.rows, or boolean constraint values were bindings. The hidden evaluator assumed they were not. Models interpreted the unstated semantics differently, so all paired outputs and preliminary scores are non-comparable.",
-  "runs": [
+  "cells": [
     {
-      "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\claude-opus-5\\registry-bridge\\run-01\\PLAN.yaml",
-      "candidate_sha256": "a9326a85ab105ab40c745b146496762331686107820d443e82b84e3a2b6c5342",
-      "elapsed_seconds": 110,
-      "model_id": "claude-opus-5",
-      "preliminary_score_non_reportable": 77.5,
-      "run_number": 1
+      "action": "Preserve outputs; amend and refreeze; rerun complete cell.",
+      "cell": "phase1/planner/registry-bridge/run-01",
+      "discovered_before_score_use": true,
+      "evaluator_sha256": "fef15fdcde3172ef66348e8ba13873386a93f1fdb7baa0d7b32bc207a717f55a",
+      "protocol_commit": "b1f436a",
+      "public_corpus_sha256": "386677028edd742a9b7104ac76bcea67c271c10206c2214688d0f668dd5995cc",
+      "reason": "The candidate-visible planner brief did not specify whether unrelated content_sha256 fields, map_manifest.rows, or boolean constraint values were bindings. The hidden evaluator assumed they were not.",
+      "runs": [
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\claude-opus-5\\registry-bridge\\run-01\\PLAN.yaml",
+          "candidate_sha256": "a9326a85ab105ab40c745b146496762331686107820d443e82b84e3a2b6c5342",
+          "elapsed_seconds": 110,
+          "model_id": "claude-opus-5",
+          "preliminary_score_non_reportable": 77.5,
+          "run_number": 1
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\gpt-5.6-sol\\registry-bridge\\run-01\\PLAN.yaml",
+          "candidate_sha256": "388f12ddb14245adfec95abce66fda5a92d36fbbdec2e8445f123389c8bdeaab",
+          "elapsed_seconds": 68,
+          "model_id": "gpt-5.6-sol",
+          "preliminary_score_non_reportable": 72.5,
+          "run_number": 1
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\gpt-5.6-terra\\registry-bridge\\run-01\\PLAN.yaml",
+          "candidate_sha256": "7ca049db79520543921e2a8a36696073b23bab6bd23a36367e989bd140a68a07",
+          "elapsed_seconds": 28,
+          "model_id": "gpt-5.6-terra",
+          "preliminary_score_non_reportable": 52.5,
+          "run_number": 1
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\gemini-3.7-flash\\registry-bridge\\run-01\\PLAN.yaml",
+          "candidate_sha256": "8f88e0ad5ac28d8ce922e3abf519dea849cd352c4e7ab1a7b81e761558f0531a",
+          "elapsed_seconds": 90,
+          "model_id": "gemini-3.7-flash",
+          "preliminary_score_non_reportable": 55.0,
+          "run_number": 1
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\grok-4.6\\registry-bridge\\run-01\\PLAN.yaml",
+          "candidate_sha256": "edb3416e77c2f0ed453be7a672e95c7386025c68405e0077f35bdce02ff3bd8e",
+          "elapsed_seconds": 82,
+          "model_id": "grok-4.6",
+          "preliminary_score_non_reportable": 55.0,
+          "run_number": 1
+        }
+      ]
     },
     {
-      "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\gpt-5.6-sol\\registry-bridge\\run-01\\PLAN.yaml",
-      "candidate_sha256": "388f12ddb14245adfec95abce66fda5a92d36fbbdec2e8445f123389c8bdeaab",
-      "elapsed_seconds": 68,
-      "model_id": "gpt-5.6-sol",
-      "preliminary_score_non_reportable": 72.5,
-      "run_number": 1
-    },
-    {
-      "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\gpt-5.6-terra\\registry-bridge\\run-01\\PLAN.yaml",
-      "candidate_sha256": "7ca049db79520543921e2a8a36696073b23bab6bd23a36367e989bd140a68a07",
-      "elapsed_seconds": 28,
-      "model_id": "gpt-5.6-terra",
-      "preliminary_score_non_reportable": 52.5,
-      "run_number": 1
-    },
-    {
-      "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\gemini-3.7-flash\\registry-bridge\\run-01\\PLAN.yaml",
-      "candidate_sha256": "8f88e0ad5ac28d8ce922e3abf519dea849cd352c4e7ab1a7b81e761558f0531a",
-      "elapsed_seconds": 90,
-      "model_id": "gemini-3.7-flash",
-      "preliminary_score_non_reportable": 55.0,
-      "run_number": 1
-    },
-    {
-      "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\grok-4.6\\registry-bridge\\run-01\\PLAN.yaml",
-      "candidate_sha256": "edb3416e77c2f0ed453be7a672e95c7386025c68405e0077f35bdce02ff3bd8e",
-      "elapsed_seconds": 82,
-      "model_id": "grok-4.6",
-      "preliminary_score_non_reportable": 55.0,
-      "run_number": 1
+      "action": "Preserve outputs; amend planner brief; refreeze public corpus; rerun complete cell.",
+      "cell": "phase1/planner/snapshot-publisher/runs-01-03",
+      "discovered_before_score_use": true,
+      "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+      "protocol_commit": "16eb281",
+      "public_corpus_sha256": "a3148ddbc8b8e2362aeaf77be60d3c53ecd87cb5e2cc5c384eac0ef75a50b269",
+      "reason": "The planner brief requested exact canonicalization and audit fields without exposing their values, while the hidden key scored those values.",
+      "runs": [
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\claude-opus-5\\snapshot-publisher\\run-01\\PLAN.yaml",
+          "candidate_sha256": "dffe22a2a70171c62b9df8c679a55f20162404781f3d0751faef16a50b093fc2",
+          "elapsed_seconds": 134,
+          "model_id": "claude-opus-5",
+          "preliminary_score_non_reportable": null,
+          "run_number": 1
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\claude-opus-5\\snapshot-publisher\\run-02\\PLAN.yaml",
+          "candidate_sha256": "696ad7725a8e7b68b753d16f366bd153d6bce569fdc9333db49bf980d018683e",
+          "elapsed_seconds": 203,
+          "model_id": "claude-opus-5",
+          "preliminary_score_non_reportable": null,
+          "run_number": 2
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\claude-opus-5\\snapshot-publisher\\run-03\\PLAN.yaml",
+          "candidate_sha256": "06be875686a23ad1c592a925102a3745ed5626f60c50c60f45f71aaef4565e19",
+          "elapsed_seconds": 136,
+          "model_id": "claude-opus-5",
+          "preliminary_score_non_reportable": null,
+          "run_number": 3
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\gpt-5.6-sol\\snapshot-publisher\\run-01\\PLAN.yaml",
+          "candidate_sha256": "fbe0e1184b922c459d6b6af96f5b928edf1bb31eafc624f7ea055854edc9fa00",
+          "elapsed_seconds": 79,
+          "model_id": "gpt-5.6-sol",
+          "preliminary_score_non_reportable": null,
+          "run_number": 1
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\gpt-5.6-sol\\snapshot-publisher\\run-02\\PLAN.yaml",
+          "candidate_sha256": "df8b80efae4b855c7636c89e23323281aeefb08872b436378e66a97a1d655c02",
+          "elapsed_seconds": 91,
+          "model_id": "gpt-5.6-sol",
+          "preliminary_score_non_reportable": null,
+          "run_number": 2
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\gpt-5.6-sol\\snapshot-publisher\\run-03\\PLAN.yaml",
+          "candidate_sha256": "90cc59293965657d5f0efdb8733ea3599269ac6391b99fec435f98f86a323af9",
+          "elapsed_seconds": 125,
+          "model_id": "gpt-5.6-sol",
+          "preliminary_score_non_reportable": null,
+          "run_number": 3
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\gpt-5.6-terra\\snapshot-publisher\\run-01\\PLAN.yaml",
+          "candidate_sha256": "25de348ff3a8e09253e5257b34c81bf96925e41c6e16b9b4b21a447db93b6716",
+          "elapsed_seconds": 49,
+          "model_id": "gpt-5.6-terra",
+          "preliminary_score_non_reportable": null,
+          "run_number": 1
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\gpt-5.6-terra\\snapshot-publisher\\run-02\\PLAN.yaml",
+          "candidate_sha256": "b3898c730045f28fec7e26e8a9bbb154974243130b524ee78d382a0ce0d84cb9",
+          "elapsed_seconds": 44,
+          "model_id": "gpt-5.6-terra",
+          "preliminary_score_non_reportable": null,
+          "run_number": 2
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\gpt-5.6-terra\\snapshot-publisher\\run-03\\PLAN.yaml",
+          "candidate_sha256": "b22545e4a7baa02a9ba244e914b779080af5ce9615b592b6af410b0ddd201823",
+          "elapsed_seconds": 46,
+          "model_id": "gpt-5.6-terra",
+          "preliminary_score_non_reportable": null,
+          "run_number": 3
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\gemini-3.7-flash\\snapshot-publisher\\run-01\\PLAN.yaml",
+          "candidate_sha256": "f81c3d5a9d1cb784da1ca291a99887ca8b1679cd1922f5e94d827f111b5c18f3",
+          "elapsed_seconds": 88,
+          "model_id": "gemini-3.7-flash",
+          "preliminary_score_non_reportable": null,
+          "run_number": 1
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\gemini-3.7-flash\\snapshot-publisher\\run-02\\PLAN.yaml",
+          "candidate_sha256": "7f12d96e215672a7cd4274ec04b96589fac927e35573101002930ad36fab86ce",
+          "elapsed_seconds": 94,
+          "model_id": "gemini-3.7-flash",
+          "preliminary_score_non_reportable": null,
+          "run_number": 2
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\gemini-3.7-flash\\snapshot-publisher\\run-03\\PLAN.yaml",
+          "candidate_sha256": "3b746d35782b403e640cd4ae65ddbe483c08a3d38c1793e28a363335ddd1c5ee",
+          "elapsed_seconds": 115,
+          "model_id": "gemini-3.7-flash",
+          "preliminary_score_non_reportable": null,
+          "run_number": 3
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\grok-4.6\\snapshot-publisher\\run-01\\PLAN.yaml",
+          "candidate_sha256": "31f7294ef1a684694fce4b96723604ce9348c7eaffeb4794f1e270403b627cb8",
+          "elapsed_seconds": 108,
+          "model_id": "grok-4.6",
+          "preliminary_score_non_reportable": null,
+          "run_number": 1
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\grok-4.6\\snapshot-publisher\\run-02\\PLAN.yaml",
+          "candidate_sha256": "69365d8253a7f2a9ec053729d4a9350d3541246b037273d4c93776d32f9ef125",
+          "elapsed_seconds": 103,
+          "model_id": "grok-4.6",
+          "preliminary_score_non_reportable": null,
+          "run_number": 2
+        },
+        {
+          "candidate_artifact": "D:\\AIProjects\\raptor-benchmark-runs\\phase1\\planner\\grok-4.6\\snapshot-publisher\\run-03\\PLAN.yaml",
+          "candidate_sha256": "9c002c657bec5a7638cca860d3cec26c87913a2e497d2e548f3e6615f95576ba",
+          "elapsed_seconds": 93,
+          "model_id": "grok-4.6",
+          "preliminary_score_non_reportable": null,
+          "run_number": 3
+        }
+      ]
     }
   ],
   "schema": "raptor-model-role-invalidated-cells-v1",

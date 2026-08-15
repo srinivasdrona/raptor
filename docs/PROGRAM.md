@@ -144,6 +144,11 @@ they were non-bindings. All five outputs and preliminary machine values are pres
 explicit and are refrozen at public hash `a3148ddb…50b269` and evaluator hash
 `682d3816…3573af`.
 
+The first snapshot-planner cell was also invalidated before score use because exact canonicalization
+and audit values were scored without being candidate-visible. Corpus v1.0.2 now exposes all
+planner requirements before execution and is frozen at `d6cfd77b…fffe81`; the evaluator remains
+v1.0.1 at `682d3816…3573af`.
+
 ## Health Rollup
 
 > *Module built ≠ live run executed.* The Tier-1/2 code path and the validation harness are **built

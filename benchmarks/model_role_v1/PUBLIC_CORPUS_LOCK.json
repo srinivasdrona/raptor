@@ -1,15 +1,15 @@
 {
   "aggregate_basis": "SHA-256 of compact sorted JSON mapping relative path to file SHA-256; lock files excluded.",
-  "aggregate_sha256": "a3148ddbc8b8e2362aeaf77be60d3c53ecd87cb5e2cc5c384eac0ef75a50b269",
-  "corpus_version": "1.0.1",
+  "aggregate_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
+  "corpus_version": "1.0.2",
   "file_count": 47,
   "files": {
     "CANDIDATE_PROMPT.md": "b1ac41594f4d0bf8b296e139bb160cc7fa3beceefddd21950cffb08757e8c30c",
-    "CORPUS_MANIFEST.yaml": "169015680fa388d63d59f5214dee86ca28fd01f2650afee7e881dbfa3c6e33c5",
+    "CORPUS_MANIFEST.yaml": "073c7c44d7e29b2617901d104f3ca820c1449b2b63bd46631dca52419655727e",
     "GOLD_SMOKE_RESULT.json": "1598b68e3fc34610905ada02877131a12e833d5e4d603fe59b48ef96234e1fe3",
-    "INVALIDATED_CELLS.json": "c5fbac66f805ba1a712e5ade6764dbded881dca0aee9f3b689f8ed8e262f046e",
+    "INVALIDATED_CELLS.json": "e5f454688cb2e81c30fceb46fc5f67312fd0004e394dad1b9b41dea033b8e97b",
     "README.md": "0478aafc731a0b835141cc22e6f5f9eda3ffd3156919432ed57f62eb46dc89cb",
-    "RUN_PROTOCOL.yaml": "52ac753be7100a86129537c1a7181a843df0ae112d261c4c073cd3a7cc82b6b4",
+    "RUN_PROTOCOL.yaml": "716d3a9a5559f2683438ff542f3f4e1b4e2f18d2344d1f7c1955f237198bdc39",
     "SCORING.md": "bc5d588305c200e22a319f6a1d2640e4ea9afdff2e185b076ff74a14f41e78e8",
     "materialize_task.py": "20ad0666044a19f79626159f5ae06d52a0ebecb14642af57a54ecbd66ad19581",
     "scenarios/registry-bridge/artifacts/map_lock.yaml": "645b48ec9c39a62963488ea9bf98bbb17ec7bbb2769420e0ec531fd92c906f7c",
@@ -34,7 +34,7 @@
     "scenarios/snapshot-publisher/checker/tests/test_visible.py": "5fd31cd3df9f0e5f9e7b223f9cb272ab6bba702d4a52a3e13eca2c6047a46979",
     "scenarios/snapshot-publisher/common/SPEC.yaml": "647b0150c4afb5e24492dfe663a22f55961173d8520e8b24324e5ae52d8b0796",
     "scenarios/snapshot-publisher/doer/TASK.md": "fec1015dcaaaa8de58713aa6510643230c8faba7698e4ac5ab47e1c5a11b9ffc",
-    "scenarios/snapshot-publisher/planner/BRIEF.md": "91fb05f48924b5c799f7ec81adab5ceba7e72d1355cee4098b132b2a84addbe1",
+    "scenarios/snapshot-publisher/planner/BRIEF.md": "1583ff361d17066dae855a80bb3de586f46ac998e228dadc4a48df6a956aa7be",
     "scenarios/snapshot-publisher/planner/OUTPUT_SCHEMA.yaml": "74d52fc69418e9121645c5a56ef79b7629dc0c761d292cd88ec998bb0b597367",
     "scenarios/snapshot-publisher/starter/src/solution.py": "18db3bc2c2f6fbec87b1db7ad51816544e524c4d006632049da6ffe7efd81d71",
     "scenarios/snapshot-publisher/test_author/TASK.md": "b28c687c19651fd7a07d85d1358fe9198055be5aab21b8b2de90f9710b843553",
@@ -46,13 +46,13 @@
     "scenarios/workspace-boundary/checker/tests/test_visible.py": "424f19fa050585e2819c2c6bf320556ee9c61b623c8aff3e771e6ea7f4f5af16",
     "scenarios/workspace-boundary/common/SPEC.yaml": "3e7a35c3b57908b600f7c5e78cfd8667b144e03a212fe6647ce42cac6a4d11e5",
     "scenarios/workspace-boundary/doer/TASK.md": "c13bd79441f9f19d49197ef0d76c41ccfeb744af2d1b5bce1d05f0b5b1802581",
-    "scenarios/workspace-boundary/planner/BRIEF.md": "477a83c090582cdd4b4e2e0e8b37e77eae0336ed046a37b9a12c3cfee8503e57",
+    "scenarios/workspace-boundary/planner/BRIEF.md": "7c96454659c0b27f878d1afdae3d4c3aab17b5d0c9c7068727ce920a8a216da6",
     "scenarios/workspace-boundary/planner/OUTPUT_SCHEMA.yaml": "be17cd89fa818245bba44d4c395c7b55fe16765b0a68a2e9634c27d64b6b9068",
     "scenarios/workspace-boundary/starter/src/solution.py": "540f801f7daaef01a71ce9ca49a96db76e803272ba2d09ca7677f20e9c17741b",
     "scenarios/workspace-boundary/test_author/TASK.md": "727507591dcbab3777687abe6b4300a09a95ee175f095ccbbdf00155ad8d5f58",
     "scenarios/workspace-boundary/visible_tests/tests/test_visible.py": "c906bb732afd6d2851b5c9ccb09e0f3a2599bd5cf0a2de80f9eb997acd182672"
   },
-  "generated_at_utc": "2026-08-15T11:32:50.793867Z",
+  "generated_at_utc": "2026-08-15T11:44:31.523290Z",
   "schema": "raptor-model-role-public-corpus-lock-v1",
-  "status": "FROZEN_BEFORE_FIRST_VALID_CANDIDATE_RUN"
+  "status": "FROZEN_BEFORE_FIRST_VALID_SNAPSHOT_AND_BOUNDARY_PLANNER_RUN"
 }

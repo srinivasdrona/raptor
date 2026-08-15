@@ -15,7 +15,7 @@
     "smoke_gold.py": "b16dcd089792c7c83ce6e1383c1be0107425d86318fb1fb57a982155e38307f3",
     "test_author_keys.yaml": "43f5a3994ef9927f00686ec3742814191b675235ec1b6b1145531bfcd5181b5a"
   },
-  "generated_at_utc": "2026-08-15T11:32:50.793867Z",
+  "generated_at_utc": "2026-08-15T11:44:31.523290Z",
   "schema": "raptor-model-role-embargoed-evaluator-lock-v1",
   "status": "CONTENT_EMBARGOED_UNTIL_ALL_CANDIDATE_RUNS_FROZEN"
 }
