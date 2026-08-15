@@ -1,0 +1,19 @@
+schema: planner-output-schema-v1
+required:
+  - task_id
+  - operation_order
+  - acceptance_criteria
+  - negative_tests
+  - preservation_set
+  - failure_modes
+  - output_contract
+  - out_of_scope
+field_shapes:
+  task_id: string
+  operation_order: list
+  acceptance_criteria: list
+  negative_tests: list
+  preservation_set: list
+  failure_modes: list
+  output_contract: list
+  out_of_scope: list

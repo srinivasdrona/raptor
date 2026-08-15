@@ -1,0 +1,7 @@
+{
+  "schema": "source-records-v1",
+  "records": [
+    {"id": "SP-001", "value": 7},
+    {"id": "SP-002", "value": 11}
+  ]
+}

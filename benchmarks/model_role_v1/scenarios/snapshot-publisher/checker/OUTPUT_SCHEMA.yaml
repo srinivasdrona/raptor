@@ -1,0 +1,13 @@
+schema: checker-output-schema-v1
+required: [verdict, findings, commands_run, contrary_case]
+verdicts: [CLEAN, WITH_CHANGES, DO_NOT_MERGE]
+finding_shape:
+  required: [category, severity, location, evidence, repair]
+categories:
+  - TOCTOU_SOURCE_DRIFT
+  - NON_ATOMIC_PUBLICATION
+  - INCOMPLETE_AUDIT
+  - FAILURE_STATE_CORRUPTION
+  - CANONICALIZATION_ERROR
+  - TEST_GAP
+severities: [CRITICAL, HIGH, MEDIUM, LOW]

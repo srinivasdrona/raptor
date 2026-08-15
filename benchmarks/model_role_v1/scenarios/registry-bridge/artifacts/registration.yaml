@@ -1,0 +1,8 @@
+schema: release-registration-v2
+universe_schema: candidate-universe-v3
+map_lock_schema: identity-map-lock-v2
+transcript_pin: TX-ALPHA.7
+required_constraints:
+  - exact_identity
+  - lawful_source
+  - complete_audit

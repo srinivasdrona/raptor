@@ -1,0 +1,62 @@
+schema: raptor-model-role-probe-corpus-v1
+corpus_id: model-role-tournament-screen-v1
+status: PUBLIC_TASK_CORPUS_BUILD_IN_PROGRESS
+created_at: '2026-08-15T16:45:17+05:30'
+candidate_workspace_root: 'D:\AIProjects\raptor-benchmark-runs'
+roles: [planner, test_author, doer, checker]
+scenarios:
+  - id: registry-bridge
+    complexity: C2
+    defect_classes:
+      - real_schema_shape_mismatch
+      - top_level_vs_record_level_binding
+      - wrong_protocol_or_hash_comparand
+  - id: snapshot-publisher
+    complexity: C3
+    defect_classes:
+      - stale_snapshot_or_toctou
+      - incomplete_audit_record
+      - non_atomic_publication
+  - id: workspace-boundary
+    complexity: C3
+    defect_classes:
+      - junction_or_resolved_path_escape
+      - lexical_prefix_boundary_error
+      - incomplete_disposition_accounting
+screening:
+  runs_per_model_task: 3
+  tasks_per_role: 3
+  role_scores:
+    planner:
+      requirement_recall: 25
+      executable_acceptance_criteria: 20
+      real_artifact_shape_coverage: 20
+      failure_mode_anticipation: 15
+      scope_and_preservation: 10
+      reproducibility: 10
+    test_author:
+      correct_implementation_pass: 15
+      mutant_kill_rate: 35
+      acceptance_criterion_coverage: 15
+      nonvacuity: 15
+      real_fixture_fidelity: 10
+      protected_test_stability: 10
+    doer:
+      hidden_acceptance_pass: 45
+      severity_weighted_escape_control: 20
+      visible_regression_pass: 10
+      scope_compliance: 10
+      maintainability: 5
+      normalized_efficiency: 10
+    checker:
+      seeded_defect_recall: 35
+      severity_weighted_recall: 20
+      finding_precision: 20
+      wrong_clean_control: 15
+      independent_reproduction_and_evidence: 10
+hard_gate_precedence: true
+hidden_material_rule: >-
+  Candidate workspaces contain only the selected role packet. Reference
+  implementations, mutants, hidden tests, answer keys, and evaluator code
+  remain embargoed outside the repository and every candidate workspace until
+  all runs are frozen. They are then published with hashes and the results.

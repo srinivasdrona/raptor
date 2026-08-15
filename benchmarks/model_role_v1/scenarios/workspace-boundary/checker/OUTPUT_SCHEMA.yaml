@@ -1,0 +1,13 @@
+schema: checker-output-schema-v1
+required: [verdict, findings, commands_run, contrary_case]
+verdicts: [CLEAN, WITH_CHANGES, DO_NOT_MERGE]
+finding_shape:
+  required: [category, severity, location, evidence, repair]
+categories:
+  - LEXICAL_BOUNDARY_CHECK
+  - RESOLVER_NOT_USED
+  - ABSOLUTE_PATH_ACCEPTED
+  - INCOMPLETE_DISPOSITIONS
+  - WRONG_RESOLVED_PATH
+  - TEST_GAP
+severities: [CRITICAL, HIGH, MEDIUM, LOW]

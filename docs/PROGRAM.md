@@ -112,7 +112,7 @@ Rule: the **checker is always a different model family from the doer**; nothing 
 checker passes it against pre-stated acceptance criteria. *(Spec/verdict schema + gate automation are
 pending `STRATEGY.md` Part II §10 — ADR-0003.)*
 
-## Model-role benchmark — BASELINE COMPOSED / TOURNAMENT NOT RUN
+## Model-role benchmark — PHASE 1 STARTED
 
 The incumbent Opus → Gemini → Sonnet 5 → GPT stack now has a versioned retrospective baseline and a
 prospective tournament contract:
@@ -128,6 +128,13 @@ The evidence-constrained retrospective maturity proxy is **69/100** (low-to-medi
 high eventual correctness and governance, but weak first-pass/real-fixture efficiency. This score is
 not selection-grade because the historical wrong-CLEAN gate is indeterminate and reproducibility is
 partial.
+
+The Phase-1 public task corpus and scoring mechanism are now frozen at
+[`benchmarks/model_role_v1`](../benchmarks/model_role_v1). It contains three role-isolation probe
+families, the repeated-run protocol, candidate prompt, public corpus lock and embargoed-evaluator
+hash lock. Gold-reference smoke evaluation reached the designed maximum for every role/scenario
+(doer quality subtotal 90/90 before telemetry). The evaluator content remains withheld until all
+candidate outputs are frozen, preventing benchmark contamination.
 
 ## Health Rollup
 

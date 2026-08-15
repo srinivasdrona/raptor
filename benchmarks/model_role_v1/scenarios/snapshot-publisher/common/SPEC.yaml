@@ -1,0 +1,26 @@
+schema: benchmark-task-spec-v1
+task_id: snapshot-publisher
+goal: Verify a source, freeze its content, and publish an atomic canonical snapshot.
+api:
+  module: src/solution.py
+  exception: SnapshotPublishError
+  function: publish_verified_snapshot(source_path, output_path, expected_sha256, before_publish=None)
+requirements:
+  - Read source bytes and require SHA-256 equality with expected_sha256 before parsing.
+  - Parse JSON only after the initial hash check.
+  - Snapshot content is schema verified-snapshot-v1 plus the initial source records.
+  - If before_publish is provided, call it with source_path after initial verification and before publication.
+  - Re-read source bytes after before_publish and require the same SHA-256 before writing output.
+  - Canonical JSON is sort_keys=true, indent=2, UTF-8, LF-only, exactly one terminal LF.
+  - Publish through a temporary sibling file followed by os.replace; never write output directly.
+  - Success returns an audit mapping with exactly:
+    schema, source_sha256, source_size, output_sha256, record_count, checks.
+  - Audit schema is snapshot-publish-audit-v1.
+  - checks is exactly [SOURCE_HASH, SOURCE_STABLE, CANONICAL_SNAPSHOT, ATOMIC_PUBLISH].
+errors:
+  shape: SnapshotPublishError(code)
+  codes: [SOURCE_HASH, SOURCE_JSON, SOURCE_DRIFT, OUTPUT_PATH]
+preservation:
+  - Do not modify source.
+  - On any failure, output_path must not exist and an existing output must remain byte-identical.
+  - Use only the Python standard library.

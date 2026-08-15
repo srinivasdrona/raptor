@@ -1,0 +1,12 @@
+schema: checker-output-schema-v1
+required: [verdict, findings, commands_run, contrary_case]
+verdicts: [CLEAN, WITH_CHANGES, DO_NOT_MERGE]
+finding_shape:
+  required: [category, severity, location, evidence, repair]
+categories:
+  - WRONG_COMPARAND
+  - WRONG_FIELD_LOCATION
+  - MISSING_CONTRACT_CHECK
+  - INCOMPLETE_AUDIT
+  - TEST_GAP
+severities: [CRITICAL, HIGH, MEDIUM, LOW]

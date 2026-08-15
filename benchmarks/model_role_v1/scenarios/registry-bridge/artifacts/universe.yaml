@@ -1,0 +1,11 @@
+schema: candidate-universe-v3
+transcript_pin: TX-ALPHA.7
+constraints:
+  exact_identity: true
+  lawful_source: true
+  complete_audit: true
+records:
+  - record_id: RB-001
+    source_id: SRC-A
+  - record_id: RB-002
+    source_id: SRC-B

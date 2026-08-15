@@ -1,0 +1,6 @@
+root: workspace
+requests:
+  - reports\summary.json
+  - cache\result.json
+  - ..\outside.json
+  - link\escaped.json

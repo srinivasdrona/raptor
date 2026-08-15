@@ -1,0 +1,56 @@
+{
+  "registry-bridge": {
+    "checker": {
+      "hard_gate": "PASS",
+      "score": 100.0
+    },
+    "doer": {
+      "hard_gate": "PASS",
+      "score": 90.0
+    },
+    "planner": {
+      "hard_gate": "PASS",
+      "score": 100.0
+    },
+    "test_author": {
+      "hard_gate": "PASS",
+      "score": 100.0
+    }
+  },
+  "snapshot-publisher": {
+    "checker": {
+      "hard_gate": "PASS",
+      "score": 100.0
+    },
+    "doer": {
+      "hard_gate": "PASS",
+      "score": 90.0
+    },
+    "planner": {
+      "hard_gate": "PASS",
+      "score": 100.0
+    },
+    "test_author": {
+      "hard_gate": "PASS",
+      "score": 100.0
+    }
+  },
+  "workspace-boundary": {
+    "checker": {
+      "hard_gate": "PASS",
+      "score": 100.0
+    },
+    "doer": {
+      "hard_gate": "PASS",
+      "score": 90.0
+    },
+    "planner": {
+      "hard_gate": "PASS",
+      "score": 100.0
+    },
+    "test_author": {
+      "hard_gate": "PASS",
+      "score": 100.0
+    }
+  }
+}

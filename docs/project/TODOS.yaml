@@ -1666,11 +1666,16 @@ todos:
   created: '2026-08-15'
 - id: build-model-role-probe-corpus
   title: Building the blinded model-role probe corpus
-  description: 'Track: DEVELOPMENT-ASSURANCE / MODEL-ROLE BENCHMARK. Build novel, hidden
-    analogues of historical RAPTOR defect classes with a withheld adjudication key, real-shape
-    fixtures, mutation operators, fixed prompts/tools/context/timeouts and no evaluator
-    contamination. Preserve failed runs and evaluator evidence.'
-  status: pending
+  description: 'Track: DEVELOPMENT-ASSURANCE / MODEL-ROLE BENCHMARK. Completed 2026-08-15:
+    built and gold-smoke-validated three novel probe families (registry binding, verified snapshot
+    publication and resolved workspace boundaries), with role-specific public packets, real-shape
+    fixtures, mutation operators, repeated-run protocol and exact scoring. The public corpus is
+    committed under benchmarks/model_role_v1. Reference implementations, mutants, answer keys and
+    evaluator remain embargoed outside the repository at aggregate SHA-256
+    fef15fdcde3172ef66348e8ba13873386a93f1fdb7baa0d7b32bc207a717f55a until every candidate
+    run is frozen, then will be published. Gold references reached the designed maxima on all
+    scenarios.'
+  status: done
   depends_on:
   - compose-model-role-baseline
   created: '2026-08-15'
@@ -1682,7 +1687,7 @@ todos:
     MAI-Code-1.1-Flash, with separately reported high-reasoning and efficiency supplements.
     Use at least three independent screening runs and five finalist runs per model/task; apply
     hard gates before quality, reproducibility, human-burden and efficiency scoring.'
-  status: pending
+  status: in_progress
   depends_on:
   - build-model-role-probe-corpus
   created: '2026-08-15'

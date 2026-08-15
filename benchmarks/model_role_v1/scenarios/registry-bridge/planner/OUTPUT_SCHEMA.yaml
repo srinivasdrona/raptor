@@ -1,0 +1,19 @@
+schema: planner-output-schema-v1
+required:
+  - task_id
+  - authoritative_shapes
+  - binding_decisions
+  - acceptance_criteria
+  - negative_tests
+  - preservation_set
+  - failure_modes
+  - out_of_scope
+field_shapes:
+  task_id: string
+  authoritative_shapes: list
+  binding_decisions: list
+  acceptance_criteria: list
+  negative_tests: list
+  preservation_set: list
+  failure_modes: list
+  out_of_scope: list

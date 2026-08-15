@@ -1,0 +1,32 @@
+schema: benchmark-task-spec-v1
+task_id: workspace-boundary
+goal: Resolve requested workspace paths safely and produce complete dispositions.
+api:
+  module: src/solution.py
+  exception: WorkspaceBoundaryError
+  functions:
+    - resolve_workspace_path(root, requested, resolver=None)
+    - build_disposition_audit(root, requests, resolver=None)
+requirements:
+  - requested must be a non-empty relative path.
+  - Reject absolute, drive-qualified, UNC, empty, dot-only, and any path containing a .. segment.
+  - resolver defaults to Path.resolve(strict=False) and is applied to both root and candidate.
+  - Boundary comparison uses resolved paths and os.path.commonpath after os.path.normcase.
+  - Lexical string-prefix checks are forbidden.
+  - A resolver-produced candidate outside the resolved root raises WorkspaceBoundaryError(RESOLVED_ESCAPE).
+  - build_disposition_audit preserves request order and emits one disposition per input.
+  - Accepted disposition fields are request, status=ACCEPT, resolved_path.
+  - Rejected disposition fields are request, status=REJECT, code.
+  - Audit returns schema workspace-disposition-audit-v1, total, accepted, rejected, dispositions.
+  - total equals len(requests); accepted + rejected equals total.
+errors:
+  shape: WorkspaceBoundaryError(code)
+  codes:
+    - EMPTY_PATH
+    - ABSOLUTE_PATH
+    - PARENT_SEGMENT
+    - RESOLVED_ESCAPE
+preservation:
+  - Do not touch the filesystem except resolver calls.
+  - Do not silently omit rejected requests.
+  - Use only the Python standard library.

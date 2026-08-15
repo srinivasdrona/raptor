@@ -1,0 +1,21 @@
+schema: planner-output-schema-v1
+required:
+  - task_id
+  - validation_order
+  - containment_algorithm
+  - acceptance_criteria
+  - negative_tests
+  - audit_contract
+  - preservation_set
+  - failure_modes
+  - out_of_scope
+field_shapes:
+  task_id: string
+  validation_order: list
+  containment_algorithm: list
+  acceptance_criteria: list
+  negative_tests: list
+  audit_contract: list
+  preservation_set: list
+  failure_modes: list
+  out_of_scope: list
