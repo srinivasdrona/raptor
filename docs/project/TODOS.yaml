@@ -1711,7 +1711,11 @@ todos:
     tournament. The primary doer pool is Sonnet 5, GPT-5.3-Codex, GPT-5.6 Terra and
     MAI-Code-1.1-Flash, with separately reported high-reasoning and efficiency supplements.
     Use at least three independent screening runs and five finalist runs per model/task; apply
-    hard gates before quality, reproducibility, human-burden and efficiency scoring.'
+    hard gates before quality, reproducibility, human-burden and efficiency scoring. Phase 1
+    individual-role evaluation completed 2026-08-15 with 15 valid finalist runs per model and
+    eight invalidated harness-defect cells preserved outside scoring. Result:
+    data/eval/model_role_phase1_result_2026-08-15.json. Phase 2 stack evaluation has not started;
+    no stack is selected.'
   status: in_progress
   depends_on:
   - build-model-role-probe-corpus

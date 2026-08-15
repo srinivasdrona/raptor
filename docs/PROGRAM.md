@@ -112,7 +112,7 @@ Rule: the **checker is always a different model family from the doer**; nothing 
 checker passes it against pre-stated acceptance criteria. *(Spec/verdict schema + gate automation are
 pending `STRATEGY.md` Part II §10 — ADR-0003.)*
 
-## Model-role benchmark — PHASE 1 STARTED
+## Model-role benchmark — PHASE 1 COMPLETE / PHASE 2 NOT STARTED
 
 The incumbent Opus → Gemini → Sonnet 5 → GPT stack now has a versioned retrospective baseline and a
 prospective tournament contract:
@@ -172,6 +172,15 @@ v1.0.7 / evaluator v1.0.5 are frozen at `f7e90c81…f08368` / `33a9aefe…3cd6de
 The first snapshot checker cell was invalidated because two deliberately seeded categories—
 failure-state corruption and canonicalization error—were absent from the expected set. Corpus
 v1.0.8 / evaluator v1.0.6 are frozen at `5bb92d97…54b731` / `cbaba289…f2599b`.
+
+Phase 1 is complete: three task families, five valid runs per finalist/task, 15 valid runs per
+model, and eight benchmark-defect cells invalidated before score use and rerun. Machine result:
+[`model_role_phase1_result_2026-08-15.json`](../data/eval/model_role_phase1_result_2026-08-15.json);
+[human-readable report](reference/model-role-phase1-results-2026-08.md). Leaders by the
+preregistered role rules are Opus 5 for planning, GPT-5.3-Codex for test authorship, GPT-5.6 Terra
+for doer quality/stability, and a four-way checker score tie led by Opus 5 on worst-run stability.
+No stack has been evaluated or selected. Phase 2 remains required before the benchmark blog, stack
+selection, RAPTOR v2 or RescueScreen.
 
 ## Health Rollup
 

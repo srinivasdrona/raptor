@@ -1,0 +1,2612 @@
+{
+  "corpus_version": "1.0.8",
+  "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+  "evaluator_version": "1.0.6",
+  "generated_at_utc": "2026-08-15T14:39:56.248708Z",
+  "included_run_bindings": {
+    "checker": {
+      "claude-opus-5": {
+        "registry-bridge": [
+          {
+            "evaluator_sha256": "33a9aefe16955ef6a4fd387d10db860ed94ab4c2c5af20db184f3732ff3cd6de",
+            "protocol_commit": "f70ca11",
+            "public_corpus_sha256": "f7e90c81c9f2ecf02f51f32abb10e9f3025db657acde311765a26ff5dff08368",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "33a9aefe16955ef6a4fd387d10db860ed94ab4c2c5af20db184f3732ff3cd6de",
+            "protocol_commit": "f70ca11",
+            "public_corpus_sha256": "f7e90c81c9f2ecf02f51f32abb10e9f3025db657acde311765a26ff5dff08368",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "33a9aefe16955ef6a4fd387d10db860ed94ab4c2c5af20db184f3732ff3cd6de",
+            "protocol_commit": "f70ca11",
+            "public_corpus_sha256": "f7e90c81c9f2ecf02f51f32abb10e9f3025db657acde311765a26ff5dff08368",
+            "run_number": 6
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          }
+        ],
+        "snapshot-publisher": [
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 9
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 10
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 11
+          }
+        ],
+        "workspace-boundary": [
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 9
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 10
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 11
+          }
+        ]
+      },
+      "gemini-3.7-flash": {
+        "registry-bridge": [
+          {
+            "evaluator_sha256": "33a9aefe16955ef6a4fd387d10db860ed94ab4c2c5af20db184f3732ff3cd6de",
+            "protocol_commit": "f70ca11",
+            "public_corpus_sha256": "f7e90c81c9f2ecf02f51f32abb10e9f3025db657acde311765a26ff5dff08368",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "33a9aefe16955ef6a4fd387d10db860ed94ab4c2c5af20db184f3732ff3cd6de",
+            "protocol_commit": "f70ca11",
+            "public_corpus_sha256": "f7e90c81c9f2ecf02f51f32abb10e9f3025db657acde311765a26ff5dff08368",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "33a9aefe16955ef6a4fd387d10db860ed94ab4c2c5af20db184f3732ff3cd6de",
+            "protocol_commit": "f70ca11",
+            "public_corpus_sha256": "f7e90c81c9f2ecf02f51f32abb10e9f3025db657acde311765a26ff5dff08368",
+            "run_number": 6
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          }
+        ],
+        "snapshot-publisher": [
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 9
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 10
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 11
+          }
+        ],
+        "workspace-boundary": [
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 9
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 10
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 11
+          }
+        ]
+      },
+      "gpt-5.6-sol": {
+        "registry-bridge": [
+          {
+            "evaluator_sha256": "33a9aefe16955ef6a4fd387d10db860ed94ab4c2c5af20db184f3732ff3cd6de",
+            "protocol_commit": "f70ca11",
+            "public_corpus_sha256": "f7e90c81c9f2ecf02f51f32abb10e9f3025db657acde311765a26ff5dff08368",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "33a9aefe16955ef6a4fd387d10db860ed94ab4c2c5af20db184f3732ff3cd6de",
+            "protocol_commit": "f70ca11",
+            "public_corpus_sha256": "f7e90c81c9f2ecf02f51f32abb10e9f3025db657acde311765a26ff5dff08368",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "33a9aefe16955ef6a4fd387d10db860ed94ab4c2c5af20db184f3732ff3cd6de",
+            "protocol_commit": "f70ca11",
+            "public_corpus_sha256": "f7e90c81c9f2ecf02f51f32abb10e9f3025db657acde311765a26ff5dff08368",
+            "run_number": 6
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          }
+        ],
+        "snapshot-publisher": [
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 9
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 10
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 11
+          }
+        ],
+        "workspace-boundary": [
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 9
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 10
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 11
+          }
+        ]
+      },
+      "grok-4.6": {
+        "registry-bridge": [
+          {
+            "evaluator_sha256": "33a9aefe16955ef6a4fd387d10db860ed94ab4c2c5af20db184f3732ff3cd6de",
+            "protocol_commit": "f70ca11",
+            "public_corpus_sha256": "f7e90c81c9f2ecf02f51f32abb10e9f3025db657acde311765a26ff5dff08368",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "33a9aefe16955ef6a4fd387d10db860ed94ab4c2c5af20db184f3732ff3cd6de",
+            "protocol_commit": "f70ca11",
+            "public_corpus_sha256": "f7e90c81c9f2ecf02f51f32abb10e9f3025db657acde311765a26ff5dff08368",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "33a9aefe16955ef6a4fd387d10db860ed94ab4c2c5af20db184f3732ff3cd6de",
+            "protocol_commit": "f70ca11",
+            "public_corpus_sha256": "f7e90c81c9f2ecf02f51f32abb10e9f3025db657acde311765a26ff5dff08368",
+            "run_number": 6
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          }
+        ],
+        "snapshot-publisher": [
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 9
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 10
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 11
+          }
+        ],
+        "workspace-boundary": [
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 9
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 10
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 11
+          }
+        ]
+      }
+    },
+    "doer": {
+      "claude-sonnet-5": {
+        "registry-bridge": [
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 6
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          }
+        ],
+        "snapshot-publisher": [
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 6
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          }
+        ],
+        "workspace-boundary": [
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 6
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          }
+        ]
+      },
+      "gpt-5.6-terra": {
+        "registry-bridge": [
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 6
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          }
+        ],
+        "snapshot-publisher": [
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 6
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          }
+        ],
+        "workspace-boundary": [
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 6
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          }
+        ]
+      },
+      "mai-code-1.1-flash": {
+        "registry-bridge": [
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 6
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          }
+        ],
+        "snapshot-publisher": [
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 6
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          }
+        ],
+        "workspace-boundary": [
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 6
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          }
+        ]
+      }
+    },
+    "planner": {
+      "claude-opus-5": {
+        "registry-bridge": [
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "16eb281",
+            "public_corpus_sha256": "a3148ddbc8b8e2362aeaf77be60d3c53ecd87cb5e2cc5c384eac0ef75a50b269",
+            "run_number": 2
+          },
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "16eb281",
+            "public_corpus_sha256": "a3148ddbc8b8e2362aeaf77be60d3c53ecd87cb5e2cc5c384eac0ef75a50b269",
+            "run_number": 3
+          },
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "16eb281",
+            "public_corpus_sha256": "a3148ddbc8b8e2362aeaf77be60d3c53ecd87cb5e2cc5c384eac0ef75a50b269",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 6
+          }
+        ],
+        "snapshot-publisher": [
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "b731964",
+            "public_corpus_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "b731964",
+            "public_corpus_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "b731964",
+            "public_corpus_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
+            "run_number": 6
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          }
+        ],
+        "workspace-boundary": [
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "b731964",
+            "public_corpus_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
+            "run_number": 1
+          },
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "b731964",
+            "public_corpus_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
+            "run_number": 2
+          },
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "b731964",
+            "public_corpus_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
+            "run_number": 3
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 5
+          }
+        ]
+      },
+      "gemini-3.7-flash": {
+        "registry-bridge": [
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "16eb281",
+            "public_corpus_sha256": "a3148ddbc8b8e2362aeaf77be60d3c53ecd87cb5e2cc5c384eac0ef75a50b269",
+            "run_number": 2
+          },
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "16eb281",
+            "public_corpus_sha256": "a3148ddbc8b8e2362aeaf77be60d3c53ecd87cb5e2cc5c384eac0ef75a50b269",
+            "run_number": 3
+          },
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "16eb281",
+            "public_corpus_sha256": "a3148ddbc8b8e2362aeaf77be60d3c53ecd87cb5e2cc5c384eac0ef75a50b269",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 6
+          }
+        ],
+        "snapshot-publisher": [
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "b731964",
+            "public_corpus_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "b731964",
+            "public_corpus_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "b731964",
+            "public_corpus_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
+            "run_number": 6
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          }
+        ],
+        "workspace-boundary": [
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "b731964",
+            "public_corpus_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
+            "run_number": 1
+          },
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "b731964",
+            "public_corpus_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
+            "run_number": 2
+          },
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "b731964",
+            "public_corpus_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
+            "run_number": 3
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 5
+          }
+        ]
+      },
+      "gpt-5.6-sol": {
+        "registry-bridge": [
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "16eb281",
+            "public_corpus_sha256": "a3148ddbc8b8e2362aeaf77be60d3c53ecd87cb5e2cc5c384eac0ef75a50b269",
+            "run_number": 2
+          },
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "16eb281",
+            "public_corpus_sha256": "a3148ddbc8b8e2362aeaf77be60d3c53ecd87cb5e2cc5c384eac0ef75a50b269",
+            "run_number": 3
+          },
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "16eb281",
+            "public_corpus_sha256": "a3148ddbc8b8e2362aeaf77be60d3c53ecd87cb5e2cc5c384eac0ef75a50b269",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 6
+          }
+        ],
+        "snapshot-publisher": [
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "b731964",
+            "public_corpus_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "b731964",
+            "public_corpus_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "b731964",
+            "public_corpus_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
+            "run_number": 6
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          }
+        ],
+        "workspace-boundary": [
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "b731964",
+            "public_corpus_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
+            "run_number": 1
+          },
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "b731964",
+            "public_corpus_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
+            "run_number": 2
+          },
+          {
+            "evaluator_sha256": "682d381607ca17c7fdeb794c15de1243f14da5e104a587b7d0bbc3abba3573af",
+            "protocol_commit": "b731964",
+            "public_corpus_sha256": "d6cfd77bc191bc0205ebcf750ad412f3848426dc93d2da88665ed26752fffe81",
+            "run_number": 3
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 5
+          }
+        ]
+      }
+    },
+    "test_author": {
+      "claude-opus-5": {
+        "registry-bridge": [
+          {
+            "evaluator_sha256": "ba4fc301064e2acfd6c78d427782a45700e7bca5896baac6f79bfab80cb3d94e",
+            "protocol_commit": "a488d98",
+            "public_corpus_sha256": "4992b090fecc22278c0451506b92ebe91cd930ed2e973629cbab2cfcb59565b0",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "ba4fc301064e2acfd6c78d427782a45700e7bca5896baac6f79bfab80cb3d94e",
+            "protocol_commit": "a488d98",
+            "public_corpus_sha256": "4992b090fecc22278c0451506b92ebe91cd930ed2e973629cbab2cfcb59565b0",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "ba4fc301064e2acfd6c78d427782a45700e7bca5896baac6f79bfab80cb3d94e",
+            "protocol_commit": "a488d98",
+            "public_corpus_sha256": "4992b090fecc22278c0451506b92ebe91cd930ed2e973629cbab2cfcb59565b0",
+            "run_number": 6
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          }
+        ],
+        "snapshot-publisher": [
+          {
+            "evaluator_sha256": "8924e344dc77e2d1eaefc0191480504cfde3cdd97fc9a761a151516f06b652bb",
+            "protocol_commit": "2b24610",
+            "public_corpus_sha256": "fcc13f6dd2cfeff35c0ae57e8acc8aca8b3dcd596731eba1994f0daa4d73b664",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "8924e344dc77e2d1eaefc0191480504cfde3cdd97fc9a761a151516f06b652bb",
+            "protocol_commit": "2b24610",
+            "public_corpus_sha256": "fcc13f6dd2cfeff35c0ae57e8acc8aca8b3dcd596731eba1994f0daa4d73b664",
+            "run_number": 8
+          },
+          {
+            "evaluator_sha256": "8924e344dc77e2d1eaefc0191480504cfde3cdd97fc9a761a151516f06b652bb",
+            "protocol_commit": "2b24610",
+            "public_corpus_sha256": "fcc13f6dd2cfeff35c0ae57e8acc8aca8b3dcd596731eba1994f0daa4d73b664",
+            "run_number": 9
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 10
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 11
+          }
+        ],
+        "workspace-boundary": [
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 8
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 9
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 10
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 11
+          }
+        ]
+      },
+      "gemini-3.7-flash": {
+        "registry-bridge": [
+          {
+            "evaluator_sha256": "ba4fc301064e2acfd6c78d427782a45700e7bca5896baac6f79bfab80cb3d94e",
+            "protocol_commit": "a488d98",
+            "public_corpus_sha256": "4992b090fecc22278c0451506b92ebe91cd930ed2e973629cbab2cfcb59565b0",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "ba4fc301064e2acfd6c78d427782a45700e7bca5896baac6f79bfab80cb3d94e",
+            "protocol_commit": "a488d98",
+            "public_corpus_sha256": "4992b090fecc22278c0451506b92ebe91cd930ed2e973629cbab2cfcb59565b0",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "ba4fc301064e2acfd6c78d427782a45700e7bca5896baac6f79bfab80cb3d94e",
+            "protocol_commit": "a488d98",
+            "public_corpus_sha256": "4992b090fecc22278c0451506b92ebe91cd930ed2e973629cbab2cfcb59565b0",
+            "run_number": 6
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          }
+        ],
+        "snapshot-publisher": [
+          {
+            "evaluator_sha256": "8924e344dc77e2d1eaefc0191480504cfde3cdd97fc9a761a151516f06b652bb",
+            "protocol_commit": "2b24610",
+            "public_corpus_sha256": "fcc13f6dd2cfeff35c0ae57e8acc8aca8b3dcd596731eba1994f0daa4d73b664",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "8924e344dc77e2d1eaefc0191480504cfde3cdd97fc9a761a151516f06b652bb",
+            "protocol_commit": "2b24610",
+            "public_corpus_sha256": "fcc13f6dd2cfeff35c0ae57e8acc8aca8b3dcd596731eba1994f0daa4d73b664",
+            "run_number": 8
+          },
+          {
+            "evaluator_sha256": "8924e344dc77e2d1eaefc0191480504cfde3cdd97fc9a761a151516f06b652bb",
+            "protocol_commit": "2b24610",
+            "public_corpus_sha256": "fcc13f6dd2cfeff35c0ae57e8acc8aca8b3dcd596731eba1994f0daa4d73b664",
+            "run_number": 9
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 10
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 11
+          }
+        ],
+        "workspace-boundary": [
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 8
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 9
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 10
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 11
+          }
+        ]
+      },
+      "gpt-5.3-codex": {
+        "registry-bridge": [
+          {
+            "evaluator_sha256": "ba4fc301064e2acfd6c78d427782a45700e7bca5896baac6f79bfab80cb3d94e",
+            "protocol_commit": "a488d98",
+            "public_corpus_sha256": "4992b090fecc22278c0451506b92ebe91cd930ed2e973629cbab2cfcb59565b0",
+            "run_number": 4
+          },
+          {
+            "evaluator_sha256": "ba4fc301064e2acfd6c78d427782a45700e7bca5896baac6f79bfab80cb3d94e",
+            "protocol_commit": "a488d98",
+            "public_corpus_sha256": "4992b090fecc22278c0451506b92ebe91cd930ed2e973629cbab2cfcb59565b0",
+            "run_number": 5
+          },
+          {
+            "evaluator_sha256": "ba4fc301064e2acfd6c78d427782a45700e7bca5896baac6f79bfab80cb3d94e",
+            "protocol_commit": "a488d98",
+            "public_corpus_sha256": "4992b090fecc22278c0451506b92ebe91cd930ed2e973629cbab2cfcb59565b0",
+            "run_number": 6
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 8
+          }
+        ],
+        "snapshot-publisher": [
+          {
+            "evaluator_sha256": "8924e344dc77e2d1eaefc0191480504cfde3cdd97fc9a761a151516f06b652bb",
+            "protocol_commit": "2b24610",
+            "public_corpus_sha256": "fcc13f6dd2cfeff35c0ae57e8acc8aca8b3dcd596731eba1994f0daa4d73b664",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "8924e344dc77e2d1eaefc0191480504cfde3cdd97fc9a761a151516f06b652bb",
+            "protocol_commit": "2b24610",
+            "public_corpus_sha256": "fcc13f6dd2cfeff35c0ae57e8acc8aca8b3dcd596731eba1994f0daa4d73b664",
+            "run_number": 8
+          },
+          {
+            "evaluator_sha256": "8924e344dc77e2d1eaefc0191480504cfde3cdd97fc9a761a151516f06b652bb",
+            "protocol_commit": "2b24610",
+            "public_corpus_sha256": "fcc13f6dd2cfeff35c0ae57e8acc8aca8b3dcd596731eba1994f0daa4d73b664",
+            "run_number": 9
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 10
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 11
+          }
+        ],
+        "workspace-boundary": [
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 7
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 8
+          },
+          {
+            "evaluator_sha256": "f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d",
+            "protocol_commit": "b9489ec",
+            "public_corpus_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+            "run_number": 9
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 10
+          },
+          {
+            "evaluator_sha256": "cbaba289e040a6c34fe8a5234b4854cf2df0157702f260ef983a14e0edf2599b",
+            "protocol_commit": "8abbfbd",
+            "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+            "run_number": 11
+          }
+        ]
+      }
+    }
+  },
+  "invalidated_cells_record": "benchmarks/model_role_v1/INVALIDATED_CELLS.json",
+  "limitations": [
+    "Doer quality scores are out of 90 because normalized token/AI-usage points could not be mapped reliably to candidate run ids.",
+    "Human-review minutes were not instrumented.",
+    "Invalidated cells are excluded and preserved separately.",
+    "Phase 1 evaluates isolated roles; no stack winner is selected."
+  ],
+  "phase2_eligible_role_finalists": {
+    "checker": [
+      "claude-opus-5",
+      "gemini-3.7-flash",
+      "grok-4.6",
+      "gpt-5.6-sol"
+    ],
+    "doer": [
+      "claude-sonnet-5",
+      "gpt-5.6-terra",
+      "mai-code-1.1-flash"
+    ],
+    "planner": [
+      "claude-opus-5",
+      "gemini-3.7-flash",
+      "gpt-5.6-sol"
+    ],
+    "test_author": [
+      "gpt-5.3-codex",
+      "gemini-3.7-flash",
+      "claude-opus-5"
+    ]
+  },
+  "phase2_status": "NOT_STARTED",
+  "public_corpus_sha256": "5bb92d97dcd08d19c6371e2d9dced157aa0a9eaa76d079407fe4d2575154b731",
+  "ranking_rules": {
+    "checker": "hard-gate pass rate first, then role_score, then worst run",
+    "doer": "hard-gate pass rate first, then role_score, then worst run; efficiency 10 points pending",
+    "planner": "role_score descending, then hard-gate pass rate, then worst run",
+    "test_author": "hard-gate pass rate first, then role_score, then worst run"
+  },
+  "rankings": {
+    "checker_tied_leaders": [
+      "claude-opus-5",
+      "gemini-3.7-flash",
+      "gpt-5.6-sol",
+      "grok-4.6"
+    ],
+    "doer": [
+      "gpt-5.6-terra",
+      "claude-sonnet-5",
+      "mai-code-1.1-flash"
+    ],
+    "planner": [
+      "claude-opus-5",
+      "gemini-3.7-flash",
+      "gpt-5.6-sol"
+    ],
+    "test_author": [
+      "gpt-5.3-codex",
+      "claude-opus-5",
+      "gemini-3.7-flash"
+    ]
+  },
+  "roles": {
+    "checker": {
+      "claude-opus-5": {
+        "efficiency_points_pending": 0,
+        "hard_gate_pass_rate": 1.0,
+        "hard_gate_passes": 15,
+        "hard_gate_total": 15,
+        "mean_all_runs": 100.0,
+        "role_score": 100.0,
+        "scenarios": {
+          "registry-bridge": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 100.0,
+            "median": 100.0,
+            "runs": [
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "scores": [
+              100.0,
+              100.0,
+              100.0,
+              100.0,
+              100.0
+            ],
+            "worst": 100.0
+          },
+          "snapshot-publisher": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 100.0,
+            "median": 100.0,
+            "runs": [
+              7,
+              8,
+              9,
+              10,
+              11
+            ],
+            "scores": [
+              100.0,
+              100.0,
+              100.0,
+              100.0,
+              100.0
+            ],
+            "worst": 100.0
+          },
+          "workspace-boundary": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 100.0,
+            "median": 100.0,
+            "runs": [
+              7,
+              8,
+              9,
+              10,
+              11
+            ],
+            "scores": [
+              100.0,
+              100.0,
+              100.0,
+              100.0,
+              100.0
+            ],
+            "worst": 100.0
+          }
+        },
+        "score_ceiling": 100,
+        "worst_run": 100.0
+      },
+      "gemini-3.7-flash": {
+        "efficiency_points_pending": 0,
+        "hard_gate_pass_rate": 1.0,
+        "hard_gate_passes": 15,
+        "hard_gate_total": 15,
+        "mean_all_runs": 99.412,
+        "role_score": 100.0,
+        "scenarios": {
+          "registry-bridge": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 98.236,
+            "median": 100.0,
+            "runs": [
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "scores": [
+              100.0,
+              100.0,
+              100.0,
+              91.18,
+              100.0
+            ],
+            "worst": 91.18
+          },
+          "snapshot-publisher": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 100.0,
+            "median": 100.0,
+            "runs": [
+              7,
+              8,
+              9,
+              10,
+              11
+            ],
+            "scores": [
+              100.0,
+              100.0,
+              100.0,
+              100.0,
+              100.0
+            ],
+            "worst": 100.0
+          },
+          "workspace-boundary": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 100.0,
+            "median": 100.0,
+            "runs": [
+              7,
+              8,
+              9,
+              10,
+              11
+            ],
+            "scores": [
+              100.0,
+              100.0,
+              100.0,
+              100.0,
+              100.0
+            ],
+            "worst": 100.0
+          }
+        },
+        "score_ceiling": 100,
+        "worst_run": 91.18
+      },
+      "gpt-5.6-sol": {
+        "efficiency_points_pending": 0,
+        "hard_gate_pass_rate": 1.0,
+        "hard_gate_passes": 15,
+        "hard_gate_total": 15,
+        "mean_all_runs": 98.824,
+        "role_score": 100.0,
+        "scenarios": {
+          "registry-bridge": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 96.47200000000001,
+            "median": 100.0,
+            "runs": [
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "scores": [
+              91.18,
+              100.0,
+              100.0,
+              91.18,
+              100.0
+            ],
+            "worst": 91.18
+          },
+          "snapshot-publisher": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 100.0,
+            "median": 100.0,
+            "runs": [
+              7,
+              8,
+              9,
+              10,
+              11
+            ],
+            "scores": [
+              100.0,
+              100.0,
+              100.0,
+              100.0,
+              100.0
+            ],
+            "worst": 100.0
+          },
+          "workspace-boundary": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 100.0,
+            "median": 100.0,
+            "runs": [
+              7,
+              8,
+              9,
+              10,
+              11
+            ],
+            "scores": [
+              100.0,
+              100.0,
+              100.0,
+              100.0,
+              100.0
+            ],
+            "worst": 100.0
+          }
+        },
+        "score_ceiling": 100,
+        "worst_run": 91.18
+      },
+      "grok-4.6": {
+        "efficiency_points_pending": 0,
+        "hard_gate_pass_rate": 1.0,
+        "hard_gate_passes": 15,
+        "hard_gate_total": 15,
+        "mean_all_runs": 99.23,
+        "role_score": 100.0,
+        "scenarios": {
+          "registry-bridge": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 97.69,
+            "median": 100.0,
+            "runs": [
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "scores": [
+              100.0,
+              100.0,
+              100.0,
+              100.0,
+              88.45
+            ],
+            "worst": 88.45
+          },
+          "snapshot-publisher": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 100.0,
+            "median": 100.0,
+            "runs": [
+              7,
+              8,
+              9,
+              10,
+              11
+            ],
+            "scores": [
+              100.0,
+              100.0,
+              100.0,
+              100.0,
+              100.0
+            ],
+            "worst": 100.0
+          },
+          "workspace-boundary": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 100.0,
+            "median": 100.0,
+            "runs": [
+              7,
+              8,
+              9,
+              10,
+              11
+            ],
+            "scores": [
+              100.0,
+              100.0,
+              100.0,
+              100.0,
+              100.0
+            ],
+            "worst": 100.0
+          }
+        },
+        "score_ceiling": 100,
+        "worst_run": 88.45
+      }
+    },
+    "doer": {
+      "claude-sonnet-5": {
+        "efficiency_points_pending": 10,
+        "hard_gate_pass_rate": 1.0,
+        "hard_gate_passes": 15,
+        "hard_gate_total": 15,
+        "mean_all_runs": 89.0,
+        "role_score": 90.0,
+        "scenarios": {
+          "registry-bridge": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 90.0,
+            "median": 90.0,
+            "runs": [
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "scores": [
+              90.0,
+              90.0,
+              90.0,
+              90.0,
+              90.0
+            ],
+            "worst": 90.0
+          },
+          "snapshot-publisher": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 87.0,
+            "median": 90.0,
+            "runs": [
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "scores": [
+              90.0,
+              80.0,
+              90.0,
+              85.0,
+              90.0
+            ],
+            "worst": 80.0
+          },
+          "workspace-boundary": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 90.0,
+            "median": 90.0,
+            "runs": [
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "scores": [
+              90.0,
+              90.0,
+              90.0,
+              90.0,
+              90.0
+            ],
+            "worst": 90.0
+          }
+        },
+        "score_ceiling": 90,
+        "worst_run": 80.0
+      },
+      "gpt-5.6-terra": {
+        "efficiency_points_pending": 10,
+        "hard_gate_pass_rate": 1.0,
+        "hard_gate_passes": 15,
+        "hard_gate_total": 15,
+        "mean_all_runs": 90.0,
+        "role_score": 90.0,
+        "scenarios": {
+          "registry-bridge": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 90.0,
+            "median": 90.0,
+            "runs": [
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "scores": [
+              90.0,
+              90.0,
+              90.0,
+              90.0,
+              90.0
+            ],
+            "worst": 90.0
+          },
+          "snapshot-publisher": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 90.0,
+            "median": 90.0,
+            "runs": [
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "scores": [
+              90.0,
+              90.0,
+              90.0,
+              90.0,
+              90.0
+            ],
+            "worst": 90.0
+          },
+          "workspace-boundary": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 90.0,
+            "median": 90.0,
+            "runs": [
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "scores": [
+              90.0,
+              90.0,
+              90.0,
+              90.0,
+              90.0
+            ],
+            "worst": 90.0
+          }
+        },
+        "score_ceiling": 90,
+        "worst_run": 90.0
+      },
+      "mai-code-1.1-flash": {
+        "efficiency_points_pending": 10,
+        "hard_gate_pass_rate": 1.0,
+        "hard_gate_passes": 15,
+        "hard_gate_total": 15,
+        "mean_all_runs": 84.0,
+        "role_score": 85.0,
+        "scenarios": {
+          "registry-bridge": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 88.0,
+            "median": 90.0,
+            "runs": [
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "scores": [
+              90.0,
+              90.0,
+              90.0,
+              90.0,
+              80.0
+            ],
+            "worst": 80.0
+          },
+          "snapshot-publisher": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 78.0,
+            "median": 75.0,
+            "runs": [
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "scores": [
+              75.0,
+              85.0,
+              75.0,
+              75.0,
+              80.0
+            ],
+            "worst": 75.0
+          },
+          "workspace-boundary": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 86.0,
+            "median": 90.0,
+            "runs": [
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "scores": [
+              90.0,
+              80.0,
+              90.0,
+              80.0,
+              90.0
+            ],
+            "worst": 80.0
+          }
+        },
+        "score_ceiling": 90,
+        "worst_run": 75.0
+      }
+    },
+    "planner": {
+      "claude-opus-5": {
+        "efficiency_points_pending": 0,
+        "hard_gate_pass_rate": 1.0,
+        "hard_gate_passes": 15,
+        "hard_gate_total": 15,
+        "mean_all_runs": 94.66666666666667,
+        "role_score": 95.0,
+        "scenarios": {
+          "registry-bridge": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 97.0,
+            "median": 97.5,
+            "runs": [
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "scores": [
+              97.5,
+              97.5,
+              97.5,
+              95.0,
+              97.5
+            ],
+            "worst": 95.0
+          },
+          "snapshot-publisher": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 92.5,
+            "median": 92.5,
+            "runs": [
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "scores": [
+              92.5,
+              92.5,
+              92.5,
+              92.5,
+              92.5
+            ],
+            "worst": 92.5
+          },
+          "workspace-boundary": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 94.5,
+            "median": 95.0,
+            "runs": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "scores": [
+              100.0,
+              95.0,
+              95.0,
+              87.5,
+              95.0
+            ],
+            "worst": 87.5
+          }
+        },
+        "score_ceiling": 100,
+        "worst_run": 87.5
+      },
+      "gemini-3.7-flash": {
+        "efficiency_points_pending": 0,
+        "hard_gate_pass_rate": 1.0,
+        "hard_gate_passes": 15,
+        "hard_gate_total": 15,
+        "mean_all_runs": 90.55666666666667,
+        "role_score": 93.05666666666667,
+        "scenarios": {
+          "registry-bridge": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 90.67,
+            "median": 91.67,
+            "runs": [
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "scores": [
+              84.17,
+              91.67,
+              94.17,
+              91.67,
+              91.67
+            ],
+            "worst": 84.17
+          },
+          "snapshot-publisher": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 91.0,
+            "median": 92.5,
+            "runs": [
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "scores": [
+              92.5,
+              92.5,
+              85.0,
+              92.5,
+              92.5
+            ],
+            "worst": 85.0
+          },
+          "workspace-boundary": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 90.0,
+            "median": 95.0,
+            "runs": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "scores": [
+              95.0,
+              95.0,
+              95.0,
+              77.5,
+              87.5
+            ],
+            "worst": 77.5
+          }
+        },
+        "score_ceiling": 100,
+        "worst_run": 77.5
+      },
+      "gpt-5.6-sol": {
+        "efficiency_points_pending": 0,
+        "hard_gate_pass_rate": 1.0,
+        "hard_gate_passes": 15,
+        "hard_gate_total": 15,
+        "mean_all_runs": 91.056,
+        "role_score": 92.5,
+        "scenarios": {
+          "registry-bridge": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 91.168,
+            "median": 95.0,
+            "runs": [
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "scores": [
+              95.0,
+              95.0,
+              95.0,
+              84.17,
+              86.67
+            ],
+            "worst": 84.17
+          },
+          "snapshot-publisher": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 91.0,
+            "median": 92.5,
+            "runs": [
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "scores": [
+              92.5,
+              92.5,
+              92.5,
+              92.5,
+              85.0
+            ],
+            "worst": 85.0
+          },
+          "workspace-boundary": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 91.0,
+            "median": 90.0,
+            "runs": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "scores": [
+              90.0,
+              90.0,
+              95.0,
+              90.0,
+              90.0
+            ],
+            "worst": 90.0
+          }
+        },
+        "score_ceiling": 100,
+        "worst_run": 84.17
+      }
+    },
+    "test_author": {
+      "claude-opus-5": {
+        "efficiency_points_pending": 0,
+        "hard_gate_pass_rate": 0.6,
+        "hard_gate_passes": 9,
+        "hard_gate_total": 15,
+        "mean_all_runs": 84.99866666666667,
+        "role_score": 84.37333333333333,
+        "scenarios": {
+          "registry-bridge": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 92.0,
+            "median": 90.0,
+            "runs": [
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "scores": [
+              90.0,
+              90.0,
+              90.0,
+              90.0,
+              100.0
+            ],
+            "worst": 90.0
+          },
+          "snapshot-publisher": {
+            "hard_gate_passes": 4,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "FAIL",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 86.248,
+            "median": 88.12,
+            "runs": [
+              7,
+              8,
+              9,
+              10,
+              11
+            ],
+            "scores": [
+              90.0,
+              75.0,
+              90.0,
+              88.12,
+              88.12
+            ],
+            "worst": 75.0
+          },
+          "workspace-boundary": {
+            "hard_gate_passes": 0,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "FAIL",
+              "FAIL",
+              "FAIL",
+              "FAIL",
+              "FAIL"
+            ],
+            "mean": 76.748,
+            "median": 75.0,
+            "runs": [
+              7,
+              8,
+              9,
+              10,
+              11
+            ],
+            "scores": [
+              75.0,
+              73.12,
+              83.12,
+              81.25,
+              71.25
+            ],
+            "worst": 71.25
+          }
+        },
+        "score_ceiling": 100,
+        "worst_run": 71.25
+      },
+      "gemini-3.7-flash": {
+        "efficiency_points_pending": 0,
+        "hard_gate_pass_rate": 0.4,
+        "hard_gate_passes": 6,
+        "hard_gate_total": 15,
+        "mean_all_runs": 81.58266666666667,
+        "role_score": 88.74666666666667,
+        "scenarios": {
+          "registry-bridge": {
+            "hard_gate_passes": 5,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 98.0,
+            "median": 100.0,
+            "runs": [
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "scores": [
+              90.0,
+              100.0,
+              100.0,
+              100.0,
+              100.0
+            ],
+            "worst": 90.0
+          },
+          "snapshot-publisher": {
+            "hard_gate_passes": 1,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "FAIL_MISSING_TESTS",
+              "FAIL",
+              "PASS",
+              "FAIL",
+              "FAIL"
+            ],
+            "mean": 66.5,
+            "median": 83.12,
+            "runs": [
+              7,
+              8,
+              9,
+              10,
+              11
+            ],
+            "scores": [
+              0.0,
+              83.12,
+              89.38,
+              75.0,
+              85.0
+            ],
+            "worst": 0.0
+          },
+          "workspace-boundary": {
+            "hard_gate_passes": 0,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "FAIL",
+              "FAIL",
+              "FAIL",
+              "FAIL",
+              "FAIL"
+            ],
+            "mean": 80.248,
+            "median": 83.12,
+            "runs": [
+              7,
+              8,
+              9,
+              10,
+              11
+            ],
+            "scores": [
+              75.0,
+              85.0,
+              83.12,
+              73.12,
+              85.0
+            ],
+            "worst": 73.12
+          }
+        },
+        "score_ceiling": 100,
+        "worst_run": 0.0
+      },
+      "gpt-5.3-codex": {
+        "efficiency_points_pending": 0,
+        "hard_gate_pass_rate": 0.7333333333333333,
+        "hard_gate_passes": 11,
+        "hard_gate_total": 15,
+        "mean_all_runs": 86.37266666666667,
+        "role_score": 88.12333333333333,
+        "scenarios": {
+          "registry-bridge": {
+            "hard_gate_passes": 4,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "FAIL",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 92.624,
+            "median": 90.0,
+            "runs": [
+              4,
+              5,
+              6,
+              7,
+              8
+            ],
+            "scores": [
+              90.0,
+              90.0,
+              83.12,
+              100.0,
+              100.0
+            ],
+            "worst": 83.12
+          },
+          "snapshot-publisher": {
+            "hard_gate_passes": 3,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "PASS",
+              "PASS",
+              "FAIL",
+              "FAIL"
+            ],
+            "mean": 82.122,
+            "median": 88.12,
+            "runs": [
+              7,
+              8,
+              9,
+              10,
+              11
+            ],
+            "scores": [
+              88.12,
+              88.12,
+              88.12,
+              75.0,
+              71.25
+            ],
+            "worst": 71.25
+          },
+          "workspace-boundary": {
+            "hard_gate_passes": 4,
+            "hard_gate_total": 5,
+            "hard_gates": [
+              "PASS",
+              "FAIL",
+              "PASS",
+              "PASS",
+              "PASS"
+            ],
+            "mean": 84.372,
+            "median": 86.25,
+            "runs": [
+              7,
+              8,
+              9,
+              10,
+              11
+            ],
+            "scores": [
+              86.25,
+              73.12,
+              86.25,
+              88.12,
+              88.12
+            ],
+            "worst": 73.12
+          }
+        },
+        "score_ceiling": 100,
+        "worst_run": 71.25
+      }
+    }
+  },
+  "schema": "raptor-model-role-phase1-result-v1",
+  "stack_selected": false,
+  "status": "PHASE_1_COMPLETE_QUALITY_ONLY_EFFICIENCY_PENDING"
+}

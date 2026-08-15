@@ -30,3 +30,8 @@ positive and negative results. Until then, every result record binds the
 embargoed evaluator by SHA-256 without exposing its content.
 
 See [`SCORING.md`](SCORING.md) for the exact scoring mechanism.
+
+Phase 1 results are published in
+[`docs/reference/model-role-phase1-results-2026-08.md`](../../docs/reference/model-role-phase1-results-2026-08.md)
+with the machine record at
+[`data/eval/model_role_phase1_result_2026-08-15.json`](../../data/eval/model_role_phase1_result_2026-08-15.json).
