@@ -400,7 +400,14 @@
       "GPT-5.6 Luna",
       "MAI-Code-1-Flash"
     ],
-    "validation": "Official sources position GPT-5.3-Codex as an agentic coding model, MAI-Code-1.1-Flash as a small-tier coding model, Sonnet 5 for strong everyday/CLI agentic coding, Terra as a balanced agentic-coding default, Sol for high-ceiling large-codebase reasoning, and Luna for smaller cost-efficient tasks."
+    "planner_primary_peer_pool": [
+      "Claude Opus 5",
+      "GPT-5.6 Sol",
+      "GPT-5.6 Terra",
+      "Gemini 3.7 Flash",
+      "Grok 4.6"
+    ],
+    "validation": "Official sources position GPT-5.3-Codex as an agentic coding model, MAI-Code-1.1-Flash as a small-tier coding model, Sonnet 5 for strong everyday/CLI agentic coding, Terra as a balanced agentic-coding default, Sol for high-ceiling large-codebase reasoning, Luna for smaller cost-efficient tasks, and Gemini 3.7 Flash for complex coding, agents, reliable multi-step execution, tunable high reasoning, codebase research, and verification."
   },
   "baseline_conclusion": "The incumbent stack has strong eventual quality on audited tasks but substantial repair burden and incomplete first-pass realism. Historical evidence is sufficient to define probes and a baseline, not to rank model families. The prospective comparison is multi-model and role-matched; no winner is selected."
 }

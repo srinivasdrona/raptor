@@ -400,6 +400,16 @@ official_role_positioning_validation:
         GitHub positions Sol for highest-ceiling large-codebase reasoning,
         Terra as the balanced agentic-coding default, and Luna as a lightweight
         cost-efficient option for smaller tasks.
+    - url: https://ai.google.dev/gemini-api/docs/latest-model
+      finding: >-
+        Google describes Gemini 3.7 Flash as its most intelligent workhorse
+        model yet for coding and agents, built for complex coding, agentic
+        workflows, reliable multi-step execution, and tunable high reasoning.
+    - url: https://github.blog/changelog/2026-08-13-gemini-3-7-flash-is-now-available-in-github-copilot/
+      finding: >-
+        GitHub reports improvements in agentic coding, codebase research,
+        verification, code quality, and final-output presentation during
+        complex coding tasks.
   validation_conclusion: >-
     A two-model Sonnet-versus-MAI comparison is too narrow. GPT-5.3-Codex is an
     explicit coding-specialized peer and Terra is an official balanced
@@ -442,7 +452,12 @@ role_model_pools:
       - Claude Opus 5
       - GPT-5.6 Sol
       - GPT-5.6 Terra
+      - Gemini 3.7 Flash
       - Grok 4.6
+    inclusion_note: >-
+      Gemini 3.7 Flash is included because official sources support complex
+      multi-step execution, tunable high reasoning, codebase research, and
+      verification. Its Flash label is not a valid reason to preclude it.
   checker:
     historical_anchor: GPT-5.4
     primary_peer_pool:
@@ -481,6 +496,11 @@ multi_model_screen:
   anti_combinatorial_rule: >-
     Do not run every possible model permutation. Isolate roles first, advance
     finalists, then test only governance-valid stack combinations.
+  final_stack_diversity_rule: >-
+    Role-isolation winners do not automatically form the selected stack.
+    Evaluate correlated-family risk explicitly. Any reduction from the current
+    four-family diversity requires evidence that the quality gain outweighs the
+    lost independence and an explicit owner governance decision.
 
 tournament_sequence:
   - id: T0

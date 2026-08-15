@@ -64,6 +64,7 @@ A two-model Sonnet-versus-MAI comparison would be too narrow. Official product d
 - **MAI-Code-1.1-Flash** is a small-tier coding model improved for coding quality, instruction following and tool use, positioned for lightweight cost-efficient coding workflows ([GitHub](https://github.blog/changelog/2026-08-11-mai-code-1-1-flash-available-in-github-copilot/)).
 - **Claude Sonnet 5** is positioned for everyday development and agentic workflows, with particularly strong CLI-style results in GitHub's internal testing ([GitHub](https://github.blog/changelog/2026-06-30-claude-sonnet-5-is-generally-available-for-github-copilot/)).
 - **GPT-5.6 Terra** is the balanced agentic-coding default; **Sol** targets high-ceiling large-codebase reasoning and **Luna** smaller cost-efficient tasks ([GitHub](https://github.blog/changelog/2026-07-09-openais-gpt-5-6-sol-terra-and-luna-are-now-available-in-github-copilot/)).
+- **Gemini 3.7 Flash** is described by Google as its most intelligent workhorse model yet for coding and agents, built for reliable multi-step execution with tunable high reasoning; GitHub reports improved codebase research and verification on complex coding tasks ([Google](https://ai.google.dev/gemini-api/docs/latest-model), [GitHub](https://github.blog/changelog/2026-08-13-gemini-3-7-flash-is-now-available-in-github-copilot/)).
 
 Those descriptions justify **eligibility**, not scores. The primary doer comparison therefore includes Sonnet 5, GPT-5.3-Codex, GPT-5.6 Terra and MAI-Code-1.1-Flash on the same complete task set. Sol and Opus 5 form a high-reasoning supplement on complex tasks; Luna and MAI-Code-1-Flash form an efficiency supplement on smaller tasks. Results remain stratified so a lightweight model is not misleadingly declared an unconditional winner or loser.
 
@@ -71,12 +72,14 @@ The other role pools are also multi-model:
 
 | Role | Primary comparison pool |
 |---|---|
-| Planner | Opus 5 · GPT-5.6 Sol · GPT-5.6 Terra · Grok 4.6 |
+| Planner | Opus 5 · GPT-5.6 Sol · GPT-5.6 Terra · Gemini 3.7 Flash · Grok 4.6 |
 | Test author | Gemini 3.7 Flash · MAI-Code-1.1-Flash · GPT-5.3-Codex · Opus 5 |
 | Doer | Sonnet 5 · GPT-5.3-Codex · GPT-5.6 Terra · MAI-Code-1.1-Flash |
 | Checker | GPT-5.4 · GPT-5.6 Sol · Opus 5 · Grok 4.6 · Gemini 3.7 Flash |
 
 The tournament uses successive halving: all primary peers run the same three-task screen with three repeats; hard-gate failures are removed; the top two or three per role run the full corpus with five repeats. Only then are a few governance-valid full stacks assembled. This preserves attribution without attempting every possible permutation.
+
+Gemini was initially omitted from the planner pool because its `Flash` label was treated as a speed/test-author signal. That was not evidence-based. Planner eligibility is now determined by observed planning metrics, not model naming. If Gemini wins more than one isolated role, the final stack still separately evaluates whether reusing one family would create correlated blind spots; role wins do not automatically override the existing four-family independence control.
 
 ## Publication and launch gate
 
