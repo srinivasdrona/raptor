@@ -165,6 +165,10 @@ test-author cell was invalidated because the evaluator omitted public dot-only v
 `.\\`. Corpus v1.0.6 / evaluator v1.0.4 are frozen at `d3b20146…552213` /
 `f333a5a5…99d45d`.
 
+The first registry checker cell was invalidated because `TEST_GAP` was intentionally seeded but
+omitted from the expected finding set, penalizing correct reports as false positives. Corpus
+v1.0.7 / evaluator v1.0.5 are frozen at `f7e90c81…f08368` / `33a9aefe…3cd6de`.
+
 ## Health Rollup
 
 > *Module built ≠ live run executed.* The Tier-1/2 code path and the validation harness are **built

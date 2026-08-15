@@ -1691,6 +1691,10 @@ todos:
     invalidated because the reference omitted public dot-only variants. Corpus v1.0.6 / evaluator
     v1.0.4 are frozen at d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213 /
     f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d.
+    The first registry checker cell was invalidated because TEST_GAP was seeded but omitted from
+    the expected set. Corpus v1.0.7 / evaluator v1.0.5 are frozen at
+    f7e90c81c9f2ecf02f51f32abb10e9f3025db657acde311765a26ff5dff08368 /
+    33a9aefe16955ef6a4fd387d10db860ed94ab4c2c5af20db184f3732ff3cd6de.
     Gold references reach their designed maxima.'
   status: done
   depends_on:
