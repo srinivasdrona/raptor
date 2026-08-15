@@ -1686,6 +1686,11 @@ todos:
     found by gold smoke and repaired. Corpus v1.0.4 / evaluator v1.0.3 are frozen at
     fcc13f6dd2cfeff35c0ae57e8acc8aca8b3dcd596731eba1994f0daa4d73b664 /
     8924e344dc77e2d1eaefc0191480504cfde3cdd97fc9a761a151516f06b652bb.
+    The first doer registry cell was invalidated because the system prompt was copied after initial
+    hashing and falsely counted as candidate scope drift. The first boundary test-author cell was
+    invalidated because the reference omitted public dot-only variants. Corpus v1.0.6 / evaluator
+    v1.0.4 are frozen at d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213 /
+    f333a5a5fe72504eda9c7aa583821d6fee7358bc0c486fd570d90ae78899d45d.
     Gold references reach their designed maxima.'
   status: done
   depends_on:

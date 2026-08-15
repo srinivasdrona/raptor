@@ -159,6 +159,12 @@ output-parent behavior and Unicode canonicalization remained implicit. Gold smok
 stale noncanonical mutant. Corpus v1.0.4 / evaluator v1.0.3 make the behavior explicit and are
 frozen at `fcc13f6d…73b664` / `8924e344…b652bb`.
 
+The first doer registry cell was invalidated because a system-copied prompt was falsely counted as
+candidate scope drift; materialization now hashes the prompt before release. The first boundary
+test-author cell was invalidated because the evaluator omitted public dot-only variants `./` and
+`.\\`. Corpus v1.0.6 / evaluator v1.0.4 are frozen at `d3b20146…552213` /
+`f333a5a5…99d45d`.
+
 ## Health Rollup
 
 > *Module built ≠ live run executed.* The Tier-1/2 code path and the validation harness are **built

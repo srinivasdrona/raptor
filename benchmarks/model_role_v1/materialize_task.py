@@ -27,6 +27,7 @@ def materialize(scenario: str, role: str, output: Path) -> None:
 
     output.mkdir(parents=True)
     copy_tree(source / "artifacts", output / "artifacts")
+    shutil.copy2(ROOT / "CANDIDATE_PROMPT.md", output / "CANDIDATE_PROMPT.md")
 
     if role == "planner":
         shutil.copy2(source / "planner" / "BRIEF.md", output / "BRIEF.md")

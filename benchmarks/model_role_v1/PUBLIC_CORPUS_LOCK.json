@@ -1,17 +1,17 @@
 {
   "aggregate_basis": "SHA-256 of compact sorted JSON mapping relative path to file SHA-256; lock files excluded.",
-  "aggregate_sha256": "fcc13f6dd2cfeff35c0ae57e8acc8aca8b3dcd596731eba1994f0daa4d73b664",
-  "corpus_version": "1.0.4",
+  "aggregate_sha256": "d3b201469e3740c9dc480652e27ca68c523c249d0e9f36ee3a544cd4ba552213",
+  "corpus_version": "1.0.6",
   "file_count": 47,
   "files": {
     "CANDIDATE_PROMPT.md": "b1ac41594f4d0bf8b296e139bb160cc7fa3beceefddd21950cffb08757e8c30c",
-    "CORPUS_MANIFEST.yaml": "8b1547766d0b5ef5b0183a522e98c6310caa111e1b4bb826ae68875fc1098774",
+    "CORPUS_MANIFEST.yaml": "1374e493b1747ba809aaaf787589994fc528658dc92efb96674af0655c65b699",
     "GOLD_SMOKE_RESULT.json": "f1adb9b51e1f71b203979a1f26f1e985afecb669e629362886e13fa5322efb45",
-    "INVALIDATED_CELLS.json": "82b4d696015ad29d0688aa8283bc5f09bfbb21f949f6f244813e51cd492e12ef",
+    "INVALIDATED_CELLS.json": "c257cb99b4886773f7c8526352da26fa17f6301eba980f78b82141a6d1518702",
     "README.md": "0478aafc731a0b835141cc22e6f5f9eda3ffd3156919432ed57f62eb46dc89cb",
-    "RUN_PROTOCOL.yaml": "0c8bdf7f733efba157810d934e1fb495028109e377608f776137d7a3d668585b",
+    "RUN_PROTOCOL.yaml": "fc8a7f86ba5a1df3ca05c074996261197b53f13f57c9e2d6de6850bb95eee513",
     "SCORING.md": "bc5d588305c200e22a319f6a1d2640e4ea9afdff2e185b076ff74a14f41e78e8",
-    "materialize_task.py": "20ad0666044a19f79626159f5ae06d52a0ebecb14642af57a54ecbd66ad19581",
+    "materialize_task.py": "df242b9b79e1f8d5b2dfec2c611f2587c50e02a9e888f3a41227c9620ad69e48",
     "scenarios/registry-bridge/artifacts/map_lock.yaml": "645b48ec9c39a62963488ea9bf98bbb17ec7bbb2769420e0ec531fd92c906f7c",
     "scenarios/registry-bridge/artifacts/map_manifest.yaml": "55ec896e003a45812a37b603dfc4152087bde089653456fafac35d33857902fc",
     "scenarios/registry-bridge/artifacts/registration.yaml": "92bb3c7f3a585ab1365b1c1ffce966181387c0cc20a3c929e2881218b0d306a8",
@@ -52,7 +52,7 @@
     "scenarios/workspace-boundary/test_author/TASK.md": "727507591dcbab3777687abe6b4300a09a95ee175f095ccbbdf00155ad8d5f58",
     "scenarios/workspace-boundary/visible_tests/tests/test_visible.py": "c906bb732afd6d2851b5c9ccb09e0f3a2599bd5cf0a2de80f9eb997acd182672"
   },
-  "generated_at_utc": "2026-08-15T12:21:02.579323Z",
+  "generated_at_utc": "2026-08-15T12:46:03.853401Z",
   "schema": "raptor-model-role-public-corpus-lock-v1",
-  "status": "FROZEN_BEFORE_FIRST_VALID_SNAPSHOT_TEST_AUTHOR_RUN"
+  "status": "FROZEN_BEFORE_FIRST_VALID_BOUNDARY_TEST_AUTHOR_RUN"
 }
