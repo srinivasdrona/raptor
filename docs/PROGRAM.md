@@ -172,11 +172,17 @@ pending `STRATEGY.md` Part II §10 — ADR-0003.)*
   `ENGINEERING_PIPELINE_BEHAVIOUR`; `DESIGN_ONLY_NOT_EXECUTED`) and
   `atlas-independent-validation-panel` (scientific; `BLOCKED_SOURCE_DIVERSITY`). No membership, no
   candidate, no run.
+- **Atlas panel rubric v2 (ADR-0019):** 🟡 **POST-HOC INTERPRETATION LAYER — ADDITIVE, NOTHING
+  APPROVED.** The frozen 2026-08-06 machine result stays `INFEASIBLE_PANEL` under protocol
+  v1.0.4; rubric v2 (`rare-disease-specialist-literature-v1`) adds the contextual outcome
+  `EXPERT_ADJUDICATION_REQUIRED` with `panel_selected: false`, `panel_approved: false`,
+  `expert_adjudication: PENDING`, `independent_validation: NOT_ESTABLISHED` and claim ceiling
+  `NONE_NO_PANEL_EXISTS`. Zero adjudication records exist.
 - **RAPTOR RescueScreen (ADR-0018):** 🔴 **DESIGNED — ENTRY GATES UNSATISFIED.** Research-only,
   separately versioned structural-rescue lane; all five entry gates are `NOT_SATISFIED`, so no
   stage is reachable. No compound, no screen, no docking, no recommendation.
 
-## Atlas panel products and RAPTOR RescueScreen — designed, not executed (ADR-0017 / ADR-0018)
+## Atlas panel products, rubric v2 and RAPTOR RescueScreen — designed, not executed (ADR-0017 / ADR-0018 / ADR-0019)
 
 > **Nothing in this section has been executed.** No panel membership exists, no candidate or
 > compound is named or selected, no screening has been run, no docking score exists, and no
@@ -197,6 +203,37 @@ were unresolved; every stratum had zero coverage at every attempted size. Becaus
 completed exhaustively and well inside budget, the shortage is in the **substrate**, not the
 algorithm — and the remedy is registered, lineage-mapped, span-verifiable source expansion, not
 weaker constraints.
+
+**Machine result and contextual interpretation, side by side (ADR-0019).** Both are published;
+neither is cited alone. The contextual column is an *additive* post-hoc reading and does not
+edit, re-run, reinterpret in place or supersede the machine column.
+
+| | **Machine result** (executed) | **Contextual interpretation** (post-hoc) |
+|---|---|---|
+| Rubric | `atlas-phase2-panel-selection-protocol` **1.0.4** (frozen, prospectively registered) | `atlas-panel-rubric` **2.0.0**, profile `rare-disease-specialist-literature-v1` |
+| Outcome | **`INFEASIBLE_PANEL`** (class `INFEASIBLE_UNDER_RUBRIC`) | **`EXPERT_ADJUDICATION_REQUIRED`** — a pending state, **not** a result |
+| Panel selected | **no** | **no** |
+| Panel approved | **no** | **no** |
+| Independent validation | not expressible | **`NOT_ESTABLISHED`** |
+| Expert adjudication | not expressible | **`PENDING`** — zero adjudication records exist |
+| Claim ceiling | not expressible | **`NONE_NO_PANEL_EXISTS`** |
+| Evidence-package verdict | not expressible | **`NOT_FAILED`** — the Gate 1–7 packages did not fail; the panel-level independence constraint was unsatisfiable |
+| Prospective state | `PROSPECTIVE_REGISTERED` | **`POST_HOC`** — the genuine downgrade; the interpretation is weaker evidence than the run it describes |
+| Record | [`tsc2_phase2_panel_selection_run_2026-08-06.json`](../data/atlas/tsc2_phase2_panel_selection_run_2026-08-06.json) · `5f5b0918…cfffd` | [`tsc2_phase2_panel_rubric_v2_readjudication_2026-08-15.json`](../data/atlas/tsc2_phase2_panel_rubric_v2_readjudication_2026-08-15.json) · content `5fad899e…87d44` |
+
+Rubric v2 ([`atlas-panel-rubric-v2.yaml`](project/specs/atlas-panel-rubric-v2.yaml), SHA-256
+`b7a642c9…13d05`) reports fifteen independent axes instead of one verdict, fixes nine
+non-waivable dimensions (identity/replay, provenance and lawful access, exact spans, assay and
+model context, contradiction disclosure, dedupe, complete dispositions, the leakage firewall,
+immutable records) and four contextually adjudicable ones (lineage minimum P2, assay
+concentration D3, model-system diversity D2, panel balance/size). **Scarcity lowers claim
+ceilings; it never strengthens evidence, and no adjudication can convert dependent evidence into
+independent replication.** A hash-bound post-hoc diagnostic shows that removing P2 alone or D3
+alone left all levels infeasible; removing both was still insufficient at L0-R5 and produced
+feasible subsets only at R6/R7, after the registered ladder's earlier relaxations were active.
+The diagnostic has empty membership and is **not** a selection, a panel or authorization to weaken
+any constraint. Public write-up:
+[*Seven $TSC2$ Variants Reached the Human-Review Boundary*](blog/2026-08-15-seven-variants-human-review-boundary.md).
 
 | | **Technical Coverage Panel** | **Independent Validation Panel** |
 |---|---|---|

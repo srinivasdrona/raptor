@@ -1,0 +1,668 @@
+# RAPTOR Atlas panel RUBRIC v2 -- versioned interpretation rubric.
+#
+# This file is a RUBRIC. It contains NO code, NO tests, NO candidate identity,
+# NO candidate count, NO functional result, NO selection, NO classification and
+# NO human approval. It does not execute, re-execute, re-run, re-sign, re-hash,
+# edit, reinterpret in place or supersede any run record.
+#
+# It defines (a) a GENERAL versioned-rubric change mechanism for RAPTOR
+# adjudication rubrics, and (b) a FIRST context profile for rare-disease
+# specialist literature, applied post hoc to the audited 2026-08-06
+# INFEASIBLE_PANEL result.
+#
+# The machine result is immutable. This rubric ADDS a contextual layer beside
+# it. It never replaces, weakens or overwrites it. Scarcity LOWERS claim
+# ceilings; it never strengthens evidence.
+#
+# Authority order for BEHAVIOUR (this rubric is subordinate to all of them):
+#   1. docs/project/atlas/ATLAS_PHASE2_PANEL_SELECTION_PROTOCOL.md  (v1.0.4, frozen)
+#   2. docs/project/atlas/atlas-phase2-panel-selection-registration-v1.yaml
+#   3. configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v4.yaml
+#   4. configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v4.yaml
+#   5. docs/DECISIONS.md (ADR-0013/0014/0015/0016/0017/0019) and
+#      docs/project/specs/atlas-panel-products-v1.yaml
+# Where this rubric and the frozen protocol appear to differ, the protocol
+# governs and this rubric is defective. Existing code is NOT behaviour
+# authority. This rubric is NOT executable and gates nothing today.
+
+schema: raptor-atlas-panel-rubric-v2
+rubric_id: atlas-panel-rubric
+version: 2.0.0
+profile: rare-disease-specialist-literature-v1
+status: POST_HOC_INTERPRETATION_ONLY
+task_id: atlas-rubric-v2-design
+title: >-
+  Scarcity-aware, versioned Atlas panel interpretation rubric: an additive
+  post-hoc contextual layer over an immutable machine result
+worktree: 'D:\AIProjects\raptor-worktrees\atlas-rubric-blog'
+branch: docs/atlas-rubric-blog-2026-08
+base_commit: 8b3b97bf821f4a853ac948b096672102231afd9b
+output: docs/project/specs/atlas-panel-rubric-v2.yaml
+created_at: '2026-08-15T10:35:36+05:30'
+created_at_utc: '2026-08-15T05:05:36Z'
+binds_adr: ADR-0019
+supersedes_rubric_version: 1.0.4
+supersedes_scope: >-
+  Interpretation policy only. This rubric supersedes NOTHING in the frozen
+  selection protocol's executable behaviour, NOTHING in ADR-0017's preserved
+  formal result or product separation, and NOTHING in ADR-0013's prospective
+  lock. It changes how an already-produced machine result may be DESCRIBED,
+  never what the machine did or what it produced.
+
+contract: >-
+  Add a versioned, scarcity-aware, post-hoc interpretation layer without
+  editing or replacing the original machine result. Report machine outcome and
+  contextual outcome side by side, on independent axes, with an explicit claim
+  ceiling and an explicit prospective/post-hoc state. Select no panel, approve
+  no panel, fabricate no human decision, and never let scarcity raise a claim.
+
+authority:
+  - docs/project/atlas/ATLAS_PHASE2_PANEL_SELECTION_PROTOCOL.md
+  - docs/project/atlas/atlas-phase2-panel-selection-registration-v1.yaml
+  - configs/atlas/panels/tsc2/atlas-phase2-candidate-universe-lock-v4.yaml
+  - configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v4.yaml
+  - docs/DECISIONS.md
+  - docs/project/specs/atlas-panel-products-v1.yaml
+
+# ---------------------------------------------------------------------------
+# 0. The immutable result rule.
+#    Read-only. Reproduced here as a binding comparand, never as a new claim.
+# ---------------------------------------------------------------------------
+immutable_result:
+  status: FROZEN_IMMUTABLE_AUDITED
+  run_record: data/atlas/tsc2_phase2_panel_selection_run_2026-08-06.json
+  run_record_sha256: 5f5b0918a24fcaa737877a15e393773f20c584c531517133e9c8b7e7574cfffd
+  run_record_sha256_basis: >-
+    SHA-256 of the committed (LF) blob content. A Windows checkout with
+    core.autocrlf=true expands line endings in the working copy, so a raw-byte
+    hash of the working file differs by design; the committed-blob value is the
+    binding one.
+  machine_outcome: INFEASIBLE_PANEL
+  machine_rubric: atlas-phase2-panel-selection-protocol 1.0.4
+  machine_rubric_doc_hash: 7b0596ab4a52601566c85a3a2c7ca42aead9c35916890397e58b3e11876e5823
+  registration_content_hash: 5b8980024bd88f9f3c7269badf7fc3e709fef4ba135b3575a7513e5d17ad1653
+  universe_lock_content_hash: f94ce81b8633bac777fd667e26c7b8d3a726b7e4d7eed9f8ed2128f9ed32b50e
+  identity_map_content_hash: 3adbf3484de28607fa3c133b2bebc4a9d7926b4c2d5b3863b0634507c599cd26
+  selection_seed: raptor-atlas-phase2-panel-v1
+  immutability_rules:
+    - The run record, its dispositions and its digests are byte-immutable.
+    - No rubric version may edit, re-sign, re-hash or reinterpret it in place.
+    - No rubric version may reuse its run-record id, seed or protocol/
+      registration pair.
+    - No rubric version may re-run the frozen selector or substitute candidates
+      after this result.
+    - The original result remains published and citable in its own right; it is
+      never withdrawn, retracted or replaced by any interpretation layer.
+
+# ---------------------------------------------------------------------------
+# 1. The additive contextual layer. ADDS, never replaces.
+# ---------------------------------------------------------------------------
+additive_contextual_layer:
+  applies_to_run_record: data/atlas/tsc2_phase2_panel_selection_run_2026-08-06.json
+  contextual_outcome: EXPERT_ADJUDICATION_REQUIRED
+  panel_selected: false
+  panel_approved: false
+  expert_adjudication: PENDING
+  independent_validation: NOT_ESTABLISHED
+  claim_ceiling: NONE_NO_PANEL_EXISTS
+  prospective_state: POST_HOC
+  membership: []
+  membership_note: >-
+    Empty by construction. This rubric has no selection procedure, no
+    allocation, no seed and no search. A contextual outcome is a statement
+    about what a qualified human must decide next, never a statement that a
+    panel exists.
+  pending_state_semantics: >-
+    EXPERT_ADJUDICATION_REQUIRED is a PENDING state, not a positive result, not
+    a pass, not a partial pass and not a provisional panel. It asserts only
+    that the machine outcome under-describes a rare-disease substrate and that
+    the next legitimate step is a named, signed, qualified human decision. If
+    no such decision is ever made, the terminal published state remains
+    INFEASIBLE_PANEL with no panel.
+
+# ---------------------------------------------------------------------------
+# 2. Independent axes. Each axis is reported separately and never collapsed
+#    into a single pass/fail. Observed values are for the 2026-08-06 run.
+# ---------------------------------------------------------------------------
+axes:
+  - id: AX-1
+    axis: run_integrity
+    question: Did the run execute faithfully against verified, pinned inputs?
+    values: [VERIFIED_COMPLETE, VERIFIED_PARTIAL, UNVERIFIED, BREACHED]
+    observed_2026_08_06: VERIFIED_COMPLETE
+    basis: >-
+      verified_digests.checks_passed lists V1-V7, K1-K6 and IM1-IM6; the
+      protocol/registration/universe/identity-map digests all reconcile through
+      the recorded eight-field lock_protocol_version_delta.
+    waivable: false
+  - id: AX-2
+    axis: search_completeness
+    question: Did the search finish, or did it merely stop?
+    values: [EXHAUSTIVE_COMPLETE, BUDGET_EXHAUSTED, UNDETERMINED, NOT_RUN]
+    observed_2026_08_06: EXHAUSTIVE_COMPLETE
+    basis: >-
+      24/24 attempts INFEASIBLE_COMPLETE; max_nodes_expanded 714 against a
+      5,000,000 node budget; zero relaxation steps applied; no attempt
+      UNDETERMINED.
+    waivable: false
+  - id: AX-3
+    axis: identity_sufficiency
+    question: Are candidate identities canonically resolved and officially replayable?
+    values: [SUFFICIENT, PARTIAL, INSUFFICIENT, NOT_ASSESSED]
+    observed_2026_08_06: PARTIAL
+    basis: 25 of 35 records resolved; 10 unresolved (disposition X1).
+    waivable: false
+  - id: AX-4
+    axis: source_access_sufficiency
+    question: Is the evidence lawfully accessible and span-verifiable at all?
+    values: [SUFFICIENT, PARTIAL_ACCESS_BLOCKED, BLOCKED_DOMINANT, NOT_ASSESSED]
+    observed_2026_08_06: PARTIAL_ACCESS_BLOCKED
+    basis: 10 of 35 records attrited as X5 (access/licence blocked), distributed S1=7, S2=1, S3=2.
+    waivable: false
+  - id: AX-5
+    axis: source_lineage_independence
+    question: How many established, verified-distinct source lineages support the evidence?
+    values: [ESTABLISHED_MULTI, ESTABLISHED_SINGLE, UNKNOWN_POOLED, NOT_ASSESSED]
+    observed_2026_08_06: UNKNOWN_POOLED
+    basis: >-
+      All 37 attributable observations and 32 of 35 records carried unknown
+      lineage and were conservatively pooled into one LG:UNKNOWN-POOL; zero
+      established groups. Lineage is determined by verified mapping, never by
+      distinct author lists, journals or PMIDs.
+    waivable: false
+    contextually_adjudicable_threshold: true
+  - id: AX-6
+    axis: assay_concentration_diversity
+    question: How many distinct assay kinds carry the evidence, and how concentrated are they?
+    values: [DIVERSE, LIMITED, CONCENTRATED_LIMITED, CONCENTRATED_SINGLE_DOMINANT, NOT_ASSESSED]
+    observed_2026_08_06: CONCENTRATED_LIMITED
+    basis: >-
+      Post-hoc substrate characterization, not a field of the frozen run
+      record: the eligible evidence spans two assay kinds with a dominant
+      mTORC1 reporter readout. The run record itself carries only the D1/D3
+      thresholds and their infeasibility, not an assay-kind inventory.
+    waivable: false
+    contextually_adjudicable_threshold: true
+  - id: AX-7
+    axis: model_system_diversity
+    question: How many distinct model systems carry the evidence?
+    values: [MULTI_CATEGORY, SINGLE_BROAD_CATEGORY, NOT_ASSESSED]
+    observed_2026_08_06: SINGLE_BROAD_CATEGORY
+    basis: >-
+      Post-hoc substrate characterization, not a field of the frozen run
+      record: the eligible evidence falls in one broad model-system category.
+      Model system is recorded per observation, never per publication.
+    waivable: false
+    contextually_adjudicable_threshold: true
+  - id: AX-8
+    axis: functional_evidence_situation_coverage
+    question: Which evidence situations could actually be populated at the attempted sizes?
+    values: [COMPLETE, PARTIAL, NO_FEASIBLE_PANEL_SATISFYING_COVERAGE, NOT_ASSESSED]
+    observed_2026_08_06: NO_FEASIBLE_PANEL_SATISFYING_COVERAGE
+    basis: >-
+      The eligible pool contained records in S1, S2, S3, S5 and S6 (S4 was
+      empty), but no size-7, size-6 or size-5 combination satisfied the complete
+      active constraint set at any ladder level. The source run's zero
+      per_stratum_coverage values reflect that no panel was selected; they do
+      not mean the eligible strata themselves were empty.
+    waivable: false
+  - id: AX-9
+    axis: independent_validation_status
+    question: Has cross-lineage, assay-diverse independent replication been established?
+    values: [ESTABLISHED, NOT_ESTABLISHED, REFUTED, NOT_ASSESSED]
+    observed_2026_08_06: NOT_ESTABLISHED
+    basis: >-
+      No established lineage group exists, so independence cannot be asserted
+      at any panel size. NOT_ESTABLISHED is an absence of evidence about
+      independence; it is not evidence that the underlying observations are
+      wrong.
+    waivable: false
+  - id: AX-10
+    axis: expert_adjudication_status
+    question: Has a named, qualified human adjudicated this substrate?
+    values: [NOT_REQUIRED, PENDING, COMPLETED_ACCEPTED, COMPLETED_REJECTED, EXPIRED]
+    observed_2026_08_06: PENDING
+    basis: >-
+      No named reviewer is engaged; Gate 8 is blocked across every Atlas
+      artifact and the accepted-claim count is zero. PENDING is never rendered
+      as accepted, provisional or conditionally accepted.
+    waivable: false
+  - id: AX-11
+    axis: claim_ceiling
+    question: What is the strongest claim any downstream artifact may make?
+    values:
+      - NONE_NO_PANEL_EXISTS
+      - ENGINEERING_PIPELINE_BEHAVIOUR
+      - SCARCITY_LIMITED_RARE_DISEASE_RESEARCH
+      - INDEPENDENT_VALIDATION_RESEARCH
+    observed_2026_08_06: NONE_NO_PANEL_EXISTS
+    basis: No panel exists, so no panel-derived claim is available at any ceiling.
+    waivable: false
+  - id: AX-12
+    axis: prospective_post_hoc_state
+    question: Was this rubric registered before the result it is describing?
+    values: [PROSPECTIVE_REGISTERED, POST_HOC]
+    observed_2026_08_06: POST_HOC
+    basis: >-
+      Rubric v2 was authored on 2026-08-15, nine days after the 2026-08-06 run
+      and with full knowledge of its outcome. It is therefore post-hoc by
+      construction and may not be described otherwise.
+    waivable: false
+  - id: AX-13
+    axis: panel_membership_state
+    question: Does a panel with members exist?
+    values: [SELECTED, NOT_SELECTED]
+    observed_2026_08_06: NOT_SELECTED
+    basis: selected_record_ids is empty; n_selected is null; 14 records were eligible but unselected.
+    waivable: false
+  - id: AX-14
+    axis: contradiction_and_null_result_disclosure
+    question: Are contradictions and null results disclosed rather than dropped?
+    values: [DISCLOSED, PARTIALLY_DISCLOSED, NOT_DISCLOSED]
+    observed_2026_08_06: DISCLOSED
+    basis: >-
+      Stale-label discordance (7 cells) and label/function discordance (0
+      cells) are reported explicitly rather than suppressed.
+    waivable: false
+  - id: AX-15
+    axis: dedupe_and_disposition_accounting
+    question: Is every input accounted for exactly once, with a recorded disposition?
+    values: [COMPLETE, INCOMPLETE]
+    observed_2026_08_06: COMPLETE
+    basis: 35 of 35 records carry a disposition (1 X3, 10 X1, 10 X5, 14 NS_NOT_IN_SOLUTION).
+    waivable: false
+
+axes_reporting_rule: >-
+  Every axis is reported on every output. An axis is never omitted because it
+  is uninteresting, never coerced to a neighbouring value, and never summarized
+  away into a single verdict. Unknown is reported as unknown.
+
+# ---------------------------------------------------------------------------
+# 3. Outcome vocabulary. Closed set.
+# ---------------------------------------------------------------------------
+outcomes:
+  - id: INDEPENDENT_VALIDATION_PANEL
+    kind: machine_reachable
+    meaning: >-
+      A panel satisfying the full independence and diversity bar at the frozen
+      base thresholds, supporting a research-only generalization claim.
+    claim_ceiling: INDEPENDENT_VALIDATION_RESEARCH
+    requires_human_decision: false
+    reachable_today: false
+    blocked_by: [AX-5, AX-6, AX-7, AX-9]
+  - id: EXPERT_ADJUDICATED_RARE_DISEASE_PANEL
+    kind: human_reachable_only
+    meaning: >-
+      A panel a named, qualified expert has authorized under an explicitly
+      lowered claim ceiling because the literature for this disease is
+      intrinsically sparse.
+    claim_ceiling: SCARCITY_LIMITED_RARE_DISEASE_RESEARCH
+    requires_human_decision: true
+    reachable_today: false
+    reachable_only_via: >-
+      A future named, signed decision record satisfying
+      adjudication_record_requirements in full. It cannot be reached by any
+      machine path, by this rubric, by any document in this commit, or by any
+      inference from the pending state.
+    hard_limit: >-
+      An expert can lower a claim ceiling and can contextualize a scarcity
+      threshold. An expert CANNOT transform dependent evidence into independent
+      replication. Same-lineage evidence adjudicated by an expert remains
+      same-lineage evidence.
+  - id: TECHNICAL_COVERAGE_PANEL
+    kind: machine_reachable
+    meaning: >-
+      An engineering panel exercising pipeline behaviour only, per ADR-0017's
+      atlas-technical-coverage-panel.
+    claim_ceiling: ENGINEERING_PIPELINE_BEHAVIOUR
+    requires_human_decision: false
+    reachable_today: false
+    blocked_by: [new protocol, new registration, new frame lock, new seed]
+    firewall: >-
+      A technical-coverage artifact may never satisfy an independent-validation
+      entry gate, and never contributes to AX-9 (PS-4/PP-D7, ADR-0017).
+  - id: EXPERT_ADJUDICATION_REQUIRED
+    kind: pending_state
+    meaning: >-
+      The machine outcome is correct under its own preregistered claim but
+      under-describes a rare-disease substrate; a named qualified human must
+      decide whether a lower-ceiling panel is scientifically useful.
+    claim_ceiling: NONE_NO_PANEL_EXISTS
+    requires_human_decision: true
+    reachable_today: true
+    is_positive_result: false
+  - id: PANEL_NOT_JUSTIFIED
+    kind: terminal
+    meaning: >-
+      Adjudication concluded that no panel at any ceiling is scientifically
+      useful on this substrate.
+    claim_ceiling: NONE_NO_PANEL_EXISTS
+    requires_human_decision: true
+    reachable_today: false
+  - id: MORE_EVIDENCE_REQUIRED
+    kind: terminal_pending_sources
+    meaning: >-
+      The substrate is not adjudicable as-is; registered, lineage-mapped,
+      span-verifiable source expansion is the named remedy.
+    claim_ceiling: NONE_NO_PANEL_EXISTS
+    requires_human_decision: false
+    reachable_today: true
+  - id: INFEASIBLE_UNDER_RUBRIC
+    kind: machine_terminal
+    meaning: >-
+      An exhaustive, in-budget search found no admissible panel under the
+      rubric in force. This is the class the 2026-08-06 machine outcome
+      belongs to and it remains true under rubric v2.
+    claim_ceiling: NONE_NO_PANEL_EXISTS
+    requires_human_decision: false
+    reachable_today: true
+    observed_2026_08_06: true
+  - id: UNDETERMINED_SEARCH_INCOMPLETE
+    kind: machine_terminal
+    meaning: >-
+      The search did not complete (budget, timeout or error), so infeasibility
+      is not established. Never conflated with INFEASIBLE_UNDER_RUBRIC.
+    claim_ceiling: NONE_NO_PANEL_EXISTS
+    requires_human_decision: false
+    reachable_today: true
+    observed_2026_08_06: false
+
+outcome_pairing_rule: >-
+  Every reported outcome is a PAIR: a machine outcome from the rubric version
+  actually executed, and a contextual outcome from the interpretation rubric
+  version in force. Neither is reported alone. For the 2026-08-06 run the pair
+  is (INFEASIBLE_PANEL under 1.0.4, EXPERT_ADJUDICATION_REQUIRED under 2.0.0).
+
+# ---------------------------------------------------------------------------
+# 4. Non-waivable vs contextually adjudicable dimensions.
+# ---------------------------------------------------------------------------
+non_waivable_dimensions:
+  - id: NW-1
+    dimension: canonical identity and official replay
+    rationale: An unresolved or unreplayable identity makes every downstream statement unattributable.
+  - id: NW-2
+    dimension: source provenance and lawful access
+    rationale: Absence of evidence of permission is not permission; blocked access is reported as a gap, never inferred past.
+  - id: NW-3
+    dimension: exact-span verification
+    rationale: A claim without a from-disk-verified exact span is not grounded (ADR-0015/ADR-0016).
+  - id: NW-4
+    dimension: assay and model-system context recording
+    rationale: Context travels with the statement; "in that system" is part of the statement.
+  - id: NW-5
+    dimension: contradiction and null-result disclosure
+    rationale: Suppressing a contradiction manufactures agreement.
+  - id: NW-6
+    dimension: deduplication and collision accounting
+    rationale: Double-counting one observation is the cheapest way to fake independence.
+  - id: NW-7
+    dimension: complete dispositions
+    rationale: Every input yields exactly one accounted outcome; silent drops are unfalsifiable.
+  - id: NW-8
+    dimension: classification and leakage firewall
+    rationale: Mechanism evidence may never be informed by, or flow into, an ACMG criterion or classification (ADR-0009/ADR-0014).
+  - id: NW-9
+    dimension: immutable inputs and run records
+    rationale: A result that can be edited after the fact carries no evidential weight.
+
+non_waivable_rule: >-
+  Human adjudication may contextualize scarcity. It may NOT waive, soften,
+  defer or partially satisfy any NW dimension. An adjudication that touches an
+  NW dimension is void, and an outcome derived from it is void.
+
+contextually_adjudicable_dimensions:
+  - id: CA-1
+    dimension: minimum number of independent laboratories or source lineages
+    frozen_constraint: P2 (minimum established source groups)
+    adjudicable_because: >-
+      In an intrinsically sparse rare-disease literature the number of
+      independent laboratories is a property of the field, not of the evidence
+      quality of any one report.
+    hard_limit: >-
+      Contextualizing P2 lowers the claim ceiling to
+      SCARCITY_LIMITED_RARE_DISEASE_RESEARCH. It never yields
+      INDEPENDENT_VALIDATION_RESEARCH and never sets AX-9 to ESTABLISHED.
+  - id: CA-2
+    dimension: assay-concentration cap
+    frozen_constraint: D3 (maximum share per assay kind)
+    adjudicable_because: >-
+      A field with one dominant validated readout concentrates by convention,
+      not by defect.
+    hard_limit: >-
+      The observed concentration and the dominant readout must be reported
+      numerically alongside any adjudicated outcome, never dropped.
+  - id: CA-3
+    dimension: model-system diversity
+    frozen_constraint: D2 (minimum model systems)
+    adjudicable_because: >-
+      Some mechanisms have one tractable model system; requiring two can be a
+      requirement for work nobody has done rather than for rigour.
+    hard_limit: Single-model evidence is bounded to that model in every downstream statement.
+  - id: CA-4
+    dimension: panel balance and size
+    frozen_constraint: C3 / n_target
+    adjudicable_because: >-
+      A balance rule calibrated for a common-disease substrate can be
+      arithmetically unsatisfiable on a sparse one.
+    hard_limit: >-
+      A smaller adjudicated panel reports its size, its imbalance and the
+      strata it could not populate.
+
+scarcity_direction_rule: >-
+  Scarcity is always a CEILING-LOWERING fact. Adjudicating CA-1..CA-4 may make
+  a lower-ceiling panel available; it may never raise a ceiling, never upgrade
+  an axis value, never convert NOT_ESTABLISHED to ESTABLISHED, and never make
+  an unwaivable NW dimension optional.
+
+# ---------------------------------------------------------------------------
+# 5. What an adjudication record must contain. All fields required.
+# ---------------------------------------------------------------------------
+adjudication_record_requirements:
+  required_fields:
+    - reviewer_identity
+    - reviewer_qualifications
+    - conflict_of_interest_declaration
+    - scope_of_adjudication
+    - rationale
+    - dimensions_contextualized
+    - dimensions_explicitly_not_waived
+    - resulting_claim_ceiling
+    - stated_limitations
+    - expiry_date
+    - re_review_triggers
+    - signatures
+  rules:
+    - A missing required field makes the record void, not provisional.
+    - Scope is per-substrate and per-rubric-version; it does not generalize to
+      another disease, another universe or another rubric version.
+    - Re-review triggers must at minimum include new source availability, a
+      lineage-mapping correction, a rubric major-version change and a
+      contradicting primary report.
+    - An expired record reverts the axis to PENDING; it does not decay to
+      accepted.
+    - No document in this repository, including this rubric, constitutes such a
+      record. As of 2026-08-15 zero adjudication records exist.
+
+# ---------------------------------------------------------------------------
+# 6. Rubric evolution workflow. Applies to any RAPTOR adjudication rubric.
+# ---------------------------------------------------------------------------
+rubric_evolution_workflow:
+  - step: 1
+    id: RE-1
+    name: nuance-discovery record
+    requires: >-
+      A written record of the specific nuance the rubric in force fails to
+      express, produced before any threshold is touched.
+  - step: 2
+    id: RE-2
+    name: classify the cause
+    classes:
+      - IMPLEMENTATION_DEFECT
+      - POLICY_DEFECT
+      - DATA_SCARCITY
+      - DISEASE_CONTEXT_MISMATCH
+      - NEW_EVIDENCE
+    requires: >-
+      Exactly one primary class, named explicitly. An implementation defect is
+      fixed in code, never by a rubric change; a data-scarcity finding is never
+      relabelled a policy defect to justify a weaker threshold.
+  - step: 3
+    id: RE-3
+    name: freeze the old rubric and the old result
+    requires: >-
+      The prior rubric version and every result produced under it are frozen
+      byte-identical and remain published.
+  - step: 4
+    id: RE-4
+    name: draft a new semantic version
+    requires: Version bump per the versioning policy below, with a diffable change list.
+  - step: 5
+    id: RE-5
+    name: prefer aggregate or blinded evidence
+    requires: >-
+      Where possible the change is justified on aggregate or blinded evidence
+      rather than on the specific record whose outcome prompted it.
+  - step: 6
+    id: RE-6
+    name: separated authorship and independent domain review
+    requires: >-
+      The author of the rubric change is not the sole reviewer of it; domain
+      review is independent of the party who wants the outcome to change.
+  - step: 7
+    id: RE-7
+    name: symmetric application
+    requires: >-
+      The new rubric is applied to the COMPLETE eligible universe, not only to
+      the record that motivated it. Selective application is prohibited.
+  - step: 8
+    id: RE-8
+    name: side-by-side rerun and published transition matrix
+    requires: >-
+      Old and new outcomes are reported together with an explicit transition
+      matrix. Neither replaces the other in publication.
+  - step: 9
+    id: RE-9
+    name: mark POST_HOC
+    requires: >-
+      Until prospectively validated, every output of the new rubric carries
+      POST_HOC. Post-hoc status is not removed by review, by agreement or by
+      time.
+  - step: 10
+    id: RE-10
+    name: prospective activation only via new registration
+    requires: >-
+      The new rubric becomes prospectively active only through a new,
+      separately named registration frozen before the run it governs.
+
+versioning_policy:
+  major: >-
+    Changes outcome semantics or a claim ceiling. 1.0.4 -> 2.0.0 qualifies
+    because a new contextual outcome vocabulary and a new claim-ceiling axis
+    are introduced.
+  minor: Changes thresholds or introduces/edits a context profile.
+  patch: Editorial only, with no executable behaviour change and no outcome change.
+  rule: >-
+    A version bump never retroactively changes a published result. Results are
+    stamped with the version that produced them.
+
+# ---------------------------------------------------------------------------
+# 7. Mandatory carry fields on every output governed by this rubric.
+# ---------------------------------------------------------------------------
+output_carry_fields:
+  - rubric_version
+  - context_profile
+  - machine_result
+  - contextual_interpretation
+  - expert_decision
+  - claim_ceiling
+  - prospective_or_post_hoc_status
+carry_rule: >-
+  An output missing any carry field is non-conformant and may not be cited. A
+  summary surface (README row, PROGRAM line, blog paragraph, table cell) counts
+  as an output.
+
+# ---------------------------------------------------------------------------
+# 8. Transition matrix for the 2026-08-06 run. Side by side, both preserved.
+# ---------------------------------------------------------------------------
+transition_matrix:
+  - dimension: outcome
+    under_v1_0_4: INFEASIBLE_PANEL
+    under_v2_0_0: 'INFEASIBLE_UNDER_RUBRIC + EXPERT_ADJUDICATION_REQUIRED (paired)'
+    changed: false
+    note: The machine outcome is unchanged. v2 adds a second, separately labelled field.
+  - dimension: panel_selected
+    under_v1_0_4: false
+    under_v2_0_0: false
+    changed: false
+  - dimension: panel_approved
+    under_v1_0_4: false
+    under_v2_0_0: false
+    changed: false
+  - dimension: independent_validation
+    under_v1_0_4: not expressible
+    under_v2_0_0: NOT_ESTABLISHED
+    changed: false
+    note: Newly expressible, not newly true.
+  - dimension: expert_adjudication
+    under_v1_0_4: not expressible
+    under_v2_0_0: PENDING
+    changed: false
+  - dimension: claim_ceiling
+    under_v1_0_4: not expressible
+    under_v2_0_0: NONE_NO_PANEL_EXISTS
+    changed: false
+  - dimension: evidence_package_verdict
+    under_v1_0_4: not expressible
+    under_v2_0_0: NOT_FAILED
+    changed: false
+    note: >-
+      The individual Gate 1-7 packages never failed; the panel-level
+      independence constraint was unsatisfiable on the available substrate.
+      Distinguishing these was the nuance v1.0.4 could not express.
+  - dimension: prospective_state
+    under_v1_0_4: PROSPECTIVE_REGISTERED
+    under_v2_0_0: POST_HOC
+    changed: true
+    note: >-
+      This is the one genuine downgrade. The v2 layer is post-hoc and is
+      therefore weaker evidence than the prospectively registered v1.0.4 run,
+      not stronger.
+
+# ---------------------------------------------------------------------------
+# 9. Prohibitions.
+# ---------------------------------------------------------------------------
+prohibitions:
+  - Never tune a rubric so that one observed result looks better.
+  - Never apply a new rubric to the motivating record alone.
+  - Never present EXPERT_ADJUDICATION_REQUIRED as a pass, a partial pass, a
+    provisional panel or a soft approval.
+  - Never assert, imply or pre-fill a human approval, reviewer name or
+    signature that does not exist.
+  - Never let a contextual outcome be cited without its paired machine outcome.
+  - Never let scarcity raise a claim ceiling or upgrade an axis value.
+  - Never let a technical-coverage artifact satisfy an independent-validation
+    gate or contribute to AX-9.
+  - Never describe a post-hoc rubric as prospective, validated or confirmed.
+  - Never treat the diagnostic counterfactual in the readjudication artifact as
+    a selection, a candidate set or a feasible panel.
+  - Never edit, re-run, re-sign or re-hash the 2026-08-06 run record.
+
+prohibited_sentences:
+  - 'INFEASIBLE_PANEL was superseded.'
+  - 'The panel is feasible under rubric v2.'
+  - 'Expert review approved a rare-disease panel.'
+  - 'Rubric v2 shows the evidence packages passed the panel gate.'
+  - 'Scarcity justifies a stronger claim for a rare disease.'
+
+# ---------------------------------------------------------------------------
+# 10. Status and backout.
+# ---------------------------------------------------------------------------
+execution_status: DESIGN_ONLY_NOT_EXECUTED
+gates_anything_today: false
+generates_evidence: false
+authorizes_anything: false
+backout: >-
+  A straight revert of this rubric, the readjudication artifact, ADR-0019, the
+  blog post and the doc/todo edits. Nothing is implemented; no code, test,
+  config, protocol, registration, universe, map, lock, pack or run record is
+  touched by this rubric.
