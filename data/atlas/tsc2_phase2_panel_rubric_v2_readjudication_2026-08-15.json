@@ -1,0 +1,215 @@
+{
+  "aggregate_facts": {
+    "access_blocked_x5": 10,
+    "access_blocked_x5_distribution": {
+      "S1": 7,
+      "S2": 1,
+      "S3": 2
+    },
+    "anchor_x3": 1,
+    "attempt_status_vocabulary_observed": [
+      "INFEASIBLE_COMPLETE"
+    ],
+    "attempted_sizes": [
+      7,
+      6,
+      5
+    ],
+    "attempts_all_infeasible_complete": true,
+    "attempts_total": 24,
+    "basis": "copied_from_source_run_record_and_verified_field_for_field",
+    "budget_exhausted": false,
+    "disposition_total": 35,
+    "eligible_but_unselected": 14,
+    "identities_resolved": 25,
+    "identities_unresolved": 10,
+    "independence_status": "DECLARED",
+    "label_function_discordant_cells": 0,
+    "ladder_levels": [
+      "L0",
+      "R1",
+      "R2",
+      "R3",
+      "R4",
+      "R5",
+      "R6",
+      "R7"
+    ],
+    "max_nodes_expanded": 714,
+    "n_target": 7,
+    "node_budget": 5000000,
+    "per_stratum_coverage": {
+      "S1": 0,
+      "S2": 0,
+      "S3": 0,
+      "S4": 0,
+      "S5": 0,
+      "S6": 0
+    },
+    "relaxation_steps_applied": 0,
+    "search_scope": "full_eligible_universe",
+    "selected_members": 0,
+    "source_lineage": {
+      "established_groups": 0,
+      "lineage_groups_observed": [
+        "LG:UNKNOWN-POOL"
+      ],
+      "pooling_rule": "Unknown lineage is conservatively pooled into a single group rather than optimistically split. Lineage is established by verified mapping, never by distinct author lists, journals or PMIDs.",
+      "unknown_lineage_observations": 37,
+      "unknown_lineage_records": 32
+    },
+    "spec_taxonomy_coverage": "COMPLETE",
+    "stale_label_discordant_cells": 7,
+    "universe_records": 35
+  },
+  "authorizes_anything": false,
+  "axis_readings": {
+    "assay_concentration_diversity": "CONCENTRATED_LIMITED",
+    "claim_ceiling": "NONE_NO_PANEL_EXISTS",
+    "contradiction_and_null_result_disclosure": "DISCLOSED",
+    "dedupe_and_disposition_accounting": "COMPLETE",
+    "expert_adjudication_status": "PENDING",
+    "functional_evidence_situation_coverage": "ZERO_AT_ALL_ATTEMPTED_SIZES",
+    "identity_sufficiency": "PARTIAL",
+    "independent_validation_status": "NOT_ESTABLISHED",
+    "model_system_diversity": "SINGLE_BROAD_CATEGORY",
+    "panel_membership_state": "NOT_SELECTED",
+    "prospective_post_hoc_state": "POST_HOC",
+    "run_integrity": "VERIFIED_COMPLETE",
+    "search_completeness": "EXHAUSTIVE_COMPLETE",
+    "source_access_sufficiency": "PARTIAL_ACCESS_BLOCKED",
+    "source_lineage_independence": "UNKNOWN_POOLED"
+  },
+  "boundaries": [
+    "Research-only. Not a clinical or diagnostic artifact.",
+    "No variant classification, ACMG criterion, VUS worklist or submission is authorized.",
+    "No panel membership exists, so no panel metric may be cited.",
+    "Gate 8 named human review remains blocked and the accepted-claim count is zero.",
+    "No RescueScreen result, compound, treatment, dose or combination claim."
+  ],
+  "candidate_free": true,
+  "claim_ceiling": "NONE_NO_PANEL_EXISTS",
+  "contains_candidate_identity": false,
+  "content_sha256": "bf043a2cb1f195bcf82c412e008862e46565b64bf227db7c679bac9d099d88dc",
+  "content_sha256_basis": "SHA-256 over the canonical JSON serialization of this record with the content_sha256 key removed: json.dumps(record, sort_keys=True, indent=2) encoded UTF-8 plus exactly one terminal LF, LF-only on every platform. Self-excluding: the hash field itself is never part of its own preimage.",
+  "contextually_adjudicable_dimensions": [
+    "minimum number of independent laboratories or source lineages (P2)",
+    "assay-concentration cap (D3)",
+    "model-system diversity (D2)",
+    "panel balance and size (C3 / n_target)"
+  ],
+  "diagnostic_counterfactual": {
+    "basis": "post_hoc_diagnostic_analysis_NOT_A_FIELD_OF_THE_SOURCE_RUN",
+    "finding": "Removing the P2 established-source-group minimum alone left the problem infeasible, and removing the D3 assay-concentration cap alone left the problem infeasible. Feasible subsets appeared only when BOTH were removed together, so P2 and D3 interact rather than acting as independent binding constraints.",
+    "interpretation_limit": "This is a diagnostic statement about which constraints bind, produced with full knowledge of the negative outcome. It is not a relaxation proposal, not an authorization to weaken P2 or D3, and not evidence that a panel exists. Weakening a constraint after seeing the answer is outcome-dependent constraint selection and remains prohibited by the frozen protocol and ADR-0017.",
+    "is_a_candidate_set": false,
+    "is_a_panel": false,
+    "is_a_rerun_of_the_frozen_selector": false,
+    "is_a_selection": false,
+    "label": "DIAGNOSTIC_POST_HOC_NOT_A_SELECTION",
+    "membership": []
+  },
+  "expert_adjudication": {
+    "adjudication_records_existing": 0,
+    "conflict_of_interest_declaration": null,
+    "hard_limit": "An expert may lower a claim ceiling and contextualize P2/D3/D2/C3. An expert may not transform dependent evidence into independent replication and may not waive any non-waivable dimension.",
+    "reachability_note": "EXPERT_ADJUDICATED_RARE_DISEASE_PANEL is reachable only through a future named, signed decision record carrying every required field. No machine path and no document in this commit can reach it.",
+    "reachable_outcomes": [
+      "EXPERT_ADJUDICATED_RARE_DISEASE_PANEL",
+      "PANEL_NOT_JUSTIFIED",
+      "MORE_EVIDENCE_REQUIRED"
+    ],
+    "required": true,
+    "reviewer_identity": null,
+    "reviewer_qualifications": null,
+    "signatures": [],
+    "state": "PENDING"
+  },
+  "generated_at_utc": "2026-08-15T05:05:36Z",
+  "generates_evidence": false,
+  "interpretation": {
+    "evidence_packages_note": "The individual Gate 1-7 evidence packages did not fail. What failed to exist was a panel-level configuration satisfying cross-lineage independence and assay diversity on the available substrate.",
+    "evidence_packages_verdict": "NOT_FAILED",
+    "original_result_validity": "The 2026-08-06 result is valid and correct under its own preregistered independent-validation claim. Nothing about it is withdrawn.",
+    "rare_disease_context": "In an intrinsically sparse rare-disease literature, specialist-lab dominance is an expected property of the field rather than a defect of the reports. That context warrants a named expert adjudication of whether a lower-claim-ceiling panel is scientifically useful, rather than automatic rejection.",
+    "scarcity_finding": "The current specialist-led literature for this substrate cannot establish cross-lineage, assay-diverse independent validation: zero established lineage groups, two assay kinds with one dominant readout, and one broad model-system category.",
+    "what_this_does_not_do": [
+      "It selects no panel membership.",
+      "It approves no panel.",
+      "It records, implies or anticipates no human approval.",
+      "It converts no dependent evidence into independent replication.",
+      "It raises no claim ceiling.",
+      "It waives no non-waivable dimension.",
+      "It authorizes no ACMG criterion, classification, worklist or submission.",
+      "It makes no RescueScreen, compound, treatment or clinical claim."
+    ]
+  },
+  "kind": "POST_HOC_INTERPRETATION_ONLY",
+  "no_human_approval_recorded": true,
+  "no_selection_performed": true,
+  "non_waivable_dimensions": [
+    "canonical identity and official replay",
+    "source provenance and lawful access",
+    "exact-span verification",
+    "assay and model-system context recording",
+    "contradiction and null-result disclosure",
+    "deduplication and collision accounting",
+    "complete dispositions",
+    "classification and leakage firewall",
+    "immutable inputs and run records"
+  ],
+  "outcome_transition": {
+    "claim_ceiling": "NONE_NO_PANEL_EXISTS",
+    "contextual_outcome": "EXPERT_ADJUDICATION_REQUIRED",
+    "contextual_outcome_is_positive_result": false,
+    "contextual_rubric_version": "2.0.0",
+    "expert_adjudication": "PENDING",
+    "genuine_downgrade": "prospective_state moves from PROSPECTIVE_REGISTERED (v1.0.4) to POST_HOC (v2.0.0). The interpretation layer is weaker evidence than the run it describes.",
+    "independent_validation": "NOT_ESTABLISHED",
+    "machine_outcome": "INFEASIBLE_PANEL",
+    "machine_outcome_class_under_v2": "INFEASIBLE_UNDER_RUBRIC",
+    "machine_outcome_preserved": true,
+    "machine_rubric_version": "1.0.4",
+    "pairing_rule": "The two outcomes are reported as a pair and neither is cited alone. The contextual outcome does not replace, supersede or soften the machine outcome.",
+    "panel_approved": false,
+    "panel_selected": false
+  },
+  "post_hoc_note": "Authored 2026-08-15, nine days after the run it describes and with full knowledge of its outcome. POST_HOC status is not removed by review, agreement or elapsed time; prospective activation requires a new registration frozen before the run it governs.",
+  "prospective_or_post_hoc_status": "POST_HOC",
+  "record_id": "tsc2-phase2-panel-rubric-v2-readjudication-2026-08-15",
+  "rubric": {
+    "binds_adr": "ADR-0019",
+    "profile": "rare-disease-specialist-literature-v1",
+    "rubric_id": "atlas-panel-rubric",
+    "spec_path": "docs/project/specs/atlas-panel-rubric-v2.yaml",
+    "spec_sha256": "1422c7b1d7c39064349604b1ad9a3128a5ad83646ac1d22b180e6c529a196ba7",
+    "spec_sha256_basis": "SHA-256 of the LF-normalized (committed-blob) spec bytes.",
+    "status": "POST_HOC_INTERPRETATION_ONLY",
+    "version": "2.0.0"
+  },
+  "scarcity_direction_rule": "Scarcity lowers claim ceilings. It never strengthens evidence, never upgrades an axis value and never makes a non-waivable dimension optional.",
+  "schema": "raptor.atlas_panel_rubric_v2_readjudication.v1",
+  "source_run": {
+    "identity_map_content_hash": "3adbf3484de28607fa3c133b2bebc4a9d7926b4c2d5b3863b0634507c599cd26",
+    "immutability_statement": "This record reads the source run and copies aggregate facts from it. It does not edit, re-run, re-sign, re-hash, retract or supersede it. The source run remains published and citable in its own right.",
+    "machine_outcome": "INFEASIBLE_PANEL",
+    "machine_rubric": "atlas-phase2-panel-selection-protocol 1.0.4",
+    "machine_rubric_doc_hash": "7b0596ab4a52601566c85a3a2c7ca42aead9c35916890397e58b3e11876e5823",
+    "mutation_performed": false,
+    "path": "data/atlas/tsc2_phase2_panel_selection_run_2026-08-06.json",
+    "registration_content_hash": "5b8980024bd88f9f3c7269badf7fc3e709fef4ba135b3575a7513e5d17ad1653",
+    "selection_seed": "raptor-atlas-phase2-panel-v1",
+    "sha256": "5f5b0918a24fcaa737877a15e393773f20c584c531517133e9c8b7e7574cfffd",
+    "sha256_basis": "SHA-256 of the committed (LF) blob content. A Windows checkout with core.autocrlf=true expands line endings in the working copy, so a raw-byte hash of the working file differs by design; the committed-blob value is binding.",
+    "sha256_verified_unchanged_at": "2026-08-15T05:05:36Z",
+    "universe_lock_content_hash": "f94ce81b8633bac777fd667e26c7b8d3a726b7e4d7eed9f8ed2128f9ed32b50e"
+  },
+  "substrate_characterization": {
+    "basis": "post_hoc_substrate_characterization_NOT_A_FIELD_OF_THE_SOURCE_RUN",
+    "basis_note": "The frozen run record carries the D1/D2/D3 thresholds and their infeasibility, not an assay-kind or model-system inventory. These three values are supplied by the readjudication task as a characterization of the eligible evidence and are labelled as such so they are never mistaken for verified run outputs.",
+    "dominant_assay_readout": "mTORC1 reporter assay",
+    "eligible_assay_kinds": 2,
+    "eligible_model_system_categories": 1,
+    "eligible_model_system_granularity": "one broad category"
+  }
+}

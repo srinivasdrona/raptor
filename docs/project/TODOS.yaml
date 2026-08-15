@@ -770,7 +770,10 @@ todos:
   title: Obtaining named human-oracle Atlas span review
   description: 'Track: MECHANISM-ATLAS / PHASE-2. Have the recruited molecular geneticist
     review every proposed anchor/panel claim, source role, exact span and assay context;
-    record accept/reject/request-more-evidence without treating review as classification.'
+    record accept/reject/request-more-evidence without treating review as classification.
+    This is CLAIM-SPAN review and is distinct from atlas-panel-composition-adjudication,
+    which is a separate panel-composition decision under rubric v2: neither task satisfies
+    the other, and a completed span review confers no panel and no panel approval.'
   status: pending
   depends_on:
   - atlas-phase2-r611q-anchor
@@ -1562,4 +1565,88 @@ todos:
   - rescuescreen-orthogonal-replication
   - rescuescreen-construct-assay-feasibility
   - rescuescreen-tool-licence-registry
+  created: '2026-08-15'
+- id: atlas-rubric-v2-design
+  title: Designing the scarcity-aware Atlas panel rubric v2
+  description: 'Track: ATLAS-PANEL-RUBRIC / INTERPRETATION (design/governance; asserts no
+    scientific or clinical result, selects no variant, approves no panel). Define a general
+    versioned-rubric change mechanism plus a first context profile for rare-disease
+    specialist literature, as an additive post-hoc interpretation layer over an immutable
+    machine result. Completed 2026-08-15 on branch docs/atlas-rubric-blog-2026-08 from clean
+    head 8b3b97b: docs/project/specs/atlas-panel-rubric-v2.yaml defines atlas-panel-rubric
+    2.0.0, profile rare-disease-specialist-literature-v1, status POST_HOC_INTERPRETATION_ONLY,
+    with fifteen independent axes AX-1..AX-15, an eight-value closed outcome vocabulary,
+    nine non-waivable dimensions NW-1..NW-9, four contextually adjudicable dimensions
+    CA-1..CA-4, twelve required adjudication-record fields, the ten-step evolution workflow
+    RE-1..RE-10, a major/minor/patch versioning policy, seven mandatory output carry fields
+    and a published transition matrix. The frozen 2026-08-06 run, protocol v1.0.4, its
+    registration, universe lock v4 and identity-map lock v4 are untouched. Scarcity lowers
+    claim ceilings and never strengthens evidence; no expert can convert dependent evidence
+    into independent replication. Bound by ADR-0019. Design only; gates nothing and
+    authorizes nothing.'
+  status: done
+  depends_on:
+  - panel-products-rescuescreen-design
+  created: '2026-08-15'
+- id: atlas-rubric-v2-readjudication
+  title: Recording the post-hoc rubric-v2 readjudication artifact
+  description: 'Track: ATLAS-PANEL-RUBRIC / INTERPRETATION (post-hoc record; no rerun, no
+    selection, no approval). Completed 2026-08-15:
+    data/atlas/tsc2_phase2_panel_rubric_v2_readjudication_2026-08-15.json is a candidate-free
+    record with a self-excluding canonical content hash
+    bf043a2cb1f195bcf82c412e008862e46565b64bf227db7c679bac9d099d88dc, binding the source run
+    data/atlas/tsc2_phase2_panel_selection_run_2026-08-06.json at committed-blob SHA-256
+    5f5b0918a24fcaa737877a15e393773f20c584c531517133e9c8b7e7574cfffd and copying only
+    aggregate facts (35 records, 25 resolved / 10 unresolved, 10 access-blocked X5, 1 anchor
+    X3, 14 eligible but unselected, 24 attempts all INFEASIBLE_COMPLETE at sizes 7/6/5 across
+    L0-R7, max 714 nodes against a 5,000,000 budget, zero relaxation steps, zero selected
+    members, 37 observations pooled as LG:UNKNOWN-POOL with zero established groups). The
+    machine outcome INFEASIBLE_PANEL under v1.0.4 is preserved verbatim; the record ADDS
+    contextual_outcome EXPERT_ADJUDICATION_REQUIRED with panel_selected false, panel_approved
+    false, expert_adjudication PENDING, independent_validation NOT_ESTABLISHED, claim ceiling
+    NONE_NO_PANEL_EXISTS and prospective status POST_HOC. The P2/D3 counterfactual is labelled
+    DIAGNOSTIC_POST_HOC_NOT_A_SELECTION with empty membership. Substrate assay/model
+    characterizations are labelled as post-hoc, not as fields of the frozen run.'
+  status: done
+  depends_on:
+  - atlas-rubric-v2-design
+  created: '2026-08-15'
+- id: atlas-rubric-v2-blog
+  title: Publishing the seven-variant human-review-boundary post
+  description: 'Track: ATLAS-PANEL-RUBRIC / COMMUNICATION (research-only public write-up).
+    Completed 2026-08-15: docs/blog/2026-08-15-seven-variants-human-review-boundary.md
+    explains the Mechanism Atlas and Gates 1-8, lists the seven TSC2 variants and their eight
+    claim-level Gate 8 decisions with exact verified spans, separates the anchor plus
+    six-variant technical repeatability cohort from the separate 35-record formal
+    independent-panel attempt, states the exact no-panel cause, explains why specialist-lab
+    dominance is expected rather than bad evidence, and reports the machine result and the
+    post-hoc rubric-v2 interpretation side by side with hashes and a research-only boundary.
+    Zero accepted claims; nothing is presented as a classification; no RescueScreen,
+    compound or treatment claim is made.'
+  status: done
+  depends_on:
+  - atlas-rubric-v2-readjudication
+  created: '2026-08-15'
+- id: atlas-panel-composition-adjudication
+  title: Obtaining named expert adjudication of Atlas panel composition
+  description: 'Track: ATLAS-PANEL-RUBRIC / ADJUDICATION (pending named human decision; NOT
+    satisfied by any artifact in this repository). Under rubric v2 the 2026-08-06 substrate
+    carries contextual outcome EXPERT_ADJUDICATION_REQUIRED, which is a pending state and not
+    a result. A named, qualified reviewer must decide whether any lower-claim-ceiling panel is
+    scientifically useful on an intrinsically sparse rare-disease literature, producing a
+    signed adjudication record carrying reviewer identity, qualifications, conflict-of-interest
+    declaration, scope, rationale, dimensions contextualized, dimensions explicitly not waived,
+    resulting claim ceiling, limitations, expiry date, re-review triggers and signatures; a
+    missing field voids the record rather than making it provisional. Reachable outcomes are
+    EXPERT_ADJUDICATED_RARE_DISEASE_PANEL, PANEL_NOT_JUSTIFIED and MORE_EVIDENCE_REQUIRED. The
+    adjudicator may contextualize only P2, D3, D2 and panel balance/size, always lowering the
+    claim ceiling, and may not waive any non-waivable dimension or convert dependent evidence
+    into independent replication. This task is distinct from atlas-phase2-human-span-review,
+    which reviews individual claim spans. Zero adjudication records exist; if none is ever
+    produced, the terminal published state remains INFEASIBLE_PANEL with no panel. Not
+    started.'
+  status: pending
+  depends_on:
+  - atlas-rubric-v2-readjudication
+  - engagement-recruit-molecular-geneticist
   created: '2026-08-15'

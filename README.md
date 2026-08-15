@@ -18,7 +18,8 @@ the same frozen R2 counts on independent axes and generates no new evidence.
 
 Public progress posts:
 [*Before the First Score*](docs/blog/2026-07-10-before-the-first-score.md) ·
-[*After the First Rerun*](docs/blog/2026-07-23-after-the-first-rerun.md)
+[*After the First Rerun*](docs/blog/2026-07-23-after-the-first-rerun.md) ·
+[*Seven $TSC2$ Variants Reached the Human-Review Boundary*](docs/blog/2026-08-15-seven-variants-human-review-boundary.md)
 
 | Milestone | Result |
 |---|---|
@@ -33,7 +34,7 @@ Public progress posts:
 | Mechanism Atlas source catalog | Five resolver-verified grounding sources plus seven mechanically non-grounding leads; public identifiers, licences and hashes are committed |
 | `$TSC2$` `$p.\mathrm{Arg611Gln}$` deterministic pass | Two exact spans passed Gates 1–7; Gate 8 blocked for missing named review; zero accepted claims |
 | Six-variant gate-smoke cohort | 6/6 technical packages passed Gates 1–7 and blocked only at Gate 8; zero accepted claims; explicitly **not** the formal contrast panel |
-| Formal Atlas contrast panel | **`INFEASIBLE_PANEL`** — the reviewed selector exhaustively completed 24 attempts across L0–R7 against universe/map v4 with no budget exhaustion; no panel or candidate was selected |
+| Formal Atlas contrast panel | **machine result: `INFEASIBLE_PANEL` under v1.0.4** — the reviewed selector exhaustively completed 24 attempts across L0–R7 against universe/map v4 with no budget exhaustion. **post-hoc rubric-v2 interpretation: `EXPERT_ADJUDICATION_REQUIRED`** (ADR-0019, `POST_HOC`, claim ceiling `NONE_NO_PANEL_EXISTS`, `independent_validation: NOT_ESTABLISHED`). **No panel selected or approved**; no candidate was selected and no human adjudication record exists |
 
 v3 is a post-hoc semantic correction of the frozen R2 aggregate: it separates
 run integrity, data sufficiency, conditional performance, policy parity and
@@ -99,6 +100,12 @@ until named human Gate 8 review. Public run manifests are under
 - Atlas Gates 1–7 verify provenance and deterministic fidelity, not biological
   truth. The current eight spans across seven variants remain unaccepted at
   Gate 8; the six-variant cohort is engineering repeatability only.
+- The rubric-v2 contextual outcome `EXPERT_ADJUDICATION_REQUIRED` (ADR-0019) is
+  a **pending state, not a result**. It selects no panel, approves no panel,
+  records no human decision, and does not supersede the frozen
+  `INFEASIBLE_PANEL` machine result. Scarcity lowers claim ceilings; it never
+  strengthens evidence, and no adjudication can convert dependent evidence into
+  independent replication.
 - BIAS remains an external, separate-process dependency under the arm's-length
   boundary documented in ADR-0007.
 

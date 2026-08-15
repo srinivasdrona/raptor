@@ -13,6 +13,7 @@
 
 | ID | Title | Status | Date |
 |----|-------|--------|------|
+| [ADR-0019](#adr-0019--versioned-atlas-interpretation-rubrics-a-scarcity-aware-post-hoc-contextual-layer-over-an-immutable-machine-result) | Versioned Atlas interpretation rubrics: a scarcity-aware post-hoc contextual layer over an immutable machine result | Accepted | 2026-08-15 |
 | [ADR-0018](#adr-0018--raptor-rescuescreen-a-gated-research-only-structural-rescue-track-downstream-of-reviewed-mechanism-evidence) | RAPTOR RescueScreen: a gated, research-only structural-rescue track downstream of reviewed mechanism evidence | Accepted | 2026-08-15 |
 | [ADR-0017](#adr-0017--dual-atlas-panel-products-a-post-result-technical-coverage-panel-separated-from-a-still-blocked-independent-validation-panel) | Dual Atlas panel products: a post-result technical-coverage panel separated from a still-blocked independent-validation panel | Accepted | 2026-08-15 |
 | [ADR-0016](#adr-0016--deterministic-offline-citation-resolver-and-phase-2-promotion-span-verification) | Deterministic offline citation resolver and Phase 2 promotion span verification | Accepted | 2026-07-27 |
@@ -40,6 +41,7 @@
 
 | ADR | Current risk linkage | Basis in current repo |
 |---|---|---|
+| **ADR-0019** | R-A13, R-A14, R-A15, R-A2 | Versioned interpretation rubrics keep the audited `INFEASIBLE_PANEL` run byte-immutable and additively re-described rather than re-run or re-signed (R-A13); they record rare-disease source scarcity as a ceiling-lowering context that requires named expert adjudication rather than as a licence to weaken P2/D3 (R-A14); the mandatory machine+contextual outcome pair, the explicit `NONE_NO_PANEL_EXISTS` claim ceiling and the `POST_HOC` stamp block authorization overclaim and prospective-sounding prose (R-A15); and the nine non-waivable dimensions preserve the exact-span, provenance and classification/leakage firewalls that stop outcome-dependent reinterpretation from becoming circular evidence (R-A2). |
 | **ADR-0018** | R-G1, R-G2, R-A6, R-B2, R-D7 | RescueScreen is a separately versioned, research-only lane whose entry gates, closed output vocabulary, no-go states and eight firewalls keep every computational output a hypothesis, forbid compound/treatment/combination recommendation and vendor procurement, bar docking scores from being read as affinity or efficacy, and require per-artifact licence verification instead of an "everything is open" assumption; the ACMG/classification and Atlas-promotion firewalls preserve ADR-0009/ADR-0015 and the ADR-0010 vertical boundary. |
 | **ADR-0017** | R-A13, R-A15, R-A2, R-A14 | Splitting the technical-coverage engineering product from the independent-validation scientific product prevents post-result reinterpretation of the audited `INFEASIBLE_PANEL` run (R-A13), fixes an explicit machine-readable claim ceiling per product against authorization overclaim (R-A15), blocks the "relax P2/D3 after seeing the answer" validation mirage (R-A2), and records source scarcity as `BLOCKED_SOURCE_DIVERSITY` rather than as a failure or a licence to weaken constraints (R-A14). |
 | **ADR-0016** | R-A2, R-A6, H1 | Deterministic offline resolver enforces ADR-0015 grounding: primary-source/dataset direct-leaf resolution + exact normalized-slice span verification with from-disk hash recompute, closing presence-only Gate 4 and truthy-boolean Gate 3 laundering while keeping acquisition out of scope (no network). |
@@ -58,6 +60,166 @@
 | **ADR-0003** | R-D1 | Explicitly cited in the checker rubber-stamp / skipped-loop risk row. |
 | **ADR-0002** | — | Document-format ADR only; no direct current risk row cites it. |
 | **ADR-0001** | — *(partially superseded by ADR-0010)* | Historical strategy framing record; current linked risks are carried by ADR-0010 instead. |
+
+---
+
+## ADR-0019 — Versioned Atlas interpretation rubrics: a scarcity-aware post-hoc contextual layer over an immutable machine result
+
+- **Status:** Accepted
+- **Date:** 2026-08-15
+- **Deciders:** @dronasrinivas (operator, acting domain owner)
+- **Track:** `docs/atlas-rubric-blog-2026-08`
+- **Supersedes:** the *interpretation policy* for Atlas panel outcomes only. Additive in every
+  other respect. It preserves the audited 2026-08-06 `INFEASIBLE_PANEL` run, the frozen panel
+  selection protocol v1.0.4, its registration, universe lock v4 and identity-map lock v4
+  byte-unchanged; it preserves ADR-0017's preserved formal result and its two-product separation
+  in full; and it preserves ADR-0009 (no classifier leakage), ADR-0013 (post-hoc labelling and the
+  prospective lock), ADR-0014, ADR-0015 and ADR-0016. Binds
+  `docs/project/specs/atlas-panel-rubric-v2.yaml` (rev 1) and
+  `data/atlas/tsc2_phase2_panel_rubric_v2_readjudication_2026-08-15.json`.
+
+### Context
+
+This is the second time a RAPTOR rubric has been found to collapse independent questions into
+one verdict, and the two cases rhyme closely enough that the response should be a general
+mechanism rather than a second one-off.
+
+**First precedent — ADR-0013.** The R2 masked held-out gate reported a coarse `FAIL` that
+conflated insufficient called data, conditional performance and a policy exclusion. The fix was
+not to re-run R2 and not to soften the gate: R2 was frozen byte-identical, and a tiered v3
+re-adjudication re-reported the *same* frozen counts on independent axes — run integrity, data
+sufficiency, conditional performance, policy parity, coverage, scope evidence and authorization
+— explicitly labelled post-hoc and explicitly authorizing nothing.
+
+**Second precedent — the Atlas panel.** On 2026-08-06 the reviewed selector returned
+`INFEASIBLE_PANEL` (`data/atlas/tsc2_phase2_panel_selection_run_2026-08-06.json`, SHA-256
+`5f5b0918a24fcaa737877a15e393773f20c584c531517133e9c8b7e7574cfffd`). All 24 fixed-size attempts
+across L0–R7 completed exhaustively — maximum 714 nodes against a 5,000,000 budget, zero
+relaxation steps, zero members selected, 35 complete dispositions. The infeasibility is a
+property of the substrate: 10 of 35 identities unresolved, 10 access- or licence-blocked, 1
+anchor excluded, 14 eligible but unselected; all 37 attributable observations and 32 of 35
+records pooled into one `LG:UNKNOWN-POOL` with zero established lineage groups; and an eligible
+evidence base spanning two assay kinds, one broad model-system category and a dominant mTORC1
+reporter readout.
+
+Protocol v1.0.4 could express exactly one proposition: *is a strictly independent contrast panel
+feasible?* It had no vocabulary for a second, materially different question: *given an
+intrinsically sparse rare-disease literature, is any lower-claim-ceiling panel scientifically
+useful, and who is competent to decide that?* Reporting only `INFEASIBLE_PANEL` therefore
+under-describes the substrate in a specific way — it reads as though the evidence packages
+failed, when in fact seven variants' packages passed Gates 1–7 and the *panel-level independence
+constraint* was unsatisfiable.
+
+The danger in fixing this is obvious and was the reason to write a general mechanism. Any
+adjustment made after seeing a negative result is suspect: relaxing P2 or D3 now would be
+outcome-dependent constraint selection, would make the original result unfalsifiable in
+retrospect, and is already forbidden by the frozen protocol and by ADR-0017. Doing nothing is
+also wrong, because it lets a scarcity finding masquerade as an evidence-quality finding.
+
+### Considered options
+
+1. **Re-run the frozen selector under adjusted constraints.** Rejected: outcome-dependent
+   constraint selection; destroys the evidential value of an exhaustively completed negative
+   result.
+2. **Edit or annotate the run record in place with a softer outcome.** Rejected: a result that
+   can be rewritten after the fact carries no evidential weight, and it breaches the ADR-0017
+   immutability rule.
+3. **Report only `INFEASIBLE_PANEL` and change nothing.** Rejected: it conflates "no independent
+   panel is assemblable" with "the evidence failed", and it leaves the rare-disease question
+   permanently unaskable.
+4. **Adopt versioned interpretation rubrics with named context profiles, paired
+   machine-plus-expert outcomes, an explicit claim ceiling, and a mandatory `POST_HOC` stamp
+   until prospective activation.** Adopted.
+
+### Decision
+
+Adopt **option 4**, specified in `docs/project/specs/atlas-panel-rubric-v2.yaml`
+(`atlas-panel-rubric` 2.0.0, profile `rare-disease-specialist-literature-v1`, status
+`POST_HOC_INTERPRETATION_ONLY`) and instantiated for the 2026-08-06 run in
+`data/atlas/tsc2_phase2_panel_rubric_v2_readjudication_2026-08-15.json`.
+
+1. **The machine result is immutable and stays published.** `INFEASIBLE_PANEL` under
+   `atlas-phase2-panel-selection-protocol 1.0.4` is never edited, re-signed, re-hashed, re-run,
+   retracted or superseded. No rubric version may reuse its run-record id, its selection seed
+   `raptor-atlas-phase2-panel-v1`, or its protocol/registration pair.
+2. **Interpretation is additive and paired.** Rubric v2 adds `contextual_outcome:
+   EXPERT_ADJUDICATION_REQUIRED`, `panel_selected: false`, `panel_approved: false`,
+   `expert_adjudication: PENDING` and `independent_validation: NOT_ESTABLISHED` **beside** the
+   machine result. Every output reports the pair; neither element may be cited alone.
+   `EXPERT_ADJUDICATION_REQUIRED` is a pending state, never a pass, a partial pass or a
+   provisional panel — if no adjudication ever occurs, the terminal published state remains
+   `INFEASIBLE_PANEL` with no panel.
+3. **Fifteen independent axes replace the single verdict**, covering run integrity, search
+   completeness, identity sufficiency, source access, source-lineage independence, assay
+   concentration/diversity, model-system diversity, evidence-situation coverage,
+   independent-validation status, expert-adjudication status, claim ceiling, prospective/post-hoc
+   state, panel membership, contradiction disclosure and disposition accounting. Unknown is
+   reported as unknown; no axis is omitted or coerced.
+4. **A closed outcome vocabulary** of eight values: `INDEPENDENT_VALIDATION_PANEL`,
+   `EXPERT_ADJUDICATED_RARE_DISEASE_PANEL`, `TECHNICAL_COVERAGE_PANEL`,
+   `EXPERT_ADJUDICATION_REQUIRED`, `PANEL_NOT_JUSTIFIED`, `MORE_EVIDENCE_REQUIRED`,
+   `INFEASIBLE_UNDER_RUBRIC` and `UNDETERMINED_SEARCH_INCOMPLETE`. The last two are never
+   conflated: a completed exhaustive search and an interrupted one are different findings.
+   `EXPERT_ADJUDICATED_RARE_DISEASE_PANEL` is reachable **only** through a future named, signed
+   decision record — by no machine path and by no document in this decision.
+5. **Nine non-waivable dimensions and four contextually adjudicable ones.** Non-waivable:
+   canonical identity and official replay; source provenance and lawful access; exact-span
+   verification; assay and model-system context; contradiction and null-result disclosure;
+   deduplication and collision accounting; complete dispositions; the classification/leakage
+   firewall; immutable inputs and run records. Contextually adjudicable: the minimum number of
+   independent laboratories or lineages (P2), the assay-concentration cap (D3), model-system
+   diversity (D2), and panel balance/size (C3 / `n_target`) where the literature is intrinsically
+   sparse. **Scarcity lowers claim ceilings; it never strengthens evidence**, never upgrades an
+   axis value, and never converts dependent evidence into independent replication — a limit that
+   binds human adjudicators exactly as it binds the machine.
+6. **Adjudication is a record, not an assertion.** Any future decision must carry reviewer
+   identity and qualifications, a conflict-of-interest declaration, scope, rationale, the
+   dimensions contextualized and those explicitly not waived, the resulting claim ceiling,
+   limitations, an expiry date, re-review triggers and signatures. A missing field makes the
+   record void rather than provisional; an expired record reverts to `PENDING` rather than
+   decaying to accepted. **Zero such records exist today, and no artifact in this decision
+   constitutes one.**
+7. **A general rubric-evolution workflow (RE-1…RE-10):** record the nuance before touching a
+   threshold; classify the cause as implementation defect, policy defect, data scarcity,
+   disease-context mismatch or new evidence; freeze the old rubric and its results; draft a new
+   semantic version; prefer aggregate or blinded evidence; separate authorship from independent
+   domain review; **apply symmetrically to the complete eligible universe**; rerun old and new
+   side by side and publish a transition matrix; mark `POST_HOC`; and activate prospectively only
+   through a new registration frozen before the run it governs. Major versions change outcome
+   semantics or a claim ceiling, minor versions change thresholds or context profiles, patch
+   versions change nothing executable.
+8. **Never tune a rubric so that one observed result looks better.** A rubric change justified
+   only by the record that motivated it, or applied only to that record, is void. This is the
+   single rule the other seven exist to protect.
+9. **Every output carries seven fields:** rubric version, context profile, machine result,
+   contextual interpretation, expert decision, claim ceiling and prospective/post-hoc status. A
+   README row, a `PROGRAM.md` line or a blog paragraph is an output.
+
+### Consequences
+
+- The 2026-08-06 run, protocol v1.0.4, its registration, universe lock v4 and identity-map lock
+  v4 remain byte-identical. The readjudication artifact is a *separate* candidate-free record
+  with its own self-excluding content hash
+  (`bf043a2cb1f195bcf82c412e008862e46565b64bf227db7c679bac9d099d88dc`) that binds the source run
+  by path and hash and copies only aggregate facts.
+- The public record now distinguishes four things that v1.0.4 collapsed: individual Gate 1–7
+  packages (which did not fail), technical repeatability, independent validation (not
+  established), and expert-adjudicated rare-disease use (pending, unreached).
+- A post-hoc diagnostic counterfactual — that removing P2 alone or D3 alone left the problem
+  infeasible, and feasible subsets appeared only when both were removed — is recorded explicitly
+  as **diagnostic and post-hoc**, with empty membership. It is not a selection, not a panel, not
+  a relaxation proposal and not authorization to weaken either constraint.
+- The interpretation layer is deliberately the *weaker* artifact: on the prospective/post-hoc
+  axis it downgrades from `PROSPECTIVE_REGISTERED` to `POST_HOC`, and that downgrade is not
+  removable by review, agreement or elapsed time.
+- The cost is ceremony. Every panel statement now carries a rubric version, a context profile
+  and a claim ceiling, and every future rubric change owes a nuance record, a cause
+  classification, symmetric application and a published transition matrix. That ceremony is the
+  control against retrospective rubric tuning, not overhead on top of it.
+- Nothing is executed, selected or approved. Backout is a straight revert of the rubric spec, the
+  readjudication artifact, this ADR, the blog post and the `METHOD`/`PROGRAM`/`README`/todo edits;
+  no code, test, config, protocol, registration, universe, map, lock, pack or run record is
+  touched.
 
 ---
 
