@@ -112,7 +112,7 @@ Rule: the **checker is always a different model family from the doer**; nothing 
 checker passes it against pre-stated acceptance criteria. *(Spec/verdict schema + gate automation are
 pending `STRATEGY.md` Part II §10 — ADR-0003.)*
 
-## Model-role benchmark — PHASE 2 ROLE COMPARISONS COMPLETE / NO STACK SELECTED
+## Model-role tournament — CLOSED / SUPERVISED OPERATING PANEL FINALIZED
 
 The incumbent Opus → Gemini → Sonnet 5 → GPT stack now has a versioned retrospective baseline and a
 completed two-phase tournament record:
@@ -120,11 +120,16 @@ completed two-phase tournament record:
 [`model_role_incumbent_baseline_2026-08-15.json`](../data/eval/model_role_incumbent_baseline_2026-08-15.json)
 and the [human-readable baseline](reference/model-role-benchmark-baseline-2026-08.md). Phase 1
 isolated individual roles; Phase 2 then ran bounded planner and paired-doer comparisons under
-SPEC-first attribution. The final machine record is
+SPEC-first attribution. The final Phase 2 machine record is
 [`model_role_phase2_result_2026-08-16.json`](../data/eval/model_role_phase2_result_2026-08-16.json)
 with a [human-readable Phase 2 report](reference/model-role-phase2-results-2026-08.md).
-Phase 2 ranks Sol first among planners and MAI-Code first in the paired-doer comparison, but
-**qualifies neither as a replacement and selects no full stack**. ADR-0003/ADR-0005 remain binding.
+The measured comparisons did not qualify an autonomous replacement or full stack. The final
+governance decision is documented in the authoritative
+[model-role operating-panel decision](reference/model-role-operating-panel-2026-08.md): **GPT-5.6
+Sol** planner, **GPT-5.3 Codex** test author, **MAI-Code-1.1-Flash** doer, and **Claude Opus 5**
+supervised checker. Human/staff adjudication remains the terminal authority; Opus HIGH and CRITICAL
+findings require adjudication.
+
 The subsequent [Terra/Grok planner extension](reference/model-role-planner-extension-2026-08.md)
 leaves Sol first: Sol 10/15, Opus 9/15, Terra 7/15, Grok 5/15 and Gemini 4/15. All five planners
 failed registry authority 0/5, so no planner replacement is authorized. Machine record:
@@ -223,8 +228,11 @@ HIGH defects. MAI-Code is therefore the pre-efficiency doer leader, not an autho
 
 The preregistered ten efficiency points are `PENDING_UNAWARDABLE`: there is no frozen deterministic
 formula or attributable candidate-run telemetry, so no points are guessed. Test-author and checker
-selection were not isolated in Phase 2. No planner replacement, doer replacement, full stack,
-operating-model change, RAPTOR v2 launch, or RescueScreen launch is authorized by these results.
+selection were not isolated in Phase 2. Those experimental results alone authorize no planner
+replacement, doer replacement, full stack, operating-model change, RAPTOR v2 launch, or RescueScreen
+launch. The subsequent [final governance decision](reference/model-role-operating-panel-2026-08.md)
+closes model-role selection with a supervised operating panel; RAPTOR v2 and RescueScreen work
+continue only under their separate scope and entry gates.
 
 ## Health Rollup
 
