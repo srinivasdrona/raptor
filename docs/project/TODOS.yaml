@@ -1408,6 +1408,23 @@ todos:
   - panel-products-independent-freeze
   - atlas-phase2-human-span-review
   created: '2026-08-15'
+- id: rescuescreen-entry-gate-status
+  title: Implementing deterministic RescueScreen entry-gate status
+  description: 'Track: RESCUESCREEN / PLATFORM (gate infrastructure only; screens no
+    compound and executes no RescueScreen stage). Implement the closed, hash-bound
+    rescuescreen.entry_gate_manifest.v1 model, deterministic offline validator and
+    rescuescreen.entry_gate_status.v1 report defined by
+    docs/project/specs/rescuescreen-entry-gates-v1.yaml. The committed manifest must
+    retain EG-1..EG-5 as NOT_SATISFIED, report EG-1 / MECHANISM_UNVERIFIED as the first
+    block, open no evidence artifact, import no network or downstream domain module,
+    and keep stage_execution_authorized=false even for an independently constructed
+    all-satisfied test fixture. This task cannot satisfy an entry gate, start S1, or
+    change any Atlas claim, ACMG criterion, classification, screen, docking, compound,
+    vendor, assay or treatment state.'
+  status: in_progress
+  depends_on:
+  - panel-products-rescuescreen-design
+  created: '2026-08-16'
 - id: rescuescreen-mechanism-structure-gate
   title: Verifying the RescueScreen mechanism and structure entry gate
   description: 'Track: RESCUESCREEN / ENTRY (research-only; asserts no clinical result and
