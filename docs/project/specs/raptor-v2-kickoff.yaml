@@ -1,0 +1,994 @@
+# RAPTOR v2 branch kickoff specification.
+#
+# PLAN ONLY. This file defines the next bounded engineering phase and its first
+# implementation slice. It changes no production code, source policy, evidence,
+# evaluation result, clinical boundary, or external authorization.
+#
+# "RAPTOR v2" is an engineering-phase label in this specification. It is NOT
+# the frozen R2 run, the additive scope-gate v2 schema, a package major version,
+# a release tag, or a claim that any evidence scope is validated.
+
+schema: raptor-v2-kickoff-v1
+status: planner_contract_ready_for_test_authoring
+task_id: raptor-v2-kickoff
+title: >-
+  RAPTOR v2 kickoff: governed source lifecycle and change-impact control
+  without evidence reinterpretation or clinical expansion
+worktree: 'D:\AIProjects\raptor-worktrees\raptor-v2'
+branch: track/raptor-v2-2026-08
+base_commit: 7b549686fdad1e863e06f346774ad5d7e2867bb1
+output: docs/project/specs/raptor-v2-kickoff.yaml
+created_at: '2026-08-16T15:00:50.941+05:30'
+created_at_utc: '2026-08-16T09:30:50.941Z'
+required_commit:
+  message: 'plan(v2): define RAPTOR v2 kickoff'
+  trailers:
+    - 'Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>'
+
+authority:
+  precedence:
+    - docs/DECISIONS.md
+    - docs/STRATEGY.md
+    - docs/EVALUATION.md
+    - docs/PROGRAM.md
+    - docs/ARCHITECTURE.md
+    - METHOD.md
+    - docs/prd/
+    - docs/project/specs/
+    - docs/project/TODOS.yaml
+  required_surfaces_read:
+    - METHOD.md
+    - README.md
+    - docs/PROGRAM.md
+    - docs/STRATEGY.md
+    - docs/ARCHITECTURE.md
+    - docs/DECISIONS.md
+    - docs/project/TODOS.yaml
+    - docs/project/specs/*.yaml
+    - docs/prd/*.md
+    - src/raptor/
+    - tests/
+  rule: >-
+    This specification is subordinate to accepted ADRs and binding strategy,
+    evaluation, and operating-model text. A conflict is a defect in this file;
+    implementation must not reinterpret the authority surface to preserve this
+    plan.
+
+planning_baseline:
+  repository_state:
+    commit: 7b549686fdad1e863e06f346774ad5d7e2867bb1
+    branch_clean_at_start: true
+    package_version_observed: 0.1.0
+    source_packages_observed:
+      - raptor.atlas
+      - raptor.census
+      - raptor.eval
+      - raptor.external
+      - raptor.ingest
+      - raptor.kb
+      - raptor.packet
+      - raptor.scorer
+      - raptor.testkit
+    absent_package_relevant_to_first_slice: raptor.sourceops
+  current_authority_summary:
+    - >-
+      The deterministic census, frozen masked R2 run, and tiered v3 post-hoc
+      re-adjudication are complete. R2 and its v1/v2 interpretation are
+      immutable; v3 creates no new evidence and authorizes no scope.
+    - >-
+      Candidate packets and Atlas artifacts are research-only,
+      non-authoritative review scaffolding. External worklists,
+      classifications, submissions, and patient-facing outputs remain outside
+      current authority.
+    - >-
+      Generic platform/orchestration expansion and PRD-05 remain frozen under
+      ADR-0010. The accepted Prefect/LiteLLM/SQLite/Ollama architecture is not a
+      deployed service.
+    - >-
+      The ordered source-expansion roadmap begins with a source owner/version/
+      licence/refresh control plane, followed by staged refresh and
+      drift-revalidation machinery.
+  immutable_evidence_preservation:
+    required_unchanged_paths:
+      - data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json
+      - data/census/tsc_tiered_readjudication_2026-07-21.json
+      - configs/eval/tsc2.yaml
+      - configs/eval/tiered_gate_v3.yaml
+      - configs/eval/bp4pp3_predictor_policy.json
+      - configs/eval/core_annotation_bundle.yaml
+    recorded_sha256:
+      frozen_r2: 7c55cd4e3059713d1d53886d8893a3819153375b62ce9d37187d731132c6a77f
+      tiered_v3: 1e36b2d07767fdd8e32fbf07dd42f60a2b4cae2ff9b21c7dfb9430d741c5bc5f
+    rule: >-
+      V2 may reference these artifacts as immutable predecessors. It may not
+      rewrite, re-score, re-label, re-hash, supersede, migrate, or infer new
+      authority from them.
+
+parallel_work_coordination:
+  rescue_screen:
+    branch: design/panel-products-rescue-screen-2026-08
+    snapshot_commit: 808aaa10acc224d8bd6bd753272295d8c4f8b961
+    coordination_status: >-
+      Parallel branch observed for collision avoidance. Its ADR-0017/ADR-0018,
+      panel-product, and RescueScreen files are not authority on this branch
+      until merged into the branch's base.
+    observed_boundary:
+      - >-
+        RescueScreen is a separately versioned, research-only lane downstream
+        of reviewed mechanism evidence.
+      - >-
+        RescueScreen entry gates are intentionally unsatisfied; it must not
+        start screening, alter ACMG evidence, promote Atlas claims, or emit
+        treatment or procurement outputs.
+      - >-
+        The Atlas technical-coverage and independent-validation panel products
+        have separate claim ceilings and no evidence flow between them.
+    v2_non_ownership:
+      - docs/project/specs/structural-rescue-screen-v1.yaml
+      - docs/project/specs/atlas-panel-products-v1.yaml
+      - any future src/raptor/rescuescreen/ package
+      - any RescueScreen structure, pocket, docking, molecular-dynamics,
+        compound, assay, or vendor artifact
+    merge_order: independent
+    merge_rule: >-
+      Before first-slice implementation begins, rebase onto the then-current
+      main branch. Preserve merged RescueScreen and panel-product decisions
+      byte-for-byte unless a separately approved reconciliation spec says
+      otherwise.
+  other_active_tracks_not_owned_by_v2:
+    - track/prospective-validation-2026-08
+    - track/atlas-panel-selection-2026-08
+    - track/r611q-expert-review-2026-08
+    - track/tsc2-mave-refresh-2026-08
+    - track/model-role-baseline-2026-08
+    - track/model-role-tournament-2026-08
+    - docs/method-control-status-2026-08
+  anti_duplication_rule: >-
+    V2 does not re-run or reinterpret prospective validation, repeat Atlas
+    panel selection, perform named human review, re-adjudicate the model-role
+    benchmark, or implement RescueScreen. Those tracks may later consume a
+    stable SourceOps contract only through their own reviewed specifications.
+
+ambiguity_resolution:
+  ambiguous_term: RAPTOR v2
+  collisions:
+    - frozen masked rerun label R2
+    - additive scope-gate schema version 2
+    - tiered gate version 3
+    - repository or release semantic versions
+    - a possible broad product rewrite
+  conservative_default:
+    phase_id: raptor-v2-governed-evidence-lifecycle
+    phase_name: RAPTOR v2 - Governed Evidence Lifecycle
+    meaning: >-
+      A bounded engineering phase that makes source identity, version,
+      permitted use, freshness, downstream impact, and rollback mechanically
+      inspectable before any source refresh can affect a RAPTOR artifact.
+    does_not_mean:
+      - a new scientific result
+      - a new validation or authorization status
+      - a replacement for R2 or v3
+      - a clinical product
+      - a generic rare-disease platform
+      - deployment of the accepted runtime stack
+      - implementation or execution of RescueScreen
+      - a package major-version or public release decision
+  rationale:
+    - >-
+      It selects the first ordered, still-pending source-expansion commitment:
+      sourceops-version-refresh-registry.
+    - >-
+      It addresses GP-5 freshness and provenance without changing evidence or
+      classification policy.
+    - >-
+      It creates a reusable control seam for the census, evaluation, packet,
+      Atlas, MAVE, and future separately gated lanes while preserving their
+      domain-specific authorities.
+    - >-
+      It avoids duplicating completed scorer, ingestion, KB, packet, census,
+      tiered-gate, Atlas core, citation-resolver, and panel-selection work.
+
+phase_definition:
+  id: raptor-v2-governed-evidence-lifecycle
+  goal: >-
+    Move RAPTOR from dispersed, module-specific source pins and operator-run
+    refresh knowledge toward a deterministic, offline-first source lifecycle
+    control plane that emits impact plans before any data promotion.
+  gp13_gate:
+    specific_user:
+      primary: RAPTOR operator maintaining the TSC evidence program
+      secondary:
+        - TSC evidence curator reviewing source freshness and permitted use
+        - maintainers of the census, evaluation, packet, Atlas, and MAVE paths
+    concrete_artifact:
+      - a hash-bound repository-wide SourceOps registry
+      - deterministic source and consumer readiness reports
+      - later, staged diff and rollback-plan artifacts
+    expert_validator:
+      mechanical: independent checker running the schema, hash, graph, and preservation tests
+      human:
+        - repository owner for source identity, ownership, and activation state
+        - qualified licence or legal reviewer where permitted-use interpretation is not mechanical
+      domain_oracle: >-
+        Not required to validate registry mechanics. A molecular geneticist is
+        still required for domain-truth or externally meaningful evidence
+        claims; SourceOps cannot substitute for that review.
+    falsifier:
+      - an active source or consumer exists outside the declared inventory
+      - a verified source lacks an independently checkable version, licence, or checksum
+      - a refresh can mutate a frozen historical artifact
+      - a blocked source can be consumed as ready
+      - a change can reach a downstream artifact without an explicit impact route
+      - rollback cannot identify the prior immutable source version
+    why_generic_products_do_not_supply_it: >-
+      Generic data catalogs and package managers do not encode RAPTOR's frozen
+      R2 boundary, criterion-lineage and consumer firewalls, research-only
+      licence states, external-content-root model, packet/benchmark
+      invalidation routes, or human approval boundary.
+  validation_ceiling: >-
+    V2 can establish that source lifecycle metadata and change-impact routing
+    are complete, deterministic, and fail-closed. It cannot establish that a
+    source is scientifically sufficient, that a criterion is valid, that a
+    variant direction is correct, or that any clinical or research scope is
+    authorized.
+  ordered_slices:
+    - id: V2-S1
+      name: SourceOps registry and offline validator
+      status: selected_first_slice
+      maps_to_todo: sourceops-version-refresh-registry
+    - id: V2-S2
+      name: staged snapshot verification and deterministic diff
+      status: later_separate_spec
+      maps_to_todo: sourceops-automated-refresh-validation
+      depends_on: [V2-S1]
+    - id: V2-S3
+      name: material-drift impact routing and rollback rehearsal
+      status: later_separate_spec
+      maps_to_todo: sourceops-drift-revalidation-gates
+      depends_on: [V2-S2]
+  phase_stop:
+    complete_when:
+      - V2-S1 through V2-S3 have independent specs, tests, implementation, and checker verdicts
+      - at least one mutable-source and one external-content-root refresh are rehearsed offline
+      - every rehearsal emits an impact plan and rollback plan before promotion
+      - frozen evidence preservation checks remain clean
+    explicitly_not_required:
+      - a live network scheduler
+      - Prefect, LiteLLM, Ollama, or SQLite service deployment
+      - automatic source promotion
+      - a new evidence run
+      - a package major-version bump
+      - any RescueScreen stage
+
+first_implementation_slice:
+  id: V2-S1
+  task_id: sourceops-version-refresh-registry
+  title: Build the SourceOps registry v1 and deterministic offline validator
+  independently_shippable: true
+  user: >-
+    The RAPTOR operator needs one command that answers which source declarations
+    exist, which are usable or blocked, which consumers depend on them, and
+    what must happen when they drift, without fetching or changing any source.
+  primary_artifact:
+    path: configs/sourceops/source_registry.yaml
+    schema: raptor.source_registry.v1
+    hash_algorithm: raptor.source_registry_content_hash.v1
+    hash_rule: >-
+      Parse with yaml.safe_load, structurally validate, remove only the
+      top-level registry_content_hash, serialize the remaining object as
+      canonical JSON with sorted mapping keys, compact separators,
+      ensure_ascii=false, and sequence order preserved, then compute lowercase
+      SHA-256.
+  validation_artifact:
+    schema: raptor.source_registry.validation.v1
+    destination: stdout by default; optional explicit output path
+    properties:
+      - deterministic for identical inputs
+      - contains no raw source data
+      - separates registry validity from source readiness
+      - records every blocked source and exact unblock condition
+  command_surface:
+    - >-
+      python -m raptor.sourceops.cli validate --registry
+      configs/sourceops/source_registry.yaml
+    - >-
+      python -m raptor.sourceops.cli status --registry
+      configs/sourceops/source_registry.yaml --consumer <consumer-id>
+  exit_codes:
+    0: registry valid; for status, requested consumer READY
+    2: malformed schema, hash mismatch, invalid reference, or graph/invariant failure
+    3: registry valid but requested consumer BLOCKED
+    4: requested source or consumer id not found
+
+  implementation_surface:
+    create:
+      - configs/sourceops/source_registry.yaml
+      - src/raptor/sourceops/__init__.py
+      - src/raptor/sourceops/model.py
+      - src/raptor/sourceops/registry.py
+      - src/raptor/sourceops/cli.py
+      - tests/sourceops/test_registry_contract.py
+      - tests/sourceops/test_registry_cli.py
+      - tests/sourceops/test_repository_registry.py
+      - tests/sourceops/test_import_and_network_boundary.py
+    may_update:
+      - src/raptor/__init__.py
+    must_not_update:
+      - METHOD.md
+      - README.md
+      - docs/PROGRAM.md
+      - docs/STRATEGY.md
+      - docs/ARCHITECTURE.md
+      - docs/DECISIONS.md
+      - docs/EVALUATION.md
+      - docs/project/TODOS.yaml
+      - src/raptor/atlas/
+      - src/raptor/census/
+      - src/raptor/eval/
+      - src/raptor/external/
+      - src/raptor/ingest/
+      - src/raptor/kb/
+      - src/raptor/packet/
+      - src/raptor/scorer/
+      - data/
+  dependency_policy:
+    runtime_dependencies: [PyYAML, Python standard library]
+    new_dependency_allowed: false
+    network_access: forbidden
+    external_content_read: forbidden
+    database_migration: none
+    service_dependency: none
+
+  registry_model:
+    top_level_required:
+      - schema
+      - registry_id
+      - registry_version
+      - created_at
+      - registry_content_hash
+      - hash_basis
+      - source_records
+      - consumers
+      - coverage_exclusions
+      - preservation_rules
+    unknown_keys: rejected at every closed schema level
+    source_record_required:
+      - source_id
+      - display_name
+      - record_kind
+      - lifecycle_state
+      - owner
+      - authoritative_locator
+      - declaration_refs
+      - licence
+      - release
+      - acquisition
+      - refresh
+      - consumers
+      - drift_policy
+      - rollback
+    source_record_optional:
+      - components
+      - blocked_reasons
+      - missing_inputs
+      - unblock_condition
+      - reviewed_by
+      - reviewed_at
+    record_kinds:
+      SINGLE_SOURCE: one independently versioned external source
+      COMPOSITE_MANIFEST: one hash-bound declaration containing multiple source components
+      POLICY_SOURCE_REGISTER: a register of citations or candidates that is not itself evidence
+      METADATA_CATALOG_TEMPLATE: a committed template with no usable source content
+    record_kind_rules:
+      - >-
+        SINGLE_SOURCE has no components. COMPOSITE_MANIFEST and
+        POLICY_SOURCE_REGISTER carry a closed components list whose rows are
+        uniquely identified and preserve the source-specific state, version,
+        licence, role, and declaration locator.
+      - >-
+        A composite record's lifecycle state is the least-permissive aggregate
+        of its components. A verified component cannot make a blocked component
+        or the composite as a whole READY.
+      - >-
+        METADATA_CATALOG_TEMPLATE must have zero components and cannot satisfy a
+        grounding or evidence consumer.
+    component_required:
+      - component_id
+      - display_name
+      - lifecycle_state
+      - source_role
+      - version_or_snapshot
+      - licence_status
+      - declaration_locator
+    coverage_exclusion_required:
+      - exclusion_id
+      - declaration_path
+      - declaration_locator
+      - owner
+      - reason
+      - review_condition
+    lifecycle_states:
+      VERIFIED_ACTIVE: >-
+        Identity, version, permitted use, and required content pins are
+        independently verified for the declared use.
+      PINNED_HISTORICAL: >-
+        Immutable evidence of a historical execution. It may be referenced but
+        never refreshed in place or treated as a current source.
+      CONFIRM_PENDING: >-
+        Registered but missing one or more named verification inputs. It is not
+        usable by a READY consumer.
+      METADATA_ONLY: >-
+        A source or catalog declaration that carries context/provenance only and
+        cannot ground or drive evidence.
+      ACCESS_BLOCKED: >-
+        Identity is known, but lawful access or content availability is absent.
+      RETIRED: >-
+        Retained for history and prohibited from new consumption.
+    blocked_state_requirements:
+      states: [CONFIRM_PENDING, ACCESS_BLOCKED]
+      required_fields:
+        - blocked_reasons
+        - missing_inputs
+        - unblock_condition
+        - reviewed_by
+        - reviewed_at
+      rule: >-
+        Empty strings, generic "pending" text, or a missing unblock condition
+        are schema failures, not acceptable placeholders.
+    declaration_reference:
+      required:
+        - path
+        - role
+        - canonical_lf_sha256
+        - authority_scope
+      path_rules:
+        - repository-relative only
+        - no drive, absolute, parent, or symlink/junction escape
+        - referenced file must exist
+      hash_basis: >-
+        UTF-8 text after CRLF and CR normalization to LF, with no other
+        normalization. This cross-platform declaration hash is not a substitute
+        for any raw-byte data-artifact checksum.
+    licence_model:
+      required:
+        - status
+        - identifier_or_family
+        - terms_locator
+        - permitted_use
+        - redistribution
+        - cloud_egress
+        - verification_basis
+      rule: >-
+        A code licence never implicitly covers data, model weights, model
+        outputs, or derived artifacts. Unknown permitted use is blocking.
+    release_model:
+      required:
+        - version_or_snapshot
+        - release_date
+        - retrieved_at
+        - content_pin_status
+      rule: >-
+        VERIFIED_ACTIVE and PINNED_HISTORICAL records require a non-placeholder
+        version/snapshot and a content pin or a hash-bound domain declaration
+        that supplies it.
+    acquisition_model:
+      required:
+        - method
+        - operator_contract
+        - writes_outside_repository
+      first_slice_rule: >-
+        Records describe acquisition only. V2-S1 implements no downloader,
+        fetcher, scheduler, credential handling, or network call.
+    refresh_model:
+      required:
+        - cadence
+        - freshness_sla
+        - last_checked_at
+        - next_check_rule
+      stale_rule: >-
+        A stale source remains structurally valid but blocks any consumer that
+        declares freshness_required=true.
+    drift_policy_model:
+      required:
+        - materiality_basis
+        - actions
+        - approval_required
+      allowed_actions:
+        - record_only
+        - block_consumer
+        - stage_diff
+        - rebuild_benchmark
+        - review_policy
+        - invalidate_packets
+        - reground_atlas
+        - rerun_validation
+        - rollback
+      first_slice_rule: >-
+        Actions are proposed impact routes only. V2-S1 executes none of them and
+        cannot approve promotion, invalidation, or a new evidence run.
+    rollback_model:
+      required:
+        - predecessor_source_id
+        - immutable_predecessor_required
+        - rollback_artifact
+        - origin_reason
+      rule: >-
+        Mutable sources use a new source_id/version for every admitted release.
+        Rollback selects a prior immutable version; it never edits history.
+        predecessor_source_id may be null only for the first immutable record,
+        with a non-blank origin_reason explaining why no predecessor exists.
+    consumer_model:
+      required:
+        - consumer_id
+        - owner
+        - required_sources
+        - freshness_required
+        - on_blocked_source
+        - forbidden_source_roles
+      readiness: >-
+        READY only when every required source is in an admissible state, every
+        declaration hash matches, freshness requirements hold, and no
+        preservation or forbidden-role rule is violated.
+
+  initial_repository_inventory:
+    coverage_rule: >-
+      The committed v1 registry must account for every source declaration in
+      the exact roots below. A declaration is accounted for only by a unique
+      top-level source record, a unique component of a composite record, or an
+      explicit exclusion carrying an owner, reason, and review condition.
+      Silent omission is a failing test.
+    exact_roots:
+      - id: ingest-tsc
+        path: configs/ingest/tsc.yaml
+        minimum_checks:
+          - ClinVar snapshot declaration
+          - assembly and MANE release
+          - four reference checksum entries
+      - id: core-annotation-bundle
+        path: configs/eval/core_annotation_bundle.yaml
+        minimum_checks:
+          - runtime Nirvana and BIAS versions
+          - exactly 28 historical data-source rows on this planning baseline
+          - historical and current-readiness states remain distinct
+      - id: pp3bp4-source-register
+        path: configs/eval/pp3bp4_source_register.yaml
+        minimum_checks:
+          - exactly four required primary-source rows
+          - exactly five candidate rows
+          - shadow/proposed status cannot become active
+      - id: external-mave-register
+        path: configs/external/mave_sources.yaml
+        minimum_checks:
+          - exactly four source rows
+          - verified and confirm-pending states remain distinct
+          - circularity guard is represented in consumer prohibitions
+      - id: atlas-tsc2-pack
+        path: configs/atlas/packs/tsc2/pack.yaml
+        minimum_checks:
+          - exactly three source-register pins
+          - all remain provenance-only on this planning baseline
+      - id: atlas-tsc2-catalog-template
+        path: configs/atlas/catalogs/tsc2/catalog.yaml
+        minimum_checks:
+          - metadata-only template
+          - exactly zero committed source rows
+          - external content root is never dereferenced
+      - id: acmg-tsc-policy
+        path: configs/acmg/tsc.yaml
+        minimum_checks:
+          - BIAS version/data placeholders remain blocking
+          - licensing tags do not become permitted-use approval
+    minimum_top_level_registry_records:
+      - tsc-ingest-and-reference-declarations
+      - frozen-core-annotation-bundle
+      - pp3bp4-shadow-source-register
+      - tsc2-mave-source-register
+      - atlas-tsc2-pack-source-pins
+      - atlas-tsc2-catalog-template
+      - tsc-acmg-runtime-source-pins
+    expected_record_count: 7
+    baseline_change_rule: >-
+      If rebase changes a root's schema, row count, or role semantics, stop and
+      revise this spec before tests are authored. The doer must not update
+      expected counts to match observed implementation output.
+
+  consumers_in_scope:
+    - ingest
+    - scorer
+    - eval-benchmark
+    - eval-gate
+    - census
+    - packet
+    - atlas
+    - external-mave
+  consumers_reserved_but_not_activatable:
+    - rescuescreen
+    - atlas-technical-coverage-panel
+    - atlas-independent-validation-panel
+  reserved_rule: >-
+    V2-S1 may reserve these identifiers to prevent collision, but they have no
+    required_sources and cannot report READY. A later lane-specific spec must
+    define their projections and gates.
+
+  exact_in_scope:
+    - strict YAML schema and typed immutable Python model
+    - self-excluding registry content hash
+    - safe repository-relative declaration references
+    - deterministic validation and per-consumer readiness reports
+    - explicit blocked, stale, metadata-only, historical, and retired states
+    - source-to-consumer graph with dangling-reference rejection
+    - impact-route declarations with human approval flags
+    - repository inventory seeded from the seven exact roots
+    - cross-platform LF declaration-hash semantics
+    - no-network and import-boundary enforcement
+  exact_out_of_scope:
+    - downloading, refreshing, or promoting any source
+    - reading external raw source content
+    - replacing any existing domain-specific register or loader
+    - modifying scorer, evaluation, census, packet, Atlas, or MAVE behavior
+    - deciding source scientific sufficiency
+    - deciding legal questions mechanically
+    - executing drift actions, packet invalidation, benchmark rebuild, or rollback
+    - Prefect flow, scheduler, database, service, UI, or API
+    - RescueScreen entry-gate, structure, screening, or assay work
+    - new evidence, classification, worklist, submission, or clinical claim
+
+  migration_and_compatibility:
+    mode: additive_overlay
+    existing_authority_rule: >-
+      Existing domain-specific configs and loaders remain the runtime authority
+      for their current consumers. The SourceOps registry references and checks
+      them; it does not supersede or rewrite them in v1.
+    conflict_rule: >-
+      If SourceOps metadata conflicts with a domain declaration, validation
+      fails. SourceOps never wins silently and never repairs the domain config.
+    import_rule: >-
+      No existing package imports raptor.sourceops in V2-S1. The new package may
+      use only standard-library and PyYAML modules and may not import scorer,
+      eval, packet, census, Atlas, ingest, KB, or external MAVE implementation
+      modules.
+    schema_evolution:
+      - source_id values are stable once committed
+      - breaking changes require a new schema id
+      - unknown keys fail closed
+      - no implicit default may change readiness
+    backout: >-
+      Revert only the new SourceOps config/package/tests and any optional
+      raptor.__init__ export. No data backout, database migration, or evidence
+      reconstruction is required.
+
+  rescuescreen_coexistence:
+    file_boundary:
+      v2_owns:
+        - configs/sourceops/
+        - src/raptor/sourceops/
+        - tests/sourceops/
+      rescue_screen_owns:
+        - docs/project/specs/structural-rescue-screen-v1.yaml
+        - any future configs/rescuescreen/
+        - any future src/raptor/rescuescreen/
+        - any future tests/rescuescreen/
+    semantic_boundary:
+      - >-
+        The generic SourceOps registry may record a source or tool's identity,
+        version, licence status, freshness, and consumers.
+      - >-
+        It does not satisfy RescueScreen's lane-specific per-artifact licence
+        gate, derived-output terms review, mechanism-review gate, structure
+        mapping gate, or assay-feasibility gate.
+      - >-
+        RescueScreen may later reference a SourceOps record by source_id and
+        registry hash, but must emit its own separately versioned gate artifact.
+      - >-
+        No RescueScreen computational result flows back into SourceOps as
+        evidence readiness, Atlas claim status, ACMG evidence, or
+        classification.
+      - >-
+        A READY SourceOps consumer state cannot start RescueScreen. The reserved
+        rescuescreen consumer remains non-activatable in V2-S1.
+    panel_product_boundary: >-
+      A SourceOps registry may later seed a panel-specific frozen source
+      registry, but cannot by itself satisfy source-lineage, span-verifiability,
+      feasibility, or independent-validation gates. Technical-panel success
+      cannot change the independent-panel source-diversity block.
+
+  failure_states:
+    - code: REGISTRY_SCHEMA_ERROR
+      trigger: malformed type, missing key, unknown key, invalid enum, or empty required value
+      result: exit 2; no report labelled valid
+    - code: REGISTRY_HASH_MISMATCH
+      trigger: recomputed registry content hash differs
+      result: exit 2
+    - code: DECLARATION_REFERENCE_INVALID
+      trigger: absolute, drive, parent, missing, or escaping declaration path
+      result: exit 2
+    - code: DECLARATION_DRIFT
+      trigger: canonical LF declaration hash differs
+      result: exit 2; affected consumers not evaluated as ready
+    - code: SOURCE_METADATA_INCOMPLETE
+      trigger: active/historical source lacks required owner, version, licence, pin, or rollback fields
+      result: exit 2
+    - code: SOURCE_BLOCKED
+      trigger: source is confirm-pending or access-blocked
+      result: valid registry; dependent consumer BLOCKED, status exit 3
+    - code: SOURCE_STALE
+      trigger: freshness rule fails
+      result: valid registry; freshness-required consumer BLOCKED, status exit 3
+    - code: DANGLING_CONSUMER_OR_SOURCE
+      trigger: unknown source, consumer, predecessor, or impact target
+      result: exit 2
+    - code: IMMUTABLE_HISTORY_VIOLATION
+      trigger: historical record is refreshable in place or lacks immutable predecessor semantics
+      result: exit 2
+    - code: FORBIDDEN_ROLE_FLOW
+      trigger: metadata-only, shadow, or provenance-only source is declared usable by a forbidden consumer
+      result: exit 2
+    - code: FORBIDDEN_CROSS_LANE_CLAIM
+      trigger: registry claims to satisfy RescueScreen or scientific-panel gates
+      result: exit 2
+    - code: NETWORK_OR_EXTERNAL_READ_ATTEMPT
+      trigger: SourceOps imports network clients or opens an external content root
+      result: test failure and DO-NOT-MERGE
+
+  acceptance_criteria:
+    - id: V2S1-AC01
+      type: mechanical
+      text: >-
+        The new registry parses through yaml.safe_load into a closed typed model;
+        every unknown key, missing required field, wrong type, duplicate id, and
+        invalid lifecycle transition fails with a typed SourceOps error.
+    - id: V2S1-AC02
+      type: mechanical
+      text: >-
+        Registry hashing follows raptor.source_registry_content_hash.v1 exactly;
+        mapping order and LF/CRLF checkout differences do not change the hash,
+        while sequence order or semantic content changes do.
+    - id: V2S1-AC03
+      type: mechanical
+      text: >-
+        The repository registry has exactly seven top-level records with the ids
+        and seven declaration roots listed in initial_repository_inventory, and
+        the baseline nested counts are asserted before implementation.
+    - id: V2S1-AC04
+      type: evidence-form
+      text: >-
+        Every declaration in the seven roots is uniquely represented or
+        explicitly excluded with owner, reason, and review condition. A
+        deliberately omitted source row makes the repository test fail.
+    - id: V2S1-AC05
+      type: mechanical
+      text: >-
+        VERIFIED_ACTIVE and PINNED_HISTORICAL records cannot use placeholders;
+        CONFIRM_PENDING and ACCESS_BLOCKED records require exact missing inputs
+        and unblock conditions and never make a consumer READY.
+    - id: V2S1-AC06
+      type: mechanical
+      text: >-
+        Declaration paths reject absolute paths, drive paths, parent traversal,
+        symlink/junction escape, missing files, and hash drift. No external
+        content root is dereferenced.
+    - id: V2S1-AC07
+      type: mechanical
+      text: >-
+        Source and consumer graphs reject duplicate and dangling ids; readiness
+        is the conjunction of required source state, declaration integrity,
+        freshness, and role rules, with no success-shaped default.
+    - id: V2S1-AC08
+      type: mechanical
+      text: >-
+        validate and status emit byte-deterministic JSON and the specified exit
+        codes. A valid registry with a blocked source is clearly distinct from a
+        ready consumer.
+    - id: V2S1-AC09
+      type: mechanical
+      text: >-
+        No existing RAPTOR package imports SourceOps, SourceOps imports no
+        existing domain package, and a static guard proves there is no network
+        client import or external-content read path.
+    - id: V2S1-AC10
+      type: evidence-form
+      text: >-
+        The registry records impact routes and approval_required=true where a
+        source change could rebuild a benchmark, review policy, invalidate
+        packets, reground Atlas, rerun validation, promote a source, or roll
+        back. V2-S1 executes none of those actions.
+    - id: V2S1-AC11
+      type: mechanical
+      text: >-
+        Reserved RescueScreen and panel consumer ids cannot become READY and no
+        registry field claims a SourceOps record satisfies a RescueScreen or
+        independent-validation entry gate.
+    - id: V2S1-AC12
+      type: mechanical
+      text: >-
+        The frozen R2/v3 artifacts and evaluation configs in the preservation
+        set have zero diff, and targeted existing MAVE, Atlas, evaluation, and
+        scorer tests remain green.
+    - id: V2S1-AC13
+      type: evidence-form
+      text: >-
+        The validation report states the ceiling verbatim: registry validity
+        and source readiness are operational facts only and establish no
+        scientific sufficiency, classification, worklist, submission, or
+        clinical authority.
+
+  invert_failure_modes:
+    - id: V2S1-FM1
+      failure: green registry launders blocked metadata
+      probe: >-
+        Change a verified source to confirm-pending while leaving a dependent
+        consumer otherwise valid. validate may report a structurally valid
+        registry, but status must return BLOCKED and exit 3.
+    - id: V2S1-FM2
+      failure: global overlay silently supersedes domain authority
+      probe: >-
+        Make a SourceOps declaration disagree with the MAVE or Atlas declaration
+        hash. Validation must fail; no value is copied into the domain config.
+    - id: V2S1-FM3
+      failure: historical evidence becomes a mutable current pointer
+      probe: >-
+        Give a PINNED_HISTORICAL record an in-place refresh target. Validation
+        must raise IMMUTABLE_HISTORY_VIOLATION.
+    - id: V2S1-FM4
+      failure: generic licence metadata opens RescueScreen
+      probe: >-
+        Attempt to mark rescuescreen READY using only a SourceOps licence record.
+        Validation must raise FORBIDDEN_CROSS_LANE_CLAIM.
+
+  test_contract:
+    authorship:
+      planner: escalation planner defines acceptance contract only
+      test_author: Gemini family writes RED tests from this file before code
+      doer: Sonnet family implements without weakening the RED tests
+      checker: GPT family independently runs tests and inspects the diff
+    required_test_groups:
+      - strict schema, enum, unknown-key, duplicate-id, and typed-error tests
+      - canonical registry and declaration hash properties
+      - repository-relative path, traversal, symlink/junction, and drift tests
+      - blocked-state and consumer-readiness truth-table tests
+      - graph conservation and dangling-reference tests
+      - CLI JSON determinism and exit-code tests
+      - repository inventory exact-root and exact-count tests
+      - no-network, no-external-read, and import-boundary tests
+      - frozen-artifact preservation and existing-suite regression tests
+      - four explicit inversion probes from invert_failure_modes
+    minimum_commands:
+      - command: python -m pytest tests/sourceops -q
+        expected_exit: 0
+      - command: >-
+          python -m pytest tests/external/test_mave_source_register.py
+          tests/atlas/test_source_registry_claims.py
+          tests/eval/test_core_annotation_bundle.py
+          tests/scorer/test_ac7_config.py -q
+        expected_exit: 0
+      - command: >-
+          python -m raptor.sourceops.cli validate --registry
+          configs/sourceops/source_registry.yaml
+        expected_exit: 0
+      - command: >-
+          python -m raptor.sourceops.cli status --registry
+          configs/sourceops/source_registry.yaml --consumer eval-gate
+        expected_exit: 0
+        note: >-
+          eval-gate is bound to the immutable historical evaluation declaration,
+          not permission to run or authorize new evidence.
+      - command: git diff --check
+        expected_exit: 0
+    non_triviality:
+      - repository registry source_records is non-empty and exactly seven
+      - at least one consumer is READY only if its required sources are admissible
+      - at least one consumer is BLOCKED by a real confirm-pending declaration
+      - an injected omission, drift, or forbidden role is proven to fail
+
+  preservation_set:
+    files:
+      - data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json
+      - data/census/tsc_tiered_readjudication_2026-07-21.json
+      - configs/eval/tsc2.yaml
+      - configs/eval/tiered_gate_v3.yaml
+      - configs/eval/bp4pp3_predictor_policy.json
+      - configs/eval/core_annotation_bundle.yaml
+      - configs/external/mave_sources.yaml
+      - configs/atlas/catalogs/tsc2/catalog.yaml
+      - configs/atlas/packs/tsc2/pack.yaml
+    assertions:
+      - no existing test is weakened, deleted, skipped, or re-owned
+      - no placeholder is converted to verified without independent evidence
+      - no consumer behavior changes in V2-S1
+
+todo_decision:
+  update_required: false
+  reason:
+    - >-
+      sourceops-version-refresh-registry already names V2-S1 exactly and is
+      pending with no prerequisite that needs correction.
+    - >-
+      sourceops-automated-refresh-validation and
+      sourceops-drift-revalidation-gates already encode V2-S2 and V2-S3 in the
+      correct dependency order.
+    - >-
+      Adding branch-prefixed duplicate tasks would fragment the durable graph
+      and increase conflict with the parallel RescueScreen TODO additions.
+  implementation_status_rule: >-
+    sourceops-version-refresh-registry remains pending until V2-S1 code,
+    repository inventory, tests, independent checker verdict, and merge are
+    complete. This planning commit does not mark it in progress or done.
+
+sol_escalations:
+  rule: >-
+    The conservative defaults below are sufficient for planning. Any change
+    from a default remains a human-approved architecture or governance decision;
+    an implementation agent or checker may not approve it.
+  decisions:
+    - id: SOL-1
+      decision: whether RAPTOR v2 becomes a public release or product label
+      conservative_default: internal engineering-phase label only
+      human_approval_required_before: tag, release note, README claim, or external announcement
+    - id: SOL-2
+      decision: whether SourceOps supersedes existing domain registries
+      conservative_default: additive overlay only
+      human_approval_required_before: rewiring any existing consumer or deleting a domain register
+    - id: SOL-3
+      decision: source inventory completeness, ownership, and permitted-use interpretation
+      conservative_default: unknown or unverified facts remain blocking
+      human_approval_required_before: moving any record to VERIFIED_ACTIVE
+    - id: SOL-4
+      decision: material-drift thresholds and automatic consequences
+      conservative_default: emit proposed impact routes; execute nothing
+      human_approval_required_before: benchmark rebuild, policy review outcome, packet invalidation, Atlas regrounding, validation rerun, promotion, or rollback
+    - id: SOL-5
+      decision: network acquisition, credentials, data egress, and scheduling
+      conservative_default: forbidden in V2-S1
+      human_approval_required_before: any downloader, external API call, scheduler, secret, or provider integration
+    - id: SOL-6
+      decision: whether SourceOps can satisfy a RescueScreen or panel-product gate
+      conservative_default: no; lane-specific frozen projection and gate artifact required
+      human_approval_required_before: any cross-lane readiness or evidence claim
+    - id: SOL-7
+      decision: whether a source refresh changes evidence or authorization
+      conservative_default: never automatically
+      human_approval_required_before: any new scoring, evidence, classification, worklist, submission, research-scope, or clinical claim
+
+planning_validation:
+  commands:
+    - >-
+      python -c "import pathlib,yaml;
+      p=pathlib.Path(r'docs/project/specs/raptor-v2-kickoff.yaml');
+      d=yaml.safe_load(p.read_text(encoding='utf-8'));
+      assert d['schema']=='raptor-v2-kickoff-v1';
+      assert d['first_implementation_slice']['id']=='V2-S1';
+      assert len(d['first_implementation_slice']['acceptance_criteria'])==13;
+      print('raptor-v2 kickoff spec parses')"
+    - >-
+      python scripts/sync_todos.py import
+      --db .raptor/raptor-v2-kickoff-todos.sqlite
+    - >-
+      python -c "import pathlib,yaml;
+      d=yaml.safe_load(pathlib.Path(r'docs/project/TODOS.yaml').read_text(encoding='utf-8'));
+      ts=d['todos']; ids={t['id'] for t in ts};
+      assert len(ids)==len(ts);
+      assert all(dep in ids for t in ts for dep in (t.get('depends_on') or []));
+      graph={t['id']:list(t.get('depends_on') or []) for t in ts};
+      from graphlib import TopologicalSorter;
+      assert len(tuple(TopologicalSorter(graph).static_order()))==len(graph);
+      print(f'{len(ts)} todos; DAG acyclic; no dangling dependencies')"
+    - git diff --check
+  cleanup:
+    - remove .raptor/raptor-v2-kickoff-todos.sqlite after validation
+  expected:
+    spec_yaml: parses
+    todo_import: succeeds
+    todo_dag: acyclic with no dangling dependencies
+    broader_program_docs_changed: false
+
+definition_of_ready_for_next_agent:
+  ready_only_if:
+    - this spec is committed on track/raptor-v2-2026-08
+    - branch is rebased onto then-current main before test authoring
+    - parallel RescueScreen changes are preserved and collision-reviewed
+    - Gemini-authored RED tests map every V2S1 acceptance criterion
+    - no Sol escalation has been silently decided by an agent
+  handoff: >-
+    The next agent receives this file as the sole implementation contract for
+    V2-S1 plus at most four focused authority references. It must not infer a
+    broader "v2 rewrite" from the branch name.
