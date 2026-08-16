@@ -838,7 +838,7 @@ first_implementation_slice:
   test_contract:
     authorship:
       planner: escalation planner defines acceptance contract only
-      test_author: Gemini family writes RED tests from this file before code
+      test_author: Codex family writes RED tests from this file before code
       doer: Sonnet family implements without weakening the RED tests
       checker: GPT family independently runs tests and inspects the diff
     required_test_groups:
@@ -986,7 +986,7 @@ definition_of_ready_for_next_agent:
     - this spec is committed on track/raptor-v2-2026-08
     - branch is rebased onto then-current main before test authoring
     - parallel RescueScreen changes are preserved and collision-reviewed
-    - Gemini-authored RED tests map every V2S1 acceptance criterion
+    - Codex-authored RED tests map every V2S1 acceptance criterion
     - no Sol escalation has been silently decided by an agent
   handoff: >-
     The next agent receives this file as the sole implementation contract for
