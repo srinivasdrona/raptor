@@ -1,0 +1,44 @@
+schema: benchmark-task-spec-v2
+task_id: registry-bridge
+goal: Validate a registration against a universe, identity-map lock and map manifest.
+api:
+  module: src/solution.py
+  exception: BundleValidationError
+  function: validate_release_bundle(registration, universe, map_lock, map_manifest)
+requirements:
+  - Registration schema must equal release-registration-v2.
+  - Universe schema must equal registration.universe_schema.
+  - Map-lock schema must equal registration.map_lock_schema.
+  - Map-manifest schema must equal map_lock.manifest_schema.
+  - Universe top-level transcript_pin must equal registration.transcript_pin.
+  - Record-level transcript pins are neither required nor permitted as a substitute.
+  - Universe constraint keys must exactly equal registration.required_constraints.
+  - Every field participating in the six binding checks is required.
+  - A missing left or right comparand fails the corresponding binding check in the same order as a mismatched comparand.
+  - No error code outside the six codes below is authorized.
+  - >-
+    Success returns schema validation-result-v1, record_count, and exactly six ordered check IDs:
+    [REGISTRATION_SCHEMA, UNIVERSE_SCHEMA, MAP_LOCK_SCHEMA, MAP_MANIFEST_SCHEMA,
+    TRANSCRIPT_PIN, CONSTRAINT_SET].
+errors:
+  shape: BundleValidationError(code)
+  codes:
+    - REGISTRATION_SCHEMA
+    - UNIVERSE_SCHEMA
+    - MAP_LOCK_SCHEMA
+    - MAP_MANIFEST_SCHEMA
+    - TRANSCRIPT_PIN
+    - CONSTRAINT_SET
+scored_input_domain:
+  - Missing fields participating in the six binding checks.
+  - Binding-field mismatches and the success contract.
+  - Top-level transcript-pin authority and exact constraint-key equality.
+not_scored:
+  - Presence or type of informational map_manifest.rows.
+  - Presence or type of map_lock.content_sha256 or map_manifest.content_sha256.
+  - Malformed or missing universe.records beyond record_count on otherwise valid success input.
+  - Non-mapping top-level arguments.
+preservation:
+  - Do not read files or environment variables.
+  - Do not mutate inputs.
+  - Do not weaken visible tests.

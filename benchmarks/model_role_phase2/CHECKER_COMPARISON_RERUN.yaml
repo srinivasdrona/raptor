@@ -1,0 +1,50 @@
+schema: raptor-model-role-checker-comparison-rerun-v1
+status: FROZEN_BEFORE_FIRST_RERUN_CHECKER_RUN
+purpose: Replace four evaluator-invalid registry pairs from CHECKER_COMPARISON.yaml with a candidate-visible binding-presence clarification.
+supersedes_cells:
+  - DV-SONNET/registry-bridge/run-04
+  - DV-SONNET/registry-bridge/run-05
+  - DV-MAI/registry-bridge/run-02
+  - DV-MAI/registry-bridge/run-04
+invalidation_reason:
+  - The frozen v1 gold omitted missing binding-comparand behavior.
+  - Opus directly reproduced material behavior outside that gold before any v1 score was used.
+  - The paired v1 cells are retained but excluded from final ranking.
+candidates:
+  - id: CC-OPUS-R2
+    model: claude-opus-5
+    family: Claude
+  - id: CC-GROK-R2
+    model: grok-4.6
+    family: Grok
+pairing:
+  - Both candidates receive byte-identical fresh workspaces for each rerun cell.
+  - PLAN, implementation, tests, fixtures, task and output schema are copied from the invalidated cell.
+  - SPEC.yaml is replaced by CHECKER_REGISTRY_SPEC_V2.yaml.
+  - RUN.json hashes are regenerated after every overlay.
+candidate_protocol:
+  prompt: ../model_role_v1/CANDIDATE_PROMPT.md
+  task: ../model_role_v1/scenarios/registry-bridge/checker/TASK.md
+  output_schema: ../model_role_v1/scenarios/registry-bridge/checker/OUTPUT_SCHEMA.yaml
+  network_access: forbidden
+  candidate_scope: assigned_workspace_only
+authority_order: [SPEC, candidate_visible_fixtures, PLAN, tests, implementation]
+gold:
+  file: CHECKER_GOLD_RERUN.yaml
+  status: FROZEN_BEFORE_FIRST_RERUN_CHECKER_RUN
+hard_gates:
+  - Missing or invalid VERDICT.yaml.
+  - CLEAN while any candidate-visible binding CRITICAL or HIGH defect remains.
+  - A CRITICAL or HIGH finding supported only by a lower-authority artifact or contradicted by the binding gold.
+  - Mutation of any candidate-visible input.
+ranking:
+  - checker hard-gate pass rate
+  - semantic defect recall
+  - severity-weighted semantic defect recall
+  - finding precision
+  - wrong-CLEAN control
+  - independent reproduction and evidence completeness
+final_composition:
+  - Use the 26 unaffected v1 pairs from CHECKER_COMPARISON.yaml.
+  - Replace the four invalidated v1 pairs with these four rerun pairs.
+  - Do not combine or average invalidated and replacement outputs.

@@ -1,0 +1,65 @@
+schema: raptor-model-role-checker-gold-v2
+status: FROZEN_BEFORE_FIRST_RERUN_CHECKER_RUN
+authority_order: [SPEC, candidate_visible_fixtures, PLAN, tests, implementation]
+spec: CHECKER_REGISTRY_SPEC_V2.yaml
+matching_rule: Match findings to defects by demonstrated behavior and authority basis, not category label alone.
+severity_weights: {CRITICAL: 10, HIGH: 5, MEDIUM: 2, LOW: 1}
+defects:
+  - id: RB-V2-PAIRED-SCHEMA-ABSENCE
+    severity: HIGH
+    kind: implementation
+    variants: [DV-SONNET]
+    runs: [4, 5]
+    summary: Paired absence of schema comparands in checks 2 through 4 is accepted as successful equality instead of failing with the corresponding binding code.
+  - id: RB-V2-PAIRED-CONSTRAINT-ABSENCE
+    severity: HIGH
+    kind: implementation
+    variants: [DV-SONNET]
+    runs: [4, 5]
+    summary: Paired absence of universe.constraints and registration.required_constraints is coerced to equal empty sets and passes CONSTRAINT_SET.
+  - id: RB-V2-NONENUMERATED-BINDING-ERROR
+    severity: HIGH
+    kind: implementation
+    variants: [DV-MAI]
+    runs: [2, 4]
+    summary: A missing field participating in a binding check raises MISSING_REQUIRED_FIELD or INVALID_INPUT_SHAPE instead of the corresponding one of the six authorized codes.
+  - id: RB-V2-BINDING-ABSENCE-TEST-GAP
+    severity: HIGH
+    kind: test
+    variants: [DV-SONNET, DV-MAI]
+    runs: [2, 4, 5]
+    cells:
+      - DV-SONNET/run-04
+      - DV-SONNET/run-05
+      - DV-MAI/run-02
+      - DV-MAI/run-04
+    summary: The authored tests omit missing binding comparands and therefore do not expose the applicable HIGH implementation defect.
+  - id: RB-V2-PLANNER-NONENUMERATED-CODES
+    severity: MEDIUM
+    kind: plan
+    variants: [DV-SONNET, DV-MAI]
+    runs: [2, 4, 5]
+    cells:
+      - DV-SONNET/run-04
+      - DV-SONNET/run-05
+      - DV-MAI/run-02
+      - DV-MAI/run-04
+    summary: PLAN assigns renamed or additional failure codes despite the candidate-visible SPEC's closed six-code contract.
+known_non_defects:
+  - id: RB-V2-INFORMATIONAL-SHAPE
+    summary: Presence or type of map_manifest.rows and the two content_sha256 fields is outside the scored input domain.
+  - id: RB-V2-RECORDS-SHAPE
+    summary: Missing or malformed universe.records outside an otherwise valid success input is outside the scored input domain.
+  - id: RB-V2-IMPORT-INVOCATION
+    summary: Mixed solution and src.solution imports are not a binding defect when the frozen runner invocation resolves both modules.
+  - id: RB-V2-RUN-HASHES
+    summary: RUN.json is regenerated after all overlays and its initial_file_sha256 values are authoritative for the rerun.
+evidence:
+  invalidated_original_cells:
+    - DV-SONNET/registry-bridge/run-04
+    - DV-SONNET/registry-bridge/run-05
+    - DV-MAI/registry-bridge/run-02
+    - DV-MAI/registry-bridge/run-04
+  direct_probe:
+    - DV-SONNET runs 04 and 05 return success after paired universe-schema or constraint comparands are removed.
+    - DV-MAI runs 02 and 04 raise MISSING_REQUIRED_FIELD for absent binding comparands.
