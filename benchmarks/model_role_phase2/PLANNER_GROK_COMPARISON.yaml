@@ -1,0 +1,38 @@
+schema: raptor-model-role-planner-grok-comparison-v1
+status: FROZEN_BEFORE_FIRST_RUN
+purpose: Add Grok 4.6 as a directly comparable planner arm to the completed Phase 2 planner comparison.
+base_comparison: PLANNER_COMPARISON.yaml
+candidate:
+  id: PC-GROK
+  model: grok-4.6
+  family: Grok
+  execution: NEW
+fixed_roles:
+  test_author: {model: gemini-3.7-flash, family: Gemini}
+  doer: {model: claude-sonnet-5, family: Claude}
+  checker: {model: gpt-5.6-sol, family: GPT}
+fixed_role_note:
+  - GPT-5.6 Sol remains the experimental checker solely to preserve direct comparability with all prior planner arms.
+  - Claude Opus 5 remains the separately selected supervised operational checker; this planner experiment does not reopen checker selection.
+scenarios: [registry-bridge, snapshot-publisher, workspace-boundary]
+runs_per_scenario: 5
+new_stack_runs: 15
+authority_order: [SPEC, candidate_visible_fixtures, PLAN, tests, implementation]
+planner_rules:
+  - PLAN may clarify mechanics but may not add or contradict a binding SPEC requirement.
+  - Any unauthorized requirement is a planner hard-gate failure.
+  - Test author, doer and checker must follow SPEC over a conflicting PLAN.
+ranking:
+  - stack hard-gate pass rate
+  - number of clean terminal verdicts
+  - planner authority compliance
+  - hidden implementation correctness
+  - test mutation quality
+  - worst-run result
+comparison:
+  - PC-GROK is compared against the frozen corrected results for PC-SOL, PC-OPUS and PC-GEMINI and the concurrently added PC-TERRA arm.
+  - No prior planner arm is rerun or rescored.
+boundaries:
+  - This extension ranks Grok as a planner only.
+  - Grok's Phase 1 and isolated comparison checker results contribute no planner evidence.
+  - This experiment does not select a test author, doer, checker or autonomous stack.
