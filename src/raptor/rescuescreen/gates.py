@@ -55,6 +55,7 @@ _EVIDENCE_FIELDS = {
     "reviewed_at",
 }
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_MAX_YAML_NESTING = 64
 _VALIDATION_CEILING = (
     "Gate status is an operational assertion about registered evidence references. "
     "It does not establish scientific sufficiency, binding, functional rescue, "
@@ -68,6 +69,11 @@ def _require(condition: bool, message: str) -> None:
 
 
 def _require_exact_fields(value: Mapping[str, Any], expected: set[str], *, what: str) -> None:
+    non_string_keys = [repr(key) for key in value if not isinstance(key, str)]
+    _require(
+        not non_string_keys,
+        f"{what} contains non-string field names {non_string_keys}",
+    )
     actual = set(value)
     missing = sorted(expected - actual)
     unknown = sorted(actual - expected)
@@ -80,15 +86,48 @@ def _nonblank_string(value: Any, *, what: str) -> str:
     return value
 
 
-def _reject_yaml_temporals(value: Any, *, what: str) -> None:
+def _reject_yaml_temporals(
+    value: Any,
+    *,
+    what: str,
+    _active_containers: set[int] | None = None,
+    _depth: int = 0,
+) -> None:
     if isinstance(value, (date, datetime)):
         raise RescueScreenSchemaError(f"{what} contains an unquoted YAML date or datetime")
-    if isinstance(value, dict):
-        for key, item in value.items():
-            _reject_yaml_temporals(item, what=f"{what}.{key}")
-    elif isinstance(value, list):
-        for index, item in enumerate(value):
-            _reject_yaml_temporals(item, what=f"{what}[{index}]")
+    if not isinstance(value, (dict, list)):
+        return
+    if _depth > _MAX_YAML_NESTING:
+        raise RescueScreenSchemaError(
+            f"{what} exceeds the maximum YAML nesting depth of {_MAX_YAML_NESTING}"
+        )
+
+    active_containers = _active_containers if _active_containers is not None else set()
+    container_id = id(value)
+    if container_id in active_containers:
+        raise RescueScreenSchemaError(f"{what} contains a recursive YAML alias")
+
+    active_containers.add(container_id)
+    try:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                key_label = key if isinstance(key, str) else repr(key)
+                _reject_yaml_temporals(
+                    item,
+                    what=f"{what}.{key_label}",
+                    _active_containers=active_containers,
+                    _depth=_depth + 1,
+                )
+        else:
+            for index, item in enumerate(value):
+                _reject_yaml_temporals(
+                    item,
+                    what=f"{what}[{index}]",
+                    _active_containers=active_containers,
+                    _depth=_depth + 1,
+                )
+    finally:
+        active_containers.remove(container_id)
 
 
 def entry_gate_manifest_content_hash(manifest: Mapping[str, Any]) -> str:
@@ -259,12 +298,12 @@ def load_entry_gate_manifest(path: Path | str) -> EntryGateManifest:
         raw_text = manifest_path.read_text(encoding="utf-8")
     except RescueScreenPathError:
         raise
-    except OSError as exc:
+    except (OSError, UnicodeError) as exc:
         raise RescueScreenPathError(f"manifest path is unreadable: {manifest_path}: {exc}") from exc
 
     try:
         raw = yaml.safe_load(raw_text)
-    except yaml.YAMLError as exc:
+    except (yaml.YAMLError, RecursionError) as exc:
         raise RescueScreenSchemaError(f"entry-gate manifest is not valid YAML: {exc}") from exc
 
     manifest = _parse_manifest(raw)
@@ -276,26 +315,91 @@ def load_entry_gate_manifest(path: Path | str) -> EntryGateManifest:
     return manifest
 
 
+def _validate_manifest_model(manifest: EntryGateManifest) -> EntryGateManifest:
+    _require(
+        isinstance(manifest, EntryGateManifest),
+        "evaluate_entry_gates requires an EntryGateManifest",
+    )
+    _require(isinstance(manifest.gates, tuple), "entry-gate manifest gates must be a tuple")
+    _require(
+        isinstance(manifest.preservation_rules, tuple),
+        "entry-gate manifest preservation_rules must be a tuple",
+    )
+    for gate_index, gate in enumerate(manifest.gates):
+        _require(
+            isinstance(gate, EntryGateAssessment),
+            f"gates[{gate_index}] must be an EntryGateAssessment",
+        )
+        _require(
+            isinstance(gate.evidence_refs, tuple),
+            f"{gate.gate_id}.evidence_refs must be a tuple",
+        )
+        for evidence_index, evidence_ref in enumerate(gate.evidence_refs):
+            _require(
+                isinstance(evidence_ref, GateEvidenceRef),
+                f"{gate.gate_id} evidence_refs[{evidence_index}] must be a GateEvidenceRef",
+            )
+
+    raw = {
+        "schema": manifest.schema,
+        "lane_id": manifest.lane_id,
+        "lane_version": manifest.lane_version,
+        "manifest_version": manifest.manifest_version,
+        "created_at": manifest.created_at,
+        "manifest_content_hash": manifest.manifest_content_hash,
+        "hash_basis": manifest.hash_basis,
+        "gates": [
+            {
+                "gate_id": gate.gate_id,
+                "status": gate.status,
+                "fail_state": gate.fail_state,
+                "evidence_refs": [
+                    {
+                        "artifact_id": evidence_ref.artifact_id,
+                        "artifact_schema": evidence_ref.artifact_schema,
+                        "content_hash": evidence_ref.content_hash,
+                        "reviewed_by": evidence_ref.reviewed_by,
+                        "reviewed_at": evidence_ref.reviewed_at,
+                    }
+                    for evidence_ref in gate.evidence_refs
+                ],
+                "note": gate.note,
+            }
+            for gate in manifest.gates
+        ],
+        "preservation_rules": list(manifest.preservation_rules),
+    }
+    validated = _parse_manifest(raw)
+    if validated.manifest_content_hash != entry_gate_manifest_content_hash(raw):
+        raise RescueScreenHashError(
+            "entry-gate manifest_content_hash does not match canonical manifest content"
+        )
+    return validated
+
+
 def evaluate_entry_gates(manifest: EntryGateManifest) -> EntryGateReport:
     """Evaluate readiness without mutating gate state or authorizing execution."""
 
-    blocking = tuple(gate for gate in manifest.gates if gate.status == "NOT_SATISFIED")
+    validated_manifest = _validate_manifest_model(manifest)
+    blocking = tuple(
+        gate for gate in validated_manifest.gates if gate.status == "NOT_SATISFIED"
+    )
     first = blocking[0] if blocking else None
     ready = not blocking
 
     return EntryGateReport(
         schema=_REPORT_SCHEMA,
-        lane_id=manifest.lane_id,
-        lane_version=manifest.lane_version,
-        manifest_version=manifest.manifest_version,
-        manifest_content_hash=manifest.manifest_content_hash,
+        lane_id=validated_manifest.lane_id,
+        lane_version=validated_manifest.lane_version,
+        manifest_version=validated_manifest.manifest_version,
+        manifest_content_hash=validated_manifest.manifest_content_hash,
         overall_status="READY_FOR_S1_REVIEW" if ready else "BLOCKED",
         first_blocking_gate=first.gate_id if first else None,
         blocking_fail_state=first.fail_state if first else None,
         blocking_gates=tuple(gate.gate_id for gate in blocking),
         eligible_next_stage="S1" if ready else None,
         stage_execution_authorized=False,
-        gates=manifest.gates,
+        gates=validated_manifest.gates,
         validation_ceiling=_VALIDATION_CEILING,
     )
 

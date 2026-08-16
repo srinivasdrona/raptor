@@ -174,3 +174,42 @@ def test_rseg_ac09_cli_invalid_manifest_exits_2_with_deterministic_json(tmp_path
     first_payload = _parse_cli_json(first)
     second_payload = _parse_cli_json(second)
     assert _canonical_json_bytes(first_payload) == _canonical_json_bytes(second_payload)
+
+
+def test_rseg_ac09_cli_corrupt_inputs_exit_2_without_tracebacks(tmp_path: Path) -> None:
+    _require_cli_module()
+    non_utf8_path = tmp_path / "non_utf8.yaml"
+    non_utf8_path.write_bytes(b"\xff\xfe\x00")
+    non_string_key = _read_committed_manifest_mapping()
+    non_string_key[123] = "value"
+    non_string_key["extra"] = "value"
+    non_string_key_path = _write_manifest(
+        tmp_path,
+        "non_string_key.yaml",
+        non_string_key,
+    )
+    recursive_alias_path = tmp_path / "recursive_alias.yaml"
+    recursive_alias_path.write_text("&root\ngates: *root\n", encoding="utf-8")
+    deep_nesting_path = tmp_path / "deep_nesting.yaml"
+    deep_nesting_path.write_text(
+        "gates: " + ("[" * 1_000) + "value" + ("]" * 1_000) + "\n",
+        encoding="utf-8",
+    )
+
+    for manifest_path in (
+        non_utf8_path,
+        non_string_key_path,
+        recursive_alias_path,
+        deep_nesting_path,
+    ):
+        first = _run_status(manifest_path)
+        second = _run_status(manifest_path)
+        assert first.returncode == 2, first.stderr or first.stdout
+        assert second.returncode == 2, second.stderr or second.stdout
+        assert "Traceback" not in first.stderr
+        assert "Traceback" not in second.stderr
+
+        first_payload = _parse_cli_json(first)
+        second_payload = _parse_cli_json(second)
+        assert first_payload["schema"] == "rescuescreen.entry_gate_error.v1"
+        assert _canonical_json_bytes(first_payload) == _canonical_json_bytes(second_payload)

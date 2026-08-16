@@ -407,6 +407,23 @@ def test_rseg_evaluation_canonical_json_is_deterministic_for_identical_input(tmp
     assert _report_canonical_bytes(report_a) == _report_canonical_bytes(report_b)
 
 
+def test_rseg_evaluation_revalidates_directly_constructed_public_models() -> None:
+    api = _require_rescuescreen_api()
+    loaded = api.load_entry_gate_manifest(_require_committed_manifest_path())
+
+    empty_gates = dataclasses.replace(loaded, gates=())
+    with pytest.raises(api.RescueScreenSchemaError):
+        api.evaluate_entry_gates(empty_gates)
+
+    wrong_gate = dataclasses.replace(loaded.gates[0], gate_id="EG-9")
+    wrong_gate_id = dataclasses.replace(
+        loaded,
+        gates=(wrong_gate, *loaded.gates[1:]),
+    )
+    with pytest.raises(api.RescueScreenSchemaError):
+        api.evaluate_entry_gates(wrong_gate_id)
+
+
 def test_rseg_ac08_loader_rejects_missing_nonregular_and_symlink_paths(tmp_path: Path) -> None:
     api = _require_rescuescreen_api()
 
