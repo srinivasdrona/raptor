@@ -125,6 +125,12 @@ SPEC-first attribution. The final machine record is
 with a [human-readable Phase 2 report](reference/model-role-phase2-results-2026-08.md).
 Phase 2 ranks Sol first among planners and MAI-Code first in the paired-doer comparison, but
 **qualifies neither as a replacement and selects no full stack**. ADR-0003/ADR-0005 remain binding.
+The later isolated [checker comparison](reference/model-role-checker-comparison-2026-08.md) ranks
+Claude Opus 5 ahead of Grok 4.6 on hard-gate pass rate and semantic recall. Neither qualifies for
+autonomous terminal review: Opus is the supervised default with mandatory adjudication of HIGH and
+CRITICAL findings; Grok remains the precision challenger and its `CLEAN` verdicts require
+independent confirmation. Machine record:
+[`model_role_checker_comparison_result_2026-08-16.json`](../data/eval/model_role_checker_comparison_result_2026-08-16.json).
 The earlier retrospective **69/100** is retained only as a deprecated expert-coded rubric:
 the arithmetic is reproducible, but most inputs were qualitative judgments rather than measured
 rates. It is not a quantitative baseline and cannot be compared with prospective tournament scores.

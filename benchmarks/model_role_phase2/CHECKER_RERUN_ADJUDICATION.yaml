@@ -1,0 +1,130 @@
+schema: raptor-model-role-checker-rerun-adjudication-v1
+status: FINAL
+protocol: CHECKER_COMPARISON_RERUN.yaml
+gold: CHECKER_GOLD_RERUN.yaml
+matching_rule: Distinct semantic claims are deduplicated by behavior; one finding may match more than one gold defect when it demonstrates both behaviors.
+cells:
+  - cell: DV-SONNET/registry-bridge/run-04
+    expected:
+      - RB-V2-PAIRED-SCHEMA-ABSENCE
+      - RB-V2-PAIRED-CONSTRAINT-ABSENCE
+      - RB-V2-BINDING-ABSENCE-TEST-GAP
+      - RB-V2-PLANNER-NONENUMERATED-CODES
+    arms:
+      CC-OPUS-R2:
+        verdict: DO_NOT_MERGE
+        hard_gate_pass: true
+        matched: [RB-V2-PAIRED-SCHEMA-ABSENCE, RB-V2-PAIRED-CONSTRAINT-ABSENCE, RB-V2-BINDING-ABSENCE-TEST-GAP, RB-V2-PLANNER-NONENUMERATED-CODES]
+        missed: []
+        distinct_semantic_claims: 4
+        precision_true_positive_claims: 4
+        evidence_score: 10
+        verdict_sha256: 51a73893127ce0f29974b596d3270e481c3e2ce48506bb5c4a730fc3127906aa
+      CC-GROK-R2:
+        verdict: DO_NOT_MERGE
+        hard_gate_pass: true
+        matched: [RB-V2-PAIRED-SCHEMA-ABSENCE, RB-V2-PAIRED-CONSTRAINT-ABSENCE, RB-V2-BINDING-ABSENCE-TEST-GAP]
+        missed: [RB-V2-PLANNER-NONENUMERATED-CODES]
+        distinct_semantic_claims: 3
+        precision_true_positive_claims: 3
+        evidence_score: 8
+        verdict_sha256: 9a86069cfa1c01f081c6c2f8a26828138c69457798a73e0946e69a005b306345
+  - cell: DV-SONNET/registry-bridge/run-05
+    expected:
+      - RB-V2-PAIRED-SCHEMA-ABSENCE
+      - RB-V2-PAIRED-CONSTRAINT-ABSENCE
+      - RB-V2-BINDING-ABSENCE-TEST-GAP
+      - RB-V2-PLANNER-NONENUMERATED-CODES
+    arms:
+      CC-OPUS-R2:
+        verdict: DO_NOT_MERGE
+        hard_gate_pass: true
+        matched: [RB-V2-PAIRED-SCHEMA-ABSENCE, RB-V2-PAIRED-CONSTRAINT-ABSENCE, RB-V2-BINDING-ABSENCE-TEST-GAP, RB-V2-PLANNER-NONENUMERATED-CODES]
+        missed: []
+        distinct_semantic_claims: 4
+        precision_true_positive_claims: 4
+        evidence_score: 10
+        verdict_sha256: 83d998689f00c2af1e50b812328126dc6e6e7cbd261122d16bea0e73b524e797
+      CC-GROK-R2:
+        verdict: DO_NOT_MERGE
+        hard_gate_pass: true
+        matched: [RB-V2-PAIRED-SCHEMA-ABSENCE, RB-V2-PAIRED-CONSTRAINT-ABSENCE, RB-V2-BINDING-ABSENCE-TEST-GAP]
+        missed: [RB-V2-PLANNER-NONENUMERATED-CODES]
+        distinct_semantic_claims: 3
+        precision_true_positive_claims: 3
+        evidence_score: 8
+        verdict_sha256: 6ef1e4c167c3f1fa3a15be56a29c5dbaa060069727afc94e474d0fd30985e5ad
+  - cell: DV-MAI/registry-bridge/run-02
+    expected:
+      - RB-V2-NONENUMERATED-BINDING-ERROR
+      - RB-V2-BINDING-ABSENCE-TEST-GAP
+      - RB-V2-PLANNER-NONENUMERATED-CODES
+    arms:
+      CC-OPUS-R2:
+        verdict: DO_NOT_MERGE
+        hard_gate_pass: true
+        matched: [RB-V2-NONENUMERATED-BINDING-ERROR, RB-V2-BINDING-ABSENCE-TEST-GAP, RB-V2-PLANNER-NONENUMERATED-CODES]
+        missed: []
+        distinct_semantic_claims: 5
+        precision_true_positive_claims: 3
+        unsupported_claims:
+          - Non-binding informational field presence and type.
+          - Import-root behavior outside the frozen runner invocation.
+        evidence_score: 10
+        verdict_sha256: daa1bf64d5633c62ae8d4246a9760ad6b86553c74bb659ce6d236f1848c9904e
+      CC-GROK-R2:
+        verdict: DO_NOT_MERGE
+        hard_gate_pass: true
+        matched: [RB-V2-NONENUMERATED-BINDING-ERROR, RB-V2-BINDING-ABSENCE-TEST-GAP]
+        missed: [RB-V2-PLANNER-NONENUMERATED-CODES]
+        distinct_semantic_claims: 3
+        precision_true_positive_claims: 2
+        unsupported_claims:
+          - Non-binding informational field presence and type.
+        evidence_score: 8
+        verdict_sha256: bff98da61d7dc7282393ab2317660a81b115d83c8388288070d1e0caad2e821f
+  - cell: DV-MAI/registry-bridge/run-04
+    expected:
+      - RB-V2-NONENUMERATED-BINDING-ERROR
+      - RB-V2-BINDING-ABSENCE-TEST-GAP
+      - RB-V2-PLANNER-NONENUMERATED-CODES
+    arms:
+      CC-OPUS-R2:
+        verdict: DO_NOT_MERGE
+        hard_gate_pass: true
+        matched: [RB-V2-NONENUMERATED-BINDING-ERROR, RB-V2-BINDING-ABSENCE-TEST-GAP, RB-V2-PLANNER-NONENUMERATED-CODES]
+        missed: []
+        distinct_semantic_claims: 3
+        precision_true_positive_claims: 3
+        evidence_score: 10
+        verdict_sha256: a777b5f3498ce2de0c23335188f9020aebcfa12781e3694bcbff9fff73c45d0d
+      CC-GROK-R2:
+        verdict: DO_NOT_MERGE
+        hard_gate_pass: true
+        matched: [RB-V2-NONENUMERATED-BINDING-ERROR, RB-V2-BINDING-ABSENCE-TEST-GAP]
+        missed: [RB-V2-PLANNER-NONENUMERATED-CODES]
+        distinct_semantic_claims: 2
+        precision_true_positive_claims: 2
+        evidence_score: 8
+        verdict_sha256: 482c66b09fc6e88d1acb48f0626849ab781c1f95f2d8fc19cb04598a7cafbe47
+summary:
+  CC-OPUS-R2:
+    expected: 14
+    matched: 14
+    expected_weight: 58
+    matched_weight: 58
+    distinct_semantic_claims: 16
+    precision_true_positive_claims: 14
+    hard_gate_pass_cells: 4
+    wrong_clean_failures: 0
+    mean_evidence_score: 10.0
+  CC-GROK-R2:
+    expected: 14
+    matched: 10
+    expected_weight: 58
+    matched_weight: 50
+    distinct_semantic_claims: 11
+    precision_true_positive_claims: 10
+    hard_gate_pass_cells: 4
+    wrong_clean_failures: 0
+    mean_evidence_score: 8.0

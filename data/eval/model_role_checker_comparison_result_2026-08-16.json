@@ -1,0 +1,254 @@
+{
+  "schema": "raptor-model-role-checker-comparison-result-v1",
+  "status": "FINAL",
+  "generated_at_utc": "2026-08-16T04:43:57.864995Z",
+  "protocol": {
+    "comparison_v1": "benchmarks/model_role_phase2/CHECKER_COMPARISON.yaml",
+    "gold_v1": "benchmarks/model_role_phase2/CHECKER_GOLD.yaml",
+    "comparison_rerun": "benchmarks/model_role_phase2/CHECKER_COMPARISON_RERUN.yaml",
+    "gold_rerun": "benchmarks/model_role_phase2/CHECKER_GOLD_RERUN.yaml",
+    "rerun_adjudication": "benchmarks/model_role_phase2/CHECKER_RERUN_ADJUDICATION.yaml",
+    "authority_order": [
+      "SPEC",
+      "candidate_visible_fixtures",
+      "PLAN",
+      "tests",
+      "implementation"
+    ],
+    "efficiency_points_awarded": 0
+  },
+  "scope": {
+    "candidates": [
+      {
+        "id": "CC-OPUS",
+        "model": "claude-opus-5"
+      },
+      {
+        "id": "CC-GROK",
+        "model": "grok-4.6"
+      }
+    ],
+    "scenarios": [
+      "registry-bridge",
+      "snapshot-publisher",
+      "workspace-boundary"
+    ],
+    "final_paired_cells": 30,
+    "outputs_scored": 60,
+    "v1_pairs_used": 26,
+    "v1_pairs_invalidated_before_score_use": 4,
+    "replacement_pairs": 4,
+    "checker_outputs_generated_or_reused": 68,
+    "new_checker_executions": 38
+  },
+  "invalidation_and_rerun": {
+    "invalidated_cells": [
+      "DV-SONNET/registry-bridge/run-04",
+      "DV-SONNET/registry-bridge/run-05",
+      "DV-MAI/registry-bridge/run-02",
+      "DV-MAI/registry-bridge/run-04"
+    ],
+    "reason": "The frozen v1 semantic gold omitted missing binding-comparand behavior. Direct Opus probes exposed the omission before any comparison score was used.",
+    "treatment": "Both v1 arms for each affected cell were excluded. A candidate-visible v2 SPEC, regenerated RUN hashes and byte-identical fresh workspaces were frozen before eight replacement executions.",
+    "replacement_integrity": {
+      "valid_verdicts": 8,
+      "expected_verdicts": 8,
+      "input_mutations": 0
+    }
+  },
+  "ranking": [
+    {
+      "rank": 1,
+      "candidate": "CC-OPUS",
+      "model": "claude-opus-5",
+      "hard_gate_pass": {
+        "passed": 20,
+        "total": 30,
+        "rate": 0.6666666666666666
+      },
+      "semantic_defect_recall": {
+        "matched": 29,
+        "expected": 85,
+        "rate": 0.3411764705882353
+      },
+      "severity_weighted_recall": {
+        "matched_weight": 124,
+        "expected_weight": 371,
+        "rate": 0.33423180592991913
+      },
+      "finding_precision": {
+        "true_positive_claims": 29,
+        "distinct_semantic_claims": 134,
+        "rate": 0.21641791044776118
+      },
+      "wrong_clean_failures": 0,
+      "mean_evidence_score": 9.466666666666667,
+      "invalid_verdicts": 0,
+      "input_mutation_cells": 0,
+      "hard_gate_failure_profile": {
+        "unsupported_high_or_critical_claim_cells": 10,
+        "wrong_clean_cells": 0,
+        "invalid_verdict_cells": 0,
+        "input_mutation_cells": 0
+      }
+    },
+    {
+      "rank": 2,
+      "candidate": "CC-GROK",
+      "model": "grok-4.6",
+      "hard_gate_pass": {
+        "passed": 14,
+        "total": 30,
+        "rate": 0.4666666666666667
+      },
+      "semantic_defect_recall": {
+        "matched": 22,
+        "expected": 85,
+        "rate": 0.25882352941176473
+      },
+      "severity_weighted_recall": {
+        "matched_weight": 107,
+        "expected_weight": 371,
+        "rate": 0.2884097035040431
+      },
+      "finding_precision": {
+        "true_positive_claims": 22,
+        "distinct_semantic_claims": 28,
+        "rate": 0.7857142857142857
+      },
+      "wrong_clean_failures": 11,
+      "mean_evidence_score": 7.066666666666666,
+      "invalid_verdicts": 1,
+      "input_mutation_cells": 4,
+      "hard_gate_failure_profile": {
+        "unsupported_high_or_critical_claim_cells": 0,
+        "wrong_clean_cells": 11,
+        "invalid_verdict_cells": 1,
+        "input_mutation_cells": 4
+      }
+    }
+  ],
+  "scenario_results": {
+    "registry-bridge": {
+      "expected_defects": 18,
+      "expected_weight": 72,
+      "CC-OPUS": {
+        "hard_gate_pass": "9/10",
+        "matched": 16,
+        "matched_weight": 68,
+        "recall": 0.8888888888888888,
+        "weighted_recall": 0.9444444444444444,
+        "precision": 0.34782608695652173,
+        "wrong_clean_failures": 0,
+        "mean_evidence_score": 10.0
+      },
+      "CC-GROK": {
+        "hard_gate_pass": "9/10",
+        "matched": 11,
+        "matched_weight": 55,
+        "recall": 0.6111111111111112,
+        "weighted_recall": 0.7638888888888888,
+        "precision": 0.7857142857142857,
+        "wrong_clean_failures": 0,
+        "mean_evidence_score": 7.7
+      }
+    },
+    "snapshot-publisher": {
+      "expected_defects": 52,
+      "expected_weight": 242,
+      "CC-OPUS": {
+        "hard_gate_pass": "5/10",
+        "matched": 3,
+        "matched_weight": 15,
+        "recall": 0.057692307692307696,
+        "weighted_recall": 0.06198347107438017,
+        "precision": 0.0625,
+        "wrong_clean_failures": 0,
+        "mean_evidence_score": 8.4
+      },
+      "CC-GROK": {
+        "hard_gate_pass": "1/10",
+        "matched": 3,
+        "matched_weight": 15,
+        "recall": 0.057692307692307696,
+        "weighted_recall": 0.06198347107438017,
+        "precision": 0.5,
+        "wrong_clean_failures": 7,
+        "mean_evidence_score": 6.1
+      }
+    },
+    "workspace-boundary": {
+      "expected_defects": 15,
+      "expected_weight": 57,
+      "CC-OPUS": {
+        "hard_gate_pass": "6/10",
+        "matched": 10,
+        "matched_weight": 41,
+        "recall": 0.6666666666666666,
+        "weighted_recall": 0.7192982456140351,
+        "precision": 0.25,
+        "wrong_clean_failures": 0,
+        "mean_evidence_score": 10.0
+      },
+      "CC-GROK": {
+        "hard_gate_pass": "4/10",
+        "matched": 8,
+        "matched_weight": 37,
+        "recall": 0.5333333333333333,
+        "weighted_recall": 0.6491228070175439,
+        "precision": 1.0,
+        "wrong_clean_failures": 4,
+        "mean_evidence_score": 7.4
+      }
+    }
+  },
+  "artifact_integrity": {
+    "CC-OPUS": {
+      "valid_final_verdicts": 30,
+      "input_mutations": []
+    },
+    "CC-GROK": {
+      "valid_final_verdicts": 29,
+      "invalid_verdicts": [
+        "DV-MAI/registry-bridge/run-03"
+      ],
+      "input_mutations": [
+        "DV-SONNET/snapshot-publisher/run-04",
+        "DV-MAI/snapshot-publisher/run-05",
+        "DV-SONNET/workspace-boundary/run-03",
+        "DV-SONNET/workspace-boundary/run-05"
+      ]
+    }
+  },
+  "decision": {
+    "leader": "CC-OPUS",
+    "leader_model": "claude-opus-5",
+    "result": "RANKED_NO_QUALIFIED_WINNER",
+    "checker_rank_authorized": true,
+    "checker_replacement_authorized": false,
+    "provisional_supervised_primary": "claude-opus-5",
+    "challenger": "grok-4.6",
+    "reason": "Opus leads the preregistered ordering on hard-gate pass rate, semantic recall and severity-weighted recall, has zero wrong-CLEAN failures, and supplies stronger evidence. It does not qualify as an autonomous checker because only 20/30 cells pass hard gates and recall is 29/85. Grok is much more precise but has 11 wrong-CLEAN failures, one invalid verdict and four input mutations."
+  },
+  "authorization": {
+    "checker_rank_authorized": true,
+    "checker_replacement_authorized": false,
+    "autonomous_checker_selection_authorized": false,
+    "supervised_checker_default": "claude-opus-5",
+    "required_controls": [
+      "Human adjudication of HIGH and CRITICAL Opus findings because unsupported overcalls caused ten hard-gate failures.",
+      "No Grok CLEAN verdict may close a task without independent confirmation.",
+      "Checker workspaces must be immutable except for VERDICT.yaml."
+    ],
+    "other_role_decisions_changed": false
+  },
+  "source_records": {
+    "v1_input_manifest_sha256": "9f4ef4ccbf459628f96d17e9f09e1dfdc75dafec7185b8f1e7c42d7b980675f3",
+    "rerun_input_manifest_sha256": "798ca26ee8b40592793a11e2294936aee1de4864d6689857d5b3d6d76c2ac7e3",
+    "private_adjudication_sha256": {
+      "checker-registry-adjudication.json": "c929489a6231c2c5a6d55456d3e986e093bc484e4bd58fb89a407e20c234b1bd",
+      "checker-snapshot-adjudication.json": "6da90cea895473f49442c010a2fdc769cbe4a6837467ecf1bb40b58188fc2273",
+      "checker-boundary-adjudication.json": "e1d57407293e19b8bfbc1567ff8b15a525e64d85bedcae2cf689332a27c436a8"
+    }
+  }
+}

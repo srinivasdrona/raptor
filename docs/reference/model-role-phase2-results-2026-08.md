@@ -93,6 +93,11 @@ selection requires a planner that clears corrected registry authority, a doer th
 snapshot HIGH-defect gate, isolated test-author and checker evidence, and either deterministic
 efficiency measurement or a prospectively amended rubric that removes it.
 
+The required isolated checker evidence was subsequently produced in the
+[Opus-versus-Grok checker comparison](model-role-checker-comparison-2026-08.md). It ranks Opus first
+but still authorizes no autonomous checker replacement; Opus is a supervised default and Grok a
+precision challenger. Other Phase 2 authorization boundaries are unchanged.
+
 ## Limits
 
 - This is a RAPTOR-specific software-engineering benchmark, not a general model leaderboard.
