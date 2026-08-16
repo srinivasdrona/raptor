@@ -1,0 +1,63 @@
+schema: raptor-model-role-checker-comparison-v1
+status: FROZEN_BEFORE_FIRST_NEW_CHECKER_RUN
+purpose: Isolate Claude Opus 5 versus Grok 4.6 as the checker over identical frozen Phase 2 inputs.
+candidates:
+  - id: CC-OPUS
+    model: claude-opus-5
+    family: Claude
+    execution: NEW
+  - id: CC-GROK
+    model: grok-4.6
+    family: Grok
+    execution: REUSE_FROZEN_PHASE2
+    source: benchmarks/model_role_phase2/DOER_VARIANTS.yaml
+source_cells:
+  variants: [DV-SONNET, DV-MAI]
+  scenarios: [registry-bridge, snapshot-publisher, workspace-boundary]
+  runs_per_variant_scenario: 5
+  cells_per_candidate: 30
+  total_checker_outputs: 60
+pairing:
+  - Each candidate receives the same candidate-visible files for a matching variant, scenario, and run.
+  - Grok verdicts are reused from the completed Phase 2 paired-doer experiment.
+  - Opus workspaces are reconstructed from the frozen checker corpus plus the exact Phase 2 PLAN, implementation, and tests.
+  - The materializer reconstructs the canonical pre-run input with the frozen materializer and records any difference in the post-run Grok workspace as a Grok input mutation.
+  - Opus receives the canonical reconstructed pre-run bytes, not any file created or changed by Grok.
+  - Grok output reuse is recorded explicitly and is not represented as a new execution.
+candidate_protocol:
+  prompt: ../model_role_v1/CANDIDATE_PROMPT.md
+  task: ../model_role_v1/scenarios/<scenario>/checker/TASK.md
+  output_schema: ../model_role_v1/scenarios/<scenario>/checker/OUTPUT_SCHEMA.yaml
+  network_access: forbidden
+  candidate_scope: assigned_workspace_only
+authority_order: [SPEC, candidate_visible_fixtures, PLAN, tests, implementation]
+gold:
+  file: CHECKER_GOLD.yaml
+  status: FROZEN_BEFORE_FIRST_NEW_CHECKER_RUN
+  source: Frozen Phase 2 SPEC-first adjudications and direct probes.
+hard_gates:
+  - Missing or invalid VERDICT.yaml.
+  - CLEAN while any candidate-visible binding CRITICAL or HIGH defect remains.
+  - A CRITICAL or HIGH finding supported only by a lower-authority artifact or contradicted by the binding gold.
+  - Mutation of any candidate-visible input.
+ranking:
+  - checker hard-gate pass rate
+  - semantic defect recall
+  - severity-weighted semantic defect recall
+  - finding precision
+  - wrong-CLEAN control
+  - independent reproduction and evidence completeness
+  - worst-run result
+scoring:
+  seeded_defect_recall: 35
+  severity_weighted_recall: 20
+  finding_precision: 20
+  wrong_clean_control: 15
+  independent_reproduction_and_evidence: 10
+  efficiency_points: 0
+boundaries:
+  - This comparison selects a checker only.
+  - It does not authorize a planner, test-author, doer, or full stack.
+  - Findings are matched semantically; category-label mismatch alone is not a miss.
+  - Defects invisible to the materialized checker workspace are excluded from checker recall.
+  - No efficiency score is awarded because Grok is reused and comparable execution telemetry is unavailable.

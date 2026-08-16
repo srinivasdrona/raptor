@@ -1,0 +1,131 @@
+schema: raptor-model-role-checker-gold-v1
+status: FROZEN_BEFORE_FIRST_NEW_CHECKER_RUN
+authority_order: [SPEC, candidate_visible_fixtures, PLAN, tests, implementation]
+matching_rule: Match findings to defects by demonstrated behavior and authority basis, not category label alone.
+severity_weights: {CRITICAL: 10, HIGH: 5, MEDIUM: 2, LOW: 1}
+defects:
+  registry-bridge:
+    - id: RB-R03-SHARED-CODEX-PREMUTATION-SNAPSHOT
+      severity: HIGH
+      kind: test
+      variants: [DV-SONNET, DV-MAI]
+      runs: [3]
+      summary: The authored test snapshots the bundle before a deliberate caller mutation and then incorrectly requires the validator to reverse that mutation.
+    - id: RB-R03-PLANNER-UNAUTHORIZED-MALFORMED-SHAPE-EXPANSION
+      severity: MEDIUM
+      kind: plan
+      variants: [DV-SONNET, DV-MAI]
+      runs: [3]
+      summary: PLAN adds malformed-shape and fail-closed records requirements absent from the closed six-check SPEC contract.
+  snapshot-publisher:
+    - id: SP-CANONICAL-NONFINITE
+      severity: HIGH
+      kind: implementation
+      variants: [DV-SONNET, DV-MAI]
+      runs: [1, 2, 3, 4, 5]
+      summary: Non-finite JSON is accepted and re-emitted as NaN rather than rejected as SOURCE_JSON.
+    - id: SP-SHORT-WRITE
+      severity: HIGH
+      kind: implementation
+      variants: [DV-SONNET, DV-MAI]
+      runs: [1, 2, 3, 4, 5]
+      summary: A short staging write is treated as success and a truncated snapshot is published.
+    - id: SP-SOURCE-OUTPUT-ALIAS
+      severity: HIGH
+      kind: implementation
+      variants: [DV-SONNET, DV-MAI]
+      runs: [1, 2, 3, 4, 5]
+      summary: Publishing with source_path equal to output_path replaces and mutates the source despite the binding preservation rule.
+    - id: SP-TYPED-PUBLICATION-FAILURE
+      severity: HIGH
+      kind: implementation
+      variants: [DV-SONNET]
+      runs: [2, 4, 5]
+      summary: Staging or replace filesystem failures leak raw OSError instead of SnapshotPublishError(OUTPUT_PATH).
+    - id: SP-TYPED-PUBLICATION-FAILURE
+      severity: HIGH
+      kind: implementation
+      variants: [DV-MAI]
+      runs: [1, 2, 5]
+      summary: Staging or replace filesystem failures leak raw OSError instead of SnapshotPublishError(OUTPUT_PATH).
+    - id: SP-FD-CLEANUP-ROBUSTNESS
+      severity: MEDIUM
+      kind: implementation
+      variants: [DV-SONNET]
+      runs: [1, 2, 4]
+      summary: An fdopen failure leaves the mkstemp descriptor live and a sibling temporary file behind.
+    - id: SP-FD-CLEANUP-ROBUSTNESS
+      severity: MEDIUM
+      kind: implementation
+      variants: [DV-MAI]
+      runs: [2, 3, 4]
+      summary: An fdopen failure leaves the mkstemp descriptor live and a sibling temporary file behind.
+    - id: SP-SHARED-CORE-TEST-GAP
+      severity: HIGH
+      kind: test
+      variants: [DV-SONNET, DV-MAI]
+      runs: [1, 2, 3, 4, 5]
+      summary: The authored suite omits non-finite JSON, short-write, and source/output alias coverage.
+  workspace-boundary:
+    - id: WB-COMMONPATH-ABORT
+      severity: HIGH
+      kind: implementation
+      variants: [DV-SONNET]
+      runs: [3, 4, 5]
+      summary: Incomparable resolved paths raise ValueError instead of RESOLVED_ESCAPE and abort the required ordered audit.
+    - id: WB-DOT-ONLY
+      severity: MEDIUM
+      kind: implementation
+      variants: [DV-SONNET]
+      runs: [3, 4]
+      summary: Multi-segment dot-only requests are accepted instead of rejected as EMPTY_PATH.
+    - id: WB-DOT-ONLY
+      severity: MEDIUM
+      kind: implementation
+      variants: [DV-MAI]
+      runs: [2, 4]
+      summary: Multi-segment dot-only requests are accepted instead of rejected as EMPTY_PATH.
+    - id: WB-R02-TEST-GAP
+      severity: MEDIUM
+      kind: test
+      variants: [DV-SONNET, DV-MAI]
+      runs: [2]
+      summary: The authored suite omits multi-segment and mixed-separator dot-only requests.
+    - id: WB-R03-TEST-GAP
+      severity: HIGH
+      kind: test
+      variants: [DV-SONNET, DV-MAI]
+      runs: [3]
+      summary: The authored suite omits incomparable resolver targets and material dot-only forms.
+    - id: WB-R04-TEST-GAP
+      severity: HIGH
+      kind: test
+      variants: [DV-SONNET, DV-MAI]
+      runs: [4]
+      summary: The authored suite omits incomparable resolver targets and multi-segment dot-only forms.
+    - id: WB-R05-TEST-GAP
+      severity: HIGH
+      kind: test
+      variants: [DV-SONNET, DV-MAI]
+      runs: [5]
+      summary: The authored suite omits incomparable resolver targets and audit continuation after that error.
+known_non_defects:
+  - id: RB-MAI-R02-OPTIONAL-SHAPE
+    cell: DV-MAI/registry-bridge/run-02
+    summary: Missing or mistyped informational rows or content_sha256 behavior is not determined by the SPEC; a finding based on PLAN shape language is unsupported.
+  - id: RB-SONNET-R03-RECORDS-SHAPE
+    cell: DV-SONNET/registry-bridge/run-03
+    summary: Missing or non-list universe.records behavior is a PLAN-only expansion and not a binding implementation defect.
+  - id: SP-MAI-R02-BASEEXCEPTION-CLEANUP
+    cell: DV-MAI/snapshot-publisher/run-02
+    summary: Temporary cleanup after KeyboardInterrupt or SystemExit is PLAN-only; SPEC requires output preservation but does not bind cancellation cleanup.
+  - id: WB-SONNET-R04-PLAN-NARROWING
+    cell: DV-SONNET/workspace-boundary/run-04
+    summary: PLAN examples cannot narrow the SPEC rule that all nonempty dot-only segment sequences are EMPTY_PATH.
+evidence_sources:
+  - private: phase2-adjudication/paired-registry.json
+    sha256: 8ba45e015081db8472141f7081067e8af67f3675f1ecf9d9bb78c12f45f45321
+  - private: phase2-adjudication/paired-snapshot.json
+    sha256: 85612d618c647d05674068cd1470471fdfa7c1c235c036363624cd0727a1ccc5
+  - private: phase2-adjudication/paired-boundary.json
+    sha256: 9e5dfb2173790b435def94a8a64b73b427f804353f8f02bb0dd805da985181bb
