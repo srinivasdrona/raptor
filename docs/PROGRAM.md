@@ -126,9 +126,14 @@ with a [human-readable Phase 2 report](reference/model-role-phase2-results-2026-
 The measured comparisons did not qualify an autonomous replacement or full stack. The final
 governance decision is documented in the authoritative
 [model-role operating-panel decision](reference/model-role-operating-panel-2026-08.md): **GPT-5.6
-Sol** planner, **GPT-5.3 Codex** test author, **MAI-Code-1.1-Flash** doer, and **Claude Opus 5**
-supervised checker. Human/staff adjudication remains the terminal authority; Opus HIGH and CRITICAL
-findings require adjudication.
+Terra at xhigh** is the default planner for routine, tightly specified, bounded, reversible work;
+**GPT-5.6 Sol** is the escalation planner for ambiguity, architecture, migrations,
+security/safety-critical or irreversible/high-blast-radius work, cross-domain integration, and
+failed Terra authority/acceptance review. The panel also selects **GPT-5.3 Codex** test author,
+**MAI-Code-1.1-Flash** doer, and **Claude Opus 5** supervised checker. Terra was tested at xhigh
+and scored 7/15; Sol led at 10/15, so the split is an explicit cost/operating governance decision,
+not a claim that Terra won. Human/staff adjudication remains the terminal authority; Opus HIGH and
+CRITICAL findings require adjudication.
 
 The subsequent [Terra/Grok planner extension](reference/model-role-planner-extension-2026-08.md)
 leaves Sol first: Sol 10/15, Opus 9/15, Terra 7/15, Grok 5/15 and Gemini 4/15. All five planners
@@ -231,8 +236,8 @@ formula or attributable candidate-run telemetry, so no points are guessed. Test-
 selection were not isolated in Phase 2. Those experimental results alone authorize no planner
 replacement, doer replacement, full stack, operating-model change, RAPTOR v2 launch, or RescueScreen
 launch. The subsequent [final governance decision](reference/model-role-operating-panel-2026-08.md)
-closes model-role selection with a supervised operating panel; RAPTOR v2 and RescueScreen work
-continue only under their separate scope and entry gates.
+closes model-role selection with tiered Terra-at-xhigh default and Sol-escalation planning; RAPTOR
+v2 and RescueScreen work continue only under their separate scope and entry gates.
 
 ## Health Rollup
 

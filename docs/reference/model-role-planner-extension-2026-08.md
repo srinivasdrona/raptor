@@ -42,13 +42,14 @@ Grok's advisory planner rubric scores were high, but the authority-first result 
 This produces 5/15. One registry test-author artifact was missing, but it was attributed to the
 fixed test-author/execution stage and did not lower Grok's corrected planner score.
 
-## Decision
+## Measured decision boundary
 
 Sol remains the best-evidenced planner, with Opus the close alternative. Terra and Grok do not
 displace either model. No planner is fully qualified because every candidate failed the registry
-authority gate in 5/5 runs. The operational stack therefore remains:
+authority gate in 5/5 runs.
 
-- planner: GPT-5.6 Sol;
-- test author: GPT-5.3 Codex;
-- doer: selected per the existing doer evidence;
-- supervised checker: Claude Opus 5.
+The subsequent [final operating-panel governance decision](model-role-operating-panel-2026-08.md)
+uses tiered planning: Terra at xhigh is the default for routine, tightly specified, bounded,
+reversible work, while Sol is the escalation planner for higher-risk or failed-review work. That is
+a cost/operating routing decision, not a revision of this measured ranking: Terra was tested at
+xhigh and scored 7/15, while Sol led at 10/15.
