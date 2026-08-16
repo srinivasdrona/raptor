@@ -2,6 +2,7 @@
 
 **Status:** Bounded planner and paired-doer comparisons complete; no full stack selected  
 **Machine record:** [`model_role_phase2_result_2026-08-16.json`](../../data/eval/model_role_phase2_result_2026-08-16.json)
+**Subsequent planner extension:** [Terra and Grok planner results](model-role-planner-extension-2026-08.md)
 
 Phase 2 ranked 45 planner-comparison cells and 30 paired-doer cells over `registry-bridge`,
 `snapshot-publisher`, and `workspace-boundary`. Thirty planner cells and all 30 doer cells were
@@ -25,17 +26,19 @@ runs without a planner-attributable SPEC-authority failure.
 |---:|---|---:|---:|---:|---:|
 | 1 | GPT-5.6 Sol | **10/15** | 0/5 | **5/5** | **5/5** |
 | 2 | Claude Opus 5 (S1 reuse) | **9/15** | 0/5 | 4/5 | **5/5** |
-| 3 | Gemini 3.7 Flash | **4/15** | 0/5 | 0/5 | 4/5 |
+| 3 | GPT-5.6 Terra | **7/15** | 0/5 | 2/5 | **5/5** |
+| 4 | Grok 4.6 | **5/15** | 0/5 | 0/5 | **5/5** |
+| 5 | Gemini 3.7 Flash | **4/15** | 0/5 | 0/5 | 4/5 |
 
 Sol is the planner leader, but **there is no qualified planner winner**. Every planner failed the
 registry authority hard gate in all five runs by adding behavior outside the closed SPEC contract.
-Sol's one-run aggregate lead over Opus cannot override that scenario-wide failure, so replacing the
-incumbent planner is not authorized.
+The later Terra/Grok extension does not change that result: Terra reaches 7/15 and Grok 5/15,
+behind Sol's 10/15 and Opus's 9/15. Replacing the incumbent planner is not authorized.
 
 The ordering is stable under the recorded sensitivity checks. Reassigning Gemini snapshot run 04
 to the fixed test author raises Gemini only to 5/15. Waiving Gemini boundary run 03 makes that
 scenario a tie but leaves the aggregate order unchanged. Registry remains non-discriminating at
-the hard gate; its advisory shipped-artifact ordering is Gemini, Sol, Opus.
+the hard gate across all five candidates.
 
 ## Paired doer comparison
 

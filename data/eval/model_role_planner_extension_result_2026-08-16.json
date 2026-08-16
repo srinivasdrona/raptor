@@ -1,0 +1,230 @@
+{
+  "schema": "raptor-model-role-planner-extension-result-v1",
+  "status": "FINAL",
+  "generated_at_utc": "2026-08-16T07:51:36.088057Z",
+  "base_result": "data/eval/model_role_phase2_result_2026-08-16.json",
+  "protocol": {
+    "base_comparison": "benchmarks/model_role_phase2/PLANNER_COMPARISON.yaml",
+    "terra_extension": "benchmarks/model_role_phase2/PLANNER_TERRA_COMPARISON.yaml",
+    "grok_extension": "benchmarks/model_role_phase2/PLANNER_GROK_COMPARISON.yaml",
+    "run_protocol": "benchmarks/model_role_phase2/RUN_PROTOCOL.yaml",
+    "authority_order": [
+      "SPEC",
+      "candidate_visible_fixtures",
+      "PLAN",
+      "tests",
+      "implementation"
+    ]
+  },
+  "scope": {
+    "new_planner_arms": [
+      {
+        "id": "PC-TERRA",
+        "model": "gpt-5.6-terra"
+      },
+      {
+        "id": "PC-GROK",
+        "model": "grok-4.6"
+      }
+    ],
+    "fixed_roles": {
+      "test_author": "gemini-3.7-flash",
+      "doer": "claude-sonnet-5",
+      "checker": "gpt-5.6-sol"
+    },
+    "scenarios": [
+      "registry-bridge",
+      "snapshot-publisher",
+      "workspace-boundary"
+    ],
+    "runs_per_arm_scenario": 5,
+    "new_stack_runs": 30,
+    "new_stage_executions": 120,
+    "valid_required_stage_artifacts": 119,
+    "expected_required_stage_artifacts": 120,
+    "hidden_evaluation_files": 120
+  },
+  "artifact_integrity": {
+    "PC-TERRA": {
+      "valid_required_stages": 60,
+      "expected_required_stages": 60,
+      "checker_verdicts": {
+        "CLEAN": 3,
+        "WITH_CHANGES": 4,
+        "DO_NOT_MERGE": 8
+      }
+    },
+    "PC-GROK": {
+      "valid_required_stages": 59,
+      "expected_required_stages": 60,
+      "missing_required_artifacts": [
+        {
+          "cell": "registry-bridge/run-05",
+          "stage": "test_author",
+          "artifact": "tests/test_*.py",
+          "attribution": "test-author/execution",
+          "planner_eligibility_effect": "none"
+        }
+      ],
+      "checker_verdicts": {
+        "CLEAN": 1,
+        "WITH_CHANGES": 5,
+        "DO_NOT_MERGE": 9
+      }
+    }
+  },
+  "extension_results": {
+    "PC-TERRA": {
+      "model": "gpt-5.6-terra",
+      "corrected_planner_eligible_runs": 7,
+      "total_runs": 15,
+      "planner_attributable_failure_runs": 8,
+      "scenario_results": {
+        "registry-bridge": {
+          "eligible": 0,
+          "total": 5,
+          "note": "All five plans expand or rename the closed six-check/error contract."
+        },
+        "snapshot-publisher": {
+          "eligible": 2,
+          "total": 5,
+          "eligible_runs": [
+            "run-04",
+            "run-05"
+          ],
+          "note": "Runs 01-03 omit the binding typed OUTPUT_PATH mapping for staging, write or replace failures."
+        },
+        "workspace-boundary": {
+          "eligible": 5,
+          "total": 5,
+          "note": "No planner-attributable SPEC-authority failure; raw failures were downstream or contradictory test mocks."
+        }
+      },
+      "advisory_hidden_planner_score": {
+        "registry_mean": 83.0,
+        "snapshot_mean": 91.5,
+        "boundary_mean": 86.0,
+        "aggregate_mean": 86.83333333333333
+      }
+    },
+    "PC-GROK": {
+      "model": "grok-4.6",
+      "corrected_planner_eligible_runs": 5,
+      "total_runs": 15,
+      "planner_attributable_failure_runs": 10,
+      "scenario_results": {
+        "registry-bridge": {
+          "eligible": 0,
+          "total": 5,
+          "note": "All five plans expand, rename or incompletely preserve the closed six-check/error contract."
+        },
+        "snapshot-publisher": {
+          "eligible": 0,
+          "total": 5,
+          "note": "All five plans omit the binding typed OUTPUT_PATH mapping for staging, write or replace failures."
+        },
+        "workspace-boundary": {
+          "eligible": 5,
+          "total": 5,
+          "note": "No planner-attributable SPEC-authority failure; raw failures were downstream or contradictory test mocks."
+        }
+      },
+      "advisory_hidden_planner_score": {
+        "registry_mean": 91.67,
+        "snapshot_mean": 91.0,
+        "boundary_mean": 86.5,
+        "aggregate_mean": 89.72333333333334
+      }
+    }
+  },
+  "combined_ranking": [
+    {
+      "rank": 1,
+      "arm": "PC-SOL",
+      "model": "gpt-5.6-sol",
+      "corrected_planner_eligible_runs": 10,
+      "total_runs": 15,
+      "scenario_results": {
+        "registry-bridge": "0/5",
+        "snapshot-publisher": "5/5",
+        "workspace-boundary": "5/5"
+      },
+      "source": "frozen base result"
+    },
+    {
+      "rank": 2,
+      "arm": "PC-OPUS",
+      "model": "claude-opus-5",
+      "corrected_planner_eligible_runs": 9,
+      "total_runs": 15,
+      "scenario_results": {
+        "registry-bridge": "0/5",
+        "snapshot-publisher": "4/5",
+        "workspace-boundary": "5/5"
+      },
+      "source": "frozen S1 reuse"
+    },
+    {
+      "rank": 3,
+      "arm": "PC-TERRA",
+      "model": "gpt-5.6-terra",
+      "corrected_planner_eligible_runs": 7,
+      "total_runs": 15,
+      "scenario_results": {
+        "registry-bridge": "0/5",
+        "snapshot-publisher": "2/5",
+        "workspace-boundary": "5/5"
+      },
+      "source": "new extension"
+    },
+    {
+      "rank": 4,
+      "arm": "PC-GROK",
+      "model": "grok-4.6",
+      "corrected_planner_eligible_runs": 5,
+      "total_runs": 15,
+      "scenario_results": {
+        "registry-bridge": "0/5",
+        "snapshot-publisher": "0/5",
+        "workspace-boundary": "5/5"
+      },
+      "source": "new extension"
+    },
+    {
+      "rank": 5,
+      "arm": "PC-GEMINI",
+      "model": "gemini-3.7-flash",
+      "corrected_planner_eligible_runs": 4,
+      "total_runs": 15,
+      "scenario_results": {
+        "registry-bridge": "0/5",
+        "snapshot-publisher": "0/5",
+        "workspace-boundary": "4/5"
+      },
+      "source": "frozen base result"
+    }
+  ],
+  "decision": {
+    "leader": "PC-SOL",
+    "leader_model": "gpt-5.6-sol",
+    "result": "RANKING_EXTENDED_NO_QUALIFIED_WINNER",
+    "planner_rank_authorized": true,
+    "planner_replacement_authorized": false,
+    "terra_replaces_sol": false,
+    "grok_replaces_sol": false,
+    "reason": "Sol remains first at 10/15, ahead of Opus 9/15, Terra 7/15, Grok 5/15 and Gemini 4/15. Every candidate fails registry-bridge 0/5, so no planner clears the cross-scenario qualification boundary."
+  },
+  "interpretation": {
+    "terra": "Terra is a credible third-ranked planner and substantially stronger than Gemini on corrected eligibility, but it does not match Sol or Opus and cannot replace Sol on this evidence.",
+    "grok": "Grok's raw planner rubric scores are high, but it repeatedly omits binding typed publication failures and therefore ranks fourth on the authority-first metric.",
+    "operational_default": "GPT-5.6 Sol remains the best-evidenced planner; Claude Opus 5 remains the close alternative. Claude Opus 5 remains the separately selected supervised checker."
+  },
+  "source_records": {
+    "private_adjudication_sha256": {
+      "planner-extension-registry.json": "4b91327d6c8d81d0936b043b82665b92baaa0861634119c84b31ec50ce82defb",
+      "planner-extension-snapshot.json": "d8051acca35819d1962dc83e71ff9deaed3b10fa912025683455570902833e41",
+      "planner-extension-boundary.json": "bf6cd448be7c1774e9e1b09cf9f56274a2497e1b16efea6358aa01d9307da60c"
+    },
+    "hidden_results_location": "D:/AIProjects/raptor-benchmark-runs/results/planner-extensions"
+  }
+}

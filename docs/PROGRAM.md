@@ -125,6 +125,10 @@ SPEC-first attribution. The final machine record is
 with a [human-readable Phase 2 report](reference/model-role-phase2-results-2026-08.md).
 Phase 2 ranks Sol first among planners and MAI-Code first in the paired-doer comparison, but
 **qualifies neither as a replacement and selects no full stack**. ADR-0003/ADR-0005 remain binding.
+The subsequent [Terra/Grok planner extension](reference/model-role-planner-extension-2026-08.md)
+leaves Sol first: Sol 10/15, Opus 9/15, Terra 7/15, Grok 5/15 and Gemini 4/15. All five planners
+failed registry authority 0/5, so no planner replacement is authorized. Machine record:
+[`model_role_planner_extension_result_2026-08-16.json`](../data/eval/model_role_planner_extension_result_2026-08-16.json).
 The later isolated [checker comparison](reference/model-role-checker-comparison-2026-08.md) ranks
 Claude Opus 5 ahead of Grok 4.6 on hard-gate pass rate and semantic recall. Neither qualifies for
 autonomous terminal review: Opus is the supervised default with mandatory adjudication of HIGH and
