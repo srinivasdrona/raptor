@@ -1,0 +1,2979 @@
+{
+  "authoritative_local_inputs": [
+    {
+      "bytes": 35184,
+      "path": "C:\\Users\\sdrona\\AppData\\Local\\Temp\\1786947585279-copilot-tool-output-6044ef.txt",
+      "sha256": "db68b55cb7671a10eece69173009c46bfec96d8c69aaa33c97b75b2e4b35bbdb"
+    },
+    {
+      "bytes": 2148,
+      "path": "D:\\AIProjects\\raptor-data\\atlas\\r611q-expert-review-v1\\R611Q_EXPERT_REVIEW_FORM.yaml",
+      "sha256": "0e9d096559f36fcfde2f3340cf9af54a4328ddb74791d9ddef4df1edc54151ba"
+    },
+    {
+      "bytes": 8094,
+      "path": "D:\\AIProjects\\raptor-data\\atlas\\r611q-expert-review-v1\\R611Q_EXPERT_REVIEW_PACKET.md",
+      "sha256": "ac456eeac4bd6e0c6a41320d3687575e058d1016e92ddd2e8b140dabfdcbe4e2"
+    },
+    {
+      "bytes": 41517,
+      "path": "D:\\AIProjects\\raptor-worktrees\\panel-products-rescue-screen\\docs\\project\\specs\\structural-rescue-screen-v1.yaml",
+      "sha256": "c08131bf51ace985613a485cacce22c040ab38f32c9ac1ec56b1228642f337eb"
+    },
+    {
+      "bytes": 3632,
+      "path": "D:\\AIProjects\\raptor-worktrees\\r611q-expert-review\\data\\atlas\\runs\\2026-08-03\\source_catalog_manifest.yaml",
+      "sha256": "38f0f61d971c9b62851b29e404580deca7f2f8feebc5cadc176cd4208decccff"
+    },
+    {
+      "bytes": 49390,
+      "path": "D:\\AIProjects\\raptor\\pre-build\\RescueScreen Exploration.md",
+      "sha256": "2333287aff5bf1b26c70e166f40626ba33bb44e96ac4299b4c75497a12d65e40"
+    }
+  ],
+  "category_vocabulary": [
+    "DIRECT_FUNCTIONAL",
+    "DIRECT_BIOCHEMICAL",
+    "DIRECT_CLINICAL_OR_TUMOR",
+    "DIRECT_DATASET",
+    "STRUCTURAL_CONTEXT",
+    "INDIRECT_GENERAL_MECHANISM",
+    "REVIEW_ONLY",
+    "UNVERIFIED_LEAD"
+  ],
+  "counts": {
+    "datasets_total": 2,
+    "identity_structure_records_total": 4,
+    "publications_by_category": {
+      "DIRECT_BIOCHEMICAL": 2,
+      "DIRECT_CLINICAL_OR_TUMOR": 11,
+      "DIRECT_DATASET": 2,
+      "DIRECT_FUNCTIONAL": 11,
+      "INDIRECT_GENERAL_MECHANISM": 2,
+      "REVIEW_ONLY": 0,
+      "STRUCTURAL_CONTEXT": 3,
+      "UNVERIFIED_LEAD": 2
+    },
+    "publications_total": 33
+  },
+  "cutoff_date": "2026-08-17",
+  "datasets": [
+    {
+      "access": {
+        "license": "CC0-1.0",
+        "retrieved_or_checked": "2026-08-17",
+        "status": "PUBLIC"
+      },
+      "category": "DIRECT_DATASET",
+      "context": "HAP1 cliPE, pS6 FACS enrichment, CMAS.",
+      "deduplication": "Underlying dataset for PMID 38895336; reused and recalibrated by DOI 10.64898/2026.01.16.699909.",
+      "evidence_location": {
+        "row": "#62",
+        "url": "https://api.mavedb.org/api/v1/score-sets/urn:mavedb:00001201-a-1/scores"
+      },
+      "exact_r611q_relevance": "Exact allele-specific row c.1832G>A / p.Arg611Gln.",
+      "identifiers": {
+        "accession": "urn:mavedb:00001201-a-1",
+        "doi": "10.1101/2024.06.07.597916",
+        "row": "urn:mavedb:00001201-a-1#62"
+      },
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [],
+        "measured_indeterminate": [
+          "P_MTORC1_SUPPRESSION"
+        ],
+        "not_measured": [
+          "P_COMPLEX_BINDING",
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_STEADY_STATE_ABUNDANCE",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_CLIPE_SCORE"
+        ]
+      },
+      "record_type": "dataset",
+      "result": {
+        "frozen_score_file_bytes": 14277,
+        "frozen_score_file_sha256": "74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717",
+        "score": 0.345544328
+      },
+      "source_id": "MAVEDB:urn:mavedb:00001201-a-1",
+      "title": "TSC2 functional assay using prime editing in HAP1s"
+    },
+    {
+      "access": {
+        "license": "EXPLICIT_REUSE_LICENSE_NOT_EXPOSED_IN_FILE_RECORD",
+        "retrieved_or_checked": "2026-08-17",
+        "status": "PUBLIC_CONTROLLED_ACCESS_FALSE"
+      },
+      "category": "DIRECT_DATASET",
+      "context": "VAMP-seq steady-state abundance of GFP-tagged TSC2 variants in landing-pad HEK293T.",
+      "deduplication": "Primary released data linked to DOI 10.64898/2026.01.16.699909; not independent of that paper.",
+      "evidence_location": {
+        "row": "line 8168",
+        "url": "https://api.data.igvf.org/tabular-files/IGVFFI9747KART/@@download/IGVFFI9747KART.tsv.gz"
+      },
+      "exact_r611q_relevance": "Exact row ENSP00000219476.3:p.Arg611Gln.",
+      "identifiers": {
+        "analysis_set": "IGVFDS5595BTYJ",
+        "doi": "10.65695/IGVFDS5595BTYJ",
+        "file": "IGVFFI9747KART"
+      },
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPLEX_BINDING",
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_STEADY_STATE_ABUNDANCE",
+          "P_VAMP_ABUNDANCE"
+        ]
+      },
+      "record_type": "dataset",
+      "result": {
+        "content_md5": "a33584f3ac2a78c0952c70d7afc48f4c",
+        "functional_class": "functionally_abnormal",
+        "gzip_md5": "1a397944b7a5158b3d63999dfcf926db",
+        "gzip_sha256": "39f052e6e4819ff245fcee8d63fa1b4c3b09b2d9a0d529f5c14de5deaafa497e",
+        "line_number": 8168,
+        "replicates": [
+          -0.0501364718009432,
+          0.0047749409768793,
+          0.132068730363521
+        ],
+        "score": -0.0226807654120319,
+        "standard_error": 0.0934680941689553
+      },
+      "source_id": "IGVF:IGVFFI9747KART",
+      "title": "TSC2 VAMP-seq combined score table"
+    }
+  ],
+  "deduplication": {
+    "canonical_publication_key_order": [
+      "PMID",
+      "DOI",
+      "PMCID"
+    ],
+    "clusters": [
+      {
+        "cluster_id": "D_CLIPE",
+        "members": [
+          "PMID:38895336",
+          "MAVEDB:urn:mavedb:00001201-a-1",
+          "DOI:10.64898/2026.01.16.699909"
+        ],
+        "note": "Same cliPE score reused; 2026 paper also adds VAMP-seq."
+      },
+      {
+        "cluster_id": "D_3H9",
+        "members": [
+          "PMID:31799751",
+          "PMID:32555378",
+          "PMID:39596632"
+        ],
+        "note": "Shared 3H9-1B1 assay lineage."
+      },
+      {
+        "cluster_id": "D_621",
+        "members": [
+          "PMID:10823953",
+          "PMID:23555865",
+          "PMID:22719903"
+        ],
+        "note": "Patient-621 tumor and derivative cell models."
+      }
+    ],
+    "rules": [
+      "PMID, PMCID and DOI aliases are one publication record.",
+      "MaveDB and PMID 38895336 are one cliPE experimental program.",
+      "The 2026 integrated paper reuses the same cliPE score but adds an independent VAMP-seq dataset.",
+      "R611Q positive-control reuse inside a laboratory/reagent lineage is not counted as independent replication.",
+      "621-101 and 621-327 are derivatives of the patient-621 tumor lineage, not independent R611Q allele models."
+    ]
+  },
+  "generated_at": "2026-08-17T11:51:44.034+05:30",
+  "non_literature_records": [
+    {
+      "access": {
+        "license": "NCBI_DATA_POLICY",
+        "retrieved_or_checked": "2026-08-17",
+        "status": "PUBLIC"
+      },
+      "identifiers": {
+        "rsid": "rs28934872"
+      },
+      "limitations": [
+        "The rs record is locus-level; the target allele is specifically G>A.",
+        "Identity record only; no mechanism inference."
+      ],
+      "mapping": {
+        "hgvs_c": "NM_000548.5:c.1832G>A",
+        "hgvs_p": "NP_000539.2:p.Arg611Gln",
+        "spdi": "NC_000016.10:2070570:G:A"
+      },
+      "record_type": "identity",
+      "source_id": "DBSNP:rs28934872",
+      "title": "NCBI RefSNP rs28934872",
+      "url": "https://www.ncbi.nlm.nih.gov/snp/rs28934872",
+      "version": {
+        "create_date": "2005-05-24T16:22Z",
+        "last_update_build_id": "157",
+        "last_update_date": "2024-11-3T19:10Z"
+      }
+    },
+    {
+      "access": {
+        "license": "CC-BY-4.0",
+        "retrieved_or_checked": "2026-08-17",
+        "status": "PUBLIC"
+      },
+      "identifiers": {
+        "dbsnp": "rs28934872",
+        "feature": "VAR_005650",
+        "uniprot": "P49815"
+      },
+      "limitations": [
+        "Feature annotation aggregates citations and is not a substitute for primary-source spans.",
+        "Identity/annotation record, not Atlas acceptance."
+      ],
+      "mapping": {
+        "alternate": "Q",
+        "canonical_length": 1807,
+        "position": 611,
+        "reference": "R"
+      },
+      "record_type": "identity",
+      "source_id": "UNIPROT:P49815/VAR_005650",
+      "title": "UniProtKB reviewed TSC2_HUMAN natural variant VAR_005650",
+      "url": "https://www.uniprot.org/uniprotkb/P49815/entry",
+      "version": {
+        "entry_version": 248,
+        "last_annotation_update": "2026-06-10",
+        "last_sequence_update": "2009-11-24",
+        "sequence_version": 2
+      }
+    },
+    {
+      "access": {
+        "license": "PDB_ARCHIVE_TERMS",
+        "retrieved_or_checked": "2026-08-17",
+        "status": "PUBLIC"
+      },
+      "identifiers": {
+        "linked_pmid": "33436626",
+        "pdb": "7DL2"
+      },
+      "limitations": [
+        "Wild type, not R611Q.",
+        "Global 4.4 Å resolution limits side-chain contact claims.",
+        "No pocket or druggability inference."
+      ],
+      "mapping": {
+        "atom_records": 22,
+        "author_residue": 611,
+        "label_residue": 562,
+        "residue_name": "ARG",
+        "tsc2_author_chains": [
+          "A",
+          "B"
+        ],
+        "uniprot": "P49815"
+      },
+      "record_type": "structure",
+      "source_id": "PDB:7DL2",
+      "title": "Cryo-EM structure of human TSC complex",
+      "url": "https://www.rcsb.org/structure/7DL2",
+      "version": {
+        "deposit_date": "2020-11-25",
+        "initial_release_date": "2020-12-16",
+        "resolution_angstrom": 4.4,
+        "revision_date": "2024-03-27"
+      }
+    },
+    {
+      "access": {
+        "license": "PDB_ARCHIVE_TERMS",
+        "retrieved_or_checked": "2026-08-17",
+        "status": "PUBLIC"
+      },
+      "identifiers": {
+        "linked_pmid": "39565846",
+        "pdb": "9CE3"
+      },
+      "limitations": [
+        "Wild type, not R611Q.",
+        "Modeled residue does not establish local side-chain accuracy, a contact, or a ligandable pocket."
+      ],
+      "mapping": {
+        "author_residue": 611,
+        "label_residue": 619,
+        "note": "Chain C also has an unrelated author residue 611 in TSC1; chain identity must be retained.",
+        "residue_name": "ARG",
+        "tsc2_author_chains": [
+          "A",
+          "B"
+        ],
+        "uniprot": "P49815"
+      },
+      "record_type": "structure",
+      "source_id": "PDB:9CE3",
+      "title": "Structure of the TSC:WIPI3 lysosomal recruitment complex",
+      "url": "https://www.rcsb.org/structure/9CE3",
+      "version": {
+        "deposit_date": "2024-06-26",
+        "initial_release_date": "2024-12-04",
+        "publication_abstract_resolution_angstrom": 2.8,
+        "resolution_angstrom_rcsb": 2.9,
+        "revision_date": "2024-12-04"
+      }
+    }
+  ],
+  "proposition_vocabulary": {
+    "P_CLINICAL_OCCURRENCE": "R611Q was observed in a reported person, family, cohort, or tumor.",
+    "P_CLIPE_SCORE": "R611Q has an allele-specific cliPE CMAS observation.",
+    "P_COMPLEX_BINDING": "R611Q reduces TSC1 binding or TSC-complex formation/associated TSC1 abundance.",
+    "P_COMPOUND_RESCUE": "A compound directly binds and stabilizes/rescues R611Q TSC2.",
+    "P_CONTROL_REUSE": "R611Q was reused as a known inactive/pathogenic comparator rather than generated as a new study allele.",
+    "P_DEFINED_DEGRON": "R611Q creates or exposes a defined degron.",
+    "P_DRUGGABLE_POCKET": "R611Q has a validated ligandable/druggable pocket or defined Arg611-TSC1 contact.",
+    "P_EVEROLIMUS_DOWNSTREAM": "Rapalog treatment suppresses downstream mTORC1 readouts in an R611Q-containing context.",
+    "P_G1_CELL_CYCLE": "Mutant TSC2 including R611Q was evaluated for a G1 cell-cycle effect.",
+    "P_GENERAL_GAP_MECHANISM": "General TSC-complex structure/biochemistry shows TSC1-dependent allosteric support of GAP activity.",
+    "P_GENERAL_PROTEOSTASIS": "General TSC1/Hsp90/HERC1 proteostasis mechanisms can regulate TSC2 handling.",
+    "P_INTRINSIC_GAP_RESCUE": "R611Q retains intrinsic Rheb-GAP activity after abundance and complex formation are restored.",
+    "P_MISFOLDING": "R611Q directly misfolds, aggregates, or exposes hydrophobic surface.",
+    "P_MTORC1_SUPPRESSION": "R611Q impairs TSC-complex-dependent suppression of mTORC1/TORC1 readouts.",
+    "P_PAM_UBIQUITINATION": "R611Q remains susceptible to Pam/MYCBP2-associated ubiquitination despite TSC1 co-expression.",
+    "P_RAC1_ROS_MOTILITY": "R611Q expression altered Rac1/ROS/cell-motility readouts in the reported system.",
+    "P_RAPAMYCIN_MIRNA": "Rapamycin altered miRNA/pS6 readouts in the R611Q-plus-LOH 621 lineage.",
+    "P_STEADY_STATE_ABUNDANCE": "R611Q lowers steady-state TSC2 abundance in the stated assay.",
+    "P_STRUCTURE_COVERAGE": "Wild-type experimental TSC2 structures model residue 611.",
+    "P_TUMOR_TWO_HIT": "R611Q occurred with loss/inactivation of the other TSC2 allele in the reported tumor context.",
+    "P_TURNOVER_PROTEASOME": "R611Q has a measured shortened half-life or demonstrated proteasome-dependent turnover.",
+    "P_VAMP_ABUNDANCE": "R611Q has an allele-specific VAMP-seq abundance observation."
+  },
+  "publications": [
+    {
+      "access": {
+        "full_text_access": "OPEN_ACCESS",
+        "license": "CC-BY-4.0",
+        "license_verification_source": "Crossref license record",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12871146/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_DATASET",
+      "citation": {
+        "authors": [
+          "Carina G Biar",
+          "Ziyu R Wang",
+          "Nathan D Camp",
+          "Daniel L Holmes",
+          "Melinda K Wheelock",
+          "Sriram Pendyala",
+          "Abby V McGee",
+          "Pankhuri Gupta",
+          "Abbye E McEwen",
+          "Alan F Rubin",
+          "Lea M Starita",
+          "Doug M Fowler",
+          "Jeffrey D Calhoun"
+        ],
+        "journal": "bioRxiv",
+        "title": "An integrated, scaled approach to resolve TSC2 variants of uncertain significance",
+        "year": "2026"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "Examples of residues highly intolerant ... are 611 ... with ... R611Q",
+          "location": "Results, residue intolerance",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12871146/"
+        },
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "For cliPE ... scores >0.25 were classified as having abnormal activity.",
+          "location": "Methods, calibration",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12871146/"
+        },
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "ENSP00000219476.3:p.Arg611Gln | -0.0226807654120319 | ... | functionally_abnormal",
+          "location": "TSV line 8168",
+          "span_locator": "line 8168",
+          "url": "https://api.data.igvf.org/tabular-files/IGVFFI9747KART/@@download/IGVFFI9747KART.tsv.gz"
+        }
+      ],
+      "exact_r611q_relevance": "The main text gives a grouped residue-611 intolerance statement; the linked IGVF VAMP-seq file provides an exact R611Q abundance row. The paper also recalibrates the existing cliPE score.",
+      "experimental_or_observational_context": "VAMP-seq in landing-pad HEK293T; SGE in primary donor T cells; cliPE in HAP1. R611Q is directly present in VAMP-seq and the reused cliPE dataset.",
+      "identifiers": {
+        "doi": "10.64898/2026.01.16.699909",
+        "pmcid": "PMC12871146",
+        "pmid": null
+      },
+      "inventory_lineage_tags": [
+        "CONTRADICTION_ADDITION"
+      ],
+      "notes": [
+        "The exact VAMP row resolves the contradiction-output data check; it measures steady-state GFP-fusion abundance, not folding or half-life."
+      ],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [
+          "P_MTORC1_SUPPRESSION"
+        ],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPLEX_BINDING",
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_CLIPE_SCORE",
+          "P_STEADY_STATE_ABUNDANCE",
+          "P_VAMP_ABUNDANCE"
+        ]
+      },
+      "record_type": "publication",
+      "result": "IGVF R611Q VAMP score -0.0226807654120319 (SE 0.0934680941689553), functional_class functionally_abnormal. The same cliPE score 0.345544328 is abnormal under the paper cutoff >0.25.",
+      "source_id": "DOI:10.64898/2026.01.16.699909",
+      "source_lineage": {
+        "independence": "VAMP-seq is methodologically independent; cliPE interpretation reuses the MaveDB score rather than replicating it.",
+        "lineage_id": "L5_CALHOUN_MAVE"
+      },
+      "verification_status": "VERIFIED_PRIMARY_AND_DATASET"
+    },
+    {
+      "access": {
+        "full_text_access": "OPEN_PREPRINT",
+        "license": "CC-BY-NC-ND-4.0",
+        "license_verification_source": "Crossref license record",
+        "primary_url": "https://www.biorxiv.org/content/10.64898/2026.07.14.738392v1",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "STRUCTURAL_CONTEXT",
+      "citation": {
+        "authors": [
+          "Sonja Titze",
+          "Maximilian Rüttermann",
+          "Mark Nellist",
+          "Daniel Kümmel"
+        ],
+        "journal": "bioRxiv",
+        "title": "Molecular basis of TSC complex GAP activity",
+        "year": "2026"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "The structure ... reveals an allosteric role of TSC1 in this process.",
+          "location": "Abstract/results",
+          "url": "https://www.biorxiv.org/content/10.64898/2026.07.14.738392v1"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q was not tested. The source constrains rescue logic by showing a general allosteric role for TSC1 in GAP activity.",
+      "experimental_or_observational_context": "Structural and biochemical transition-state analysis of the TSC complex and Rheb.",
+      "identifiers": {
+        "doi": "10.64898/2026.07.14.738392",
+        "pmcid": null,
+        "pmid": null
+      },
+      "inventory_lineage_tags": [
+        "CONTRADICTION_ADDITION"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [
+          "P_GENERAL_GAP_MECHANISM",
+          "P_INTRINSIC_GAP_RESCUE"
+        ],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPOUND_RESCUE",
+          "P_DRUGGABLE_POCKET"
+        ],
+        "supported": []
+      },
+      "record_type": "publication",
+      "result": "TSC1 strongly supports catalytic competence and asymmetric activation of TSC2; abundance restoration alone therefore cannot be assumed to restore full GAP function.",
+      "source_id": "DOI:10.64898/2026.07.14.738392",
+      "source_lineage": {
+        "independence": "General structural biochemistry; no R611Q rescue experiment.",
+        "lineage_id": "L12_STRUCTURAL"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "FREE_FULL_TEXT_NO_OPEN_LICENSE_CONFIRMED",
+        "license": "NO_OPEN_LICENSE_CONFIRMED",
+        "license_verification_source": "NCBI PMC OA API reports not Open Access",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC18562/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_CLINICAL_OR_TUMOR",
+      "citation": {
+        "authors": [
+          "T Carsillo",
+          "A Astrinidis",
+          "E P Henske"
+        ],
+        "journal": "Proceedings of the National Academy of Sciences of the United States of America",
+        "title": "Mutations in the tuberous sclerosis complex gene TSC2 are a cause of sporadic pulmonary lymphangioleiomyomatosis.",
+        "year": "2000"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "621 ... G→A at 1832 ... Arg→Gln at 611; 651 ... G→A at 1832 ... Arg→Gln at 611",
+          "location": "Table 1",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC18562/"
+        },
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "Four ... angiomyolipomas ... also had TSC2 LOH (patients ... 621, and 651)",
+          "location": "Results and Table 2",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC18562/"
+        }
+      ],
+      "exact_r611q_relevance": "Somatic G1832A/R611Q was detected in angiomyolipomas from patients 621 and 651; both tumors had TSC2 LOH.",
+      "experimental_or_observational_context": "Human sporadic LAM-associated angiomyolipoma and microdissected pulmonary LAM/normal tissue sequencing plus LOH analysis.",
+      "identifiers": {
+        "doi": "10.1073/pnas.97.11.6085",
+        "pmcid": "PMC18562",
+        "pmid": "10823953"
+      },
+      "inventory_lineage_tags": [
+        "USER_NAMED"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPLEX_BINDING",
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_MTORC1_SUPPRESSION",
+          "P_STEADY_STATE_ABUNDANCE",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_CLINICAL_OCCURRENCE",
+          "P_TUMOR_TWO_HIT"
+        ]
+      },
+      "record_type": "publication",
+      "result": "R611Q was tumor-specific in two individuals; patient 651 pulmonary LAM carried the same mutation; both R611Q angiomyolipomas had TSC2 LOH.",
+      "source_id": "PMID:10823953",
+      "source_lineage": {
+        "independence": "Independent human tumor-genetic evidence; anchors the later 621 cell-line lineage.",
+        "lineage_id": "L4_HENSKE_621"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "ABSTRACT_OR_METADATA_ONLY",
+        "license": "NO_OPEN_LICENSE_CONFIRMED",
+        "license_verification_source": "PubMed/publisher metadata",
+        "primary_url": "https://pubmed.ncbi.nlm.nih.gov/11741832/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_BIOCHEMICAL",
+      "citation": {
+        "authors": [
+          "M Nellist",
+          "B Verhaaf",
+          "M A Goedbloed",
+          "A J Reuser",
+          "A M van den Ouweland",
+          "D J Halley"
+        ],
+        "journal": "Human molecular genetics",
+        "title": "TSC2 missense mutations inhibit tuberin phosphorylation and prevent formation of the tuberin-hamartin complex.",
+        "year": "2001"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "ABSTRACT_ONLY",
+          "exact_span": "Abstract describes pathogenic missense variants disrupting soluble tuberin-hamartin complex; R611Q is not allele-named.",
+          "location": "PubMed abstract",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/11741832/"
+        },
+        {
+          "access_status": "CROSS_SOURCE_PRIMARY_ATTRIBUTION",
+          "exact_span": "Tuberin R611Q mutant has been shown to be incapable of binding hamartin",
+          "location": "Han 2008 Results 3.5 cross-reference",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2435383/"
+        }
+      ],
+      "exact_r611q_relevance": "Foundational R611Q tuberin-hamartin source. The original allele span was inaccessible; later primary papers explicitly attribute inability to bind hamartin to R611Q and cite this paper.",
+      "experimental_or_observational_context": "Original tuberin-hamartin interaction/chaperone and phosphorylation study; exact cell/construct details were unavailable from accessible primary text.",
+      "identifiers": {
+        "doi": "10.1093/hmg/10.25.2889",
+        "pmcid": null,
+        "pmid": "11741832"
+      },
+      "inventory_lineage_tags": [
+        "FROZEN_ATLAS"
+      ],
+      "notes": [
+        "Publisher full text returned HTTP 403; original exact allele span remains an access gap."
+      ],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_COMPLEX_BINDING"
+        ]
+      },
+      "record_type": "publication",
+      "result": "Cross-source primary attribution supports loss of hamartin binding, but the original exact span could not be verified.",
+      "source_id": "PMID:11741832",
+      "source_lineage": {
+        "independence": "Original Nellist biochemical lineage; later lineage papers reuse the allele.",
+        "lineage_id": "L1_NELLIST_PARENTAL"
+      },
+      "verification_status": "PARTIAL_PRIMARY_CROSS_SOURCE"
+    },
+    {
+      "access": {
+        "full_text_access": "PMC_RECORD_PDF_NOT_TEXT_EXTRACTED",
+        "license": "NO_OPEN_LICENSE_CONFIRMED",
+        "license_verification_source": "NCBI PMC OA API reports not Open Access",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC1735223/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_FUNCTIONAL",
+      "citation": {
+        "authors": [
+          "L Khare",
+          "A Astrinidis",
+          "W Senapedis",
+          "P D Adams",
+          "E Petri Henske"
+        ],
+        "journal": "Journal of medical genetics",
+        "title": "Expression of wild type and mutant TSC2, but not TSC1, causes an increase in the G1 fraction of the cell cycle in HEK293 cells.",
+        "year": "2002"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PARTIAL_RECORD_ONLY",
+          "exact_span": "Expression of wild type and mutant TSC2 ... causes an increase in the G1 fraction",
+          "location": "PMC record/title and local contradiction report row R018",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC1735223/"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q was indexed among patient-derived mutant TSC2 constructs, but the accessible article record did not expose an allele-isolated result.",
+      "experimental_or_observational_context": "HEK293 cell-cycle study of wild-type and mutant TSC2; full article text was not machine-extractable.",
+      "identifiers": {
+        "doi": "10.1136/jmg.39.9.676",
+        "pmcid": "PMC1735223",
+        "pmid": "12205112"
+      },
+      "inventory_lineage_tags": [
+        "CONTRADICTION_ADDITION"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [
+          "P_G1_CELL_CYCLE"
+        ],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPOUND_RESCUE",
+          "P_INTRINSIC_GAP_RESCUE"
+        ],
+        "supported": []
+      },
+      "record_type": "publication",
+      "result": "The contradiction source reports a grouped retained G1-fraction effect for mutant TSC2 proteins; this is not a Rheb-GAP or stabilization assay.",
+      "source_id": "PMID:12205112",
+      "source_lineage": {
+        "independence": "Independent Henske laboratory; exact R611Q-specific magnitude unavailable.",
+        "lineage_id": "L10_HENSKE_G1"
+      },
+      "verification_status": "PARTIAL_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "ABSTRACT_OR_METADATA_ONLY",
+        "license": "NO_OPEN_LICENSE_CONFIRMED",
+        "license_verification_source": "PubMed/publisher metadata",
+        "primary_url": "https://pubmed.ncbi.nlm.nih.gov/15483652/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "UNVERIFIED_LEAD",
+      "citation": {
+        "authors": [
+          "Mark Nellist",
+          "Ozgur Sancak",
+          "Miriam A Goedbloed",
+          "Christan Rohe",
+          "Diana van Netten",
+          "Karin Mayer",
+          "Aimee Tucker-Williams",
+          "Ans M W van den Ouweland",
+          "Dicky J J Halley"
+        ],
+        "journal": "European journal of human genetics : EJHG",
+        "title": "Distinct effects of single amino-acid changes to tuberin on the function of the tuberin-hamartin complex.",
+        "year": "2005"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "ABSTRACT_ONLY",
+          "exact_span": "The abstract reports distinct effects of pathogenic tuberin substitutions but does not name R611Q.",
+          "location": "PubMed abstract",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/15483652/"
+        },
+        {
+          "access_status": "CROSS_SOURCE_PRIMARY_ATTRIBUTION",
+          "exact_span": "a known pathogenic variant (TSC2-R611Q [Nellist et al., 2005])",
+          "location": "Hoogeveen-Westerveld 2011 manuscript, PDF page 11",
+          "url": "https://hal.science/hal-00620580/document"
+        }
+      ],
+      "exact_r611q_relevance": "A later same-lineage primary manuscript identifies R611Q as a known pathogenic comparator and cites Nellist 2005; the original allele-specific span was not accessible.",
+      "experimental_or_observational_context": "Reported study of single-amino-acid effects on tuberin-hamartin complex function.",
+      "identifiers": {
+        "doi": "10.1038/sj.ejhg.5201276",
+        "pmcid": null,
+        "pmid": "15483652"
+      },
+      "inventory_lineage_tags": [
+        "FROZEN_ATLAS"
+      ],
+      "notes": [
+        "Nature publisher page returned HTTP 406; no original table/figure span was used."
+      ],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [
+          "P_CONTROL_REUSE"
+        ],
+        "measured_indeterminate": [],
+        "not_measured": [],
+        "supported": []
+      },
+      "record_type": "publication",
+      "result": "No R611Q-specific result is asserted from this source in the bundle because full-text verification failed.",
+      "source_id": "PMID:15483652",
+      "source_lineage": {
+        "independence": "Same Nellist/Erasmus lineage.",
+        "lineage_id": "L1_NELLIST_PARENTAL"
+      },
+      "verification_status": "UNVERIFIED_ORIGINAL_SPAN"
+    },
+    {
+      "access": {
+        "full_text_access": "ABSTRACT_OR_METADATA_ONLY",
+        "license": "NO_OPEN_LICENSE_CONFIRMED",
+        "license_verification_source": "PubMed/publisher metadata",
+        "primary_url": "https://pubmed.ncbi.nlm.nih.gov/15595939/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_CLINICAL_OR_TUMOR",
+      "citation": {
+        "authors": [
+          "M Ali",
+          "S C Girimaji",
+          "M Markandaya",
+          "A K Shukla",
+          "S Sacchidanand",
+          "A Kumar"
+        ],
+        "journal": "Acta neurologica Scandinavica",
+        "title": "Mutation and polymorphism analysis of TSC1 and TSC2 genes in Indian patients with tuberous sclerosis complex.",
+        "year": "2005"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "c.1832G>A (p.R611Q) had been reported previously",
+          "location": "PubMed abstract",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/15595939/"
+        }
+      ],
+      "exact_r611q_relevance": "The abstract explicitly lists c.1832G>A/p.R611Q among previously reported TSC2 mutations found in the Indian cohort.",
+      "experimental_or_observational_context": "Mutation screening of 24 Indian TSC families.",
+      "identifiers": {
+        "doi": "10.1111/j.1600-0404.2004.00366.x",
+        "pmcid": null,
+        "pmid": "15595939"
+      },
+      "inventory_lineage_tags": [
+        "USER_NAMED"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPLEX_BINDING",
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_MTORC1_SUPPRESSION",
+          "P_STEADY_STATE_ABUNDANCE",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_CLINICAL_OCCURRENCE"
+        ]
+      },
+      "record_type": "publication",
+      "result": "R611Q was observed; no allele-specific functional experiment was reported.",
+      "source_id": "PMID:15595939",
+      "source_lineage": {
+        "independence": "Independent clinical molecular cohort.",
+        "lineage_id": "L8_CLINICAL_COHORTS"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "ABSTRACT_OR_METADATA_ONLY",
+        "license": "NO_OPEN_LICENSE_CONFIRMED",
+        "license_verification_source": "PubMed/publisher metadata",
+        "primary_url": "https://pubmed.ncbi.nlm.nih.gov/16032769/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_CLINICAL_OR_TUMOR",
+      "citation": {
+        "authors": [
+          "Aubrey Milunsky",
+          "Sung Han Shim",
+          "Masamichi Ito",
+          "Ronald K Jaekle",
+          "Lori L Bassett",
+          "Michael R Brumund",
+          "Jeff M Milunsky"
+        ],
+        "journal": "Prenatal diagnosis",
+        "title": "Precise prenatal diagnosis of tuberous sclerosis by sequencing the TSC2 gene.",
+        "year": "2005"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "A mutation (R611Q) was found in exon 16 of the TSC2 gene.",
+          "location": "PubMed abstract",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/16032769/"
+        }
+      ],
+      "exact_r611q_relevance": "Prenatal sequencing identified R611Q in a fetus with multiple intracardiac tumors.",
+      "experimental_or_observational_context": "Prenatal molecular diagnosis from cultured amniotic-fluid cells; parental samples were not available at publication.",
+      "identifiers": {
+        "doi": "10.1002/pd.1197",
+        "pmcid": null,
+        "pmid": "16032769"
+      },
+      "inventory_lineage_tags": [
+        "USER_NAMED"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPLEX_BINDING",
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_MTORC1_SUPPRESSION",
+          "P_STEADY_STATE_ABUNDANCE",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_CLINICAL_OCCURRENCE"
+        ]
+      },
+      "record_type": "publication",
+      "result": "R611Q was observed in the fetus; this is an occurrence report, not mechanism evidence.",
+      "source_id": "PMID:16032769",
+      "source_lineage": {
+        "independence": "Independent prenatal case report.",
+        "lineage_id": "L8_CLINICAL_COHORTS"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "ABSTRACT_OR_METADATA_ONLY",
+        "license": "NO_OPEN_LICENSE_CONFIRMED",
+        "license_verification_source": "PubMed/publisher metadata",
+        "primary_url": "https://pubmed.ncbi.nlm.nih.gov/16464865/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "INDIRECT_GENERAL_MECHANISM",
+      "citation": {
+        "authors": [
+          "Huira Chong-Kopera",
+          "Ken Inoki",
+          "Yong Li",
+          "Tianqing Zhu",
+          "Francesc R Garcia-Gonzalo",
+          "Jose Luis Rosa",
+          "Kun-Liang Guan"
+        ],
+        "journal": "The Journal of biological chemistry",
+        "title": "TSC1 stabilizes TSC2 by inhibiting the interaction between TSC2 and the HERC1 ubiquitin ligase.",
+        "year": "2006"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "Disease mutations in TSC2, which result in its destabilization, allow binding to HERC1 in the presence of TSC1.",
+          "location": "PubMed abstract",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/16464865/"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q is not named in the accessible abstract. The paper establishes a general TSC1-HERC1 stabilization mechanism for some disease mutations.",
+      "experimental_or_observational_context": "TSC1/TSC2/HERC1 interaction and stability experiments.",
+      "identifiers": {
+        "doi": "10.1074/jbc.C500451200",
+        "pmcid": null,
+        "pmid": "16464865"
+      },
+      "inventory_lineage_tags": [
+        "CONTRADICTION_ADDITION"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [
+          "P_GENERAL_PROTEOSTASIS"
+        ],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_DEFINED_DEGRON",
+          "P_MISFOLDING",
+          "P_PAM_UBIQUITINATION",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": []
+      },
+      "record_type": "publication",
+      "result": "TSC1 excluded HERC1 from TSC2; disease mutations permitting HERC1 binding were not allele-resolved in the accessible text.",
+      "source_id": "PMID:16464865",
+      "source_lineage": {
+        "independence": "Independent general mechanism; must not be transferred to R611Q.",
+        "lineage_id": "L11_GENERAL_PROTEOSTASIS"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "OPEN_ACCESS",
+        "license": "CC-BY",
+        "license_verification_source": "NCBI PMC OA API",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC1592085/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_CLINICAL_OR_TUMOR",
+      "citation": {
+        "authors": [
+          "Chia-Cheng Hung",
+          "Yi-Ning Su",
+          "Shu-Chin Chien",
+          "Horng-Huei Liou",
+          "Chih-Chuan Chen",
+          "Pau-Chung Chen",
+          "Chia-Jung Hsieh",
+          "Chih-Ping Chen",
+          "Wang-Tso Lee",
+          "Win-Li Lin",
+          "Chien-Nan Lee"
+        ],
+        "journal": "BMC medical genetics",
+        "title": "Molecular and clinical analyses of 84 patients with tuberous sclerosis complex.",
+        "year": "2006"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "29 | TSC2 | 16 | c.1832G>A | R611Q | Missense | S | R",
+          "location": "Table: Status of TSC2 mutations in Taiwanese patients",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC1592085/"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q appears as a reported sporadic TSC2 mutation in the Taiwanese cohort table.",
+      "experimental_or_observational_context": "Mutation screening of 84 Taiwanese TSC families.",
+      "identifiers": {
+        "doi": "10.1186/1471-2350-7-72",
+        "pmcid": "PMC1592085",
+        "pmid": "16981987"
+      },
+      "inventory_lineage_tags": [
+        "USER_NAMED"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPLEX_BINDING",
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_MTORC1_SUPPRESSION",
+          "P_STEADY_STATE_ABUNDANCE",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_CLINICAL_OCCURRENCE"
+        ]
+      },
+      "record_type": "publication",
+      "result": "One cohort entry (No. 29) carried c.1832G>A/R611Q; no R611Q-specific functional assay was performed.",
+      "source_id": "PMID:16981987",
+      "source_lineage": {
+        "independence": "Independent clinical molecular cohort.",
+        "lineage_id": "L8_CLINICAL_COHORTS"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "ABSTRACT_OR_METADATA_ONLY",
+        "license": "NO_OPEN_LICENSE_CONFIRMED",
+        "license_verification_source": "PubMed/publisher metadata",
+        "primary_url": "https://pubmed.ncbi.nlm.nih.gov/18230340/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_FUNCTIONAL",
+      "citation": {
+        "authors": [
+          "Tsukasa Suzuki",
+          "Swadesh K Das",
+          "Hirohumi Inoue",
+          "Machiko Kazami",
+          "Okio Hino",
+          "Toshiyuki Kobayashi",
+          "Raymond S Yeung",
+          "Ken-Ichi Kobayashi",
+          "Tadahiro Tadokoro",
+          "Yuji Yamamoto"
+        ],
+        "journal": "Biochemical and biophysical research communications",
+        "title": "Tuberous sclerosis complex 2 loss-of-function mutation regulates reactive oxygen species production through Rac1 activation.",
+        "year": "2008"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "TSC2(R611Q), which also lacks the ability to form a complex with hamartin ... increased Rac1 activity as well as cell motility",
+          "location": "PubMed abstract",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/18230340/"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q was directly expressed in COS-1 cells and described as unable to form a complex with hamartin.",
+      "experimental_or_observational_context": "COS-1 transfection of R611Q and Y1571H TSC2 mutants; Rac1 activity, cell motility, ROS and interaction assays.",
+      "identifiers": {
+        "doi": "10.1016/j.bbrc.2008.01.077",
+        "pmcid": null,
+        "pmid": "18230340"
+      },
+      "inventory_lineage_tags": [
+        "FROZEN_ATLAS"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_MTORC1_SUPPRESSION",
+          "P_STEADY_STATE_ABUNDANCE",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_COMPLEX_BINDING",
+          "P_RAC1_ROS_MOTILITY"
+        ]
+      },
+      "record_type": "publication",
+      "result": "Both mutants increased Rac1 activity, motility and ROS; the paper states R611Q lacks hamartin complex formation.",
+      "source_id": "PMID:18230340",
+      "source_lineage": {
+        "independence": "Independent laboratory and non-mTOR endpoint; the binding premise was already established elsewhere.",
+        "lineage_id": "L6_SUZUKI_RAC1"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "OPEN_ACCESS",
+        "license": "CC-BY",
+        "license_verification_source": "NCBI PMC OA API",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2291454/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_FUNCTIONAL",
+      "citation": {
+        "authors": [
+          "Mark Nellist",
+          "Ozgür Sancak",
+          "Miriam Goedbloed",
+          "Alwin Adriaans",
+          "Marja Wessels",
+          "Anneke Maat-Kievit",
+          "Marieke Baars",
+          "Charlotte Dommering",
+          "Ans van den Ouweland",
+          "Dicky Halley"
+        ],
+        "journal": "BMC medical genetics",
+        "title": "Functional characterisation of the TSC1-TSC2 complex to assess multiple TSC2 variants identified in single families affected by tuberous sclerosis complex.",
+        "year": "2008"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "coimmunoprecipitation ... was reduced ... compare ... to the R611Q variant",
+          "location": "Results, Figure 2A-B",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2291454/"
+        },
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "less than 20% of the MEFs expressing ... R611Q variants showed inhibition of S6 phosphorylation",
+          "location": "Results, Figure 2D-F",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2291454/"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q was a known nonbinding/inactive positive control in direct co-IP and downstream mTOR assays.",
+      "experimental_or_observational_context": "Parental HEK293 biochemical arm; Tsc2-null mouse embryonic fibroblast addback; TSC1 co-IP, S6K-T389, phospho-S6 and immunoprecipitated-complex Rheb-GAP assays.",
+      "identifiers": {
+        "doi": "10.1186/1471-2350-9-10",
+        "pmcid": "PMC2291454",
+        "pmid": "18302728"
+      },
+      "inventory_lineage_tags": [
+        "CONTRADICTION_ADDITION",
+        "USER_NAMED"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": true,
+        "indirect_context": [],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_COMPLEX_BINDING",
+          "P_MTORC1_SUPPRESSION"
+        ]
+      },
+      "record_type": "publication",
+      "result": "R611Q showed very low TSC1 co-IP, increased S6K-T389 and fewer than 20% of expressing Tsc2-null MEFs suppressed phospho-S6.",
+      "source_id": "PMID:18302728",
+      "source_lineage": {
+        "independence": "Positive-control reuse within the original Nellist lineage; not a fresh allele generation.",
+        "lineage_id": "L1_NELLIST_PARENTAL"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "FREE_AUTHOR_MANUSCRIPT_NO_OPEN_LICENSE_CONFIRMED",
+        "license": "NO_OPEN_LICENSE_CONFIRMED",
+        "license_verification_source": "NCBI PMC OA API reports not Open Access",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2435383/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_BIOCHEMICAL",
+      "citation": {
+        "authors": [
+          "Sangyeul Han",
+          "Rochelle M Witt",
+          "Túlio M Santos",
+          "Carolyn Polizzano",
+          "Bernardo L Sabatini",
+          "Vijaya Ramesh"
+        ],
+        "journal": "Cellular signalling",
+        "title": "Pam (Protein associated with Myc) functions as an E3 ubiquitin ligase and regulates TSC/mTOR signaling.",
+        "year": "2008"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "TSC1 was unable to inhibit TSC2 ubiquitination by Pam when ... TSC2 R611Q was expressed",
+          "location": "Results 3.5 and Figure 3B",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2435383/"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q was directly tested in a Pam/MYCBP2 ubiquitination experiment.",
+      "experimental_or_observational_context": "HEK293T transfection of wild-type/R611Q/R905Q TSC2, Pam F3, TSC1 and Ub-HA; TSC2 immunoprecipitation and ubiquitin immunoblot.",
+      "identifiers": {
+        "doi": "10.1016/j.cellsig.2008.01.020",
+        "pmcid": "PMC2435383",
+        "pmid": "18308511"
+      },
+      "inventory_lineage_tags": [
+        "CONTRADICTION_ADDITION",
+        "USER_NAMED"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [
+          "P_COMPLEX_BINDING"
+        ],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_PAM_UBIQUITINATION"
+        ]
+      },
+      "record_type": "publication",
+      "result": "TSC1 blocked Pam-induced ubiquitination of wild type and R905Q but not R611Q.",
+      "source_id": "PMID:18308511",
+      "source_lineage": {
+        "independence": "Independent laboratory and direct ubiquitination endpoint; imports the binding-defect premise from Nellist 2001.",
+        "lineage_id": "L3_RAMESH_PAM"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "FREE_FULL_TEXT_NO_OPEN_LICENSE_CONFIRMED",
+        "license": "NO_OPEN_LICENSE_CONFIRMED",
+        "license_verification_source": "NCBI PMC OA API reports not Open Access",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2986163/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_FUNCTIONAL",
+      "citation": {
+        "authors": [
+          "Ricardo Coevoets",
+          "Sermin Arican",
+          "Marianne Hoogeveen-Westerveld",
+          "Erik Simons",
+          "Ans van den Ouweland",
+          "Dicky Halley",
+          "Mark Nellist"
+        ],
+        "journal": "European journal of human genetics : EJHG",
+        "title": "A reliable cell-based assay for testing unclassified TSC2 gene variants.",
+        "year": "2009"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "S6K-T389 phosphorylation was reduced approximately 2-fold in cells expressing wild-type TSC2, compared to ... R611Q",
+          "location": "Results, Figure 1",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2986163/"
+        },
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "a slight decrease was noted for the R611Q ... variants",
+          "location": "Results, ICW Figure 3",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2986163/"
+        },
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "Compared to wild-type TSC2, the signal for the R611Q variant was consistently reduced. In addition, the TSC1 signal was also reduced",
+          "location": "Results, immunoblot Figure 4",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2986163/"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q was the direct inactive comparator in ICW and conventional immunoblot assays.",
+      "experimental_or_observational_context": "Parental HEK293T cells retaining endogenous complexes; transient TSC2/TSC1/S6K expression; four ICW optimization transfections and three variant-analysis experiments.",
+      "identifiers": {
+        "doi": "10.1038/ejhg.2008.184",
+        "pmcid": "PMC2986163",
+        "pmid": "18854862"
+      },
+      "inventory_lineage_tags": [
+        "FROZEN_ATLAS"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": true,
+        "indirect_context": [],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_COMPLEX_BINDING",
+          "P_MTORC1_SUPPRESSION",
+          "P_STEADY_STATE_ABUNDANCE"
+        ]
+      },
+      "record_type": "publication",
+      "result": "Wild type reduced S6K-T389 phosphorylation about twofold relative to R611Q (P=0.03). R611Q abundance reductions were slight by ICW but consistent by cytosolic immunoblot, with reduced TSC1 signal.",
+      "source_id": "PMID:18854862",
+      "source_lineage": {
+        "independence": "Same Nellist/Erasmus construct and assay lineage; assay-format dependence must be retained.",
+        "lineage_id": "L1_NELLIST_PARENTAL"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "OPEN_AUTHOR_MANUSCRIPT",
+        "license": "LICENSE_NOT_STATED_IN_HAL_RECORD",
+        "license_verification_source": "HAL API record",
+        "primary_url": "https://hal.science/hal-00620580/document",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_FUNCTIONAL",
+      "citation": {
+        "authors": [
+          "Marianne Hoogeveen-Westerveld",
+          "Marjolein Wentink",
+          "Diana van den Heuvel",
+          "Melika Mozaffari",
+          "Rosemary Ekong",
+          "Sue Povey",
+          "Johan T den Dunnen",
+          "Kay Metcalfe",
+          "Stephanie Vallee",
+          "Stefan Krueger",
+          "JoAnn Bergoffen",
+          "Vandana Shashi",
+          "Frances Elmslie",
+          "David Kwiatkowski",
+          "Julian Sampson",
+          "Concha Vidales",
+          "Jacinta Dzarir",
+          "Javier Garcia-Planells",
+          "Kira Dies",
+          "Anneke Maat-Kievit",
+          "Ans van den Ouweland",
+          "Dicky Halley",
+          "Mark Nellist"
+        ],
+        "journal": "Human mutation",
+        "title": "Functional assessment of variants in the TSC1 and TSC2 genes identified in individuals with Tuberous Sclerosis Complex.",
+        "year": "2011"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "Cells expressing the TSC2 variants were compared to ... TSC2-R611Q",
+          "location": "Accepted manuscript PDF page 11",
+          "url": "https://hal.science/hal-00620580/document"
+        },
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "The effects of the TSC2 R1200W and R611Q variants on S6K T389 phosphorylation are clearly distinguishable from wild-type TSC2",
+          "location": "Supporting Figure S4, PDF page 48",
+          "url": "https://hal.science/hal-00620580/document"
+        },
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "c.1832G>A (p.R611Q) ... pathogenic ... unstable, destabilising, pathogenic",
+          "location": "Supporting table, PDF page 60",
+          "url": "https://hal.science/hal-00620580/document"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q was directly used as the pathogenic comparator across standardized TSC2 functional assays.",
+      "experimental_or_observational_context": "Parental HEK293T transfection of TSC2, TSC1 and S6K constructs with immunoblot signal and S6K-T389 readouts.",
+      "identifiers": {
+        "doi": "10.1002/humu.21451",
+        "pmcid": null,
+        "pmid": "21309039"
+      },
+      "inventory_lineage_tags": [
+        "FROZEN_ATLAS"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": true,
+        "indirect_context": [
+          "P_COMPLEX_BINDING"
+        ],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_MTORC1_SUPPRESSION",
+          "P_STEADY_STATE_ABUNDANCE"
+        ]
+      },
+      "record_type": "publication",
+      "result": "The manuscript labels R611Q unstable/destabilising and shows its S6K-T389 effect clearly distinguishable from wild type over a range of transfected DNA.",
+      "source_id": "PMID:21309039",
+      "source_lineage": {
+        "independence": "Standardized positive-control reuse in the same laboratory lineage.",
+        "lineage_id": "L1_NELLIST_PARENTAL"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "OPEN_ACCESS",
+        "license": "CC-BY",
+        "license_verification_source": "NCBI PMC OA API",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3376142/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_FUNCTIONAL",
+      "citation": {
+        "authors": [
+          "Fangbing Liu",
+          "Elaine P Lunsford",
+          "Jingli Tong",
+          "Yoshitomo Ashitate",
+          "Summer L Gibbs",
+          "Jane Yu",
+          "Hak Soo Choi",
+          "Elizabeth P Henske",
+          "John V Frangioni"
+        ],
+        "journal": "PloS one",
+        "title": "Real-time monitoring of tumorigenesis, dissemination, & drug response in a preclinical model of lymphangioleiomyomatosis/tuberous sclerosis complex.",
+        "year": "2012"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "Genomic DNA sequencing ... confirmed ... G1832A ... Arg611Gln ... and loss of heterozygosity",
+          "location": "Results, Figure 1D",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3376142/"
+        },
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "Tuberin and hamartin protein levels were dramatically reduced ... phospho-S6 ... elevated",
+          "location": "Results, Figure 1D",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3376142/"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q relevance is through 621-327, a NIS/GFP derivative of the R611Q-plus-LOH 621-101 tumor line.",
+      "experimental_or_observational_context": "621-327 xenograft/dissemination model; Western blot, sequencing, SPECT/CT and rapamycin response.",
+      "identifiers": {
+        "doi": "10.1371/journal.pone.0038589",
+        "pmcid": "PMC3376142",
+        "pmid": "22719903"
+      },
+      "inventory_lineage_tags": [
+        "USER_NAMED"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": true,
+        "indirect_context": [],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_EVEROLIMUS_DOWNSTREAM",
+          "P_MTORC1_SUPPRESSION",
+          "P_STEADY_STATE_ABUNDANCE",
+          "P_TUMOR_TWO_HIT"
+        ]
+      },
+      "record_type": "publication",
+      "result": "The line retained G1832A/Arg611Gln with no wild-type allele, low tuberin/hamartin and high phospho-S6; rapamycin reduced tumor signal, but no R611Q protein rescue was tested.",
+      "source_id": "PMID:22719903",
+      "source_lineage": {
+        "independence": "Derivative of 621-101 with added reporter genes; not an independent allele or isogenic correction.",
+        "lineage_id": "L4_HENSKE_621"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "ABSTRACT_OR_METADATA_ONLY",
+        "license": "NO_OPEN_LICENSE_CONFIRMED",
+        "license_verification_source": "PubMed/publisher metadata",
+        "primary_url": "https://pubmed.ncbi.nlm.nih.gov/22903760/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "UNVERIFIED_LEAD",
+      "citation": {
+        "authors": [
+          "Marianne Hoogeveen-Westerveld",
+          "Rosemary Ekong",
+          "Sue Povey",
+          "Karin Mayer",
+          "Nathalie Lannoy",
+          "Frances Elmslie",
+          "Martina Bebin",
+          "Kira Dies",
+          "Catherine Thompson",
+          "Steven P Sparagana",
+          "Peter Davies",
+          "Agnies M van Eeghen",
+          "Elizabeth A Thiele",
+          "Ans van den Ouweland",
+          "Dicky Halley",
+          "Mark Nellist"
+        ],
+        "journal": "Human mutation",
+        "title": "Functional assessment of TSC2 variants identified in individuals with tuberous sclerosis complex.",
+        "year": "2013"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "ABSTRACT_ONLY",
+          "exact_span": "The abstract does not name R611Q.",
+          "location": "PubMed abstract",
+          "url": "https://pubmed.ncbi.nlm.nih.gov/22903760/"
+        }
+      ],
+      "exact_r611q_relevance": "The frozen Atlas catalog includes this same-lineage functional paper, but exact R611Q inclusion/result was not verified from an accessible primary span.",
+      "experimental_or_observational_context": "Functional assessment of 78 TSC2 variants in the Nellist/Erasmus assay lineage.",
+      "identifiers": {
+        "doi": "10.1002/humu.22202",
+        "pmcid": null,
+        "pmid": "22903760"
+      },
+      "inventory_lineage_tags": [
+        "FROZEN_ATLAS"
+      ],
+      "notes": [
+        "Wiley full text returned HTTP 403."
+      ],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [],
+        "measured_indeterminate": [],
+        "not_measured": [],
+        "supported": []
+      },
+      "record_type": "publication",
+      "result": "No R611Q-specific result is asserted.",
+      "source_id": "PMID:22903760",
+      "source_lineage": {
+        "independence": "Likely same comparator lineage; not counted as an R611Q replication.",
+        "lineage_id": "L1_NELLIST_PARENTAL"
+      },
+      "verification_status": "UNVERIFIED_ORIGINAL_SPAN"
+    },
+    {
+      "access": {
+        "full_text_access": "OPEN_ACCESS",
+        "license": "CC-BY",
+        "license_verification_source": "NCBI PMC OA API",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3612076/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_FUNCTIONAL",
+      "citation": {
+        "authors": [
+          "Anil J Trindade",
+          "Douglas A Medvetz",
+          "Nicole A Neuman",
+          "Faina Myachina",
+          "Jane Yu",
+          "Carmen Priolo",
+          "Elizabeth P Henske"
+        ],
+        "journal": "PloS one",
+        "title": "MicroRNA-21 is induced by rapamycin in a model of tuberous sclerosis (TSC) and lymphangioleiomyomatosis (LAM).",
+        "year": "2013"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "These cells ... carry bi-allelic inactivation of the TSC2 gene. An identical TSC2 mutation (R611Q) was present in this patient’s pulmonary LAM cells",
+          "location": "Results, first miRNA screen",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3612076/"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q relevance is through the patient-derived 621-101 cell line with biallelic TSC2 inactivation, not a controlled heterozygous allele experiment.",
+      "experimental_or_observational_context": "621-101 angiomyolipoma-derived cells treated with rapamycin 20 nM for 24 hours; pS6 and miRNA arrays/qRT-PCR.",
+      "identifiers": {
+        "doi": "10.1371/journal.pone.0060014",
+        "pmcid": "PMC3612076",
+        "pmid": "23555865"
+      },
+      "inventory_lineage_tags": [
+        "USER_NAMED"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": true,
+        "indirect_context": [
+          "P_MTORC1_SUPPRESSION"
+        ],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_EVEROLIMUS_DOWNSTREAM",
+          "P_RAPAMYCIN_MIRNA"
+        ]
+      },
+      "record_type": "publication",
+      "result": "Rapamycin reduced pS6 and altered miRNA, including induction of miR-21, in the R611Q-plus-LOH lineage.",
+      "source_id": "PMID:23555865",
+      "source_lineage": {
+        "independence": "621-101 reuse; biallelic tumor-derived/immortalized background, not an independent allele model.",
+        "lineage_id": "L4_HENSKE_621"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "FREE_FULL_TEXT_NO_OPEN_LICENSE_CONFIRMED",
+        "license": "NO_OPEN_LICENSE_CONFIRMED",
+        "license_verification_source": "NCBI PMC OA API reports not Open Access",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3959815/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_CLINICAL_OR_TUMOR",
+      "citation": {
+        "authors": [
+          "Magdalena E Tyburczy",
+          "Ji-An Wang",
+          "Shaowei Li",
+          "Rajesh Thangapazham",
+          "Yvonne Chekaluk",
+          "Joel Moss",
+          "David J Kwiatkowski",
+          "Thomas N Darling"
+        ],
+        "journal": "Human molecular genetics",
+        "title": "Sun exposure causes somatic second-hit mutations and angiofibroma development in tuberous sclerosis complex.",
+        "year": "2014"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "P11T ... TSC2 c.1832G>A, p.R611Q | 0.02 | Not seen in P11C and P11B",
+          "location": "Table 2, patient P11",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3959815/"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q was detected at low allele frequency in an angiofibroma culture and not in control skin/blood.",
+      "experimental_or_observational_context": "Deep sequencing of TSC skin-tumor fibroblast cultures and normal tissues.",
+      "identifiers": {
+        "doi": "10.1093/hmg/ddt597",
+        "pmcid": "PMC3959815",
+        "pmid": "24271014"
+      },
+      "inventory_lineage_tags": [
+        "USER_NAMED"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPLEX_BINDING",
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_MTORC1_SUPPRESSION",
+          "P_STEADY_STATE_ABUNDANCE",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_CLINICAL_OCCURRENCE"
+        ]
+      },
+      "record_type": "publication",
+      "result": "P11 tumor carried c.1832G>A/p.R611Q at 0.02 allele frequency; the row does not establish a paired second allele event.",
+      "source_id": "PMID:24271014",
+      "source_lineage": {
+        "independence": "Independent skin-tumor genetics study.",
+        "lineage_id": "L9_TUMOR_GENETICS"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "OPEN_ACCESS",
+        "license": "CC-BY",
+        "license_verification_source": "NCBI PMC OA API",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4843954/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_FUNCTIONAL",
+      "citation": {
+        "authors": [
+          "Rosemary Ekong",
+          "Mark Nellist",
+          "Marianne Hoogeveen-Westerveld",
+          "Marjolein Wentink",
+          "Jessica Panzer",
+          "Steven Sparagana",
+          "Warren Emmett",
+          "Natalie L Dawson",
+          "Marie Claire Malinge",
+          "Rima Nabbout",
+          "Caterina Carbonara",
+          "Marco Barberis",
+          "Sergio Padovan",
+          "Marta Futema",
+          "Vincent Plagnol",
+          "Steve E Humphries",
+          "Nicola Migone",
+          "Sue Povey"
+        ],
+        "journal": "Human mutation",
+        "title": "Variants Within TSC2 Exons 25 and 31 Are Very Unlikely to Cause Clinically Diagnosable Tuberous Sclerosis.",
+        "year": "2016"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "the introduction of ... TSC2 p.R611Q ... significantly reduced the TSC1 protein signal ... and prevented ... inhibition of TORC1 activity",
+          "location": "Results, Figure 1B-C",
+          "span_locator": "text-char:20956:21353",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4843954/"
+        },
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "the presence of sequences corresponding to exon 31 did not rescue the activity of the p.R611Q variant",
+          "location": "Results, Figure 1",
+          "span_locator": "text-char:21584:21692",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4843954/"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q was directly tested as a positive-control construct in parental HEK293T cells in both exon-31 construct backgrounds.",
+      "experimental_or_observational_context": "Parental HEK293T transient overexpression of full-length TSC2, TSC1 and S6K; immunoblot; at least three independent transfections.",
+      "identifiers": {
+        "doi": "10.1002/humu.22951",
+        "pmcid": "PMC4843954",
+        "pmid": "26703369"
+      },
+      "inventory_lineage_tags": [
+        "FROZEN_ATLAS"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": true,
+        "indirect_context": [],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_COMPLEX_BINDING",
+          "P_MTORC1_SUPPRESSION",
+          "P_STEADY_STATE_ABUNDANCE"
+        ]
+      },
+      "record_type": "publication",
+      "result": "R611Q reduced TSC2 and TSC1 signals, prevented TSC-complex-dependent TORC1 inhibition, and was not functionally rescued by inclusion of exon 31.",
+      "source_id": "PMID:26703369",
+      "source_lineage": {
+        "independence": "Positive-control reuse in the concentrated Nellist/Erasmus parental-HEK293T lineage.",
+        "lineage_id": "L1_NELLIST_PARENTAL"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "OPEN_ACCESS",
+        "license": "CC-BY",
+        "license_verification_source": "NCBI PMC OA API",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4878062/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_FUNCTIONAL",
+      "citation": {
+        "authors": [
+          "Su-Kyeong Hwang",
+          "Jae-Hyung Lee",
+          "Jung-Eun Yang",
+          "Chae-Seok Lim",
+          "Jin-A Lee",
+          "Yong-Seok Lee",
+          "Kyungmin Lee",
+          "Bong-Kiun Kaang"
+        ],
+        "journal": "Molecular brain",
+        "title": "Everolimus improves neuropsychiatric symptoms in a patient with tuberous sclerosis carrying a novel TSC2 mutation.",
+        "year": "2016"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "TSC2 p.R611Q mutant: 0.455 ± 0.065 ... TSC1 ... p.R611Q mutant: 0.161 ± 0.061",
+          "location": "Results, Figure 3",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4878062/"
+        },
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "Everolimus significantly reduced ... phospho-S6K ... in p.R611Q mutant group (4.096 ± 0.884 to 0.637 ± 0.156)",
+          "location": "Results, Figure 4",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4878062/"
+        }
+      ],
+      "exact_r611q_relevance": "The patient carried a different deletion; R611Q was a supplied Nellist positive-control plasmid directly tested in HEK293T cells.",
+      "experimental_or_observational_context": "Parental HEK293T transient TSC2/TSC1/S6K expression. Abundance/TSC1 readouts n=9; 10 nM everolimus pS6K experiment n=3.",
+      "identifiers": {
+        "doi": "10.1186/s13041-016-0222-6",
+        "pmcid": "PMC4878062",
+        "pmid": "27216612"
+      },
+      "inventory_lineage_tags": [
+        "USER_NAMED"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": true,
+        "indirect_context": [
+          "P_MTORC1_SUPPRESSION"
+        ],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_COMPLEX_BINDING",
+          "P_EVEROLIMUS_DOWNSTREAM",
+          "P_STEADY_STATE_ABUNDANCE"
+        ]
+      },
+      "record_type": "publication",
+      "result": "R611Q TSC2 and TSC1 signals were lower than wild type; everolimus reduced R611Q-associated pS6K from 4.096±0.884 to 0.637±0.156 (p<0.01).",
+      "source_id": "PMID:27216612",
+      "source_lineage": {
+        "independence": "Independent laboratory execution, but R611Q plasmids were supplied by Mark Nellist and the assay follows the same overexpression family.",
+        "lineage_id": "L7_EXTERNAL_NELLIST_REAGENT"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "OPEN_ACCESS",
+        "license": "CC-BY",
+        "license_verification_source": "NCBI PMC OA API",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5730846/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "INDIRECT_GENERAL_MECHANISM",
+      "citation": {
+        "authors": [
+          "Mark R Woodford",
+          "Rebecca A Sager",
+          "Elijah Marris",
+          "Diana M Dunn",
+          "Adam R Blanden",
+          "Ryan L Murphy",
+          "Nicholas Rensing",
+          "Oleg Shapiro",
+          "Barry Panaretou",
+          "Chrisostomos Prodromou",
+          "Stewart N Loh",
+          "David H Gutmann",
+          "Dimitra Bourboulia",
+          "Gennady Bratslavsky",
+          "Michael Wong",
+          "Mehdi Mollapour"
+        ],
+        "journal": "The EMBO journal",
+        "title": "Tumor suppressor Tsc1 is a new Hsp90 co-chaperone that facilitates folding of kinase and non-kinase clients.",
+        "year": "2017"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "Tsc1 ... facilitator of Hsp90-mediated folding ... including Tsc2 ... preventing their ubiquitination and proteasomal degradation",
+          "location": "PubMed abstract/full text",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5730846/"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q was not tested. The paper describes a general TSC1-Hsp90 co-chaperone mechanism that can affect TSC2 folding and degradation.",
+      "experimental_or_observational_context": "Biochemical Hsp90 ATPase/co-chaperone and client-folding experiments.",
+      "identifiers": {
+        "doi": "10.15252/embj.201796700",
+        "pmcid": "PMC5730846",
+        "pmid": "29127155"
+      },
+      "inventory_lineage_tags": [
+        "STRUCTURAL_SPEC_CITATION"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [
+          "P_GENERAL_PROTEOSTASIS"
+        ],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_DEFINED_DEGRON",
+          "P_MISFOLDING",
+          "P_PAM_UBIQUITINATION",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": []
+      },
+      "record_type": "publication",
+      "result": "TSC1 facilitated Hsp90-mediated folding of clients including TSC2 and prevented ubiquitination/proteasomal degradation generally.",
+      "source_id": "PMID:29127155",
+      "source_lineage": {
+        "independence": "General proteostasis context only; no R611Q allele experiment.",
+        "lineage_id": "L11_GENERAL_PROTEOSTASIS"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "OPEN_ACCESS",
+        "license": "CC-BY",
+        "license_verification_source": "NCBI PMC OA API",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5707039/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_CLINICAL_OR_TUMOR",
+      "citation": {
+        "authors": [
+          "Anika Bongaarts",
+          "Krinio Giannikou",
+          "Roy J Reinten",
+          "Jasper J Anink",
+          "James D Mills",
+          "Floor E Jansen",
+          "G M Wim Spliet",
+          "Willfred F A den Dunnen",
+          "Roland Coras",
+          "Ingmar Blümcke",
+          "Werner Paulus",
+          "Theresa Scholl",
+          "Martha Feucht",
+          "Katarzyna Kotulska",
+          "Sergiusz Jozwiak",
+          "Anna Maria Buccoliero",
+          "Chiara Caporalini",
+          "Flavio Giordano",
+          "Lorenzo Genitori",
+          "Figen Söylemezoğlu",
+          "José Pimentel",
+          "Mark Nellist",
+          "Antoinette Y N Schouten-van Meeteren",
+          "Anwesha Nag",
+          "Angelika Mühlebner",
+          "David J Kwiatkowski",
+          "Eleonora Aronica"
+        ],
+        "journal": "Oncotarget",
+        "title": "Subependymal giant cell astrocytomas in Tuberous Sclerosis Complex have consistent TSC1/TSC2 biallelic inactivation, and no BRAF mutations.",
+        "year": "2017"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "20 | TSC2 | c.1832G>A | 65 | Missense | p.R611Q | Yes | point+CN-LOH",
+          "location": "Table 2",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5707039/"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q was identified in a SEGA tumor with copy-neutral LOH.",
+      "experimental_or_observational_context": "Targeted sequencing/copy-number analysis of 34 SEGA samples.",
+      "identifiers": {
+        "doi": "10.18632/oncotarget.20764",
+        "pmcid": "PMC5707039",
+        "pmid": "29221145"
+      },
+      "inventory_lineage_tags": [
+        "USER_NAMED"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPLEX_BINDING",
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_MTORC1_SUPPRESSION",
+          "P_STEADY_STATE_ABUNDANCE",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_CLINICAL_OCCURRENCE",
+          "P_TUMOR_TWO_HIT"
+        ]
+      },
+      "record_type": "publication",
+      "result": "Case 20 had c.1832G>A/p.R611Q at 65% mutant allele fraction with CN-LOH.",
+      "source_id": "PMID:29221145",
+      "source_lineage": {
+        "independence": "Independent SEGA tumor-genetics cohort.",
+        "lineage_id": "L9_TUMOR_GENETICS"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "OPEN_ACCESS",
+        "license": "CC-BY-NC",
+        "license_verification_source": "NCBI PMC OA API",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6531247/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_CLINICAL_OR_TUMOR",
+      "citation": {
+        "authors": [
+          "Xuncan Liu",
+          "Yanfeng Zhang",
+          "Yunpeng Hao",
+          "Yinbo Chen",
+          "Chen Chen"
+        ],
+        "journal": "Medicine",
+        "title": "Tuberous sclerosis complex presenting as convulsive status epilepticus followed by hypoxic cerebropathy: A case report.",
+        "year": "2019"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "the patient had inherited the TSC2 c.1832G>A (p.R611Q) mutation from her mother, who was clinically unaffected",
+          "location": "Case report",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6531247/"
+        }
+      ],
+      "exact_r611q_relevance": "A child with TSC inherited c.1832G>A/p.R611Q from a clinically unaffected mother.",
+      "experimental_or_observational_context": "Single clinical case report with genetic testing.",
+      "identifiers": {
+        "doi": "10.1097/MD.0000000000015545",
+        "pmcid": "PMC6531247",
+        "pmid": "31083211"
+      },
+      "inventory_lineage_tags": [
+        "USER_NAMED"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPLEX_BINDING",
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_MTORC1_SUPPRESSION",
+          "P_STEADY_STATE_ABUNDANCE",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_CLINICAL_OCCURRENCE"
+        ]
+      },
+      "record_type": "publication",
+      "result": "R611Q occurrence and intrafamilial phenotype discordance were reported; no mechanism was measured.",
+      "source_id": "PMID:31083211",
+      "source_lineage": {
+        "independence": "Independent clinical case.",
+        "lineage_id": "L8_CLINICAL_COHORTS"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "OPEN_ACCESS",
+        "license": "CC-BY",
+        "license_verification_source": "NCBI PMC OA API",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7154745/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_FUNCTIONAL",
+      "citation": {
+        "authors": [
+          "Luiz G Dufner Almeida",
+          "Santoesha Nanhoe",
+          "Andrea Zonta",
+          "Mitra Hosseinzadeh",
+          "Regina Kom-Gortat",
+          "Peter Elfferich",
+          "Gerben Schaaf",
+          "Annegien Kenter",
+          "Daniel Kümmel",
+          "Nicola Migone",
+          "Sue Povey",
+          "Rosemary Ekong",
+          "Mark Nellist"
+        ],
+        "journal": "Human mutation",
+        "title": "Comparison of the functional and structural characteristics of rare TSC2 variants with clinical and genetic findings.",
+        "year": "2020"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "Variants were compared with wild-type TSC2 ... and to the inactive TSC2 c.1832G>A, p.(R611Q) variant",
+          "location": "Methods, expression constructs",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7154745/"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q was the previously known inactive comparator, not one of the study VUS.",
+      "experimental_or_observational_context": "CRISPR-derived TSC2-knockout and TSC1:TSC2-double-knockout HEK293T re-expression, S6K-T389 immunoblot and co-immunoprecipitation.",
+      "identifiers": {
+        "doi": "10.1002/humu.23963",
+        "pmcid": "PMC7154745",
+        "pmid": "31799751"
+      },
+      "inventory_lineage_tags": [
+        "FROZEN_ATLAS"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": true,
+        "indirect_context": [
+          "P_COMPLEX_BINDING",
+          "P_MTORC1_SUPPRESSION"
+        ],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": []
+      },
+      "record_type": "publication",
+      "result": "The publication establishes the 3H9 assay generation and comparator use; no new isolated R611Q magnitude was stated in the inspected prose.",
+      "source_id": "PMID:31799751",
+      "source_lineage": {
+        "independence": "Foundational DKO reagent paper in the same laboratory/construct lineage.",
+        "lineage_id": "L2_NELLIST_3H9_DKO"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "OPEN_ACCESS",
+        "license": "CC-BY",
+        "license_verification_source": "NCBI PMC OA API",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7170856/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_CLINICAL_OR_TUMOR",
+      "citation": {
+        "authors": [
+          "Miriam E Reyna-Fabián",
+          "Nancy L Hernández-Martínez",
+          "Miguel A Alcántara-Ortigoza",
+          "Jorge T Ayala-Sumuano",
+          "Sergio Enríquez-Flores",
+          "José A Velázquez-Aragón",
+          "Alfredo Varela-Echavarría",
+          "Carlos G Todd-Quiñones",
+          "Ariadna González-Del Angel"
+        ],
+        "journal": "Scientific reports",
+        "title": "First comprehensive TSC1/TSC2 mutational analysis in Mexican patients with Tuberous Sclerosis Complex reveals numerous novel pathogenic variants.",
+        "year": "2020"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "Exon 17 | c.1832G>A | p.(Arg611Gln) | ... de novo ... ET72 | M | 1 y",
+          "location": "General patient/variant table",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7170856/"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q was reported in one de novo Mexican cohort case.",
+      "experimental_or_observational_context": "Comprehensive molecular analysis of 66 unrelated Mexican-descent patients.",
+      "identifiers": {
+        "doi": "10.1038/s41598-020-62759-5",
+        "pmcid": "PMC7170856",
+        "pmid": "32313033"
+      },
+      "inventory_lineage_tags": [
+        "USER_NAMED"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPLEX_BINDING",
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_MTORC1_SUPPRESSION",
+          "P_STEADY_STATE_ABUNDANCE",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_CLINICAL_OCCURRENCE"
+        ]
+      },
+      "record_type": "publication",
+      "result": "Table entry ET72, male, age 1 year, carried de novo c.1832G>A/p.Arg611Gln.",
+      "source_id": "PMID:32313033",
+      "source_lineage": {
+        "independence": "Independent clinical molecular cohort.",
+        "lineage_id": "L8_CLINICAL_COHORTS"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "OPEN_ACCESS",
+        "license": "CC-BY",
+        "license_verification_source": "NCBI PMC OA API",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7303179/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_CLINICAL_OR_TUMOR",
+      "citation": {
+        "authors": [
+          "Thomas Rosengren",
+          "Santoesha Nanhoe",
+          "Luis Gustavo Dufner de Almeida",
+          "Bitten Schönewolf-Greulich",
+          "Lasse Jonsgaard Larsen",
+          "Caroline Amalie Brunbjerg Hey",
+          "Morten Dunø",
+          "Jakob Ek",
+          "Lotte Risom",
+          "Mark Nellist",
+          "Lisbeth Birk Møller"
+        ],
+        "journal": "Scientific reports",
+        "title": "Mutational analysis of TSC1 and TSC2 in Danish patients with tuberous sclerosis complex.",
+        "year": "2020"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "Cells expressing the variants were compared to ... the pathogenic TSC2 p.Arg611Gln variant",
+          "location": "Methods, functional investigation",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7303179/"
+        },
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "c.1832G > A, p.(Arg611Gln) ... identified in 5 unrelated patients",
+          "location": "Results/discussion, recurrent variants",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7303179/"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q occurred in five unrelated Danish cohort members and was also reused as the 3H9 inactive comparator.",
+      "experimental_or_observational_context": "Danish diagnostic cohort of 327 referrals; functional testing of other variants in 3H9-1B1 cells.",
+      "identifiers": {
+        "doi": "10.1038/s41598-020-66588-4",
+        "pmcid": "PMC7303179",
+        "pmid": "32555378"
+      },
+      "inventory_lineage_tags": [
+        "FROZEN_ATLAS"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": true,
+        "indirect_context": [
+          "P_MTORC1_SUPPRESSION"
+        ],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_CLINICAL_OCCURRENCE"
+        ]
+      },
+      "record_type": "publication",
+      "result": "Five unrelated R611Q occurrences were reported; no new allele-specific functional magnitude was isolated.",
+      "source_id": "PMID:32555378",
+      "source_lineage": {
+        "independence": "Clinical cohort is distinct; functional comparator belongs to the shared 3H9 lineage.",
+        "lineage_id": "L2_NELLIST_3H9_DKO"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "OPEN_ACCESS",
+        "license": "CC-BY",
+        "license_verification_source": "NCBI PMC OA API",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7804450/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "STRUCTURAL_CONTEXT",
+      "citation": {
+        "authors": [
+          "Huirong Yang",
+          "Zishuo Yu",
+          "Xizi Chen",
+          "Jiabei Li",
+          "Ningning Li",
+          "Jiaxuan Cheng",
+          "Ning Gao",
+          "Hai-Xin Yuan",
+          "Dan Ye",
+          "Kun-Liang Guan",
+          "Yanhui Xu"
+        ],
+        "journal": "Nature communications",
+        "title": "Structural insights into TSC complex assembly and GAP activity on Rheb.",
+        "year": "2021"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "TSC2 chains A/B contain modeled ARG author residue 611; global resolution 4.4 Å",
+          "location": "RCSB entry and atom records",
+          "url": "https://www.rcsb.org/structure/7DL2"
+        },
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "Wild-type TSC-complex structure; no R611Q mutant or ligand study.",
+          "location": "Article",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC7804450/"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q was not tested. The linked wild-type structure PDB 7DL2 models TSC2 residue 611.",
+      "experimental_or_observational_context": "Cryo-EM structure/biochemistry of the human TSC complex and Rheb GAP mechanism.",
+      "identifiers": {
+        "doi": "10.1038/s41467-020-20522-4",
+        "pmcid": "PMC7804450",
+        "pmid": "33436626"
+      },
+      "inventory_lineage_tags": [
+        "CONTRADICTION_ADDITION"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [
+          "P_GENERAL_GAP_MECHANISM"
+        ],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPOUND_RESCUE",
+          "P_DRUGGABLE_POCKET",
+          "P_MISFOLDING"
+        ],
+        "supported": [
+          "P_STRUCTURE_COVERAGE"
+        ]
+      },
+      "record_type": "publication",
+      "result": "PDB 7DL2 contains ARG at author residue 611 in TSC2 chains A and B; global resolution is 4.4 Å.",
+      "source_id": "PMID:33436626",
+      "source_lineage": {
+        "independence": "Independent wild-type structural context.",
+        "lineage_id": "L12_STRUCTURAL"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "OPEN_ACCESS",
+        "license": "CC-BY",
+        "license_verification_source": "NCBI PMC OA API",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11004469/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_CLINICAL_OR_TUMOR",
+      "citation": {
+        "authors": [
+          "Mariko Peterson",
+          "David L Kolin",
+          "Panagiotis A Konstantinopoulos"
+        ],
+        "journal": "Frontiers in oncology",
+        "title": "Case report: Response to everolimus in a patient with platinum resistant, high grade serous ovarian carcinoma with biallelic TSC2 inactivation.",
+        "year": "2024"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "ovarian carcinoma harboring ... TSC2 R611Q ... with concomitant single copy loss ... treated with ... everolimus ... 19 months",
+          "location": "Abstract",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11004469/"
+        },
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "TSC2 c.1832G>A (p.R611Q) ... single copy deletions involving ... TSC2",
+          "location": "Tumor profiling",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11004469/"
+        }
+      ],
+      "exact_r611q_relevance": "Somatic R611Q plus single-copy TSC2 loss was found in an ovarian carcinoma; germline testing was negative.",
+      "experimental_or_observational_context": "Single platinum-resistant high-grade serous ovarian carcinoma case with tumor sequencing and everolimus treatment.",
+      "identifiers": {
+        "doi": "10.3389/fonc.2024.1357980",
+        "pmcid": "PMC11004469",
+        "pmid": "38601768"
+      },
+      "inventory_lineage_tags": [
+        "USER_NAMED"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPLEX_BINDING",
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_STEADY_STATE_ABUNDANCE",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_CLINICAL_OCCURRENCE",
+          "P_EVEROLIMUS_DOWNSTREAM",
+          "P_TUMOR_TWO_HIT"
+        ]
+      },
+      "record_type": "publication",
+      "result": "The tumor showed R611Q plus TSC2 copy loss and a reported 19-month response to everolimus. This does not demonstrate R611Q protein stabilization or TSC treatment relevance.",
+      "source_id": "PMID:38601768",
+      "source_lineage": {
+        "independence": "Independent somatic oncology case; multiple co-alterations and tumor context prevent allele-isolated inference.",
+        "lineage_id": "L9_TUMOR_GENETICS"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "OPEN_ACCESS",
+        "license": "CC-BY-NC-ND",
+        "license_verification_source": "NCBI PMC OA API",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11185720/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_DATASET",
+      "citation": {
+        "authors": [
+          "Carina G Biar",
+          "Cole Pfeifer",
+          "Gemma L Carvill",
+          "Jeffrey D Calhoun"
+        ],
+        "journal": "bioRxiv : the preprint server for biology",
+        "title": "Multimodal framework to resolve variants of uncertain significance in TSC2.",
+        "year": "2024"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "TBLB = 0.242; TPLP = 0.477",
+          "location": "Results, Figure 3 calibration",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11185720/"
+        },
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "urn:mavedb:00001201-a-1#62,c.1832G>A,NA,p.Arg611Gln,0.345544328",
+          "location": "Score row urn:mavedb:00001201-a-1#62",
+          "span_locator": "CSV row #62",
+          "url": "https://api.mavedb.org/api/v1/score-sets/urn:mavedb:00001201-a-1/scores"
+        }
+      ],
+      "exact_r611q_relevance": "The associated MaveDB score set contains the exact R611Q row; the paper and dataset are one experimental program.",
+      "experimental_or_observational_context": "Endogenous-locus cliPE prime editing in HAP1 cells with pS6 FACS enrichment and CMAS scoring.",
+      "identifiers": {
+        "doi": "10.1101/2024.06.07.597916",
+        "pmcid": "PMC11185720",
+        "pmid": "38895336"
+      },
+      "inventory_lineage_tags": [
+        "FROZEN_ATLAS"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [],
+        "measured_indeterminate": [
+          "P_MTORC1_SUPPRESSION"
+        ],
+        "not_measured": [
+          "P_COMPLEX_BINDING",
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_STEADY_STATE_ABUNDANCE",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_CLIPE_SCORE"
+        ]
+      },
+      "record_type": "publication",
+      "result": "R611Q CMAS was 0.345544328. It lies between the paper original thresholds 0.242 and 0.477 and is therefore measured-indeterminate under that calibration.",
+      "source_id": "PMID:38895336",
+      "source_lineage": {
+        "independence": "Methodologically independent of HEK293T overexpression; publication and MaveDB are the same dataset.",
+        "lineage_id": "L5_CALHOUN_MAVE"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "OPEN_ACCESS",
+        "license": "CC-BY-NC",
+        "license_verification_source": "NCBI PMC OA API",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11578170/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "STRUCTURAL_CONTEXT",
+      "citation": {
+        "authors": [
+          "Charles Bayly-Jones",
+          "Christopher J Lupton",
+          "Laura D'Andrea",
+          "Yong-Gang Chang",
+          "Gareth D Jones",
+          "Joel R Steele",
+          "Hari Venugopal",
+          "Ralf B Schittenhelm",
+          "Michelle L Halls",
+          "Andrew M Ellisdon"
+        ],
+        "journal": "Science advances",
+        "title": "Structure of the human TSC:WIPI3 lysosomal recruitment complex.",
+        "year": "2024"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "TSC2 chains A/B contain modeled ARG author residue 611; global resolution 2.9 Å",
+          "location": "RCSB entry and atom records",
+          "url": "https://www.rcsb.org/structure/9CE3"
+        },
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "complete human TSC in complex with WIPI3; no R611Q mutant or pocket analysis",
+          "location": "Article abstract",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11578170/"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q was not tested. The linked wild-type structure PDB 9CE3 models TSC2 residue 611.",
+      "experimental_or_observational_context": "Cryo-EM structure of human TSC:WIPI3 lysosomal recruitment complex.",
+      "identifiers": {
+        "doi": "10.1126/sciadv.adr5807",
+        "pmcid": "PMC11578170",
+        "pmid": "39565846"
+      },
+      "inventory_lineage_tags": [
+        "CONTRADICTION_ADDITION"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPOUND_RESCUE",
+          "P_DRUGGABLE_POCKET",
+          "P_MISFOLDING"
+        ],
+        "supported": [
+          "P_STRUCTURE_COVERAGE"
+        ]
+      },
+      "record_type": "publication",
+      "result": "PDB 9CE3 contains ARG at author residue 611 in TSC2 chains A and B; RCSB global resolution is 2.9 Å (publication abstract reports 2.8 Å).",
+      "source_id": "PMID:39565846",
+      "source_lineage": {
+        "independence": "Independent wild-type structural study.",
+        "lineage_id": "L12_STRUCTURAL"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "OPEN_ACCESS",
+        "license": "CC-BY",
+        "license_verification_source": "NCBI PMC OA API",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11593644/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_FUNCTIONAL",
+      "citation": {
+        "authors": [
+          "Luiz Gustavo Dufner-Almeida",
+          "Laís F M Cardozo",
+          "Mariana R Schwind",
+          "Danielly Carvalho",
+          "Juliana Paula G Almeida",
+          "Andrea Maria Cappellano",
+          "Thiago G P Alegria",
+          "Santoesha Nanhoe",
+          "Mark Nellist",
+          "Maria Rita Passos-Bueno",
+          "Silvana Chiavegatto",
+          "Nasjla S Silva",
+          "Sérgio Rosemberg",
+          "Ana Paula A Pereira",
+          "Sérgio Antônio Antoniuk",
+          "Luciana A Haddad"
+        ],
+        "journal": "Genes",
+        "title": "Molecular and Functional Assessment of TSC1 and TSC2 in Individuals with Tuberous Sclerosis Complex.",
+        "year": "2024"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "The variant p.R611Q (c.1832G>A) ... was employed as a positive control.",
+          "location": "Results before Figure 4",
+          "span_locator": "text-char:30941:31052",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11593644/"
+        },
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "the p.T509P, p.L847P, and p.R611Q variants were associated with reduced TSC1 and TSC2 signals",
+          "location": "Results, Figure 4A-C",
+          "span_locator": "text-char:31158:31266",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11593644/"
+        },
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "... unable to inactivate TORC1-dependent S6K-T389 phosphorylation, similar to ... p.R611Q",
+          "location": "Results, Figure 4A,E",
+          "span_locator": "text-char:31267:31477",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11593644/"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q was a reused positive control and was allele-named within grouped signal and TORC1-comparator statements.",
+      "experimental_or_observational_context": "3H9-1B1 TSC1:TSC2 double-knockout HEK293T cells; transient TSC2 variant, myc-TSC1 and S6K re-expression; immunoblot; two independent experiments.",
+      "identifiers": {
+        "doi": "10.3390/genes15111432",
+        "pmcid": "PMC11593644",
+        "pmid": "39596632"
+      },
+      "inventory_lineage_tags": [
+        "FROZEN_ATLAS",
+        "USER_NAMED"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": true,
+        "indirect_context": [],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_COMPLEX_BINDING",
+          "P_MTORC1_SUPPRESSION",
+          "P_STEADY_STATE_ABUNDANCE"
+        ]
+      },
+      "record_type": "publication",
+      "result": "R611Q was one of three variants associated with reduced TSC1 and TSC2 signals and served as the inactive comparator for S6K-T389 suppression.",
+      "source_id": "PMID:39596632",
+      "source_lineage": {
+        "independence": "Shared 3H9-1B1 reagent and assay family; not an independent R611Q allele-generation experiment.",
+        "lineage_id": "L2_NELLIST_3H9_DKO"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    },
+    {
+      "access": {
+        "full_text_access": "OPEN_ACCESS",
+        "license": "CC-BY",
+        "license_verification_source": "NCBI PMC OA API",
+        "primary_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11918493/",
+        "retrieved_or_checked": "2026-08-17"
+      },
+      "category": "DIRECT_CLINICAL_OR_TUMOR",
+      "citation": {
+        "authors": [
+          "Hannah D West",
+          "Mark Nellist",
+          "Rutger W W Brouwer",
+          "Mirjam C G N van den Hout-van Vroonhoven",
+          "Luiz Gustavo Dufner de Almeida",
+          "Femke Hendriks",
+          "Peter Elfferich",
+          "Meera Raja",
+          "Peter Giles",
+          "Rosa M Alfano",
+          "Angela Peron",
+          "Yves Sznajer",
+          "Liesbeth De Waele",
+          "Anna Jansen",
+          "Marije Koopmans",
+          "Anneke Kievit",
+          "Laura S Farach",
+          "Hope Northrup",
+          "Julian R Sampson",
+          "Laura E Thomas",
+          "Wilfred F J van IJcken"
+        ],
+        "journal": "Human mutation",
+        "title": "Targeted Genomic Sequencing of TSC1 and TSC2 Reveals Causal Variants in Individuals for Whom Previous Genetic Testing for Tuberous Sclerosis Complex Was Normal.",
+        "year": "2023"
+      },
+      "evidence_locations": [
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "1.7 ... TSC2 c.1832G>A, p.(Arg611Gln) ... 51%; 1.8 ... 54%",
+          "location": "Table 1",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11918493/"
+        },
+        {
+          "access_status": "PRIMARY_TEXT_ACCESSED",
+          "exact_span": "2.21 ... TSC2 c.1832G>A, p.(Arg611Gln) ... 1%",
+          "location": "Table 2",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11918493/"
+        }
+      ],
+      "exact_r611q_relevance": "R611Q was found in two likely germline cases and one low-level post-zygotic case after prior testing had been unrevealing.",
+      "experimental_or_observational_context": "Targeted HaloPlex genomic sequencing of TSC1/TSC2 in 155 individuals.",
+      "identifiers": {
+        "doi": "10.1155/2023/4899372",
+        "pmcid": "PMC11918493",
+        "pmid": "40225170"
+      },
+      "inventory_lineage_tags": [
+        "USER_NAMED"
+      ],
+      "notes": [],
+      "propositions": {
+        "contradicted": [],
+        "control_reuse": false,
+        "indirect_context": [],
+        "measured_indeterminate": [],
+        "not_measured": [
+          "P_COMPLEX_BINDING",
+          "P_COMPOUND_RESCUE",
+          "P_DEFINED_DEGRON",
+          "P_DRUGGABLE_POCKET",
+          "P_INTRINSIC_GAP_RESCUE",
+          "P_MISFOLDING",
+          "P_MTORC1_SUPPRESSION",
+          "P_STEADY_STATE_ABUNDANCE",
+          "P_TURNOVER_PROTEASOME"
+        ],
+        "supported": [
+          "P_CLINICAL_OCCURRENCE"
+        ]
+      },
+      "record_type": "publication",
+      "result": "Subjects 1.7 and 1.8 had about 51-54% VAF; subject 2.21 had about 1% VAF.",
+      "source_id": "PMID:40225170",
+      "source_lineage": {
+        "independence": "Independent targeted-sequencing cohort.",
+        "lineage_id": "L8_CLINICAL_COHORTS"
+      },
+      "verification_status": "VERIFIED_PRIMARY"
+    }
+  ],
+  "schema": "rescuescreen.r611q.master_source_inventory.v1",
+  "scope": {
+    "accepted_claim_count": 0,
+    "atlas_effect": "NONE",
+    "clinical_interpretation": "NONE",
+    "gate_8_status": "BLOCKED_HUMAN_REVIEW",
+    "purpose": "RescueScreen exploratory evidence synthesis only"
+  },
+  "source_lineages": [
+    {
+      "description": "Nellist/Erasmus parental-HEK293/HEK293T functional-assay and construct lineage; repeated positive-control use is not independent replication.",
+      "lineage_id": "L1_NELLIST_PARENTAL"
+    },
+    {
+      "description": "Nellist/Erasmus CRISPR 3H9-1B1 double-knockout assay generation reused across 2020-2024 papers.",
+      "lineage_id": "L2_NELLIST_3H9_DKO"
+    },
+    {
+      "description": "Independent Pam/MYCBP2 ubiquitination laboratory; imports the R611Q binding premise.",
+      "lineage_id": "L3_RAMESH_PAM"
+    },
+    {
+      "description": "Patient-621 R611Q-plus-LOH tumor and derivative 621-101/621-327 lineage; derivatives are not independent allele models.",
+      "lineage_id": "L4_HENSKE_621"
+    },
+    {
+      "description": "Independent endogenous cliPE program plus later integrated MAVE/VAMP work; publication and released datasets must be deduplicated.",
+      "lineage_id": "L5_CALHOUN_MAVE"
+    },
+    {
+      "description": "Independent COS-1 Rac1/ROS/motility study.",
+      "lineage_id": "L6_SUZUKI_RAC1"
+    },
+    {
+      "description": "External laboratory using R611Q plasmids supplied by Mark Nellist.",
+      "lineage_id": "L7_EXTERNAL_NELLIST_REAGENT"
+    },
+    {
+      "description": "Independent clinical molecular cohorts/cases; occurrence does not establish mechanism.",
+      "lineage_id": "L8_CLINICAL_COHORTS"
+    },
+    {
+      "description": "Independent tumor sequencing/two-hit contexts.",
+      "lineage_id": "L9_TUMOR_GENETICS"
+    },
+    {
+      "description": "Independent non-mTOR cell-cycle study; allele-specific extraction incomplete.",
+      "lineage_id": "L10_HENSKE_G1"
+    },
+    {
+      "description": "General HERC1/Hsp90/TSC1 proteostasis mechanisms without R611Q testing.",
+      "lineage_id": "L11_GENERAL_PROTEOSTASIS"
+    },
+    {
+      "description": "Wild-type structural and GAP-biochemistry studies; no mutant or ligand-bound R611Q structure.",
+      "lineage_id": "L12_STRUCTURAL"
+    }
+  ],
+  "variant": {
+    "aliases": [
+      "R611Q",
+      "G1832A",
+      "rs28934872"
+    ],
+    "gene": "TSC2",
+    "hgvs_c": "NM_000548.5:c.1832G>A",
+    "hgvs_p": "NP_000539.2:p.Arg611Gln",
+    "spdi": "NC_000016.10:2070570:G:A",
+    "uniprot": "P49815",
+    "uniprot_feature": "VAR_005650"
+  }
+}

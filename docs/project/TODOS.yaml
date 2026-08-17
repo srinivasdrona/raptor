@@ -1421,10 +1421,28 @@ todos:
     all-satisfied test fixture. This task cannot satisfy an entry gate, start S1, or
     change any Atlas claim, ACMG criterion, classification, screen, docking, compound,
     vendor, assay or treatment state.'
-  status: in_progress
+  status: done
   depends_on:
   - panel-products-rescuescreen-design
   created: '2026-08-16'
+- id: rescuescreen-r611q-literature-baseline
+  title: Freezing the RescueScreen R611Q literature baseline
+  description: 'Track: RESCUESCREEN / EVIDENCE DISCOVERY (exploratory, non-Atlas).
+    Completed 2026-08-17. A globally broadened, deduplicated R611Q inventory,
+    mechanism matrix, contradiction report, access-gap register and reproducible
+    search protocol are committed under data/rescuescreen/r611q/literature-v1/.
+    The bundle contains 33 publication records, two direct datasets and four
+    identity/structure records, all bound by manifest.sha256. It supports
+    context-limited hypotheses about impaired complex behaviour, lower
+    steady-state abundance, Pam-associated ubiquitination and impaired mTORC1
+    suppression while retaining explicit unknowns for misfolding, half-life,
+    degrons, intrinsic GAP rescue, mutant structure, ligandability and compound
+    rescue. This product does not modify the Atlas catalog, Gate 8, or
+    accepted_claim_count=0 and is not a classification or treatment artifact.'
+  status: done
+  depends_on:
+  - rescuescreen-entry-gate-status
+  created: '2026-08-17'
 - id: rescuescreen-mechanism-structure-gate
   title: Verifying the RescueScreen mechanism and structure entry gate
   description: 'Track: RESCUESCREEN / ENTRY (research-only; asserts no clinical result and
@@ -1444,6 +1462,7 @@ todos:
   status: blocked
   depends_on:
   - panel-products-rescuescreen-design
+  - rescuescreen-r611q-literature-baseline
   - atlas-phase2-human-span-review
   created: '2026-08-15'
 - id: rescuescreen-tool-licence-registry
