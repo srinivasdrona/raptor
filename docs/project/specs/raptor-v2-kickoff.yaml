@@ -839,8 +839,8 @@ first_implementation_slice:
     authorship:
       planner: escalation planner defines acceptance contract only
       test_author: Codex family writes RED tests from this file before code
-      doer: Sonnet family implements without weakening the RED tests
-      checker: GPT family independently runs tests and inspects the diff
+      doer: MAI-Code-1.1-Flash implements without weakening the RED tests
+      checker: Opus 5 independently runs tests and inspects the diff under human supervision
     required_test_groups:
       - strict schema, enum, unknown-key, duplicate-id, and typed-error tests
       - canonical registry and declaration hash properties
