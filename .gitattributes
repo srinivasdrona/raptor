@@ -13,3 +13,6 @@ src/raptor/eval/predictor_aggregation.py text eol=crlf
 src/raptor/eval/predictor_policy.py text eol=crlf
 src/raptor/eval/terminal_source.py text eol=crlf
 scripts/run_masked_holdout_eval.py text eol=crlf
+
+# RescueScreen literature bundles carry byte-level SHA-256 manifests.
+data/rescuescreen/r611q/literature-v1/* text eol=lf
