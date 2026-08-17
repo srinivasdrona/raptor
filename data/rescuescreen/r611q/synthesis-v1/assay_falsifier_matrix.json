@@ -1,0 +1,163 @@
+{
+  "schema": "rescuescreen.r611q.assay_falsifier_matrix.v1",
+  "status": "PROPOSED_WET_LAB_VALIDATION_LOGIC",
+  "variant": "NP_000539.2:p.Arg611Gln",
+  "assays": [
+    {
+      "assay_id": "AF-1",
+      "stage": "construct feasibility",
+      "question": "Can the selected TSC2 construct or complex be expressed and measured reproducibly?",
+      "minimum_conditions": [
+        "wild type",
+        "R611Q",
+        "matched expression and loading controls"
+      ],
+      "readouts": [
+        "recoverable protein abundance",
+        "assay quality and replicate variance",
+        "construct integrity"
+      ],
+      "advancement_condition": "A reproducible construct supports at least one protein-state assay and one complex or function assay.",
+      "falsifier": "No tractable construct or discriminating assay can be established.",
+      "routes": [
+        "RH-1",
+        "RH-2",
+        "RH-3",
+        "RH-0"
+      ]
+    },
+    {
+      "assay_id": "AF-2",
+      "stage": "baseline protein state",
+      "question": "Does R611Q alter abundance, half-life, ubiquitination, or proteasome dependence?",
+      "minimum_conditions": [
+        "wild type",
+        "R611Q",
+        "translation-chase condition",
+        "proteasome perturbation",
+        "vehicle control"
+      ],
+      "readouts": [
+        "steady-state TSC2 abundance",
+        "half-life",
+        "ubiquitination",
+        "proteasome-dependent rescue"
+      ],
+      "advancement_condition": "A reproducible R611Q-specific protein-state defect defines an assayable local-stabilization route.",
+      "falsifier": "R611Q has no reproducible protein-state defect under the declared conditions.",
+      "routes": [
+        "RH-1",
+        "RH-0"
+      ]
+    },
+    {
+      "assay_id": "AF-3",
+      "stage": "physical target engagement",
+      "question": "Does a later candidate physically engage the declared target or complex?",
+      "minimum_conditions": [
+        "candidate",
+        "vehicle",
+        "inactive structural analog where available",
+        "wild type",
+        "R611Q"
+      ],
+      "readouts": [
+        "nanoDSF or DSF as a screening signal where construct-compatible",
+        "one orthogonal direct-binding method such as SPR, BLI, MST, ITC, or an equivalent physical principle",
+        "CETSA as cellular target-engagement support where appropriate"
+      ],
+      "advancement_condition": "Target engagement reproduces and survives an orthogonal method and assay-interference controls.",
+      "falsifier": "Thermal or cellular stabilization does not reproduce as direct binding, or is explained by aggregation/interference.",
+      "routes": [
+        "RH-1",
+        "RH-2",
+        "RH-3"
+      ],
+      "threshold_rule": "No universal delta-Tm threshold is authorized; define the advancement threshold from assay variance, positive/negative controls, and preregistered sensitivity analysis."
+    },
+    {
+      "assay_id": "AF-4",
+      "stage": "complex rescue",
+      "question": "Does a later candidate increase R611Q TSC1-TSC2 complex formation without disrupting wild type?",
+      "minimum_conditions": [
+        "wild type",
+        "R611Q",
+        "TSC2-null",
+        "candidate",
+        "vehicle",
+        "inactive analog"
+      ],
+      "readouts": [
+        "co-immunoprecipitation or equivalent native-complex readout",
+        "TSC1 and TSC2 abundance in matched lysates"
+      ],
+      "advancement_condition": "R611Q complex formation improves reproducibly and wild-type complex formation is not impaired.",
+      "falsifier": "The candidate changes abundance or signaling without improving complex formation, or disrupts the wild-type complex.",
+      "routes": [
+        "RH-2",
+        "RH-3"
+      ]
+    },
+    {
+      "assay_id": "AF-5",
+      "stage": "target dependence",
+      "question": "Is the later candidate's functional effect dependent on TSC2?",
+      "minimum_conditions": [
+        "isogenic wild type",
+        "R611Q reconstitution",
+        "TSC2-null",
+        "downstream mTOR inhibitor control"
+      ],
+      "readouts": [
+        "Rheb-GTP or another GAP-proximal readout",
+        "phospho-S6K and phospho-S6 as downstream corroboration"
+      ],
+      "advancement_condition": "The prespecified R611Q rescue effect is absent or materially reduced in the TSC2-null condition and is consistent with a GAP-proximal change.",
+      "falsifier": "The pathway effect persists in TSC2-null cells or occurs without the route-specific protein/complex rescue.",
+      "routes": [
+        "RH-1",
+        "RH-2",
+        "RH-3"
+      ]
+    },
+    {
+      "assay_id": "AF-6",
+      "stage": "artifact and toxicity controls",
+      "question": "Is the apparent rescue explained by nonspecific chemistry or cellular toxicity?",
+      "minimum_conditions": [
+        "aggregation counter-screen",
+        "assay-interference counter-screen",
+        "cytotoxicity or viability",
+        "dose response",
+        "independent replicates and compound lots"
+      ],
+      "readouts": [
+        "route-specific rescue readout",
+        "artifact signals",
+        "cell viability"
+      ],
+      "advancement_condition": "The route-specific effect survives all declared controls with acceptable uncertainty.",
+      "falsifier": "The effect is attributable to aggregation, interference, reactivity, or cytotoxicity.",
+      "routes": [
+        "RH-1",
+        "RH-2",
+        "RH-3"
+      ]
+    }
+  ],
+  "ordering": [
+    "AF-1",
+    "AF-2",
+    "AF-3",
+    "AF-4",
+    "AF-5",
+    "AF-6"
+  ],
+  "interpretation_rules": [
+    "A thermal shift alone does not establish direct binding.",
+    "A downstream phospho-S6K or phospho-S6 change alone does not establish TSC2 rescue.",
+    "Activity in TSC2-null cells falsifies a claimed TSC2-dependent functional rescue but does not by itself disprove physical binding.",
+    "Negative and null results are complete outcomes and must not trigger post hoc threshold relaxation.",
+    "No assay result in this matrix is a treatment recommendation or patient-specific conclusion."
+  ]
+}

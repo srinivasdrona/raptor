@@ -1,0 +1,137 @@
+{
+  "schema": "rescuescreen.r611q.synthesis_traceability.v1",
+  "source_bundle": "../literature-v1",
+  "synthesis_artifacts": [
+    "mechanism_baseline.json",
+    "rescue_hypothesis_map.json",
+    "assay_falsifier_matrix.json",
+    "synthesis_report.md",
+    "wet_lab_feasibility_brief.md"
+  ],
+  "traceability": [
+    {
+      "synthesis_id": "MB-1",
+      "proposition_ids": [
+        "P_COMPLEX_BINDING"
+      ],
+      "source_ids": [
+        "PMID:18230340",
+        "PMID:18302728",
+        "PMID:18854862",
+        "PMID:26703369",
+        "PMID:39596632"
+      ]
+    },
+    {
+      "synthesis_id": "MB-2",
+      "proposition_ids": [
+        "P_STEADY_STATE_ABUNDANCE",
+        "P_VAMP_ABUNDANCE"
+      ],
+      "source_ids": [
+        "IGVF:IGVFFI9747KART",
+        "PMID:18854862",
+        "PMID:21309039",
+        "PMID:26703369",
+        "PMID:27216612",
+        "PMID:39596632"
+      ]
+    },
+    {
+      "synthesis_id": "MB-3",
+      "proposition_ids": [
+        "P_PAM_UBIQUITINATION",
+        "P_TURNOVER_PROTEASOME",
+        "P_DEFINED_DEGRON"
+      ],
+      "source_ids": [
+        "PMID:16464865",
+        "PMID:18308511",
+        "PMID:29127155"
+      ]
+    },
+    {
+      "synthesis_id": "MB-4",
+      "proposition_ids": [
+        "P_MTORC1_SUPPRESSION",
+        "P_CLIPE_SCORE"
+      ],
+      "source_ids": [
+        "MAVEDB:urn:mavedb:00001201-a-1",
+        "PMID:18302728",
+        "PMID:18854862",
+        "PMID:21309039",
+        "PMID:26703369",
+        "PMID:27216612",
+        "PMID:38895336",
+        "PMID:39596632"
+      ]
+    },
+    {
+      "synthesis_id": "MB-5",
+      "proposition_ids": [
+        "P_STRUCTURE_COVERAGE",
+        "P_DRUGGABLE_POCKET"
+      ],
+      "source_ids": [
+        "PDB:7DL2",
+        "PDB:9CE3",
+        "PMID:33436626",
+        "PMID:39565846"
+      ]
+    },
+    {
+      "synthesis_id": "RH-1",
+      "baseline_ids": [
+        "MB-2",
+        "MB-3",
+        "MB-5"
+      ],
+      "unknown_ids": [
+        "MU-1",
+        "MU-2",
+        "MU-3",
+        "MU-5"
+      ]
+    },
+    {
+      "synthesis_id": "RH-2",
+      "baseline_ids": [
+        "MB-1",
+        "MB-3",
+        "MB-4",
+        "MB-5"
+      ],
+      "unknown_ids": [
+        "MU-4",
+        "MU-5"
+      ]
+    },
+    {
+      "synthesis_id": "RH-3",
+      "baseline_ids": [
+        "MB-4",
+        "MB-5"
+      ],
+      "unknown_ids": [
+        "MU-4",
+        "MU-5"
+      ]
+    },
+    {
+      "synthesis_id": "RH-0",
+      "unknown_ids": [
+        "MU-1",
+        "MU-2",
+        "MU-4",
+        "MU-5"
+      ]
+    }
+  ],
+  "boundary": {
+    "atlas_gate_8_changed": false,
+    "accepted_claim_count_changed": false,
+    "classification_changed": false,
+    "stage_execution_authorized": false
+  }
+}

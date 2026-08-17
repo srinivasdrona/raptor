@@ -1443,6 +1443,23 @@ todos:
   depends_on:
   - rescuescreen-entry-gate-status
   created: '2026-08-17'
+- id: rescuescreen-r611q-synthesis-package
+  title: Synthesizing the R611Q RescueScreen mechanism baseline
+  description: 'Track: RESCUESCREEN / EVIDENCE SYNTHESIS (exploratory,
+    non-Atlas). Completed 2026-08-17. The literature-v1 evidence bundle is
+    translated into a traceable mechanism baseline, four-route rescue hypothesis
+    map, ordered assay/falsifier matrix, synthesis report and laboratory
+    feasibility brief under data/rescuescreen/r611q/synthesis-v1/. The package
+    supports local-stabilization, TSC1-TSC2-interface, distal-allosteric and
+    no-route hypotheses without selecting one, screening a compound or claiming
+    rescue. It records misfolding, half-life, degron exposure, intrinsic GAP
+    rescue, mutant structure and ligandability as unresolved. The package is
+    byte-bound by manifest.sha256 and does not change the Atlas catalog, Gate 8,
+    accepted_claim_count=0, classification or stage authorization.'
+  status: done
+  depends_on:
+  - rescuescreen-r611q-literature-baseline
+  created: '2026-08-17'
 - id: rescuescreen-mechanism-structure-gate
   title: Verifying the RescueScreen mechanism and structure entry gate
   description: 'Track: RESCUESCREEN / ENTRY (research-only; asserts no clinical result and
@@ -1463,6 +1480,7 @@ todos:
   depends_on:
   - panel-products-rescuescreen-design
   - rescuescreen-r611q-literature-baseline
+  - rescuescreen-r611q-synthesis-package
   - atlas-phase2-human-span-review
   created: '2026-08-15'
 - id: rescuescreen-tool-licence-registry

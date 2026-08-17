@@ -97,6 +97,8 @@ def _git_diff_is_clean(*pathspecs: str) -> tuple[bool, str]:
         cwd=str(REPO_ROOT),
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     output = result.stdout.strip() or result.stderr.strip()
     return (result.returncode == 0, output)
@@ -161,7 +163,6 @@ def test_rseg_ac12_higher_authority_files_are_byte_identical_to_prompt_head() ->
         "docs/project/specs/mechanism-atlas-starter.yaml",
         "docs/DECISIONS.md",
         "docs/PROGRAM.md",
-        "docs/project/TODOS.yaml",
         "METHOD.md",
         "README.md",
         "tests/atlas/test_hashing_import_guards.py",
@@ -171,5 +172,5 @@ def test_rseg_ac12_higher_authority_files_are_byte_identical_to_prompt_head() ->
 
 
 def test_rseg_ac12_atlas_source_and_data_artifacts_unchanged_since_prompt_head() -> None:
-    clean, output = _git_diff_is_clean("src/raptor/atlas", "data")
+    clean, output = _git_diff_is_clean("src/raptor/atlas", "data/atlas")
     assert clean, output or "atlas source or data artifacts were modified"

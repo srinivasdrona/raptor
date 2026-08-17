@@ -16,3 +16,4 @@ scripts/run_masked_holdout_eval.py text eol=crlf
 
 # RescueScreen literature bundles carry byte-level SHA-256 manifests.
 data/rescuescreen/r611q/literature-v1/* text eol=lf
+data/rescuescreen/r611q/synthesis-v1/* text eol=lf

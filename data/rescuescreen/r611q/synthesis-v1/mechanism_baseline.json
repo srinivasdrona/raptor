@@ -1,0 +1,206 @@
+{
+  "schema": "rescuescreen.r611q.mechanism_baseline.v1",
+  "status": "EXPLORATORY_SYNTHESIS_NOT_EXPERT_VALIDATED",
+  "cutoff_date": "2026-08-17",
+  "variant": {
+    "gene": "TSC2",
+    "hgvs_c": "NM_000548.5:c.1832G>A",
+    "hgvs_p": "NP_000539.2:p.Arg611Gln",
+    "spdi": "NC_000016.10:2070570:G:A",
+    "uniprot": "P49815"
+  },
+  "source_bundle": {
+    "path": "../literature-v1",
+    "inventory_schema": "rescuescreen.r611q.master_source_inventory.v1",
+    "matrix_schema": "rescuescreen.r611q.mechanism_evidence_matrix.v1",
+    "manifest_sha256": "3546b6e20fe0abd945f2079c381c6a9551d55c2c6d44dc8c573f1df4917020c3"
+  },
+  "atlas_boundary": {
+    "gate_8": "BLOCKED_HUMAN_REVIEW",
+    "accepted_claim_count": 0,
+    "changed_by_this_package": false
+  },
+  "baseline_findings": [
+    {
+      "finding_id": "MB-1",
+      "statement": "R611Q is associated with reduced TSC1 binding, TSC-complex formation, or complex-associated TSC1 abundance in the reported engineered systems.",
+      "evidence_status": "DIRECT_SUPPORT_CONTEXT_BOUND",
+      "exploratory_strength": "MODERATE",
+      "proposition_ids": [
+        "P_COMPLEX_BINDING"
+      ],
+      "direct_sources": [
+        "PMID:18230340",
+        "PMID:18302728"
+      ],
+      "supporting_grouped_or_control_sources": [
+        "PMID:18854862",
+        "PMID:26703369",
+        "PMID:39596632"
+      ],
+      "independent_lineages": [
+        "L1_NELLIST_PARENTAL",
+        "L6_SUZUKI_RAC1"
+      ],
+      "limitations": [
+        "Several later sources measure TSC1 or TSC2 signal rather than physical binding.",
+        "Repeated use of the same constructs, comparator allele, or assay lineage is not independent replication.",
+        "The systems are engineered overexpression or re-expression models, not endogenous heterozygous patient cells."
+      ]
+    },
+    {
+      "finding_id": "MB-2",
+      "statement": "R611Q has lower steady-state TSC2 abundance in multiple assay formats, including an independent VAMP-seq measurement.",
+      "evidence_status": "DIRECT_SUPPORT_ASSAY_DEPENDENT",
+      "exploratory_strength": "MODERATE",
+      "proposition_ids": [
+        "P_STEADY_STATE_ABUNDANCE",
+        "P_VAMP_ABUNDANCE"
+      ],
+      "direct_sources": [
+        "IGVF:IGVFFI9747KART",
+        "PMID:18854862",
+        "PMID:26703369",
+        "PMID:27216612"
+      ],
+      "supporting_grouped_or_control_sources": [
+        "PMID:21309039",
+        "PMID:39596632"
+      ],
+      "independent_lineages": [
+        "L1_NELLIST_PARENTAL",
+        "L5_CALHOUN_MAVE",
+        "L7_EXTERNAL_NELLIST_REAGENT"
+      ],
+      "limitations": [
+        "Steady-state abundance is not a direct measurement of folding, half-life, or degradation route.",
+        "VAMP-seq measures a GFP-fusion abundance phenotype.",
+        "The external laboratory used an R611Q plasmid supplied from the Nellist reagent lineage."
+      ]
+    },
+    {
+      "finding_id": "MB-3",
+      "statement": "R611Q remains susceptible to Pam/MYCBP2-associated ubiquitination despite TSC1 co-expression in one direct HEK293T experiment.",
+      "evidence_status": "DIRECT_SUPPORT_SINGLE_LAB",
+      "exploratory_strength": "LIMITED_DIRECT",
+      "proposition_ids": [
+        "P_PAM_UBIQUITINATION"
+      ],
+      "direct_sources": [
+        "PMID:18308511"
+      ],
+      "indirect_sources": [
+        "PMID:16464865",
+        "PMID:29127155"
+      ],
+      "independent_lineages": [
+        "L3_RAMESH_PAM",
+        "L11_GENERAL_PROTEOSTASIS"
+      ],
+      "limitations": [
+        "The direct R611Q ubiquitination result is from one laboratory and one engineered system.",
+        "The experiment did not measure R611Q-specific half-life, proteasome-dependent abundance rescue, a degron, or misfolding.",
+        "HERC1 and Hsp90 sources describe general TSC2 proteostasis and did not test R611Q."
+      ]
+    },
+    {
+      "finding_id": "MB-4",
+      "statement": "R611Q impairs TSC-complex-dependent suppression of mTORC1 readouts in several low-throughput assays.",
+      "evidence_status": "DIRECT_SUPPORT_WITH_LINEAGE_AND_CALIBRATION_DEPENDENCE",
+      "exploratory_strength": "MODERATE",
+      "proposition_ids": [
+        "P_MTORC1_SUPPRESSION",
+        "P_CLIPE_SCORE"
+      ],
+      "direct_sources": [
+        "PMID:18302728",
+        "PMID:18854862",
+        "PMID:26703369",
+        "PMID:27216612"
+      ],
+      "measured_indeterminate_sources": [
+        "MAVEDB:urn:mavedb:00001201-a-1",
+        "PMID:38895336"
+      ],
+      "independent_lineages": [
+        "L1_NELLIST_PARENTAL",
+        "L5_CALHOUN_MAVE",
+        "L7_EXTERNAL_NELLIST_REAGENT"
+      ],
+      "limitations": [
+        "Most low-throughput support shares assay and reagent ancestry.",
+        "The same cliPE score is indeterminate under the 2024 thresholds and abnormal under the 2026 cutoff.",
+        "Downstream phospho-S6K or phospho-S6 changes do not isolate complex formation, abundance, or intrinsic GAP activity."
+      ]
+    },
+    {
+      "finding_id": "MB-5",
+      "statement": "Wild-type experimental TSC-complex coordinates include TSC2 residue 611, providing a structural baseline but not an R611Q structure.",
+      "evidence_status": "STRUCTURAL_CONTEXT_ONLY",
+      "exploratory_strength": "DIRECT_WILDTYPE_CONTEXT",
+      "proposition_ids": [
+        "P_STRUCTURE_COVERAGE",
+        "P_DRUGGABLE_POCKET"
+      ],
+      "direct_sources": [
+        "PDB:7DL2",
+        "PDB:9CE3"
+      ],
+      "publication_sources": [
+        "PMID:33436626",
+        "PMID:39565846"
+      ],
+      "independent_lineages": [
+        "L12_STRUCTURAL"
+      ],
+      "limitations": [
+        "Neither structure contains the R611Q mutant.",
+        "Residue inclusion does not establish local side-chain density, a defined TSC1 contact, ligandability, or a mutant-created pocket.",
+        "Local map quality, chain numbering, construct boundaries, alternate conformers, and assembly assumptions require explicit assessment."
+      ]
+    }
+  ],
+  "unsupported_or_not_measured": [
+    {
+      "unknown_id": "MU-1",
+      "statement": "R611Q directly misfolds, aggregates, or exposes a hydrophobic patch.",
+      "proposition_id": "P_MISFOLDING"
+    },
+    {
+      "unknown_id": "MU-2",
+      "statement": "R611Q has a shortened half-life or demonstrated proteasome-dependent turnover.",
+      "proposition_id": "P_TURNOVER_PROTEASOME"
+    },
+    {
+      "unknown_id": "MU-3",
+      "statement": "R611Q creates or exposes a defined degron.",
+      "proposition_id": "P_DEFINED_DEGRON"
+    },
+    {
+      "unknown_id": "MU-4",
+      "statement": "R611Q retains intrinsic Rheb-GAP activity after abundance and complex formation are restored.",
+      "proposition_id": "P_INTRINSIC_GAP_RESCUE"
+    },
+    {
+      "unknown_id": "MU-5",
+      "statement": "R611Q has a validated ligandable pocket or a defined Arg611-TSC1 contact.",
+      "proposition_id": "P_DRUGGABLE_POCKET"
+    },
+    {
+      "unknown_id": "MU-6",
+      "statement": "A compound directly binds, stabilizes, or rescues R611Q TSC2.",
+      "proposition_id": "P_COMPOUND_RESCUE"
+    }
+  ],
+  "mechanism_decision": {
+    "current_classification": "MULTI_ROUTE_RESCUE_HYPOTHESIS_MERITED",
+    "rationale": "The corpus supports impaired complex behavior and lower steady-state abundance, with one direct ubiquitination result, but does not determine whether the primary remediable defect is local instability, interface disruption, distal allostery, or no structurally addressable route.",
+    "does_not_authorize": [
+      "compound screening",
+      "stage execution",
+      "clinical interpretation",
+      "Atlas claim promotion",
+      "treatment or combination recommendations"
+    ]
+  }
+}

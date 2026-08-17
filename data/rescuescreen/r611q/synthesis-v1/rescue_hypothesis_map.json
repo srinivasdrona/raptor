@@ -1,0 +1,113 @@
+{
+  "schema": "rescuescreen.r611q.rescue_hypothesis_map.v1",
+  "status": "EXPLORATORY_HYPOTHESES_NOT_RESULTS",
+  "variant": "NP_000539.2:p.Arg611Gln",
+  "input_baseline": "mechanism_baseline.json",
+  "routes": [
+    {
+      "route_id": "RH-1",
+      "name": "local mutant stabilization",
+      "hypothesis": "A molecule binding a reproducible local or nearby allosteric site may increase the stable cellular abundance of R611Q TSC2.",
+      "current_support": [
+        "MB-2",
+        "MB-3",
+        "MB-5"
+      ],
+      "status": "PLAUSIBLE_NOT_DEMONSTRATED",
+      "minimum_computational_tests": [
+        "Verify exact residue and chain mapping in PDB 7DL2 and 9CE3.",
+        "Assess local map quality and modeled atoms around residue 611.",
+        "Generate a restrained R611Q structural ensemble without treating predicted differences as evidence.",
+        "Compare solvent exposure, local contacts, flexibility, and pockets across wild-type and mutant ensembles with at least two methods."
+      ],
+      "minimum_laboratory_tests": [
+        "Measure R611Q abundance and half-life relative to wild type.",
+        "Test proteasome dependence and R611Q ubiquitination.",
+        "Confirm direct target engagement with at least two orthogonal physical principles before interpreting stabilization."
+      ],
+      "falsifiers": [
+        "No reproducible local structural perturbation or persistent ligandable site is detected.",
+        "A candidate binds but does not improve R611Q abundance, half-life, or the prespecified protein-state readout.",
+        "The apparent effect is aggregation, assay interference, or general proteostasis modulation."
+      ]
+    },
+    {
+      "route_id": "RH-2",
+      "name": "TSC1-TSC2 interface stabilization",
+      "hypothesis": "A molecule binding at or allosterically coupled to the TSC1-TSC2 interface may increase R611Q complex formation.",
+      "current_support": [
+        "MB-1",
+        "MB-3",
+        "MB-4",
+        "MB-5"
+      ],
+      "status": "PLAUSIBLE_NOT_DEMONSTRATED",
+      "minimum_computational_tests": [
+        "Map residue 611 relative to the experimentally modeled TSC1-TSC2 interface without assuming a salt bridge.",
+        "Compare interface geometry and pocket persistence across experimental conformers and restrained mutant models.",
+        "Separate a mutant-only pocket from a site shared with wild type.",
+        "Counter-screen hypotheses for predicted disruption of the native wild-type complex."
+      ],
+      "minimum_laboratory_tests": [
+        "Measure TSC1-TSC2 complex formation directly by co-immunoprecipitation or an equivalent native-complex method.",
+        "Measure R611Q and TSC1 abundance in the same experiment.",
+        "Test target dependence in wild-type, R611Q, and TSC2-null backgrounds."
+      ],
+      "falsifiers": [
+        "Residue 611 is not structurally coupled to an addressable interface site.",
+        "A candidate destabilizes wild-type complex formation.",
+        "A candidate changes downstream signaling without improving R611Q complex formation."
+      ]
+    },
+    {
+      "route_id": "RH-3",
+      "name": "distal allosteric stabilization",
+      "hypothesis": "A molecule binding a distal TSC2 site may favor a complex-competent and GAP-competent state without binding near residue 611.",
+      "current_support": [
+        "MB-4",
+        "MB-5"
+      ],
+      "status": "SPECULATIVE_GENERAL_MECHANISM_ONLY",
+      "minimum_computational_tests": [
+        "Identify reproducible distal pockets and plausible coupling paths in the experimental ensemble.",
+        "Demonstrate that the proposed site is not selected solely because one scoring method ranks it highly.",
+        "Evaluate structural effects on both wild-type and R611Q ensembles."
+      ],
+      "minimum_laboratory_tests": [
+        "Confirm direct binding.",
+        "Measure complex formation and a Rheb-GAP-proximal readout.",
+        "Demonstrate that any pathway effect is lost or materially reduced in a TSC2-null counter-screen."
+      ],
+      "falsifiers": [
+        "No reproducible coupling between the site and complex/GAP state is observed.",
+        "The candidate suppresses mTORC1 equally in TSC2-null cells.",
+        "The candidate binds but does not improve complex or GAP-proximal function."
+      ]
+    },
+    {
+      "route_id": "RH-0",
+      "name": "no structurally plausible rescue route",
+      "hypothesis": "The R611Q phenotype may not be addressable by a small-molecule structural rescue strategy.",
+      "current_support": [
+        "MU-1",
+        "MU-2",
+        "MU-4",
+        "MU-5"
+      ],
+      "status": "MANDATORY_NULL_ROUTE",
+      "minimum_computational_tests": [
+        "Apply the same ensemble, pocket, uncertainty, and method-agreement rules used for positive routes.",
+        "Report absent, unstable, inaccessible, or method-disagreed sites without lowering thresholds post hoc."
+      ],
+      "minimum_laboratory_tests": [
+        "Establish whether R611Q has a remediable abundance, turnover, complex, or intrinsic-function defect.",
+        "Terminate if no tractable construct or discriminating assay exists."
+      ],
+      "falsifiers": [
+        "A reproducible site and route-specific laboratory assay are both established."
+      ]
+    }
+  ],
+  "routing_rule": "No route advances to a calibrated compound pilot until it has a reproducible structural site, an assay capable of falsifying the proposed rescue mechanism, and a lawful per-artifact tool/data plan.",
+  "selection_rule": "Routes may coexist. The synthesis does not select a winning route and treats RH-0 as an equally valid outcome."
+}
