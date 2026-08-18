@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import re
 import subprocess
 from pathlib import Path
 
@@ -84,8 +85,27 @@ def _import_names(tree: ast.AST) -> set[str]:
 
 
 def _git_diff_is_clean(*pathspecs: str) -> tuple[bool, str]:
+    git_context: list[str] = []
+    dot_git = REPO_ROOT / ".git"
+    if dot_git.is_file():
+        declaration = dot_git.read_text(encoding="utf-8").strip()
+        assert declaration.startswith("gitdir: "), f"unexpected .git file: {declaration!r}"
+        raw_git_dir = declaration.removeprefix("gitdir: ").strip()
+        windows_path = re.fullmatch(r"([A-Za-z]):[\\/](.*)", raw_git_dir)
+        if windows_path and Path("/proc/version").is_file():
+            git_dir = (
+                Path("/mnt")
+                / windows_path.group(1).lower()
+                / Path(windows_path.group(2).replace("\\", "/"))
+            )
+        else:
+            declared = Path(raw_git_dir)
+            git_dir = declared if declared.is_absolute() else (REPO_ROOT / declared).resolve()
+        git_context = [f"--git-dir={git_dir}", f"--work-tree={REPO_ROOT}"]
+
     cmd = [
         "git",
+        *git_context,
         "diff",
         "--exit-code",
         f"{BASELINE_HEAD}..HEAD",
