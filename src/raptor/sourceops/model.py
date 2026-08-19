@@ -77,6 +77,14 @@ class SourceBlockedError(SourceOpsError):
     code = "SOURCE_BLOCKED"
 
 
+class StagedSnapshotError(SourceOpsError):
+    code = "STAGED_SNAPSHOT_ERROR"
+
+
+class VerificationArtifactError(SourceOpsError):
+    code = "VERIFICATION_ARTIFACT_ERROR"
+
+
 def _require_mapping(value: Any, label: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise RegistrySchemaError(f"{label} must be a mapping")
@@ -537,6 +545,444 @@ class Registry:
 
     def as_dict(self) -> JsonObject:
         return {"schema": self.schema, "registry_id": self.registry_id, "registry_version": self.registry_version, "created_at": self.created_at, "registry_content_hash": self.registry_content_hash, "hash_basis": self.hash_basis, "source_records": [item.as_dict() for item in self.source_records], "consumers": [item.as_dict() for item in self.consumers], "coverage_exclusions": [item.as_dict() for item in self.coverage_exclusions], "preservation_rules": [item.as_dict() for item in self.preservation_rules]}
+
+
+@dataclass(frozen=True, slots=True)
+class ManifestChecksum:
+    mode: str
+    raw_byte_size: int | None = None
+    raw_sha256: str | None = None
+    canonical_lf_utf8_bytes: int | None = None
+    canonical_lf_sha256: str | None = None
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "ManifestChecksum":
+        mapping = _require_mapping(data, "checksum")
+        fields = {"mode", "raw_byte_size", "raw_sha256", "canonical_lf_utf8_bytes", "canonical_lf_sha256"}
+        if set(mapping) != fields:
+            raise RegistrySchemaError("checksum has unknown keys")
+        return cls(
+            mode=_require_str(mapping["mode"], "checksum.mode"),
+            raw_byte_size=None if mapping.get("raw_byte_size") is None else int(mapping["raw_byte_size"]),
+            raw_sha256=None if mapping.get("raw_sha256") is None else _require_str(mapping["raw_sha256"], "checksum.raw_sha256"),
+            canonical_lf_utf8_bytes=None if mapping.get("canonical_lf_utf8_bytes") is None else int(mapping["canonical_lf_utf8_bytes"]),
+            canonical_lf_sha256=None if mapping.get("canonical_lf_sha256") is None else _require_str(mapping["canonical_lf_sha256"], "checksum.canonical_lf_sha256"),
+        )
+
+    def as_dict(self) -> JsonObject:
+        return {
+            "mode": self.mode,
+            "raw_byte_size": self.raw_byte_size,
+            "raw_sha256": self.raw_sha256,
+            "canonical_lf_utf8_bytes": self.canonical_lf_utf8_bytes,
+            "canonical_lf_sha256": self.canonical_lf_sha256,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ManifestFile:
+    file_id: str
+    path: str
+    role: str
+    media_type: str
+    checksum: ManifestChecksum
+    component_ids: tuple[str, ...]
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "ManifestFile":
+        mapping = _require_mapping(data, "file")
+        required = {"file_id", "path", "role", "media_type", "checksum", "component_ids"}
+        if required - set(mapping):
+            raise RegistrySchemaError("file missing required keys")
+        if set(mapping) - required:
+            raise RegistrySchemaError("file has unknown keys")
+        return cls(
+            file_id=_require_str(mapping["file_id"], "file.file_id"),
+            path=_require_str(mapping["path"], "file.path"),
+            role=_require_str(mapping["role"], "file.role"),
+            media_type=_require_str(mapping["media_type"], "file.media_type"),
+            checksum=ManifestChecksum.from_mapping(mapping["checksum"]),
+            component_ids=tuple(_require_str(item, "file.component_ids[]") for item in _require_list(mapping["component_ids"], "file.component_ids")),
+        )
+
+    def as_dict(self) -> JsonObject:
+        return {"file_id": self.file_id, "path": self.path, "role": self.role, "media_type": self.media_type, "checksum": self.checksum.as_dict(), "component_ids": list(self.component_ids)}
+
+
+@dataclass(frozen=True, slots=True)
+class ManifestContentBinding:
+    binding_id: str
+    baseline_kind: str
+    baseline_id: str | None
+    candidate_file_id: str | None
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "ManifestContentBinding":
+        mapping = _require_mapping(data, "content_binding")
+        required = {"binding_id", "baseline_kind", "baseline_id", "candidate_file_id"}
+        if required - set(mapping):
+            raise RegistrySchemaError("content_binding missing required keys")
+        if set(mapping) - required:
+            raise RegistrySchemaError("content_binding has unknown keys")
+        baseline_id = mapping.get("baseline_id")
+        candidate_file_id = mapping.get("candidate_file_id")
+        if baseline_id is not None:
+            baseline_id = _require_str(baseline_id, "content_binding.baseline_id")
+        if candidate_file_id is not None:
+            candidate_file_id = _require_str(candidate_file_id, "content_binding.candidate_file_id")
+        return cls(
+            binding_id=_require_str(mapping["binding_id"], "content_binding.binding_id"),
+            baseline_kind=_require_str(mapping["baseline_kind"], "content_binding.baseline_kind"),
+            baseline_id=baseline_id,
+            candidate_file_id=candidate_file_id,
+        )
+
+    def as_dict(self) -> JsonObject:
+        return {"binding_id": self.binding_id, "baseline_kind": self.baseline_kind, "baseline_id": self.baseline_id, "candidate_file_id": self.candidate_file_id}
+
+
+@dataclass(frozen=True, slots=True)
+class ComponentProjectionEntry:
+    component_id: str
+    display_name: str
+    source_role: str
+    version_or_snapshot: str
+    licence_status: str
+    declaration_locator: str
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "ComponentProjectionEntry":
+        mapping = _require_mapping(data, "component_projection_entry")
+        required = {"component_id", "display_name", "source_role", "version_or_snapshot", "licence_status", "declaration_locator"}
+        if required - set(mapping):
+            raise RegistrySchemaError("component_projection_entry missing required keys")
+        if set(mapping) - required:
+            raise RegistrySchemaError("component_projection_entry has unknown keys")
+        return cls(
+            component_id=_require_str(mapping["component_id"], "component_projection_entry.component_id"),
+            display_name=_require_str(mapping["display_name"], "component_projection_entry.display_name"),
+            source_role=_require_str(mapping["source_role"], "component_projection_entry.source_role"),
+            version_or_snapshot=_require_str(mapping["version_or_snapshot"], "component_projection_entry.version_or_snapshot"),
+            licence_status=_require_str(mapping["licence_status"], "component_projection_entry.licence_status"),
+            declaration_locator=_require_str(mapping["declaration_locator"], "component_projection_entry.declaration_locator"),
+        )
+
+    def as_dict(self) -> JsonObject:
+        return {"component_id": self.component_id, "display_name": self.display_name, "source_role": self.source_role, "version_or_snapshot": self.version_or_snapshot, "licence_status": self.licence_status, "declaration_locator": self.declaration_locator}
+
+
+@dataclass(frozen=True, slots=True)
+class ManifestComponentProjection:
+    mode: str
+    components: tuple[ComponentProjectionEntry, ...]
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "ManifestComponentProjection":
+        mapping = _require_mapping(data, "component_projection")
+        required = {"mode", "components"}
+        if required - set(mapping):
+            raise RegistrySchemaError("component_projection missing required keys")
+        if set(mapping) - required:
+            raise RegistrySchemaError("component_projection has unknown keys")
+        return cls(
+            mode=_require_str(mapping["mode"], "component_projection.mode"),
+            components=tuple(ComponentProjectionEntry.from_mapping(item) for item in _require_list(mapping["components"], "component_projection.components")),
+        )
+
+    def as_dict(self) -> JsonObject:
+        return {"mode": self.mode, "components": [item.as_dict() for item in self.components]}
+
+
+@dataclass(frozen=True, slots=True)
+class SourceBinding:
+    source_id: str
+    registry_content_hash: str
+    declaration_refs: tuple[DeclarationReference, ...]
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "SourceBinding":
+        mapping = _require_mapping(data, "source_binding")
+        required = {"source_id", "registry_content_hash", "declaration_refs"}
+        if required - set(mapping):
+            raise RegistrySchemaError("source_binding missing required keys")
+        if set(mapping) - required:
+            raise RegistrySchemaError("source_binding has unknown keys")
+        return cls(
+            source_id=_require_str(mapping["source_id"], "source_binding.source_id"),
+            registry_content_hash=_require_str(mapping["registry_content_hash"], "source_binding.registry_content_hash"),
+            declaration_refs=tuple(DeclarationReference.from_mapping(item) for item in _require_list(mapping["declaration_refs"], "source_binding.declaration_refs")),
+        )
+
+    def as_dict(self) -> JsonObject:
+        return {
+            "source_id": self.source_id,
+            "registry_content_hash": self.registry_content_hash,
+            "declaration_refs": [item.as_dict() for item in self.declaration_refs],
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class CandidateIdentity:
+    display_name: str
+    record_kind: str
+    owner: str
+    authoritative_locator: str
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "CandidateIdentity":
+        mapping = _require_mapping(data, "candidate.identity")
+        required = {"display_name", "record_kind", "owner", "authoritative_locator"}
+        if required - set(mapping):
+            raise RegistrySchemaError("candidate.identity missing required keys")
+        if set(mapping) - required:
+            raise RegistrySchemaError("candidate.identity has unknown keys")
+        return cls(
+            display_name=_require_str(mapping["display_name"], "candidate.identity.display_name"),
+            record_kind=_require_str(mapping["record_kind"], "candidate.identity.record_kind"),
+            owner=_require_str(mapping["owner"], "candidate.identity.owner"),
+            authoritative_locator=_require_str(mapping["authoritative_locator"], "candidate.identity.authoritative_locator"),
+        )
+
+    def as_dict(self) -> JsonObject:
+        return {"display_name": self.display_name, "record_kind": self.record_kind, "owner": self.owner, "authoritative_locator": self.authoritative_locator}
+
+
+@dataclass(frozen=True, slots=True)
+class CandidateRelease:
+    version_or_snapshot: str
+    release_date: str | None
+    retrieved_at: str
+    content_pin_status: str
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "CandidateRelease":
+        mapping = _require_mapping(data, "candidate.release")
+        required = {"version_or_snapshot", "release_date", "retrieved_at", "content_pin_status"}
+        if required - set(mapping):
+            raise RegistrySchemaError("candidate.release missing required keys")
+        if set(mapping) - required:
+            raise RegistrySchemaError("candidate.release has unknown keys")
+        return cls(
+            version_or_snapshot=_require_str(mapping["version_or_snapshot"], "candidate.release.version_or_snapshot"),
+            release_date=None if mapping.get("release_date") is None else _require_str(mapping["release_date"], "candidate.release.release_date"),
+            retrieved_at=_require_str(mapping["retrieved_at"], "candidate.release.retrieved_at"),
+            content_pin_status=_require_str(mapping["content_pin_status"], "candidate.release.content_pin_status"),
+        )
+
+    def as_dict(self) -> JsonObject:
+        return {"version_or_snapshot": self.version_or_snapshot, "release_date": self.release_date, "retrieved_at": self.retrieved_at, "content_pin_status": self.content_pin_status}
+
+
+@dataclass(frozen=True, slots=True)
+class CandidateLicence:
+    status: str
+    identifier_or_family: str
+    terms_locator: str
+    permitted_use: str
+    redistribution: str
+    cloud_egress: str
+    verification_basis: str
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "CandidateLicence":
+        mapping = _require_mapping(data, "candidate.licence")
+        required = {"status", "identifier_or_family", "terms_locator", "permitted_use", "redistribution", "cloud_egress", "verification_basis"}
+        if required - set(mapping):
+            raise RegistrySchemaError("candidate.licence missing required keys")
+        if set(mapping) - required:
+            raise RegistrySchemaError("candidate.licence has unknown keys")
+        return cls(
+            status=_require_str(mapping["status"], "candidate.licence.status"),
+            identifier_or_family=_require_str(mapping["identifier_or_family"], "candidate.licence.identifier_or_family"),
+            terms_locator=_require_str(mapping["terms_locator"], "candidate.licence.terms_locator"),
+            permitted_use=_require_str(mapping["permitted_use"], "candidate.licence.permitted_use"),
+            redistribution=_require_str(mapping["redistribution"], "candidate.licence.redistribution"),
+            cloud_egress=_require_str(mapping["cloud_egress"], "candidate.licence.cloud_egress"),
+            verification_basis=_require_str(mapping["verification_basis"], "candidate.licence.verification_basis"),
+        )
+
+    def as_dict(self) -> JsonObject:
+        return {"status": self.status, "identifier_or_family": self.identifier_or_family, "terms_locator": self.terms_locator, "permitted_use": self.permitted_use, "redistribution": self.redistribution, "cloud_egress": self.cloud_egress, "verification_basis": self.verification_basis}
+
+
+@dataclass(frozen=True, slots=True)
+class CandidateAcquisition:
+    method: str
+    operator_contract: str
+    writes_outside_repository: bool
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "CandidateAcquisition":
+        mapping = _require_mapping(data, "candidate.acquisition")
+        required = {"method", "operator_contract", "writes_outside_repository"}
+        if required - set(mapping):
+            raise RegistrySchemaError("candidate.acquisition missing required keys")
+        if set(mapping) - required:
+            raise RegistrySchemaError("candidate.acquisition has unknown keys")
+        return cls(
+            method=_require_str(mapping["method"], "candidate.acquisition.method"),
+            operator_contract=_require_str(mapping["operator_contract"], "candidate.acquisition.operator_contract"),
+            writes_outside_repository=_require_bool(mapping["writes_outside_repository"], "candidate.acquisition.writes_outside_repository"),
+        )
+
+    def as_dict(self) -> JsonObject:
+        return {"method": self.method, "operator_contract": self.operator_contract, "writes_outside_repository": self.writes_outside_repository}
+
+
+@dataclass(frozen=True, slots=True)
+class Candidate:
+    snapshot_id: str
+    identity: CandidateIdentity
+    release: CandidateRelease
+    licence: CandidateLicence
+    acquisition: CandidateAcquisition
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "Candidate":
+        mapping = _require_mapping(data, "candidate")
+        required = {"snapshot_id", "identity", "release", "licence", "acquisition"}
+        if required - set(mapping):
+            raise RegistrySchemaError("candidate missing required keys")
+        if set(mapping) - required:
+            raise RegistrySchemaError("candidate has unknown keys")
+        return cls(
+            snapshot_id=_require_str(mapping["snapshot_id"], "candidate.snapshot_id"),
+            identity=CandidateIdentity.from_mapping(mapping["identity"]),
+            release=CandidateRelease.from_mapping(mapping["release"]),
+            licence=CandidateLicence.from_mapping(mapping["licence"]),
+            acquisition=CandidateAcquisition.from_mapping(mapping["acquisition"]),
+        )
+
+    def as_dict(self) -> JsonObject:
+        return {
+            "snapshot_id": self.snapshot_id,
+            "identity": self.identity.as_dict(),
+            "release": self.release.as_dict(),
+            "licence": self.licence.as_dict(),
+            "acquisition": self.acquisition.as_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ManifestDocument:
+    schema: str
+    manifest_content_hash: str
+    hash_basis: str
+    observed_at: str
+    source_binding: SourceBinding
+    candidate: Candidate
+    files: tuple[ManifestFile, ...]
+    content_bindings: tuple[ManifestContentBinding, ...]
+    component_projection: ManifestComponentProjection | None
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "ManifestDocument":
+        mapping = _require_mapping(data, "manifest")
+        required = {"schema", "manifest_content_hash", "hash_basis", "observed_at", "source_binding", "candidate", "files", "content_bindings", "component_projection"}
+        if required - set(mapping):
+            raise RegistrySchemaError("manifest missing required keys")
+        if set(mapping) - required:
+            raise RegistrySchemaError("manifest has unknown keys")
+        files = tuple(ManifestFile.from_mapping(item) for item in _require_list(mapping["files"], "manifest.files"))
+        bindings = tuple(ManifestContentBinding.from_mapping(item) for item in _require_list(mapping["content_bindings"], "manifest.content_bindings"))
+        projection = None if mapping.get("component_projection") is None else ManifestComponentProjection.from_mapping(mapping["component_projection"])
+        return cls(
+            schema=_require_str(mapping["schema"], "manifest.schema"),
+            manifest_content_hash=_require_str(mapping["manifest_content_hash"], "manifest.manifest_content_hash"),
+            hash_basis=_require_str(mapping["hash_basis"], "manifest.hash_basis"),
+            observed_at=_require_str(mapping["observed_at"], "manifest.observed_at"),
+            source_binding=SourceBinding.from_mapping(mapping["source_binding"]),
+            candidate=Candidate.from_mapping(mapping["candidate"]),
+            files=files,
+            content_bindings=bindings,
+            component_projection=projection,
+        )
+
+    def as_dict(self) -> JsonObject:
+        payload: JsonObject = {
+            "schema": self.schema,
+            "manifest_content_hash": self.manifest_content_hash,
+            "hash_basis": self.hash_basis,
+            "observed_at": self.observed_at,
+            "source_binding": self.source_binding.as_dict(),
+            "candidate": self.candidate.as_dict(),
+            "files": [item.as_dict() for item in self.files],
+            "content_bindings": [item.as_dict() for item in self.content_bindings],
+        }
+        payload["component_projection"] = None if self.component_projection is None else self.component_projection.as_dict()
+        return payload
+
+
+@dataclass(frozen=True, slots=True)
+class CliResult:
+    schema: str
+    command: str
+    run_status: str
+    input_validity: str
+    stage_outcome: str | None
+    source_id: str | None
+    registry_content_hash: str | None
+    manifest_content_hash: str | None
+    verification_artifact: dict[str, Any] | None
+    diff_artifact: dict[str, Any] | None
+    error: dict[str, Any] | None
+    validation_ceiling: str
+
+    def __getitem__(self, key: str) -> Any:
+        return self.as_dict()[key]
+
+    def __iter__(self):
+        return iter(self.as_dict())
+
+    def __len__(self) -> int:
+        return len(self.as_dict())
+
+    def __contains__(self, key: object) -> bool:
+        return key in self.as_dict()
+
+    def keys(self):
+        return self.as_dict().keys()
+
+    def items(self):
+        return self.as_dict().items()
+
+    def values(self):
+        return self.as_dict().values()
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self.as_dict().get(key, default)
+
+    def as_dict(self) -> JsonObject:
+        return {
+            "schema": self.schema,
+            "command": self.command,
+            "run_status": self.run_status,
+            "input_validity": self.input_validity,
+            "stage_outcome": self.stage_outcome,
+            "source_id": self.source_id,
+            "registry_content_hash": self.registry_content_hash,
+            "manifest_content_hash": self.manifest_content_hash,
+            "verification_artifact": self.verification_artifact,
+            "diff_artifact": self.diff_artifact,
+            "error": self.error,
+            "validation_ceiling": self.validation_ceiling,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class VerifyStageResult:
+    exit_code: int
+    report: CliResult
+
+    def __iter__(self):
+        # Attribute access (``result.report``) exposes the typed, immutable
+        # ``CliResult`` unchanged. Tuple unpacking (``code, report =
+        # verify_stage(...)``) instead yields the plain JSON-serializable
+        # dict payload, matching the shape callers see over the CLI/JSON
+        # boundary so it can be passed straight to ``json.dumps`` (e.g. for
+        # asserting no raw exception text leaked into the report).
+        yield self.exit_code
+        yield self.report.as_dict()
 
 
 @dataclass(frozen=True)

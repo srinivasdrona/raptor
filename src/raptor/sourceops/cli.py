@@ -3,10 +3,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
 from raptor.sourceops.registry import VALIDATION_CEILING, VALIDATION_SCHEMA_ID, load_registry, status_for_consumer, validate_registry
+from raptor.sourceops.staged_snapshot import _cli_error_payload, _main_verify_cli, _serialize_json
 
 
 def _emit(payload: dict[str, Any]) -> None:
@@ -65,6 +67,11 @@ def _status(path: str | os.PathLike[str], consumer_id: str) -> tuple[int, dict[s
 
 
 def main(argv: list[str] | None = None) -> int:
+    args = list(sys.argv[1:] if argv is None else argv)
+
+    if args and args[0] == "verify-stage":
+        return _main_verify_cli(args[1:])
+
     parser = argparse.ArgumentParser(prog="raptor.sourceops.cli")
     subparsers = parser.add_subparsers(dest="command", required=True)
     validate_parser = subparsers.add_parser("validate")
@@ -72,14 +79,21 @@ def main(argv: list[str] | None = None) -> int:
     status_parser = subparsers.add_parser("status")
     status_parser.add_argument("--registry", required=True)
     status_parser.add_argument("--consumer", required=True)
-    args = parser.parse_args(argv)
+    verify_parser = subparsers.add_parser("verify-stage")
+    verify_parser.add_argument("--registry", required=True)
+    verify_parser.add_argument("--staging-root", required=True)
+    try:
+        parsed = parser.parse_args(args)
+    except SystemExit as exc:
+        # Keep validate/status compatibility and avoid stderr for the new verify-stage command.
+        return 2 if exc.code is None else int(exc.code)
 
-    if args.command == "validate":
-        code, report = _validate(args.registry)
+    if parsed.command == "validate":
+        code, report = _validate(parsed.registry)
         _emit(report)
         return code
-    if args.command == "status":
-        code, report = _status(args.registry, args.consumer)
+    if parsed.command == "status":
+        code, report = _status(parsed.registry, parsed.consumer)
         _emit(report)
         return code
     parser.error("unknown command")

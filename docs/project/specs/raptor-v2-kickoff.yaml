@@ -238,7 +238,8 @@ phase_definition:
       maps_to_todo: sourceops-version-refresh-registry
     - id: V2-S2
       name: staged snapshot verification and deterministic diff
-      status: later_separate_spec
+      status: planning_complete_separate_spec
+      spec: docs/project/specs/raptor-v2-s2-staged-snapshot.yaml
       maps_to_todo: sourceops-automated-refresh-validation
       depends_on: [V2-S1]
     - id: V2-S3
