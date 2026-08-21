@@ -9,6 +9,7 @@ from typing import Any
 
 from raptor.sourceops.registry import VALIDATION_CEILING, VALIDATION_SCHEMA_ID, load_registry, status_for_consumer, validate_registry
 from raptor.sourceops.staged_snapshot import _cli_error_payload, _main_verify_cli, _serialize_json
+from raptor.sourceops.drift_planning import _main_plan_drift_cli
 
 
 def _emit(payload: dict[str, Any]) -> None:
@@ -71,6 +72,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args and args[0] == "verify-stage":
         return _main_verify_cli(args[1:])
+    if args and args[0] == "plan-drift":
+        return _main_plan_drift_cli(args[1:])
 
     parser = argparse.ArgumentParser(prog="raptor.sourceops.cli")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -82,6 +85,8 @@ def main(argv: list[str] | None = None) -> int:
     verify_parser = subparsers.add_parser("verify-stage")
     verify_parser.add_argument("--registry", required=True)
     verify_parser.add_argument("--staging-root", required=True)
+    drift_parser = subparsers.add_parser("plan-drift")
+    drift_parser.add_argument("--manifest-hash", required=True)
     try:
         parsed = parser.parse_args(args)
     except SystemExit as exc:

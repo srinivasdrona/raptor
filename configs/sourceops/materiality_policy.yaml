@@ -1,0 +1,354 @@
+# RAPTOR v2 V2-S3 checked-in materiality policy.
+# Authority: docs/project/specs/raptor-v2-s3-drift-gates.yaml (materiality_policy_contract).
+# Human-adjudicated exact hash. Any rule/binding change requires a new
+# policy_version, recomputed policy_content_hash, RED tests, checker review,
+# and human adjudication -- never an in-place silent edit.
+schema: raptor.sourceops.materiality_policy.v1
+policy_id: raptor-v2-s3-materiality-v1
+policy_version: 1.0.0
+policy_content_hash: 8e6fb7cf254afdda56858308be94e2f2c3456df9e46c9b8fcb19cb0cf17297a5
+hash_basis: raptor.sourceops.materiality_policy_content_hash.v1
+approval_binding:
+  mode: HUMAN_ADJUDICATED_EXACT_HASH
+  authority_file: docs/project/specs/raptor-v2-s3-drift-gates.yaml
+  change_rule: NEW_POLICY_VERSION_NEW_HASH_AND_HUMAN_ADJUDICATION
+registry_binding:
+  schema: raptor.source_registry.v1
+  registry_id: raptor-sourceops-registry-v1
+  registry_content_hash: ef6995a8822c53a1bef228545b0a01c23963b79212967d3f3c15b66d54b02e90
+artifact_binding:
+  diff_schema: raptor.sourceops.staged_snapshot_diff.v1
+  diff_hash_basis: raptor.sourceops.staged_snapshot_diff_content_hash.v1
+  verification_schema: raptor.sourceops.staged_snapshot_verification.v1
+  verification_hash_basis: raptor.sourceops.staged_snapshot_verification_content_hash.v1
+evaluator:
+  algorithm: FIRST_MATCH_BY_ASCENDING_UNIQUE_PRIORITY
+  changed_classifications:
+  - ADDED
+  - REMOVED
+  - CHANGED
+  aggregate_precedence:
+  - MATERIAL_CHANGE
+  - NON_MATERIAL_CHANGE
+  - NO_OBSERVED_CHANGE
+  conservative_unmatched_rule_id: SYSTEM-UNMATCHED-MATERIAL-001
+  source_role_derivation: CURRENT_BASELINE_CONTEXT
+rules:
+- priority: 0
+  rule_id: OBS-UNCHANGED-001
+  rationale_id: OBSERVATION_EQUAL
+  selectors:
+    classifications:
+    - UNCHANGED
+    difference_kinds:
+    - ANY
+    fact_kinds:
+    - ANY
+    subject_types:
+    - ANY
+    fact_path:
+      mode: ANY
+      values: []
+    source_roles:
+    - ANY
+    source_lifecycles:
+    - ANY
+    consumer_freshness_profiles:
+    - ANY
+    record_kinds:
+    - ANY
+  outcome: NO_OBSERVED_CHANGE
+- priority: 100
+  rule_id: MAT-PINNED-HISTORICAL-001
+  rationale_id: PINNED_HISTORY_CHANGED
+  selectors:
+    classifications:
+    - ADDED
+    - REMOVED
+    - CHANGED
+    difference_kinds:
+    - ANY
+    fact_kinds:
+    - ANY
+    subject_types:
+    - ANY
+    fact_path:
+      mode: ANY
+      values: []
+    source_roles:
+    - ANY
+    source_lifecycles:
+    - PINNED_HISTORICAL
+    consumer_freshness_profiles:
+    - ANY
+    record_kinds:
+    - ANY
+  outcome: MATERIAL_CHANGE
+- priority: 110
+  rule_id: MAT-FRESHNESS-RETRIEVAL-001
+  rationale_id: FRESHNESS_CONTEXT_CHANGED
+  selectors:
+    classifications:
+    - CHANGED
+    difference_kinds:
+    - METADATA
+    fact_kinds:
+    - METADATA
+    subject_types:
+    - SOURCE
+    fact_path:
+      mode: EXACT
+      values:
+      - /release/retrieved_at
+    source_roles:
+    - SOURCE_RECORD
+    source_lifecycles:
+    - ANY
+    consumer_freshness_profiles:
+    - SOME_REQUIRED
+    - ALL_REQUIRED
+    record_kinds:
+    - ANY
+  outcome: MATERIAL_CHANGE
+- priority: 120
+  rule_id: NONMAT-RETRIEVED-AT-001
+  rationale_id: RETRIEVAL_TIMESTAMP_ONLY
+  selectors:
+    classifications:
+    - CHANGED
+    difference_kinds:
+    - METADATA
+    fact_kinds:
+    - METADATA
+    subject_types:
+    - SOURCE
+    fact_path:
+      mode: EXACT
+      values:
+      - /release/retrieved_at
+    source_roles:
+    - SOURCE_RECORD
+    source_lifecycles:
+    - CONFIRM_PENDING
+    - VERIFIED_ACTIVE
+    - METADATA_ONLY
+    - ACCESS_BLOCKED
+    - RETIRED
+    consumer_freshness_profiles:
+    - NO_CONSUMERS
+    - NONE_REQUIRED
+    record_kinds:
+    - ANY
+  outcome: NON_MATERIAL_CHANGE
+- priority: 200
+  rule_id: MAT-CONTENT-001
+  rationale_id: CONTENT_BYTES_CHANGED
+  selectors:
+    classifications:
+    - ADDED
+    - REMOVED
+    - CHANGED
+    difference_kinds:
+    - CONTENT
+    fact_kinds:
+    - ANY
+    subject_types:
+    - ANY
+    fact_path:
+      mode: ANY
+      values: []
+    source_roles:
+    - ANY
+    source_lifecycles:
+    - ANY
+    consumer_freshness_profiles:
+    - ANY
+    record_kinds:
+    - ANY
+  outcome: MATERIAL_CHANGE
+- priority: 210
+  rule_id: MAT-DECLARATION-001
+  rationale_id: DECLARATION_BINDING_CHANGED
+  selectors:
+    classifications:
+    - ADDED
+    - REMOVED
+    - CHANGED
+    difference_kinds:
+    - DECLARATION
+    fact_kinds:
+    - ANY
+    subject_types:
+    - ANY
+    fact_path:
+      mode: ANY
+      values: []
+    source_roles:
+    - ANY
+    source_lifecycles:
+    - ANY
+    consumer_freshness_profiles:
+    - ANY
+    record_kinds:
+    - ANY
+  outcome: MATERIAL_CHANGE
+- priority: 220
+  rule_id: MAT-IDENTITY-001
+  rationale_id: IDENTITY_CHANGED
+  selectors:
+    classifications:
+    - ADDED
+    - REMOVED
+    - CHANGED
+    difference_kinds:
+    - ANY
+    fact_kinds:
+    - IDENTITY
+    subject_types:
+    - ANY
+    fact_path:
+      mode: ANY
+      values: []
+    source_roles:
+    - ANY
+    source_lifecycles:
+    - ANY
+    consumer_freshness_profiles:
+    - ANY
+    record_kinds:
+    - ANY
+  outcome: MATERIAL_CHANGE
+- priority: 230
+  rule_id: MAT-VERSION-CHECKSUM-MANIFEST-001
+  rationale_id: VERSION_OR_CHECKSUM_CHANGED
+  selectors:
+    classifications:
+    - ADDED
+    - REMOVED
+    - CHANGED
+    difference_kinds:
+    - ANY
+    fact_kinds:
+    - VERSION
+    - CHECKSUM
+    - MANIFEST
+    subject_types:
+    - ANY
+    fact_path:
+      mode: ANY
+      values: []
+    source_roles:
+    - ANY
+    source_lifecycles:
+    - ANY
+    consumer_freshness_profiles:
+    - ANY
+    record_kinds:
+    - ANY
+  outcome: MATERIAL_CHANGE
+- priority: 240
+  rule_id: MAT-COMPONENT-001
+  rationale_id: COMPONENT_MODEL_CHANGED
+  selectors:
+    classifications:
+    - ADDED
+    - REMOVED
+    - CHANGED
+    difference_kinds:
+    - ANY
+    fact_kinds:
+    - COMPONENT
+    subject_types:
+    - ANY
+    fact_path:
+      mode: ANY
+      values: []
+    source_roles:
+    - ANY
+    source_lifecycles:
+    - ANY
+    consumer_freshness_profiles:
+    - ANY
+    record_kinds:
+    - ANY
+  outcome: MATERIAL_CHANGE
+- priority: 250
+  rule_id: MAT-LICENCE-ACQUISITION-001
+  rationale_id: LICENCE_OR_ACQUISITION_CHANGED
+  selectors:
+    classifications:
+    - ADDED
+    - REMOVED
+    - CHANGED
+    difference_kinds:
+    - METADATA
+    fact_kinds:
+    - METADATA
+    subject_types:
+    - SOURCE
+    fact_path:
+      mode: PREFIX
+      values:
+      - /licence/
+      - /acquisition/
+    source_roles:
+    - SOURCE_RECORD
+    source_lifecycles:
+    - ANY
+    consumer_freshness_profiles:
+    - ANY
+    record_kinds:
+    - ANY
+  outcome: MATERIAL_CHANGE
+- priority: 260
+  rule_id: MAT-METADATA-001
+  rationale_id: METADATA_CHANGED
+  selectors:
+    classifications:
+    - ADDED
+    - REMOVED
+    - CHANGED
+    difference_kinds:
+    - METADATA
+    fact_kinds:
+    - ANY
+    subject_types:
+    - ANY
+    fact_path:
+      mode: ANY
+      values: []
+    source_roles:
+    - ANY
+    source_lifecycles:
+    - ANY
+    consumer_freshness_profiles:
+    - ANY
+    record_kinds:
+    - ANY
+  outcome: MATERIAL_CHANGE
+- priority: 999
+  rule_id: MAT-CONSERVATIVE-DEFAULT-001
+  rationale_id: CONSERVATIVE_DEFAULT
+  selectors:
+    classifications:
+    - ADDED
+    - REMOVED
+    - CHANGED
+    difference_kinds:
+    - ANY
+    fact_kinds:
+    - ANY
+    subject_types:
+    - ANY
+    fact_path:
+      mode: ANY
+      values: []
+    source_roles:
+    - ANY
+    source_lifecycles:
+    - ANY
+    consumer_freshness_profiles:
+    - ANY
+    record_kinds:
+    - ANY
+  outcome: MATERIAL_CHANGE

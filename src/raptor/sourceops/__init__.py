@@ -12,6 +12,15 @@ from raptor.sourceops.model import (
 )
 from raptor.sourceops.registry import VALIDATION_CEILING, VALIDATION_SCHEMA_ID, canonical_registry_hash, load_registry, status_for_consumer, validate_registry
 from raptor.sourceops.staged_snapshot import StagedSnapshotError, verify_stage
+from raptor.sourceops.drift_planning import (
+    DriftPlanningError,
+    evaluate_materiality,
+    load_materiality_policy,
+    load_v2_s2_artifact_pair,
+    plan_drift,
+    rehearse_rollback,
+    route_impact,
+)
 
 
 def load_manifest(path):
@@ -66,4 +75,11 @@ __all__ = [
     "validate_registry",
     "verify_stage",
     "load_manifest",
+    "DriftPlanningError",
+    "evaluate_materiality",
+    "load_materiality_policy",
+    "load_v2_s2_artifact_pair",
+    "plan_drift",
+    "rehearse_rollback",
+    "route_impact",
 ]

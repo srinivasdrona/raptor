@@ -244,7 +244,8 @@ phase_definition:
       depends_on: [V2-S1]
     - id: V2-S3
       name: material-drift impact routing and rollback rehearsal
-      status: later_separate_spec
+      status: planning_complete_separate_spec
+      spec: docs/project/specs/raptor-v2-s3-drift-gates.yaml
       maps_to_todo: sourceops-drift-revalidation-gates
       depends_on: [V2-S2]
   phase_stop:

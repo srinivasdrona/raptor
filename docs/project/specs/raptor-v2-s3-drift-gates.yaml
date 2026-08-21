@@ -1,0 +1,3833 @@
+# RAPTOR v2 V2-S3 planner specification.
+#
+# PLAN ONLY. This file authorizes RED-test authoring and later implementation
+# of deterministic materiality evaluation, proposed impact routing, and
+# read-only rollback rehearsal over one already-published V2-S2 artifact pair.
+# It authorizes no source, registry, declaration, evidence, consumer, policy,
+# lifecycle, rollback, promotion, validation, benchmark, packet, Atlas,
+# RescueScreen, service, database, scheduler, UI, API, or external mutation.
+
+schema: raptor.sourceops.v2_s3_drift_gates_spec.v1
+status: planner_contract_amended_ready_for_red_test_rework
+slice_id: V2-S3
+task_id: sourceops-drift-revalidation-gates
+title: Material-drift impact routing and rollback rehearsal
+authority_file: docs/project/specs/raptor-v2-s3-drift-gates.yaml
+roadmap_file: docs/project/specs/raptor-v2-kickoff.yaml
+branch: track/raptor-v2-2026-08
+published_v2_s2_commit: fd0abdf3dea009ef8d90114193c4e28c58ef864d
+planned_at: '2026-08-19T16:40:34+05:30'
+amended_at: '2026-08-21T07:52:06+05:30'
+
+authority_amendment:
+  id: V2-S3-A1-ROLLBACK-BINDING-AND-RED-NON-VACUITY
+  trigger: >-
+    Independent review proved the original non-null READY rollback contract
+    structurally unreachable. The raw current source-record hash and the full
+    registry hash both include rollback.rollback_artifact, whose filename was
+    required to equal the rollback artifact's own content hash; embedding
+    either full hash in that artifact therefore required a cryptographic
+    fixpoint.
+  decision:
+    chosen: OPTION_A_DEDICATED_ROLLBACK_SOURCE_RECORD_BINDING
+    rationale: >-
+      Retain filename-bound content addressing and introduce one dedicated,
+      versioned source-record binding hash whose only transformed value is
+      rollback.rollback_artifact. The rollback input artifact carries the
+      normalized current and predecessor bindings, not the full registry or
+      full source-record hashes that contain the artifact path. V2-S3
+      independently validates and emits the full hashes beside the normalized
+      hashes in its output pair.
+    rejected:
+      option: OPTION_B_DROP_FILENAME_OWN_HASH
+      reason: >-
+        Dropping the filename binding would remove useful content-addressed
+        discovery, collision detection, and immutable admission semantics when
+        the cycle can instead be removed without weakening those properties.
+  cycle_proof:
+    original: >-
+      A = SHA256(artifact(registry_hash(record_path(A)),
+      source_record_hash(record_path(A)))) required an accidental SHA-256
+      fixpoint before a READY artifact could exist.
+    amended: >-
+      Under raptor.sourceops.rollback_source_record_binding_hash.v1, B =
+      SHA256(canonical(record_path(SENTINEL))); A =
+      SHA256(canonical(artifact(B))); path = rb-A.json. Full source-record and
+      registry hashes are computed only after path assignment and are emitted
+      by V2-S3, never fed back into A.
+  preserved_authority:
+    - V2-S1 registry schema, hash basis, content hash, and all seven current source-record hashes
+    - V2-S2 schemas, hash bases, artifacts, component projection authority, and public behavior
+    - rollback artifact filename-own-hash and canonical-byte requirements
+    - materiality policy mapping, version, hash, selectors, outcomes, and registry binding
+    - all proposal-only, no-execution, no-network, preservation, mutation, and output guarantees
+  policy_impact:
+    materiality_policy_mapping_changed: false
+    materiality_policy_content_hash_changed: false
+    retained_policy_content_hash: 8e6fb7cf254afdda56858308be94e2f2c3456df9e46c9b8fcb19cb0cf17297a5
+    policy_config_edit_authorized: false
+    reason: >-
+      The policy binds the unchanged full registry and V2-S2 schemas. The new
+      hash basis is confined to rollback metadata admission and V2-S3 output
+      bindings; it changes no materiality rule or policy input.
+
+final_recheck_amendment:
+  id: V2-S3-A2-OPUS-FINAL-RECHECK
+  scope: docs_only_single_authority_file
+  accepted_corrections:
+    - independently reproduced and corrected the four path-dependent normative cycle-free example constants
+    - pinned every normative rollback artifact scalar, declaration sequence, file binding, preservation binding, and registry sequence operation
+    - separated COMPONENT_CHECKSUM content facts from /components/ projection facts in both projection modes
+    - made preservation-conflict statuses report actual non-linear check execution rather than blocker-index prefixes
+    - bound every Opus-flagged RED test to its criterion-relevant production function and observable behavior
+  policy_impact:
+    materiality_policy_mapping_changed: false
+    materiality_policy_content_hash_changed: false
+    retained_policy_content_hash: 8e6fb7cf254afdda56858308be94e2f2c3456df9e46c9b8fcb19cb0cf17297a5
+    policy_config_edit_authorized: false
+
+authority:
+  sole_detailed_v2_s3_authority: true
+  precedence:
+    - docs/DECISIONS.md
+    - docs/STRATEGY.md
+    - docs/EVALUATION.md
+    - docs/PROGRAM.md
+    - docs/ARCHITECTURE.md
+    - METHOD.md
+    - docs/prd/
+    - docs/project/specs/raptor-v2-kickoff.yaml
+    - docs/project/specs/raptor-v2-s2-staged-snapshot.yaml
+    - docs/project/specs/raptor-v2-s3-drift-gates.yaml
+  read_only_inputs:
+    - docs/project/specs/raptor-v2-kickoff.yaml
+    - docs/project/specs/raptor-v2-s2-staged-snapshot.yaml
+    - configs/sourceops/source_registry.yaml
+    - src/raptor/sourceops/
+    - tests/sourceops/
+    - configs/ingest/tsc.yaml
+    - configs/eval/core_annotation_bundle.yaml
+    - configs/eval/pp3bp4_source_register.yaml
+    - configs/external/mave_sources.yaml
+    - configs/atlas/packs/tsc2/pack.yaml
+    - configs/atlas/catalogs/tsc2/catalog.yaml
+    - configs/acmg/tsc.yaml
+    - every path in source_registry.yaml preservation_rules
+  conflict_rule: >-
+    A conflict with a higher-precedence accepted authority is a defect in this
+    file. The RED author, doer, checker, and human adjudicator must not broaden
+    V2-S3 or weaken V2-S1/V2-S2 to make a conflict disappear.
+  planning_only_rule: >-
+    This planning stage may create this file and make the minimal V2-S3
+    roadmap pointer/status update. It changes no config, source, test, data,
+    dependency, TODO, declaration, preservation, rollback, generated runtime,
+    RescueScreen, or panel-product surface.
+
+planning_baseline:
+  v2_s1:
+    implementation_commit: a662276700f1138b1baf5581be8bc76e6e68e314
+    registry_path: configs/sourceops/source_registry.yaml
+    registry_schema: raptor.source_registry.v1
+    registry_hash_basis: raptor.source_registry_content_hash.v1
+    registry_content_hash: ef6995a8822c53a1bef228545b0a01c23963b79212967d3f3c15b66d54b02e90
+    source_record_hash_basis: raptor.sourceops.source_record_content_hash.v1
+    rollback_source_record_binding_hash_basis: raptor.sourceops.rollback_source_record_binding_hash.v1
+    source_record_count: 7
+    allowed_action_enum_in_order:
+      - record_only
+      - block_consumer
+      - stage_diff
+      - rebuild_benchmark
+      - review_policy
+      - invalidate_packets
+      - reground_atlas
+      - rerun_validation
+      - rollback
+    reserved_consumer_ids:
+      - atlas-independent-validation-panel
+      - atlas-technical-coverage-panel
+      - rescuescreen
+    compatibility_rule: >-
+      V2-S3 consumes the current, valid V2-S1 registry as governance context.
+      It does not change the registry schema/hash, source/component ids,
+      declaration hashes, lifecycle/readiness semantics, consumer graph, action
+      enum, rollback metadata, validate/status behavior, or any declaration.
+  v2_s2:
+    implementation_commit: fd0abdf3dea009ef8d90114193c4e28c58ef864d
+    diff_schema: raptor.sourceops.staged_snapshot_diff.v1
+    diff_hash_basis: raptor.sourceops.staged_snapshot_diff_content_hash.v1
+    verification_schema: raptor.sourceops.staged_snapshot_verification.v1
+    verification_hash_basis: raptor.sourceops.staged_snapshot_verification_content_hash.v1
+    generated_parent: .raptor/sourceops/generated/staged-snapshots
+    accepted_handoff: >-
+      Exactly one final content-addressed diff artifact and its exact
+      verification artifact are accepted. The V2-S2 CLI outcome is not trusted
+      as proof; V2-S3 independently validates bytes, schemas, hashes, facts,
+      pair bindings, and the current V2-S1 baseline before interpretation.
+  current_repository_reality:
+    declaration_roots:
+      - source_id: tsc-ingest-and-reference-declarations
+        path: configs/ingest/tsc.yaml
+        source_record_content_hash: 7d643f34e35b46435e1eff5a0c8a5238268f74266f2ab198cf15af0f91c9401d
+      - source_id: frozen-core-annotation-bundle
+        path: configs/eval/core_annotation_bundle.yaml
+        source_record_content_hash: 07991ad436c5f0eceddd64f8f2669bcb1ab6d4465238d23f291d0f09c1d9c132
+      - source_id: pp3bp4-shadow-source-register
+        path: configs/eval/pp3bp4_source_register.yaml
+        source_record_content_hash: d403a46cb63deb61c5fbf2ff549f91ae61bb5c8b906b7e77fd1d3bdbdd3febe1
+      - source_id: tsc2-mave-source-register
+        path: configs/external/mave_sources.yaml
+        source_record_content_hash: 2c9785740317019a06263251121965a680676aa1c0f69322eb08931d9611800c
+      - source_id: atlas-tsc2-pack-source-pins
+        path: configs/atlas/packs/tsc2/pack.yaml
+        source_record_content_hash: 1991722f902a04bab15c83ef8a92b82a4e0dac38fe967af5fd60acc3307a7e14
+      - source_id: atlas-tsc2-catalog-template
+        path: configs/atlas/catalogs/tsc2/catalog.yaml
+        source_record_content_hash: 60afd65ec49ad3f91246dd19789d63bfed50366b211e29c783c958c1337e1b1a
+      - source_id: tsc-acmg-runtime-source-pins
+        path: configs/acmg/tsc.yaml
+        source_record_content_hash: b584ce0e18dd7851dc02919a9a641e5134417e597c16d51bb9db69f739c7d848
+    predecessor_observation:
+      every_source_predecessor_is_null: true
+      every_source_immutable_predecessor_required_is_true: true
+      meaning: >-
+        All seven records are root lineage records on this baseline. A root
+        receives NO_PREDECESSOR/NOT_APPLICABLE rehearsal semantics. V2-S3 does
+        not invent a predecessor or require a currently missing rollback file.
+    rollback_path_observation:
+      registry_paths_may_be_absent: true
+      all_seven_paths_absent_at_planning: true
+      rule: >-
+        Absence is not a defect for a null predecessor. For a future non-null
+        predecessor, the stricter content-addressed rollback-artifact contract
+        in this file applies and absence blocks rehearsal without editing the
+        registry.
+    reserved_consumers_have_no_required_sources: true
+    materiality_policy_path_absent_at_planning: configs/sourceops/materiality_policy.yaml
+    planned_materiality_policy_content_hash: 8e6fb7cf254afdda56858308be94e2f2c3456df9e46c9b8fcb19cb0cf17297a5
+  implementation_dependency_ceiling:
+    - Python standard library
+    - PyYAML already declared by the repository
+  new_dependency_allowed: false
+
+product_contract:
+  operator: RAPTOR source-maintenance operator
+  goal: >-
+    Given one immutable V2-S2 diff/verification pair and the still-current
+    canonical V2-S1 registry, independently validate all bindings, apply one
+    checked-in human-governed materiality policy, and publish deterministic
+    proposed impact and rollback-rehearsal plans for human adjudication.
+  accepted_inputs:
+    - one V2-S2 diff artifact
+    - the exact V2-S2 verification artifact that cross-binds that diff
+    - the current canonical V2-S1 registry and its declaration/preservation preconditions
+    - one fixed checked-in, self-hashed materiality policy
+    - when a non-null predecessor exists, its fixed registry-bound rollback metadata artifact
+  outputs_are:
+    - independently verified references to observed V2-S2 facts
+    - deterministic per-fact policy evaluations
+    - deterministic proposed routes derived from current V2-S1 actions and edges
+    - read-only rollback lineage, integrity, and feasibility observations
+    - inert proposed rollback operations for later human adjudication
+  outputs_are_not:
+    - an approval, recommendation, authorization, command, dispatch, or execution
+    - a source readiness, blocked-state, activation, promotion, or lifecycle transition
+    - a benchmark rebuild, validation rerun, packet invalidation, Atlas regrounding, rollback, restoration, or deletion
+    - a scientific, legal, clinical, evidence-sufficiency, classification, worklist, submission, RescueScreen, or panel decision
+  validation_ceiling: >-
+    V2-S3 can establish that one valid V2-S2 observation was evaluated by one
+    exact approved mechanical policy, that proposed routes follow the current
+    declared SourceOps graph, and that a rollback lineage is mechanically
+    ready, not applicable, or blocked. It cannot approve or execute any route,
+    establish scientific or legal sufficiency, alter evidence, authorize
+    promotion, or satisfy a clinical, RescueScreen, or independent-panel gate.
+
+scope:
+  exact_in:
+    - fixed-leaf discovery of one final V2-S2 artifact pair by manifest hash
+    - independent strict JSON, canonical-byte, schema, self-hash, filename-hash, and pair validation
+    - independent V2-S2 fact, summary, ordering, classification, and input-tree invariant validation
+    - current V2-S1 registry, source record, declarations, consumers, actions, and preservation preconditions
+    - fixed checked-in policy parsing, self-hash, registry/schema binding, and exact categorical rule evaluation
+    - deterministic NO_OBSERVED_CHANGE, NON_MATERIAL_CHANGE, or MATERIAL_CHANGE aggregation
+    - deterministic proposal-only impact routes and action dispositions
+    - immutable predecessor lineage and rollback metadata validation
+    - read-only rollback feasibility checks and inert typed rollback plan
+    - two-pass no-follow input immutability checks
+    - canonical JSON artifacts, content-addressed fixed output, atomic pair publication, deterministic CLI JSON
+  exact_out:
+    - acquisition, download, URL dereference, network, credential, egress, archive extraction, or decompression
+    - scheduler, workflow dispatch, Prefect flow, service, daemon, database, UI, API, or external-content-root read
+    - source promotion, activation, installation, lifecycle mutation, registry mutation, or declaration mutation
+    - benchmark rebuild, validation rerun, packet invalidation, Atlas regrounding, policy change, consumer invalidation, or rollback
+    - file restoration, replacement, copy, rename, chmod, deletion, shell execution, subprocess, or generated command string
+    - candidate-domain parsing, scoring, evidence reinterpretation, classification, legal or clinical decision
+    - worklist, submission, patient-facing, RescueScreen, structure, assay, procurement, or panel authorization
+    - V2-S1 READY/BLOCKED calculation or a call to status_for_consumer
+  execution_rule: >-
+    V2-S3 performs bounded reads, hashes, equality checks, deterministic
+    evaluation, and generated-artifact publication only. Every domain action
+    remains a proposal with approval_required=true, approval_state=NOT_GRANTED,
+    and executed=false.
+
+preservation_and_cross_lane_boundaries:
+  immutable_repository_inputs:
+    - configs/sourceops/source_registry.yaml
+    - configs/sourceops/materiality_policy.yaml
+    - all seven declaration roots
+    - every declaration_refs.path in the validated registry
+    - every preservation_rules.path in the validated registry
+    - every accepted V2-S2 input artifact byte
+    - every accepted non-null-predecessor rollback artifact byte
+  frozen_evidence_required_zero_diff:
+    - data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json
+    - data/census/tsc_tiered_readjudication_2026-07-21.json
+    - configs/eval/tsc2.yaml
+    - configs/eval/tiered_gate_v3.yaml
+    - configs/eval/bp4pp3_predictor_policy.json
+    - configs/eval/core_annotation_bundle.yaml
+  current_registry_preservation_paths:
+    - data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json
+    - data/census/tsc_tiered_readjudication_2026-07-21.json
+    - configs/eval/tsc2.yaml
+    - configs/eval/tiered_gate_v3.yaml
+    - configs/eval/bp4pp3_predictor_policy.json
+    - configs/eval/core_annotation_bundle.yaml
+    - configs/external/mave_sources.yaml
+    - configs/atlas/catalogs/tsc2/catalog.yaml
+    - configs/atlas/packs/tsc2/pack.yaml
+  rescuescreen_and_panels:
+    must_not_read_or_write:
+      - docs/project/specs/structural-rescue-screen-v1.yaml
+      - configs/rescuescreen/
+      - src/raptor/rescuescreen/
+      - tests/rescuescreen/
+    reserved_consumers:
+      - rescuescreen
+      - atlas-technical-coverage-panel
+      - atlas-independent-validation-panel
+    rule: >-
+      Reserved consumers cannot be route targets, approvals, prerequisites, or
+      evidence of readiness. Their appearance on a selected source edge is a
+      baseline failure, not a route.
+  assertion: >-
+    Success, blocked rehearsal, and every handled failure leave all listed
+    inputs byte-identical and do not create, replace, rename, remove, chmod, or
+    intentionally timestamp them. Only a successful or rehearsal-blocked run
+    may publish the exact V2-S3 generated artifact pair under its fixed output
+    leaf.
+
+terminology:
+  observed_fact: >-
+    One independently validated V2-S2 DiffFact. Its before/after values and
+    ADDED/REMOVED/CHANGED/UNCHANGED classification are observations, not a
+    V2-S3 materiality or action decision.
+  policy_evaluation: >-
+    One deterministic categorical result for one observed fact under the exact
+    checked-in policy and current registry context.
+  proposal: >-
+    A non-executable route or rollback operation prepared for human
+    adjudication. It is never approval and never evidence that an action ran.
+  assessment_outcomes:
+    NO_OBSERVED_CHANGE: every fact is UNCHANGED and evaluates to NO_OBSERVED_CHANGE
+    NON_MATERIAL_CHANGE: >-
+      At least one fact changed, every changed fact matches a
+      NON_MATERIAL_CHANGE rule, and no fact is material.
+    MATERIAL_CHANGE: at least one changed fact evaluates to MATERIAL_CHANGE
+    INVALID: supplied artifact or policy bytes are malformed, inconsistent, tampered, or non-canonical
+    NOT_EVALUATED: current baseline, source identity, or another prerequisite prevents policy interpretation
+  rollback_rehearsal_outcomes:
+    READY_FOR_HUMAN_ADJUDICATION: >-
+      A non-null immutable predecessor and its rollback artifact pass every
+      read-only integrity and preservation check. No restoration has run.
+    NOT_APPLICABLE: >-
+      predecessor_source_id is explicitly null on a valid root lineage record;
+      reason_code is exactly NO_PREDECESSOR and no rollback operation exists.
+    BLOCKED: >-
+      A non-null predecessor exists but the safe rollback path, artifact,
+      binding, content, or preservation prerequisites are unavailable.
+  forbidden_outcome_terms:
+    - READY
+    - BLOCKED_SOURCE
+    - APPROVED
+    - AUTHORIZED
+    - PROMOTE
+    - EXECUTED
+    - RESTORED
+
+runtime_boundaries:
+  repository_root: >-
+    Resolve the repository root from installed SourceOps code using the same
+    concept as V2-S1/V2-S2. The production CLI exposes no root override.
+  canonical_registry:
+    path: configs/sourceops/source_registry.yaml
+    cli_argument: none
+    rule: >-
+      V2-S3 always reads this exact repository-relative path. An alternate
+      registry path is not accepted by the production command.
+  materiality_policy:
+    path: configs/sourceops/materiality_policy.yaml
+    cli_argument: none
+    created_during_v2_s3_implementation: true
+    rule: >-
+      This is the only production policy path. There is no CLI threshold,
+      policy-path, inline-rule, environment-variable, or default override.
+  v2_s2_input:
+    parent: .raptor/sourceops/generated/staged-snapshots
+    leaf_shape: .raptor/sourceops/generated/staged-snapshots/<manifest_content_hash>
+    selector_argument: --manifest-hash
+    selector_regex: '^[0-9a-f]{64}$'
+    allowed_final_files:
+      verification: 'v-<verification_artifact_content_hash>.json'
+      diff: 'd-<diff_artifact_content_hash>.json'
+    exact_leaf_rule: >-
+      The derived leaf must be a real directory containing exactly one matching
+      verification file and exactly one matching diff file. A lock, temp,
+      partial, extra, hidden, linked, special, or differently named entry means
+      the V2-S2 publication is not an acceptable final pair.
+    override_forbidden:
+      - arbitrary leaf path
+      - verification path
+      - diff path
+      - output path
+      - policy path
+      - registry path
+  generated_output:
+    parent: .raptor/sourceops/generated/drift-plans
+    leaf_shape: >-
+      .raptor/sourceops/generated/drift-plans/
+      <diff_artifact_content_hash>/<policy_content_hash>
+    files:
+      impact: impact-<impact_artifact_content_hash>.json
+      rollback: rollback-<rollback_artifact_content_hash>.json
+    cli_override_allowed: false
+    rules:
+      - the diff hash already binds the V2-S2 manifest, verification, source record, registry, and input tree
+      - the policy hash binds the exact human-governed evaluator
+      - no latest pointer, mutable index, timestamp directory, force, overwrite, cleanup, or alternate root exists
+      - output is never inside or overlapping the V2-S2 input leaf
+  path_normalization:
+    cli_hash: no path normalization because only a lowercase SHA-256 is accepted
+    repository_paths: >-
+      Emit forward-slash repository-relative paths. Reject absolute, drive,
+      UNC, device, URI, root-relative, dot, dot-dot, empty-segment, control,
+      trailing-space/period, and Windows device-name segments.
+    maximum_path_characters: 240
+    maximum_segments: 12
+    case_collision_rule: exact and Unicode-casefold collisions are invalid
+  no_follow_and_reparse_rule: >-
+    Inspect every existing ancestor and final entry with lstat without
+    following it. Reject symlinks, Windows junctions/reparse points, mounts
+    that appear as reparse entries, directories where a file is required,
+    regular files where a directory is required, sockets, FIFOs, devices, and
+    other special entries. Use O_NOFOLLOW where available plus pre-read and
+    post-read lstat/fstat equality; Windows must also inspect
+    FILE_ATTRIBUTE_REPARSE_POINT/st_reparse_tag without relying only on
+    os.path.isjunction.
+  read_and_structure_limits:
+    verification_artifact_bytes: 2097152
+    diff_artifact_bytes: 16777216
+    materiality_policy_bytes: 524288
+    registry_bytes: 1048576
+    each_declaration_or_preservation_file_bytes: 16777216
+    rollback_artifact_bytes: 2097152
+    each_rollback_bound_file_bytes: 16777216
+    total_baseline_and_rollback_file_bytes: 67108864
+    maximum_diff_facts: 2048
+    maximum_json_nodes: 200000
+    maximum_json_depth: 32
+    maximum_policy_nodes: 20000
+    maximum_policy_depth: 20
+    maximum_policy_rules: 64
+    maximum_routes: 256
+    maximum_rollback_file_bindings: 64
+    maximum_proposed_rollback_operations: 260
+    each_output_artifact_bytes: 16777216
+    total_output_artifact_bytes: 33554432
+
+v2_s2_input_pair_contract:
+  discovery_algorithm:
+    steps:
+      - validate --manifest-hash lexical form before any filesystem read
+      - derive the one fixed input leaf from the validated hash
+      - validate all ancestors and the leaf without following links or reparses
+      - enumerate the complete leaf in Unicode code-point filename order
+      - require exactly two regular final files and no other entry
+      - require one filename matching the verification pattern and one matching the diff pattern
+      - capture first-pass directory and file lstat identity before reading bytes
+    no_glob_outside_leaf: true
+    no_latest_selection: true
+    no_multiple_pair_selection: true
+  strict_json_read:
+    encoding: UTF-8 strict without BOM
+    document_count: exactly_one
+    root_type: mapping
+    duplicate_mapping_keys: rejected
+    mapping_keys: strings_only
+    non_finite_numbers: rejected
+    trailing_bytes: exactly_one_LF_after_the_JSON_document
+    parser_failures_caught:
+      - UnicodeDecodeError
+      - JSONDecodeError
+      - RecursionError
+      - OSError
+      - ValueError
+      - TypeError
+    raw_exception_text_in_output: forbidden
+  canonical_artifact_bytes:
+    algorithm:
+      - parse and fully validate the closed artifact mapping
+      - serialize the complete mapping with json.dumps sort_keys=true
+      - use separators=(',', ':'), ensure_ascii=false, allow_nan=false
+      - encode UTF-8 without platform newline translation
+      - append exactly one LF
+      - require exact byte equality with the supplied file
+    consequence: >-
+      A semantically equivalent but non-canonical file is invalid. V2-S3 does
+      not normalize or republish a V2-S2 input.
+  self_hash_and_filename:
+    algorithm:
+      - deep-copy the complete validated artifact mapping
+      - remove only top-level artifact_content_hash
+      - serialize canonical JSON without a trailing LF
+      - compute lowercase SHA-256
+      - require equality with artifact_content_hash
+      - require the filename hash segment to equal artifact_content_hash
+    verification_filename_prefix: v-
+    diff_filename_prefix: d-
+
+  common_source_binding_schema:
+    required_exact:
+      - source_id
+      - registry_content_hash
+      - source_record_content_hash
+      - declaration_refs
+    declaration_ref_required_exact:
+      - path
+      - role
+      - canonical_lf_sha256
+      - authority_scope
+
+  verification_artifact:
+    schema: raptor.sourceops.staged_snapshot_verification.v1
+    hash_basis: raptor.sourceops.staged_snapshot_verification_content_hash.v1
+    top_level_required_exact:
+      - schema
+      - artifact_content_hash
+      - hash_basis
+      - manifest_content_hash
+      - observed_at
+      - source_binding
+      - candidate_snapshot_id
+      - component_projection_status
+      - input_tree
+      - checks
+      - stage_outcome
+      - diff_artifact_content_hash
+      - validation_ceiling
+    input_tree_required_exact:
+      - hash_basis
+      - input_tree_content_hash
+      - files
+      - total_bound_content_bytes
+    input_tree_hash_basis: raptor.sourceops.staged_snapshot_input_tree_content_hash.v1
+    observed_file_required_exact:
+      - file_id
+      - path
+      - role
+      - media_type
+      - checksum_mode
+      - content_byte_size
+      - content_sha256
+      - component_ids
+    check_keys_exact:
+      - manifest_schema_valid
+      - manifest_hash_match
+      - baseline_registry_valid
+      - baseline_hash_match
+      - declaration_bindings_match
+      - baseline_immutable_during_run
+      - inventory_complete
+      - content_bindings_valid
+      - component_projection_valid
+      - file_checksums_match
+      - input_immutable_during_run
+      - inputs_not_mutated_by_command
+    check_rule: every value is the JSON boolean true
+    stage_outcomes:
+      - OBSERVED_NO_DIFFERENCE
+      - OBSERVED_DIFFERENCE
+    component_projection_statuses:
+      - NOT_PROVIDED
+      - COMPLETE
+
+  diff_artifact:
+    schema: raptor.sourceops.staged_snapshot_diff.v1
+    hash_basis: raptor.sourceops.staged_snapshot_diff_content_hash.v1
+    top_level_required_exact:
+      - schema
+      - artifact_content_hash
+      - hash_basis
+      - manifest_content_hash
+      - observed_at
+      - source_binding
+      - candidate_snapshot_id
+      - input_tree_content_hash
+      - component_projection_status
+      - stage_outcome
+      - summary
+      - facts
+      - validation_ceiling
+    summary_required_exact:
+      - total_facts
+      - classifications
+      - difference_kinds
+      - fact_kinds
+    summary_classification_keys:
+      - ADDED
+      - REMOVED
+      - CHANGED
+      - UNCHANGED
+    summary_difference_kind_keys:
+      - CONTENT
+      - METADATA
+      - DECLARATION
+    summary_fact_kind_keys:
+      - IDENTITY
+      - VERSION
+      - CHECKSUM
+      - MANIFEST
+      - COMPONENT
+      - METADATA
+    recursively_forbidden_keys:
+      - ready
+      - blocked
+      - lifecycle_state
+      - materiality
+      - severity
+      - approval
+      - recommendation
+      - promote
+      - promotion
+      - action
+      - consumer_impacts
+      - rollback
+      - executed
+
+  pair_cross_bindings:
+    exact_equal_between_artifacts:
+      - manifest_content_hash
+      - observed_at
+      - source_binding
+      - candidate_snapshot_id
+      - component_projection_status
+      - stage_outcome
+    derived_equalities:
+      - verification.diff_artifact_content_hash equals diff.artifact_content_hash
+      - --manifest-hash equals both manifest_content_hash values and the input leaf name
+      - verification.input_tree.input_tree_content_hash equals diff.input_tree_content_hash
+      - canonical hash of verification.input_tree.files equals input_tree_content_hash
+      - sum of verification file content_byte_size equals total_bound_content_bytes
+    validation_ceiling_exact: >-
+      V2-S2 records offline deterministic observations about supplied staged
+      bytes and their declared comparison to one V2-S1 baseline. It makes no
+      materiality, approval, promotion, lifecycle, scientific, legal, clinical,
+      consumer-impact, or rollback decision.
+
+  diff_fact_validation:
+    DiffFact_required_exact:
+      - difference_kind
+      - fact_kind
+      - subject_type
+      - subject_id
+      - fact_path
+      - classification
+      - before
+      - after
+      - provenance
+    difference_kinds:
+      - CONTENT
+      - METADATA
+      - DECLARATION
+    fact_kinds:
+      - IDENTITY
+      - VERSION
+      - CHECKSUM
+      - MANIFEST
+      - COMPONENT
+      - METADATA
+    subject_types:
+      - SOURCE
+      - FILE
+      - COMPONENT
+      - DECLARATION
+    classifications:
+      - ADDED
+      - REMOVED
+      - CHANGED
+      - UNCHANGED
+    fact_envelope_required_exact:
+      - present
+      - value
+    provenance_required_exact:
+      - baseline_origin
+      - candidate_origin
+    baseline_origins:
+      - REGISTRY_SOURCE_RECORD
+      - REGISTRY_DECLARATION_REF
+      - REGISTRY_COMPONENT
+      - ABSENT
+    candidate_origins:
+      - MANIFEST_CANDIDATE
+      - STAGED_FILE_OBSERVATION
+      - MANIFEST_COMPONENT
+      - ABSENT
+    classification_recompute:
+      ADDED: before.present=false and after.present=true
+      REMOVED: before.present=true and after.present=false
+      UNCHANGED: >-
+        both present and canonical JSON bytes of before.value and after.value
+        are identical
+      CHANGED: >-
+        both present and canonical JSON bytes of before.value and after.value
+        differ
+      impossible: both present=false
+    absent_value_rule: present=false requires value=null
+    explicit_null_rule: present=true/value=null is distinct from absence
+    fact_id_algorithm: >-
+      Canonicalize the complete DiffFact mapping without a trailing LF, hash
+      with SHA-256, and prefix the lowercase digest with "fact-".
+    ordering:
+      difference_kind:
+        - CONTENT
+        - METADATA
+        - DECLARATION
+      fact_kind:
+        - IDENTITY
+        - VERSION
+        - CHECKSUM
+        - MANIFEST
+        - COMPONENT
+        - METADATA
+      subject_type:
+        - SOURCE
+        - FILE
+        - COMPONENT
+        - DECLARATION
+      remaining:
+        - subject_id Unicode code-point order
+        - fact_path Unicode code-point order
+    uniqueness_key:
+      - difference_kind
+      - fact_kind
+      - subject_type
+      - subject_id
+      - fact_path
+
+  source_fact_universe:
+    required_exact_paths:
+      - /identity/display_name
+      - /identity/record_kind
+      - /identity/owner
+      - /identity/authoritative_locator
+      - /release/version_or_snapshot
+      - /release/release_date
+      - /release/retrieved_at
+      - /release/content_pin_status
+      - /licence/status
+      - /licence/identifier_or_family
+      - /licence/terms_locator
+      - /licence/permitted_use
+      - /licence/redistribution
+      - /licence/cloud_egress
+      - /licence/verification_basis
+      - /acquisition/method
+      - /acquisition/operator_contract
+      - /acquisition/writes_outside_repository
+    rules:
+      - exactly one fact exists for each path
+      - subject_type is SOURCE and subject_id is the selected source_id
+      - before and after are both present, including explicit null release_date
+      - before value equals the current source-record pointer exactly
+      - baseline_origin is REGISTRY_SOURCE_RECORD and candidate_origin is MANIFEST_CANDIDATE
+      - difference_kind and fact_kind equal the V2-S2 source projection table
+
+  content_fact_universe:
+    allowed_fact_paths:
+      - /content-bindings/<binding_id>
+      - /content-bindings/<binding_id>/sha256
+    universe_partition:
+      discriminator: fact_path, not subject_type alone
+      component_checksum_variant: >-
+        A content binding whose baseline_kind is COMPONENT_CHECKSUM has
+        subject_type=COMPONENT and a /content-bindings/<binding_id> or
+        /content-bindings/<binding_id>/sha256 fact_path. It belongs exclusively
+        to content_fact_universe; COMPONENT subject_type does not make it a
+        component-projection fact.
+      exclusive_rule: >-
+        Every /content-bindings/... fact is validated only as a content fact
+        and never counted in component_fact_universe.
+    rules:
+      - binding_id satisfies the V2-S2 file-identifier grammar
+      - every verification input-tree file is represented by exactly one content fact
+      - every DECLARATION_REF baseline id exists in current source declaration_refs
+      - every COMPONENT_CHECKSUM baseline id exists in current source components and carries a checksum role/hash
+      - candidate file hashes/sizes/roles in facts equal verification input-tree observations
+      - baseline hashes equal current declaration/component hashes
+      - subject type, provenance, fact kind, difference kind, and envelope shape match the V2-S2 variant table
+      - no unknown or duplicate candidate file or baseline target is accepted
+
+  component_fact_universe:
+    universe_partition:
+      allowed_fact_path_prefix: /components/
+      exclusive_rule: >-
+        Only facts whose fact_path starts with /components/ belong to the
+        component projection universe. A COMPONENT-subject content-binding
+        fact remains outside this universe in every projection mode.
+    when_projection_not_provided:
+      component_fact_count: 0
+      prohibition_scope: >-
+        NOT_PROVIDED prohibits only /components/... component-projection facts.
+        It does not prohibit a valid COMPONENT_CHECKSUM content-binding fact
+        with subject_type=COMPONENT and a fact_path under /content-bindings/.
+      valid_content_binding_requirement: >-
+        The same valid COMPONENT_CHECKSUM content binding must pass content
+        fact validation when component_projection is NOT_PROVIDED and when it
+        is COMPLETE. Its content baseline remains independently bound to the
+        current registry component checksum in both modes.
+    when_projection_complete:
+      authority_clarification:
+        source_of_truth: >-
+          The V2-S2 COMPLETE component projection and the current V2-S1
+          registry are the complete component fact universe. V2-S3 validates
+          their exact identities, five projected fields, envelopes,
+          provenance, classifications, ordering, and aggregates.
+        file_anchor_requirement: none
+        explicit_non_requirement: >-
+          V2-S3 must not require a projected component id to appear in
+          verification.input_tree.files[*].component_ids or in a content
+          binding. V2-S2 permits an explicit empty component_ids list and does
+          not make file anchoring a precondition of a COMPLETE projection.
+      rules:
+        - every current baseline component has either one REMOVED aggregate fact or five field facts
+        - every added candidate component has one ADDED aggregate fact
+        - aggregate component values contain exactly display_name, source_role, version_or_snapshot, licence_status, declaration_locator
+        - shared component field facts cover exactly those five fields
+        - baseline component identities equal the current registry component identities exactly
+        - REMOVED and shared component ids exist in the current registry; ADDED component ids do not
+        - before values equal current registry component values
+        - RFC6901 escaping is validated for component ids
+        - no partial, duplicate, missing, or extra component projection is accepted
+        - input-tree component_ids remain validated as V2-S2 file metadata but do not define or corroborate the component projection
+      materiality_handoff: >-
+        After these structural and baseline checks pass, an uncorroborated or
+        unfamiliar candidate component value remains a valid observed fact.
+        It is evaluated by the exact materiality policy; changed, added, or
+        removed component facts are material under the applicable component
+        rule or conservative terminal default. Lack of a file anchor or an
+        unfamiliar role is never by itself DRIFT_FACT_INVARIANT_INVALID.
+
+  summary_and_outcome_recompute:
+    steps:
+      - recompute every classification from envelopes
+      - recompute all summary counts from facts
+      - require every summary grouping to sum to total_facts
+      - require total_facts to equal facts length and be between 1 and 2048
+      - derive OBSERVED_NO_DIFFERENCE only when every fact is UNCHANGED
+      - otherwise derive OBSERVED_DIFFERENCE
+      - require both artifacts stage_outcome to equal the derived value
+    no_trust_rule: >-
+      A self-hashed artifact with a forged summary, fact classification, stage
+      outcome, before value, file observation, or registry binding is invalid.
+
+current_registry_and_baseline_contract:
+  validation_order:
+    - read the canonical registry as a bounded no-follow regular UTF-8 file
+    - load it with the public V2-S1 loader
+    - run the public V2-S1 validator against the repository root
+    - map declaration drift/reference errors separately from other registry invalidity
+    - require the registry schema, id, hash basis, and self-hash to be valid
+    - locate the pair source_id exactly once; UNKNOWN_SOURCE precedes hash comparison
+    - require pair registry_content_hash to equal current registry_content_hash
+    - require pair declaration_refs to equal the current source sequence
+    - recompute and require source_record_content_hash
+    - validate selected source actions, approval flag, consumers, owner, rollback metadata, and reserved boundaries
+    - independently validate the complete V2-S2 fact universe against the current source
+  no_readiness_interpretation:
+    status_for_consumer_called: false
+    READY_or_BLOCKED_used_as_materiality: false
+    lifecycle_mutation_or_candidate_lifecycle: false
+  source_record_hash_algorithm: >-
+    Serialize the selected raw source-record mapping as canonical JSON with
+    sorted mapping keys, compact separators, ensure_ascii=false,
+    allow_nan=false, preserved sequences, and no trailing LF; hash its UTF-8
+    bytes with SHA-256. Remove no field.
+  action_preconditions:
+    - drift_policy.actions is unique exactly and after casefold
+    - every action is in the V2-S1 allowed enum
+    - actions preserve the V2-S1 enum relative order
+    - drift_policy.approval_required is exactly true
+    - an unknown action, promote-like action, duplicate, reordered action, or false approval flag is a baseline failure
+  consumer_edge_preconditions:
+    - every source consumer id exists exactly once in registry consumers
+    - the reverse consumer.required_sources edge contains the selected source
+    - source consumer sequence contains no duplicate or case collision
+    - no reserved consumer id appears on the selected source
+    - target owner always comes from the current registry, never a candidate after value
+  immutable_first_snapshot:
+    include:
+      - registry file
+      - every declaration_refs.path in all seven source records
+      - every preservation_rules.path
+      - V2-S2 input leaf directory and both artifacts
+      - materiality policy
+      - a non-null-predecessor rollback artifact and every bound current/predecessor file when present
+    stable_fields:
+      - entry type
+      - st_dev where supplied
+      - st_ino where supplied
+      - st_size
+      - st_mtime_ns where supplied
+      - st_ctime_ns where supplied
+      - raw bytes for every read file
+      - complete enumerated entry set for each governed directory
+    ignore:
+      - st_atime
+  immutable_second_snapshot:
+    timing: >-
+      After policy evaluation, impact routing, rollback rehearsal, and both
+      complete output objects are computed, but before creating any output
+      directory or file.
+    steps:
+      - repeat no-follow enumeration, lstat, bounded reads, and hashes
+      - rerun V2-S1 load/validation
+      - rerun policy parse/hash/binding validation
+      - rerun V2-S2 artifact parse/hash/cross-binding validation
+      - rerun rollback artifact/hash/file checks when applicable
+      - require exact equality with the first snapshot and validation reports
+    failures:
+      v2_s2_input_changed: input invalid, exit 2, no artifacts
+      registry_or_declaration_changed: baseline mismatch, exit 5, no artifacts
+      policy_changed: policy mismatch, exit 6, no artifacts
+      rollback_input_changed: rollback rehearsal failure, exit 8, no artifacts
+
+materiality_policy_contract:
+  production_file:
+    path: configs/sourceops/materiality_policy.yaml
+    implementation_decision: create_during_v2_s3_implementation
+    schema: raptor.sourceops.materiality_policy.v1
+    hash_basis: raptor.sourceops.materiality_policy_content_hash.v1
+    tracked: true
+    mutable_runtime_override: false
+  authority_rule: >-
+    The implementation file must parse to exactly the initial_checked_in_mapping
+    below. YAML mapping order and LF/CRLF checkout do not affect its content
+    hash; sequence order and every semantic value do. The final human
+    adjudication accepts or rejects this exact hash. No doer or checker may
+    silently alter a rule, threshold, selector, outcome, or approval binding.
+  initial_checked_in_mapping:
+    schema: raptor.sourceops.materiality_policy.v1
+    policy_id: raptor-v2-s3-materiality-v1
+    policy_version: 1.0.0
+    policy_content_hash: 8e6fb7cf254afdda56858308be94e2f2c3456df9e46c9b8fcb19cb0cf17297a5
+    hash_basis: raptor.sourceops.materiality_policy_content_hash.v1
+    approval_binding:
+      mode: HUMAN_ADJUDICATED_EXACT_HASH
+      authority_file: docs/project/specs/raptor-v2-s3-drift-gates.yaml
+      change_rule: NEW_POLICY_VERSION_NEW_HASH_AND_HUMAN_ADJUDICATION
+    registry_binding:
+      schema: raptor.source_registry.v1
+      registry_id: raptor-sourceops-registry-v1
+      registry_content_hash: ef6995a8822c53a1bef228545b0a01c23963b79212967d3f3c15b66d54b02e90
+    artifact_binding:
+      diff_schema: raptor.sourceops.staged_snapshot_diff.v1
+      diff_hash_basis: raptor.sourceops.staged_snapshot_diff_content_hash.v1
+      verification_schema: raptor.sourceops.staged_snapshot_verification.v1
+      verification_hash_basis: raptor.sourceops.staged_snapshot_verification_content_hash.v1
+    evaluator:
+      algorithm: FIRST_MATCH_BY_ASCENDING_UNIQUE_PRIORITY
+      changed_classifications:
+        - ADDED
+        - REMOVED
+        - CHANGED
+      aggregate_precedence:
+        - MATERIAL_CHANGE
+        - NON_MATERIAL_CHANGE
+        - NO_OBSERVED_CHANGE
+      conservative_unmatched_rule_id: SYSTEM-UNMATCHED-MATERIAL-001
+      source_role_derivation: CURRENT_BASELINE_CONTEXT
+    rules:
+      - priority: 0
+        rule_id: OBS-UNCHANGED-001
+        rationale_id: OBSERVATION_EQUAL
+        selectors:
+          classifications: [UNCHANGED]
+          difference_kinds: [ANY]
+          fact_kinds: [ANY]
+          subject_types: [ANY]
+          fact_path: {mode: ANY, values: []}
+          source_roles: [ANY]
+          source_lifecycles: [ANY]
+          consumer_freshness_profiles: [ANY]
+          record_kinds: [ANY]
+        outcome: NO_OBSERVED_CHANGE
+      - priority: 100
+        rule_id: MAT-PINNED-HISTORICAL-001
+        rationale_id: PINNED_HISTORY_CHANGED
+        selectors:
+          classifications: [ADDED, REMOVED, CHANGED]
+          difference_kinds: [ANY]
+          fact_kinds: [ANY]
+          subject_types: [ANY]
+          fact_path: {mode: ANY, values: []}
+          source_roles: [ANY]
+          source_lifecycles: [PINNED_HISTORICAL]
+          consumer_freshness_profiles: [ANY]
+          record_kinds: [ANY]
+        outcome: MATERIAL_CHANGE
+      - priority: 110
+        rule_id: MAT-FRESHNESS-RETRIEVAL-001
+        rationale_id: FRESHNESS_CONTEXT_CHANGED
+        selectors:
+          classifications: [CHANGED]
+          difference_kinds: [METADATA]
+          fact_kinds: [METADATA]
+          subject_types: [SOURCE]
+          fact_path: {mode: EXACT, values: [/release/retrieved_at]}
+          source_roles: [SOURCE_RECORD]
+          source_lifecycles: [ANY]
+          consumer_freshness_profiles: [SOME_REQUIRED, ALL_REQUIRED]
+          record_kinds: [ANY]
+        outcome: MATERIAL_CHANGE
+      - priority: 120
+        rule_id: NONMAT-RETRIEVED-AT-001
+        rationale_id: RETRIEVAL_TIMESTAMP_ONLY
+        selectors:
+          classifications: [CHANGED]
+          difference_kinds: [METADATA]
+          fact_kinds: [METADATA]
+          subject_types: [SOURCE]
+          fact_path: {mode: EXACT, values: [/release/retrieved_at]}
+          source_roles: [SOURCE_RECORD]
+          source_lifecycles:
+            - CONFIRM_PENDING
+            - VERIFIED_ACTIVE
+            - METADATA_ONLY
+            - ACCESS_BLOCKED
+            - RETIRED
+          consumer_freshness_profiles: [NO_CONSUMERS, NONE_REQUIRED]
+          record_kinds: [ANY]
+        outcome: NON_MATERIAL_CHANGE
+      - priority: 200
+        rule_id: MAT-CONTENT-001
+        rationale_id: CONTENT_BYTES_CHANGED
+        selectors:
+          classifications: [ADDED, REMOVED, CHANGED]
+          difference_kinds: [CONTENT]
+          fact_kinds: [ANY]
+          subject_types: [ANY]
+          fact_path: {mode: ANY, values: []}
+          source_roles: [ANY]
+          source_lifecycles: [ANY]
+          consumer_freshness_profiles: [ANY]
+          record_kinds: [ANY]
+        outcome: MATERIAL_CHANGE
+      - priority: 210
+        rule_id: MAT-DECLARATION-001
+        rationale_id: DECLARATION_BINDING_CHANGED
+        selectors:
+          classifications: [ADDED, REMOVED, CHANGED]
+          difference_kinds: [DECLARATION]
+          fact_kinds: [ANY]
+          subject_types: [ANY]
+          fact_path: {mode: ANY, values: []}
+          source_roles: [ANY]
+          source_lifecycles: [ANY]
+          consumer_freshness_profiles: [ANY]
+          record_kinds: [ANY]
+        outcome: MATERIAL_CHANGE
+      - priority: 220
+        rule_id: MAT-IDENTITY-001
+        rationale_id: IDENTITY_CHANGED
+        selectors:
+          classifications: [ADDED, REMOVED, CHANGED]
+          difference_kinds: [ANY]
+          fact_kinds: [IDENTITY]
+          subject_types: [ANY]
+          fact_path: {mode: ANY, values: []}
+          source_roles: [ANY]
+          source_lifecycles: [ANY]
+          consumer_freshness_profiles: [ANY]
+          record_kinds: [ANY]
+        outcome: MATERIAL_CHANGE
+      - priority: 230
+        rule_id: MAT-VERSION-CHECKSUM-MANIFEST-001
+        rationale_id: VERSION_OR_CHECKSUM_CHANGED
+        selectors:
+          classifications: [ADDED, REMOVED, CHANGED]
+          difference_kinds: [ANY]
+          fact_kinds: [VERSION, CHECKSUM, MANIFEST]
+          subject_types: [ANY]
+          fact_path: {mode: ANY, values: []}
+          source_roles: [ANY]
+          source_lifecycles: [ANY]
+          consumer_freshness_profiles: [ANY]
+          record_kinds: [ANY]
+        outcome: MATERIAL_CHANGE
+      - priority: 240
+        rule_id: MAT-COMPONENT-001
+        rationale_id: COMPONENT_MODEL_CHANGED
+        selectors:
+          classifications: [ADDED, REMOVED, CHANGED]
+          difference_kinds: [ANY]
+          fact_kinds: [COMPONENT]
+          subject_types: [ANY]
+          fact_path: {mode: ANY, values: []}
+          source_roles: [ANY]
+          source_lifecycles: [ANY]
+          consumer_freshness_profiles: [ANY]
+          record_kinds: [ANY]
+        outcome: MATERIAL_CHANGE
+      - priority: 250
+        rule_id: MAT-LICENCE-ACQUISITION-001
+        rationale_id: LICENCE_OR_ACQUISITION_CHANGED
+        selectors:
+          classifications: [ADDED, REMOVED, CHANGED]
+          difference_kinds: [METADATA]
+          fact_kinds: [METADATA]
+          subject_types: [SOURCE]
+          fact_path: {mode: PREFIX, values: [/licence/, /acquisition/]}
+          source_roles: [SOURCE_RECORD]
+          source_lifecycles: [ANY]
+          consumer_freshness_profiles: [ANY]
+          record_kinds: [ANY]
+        outcome: MATERIAL_CHANGE
+      - priority: 260
+        rule_id: MAT-METADATA-001
+        rationale_id: METADATA_CHANGED
+        selectors:
+          classifications: [ADDED, REMOVED, CHANGED]
+          difference_kinds: [METADATA]
+          fact_kinds: [ANY]
+          subject_types: [ANY]
+          fact_path: {mode: ANY, values: []}
+          source_roles: [ANY]
+          source_lifecycles: [ANY]
+          consumer_freshness_profiles: [ANY]
+          record_kinds: [ANY]
+        outcome: MATERIAL_CHANGE
+      - priority: 999
+        rule_id: MAT-CONSERVATIVE-DEFAULT-001
+        rationale_id: CONSERVATIVE_DEFAULT
+        selectors:
+          classifications: [ADDED, REMOVED, CHANGED]
+          difference_kinds: [ANY]
+          fact_kinds: [ANY]
+          subject_types: [ANY]
+          fact_path: {mode: ANY, values: []}
+          source_roles: [ANY]
+          source_lifecycles: [ANY]
+          consumer_freshness_profiles: [ANY]
+          record_kinds: [ANY]
+        outcome: MATERIAL_CHANGE
+
+  strict_yaml_and_hash:
+    parser:
+      - UTF-8 strict, one non-empty safe YAML mapping document
+      - duplicate keys, aliases, anchors, merge keys, custom tags, sets, binary scalars, timestamps as objects, and non-JSON values forbidden
+      - mapping keys are strings and unknown keys fail at every closed level
+      - bounded bytes, nodes, depth, strings, rule count, and sequence lengths
+    hash_algorithm:
+      - deep-copy the validated raw mapping
+      - remove only top-level policy_content_hash
+      - serialize canonical JSON with sorted keys, compact separators, ensure_ascii=false, allow_nan=false
+      - preserve every sequence exactly and retain explicit nulls
+      - encode UTF-8 without a trailing LF
+      - compute lowercase SHA-256 and compare with policy_content_hash
+    repository_test_rule: >-
+      Tests independently compute the exact expected digest from
+      initial_checked_in_mapping and require the production config mapping and
+      self-hash to match. The implementation must not use its own hash helper
+      as the test oracle.
+  closed_policy_schema:
+    top_level_required_exact:
+      - schema
+      - policy_id
+      - policy_version
+      - policy_content_hash
+      - hash_basis
+      - approval_binding
+      - registry_binding
+      - artifact_binding
+      - evaluator
+      - rules
+    rule_required_exact:
+      - priority
+      - rule_id
+      - rationale_id
+      - selectors
+      - outcome
+    selector_required_exact:
+      - classifications
+      - difference_kinds
+      - fact_kinds
+      - subject_types
+      - fact_path
+      - source_roles
+      - source_lifecycles
+      - consumer_freshness_profiles
+      - record_kinds
+    fact_path_required_exact:
+      - mode
+      - values
+    fact_path_modes:
+      - ANY
+      - EXACT
+      - PREFIX
+    outcomes:
+      - NO_OBSERVED_CHANGE
+      - NON_MATERIAL_CHANGE
+      - MATERIAL_CHANGE
+    priority_rule: integer 0 through 9999, unique, and rules strictly ascending
+    id_rule: stable non-empty ASCII identifiers unique exactly and after casefold
+    id_maximum_characters: 128
+    general_string_maximum_characters: 1024
+    ANY_rule: >-
+      ANY may appear only as the sole item in a selector list. It is not
+      allowed in fact_path.values.
+    exact_path_rule: one or more known V2-S2 fact paths, sorted and unique
+    prefix_path_rule: one or more slash-terminated known source-path prefixes, sorted and unique
+    no_threshold_rule: numeric severity, score, confidence, percentage, count threshold, regex, expression, code, or callable selectors are forbidden
+  approved_baseline_binding:
+    exact_registry_hash_required: true
+    exact_artifact_schemas_required: true
+    policy_change_behavior: >-
+      Any rule or binding change requires a new policy_version, recomputed
+      policy_content_hash, updated registry binding when applicable, RED tests,
+      Opus checking, and human adjudication. In-place silent threshold or rule
+      changes are invalid.
+    human_gate: >-
+      The policy identifies HUMAN_ADJUDICATED_EXACT_HASH as its approval mode.
+      That approves only use of the mechanical evaluator. It never approves a
+      generated route, rollback, promotion, scientific claim, or legal claim.
+
+materiality_evaluation_algorithm:
+  registry_context:
+    record_kind: current selected source record_kind
+    source_lifecycle: >-
+      Current selected source lifecycle_state is context only. It is never
+      copied into a candidate, used as a readiness result, or emitted as a
+      materiality outcome.
+    consumer_freshness_profile:
+      NO_CONSUMERS: selected source has zero current consumer edges
+      NONE_REQUIRED: at least one edge and every target consumer freshness_required=false
+      SOME_REQUIRED: both true and false freshness_required values occur
+      ALL_REQUIRED: at least one edge and every target consumer freshness_required=true
+    source_role_derivation:
+      SOURCE: SOURCE_RECORD
+      DECLARATION: 'DECLARATION_REF:<current declaration role>'
+      COMPONENT_existing: 'COMPONENT:<current baseline component source_role>'
+      COMPONENT_added: 'COMPONENT:<added after.value.source_role>'
+      FILE_added: 'STAGED_FILE:<after.value.role>'
+      content_declaration: 'DECLARATION_REF:<current declaration role>'
+      content_component: 'COMPONENT:<current component source_role>'
+    role_transition_rule: >-
+      A component source_role field change is evaluated with the current
+      baseline role context. The changed candidate role remains an observed
+      value and is material under MAT-COMPONENT-001. It never changes routing
+      ownership or grants authority.
+  selector_match:
+    list_semantics: exact membership unless the sole value is ANY
+    fact_path_ANY: always matches
+    fact_path_EXACT: exact Unicode string equality against one listed path
+    fact_path_PREFIX: startswith one listed slash-terminated prefix
+    source_role: exact derived context string
+    all_dimensions_required: true
+  rule_selection:
+    steps:
+      - inspect rules in strictly ascending unique priority
+      - collect rules whose every selector dimension matches
+      - select the first matching rule
+      - later matching rules are shadowed by explicit priority and do not create ambiguity
+    invalid_policy_cases:
+      - duplicate priority
+      - unsorted rules
+      - duplicate/case-colliding rule or rationale id
+      - unknown selector token, outcome, mode, lifecycle, record kind, or freshness profile
+      - malformed path selector
+      - missing required unchanged rule or terminal changed catchall
+    defensive_unmatched_behavior: >-
+      A valid changed fact reaching no policy rule evaluates MATERIAL_CHANGE
+      with rule_id SYSTEM-UNMATCHED-MATERIAL-001 and
+      rationale_id CONSERVATIVE_DEFAULT. This is a fail-safe; the required
+      terminal rule makes it unreachable for the approved baseline.
+    unknown_fact_behavior: >-
+      An unknown enum, fact path, subject/provenance combination, or impossible
+      envelope is invalid V2-S2 input and is not evaluated. It is never treated
+      as non-material.
+  per_fact_output:
+    required_exact:
+      - fact_id
+      - fact_index
+      - fact_locator
+      - context
+      - evaluation
+      - rule_id
+      - rationale_id
+      - conservative_default
+    fact_locator_required_exact:
+      - difference_kind
+      - fact_kind
+      - subject_type
+      - subject_id
+      - fact_path
+      - classification
+    context_required_exact:
+      - source_role
+      - source_lifecycle
+      - consumer_freshness_profile
+      - record_kind
+    conservative_default_type: boolean
+    severity_field: forbidden
+    rationale_prose_field: forbidden
+  aggregate_algorithm:
+    precedence:
+      - if any fact is MATERIAL_CHANGE, aggregate MATERIAL_CHANGE
+      - else if any fact is NON_MATERIAL_CHANGE, aggregate NON_MATERIAL_CHANGE
+      - else aggregate NO_OBSERVED_CHANGE
+    validity_precedence:
+      - malformed/tampered artifact or policy gives INVALID and no plan artifact
+      - unknown/stale current baseline gives NOT_EVALUATED and no plan artifact
+    consistency:
+      NO_OBSERVED_CHANGE: V2-S2 stage_outcome must be OBSERVED_NO_DIFFERENCE
+      NON_MATERIAL_CHANGE: V2-S2 stage_outcome must be OBSERVED_DIFFERENCE
+      MATERIAL_CHANGE: V2-S2 stage_outcome must be OBSERVED_DIFFERENCE
+    counts:
+      required_exact:
+        - total_facts
+        - NO_OBSERVED_CHANGE
+        - NON_MATERIAL_CHANGE
+        - MATERIAL_CHANGE
+      sum_rule: the three outcome counts sum to total_facts
+  normative_examples:
+    no_change:
+      input: every independently validated V2-S2 fact is UNCHANGED
+      result: NO_OBSERVED_CHANGE
+      routes: record_only only; stage_diff is recorded as evidenced by input
+    non_material:
+      input: >-
+        On a non-PINNED_HISTORICAL source with NO_CONSUMERS or NONE_REQUIRED
+        freshness profile, only /release/retrieved_at changes and every other
+        fact is unchanged.
+      result: NON_MATERIAL_CHANGE
+      winning_rule: NONMAT-RETRIEVED-AT-001
+      routes: record_only only; no consumer block, rebuild, invalidation, regrounding, validation, or rollback
+    material:
+      input: one valid content checksum, declaration, identity, version, component, licence, acquisition, or unmatched changed fact
+      result: MATERIAL_CHANGE
+      routes: exact declared/edge-conditioned proposal set
+    pinned_historical:
+      input: only /release/retrieved_at changes on frozen-core-annotation-bundle
+      result: MATERIAL_CHANGE
+      winning_rule: MAT-PINNED-HISTORICAL-001
+
+impact_routing_contract:
+  authority_source:
+    actions: current selected source drift_policy.actions only
+    consumer_edges: current selected source consumers plus matching registry consumer records only
+    owner: current registry owner fields only
+    candidate_values_can_authorize_routes: false
+  allowed_action_enum_in_order:
+    - record_only
+    - block_consumer
+    - stage_diff
+    - rebuild_benchmark
+    - review_policy
+    - invalidate_packets
+    - reground_atlas
+    - rerun_validation
+    - rollback
+  promote_resolution: >-
+    V2-S1's closed allowed action enum contains no promote action. V2-S3 v1
+    therefore has no promotion route, prerequisite, disposition, or approval.
+    A promote/promotion action or field is invalid. A future authority must
+    version both the registry action enum and this contract before promotion
+    can be represented.
+  action_disposition_required_exact:
+    - action
+    - disposition
+    - reason_id
+    - route_ids
+  action_dispositions:
+    - PROPOSED
+    - EVIDENCED_BY_VALIDATED_INPUT
+    - NOT_DECLARED_BY_SOURCE
+    - NOT_PROPOSED_NO_OBSERVED_CHANGE
+    - NOT_PROPOSED_NON_MATERIAL
+    - NOT_PROPOSED_NO_TARGET_EDGE
+    - NOT_PROPOSED_NO_PREDECESSOR
+    - NOT_PROPOSED_REHEARSAL_BLOCKED
+  action_disposition_reason_ids:
+    - COMPLETED_ASSESSMENT_REQUIRES_RECORD
+    - VALIDATED_V2_S2_DIFF_PRESENT
+    - ACTION_NOT_DECLARED
+    - NO_OBSERVED_CHANGE
+    - NON_MATERIAL_CHANGE
+    - TARGET_EDGE_ABSENT
+    - NO_PREDECESSOR
+    - ROLLBACK_REHEARSAL_BLOCKED
+    - MATERIAL_ROUTE_CONDITION_MET
+  action_disposition_selection_order:
+    - if action is not in current source actions, use NOT_DECLARED_BY_SOURCE/ACTION_NOT_DECLARED
+    - if action is stage_diff, use EVIDENCED_BY_VALIDATED_INPUT/VALIDATED_V2_S2_DIFF_PRESENT
+    - if action is record_only, use PROPOSED/COMPLETED_ASSESSMENT_REQUIRES_RECORD
+    - if aggregate is NO_OBSERVED_CHANGE, use NOT_PROPOSED_NO_OBSERVED_CHANGE/NO_OBSERVED_CHANGE
+    - if aggregate is NON_MATERIAL_CHANGE, use NOT_PROPOSED_NON_MATERIAL/NON_MATERIAL_CHANGE
+    - if an edge-conditioned action has no exact target edge, use NOT_PROPOSED_NO_TARGET_EDGE/TARGET_EDGE_ABSENT
+    - if rollback has a null predecessor, use NOT_PROPOSED_NO_PREDECESSOR/NO_PREDECESSOR
+    - if rollback rehearsal is BLOCKED, use NOT_PROPOSED_REHEARSAL_BLOCKED/ROLLBACK_REHEARSAL_BLOCKED
+    - otherwise use PROPOSED/MATERIAL_ROUTE_CONDITION_MET with the action-specific route ids
+  action_disposition_route_id_rule: >-
+    PROPOSED carries the exact final route ids for that action in route order.
+    Every other disposition carries an explicit empty route_ids sequence.
+  exact_route_conditions:
+    record_only:
+      target_scope: SOURCE
+      condition: >-
+        The action is declared and materiality evaluation completed with any
+        of the three successful outcomes.
+      route_count: exactly_one
+    block_consumer:
+      target_scope: CONSUMER
+      condition: >-
+        The action is declared and aggregate outcome is MATERIAL_CHANGE.
+      targets: every current non-reserved selected-source consumer edge
+      route_count: one_per_target_or_zero_when_no_edges
+    stage_diff:
+      target_scope: none
+      condition: >-
+        The action is declared and the independently validated V2-S2 pair is
+        the required staged diff evidence.
+      disposition: EVIDENCED_BY_VALIDATED_INPUT
+      route_count: zero
+      no_execution_claim: >-
+        This disposition records an input precondition, not an assertion that
+        V2-S3 ran or approved stage_diff.
+    rebuild_benchmark:
+      target_scope: CONSUMER
+      condition: >-
+        The action is declared, aggregate outcome is MATERIAL_CHANGE, and the
+        current source has an exact consumer edge to eval-benchmark.
+      target_id: eval-benchmark
+      route_count: zero_or_one
+    review_policy:
+      target_scope: SOURCE
+      condition: the action is declared and aggregate outcome is MATERIAL_CHANGE
+      route_count: exactly_one_when_condition_met
+    invalidate_packets:
+      target_scope: CONSUMER
+      condition: >-
+        The action is declared, aggregate outcome is MATERIAL_CHANGE, and the
+        current source has an exact consumer edge to packet.
+      target_id: packet
+      route_count: zero_or_one
+    reground_atlas:
+      target_scope: CONSUMER
+      condition: >-
+        The action is declared, aggregate outcome is MATERIAL_CHANGE, and the
+        current source has an exact consumer edge to atlas.
+      target_id: atlas
+      route_count: zero_or_one
+    rerun_validation:
+      target_scope: SOURCE
+      condition: the action is declared and aggregate outcome is MATERIAL_CHANGE
+      route_count: exactly_one_when_condition_met
+    rollback:
+      target_scope: SOURCE
+      condition: >-
+        The action is declared, aggregate outcome is MATERIAL_CHANGE, a
+        non-null predecessor exists, and rollback rehearsal outcome is
+        READY_FOR_HUMAN_ADJUDICATION.
+      route_count: zero_or_one
+      no_predecessor: no route and disposition NOT_PROPOSED_NO_PREDECESSOR
+      blocked_rehearsal: no route and disposition NOT_PROPOSED_REHEARSAL_BLOCKED
+  no_change_and_non_material_rules:
+    NO_OBSERVED_CHANGE:
+      proposed_actions:
+        - record_only
+      stage_diff_disposition: EVIDENCED_BY_VALIDATED_INPUT
+    NON_MATERIAL_CHANGE:
+      proposed_actions:
+        - record_only
+      stage_diff_disposition: EVIDENCED_BY_VALIDATED_INPUT
+    rule: >-
+      block_consumer, rebuild_benchmark, review_policy, invalidate_packets,
+      reground_atlas, rerun_validation, and rollback are never proposed for a
+      non-material or no-change aggregate.
+  ProposedRoute:
+    required_exact:
+      - route_id
+      - action
+      - state
+      - source_id
+      - target
+      - consumer_id
+      - prerequisites
+      - reason_fact_ids
+      - reason_rule_ids
+      - proposal_only
+      - approval_required
+      - approval_state
+      - executed
+    constants:
+      state: PROPOSED
+      proposal_only: true
+      approval_required: true
+      approval_state: NOT_GRANTED
+      executed: false
+    target_required_exact:
+      - type
+      - id
+      - owner
+    target_types:
+      - SOURCE
+      - CONSUMER
+    consumer_id_rule: null for SOURCE target; exact target id for CONSUMER target
+    route_id_algorithm: >-
+      Join action, target.type, and target.id with a colon in that order. All
+      components are already validated stable identifiers.
+  prerequisites:
+    required_exact:
+      - prerequisite
+      - status
+    enum_order:
+      - VALIDATED_V2_S2_PAIR
+      - CURRENT_BASELINE_MATCH
+      - POLICY_BASELINE_MATCH
+      - MATERIAL_CHANGE
+      - CURRENT_CONSUMER_EDGE
+      - ROLLBACK_REHEARSAL_READY
+      - HUMAN_ADJUDICATION
+    statuses:
+      - SATISFIED
+      - REQUIRED
+    rules:
+      - every route contains the first three SATISFIED prerequisites
+      - material-only routes contain MATERIAL_CHANGE=SATISFIED
+      - consumer routes contain CURRENT_CONSUMER_EDGE=SATISFIED
+      - rollback contains ROLLBACK_REHEARSAL_READY=SATISFIED
+      - every route ends with HUMAN_ADJUDICATION=REQUIRED
+  reason_assignment:
+    record_only: all changed fact ids; empty for NO_OBSERVED_CHANGE
+    material_routes: every MATERIAL_CHANGE fact id in V2-S2 fact order
+    reason_rule_ids: unique winning rule ids in policy priority order
+    no_candidate_owner_or_consumer_fact_can_change_targeting: true
+  dedupe_and_order:
+    dedupe_key:
+      - action
+      - target.type
+      - target.id
+    aggregation: >-
+      Union reason_fact_ids and reason_rule_ids without duplicates, preserving
+      the specified source orders. Any duplicate final route is an internal
+      contract failure, never emitted twice.
+    route_order:
+      - action in V2-S1 allowed enum order
+      - target.type SOURCE before CONSUMER
+      - target.id Unicode code-point order
+    action_disposition_order: V2-S1 allowed enum order
+  reserved_consumer_rule: >-
+    A reserved consumer cannot appear in a route, target, prerequisite,
+    approval, owner derivation, or reason. Its presence on a current source
+    edge fails the baseline before routing.
+
+rollback_input_artifact_contract:
+  purpose: >-
+    A separately authored immutable metadata artifact for a future source
+    record with a non-null predecessor. V2-S3 reads and validates it; V2-S3
+    never creates, repairs, or updates it.
+  null_predecessor_exception: >-
+    For predecessor_source_id=null, validate only that the registry
+    rollback_artifact string is a safe repository-relative path. Do not require
+    existence, do not read it, do not apply the non-null filename/schema rule,
+    and emit NO_PREDECESSOR/NOT_APPLICABLE. Missing path segments are allowed;
+    inspect every existing ancestor without following links or reparses.
+  null_predecessor_unsafe_path: >-
+    An unsafe, absolute, external, traversing, linked-ancestor, or malformed
+    rollback_artifact path is invalid registry rollback metadata even when the
+    predecessor is null. Fail DRIFT_LINEAGE_INVALID, exit 5, and publish no
+    artifact; only safe absence receives the root exception.
+  non_null_path:
+    exact_shape: configs/sourceops/rollbacks/rb-<artifact_content_hash>.json
+    filename_hash_binding: required
+    arbitrary_yaml_or_legacy_name: forbidden
+    safe_real_file: required
+  rollback_source_record_binding:
+    hash_basis: raptor.sourceops.rollback_source_record_binding_hash.v1
+    fixed_sentinel: __RAPTOR_ROLLBACK_ARTIFACT_CONTENT_ADDRESS_V1__
+    artifact_field_names:
+      basis: rollback_source_record_binding_hash_basis
+      current: current_rollback_source_record_binding_hash
+      predecessor: predecessor_rollback_source_record_binding_hash
+    preconditions:
+      - validate the complete raw source record under the unchanged V2-S1 schema
+      - retain explicit nulls, mapping membership, and sequence order
+      - require rollback.rollback_artifact to be present and valid before normalization
+    algorithm:
+      - deep-copy the complete validated raw source-record mapping
+      - replace only rollback.rollback_artifact with the exact fixed_sentinel string
+      - remove no key and transform no other value
+      - serialize with sorted mapping keys, compact separators, ensure_ascii=false, allow_nan=false
+      - preserve every sequence and explicit null exactly
+      - encode UTF-8 without a trailing LF
+      - compute lowercase SHA-256
+    treatment:
+      current: always recomputed from the selected current raw registry record
+      predecessor_non_null: recomputed from the exact predecessor raw registry record
+      predecessor_null: explicit null in V2-S3 outputs; no rollback input artifact exists
+      deeper_chain: recompute for every lineage-chain entry emitted by V2-S3
+    excluded_from_rollback_input_artifact:
+      - registry_content_hash
+      - current_source_record_content_hash
+      - predecessor_source_record_content_hash
+    exclusion_reason: >-
+      Each excluded full hash contains a rollback artifact path and would feed
+      the artifact's own filename hash back into its self-hash. They remain
+      mandatory current-baseline and V2-S3 output bindings.
+    tamper_evidence: >-
+      The normalized hash covers every source-record key and value except the
+      content-addressed path value. The exact path is independently constrained
+      to rb-<artifact_content_hash>.json and checked against the artifact
+      self-hash. V2-S3 also validates the full registry and full record hashes,
+      declaration bytes, file bindings, preservation bindings, and immutable
+      snapshots, then cross-binds all values in both output plans.
+    normative_cycle_free_example:
+      base_registry_content_hash: ef6995a8822c53a1bef228545b0a01c23963b79212967d3f3c15b66d54b02e90
+      base_current_source_id: tsc-ingest-and-reference-declarations
+      exact_construction:
+        - deep-copy the base current raw source record from the frozen registry
+        - set current rollback.predecessor_source_id to synthetic-predecessor-tsc-ingest
+        - set current rollback.origin_reason to synthetic non-null READY fixture
+        - initially set current rollback.rollback_artifact to configs/sourceops/rollbacks/rb-<64 lowercase ASCII zeroes>.json
+        - leave every other current source-record key, value, explicit null, mapping member, and sequence position byte-semantically unchanged
+        - deep-copy the unmodified base record as predecessor
+        - set predecessor source_id and display_name to the exact values below, lifecycle_state to PINNED_HISTORICAL, and consumers to an empty sequence
+        - set predecessor rollback.predecessor_source_id to explicit null, rollback.rollback_artifact to configs/sourceops/rollbacks/synthetic-predecessor-root.yaml, and rollback.origin_reason to synthetic root predecessor
+        - leave predecessor rollback.immutable_predecessor_required=true and every other predecessor key, value, explicit null, mapping member, and sequence position byte-semantically unchanged from the base record
+        - derive both normalized hashes before creating the artifact
+        - copy both exact declaration-ref sequences shown below without reordering
+        - zip the two declaration-ref sequences by their 1-based sequence index and assign binding_id as ASCII bind- plus that index zero-padded to three decimal digits
+        - emit file bindings in ascending binding_id order with the exact fields and values below
+        - emit preservation bindings in the frozen registry preservation_rules sequence with the exact fields and values below
+        - create the artifact with exactly the schema top-level keys and exact scalar/sequence values below; remove only artifact_content_hash when self-hashing
+        - set artifact_content_hash to the lowercase self-hash, serialize the final artifact as canonical JSON plus exactly one LF, then replace the current provisional path with the exact final_registry_path below
+        - replace the current record at its existing source_records index, append the predecessor as the final source_records element, preserve every other registry value and sequence, and recompute only registry_content_hash
+        - compute the full current/predecessor record and synthetic registry hashes only after final path assignment
+      predecessor_source_id: synthetic-predecessor-tsc-ingest
+      predecessor_display_name: Synthetic predecessor TSC ingest declaration
+      current_declaration_refs_exact:
+        - path: configs/ingest/tsc.yaml
+          role: authoritative_root
+          canonical_lf_sha256: dcd02fde77a711afe2e47cb5a01449fc0a926708476ff07cfb756458459ffad2
+          authority_scope: repository
+      predecessor_declaration_refs_exact:
+        - path: configs/ingest/tsc.yaml
+          role: authoritative_root
+          canonical_lf_sha256: dcd02fde77a711afe2e47cb5a01449fc0a926708476ff07cfb756458459ffad2
+          authority_scope: repository
+      file_bindings_exact:
+        - binding_id: bind-001
+          predecessor_path: configs/ingest/tsc.yaml
+          predecessor_content_byte_size: 2836
+          predecessor_canonical_lf_sha256: dcd02fde77a711afe2e47cb5a01449fc0a926708476ff07cfb756458459ffad2
+          current_path: configs/ingest/tsc.yaml
+          current_content_byte_size: 2836
+          current_canonical_lf_sha256: dcd02fde77a711afe2e47cb5a01449fc0a926708476ff07cfb756458459ffad2
+      preservation_bindings_exact:
+        - rule_id: preserve-r2-census
+          path: data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json
+          content_byte_size: 10960
+          canonical_lf_sha256: 7c55cd4e3059713d1d53886d8893a3819153375b62ce9d37187d731132c6a77f
+        - rule_id: preserve-r2-tiered
+          path: data/census/tsc_tiered_readjudication_2026-07-21.json
+          content_byte_size: 8282
+          canonical_lf_sha256: 1e36b2d07767fdd8e32fbf07dd42f60a2b4cae2ff9b21c7dfb9430d741c5bc5f
+        - rule_id: preserve-eval-tsc2
+          path: configs/eval/tsc2.yaml
+          content_byte_size: 8236
+          canonical_lf_sha256: 45358c2e66d09d8ba32937b1d2751659f382a8444679fdd0244bbde3b63f7206
+        - rule_id: preserve-eval-tiered
+          path: configs/eval/tiered_gate_v3.yaml
+          content_byte_size: 5184
+          canonical_lf_sha256: d140d041c1582eb1c6e49ea071ebc3d1e7d6d64b9cff29141b1be197c419fe6d
+        - rule_id: preserve-bp4pp3-policy
+          path: configs/eval/bp4pp3_predictor_policy.json
+          content_byte_size: 864
+          canonical_lf_sha256: 85e9e92fa9f4c221c02af30e787315a88ed2bef51f6f58d25c5dc267eb55a34a
+        - rule_id: preserve-core-annotation
+          path: configs/eval/core_annotation_bundle.yaml
+          content_byte_size: 17935
+          canonical_lf_sha256: fd175a1e77e3cf65a148038c6f06d5acd10078411ce6077100081cd881ad2815
+        - rule_id: preserve-mave
+          path: configs/external/mave_sources.yaml
+          content_byte_size: 4703
+          canonical_lf_sha256: 34bdaff3c9d3ecff31942dfc73b47f34b0ab808419a1fa945141082a8d3fa9d1
+        - rule_id: preserve-atlas-catalog
+          path: configs/atlas/catalogs/tsc2/catalog.yaml
+          content_byte_size: 1452
+          canonical_lf_sha256: b9d90a2d490cbb8bf7b49d59fd0bc5e98417eb847a7ba9febecd5c090a8f17e1
+        - rule_id: preserve-atlas-pack
+          path: configs/atlas/packs/tsc2/pack.yaml
+          content_byte_size: 2814
+          canonical_lf_sha256: 158861d7026b9be6b8fa80625c7c07157d75a04d26ffb7ababfedf2a6c711a2f
+      current_rollback_source_record_binding_hash: b0381867b60b1629db27b2cf14966cd16455e0d1c0a2ccd8ed8de556e30e71e5
+      predecessor_rollback_source_record_binding_hash: 85badafac6d4987aee393882cfccbc4459a81cd2b6d219af1baa51588b7b131a
+      artifact_content_hash: ae4c29b68766e9483c288f8a636af1340eae0bef1395383fce019167a31b2b55
+      final_registry_path: configs/sourceops/rollbacks/rb-ae4c29b68766e9483c288f8a636af1340eae0bef1395383fce019167a31b2b55.json
+      artifact_scalar_fields_exact:
+        schema: raptor.sourceops.rollback_artifact.v1
+        artifact_content_hash: ae4c29b68766e9483c288f8a636af1340eae0bef1395383fce019167a31b2b55
+        hash_basis: raptor.sourceops.rollback_artifact_content_hash.v1
+        rollback_source_record_binding_hash_basis: raptor.sourceops.rollback_source_record_binding_hash.v1
+        current_source_id: tsc-ingest-and-reference-declarations
+        current_rollback_source_record_binding_hash: b0381867b60b1629db27b2cf14966cd16455e0d1c0a2ccd8ed8de556e30e71e5
+        predecessor_source_id: synthetic-predecessor-tsc-ingest
+        predecessor_rollback_source_record_binding_hash: 85badafac6d4987aee393882cfccbc4459a81cd2b6d219af1baa51588b7b131a
+      artifact_canonical_json_byte_size_without_trailing_lf: 3299
+      artifact_file_byte_size_with_one_trailing_lf: 3300
+      current_source_record_content_hash_after_path: edc21393a63f98a55888d575f48c0936fcbe1019af2d3b506af97cf950151c81
+      predecessor_source_record_content_hash: 9f850e1681b8a91cbb17eac0b4f1f369f3b92bad735ab9e8ad3d10eea648d98e
+      synthetic_registry_content_hash_after_path: 1d7a83cadc9d2db1ba4a6ca1c74799259f8e2b10550617b16d0d22b62bc68f42
+      stability_assertions:
+        - replacing the provisional path with the final path leaves the current normalized binding hash unchanged
+        - neither full source-record hash nor the full synthetic registry hash is present in the rollback input artifact
+        - the artifact bytes and artifact_content_hash are final before the full hashes are computed
+        - a fixture with the derived files present can therefore reach all 12 PASS checks without a hash fixpoint
+  schema:
+    id: raptor.sourceops.rollback_artifact.v1
+    hash_basis: raptor.sourceops.rollback_artifact_content_hash.v1
+    canonical_json: same strict canonical one-LF rule as V2-S2 inputs
+    top_level_required_exact:
+      - schema
+      - artifact_content_hash
+      - hash_basis
+      - rollback_source_record_binding_hash_basis
+      - current_source_id
+      - current_rollback_source_record_binding_hash
+      - predecessor_source_id
+      - predecessor_rollback_source_record_binding_hash
+      - current_declaration_refs
+      - predecessor_declaration_refs
+      - file_bindings
+      - preservation_bindings
+    self_hash: remove only artifact_content_hash and hash canonical JSON without LF
+    recursively_forbidden_keys:
+      - command
+      - shell
+      - script
+      - executable
+      - execute
+      - executed
+      - approval
+      - promote
+      - promotion
+      - delete
+  FileBinding:
+    required_exact:
+      - binding_id
+      - predecessor_path
+      - predecessor_content_byte_size
+      - predecessor_canonical_lf_sha256
+      - current_path
+      - current_content_byte_size
+      - current_canonical_lf_sha256
+    rules:
+      - binding_id is unique exactly and after casefold
+      - sequence is strictly ascending by binding_id
+      - all sizes are positive JSON integers no greater than the file limit
+      - every path is canonical repository-relative and safe
+      - every current declaration_refs.path appears exactly once as current_path
+      - every predecessor declaration_refs.path appears exactly once as predecessor_path
+      - current and predecessor declaration counts must be equal
+      - declared hashes equal their corresponding declaration_ref canonical_lf_sha256
+      - actual strict UTF-8 canonical-LF byte sizes/hashes equal the artifact values
+      - source and target paths cannot be generated, staging, policy, registry, or rollback metadata paths
+      - preservation overlap is structurally representable but is evaluated only by the dedicated preservation-conflict check
+  PreservationBinding:
+    required_exact:
+      - rule_id
+      - path
+      - content_byte_size
+      - canonical_lf_sha256
+    rules:
+      - sequence exactly matches current registry preservation_rules by rule_id/path order
+      - each file is strict UTF-8 text and its canonical-LF size/hash match
+      - all rule ids and paths are unique exactly and after casefold
+  exact_cross_bindings:
+    - current_source_id equals the selected V2-S2 source
+    - predecessor_source_id equals current rollback.predecessor_source_id
+    - rollback_source_record_binding_hash_basis equals the fixed v1 basis
+    - both rollback source-record binding hashes recompute from the current registry
+    - both declaration-ref sequences equal their current registry records
+    - file and preservation bindings are complete, exact, and content-valid
+    - the current registry path filename equals artifact_content_hash
+    - full registry and source-record hashes recompute independently for V2-S3 output binding but are not artifact fields
+  future_admission_rule: >-
+    Adding a non-null predecessor requires the rollback artifact to exist and
+    be content-addressed in the same separately approved registry admission.
+    Creating a formerly missing artifact in place without a new registry hash,
+    policy binding, and V2-S2 observation is not an allowed repair.
+
+rollback_rehearsal_contract:
+  lineage_validation:
+    steps:
+      - read current rollback metadata from the validated registry
+      - require immutable_predecessor_required=true
+      - if predecessor is null, stop lineage traversal with NO_PREDECESSOR
+      - otherwise require predecessor exists exactly once and differs from current source
+      - require predecessor lifecycle is VERIFIED_ACTIVE or PINNED_HISTORICAL
+      - require predecessor immutable_predecessor_required=true
+      - require matching authoritative_locator under the V2-S1 lineage rule
+      - traverse predecessor links to a null root with no repeated id
+      - cap traversal at registry source-record count
+    invalid_lineage: current baseline invalid, exit 5, no artifacts
+  root_source_semantics:
+    lineage_status: NO_PREDECESSOR
+    rehearsal_outcome: NOT_APPLICABLE
+    reason_code: NO_PREDECESSOR
+    rollback_artifact_status: NOT_REQUIRED
+    rollback_artifact_content_hash: null
+    rollback_source_record_binding_hash_basis: raptor.sourceops.rollback_source_record_binding_hash.v1
+    current_rollback_source_record_binding_hash: recomputed
+    predecessor_source_record_content_hash: null
+    predecessor_rollback_source_record_binding_hash: null
+    predecessor_declaration_refs: []
+    integrity_checks_not_applicable: true
+    proposed_operations: []
+    rollback_route_eligible: false
+    missing_legacy_path_is_not_a_blocker: true
+  non_null_rehearsal:
+    read_only_checks_in_order:
+      - safe rollback artifact path
+      - rollback artifact exists as a regular no-follow file
+      - strict canonical schema, filename hash, and self-hash
+      - normalized current/predecessor source and declaration cross-bindings
+      - dedicated preservation-target conflict gate before any current/predecessor file or preservation-binding check
+      - current declaration file size/hash bindings
+      - predecessor immutable file size/hash bindings
+      - complete preservation binding size/hash checks
+      - no file/path/registry/policy/input mutation across both snapshots
+    ready_result:
+      outcome: READY_FOR_HUMAN_ADJUDICATION
+      reason_code: REHEARSAL_INTEGRITY_VALID
+      blocker: null
+    blocked_result:
+      outcome: BLOCKED
+      one_blocker_only: true
+      exit_code: 8
+      artifacts_are_published_when_inputs_are_stable: true
+      no_rollback_route: true
+  blocker_precedence:
+    - ROLLBACK_PATH_INVALID
+    - ROLLBACK_ARTIFACT_MISSING
+    - ROLLBACK_ARTIFACT_TYPE_INVALID
+    - ROLLBACK_ARTIFACT_READ_FAILED
+    - ROLLBACK_ARTIFACT_LIMIT_EXCEEDED
+    - ROLLBACK_ARTIFACT_ENCODING_INVALID
+    - ROLLBACK_ARTIFACT_JSON_INVALID
+    - ROLLBACK_ARTIFACT_CANONICAL_BYTES_INVALID
+    - ROLLBACK_ARTIFACT_SCHEMA_INVALID
+    - ROLLBACK_ARTIFACT_FILENAME_HASH_MISMATCH
+    - ROLLBACK_ARTIFACT_HASH_MISMATCH
+    - ROLLBACK_ARTIFACT_BINDING_MISMATCH
+    - ROLLBACK_PRESERVATION_CONFLICT
+    - ROLLBACK_FILE_BINDING_INVALID
+    - ROLLBACK_CURRENT_CONTENT_MISMATCH
+    - ROLLBACK_PREDECESSOR_CONTENT_UNAVAILABLE
+    - ROLLBACK_PRESERVATION_BINDING_MISMATCH
+  blocker_schema:
+    required_exact:
+      - code
+      - phase
+      - subject
+      - expected
+      - actual
+    details_rule: JSON-safe, bounded, canonical, and never raw exception text
+  binding_failure_partition:
+    ROLLBACK_ARTIFACT_SCHEMA_INVALID: >-
+      A required normalized-binding field is missing, extra, malformed, or has
+      an unknown hash-basis id.
+    ROLLBACK_ARTIFACT_FILENAME_HASH_MISMATCH: >-
+      The safe rb-<hash>.json filename does not equal the declared artifact
+      content hash.
+    ROLLBACK_ARTIFACT_HASH_MISMATCH: >-
+      The declared artifact content hash does not equal the self-excluding
+      canonical artifact hash.
+    ROLLBACK_ARTIFACT_BINDING_MISMATCH: >-
+      A structurally valid declared normalized source-record hash, source id,
+      or declaration sequence does not equal the recomputed current-registry
+      value. Detailed file and preservation binding validation belongs to its
+      later dedicated checks.
+    DRIFT_BASELINE_BINDING_MISMATCH: >-
+      A full V2-S2 registry/source-record/declaration binding is stale; this is
+      a baseline error with exit 5 and no artifacts, not a rollback blocker.
+  performed_integrity_check:
+    required_exact:
+      - check
+      - status
+    statuses:
+      - PASS
+      - FAIL
+      - NOT_APPLICABLE
+    exact_checks:
+      - CURRENT_SOURCE_BINDING
+      - PREDECESSOR_SOURCE_BINDING
+      - LINEAGE_ACYCLIC
+      - ROLLBACK_PATH_SAFE
+      - ROLLBACK_ARTIFACT_PRESENT
+      - ROLLBACK_ARTIFACT_HASH_MATCH
+      - ROLLBACK_ARTIFACT_BINDINGS_MATCH
+      - CURRENT_FILES_MATCH
+      - PREDECESSOR_FILES_MATCH
+      - PRESERVATION_BINDINGS_MATCH
+      - PRESERVATION_TARGETS_CLEAR
+      - INPUTS_IMMUTABLE
+    reporting_and_execution_semantics:
+      exact_checks_is_canonical_reporting_order: true
+      status_rule: >-
+        Status records actual execution, not a position-derived fiction. A
+        performed successful check is PASS, the dedicated failed check is
+        FAIL, and every bypassed or unexecuted check is NOT_APPLICABLE even
+        when that row appears earlier in exact_checks.
+      blocker_index_prefix_fill: forbidden
+      preservation_conflict_execution: >-
+        After the first seven checks succeed, execute
+        PRESERVATION_TARGETS_CLEAR before CURRENT_FILES_MATCH,
+        PREDECESSOR_FILES_MATCH, and PRESERVATION_BINDINGS_MATCH. On conflict,
+        fail it immediately, bypass those three file/binding checks and
+        INPUTS_IMMUTABLE, and emit no operation.
+      ROLLBACK_PRESERVATION_CONFLICT_exact_vector:
+        expected_length: 12
+        rows_in_exact_checks_order:
+          - {check: CURRENT_SOURCE_BINDING, status: PASS}
+          - {check: PREDECESSOR_SOURCE_BINDING, status: PASS}
+          - {check: LINEAGE_ACYCLIC, status: PASS}
+          - {check: ROLLBACK_PATH_SAFE, status: PASS}
+          - {check: ROLLBACK_ARTIFACT_PRESENT, status: PASS}
+          - {check: ROLLBACK_ARTIFACT_HASH_MATCH, status: PASS}
+          - {check: ROLLBACK_ARTIFACT_BINDINGS_MATCH, status: PASS}
+          - {check: CURRENT_FILES_MATCH, status: NOT_APPLICABLE}
+          - {check: PREDECESSOR_FILES_MATCH, status: NOT_APPLICABLE}
+          - {check: PRESERVATION_BINDINGS_MATCH, status: NOT_APPLICABLE}
+          - {check: PRESERVATION_TARGETS_CLEAR, status: FAIL}
+          - {check: INPUTS_IMMUTABLE, status: NOT_APPLICABLE}
+        statuses_in_exact_checks_order:
+          - PASS
+          - PASS
+          - PASS
+          - PASS
+          - PASS
+          - PASS
+          - PASS
+          - NOT_APPLICABLE
+          - NOT_APPLICABLE
+          - NOT_APPLICABLE
+          - FAIL
+          - NOT_APPLICABLE
+    binding_check_semantics:
+      CURRENT_SOURCE_BINDING: >-
+        Current id, normalized binding hash, and declaration refs match the
+        current raw registry record; the full current record hash is separately
+        retained for output.
+      PREDECESSOR_SOURCE_BINDING: >-
+        Predecessor id, normalized binding hash, lifecycle, immutable lineage,
+        and declaration refs match the exact predecessor raw registry record;
+        the full predecessor record hash is separately retained for output.
+      ROLLBACK_ARTIFACT_HASH_MATCH: >-
+        Canonical bytes, artifact self-hash, and filename hash all match.
+      ROLLBACK_ARTIFACT_BINDINGS_MATCH: >-
+        Hash-basis id, source ids, normalized record hashes, and declaration
+        refs match. The file/preservation sequences have closed schema, but
+        their target membership and content are not claimed checked here;
+        those belong to CURRENT_FILES_MATCH, PREDECESSOR_FILES_MATCH, and
+        PRESERVATION_BINDINGS_MATCH.
+  proposed_operation_contract:
+    required_exact:
+      - operation_id
+      - sequence
+      - operation_type
+      - source_path
+      - target_path
+      - expected_source_hash
+      - expected_target_hash
+      - preservation_rule_id
+      - proposal_only
+      - approval_required
+      - approval_state
+      - executed
+    operation_types:
+      - REVALIDATE_INPUT_BINDINGS
+      - REVALIDATE_PRESERVATION_BOUNDARIES
+      - RESTORE_DECLARATION_FROM_PREDECESSOR
+      - VERIFY_RESTORED_DECLARATION_HASH
+      - REQUEST_HUMAN_ADJUDICATION
+    constants:
+      proposal_only: true
+      approval_required: true
+      approval_state: NOT_GRANTED
+      executed: false
+    no_command_fields: true
+    ready_plan_order:
+      - one REVALIDATE_INPUT_BINDINGS
+      - one REVALIDATE_PRESERVATION_BOUNDARIES
+      - one RESTORE_DECLARATION_FROM_PREDECESSOR per file binding in binding order
+      - one VERIFY_RESTORED_DECLARATION_HASH per file binding in binding order
+      - one REQUEST_HUMAN_ADJUDICATION
+    blocked_or_not_applicable_operations: []
+    execution_ceiling: >-
+      These are inert typed descriptions. V2-S3 contains no dispatcher,
+      subprocess, shell, file-copy, file-replace, delete, chmod, workflow, or
+      callback surface capable of executing them.
+  creates:
+    rollback_metadata_artifact: false
+    executable_rehearsal_manifest: false
+    restoration_script: false
+    rollback_rehearsal_plan_artifact: true
+
+artifact_contracts:
+  artifact_set_decision:
+    count: 2
+    impact_assessment_and_plan: one combined impact artifact
+    rollback_rehearsal_and_plan: one combined rollback artifact
+    separate_manifest: false
+    rationale: >-
+      Two cross-bound artifacts are the minimum coherent set. Each keeps
+      observations, evaluation/checks, and proposals in separate closed
+      sections without adding a mutable index or executable manifest.
+  common_canonical_json:
+    mapping_order: sorted keys
+    separators: [',', ':']
+    ensure_ascii: false
+    allow_nan: false
+    encoding: UTF-8
+    hash_input_trailing_newline: false
+    persisted_file_trailing_newline: exactly_one_LF
+    write_mode: bytes_without_platform_newline_translation
+    sequence_rule: preserve specified deterministic order
+    explicit_null_rule: retain
+  self_excluding_hash: >-
+    Deep-copy the complete artifact mapping, remove only top-level
+    artifact_content_hash, serialize common canonical JSON without a trailing
+    LF, and compute lowercase SHA-256.
+  observed_at_rule: >-
+    Copy observed_at byte-for-byte from the validated V2-S2 pair. No current
+    time, command time, file time, policy approval time, or rollback time enters
+    artifact bytes, hashes, paths, or successful CLI stdout.
+
+  impact_artifact:
+    schema: raptor.sourceops.drift_impact_plan.v1
+    hash_basis: raptor.sourceops.drift_impact_plan_content_hash.v1
+    top_level_required_exact:
+      - schema
+      - artifact_content_hash
+      - hash_basis
+      - observed_at
+      - input_binding
+      - observation
+      - policy_evaluation
+      - proposal
+      - proposal_only
+      - approval_required
+      - approval_state
+      - executed
+      - validation_ceiling
+    constants:
+      proposal_only: true
+      approval_required: true
+      approval_state: NOT_GRANTED
+      executed: false
+    input_binding_required_exact:
+      - manifest_content_hash
+      - diff_artifact
+      - verification_artifact
+      - registry
+      - source
+      - policy
+    artifact_ref_required_exact:
+      - path
+      - content_hash
+      - schema
+    registry_binding_required_exact:
+      - path
+      - schema
+      - registry_id
+      - content_hash
+    source_binding_required_exact:
+      - source_id
+      - source_record_content_hash
+      - rollback_source_record_binding_hash_basis
+      - rollback_source_record_binding_hash
+      - declaration_refs
+    policy_binding_required_exact:
+      - path
+      - schema
+      - policy_id
+      - policy_version
+      - content_hash
+      - approval_mode
+    observation_required_exact:
+      - stage_outcome
+      - summary
+      - fact_ids
+    policy_evaluation_required_exact:
+      - outcome
+      - counts
+      - evaluations
+    proposal_required_exact:
+      - source_declared_actions
+      - action_dispositions
+      - routes
+    rules:
+      - observed before/after values remain authoritative only in the referenced V2-S2 diff
+      - evaluations are one-to-one and in V2-S2 fact order
+      - proposed routes satisfy exact route order and uniqueness
+      - no route carries an approved or executed state
+
+  rollback_artifact:
+    schema: raptor.sourceops.rollback_rehearsal_plan.v1
+    hash_basis: raptor.sourceops.rollback_rehearsal_plan_content_hash.v1
+    top_level_required_exact:
+      - schema
+      - artifact_content_hash
+      - hash_basis
+      - observed_at
+      - input_binding
+      - impact_plan_content_hash
+      - lineage
+      - rollback_artifact
+      - integrity_checks
+      - rehearsal
+      - proposal_only
+      - approval_required
+      - approval_state
+      - executed
+      - validation_ceiling
+    constants:
+      proposal_only: true
+      approval_required: true
+      approval_state: NOT_GRANTED
+      executed: false
+    input_binding: same_as_impact_artifact
+    lineage_required_exact:
+      - status
+      - rollback_source_record_binding_hash_basis
+      - current_source_id
+      - current_source_record_content_hash
+      - current_rollback_source_record_binding_hash
+      - current_declaration_refs
+      - predecessor_source_id
+      - predecessor_source_record_content_hash
+      - predecessor_rollback_source_record_binding_hash
+      - predecessor_declaration_refs
+      - chain
+    lineage_chain_entry_required_exact:
+      - source_id
+      - source_record_content_hash
+      - rollback_source_record_binding_hash
+    lineage_chain_rule: >-
+      Current source first, then each predecessor, ending at the null-root
+      source; every id and both hashes recompute from the current registry, and
+      the sequence is unique and bounded.
+    rollback_artifact_required_exact:
+      - registry_path
+      - status
+      - content_hash
+      - file_bindings
+      - preservation_bindings
+    rollback_artifact_statuses:
+      - NOT_REQUIRED
+      - VERIFIED
+      - BLOCKED
+    rollback_artifact_field_rules:
+      - root null-predecessor output retains the safe registry path, status NOT_REQUIRED, null hash, and empty binding sequences
+      - a verified non-null artifact retains its safe canonical path, status VERIFIED, declared hash, and complete bindings
+      - a blocked safe path retains the canonical path, status BLOCKED, nullable hash, and only fully validated bindings
+      - ROLLBACK_PATH_INVALID uses registry_path=null and never echoes the unsafe raw value
+    rehearsal_required_exact:
+      - outcome
+      - reason_code
+      - blocker
+      - rollback_route_eligible
+      - proposed_operations
+    cross_reference_rule: >-
+      impact_plan_content_hash equals the exact self-hash of the impact artifact
+      published in the same output leaf. Both artifacts repeat the same input
+      binding and observed_at.
+
+  output_write_policy:
+    compute_before_write:
+      - complete rollback assessment in memory
+      - complete and self-hash impact artifact
+      - bind impact hash into rollback artifact and self-hash rollback artifact
+      - compute both exact persisted byte strings
+      - require each and total persisted byte length to satisfy the output limits
+      - complete the second immutable-input snapshot
+    allowed_leaf_initial_states:
+      - absent
+      - existing real empty directory
+      - existing real directory containing exactly the two expected identical final files
+    rejected_leaf_states:
+      - symlink, junction, reparse, special, or non-directory leaf
+      - extra or unknown entry
+      - expected filename with non-identical bytes
+      - expected filename that is not a regular no-follow file
+      - active, malformed, foreign, or orphan transaction lock
+    idempotency: >-
+      Identical valid inputs produce identical paths, names, hashes, bytes, and
+      stdout. Existing identical files are accepted without rewrite or mtime
+      change.
+    transaction_pattern:
+      fixed_lock_name: .sourceops-transaction.lock
+      temporary_prefix: .sourceops-artifact-tmp-
+      acquire_timeout_seconds: 30
+      rules:
+        - all writers contend on the exact same per-leaf in-process and on-disk lock
+        - on-disk lock creation is exclusive and owner metadata is bounded and parseable
+        - a live owner is bounded-waited; foreign, malformed, dead, or orphan lock is preserved and fails closed
+        - no run reclaims or deletes a lock or temp file it did not create
+        - final creation is exclusive; a winner is accepted only after no-follow byte-identical reread
+        - on handled failure remove only this run's own temp/finals and never a winner's bytes
+        - publish impact then rollback as one whole-leaf transaction
+    conceptual_reuse_rule: >-
+      Reuse the proven V2-S2 transaction semantics. A behavior-preserving
+      extraction to shared SourceOps artifact I/O is allowed only with
+      byte-compatible V2-S2 tests; V2-S3 must not call unsafe private helpers
+      or weaken V2-S2 collision/rollback guarantees.
+
+typed_model_and_public_api_contract:
+  required_public_models:
+    - MaterialityPolicy
+    - MaterialityRule
+    - MaterialitySelectors
+    - V2S2ArtifactRef
+    - V2S2ArtifactPair
+    - DiffFact
+    - FactEvaluation
+    - MaterialityAssessment
+    - ActionDisposition
+    - ProposedRoute
+    - RoutePrerequisite
+    - ImpactRoutingResult
+    - RollbackMetadataArtifact
+    - RollbackFileBinding
+    - PreservationBinding
+    - RollbackBlocker
+    - RollbackIntegrityCheck
+    - ProposedRollbackOperation
+    - RollbackRehearsal
+    - ImpactPlanArtifact
+    - RollbackPlanArtifact
+    - ArtifactReference
+    - PlanDriftCliResult
+    - PlanDriftResult
+  immutability_and_types:
+    - public state is frozen and slotted
+    - sequences are tuples or another immutable concrete sequence
+    - enums are closed string enums or equivalent literal-safe types
+    - no public required field is Any, object, bare dict/list/tuple/set, or mutable raw mapping
+    - optionality is explicit with typed nulls
+    - serializers return fresh exact closed mappings only at JSON/YAML boundaries
+  required_public_errors:
+    base: DriftPlanningError
+    subclasses_follow_error_catalog: true
+    properties:
+      - code
+      - phase
+      - exit_code
+      - fixed message
+      - JSON-safe subject
+      - JSON-safe expected
+      - JSON-safe actual
+  required_public_functions:
+    - signature: 'load_materiality_policy() -> MaterialityPolicy'
+      behavior: load and validate only the fixed production policy
+    - signature: 'load_v2_s2_artifact_pair(manifest_content_hash: str) -> V2S2ArtifactPair'
+      behavior: discover and independently validate only the fixed final leaf
+    - signature: 'evaluate_materiality(pair: V2S2ArtifactPair, registry: Registry, policy: MaterialityPolicy) -> MaterialityAssessment'
+      behavior: pure deterministic evaluation with no filesystem mutation
+    - signature: 'route_impact(assessment: MaterialityAssessment, registry: Registry, rehearsal: RollbackRehearsal) -> ImpactRoutingResult'
+      behavior: pure deterministic proposal derivation
+    - signature: 'rehearse_rollback(pair: V2S2ArtifactPair, registry: Registry) -> RollbackRehearsal'
+      behavior: bounded read-only validation and inert plan construction
+    - signature: 'plan_drift(manifest_content_hash: str) -> PlanDriftResult'
+      behavior: complete production operation used by the CLI
+  testability_rule: >-
+    Tests may monkeypatch only public loader/repository-boundary functions to
+    supply synthetic typed fixtures. They must not assert private helper names,
+    copy private hash helpers as oracles, or require a CLI path override.
+  V2_S1_V2_S2_reuse:
+    - use public load_registry and validate_registry
+    - consume public typed V2-S2 schemas or add independent public loaders
+    - do not trust a mutable raw dictionary retained by a public result
+    - helper extraction is behavior-preserving and additive only
+  dependency_and_import_boundary:
+    allowed:
+      - Python standard library
+      - PyYAML
+      - raptor.sourceops modules
+    forbidden:
+      - requests
+      - httpx
+      - urllib.request
+      - socket network use
+      - subprocess
+      - sqlite3
+      - schedulers or workflow clients
+      - raptor domain packages outside sourceops
+
+cli_contract:
+  existing_commands_byte_compatible:
+    - validate
+    - status
+    - verify-stage
+  new_command:
+    count: 1
+    command: plan-drift
+    invocation: >-
+      python -m raptor.sourceops.cli plan-drift
+      --manifest-hash <lowercase-sha256>
+    arguments:
+      --manifest-hash:
+        required: true
+        regex: '^[0-9a-f]{64}$'
+    forbidden_arguments:
+      - --registry
+      - --policy
+      - --diff
+      - --verification
+      - --input
+      - --output
+      - --output-root
+      - --force
+      - --threshold
+      - --materiality
+      - --approve
+      - --execute
+      - --promote
+      - --rollback
+      - --consumer
+      - --network
+  exit_codes:
+    0: >-
+      Valid input, baseline, and policy; impact/rollback artifacts published;
+      materiality is NO_OBSERVED_CHANGE, NON_MATERIAL_CHANGE, or
+      MATERIAL_CHANGE; rollback is READY_FOR_HUMAN_ADJUDICATION or
+      NOT_APPLICABLE.
+    2: CLI usage or invalid/tampered/unsafe V2-S2 input pair
+    4: source_id from the valid pair is absent from the valid current registry
+    5: current registry, declarations, source record, actions, consumers, lineage, or V2-S2 baseline binding is invalid, stale, mismatched, or changed
+    6: fixed policy is missing, invalid, tampered, unapproved-by-binding, mismatched, ambiguous, or changed
+    7: generated-output boundary, collision, transaction, or write failure
+    8: >-
+      Input/baseline/policy evaluation succeeded and both artifacts were
+      published, but a non-null-predecessor rollback rehearsal is BLOCKED; or a
+      rollback input mutated before publication, in which case no artifact is
+      published.
+    70: unexpected internal failure caught at the plan-drift boundary
+  successful_observation_exit_rule: >-
+    Material and non-material observations both use exit 0. Materiality is data
+    in deterministic JSON, not process failure. Exit 8 is reserved only for a
+    mechanically blocked non-null rollback rehearsal.
+  stdout:
+    schema: raptor.sourceops.drift_plan_cli_result.v1
+    serialization: canonical JSON one line followed by exactly one LF
+    top_level_required_exact:
+      - schema
+      - command
+      - run_status
+      - input_validity
+      - baseline_validity
+      - policy_validity
+      - assessment_outcome
+      - rollback_rehearsal_outcome
+      - source_id
+      - manifest_content_hash
+      - diff_artifact_content_hash
+      - verification_artifact_content_hash
+      - registry_content_hash
+      - policy_content_hash
+      - impact_plan
+      - rollback_plan
+      - error
+      - proposal_only
+      - approval_required
+      - approval_state
+      - executed
+      - validation_ceiling
+    constants:
+      schema: raptor.sourceops.drift_plan_cli_result.v1
+      command: plan-drift
+      proposal_only: true
+      approval_required: true
+      approval_state: NOT_GRANTED
+      executed: false
+    run_status_values:
+      - COMPLETED
+      - FAILED
+    input_validity_values:
+      - VALID
+      - INVALID
+      - NOT_EVALUATED
+    baseline_validity_values:
+      - VALID
+      - INVALID
+      - MISMATCH
+      - UNKNOWN_SOURCE
+      - NOT_EVALUATED
+    policy_validity_values:
+      - VALID
+      - INVALID
+      - MISMATCH
+      - NOT_EVALUATED
+    assessment_outcome_values:
+      - NO_OBSERVED_CHANGE
+      - NON_MATERIAL_CHANGE
+      - MATERIAL_CHANGE
+      - INVALID
+      - NOT_EVALUATED
+    rollback_rehearsal_outcome_values:
+      - READY_FOR_HUMAN_ADJUDICATION
+      - NOT_APPLICABLE
+      - BLOCKED
+      - NOT_EVALUATED
+    success_artifact_ref_required_exact:
+      - path
+      - content_hash
+      - schema
+    success_artifact_ref_rules:
+      - impact_plan schema is raptor.sourceops.drift_impact_plan.v1
+      - rollback_plan schema is raptor.sourceops.rollback_rehearsal_plan.v1
+      - each path is the canonical forward-slash fixed output path
+      - each content_hash equals the filename and artifact self-hash
+    success_rules:
+      - run_status=COMPLETED
+      - input_validity=VALID
+      - baseline_validity=VALID
+      - policy_validity=VALID
+      - both artifact refs are non-null
+      - error=null
+      - exit 0 or 8 according to rollback outcome
+    failure_rules:
+      - run_status=FAILED
+      - artifact refs are null
+      - error is non-null
+      - usage/internal failures use NOT_EVALUATED outcomes
+      - invalid V2-S2 bytes use assessment_outcome=INVALID
+      - baseline failures use assessment_outcome=NOT_EVALUATED
+      - policy invalidity uses assessment_outcome=INVALID
+      - output failures retain already computed materiality/rollback outcomes
+  stderr:
+    handled_results: exactly_zero_bytes
+    traceback_or_raw_exception_text: forbidden
+  argument_error_rule: >-
+    Missing, duplicate, extra, unknown, non-lowercase, or malformed plan-drift
+    arguments emit one closed JSON CLI_USAGE_ERROR, exit 2, and empty stderr.
+    Existing command argument behavior remains byte-compatible.
+
+error_contract:
+  error_envelope_required_exact:
+    - code
+    - type
+    - phase
+    - message
+    - subject
+    - expected
+    - actual
+  value_rules:
+    subject: canonical repository-relative path, identifier, field name, or null
+    expected: bounded JSON value or null
+    actual: bounded JSON value or null
+    message: fixed catalog text only
+  deterministic_phase_order:
+    - CLI
+    - BOUNDARY
+    - INPUT_DISCOVERY
+    - ARTIFACT_READ
+    - ARTIFACT_SCHEMA
+    - ARTIFACT_HASH
+    - ARTIFACT_CROSS_BINDING
+    - BASELINE
+    - FACT_VALIDATION
+    - POLICY_READ
+    - POLICY_SCHEMA
+    - POLICY_HASH
+    - MATERIALITY
+    - ROUTING
+    - ROLLBACK
+    - IMMUTABILITY
+    - OUTPUT
+    - INTERNAL
+  deterministic_selection:
+    - fail on the first failing phase
+    - within the pair validate verification before diff
+    - inspect mapping fields in required_exact order
+    - inspect sequences in index order
+    - choose the lowest Unicode-sorted duplicate/collision subject
+    - choose the first rollback blocker in blocker_precedence
+    - emit exactly one error envelope or one rollback blocker, never both
+  JSON_safety:
+    - recursively normalize only JSON scalars, mappings, and sequences
+    - non-finite or unsupported values become fixed type labels in error details
+    - never call repr on an arbitrary object
+    - never include absolute paths, drive letters, environment values, PIDs, tokens, or raw OS text
+    - truncate normalized detail strings to 1024 Unicode code points
+    - cap detail sequences and mappings at 64 entries and detail nesting at depth 8
+  catalog:
+    - code: CLI_USAGE_ERROR
+      type: DriftCliUsageError
+      phase: CLI
+      exit: 2
+      message: plan-drift arguments do not match the closed command contract
+    - code: DRIFT_INPUT_LEAF_INVALID
+      type: DriftInputLeafError
+      phase: BOUNDARY
+      exit: 2
+      message: V2-S2 input leaf is outside the fixed safe generated boundary
+    - code: DRIFT_INPUT_ARTIFACT_SET_INVALID
+      type: DriftInputArtifactSetError
+      phase: INPUT_DISCOVERY
+      exit: 2
+      message: V2-S2 input leaf does not contain exactly one final artifact pair
+    - code: DRIFT_INPUT_LEAF_NOT_FINALIZED
+      type: DriftInputLeafNotFinalizedError
+      phase: INPUT_DISCOVERY
+      exit: 2
+      message: V2-S2 input leaf contains a lock, temporary, linked, special, or partial entry
+    - code: DRIFT_ARTIFACT_READ_FAILED
+      type: DriftArtifactReadError
+      phase: ARTIFACT_READ
+      exit: 2
+      message: V2-S2 artifact could not be read as a bounded local regular file
+    - code: DRIFT_ARTIFACT_LIMIT_EXCEEDED
+      type: DriftArtifactLimitError
+      phase: ARTIFACT_READ
+      exit: 2
+      message: V2-S2 artifact exceeds a closed byte or structure limit
+    - code: DRIFT_ARTIFACT_ENCODING_INVALID
+      type: DriftArtifactEncodingError
+      phase: ARTIFACT_READ
+      exit: 2
+      message: V2-S2 artifact is not strict UTF-8 without a BOM
+    - code: DRIFT_ARTIFACT_JSON_INVALID
+      type: DriftArtifactJsonError
+      phase: ARTIFACT_SCHEMA
+      exit: 2
+      message: V2-S2 artifact is not one duplicate-safe finite JSON mapping
+    - code: DRIFT_ARTIFACT_CANONICAL_BYTES_INVALID
+      type: DriftArtifactCanonicalBytesError
+      phase: ARTIFACT_SCHEMA
+      exit: 2
+      message: V2-S2 artifact bytes are not canonical JSON with exactly one LF
+    - code: DRIFT_VERIFICATION_SCHEMA_INVALID
+      type: DriftVerificationSchemaError
+      phase: ARTIFACT_SCHEMA
+      exit: 2
+      message: V2-S2 verification artifact violates its closed schema
+    - code: DRIFT_DIFF_SCHEMA_INVALID
+      type: DriftDiffSchemaError
+      phase: ARTIFACT_SCHEMA
+      exit: 2
+      message: V2-S2 diff artifact violates its closed schema
+    - code: DRIFT_ARTIFACT_FILENAME_HASH_MISMATCH
+      type: DriftArtifactFilenameHashMismatch
+      phase: ARTIFACT_HASH
+      exit: 2
+      message: V2-S2 artifact filename does not match its declared content hash
+    - code: DRIFT_ARTIFACT_HASH_MISMATCH
+      type: DriftArtifactHashMismatch
+      phase: ARTIFACT_HASH
+      exit: 2
+      message: V2-S2 artifact self-hash does not match its canonical mapping
+    - code: DRIFT_ARTIFACT_CROSS_BINDING_MISMATCH
+      type: DriftArtifactCrossBindingMismatch
+      phase: ARTIFACT_CROSS_BINDING
+      exit: 2
+      message: V2-S2 diff and verification artifacts do not bind the same observation
+    - code: DRIFT_INPUT_TREE_HASH_MISMATCH
+      type: DriftInputTreeHashMismatch
+      phase: ARTIFACT_CROSS_BINDING
+      exit: 2
+      message: V2-S2 input-tree hash or summary does not recompute
+    - code: DRIFT_BASELINE_REGISTRY_INVALID
+      type: DriftBaselineRegistryError
+      phase: BASELINE
+      exit: 5
+      message: current V2-S1 registry is invalid
+    - code: DRIFT_BASELINE_DECLARATION_INVALID
+      type: DriftBaselineDeclarationError
+      phase: BASELINE
+      exit: 5
+      message: current V2-S1 declaration or preservation precondition is invalid
+    - code: DRIFT_UNKNOWN_SOURCE
+      type: DriftUnknownSourceError
+      phase: BASELINE
+      exit: 4
+      message: V2-S2 source_id is not present in the current valid registry
+    - code: DRIFT_BASELINE_BINDING_MISMATCH
+      type: DriftBaselineBindingMismatch
+      phase: BASELINE
+      exit: 5
+      message: V2-S2 source, registry, record, or declaration binding is stale or mismatched
+    - code: DRIFT_BASELINE_ACTION_POLICY_INVALID
+      type: DriftBaselineActionPolicyError
+      phase: BASELINE
+      exit: 5
+      message: current source actions, approval flag, consumer edges, or reserved boundary are invalid
+    - code: DRIFT_LINEAGE_INVALID
+      type: DriftLineageError
+      phase: BASELINE
+      exit: 5
+      message: current rollback predecessor lineage is not a valid immutable chain
+    - code: DRIFT_FACT_INVARIANT_INVALID
+      type: DriftFactInvariantError
+      phase: FACT_VALIDATION
+      exit: 2
+      message: V2-S2 fact, summary, ordering, classification, provenance, or baseline invariant is invalid
+    - code: DRIFT_POLICY_READ_FAILED
+      type: DriftPolicyReadError
+      phase: POLICY_READ
+      exit: 6
+      message: fixed materiality policy could not be read as a bounded local regular file
+    - code: DRIFT_POLICY_ENCODING_INVALID
+      type: DriftPolicyEncodingError
+      phase: POLICY_READ
+      exit: 6
+      message: fixed materiality policy is not strict UTF-8
+    - code: DRIFT_POLICY_YAML_INVALID
+      type: DriftPolicyYamlError
+      phase: POLICY_SCHEMA
+      exit: 6
+      message: fixed materiality policy is not one safe duplicate-free YAML mapping
+    - code: DRIFT_POLICY_SCHEMA_INVALID
+      type: DriftPolicySchemaError
+      phase: POLICY_SCHEMA
+      exit: 6
+      message: fixed materiality policy violates its closed schema
+    - code: DRIFT_POLICY_HASH_MISMATCH
+      type: DriftPolicyHashMismatch
+      phase: POLICY_HASH
+      exit: 6
+      message: fixed materiality policy self-hash does not match its canonical mapping
+    - code: DRIFT_POLICY_BINDING_MISMATCH
+      type: DriftPolicyBindingMismatch
+      phase: POLICY_HASH
+      exit: 6
+      message: fixed materiality policy does not bind the current registry or V2-S2 schemas
+    - code: DRIFT_POLICY_AMBIGUOUS
+      type: DriftPolicyAmbiguityError
+      phase: POLICY_HASH
+      exit: 6
+      message: fixed materiality policy contains ambiguous, duplicate, or unordered rules
+    - code: DRIFT_MATERIALITY_EVALUATION_INVALID
+      type: DriftMaterialityEvaluationError
+      phase: MATERIALITY
+      exit: 6
+      message: materiality evaluation did not produce one closed result per valid fact
+    - code: DRIFT_ROUTE_INVARIANT_INVALID
+      type: DriftRouteInvariantError
+      phase: ROUTING
+      exit: 70
+      message: proposed impact routes violate the closed dedupe, order, target, or approval contract
+    - code: DRIFT_INPUT_MUTATED
+      type: DriftInputMutationError
+      phase: IMMUTABILITY
+      exit: 2
+      message: V2-S2 artifact pair changed during planning
+    - code: DRIFT_BASELINE_CHANGED_DURING_RUN
+      type: DriftBaselineMutationError
+      phase: IMMUTABILITY
+      exit: 5
+      message: registry, declaration, preservation, or lineage input changed during planning
+    - code: DRIFT_POLICY_CHANGED_DURING_RUN
+      type: DriftPolicyMutationError
+      phase: IMMUTABILITY
+      exit: 6
+      message: materiality policy changed during planning
+    - code: DRIFT_ROLLBACK_INPUT_MUTATED
+      type: DriftRollbackMutationError
+      phase: IMMUTABILITY
+      exit: 8
+      message: rollback artifact or bound file changed during rehearsal
+    - code: DRIFT_OUTPUT_BOUNDARY_INVALID
+      type: DriftOutputBoundaryError
+      phase: OUTPUT
+      exit: 7
+      message: drift-plan output path is not a safe real path below the fixed boundary
+    - code: DRIFT_OUTPUT_LIMIT_EXCEEDED
+      type: DriftOutputLimitError
+      phase: OUTPUT
+      exit: 7
+      message: drift-plan artifact pair exceeds a closed output byte limit
+    - code: DRIFT_OUTPUT_COLLISION
+      type: DriftOutputCollisionError
+      phase: OUTPUT
+      exit: 7
+      message: content-addressed drift-plan leaf contains non-identical or unknown content
+    - code: DRIFT_OUTPUT_WRITE_FAILED
+      type: DriftOutputWriteError
+      phase: OUTPUT
+      exit: 7
+      message: drift-plan artifact pair could not be published atomically
+    - code: DRIFT_INTERNAL_ERROR
+      type: DriftInternalError
+      phase: INTERNAL
+      exit: 70
+      message: plan-drift failed closed because of an unexpected internal error
+
+implementation_and_repository_layout:
+  implementation_allowed:
+    create:
+      - configs/sourceops/materiality_policy.yaml
+      - src/raptor/sourceops/drift_planning.py
+    update_additively:
+      - src/raptor/sourceops/__init__.py
+      - src/raptor/sourceops/cli.py
+      - src/raptor/sourceops/model.py
+    conditional_shared_helpers:
+      - src/raptor/sourceops/artifact_io.py
+      - src/raptor/sourceops/hashing.py
+      - src/raptor/sourceops/paths.py
+    rule: >-
+      Shared helper extraction is allowed only when observable V2-S1/V2-S2
+      behavior, bytes, errors, exits, and tests remain unchanged. No private
+      V2-S2 implementation function becomes a required V2-S3 public contract.
+  red_test_author_expected:
+    create:
+      - tests/sourceops/test_drift_planning_contract.py
+      - tests/sourceops/test_drift_planning_cli.py
+      - tests/sourceops/test_drift_planning_safety.py
+      - tests/sourceops/test_drift_planning_repository.py
+    may_create_fixture_directory:
+      - tests/sourceops/fixtures/drift_planning/
+  forbidden_changes:
+    - configs/sourceops/source_registry.yaml
+    - configs/sourceops/rollbacks/
+    - configs/ingest/
+    - configs/eval/
+    - configs/external/
+    - configs/atlas/
+    - configs/acmg/
+    - data/
+    - docs/project/TODOS.yaml
+    - dependency manifests
+    - existing domain packages
+    - existing V2-S1/V2-S2 tests except additive shared-fixture imports with byte-identical assertions
+    - any RescueScreen or panel-product path
+  runtime_artifacts:
+    V2_S2_input: .raptor/sourceops/generated/staged-snapshots/<manifest-hash>/
+    V2_S3_output: .raptor/sourceops/generated/drift-plans/<diff-hash>/<policy-hash>/
+    tracked: false
+  fixture_decisions:
+    checked_in_generated_golden_artifacts: false
+    checked_in_real_rollback_artifacts: false
+    rollback_rehearsal_fixtures: synthetic_only
+    optional_tiny_payload_limit_bytes: 4096
+    real_source_integration: >-
+      At least one integration uses the actual current registry and a V2-S2
+      artifact pair generated through public verify-stage behavior for
+      tsc-ingest-and-reference-declarations. It must exercise no-change,
+      retrieved_at-only non-material, and one material fact without changing a
+      declaration or the registry.
+    future_predecessor_cases: >-
+      Non-null predecessor, missing artifact, unsafe path, malformed artifact,
+      and preservation-conflict cases use synthetic typed registries and tiny
+      checked-in or programmatically generated files only. They do not edit the
+      production registry or create its currently absent rollback paths.
+    algorithmic_non_null_READY_fixture:
+      required: true
+      construction: >-
+        Build a complete valid current/predecessor registry lineage and its
+        bound files programmatically. Compute both normalized source-record
+        binding hashes first, self-hash the rollback artifact second, assign
+        rb-<artifact_content_hash>.json to the current raw record third, and
+        compute the full record/registry hashes last. No brute force, repeated
+        hash search, monkeypatched digest, hard-coded self-hash, or fixpoint
+        assumption is allowed.
+      minimum_file_bindings: 1
+      expected_rehearsal_outcome: READY_FOR_HUMAN_ADJUDICATION
+      exact_integrity_result: all 12 performed_integrity_check rows are PASS
+      exact_operation_type_coverage:
+        - REVALIDATE_INPUT_BINDINGS
+        - REVALIDATE_PRESERVATION_BOUNDARIES
+        - RESTORE_DECLARATION_FROM_PREDECESSOR
+        - VERIFY_RESTORED_DECLARATION_HASH
+        - REQUEST_HUMAN_ADJUDICATION
+      operation_constants:
+        proposal_only: true
+        approval_required: true
+        approval_state: NOT_GRANTED
+        executed: false
+      required_production_surface: rehearse_rollback
+      normative_example_self_test:
+        exact_test: tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac16_normative_cycle_free_example_constants_reproduce_independently
+        oracle_rule: >-
+          Reimplement the published exact_construction in test code using only
+          Python standard-library canonical JSON/SHA-256, PyYAML for the frozen
+          registry, and direct repository-byte reads. Do not call or copy an
+          implementation helper and do not seed any derived hash.
+        assertions:
+          - every exact current/predecessor mutation and sequence position
+          - both declaration-ref sequences and every file/preservation binding field in order
+          - both normalized source-record binding hashes
+          - artifact_content_hash, final_registry_path, and both artifact byte sizes
+          - current and predecessor full source-record hashes after final path assignment
+          - synthetic registry hash after current replacement and final predecessor append
+          - the final fixture reaches rehearse_rollback with all 12 checks PASS
+        required_production_surface: rehearse_rollback
+    blocker_fixture_integrity_sequence:
+      - use a valid non-null immutable lineage and a canonical safe registry path before testing any blocker after ROLLBACK_PATH_SAFE
+      - for a missing-artifact case, all source/lineage/path checks preceding ROLLBACK_ARTIFACT_PRESENT are PASS and that check alone is FAIL
+      - for each later artifact/hash/binding/file/preservation blocker, make every check earlier in actual execution order PASS and mutate only the targeted prerequisite
+      - when testing a binding after self-hash validation, recompute the artifact self-hash and filename so the intended binding blocker is first
+      - assert every unexecuted check is NOT_APPLICABLE and proposed_operations is empty
+      - ROLLBACK_PRESERVATION_CONFLICT uses its exact non-linear 12-row vector; CURRENT_FILES_MATCH, PREDECESSOR_FILES_MATCH, and PRESERVATION_BINDINGS_MATCH are NOT_APPLICABLE rather than fabricated PASS
+      - unsafe-path cases remain separate and intentionally fail ROLLBACK_PATH_SAFE
+    cleanup: >-
+      Tests remove only uniquely owned .raptor test leaves and synthetic
+      repository roots after lstat/no-follow ownership checks. They never
+      delete fixed parents, current policy, operator input, or unrelated
+      generated artifacts.
+
+acceptance_criteria:
+  - id: V2S3-AC01
+    type: boundary
+    text: >-
+      plan-drift accepts only one lowercase manifest hash, derives one fixed
+      final V2-S2 leaf, and rejects every alternate, linked, reparse, special,
+      partial, extra, ambiguous, or unsafe input path without writing output.
+  - id: V2S3-AC02
+    type: artifact_validation
+    text: >-
+      Both V2-S2 artifacts are strict canonical one-LF JSON with exact closed
+      schemas, filename-bound self-hashes, bounded structures, and no duplicate
+      keys or non-finite values.
+  - id: V2S3-AC03
+    type: cross_binding
+    text: >-
+      Manifest, observed_at, source, registry, source-record, declarations,
+      candidate, projection, input-tree, stage outcome, and diff/verification
+      hash bindings all recompute and match before interpretation.
+  - id: V2S3-AC04
+    type: fact_validation
+    text: >-
+      Every source, content, and component fact is independently validated
+      against the V2-S2 closed universe and current source; classifications,
+      summary, order, provenance, explicit nulls, and stage outcome recompute.
+      COMPONENT_CHECKSUM content-binding facts remain exclusively content
+      facts despite subject_type=COMPONENT and are valid under both
+      NOT_PROVIDED and COMPLETE component projection modes.
+      A valid COMPLETE component projection needs no input-tree file anchor;
+      exact baseline identities/values are checked and unfamiliar valid
+      candidate values proceed to conservative policy evaluation.
+  - id: V2S3-AC05
+    type: baseline
+    text: >-
+      The canonical V2-S1 registry and all declaration/preservation
+      preconditions validate; unknown source, stale hash, changed declaration,
+      invalid actions, false approval flag, bad edge, and reserved consumer are
+      distinct fail-closed baseline outcomes. Readiness is never queried.
+  - id: V2S3-AC06
+    type: immutability
+    text: >-
+      V2-S2 artifacts, registry, all declarations, preservation files, policy,
+      and applicable rollback inputs pass two no-follow snapshots and
+      revalidation. Any mutation prevents mixed-input publication.
+  - id: V2S3-AC07
+    type: policy
+    text: >-
+      The fixed checked-in policy exactly matches the approved mapping, closed
+      schema, self-hash, current registry hash, and V2-S2 schema bindings; no
+      CLI threshold or alternate policy exists.
+  - id: V2S3-AC08
+    type: materiality
+    text: >-
+      Every valid fact receives exactly one stable rule/rationale result, and
+      aggregation yields only NO_OBSERVED_CHANGE, NON_MATERIAL_CHANGE, or
+      MATERIAL_CHANGE with the specified precedence and counts.
+  - id: V2S3-AC09
+    type: conservative_default
+    text: >-
+      Unknown fact structure is invalid; unknown role context or a defensively
+      unmatched valid changed fact is material; duplicate/ambiguous policy
+      rules are invalid. No unknown becomes silently non-material.
+  - id: V2S3-AC10
+    type: outcome_examples
+    text: >-
+      All-unchanged, non-historical retrieved_at-only, ordinary content change,
+      and pinned-historical retrieved_at cases produce the exact four normative
+      results and winning rule ids.
+  - id: V2S3-AC11
+    type: routing
+    text: >-
+      Routes derive only from current declared actions and current non-reserved
+      edges, use current owners, satisfy the exact action conditions, carry
+      reason fact/rule ids, and are deterministically deduplicated and ordered.
+  - id: V2S3-AC12
+    type: proposal_boundary
+    text: >-
+      Every route and artifact is proposal_only=true,
+      approval_required=true, approval_state=NOT_GRANTED, executed=false; no
+      promote action or approval/execution-shaped field can be laundered in.
+  - id: V2S3-AC13
+    type: reserved_boundary
+    text: >-
+      RescueScreen and both panel consumers cannot become routes, targets,
+      prerequisites, owners, approvals, or evidence of readiness.
+  - id: V2S3-AC14
+    type: rollback_lineage
+    text: >-
+      A non-null predecessor must form an acyclic immutable same-lineage chain,
+      and current/predecessor full record hashes, normalized rollback binding
+      hashes, and declaration sequences bind exactly to the current registry.
+  - id: V2S3-AC15
+    type: root_rollback
+    text: >-
+      Every current root source yields lineage NO_PREDECESSOR, rehearsal
+      NOT_APPLICABLE, reason NO_PREDECESSOR, no rollback route/operations, and
+      exit 0 even though its legacy rollback_artifact path is absent.
+  - id: V2S3-AC16
+    type: rollback_artifact
+    text: >-
+      A future non-null predecessor requires one safe content-addressed
+      canonical rollback artifact with exact normalized current/predecessor
+      source, declaration, file, and preservation bindings. Its own filename
+      hash is constructable without a fixpoint; full registry and record hashes
+      are validated separately and emitted by V2-S3. V2-S3 creates no such
+      input artifact.
+  - id: V2S3-AC17
+    type: rollback_blocked
+    text: >-
+      Stable missing, unsafe, malformed, mismatched, unavailable, or
+      preservation-conflicting non-null rollback metadata yields one
+      deterministic BLOCKED rehearsal artifact, no rollback route/operations,
+      both V2-S3 artifacts published, and exit 8.
+  - id: V2S3-AC18
+    type: rollback_inertness
+    text: >-
+      An algorithmically constructed non-null ready rehearsal produces all 12
+      integrity checks as PASS and exercises all five operation types as closed
+      inert proposals with no command string, dispatcher, copy, replacement,
+      deletion, chmod, shell, workflow, or restoration behavior.
+  - id: V2S3-AC19
+    type: artifacts
+    text: >-
+      Exactly two output artifacts have closed schemas, self-excluding hashes,
+      exact one-LF canonical bytes, fixed content-addressed paths, exact
+      cross-references, full registry/source-record bindings beside normalized
+      rollback source-record bindings, and observed_at inherited only from
+      V2-S2.
+  - id: V2S3-AC20
+    type: publication
+    text: >-
+      Pair publication is idempotent, whole-leaf transactional, race-safe, and
+      collision-preserving under identical writers, partial failures, live or
+      orphan locks, extra files, links, and non-identical winners.
+  - id: V2S3-AC21
+    type: cli
+    text: >-
+      plan-drift is the sole new command; handled results emit one deterministic
+      JSON object, exactly one LF, empty stderr, exact exits, and material plus
+      non-material observations both use exit 0.
+  - id: V2S3-AC22
+    type: typed_api
+    text: >-
+      New public models, functions, results, and errors are closed, typed, and
+      immutable with no Any or mutable raw required surfaces; runtime remains
+      standard library plus PyYAML and offline.
+  - id: V2S3-AC23
+    type: bounded_failure
+    text: >-
+      Parser, tree, fact, route, rollback, input, output, and concurrency work
+      is bounded; first-error phase selection is deterministic; raw exceptions,
+      absolute paths, secrets, and non-JSON values never escape.
+  - id: V2S3-AC24
+    type: non_mutation
+    text: >-
+      Success, exit 8, and representative failures leave registry, policy,
+      declarations, preservation paths, V2-S2 artifacts, frozen evidence,
+      staging, domain files, RescueScreen, and rollback inputs byte-identical.
+  - id: V2S3-AC25
+    type: compatibility
+    text: >-
+      Existing validate, status, and verify-stage stdout/exits remain
+      byte-compatible; all V2-S1/V2-S2 and established domain regression gates
+      pass without weakened assertions, skips, fixtures, or semantics.
+  - id: V2S3-AC26
+    type: phase_handoff
+    text: >-
+      Implementation acceptance uses only synthetic rollback fixtures and
+      current offline integration. Separate post-publication rehearsals of one
+      mutable source and one external-content-root refresh remain human-gated
+      V2 phase work and authorize no promotion.
+
+inversion_and_falsifier_probes:
+  - id: V2S3-FM01
+    threat: arbitrary input path or ambiguous leaf selection
+    probe: >-
+      Supply path-like, uppercase, short, traversal, drive, UNC, URI, latest,
+      extra-argument, and multi-pair cases. All fail before artifact content is
+      accepted and write nothing.
+  - id: V2S3-FM02
+    threat: symlink, junction, reparse, FIFO, device, or special input launders bytes
+    probe: >-
+      Place each type at an input ancestor, leaf, and artifact. No target is
+      followed, read, or written; the exact boundary/discovery error wins.
+  - id: V2S3-FM03
+    threat: self-hash or filename creates false content address
+    probe: >-
+      Tamper each artifact byte, declared hash, and filename independently.
+      Canonical bytes, self-hash, and filename checks detect every case.
+  - id: V2S3-FM04
+    threat: valid self-hashed files are cross-paired
+    probe: >-
+      Pair diff and verification artifacts from different manifests, sources,
+      trees, observations, candidates, or outcomes. Cross-binding fails before
+      registry or policy interpretation.
+  - id: V2S3-FM05
+    threat: forged V2-S2 outcome or summary is trusted
+    probe: >-
+      Rehash a fact with wrong before value, classification, provenance,
+      summary count, ordering, input-tree hash, or stage outcome. Independent
+      fact validation rejects it.
+  - id: V2S3-FM06
+    threat: stale current registry or declaration is interpreted
+    probe: >-
+      Change registry hash, selected record, any declaration, consumer edge,
+      action, approval flag, or preservation precondition. The baseline fails
+      with exit 4 or 5 and no plan.
+  - id: V2S3-FM07
+    threat: input changes between validation and publication
+    probe: >-
+      Replace or modify a V2-S2 artifact, registry, declaration, preservation
+      file, policy, rollback artifact, or bound file after first snapshot. The
+      exact mutation category wins and no mixed-input pair is published.
+  - id: V2S3-FM08
+    threat: ad hoc threshold or alternate policy bypass
+    probe: >-
+      Pass a policy/threshold argument, environment override, or alternate
+      file. CLI usage fails; the production evaluator still reads only the
+      fixed checked-in path.
+  - id: V2S3-FM09
+    threat: policy tamper, stale binding, or ambiguous rule becomes accepted
+    probe: >-
+      Change a policy byte/hash/version/registry binding/schema binding, add an
+      unknown selector/outcome, duplicate priority/id, reorder rules, or remove
+      the terminal default. Exit 6, no artifacts.
+  - id: V2S3-FM10
+    threat: unknown or unmatched fact becomes non-material
+    probe: >-
+      Use an unknown fact path/enum and a valid changed fact with an unfamiliar
+      added component role in a COMPLETE projection whose staged files have
+      empty component_ids. The former is invalid; the latter is structurally
+      valid without file anchoring and reaches the component material rule or
+      conservative material default. Separately exercise a valid
+      COMPONENT_CHECKSUM content binding with subject_type=COMPONENT under
+      both NOT_PROVIDED and COMPLETE projections; both pass content-universe
+      validation, while a forged current-registry component checksum baseline
+      is invalid in both modes and never reaches materiality evaluation.
+  - id: V2S3-FM11
+    threat: no-change is conflated with non-material change
+    probe: >-
+      Compare all-UNCHANGED against retrieved_at-only change. Outcomes,
+      evaluation counts, rule ids, and route dispositions remain distinct.
+  - id: V2S3-FM12
+    threat: historical or freshness context is ignored
+    probe: >-
+      Apply the same retrieved_at change to NONE_REQUIRED non-historical,
+      SOME_REQUIRED, and PINNED_HISTORICAL contexts. Results are respectively
+      non-material, material, and material.
+  - id: V2S3-FM13
+    threat: action laundering or candidate owner controls routes
+    probe: >-
+      Add promote/executed/approved fields, unknown actions, false approval,
+      and a changed candidate owner. Inputs fail or routes retain current
+      registry owner and NOT_GRANTED/executed=false.
+  - id: V2S3-FM14
+    threat: reserved consumer becomes impact target or approval
+    probe: >-
+      Add each reserved id to source edges or forged facts/routes. Baseline or
+      artifact validation fails; no reserved route exists.
+  - id: V2S3-FM15
+    threat: duplicate or nondeterministic routes
+    probe: >-
+      Feed multiple material facts for the same target and perturb fact/policy
+      mapping insertion order. Exactly one route per dedupe key appears with
+      stable unioned reasons and byte-identical order.
+  - id: V2S3-FM16
+    threat: stage_diff is falsely claimed executed by V2-S3
+    probe: >-
+      Assert stage_diff has EVIDENCED_BY_VALIDATED_INPUT disposition, no route,
+      and no execution/approval claim on all successful materiality outcomes.
+  - id: V2S3-FM17
+    threat: absent root rollback path blocks current baseline
+    probe: >-
+      Run each current null-predecessor source with its absent registry path.
+      Each is NOT_APPLICABLE/NO_PREDECESSOR, has zero operations/route, and does
+      not attempt to open the path.
+  - id: V2S3-FM18
+    threat: missing non-null rollback artifact is silently treated feasible
+    probe: >-
+      Use a valid synthetic non-null lineage and absent canonical safe artifact
+      path. All source, lineage, and path checks pass before artifact presence
+      alone fails. Publish BLOCKED with ROLLBACK_ARTIFACT_MISSING, later checks
+      NOT_APPLICABLE, no operations/route, and exit 8.
+  - id: V2S3-FM19
+    threat: unsafe or tampered rollback artifact becomes an executable plan
+    probe: >-
+      Exercise absolute/traversal/link path, wrong filename/self-hash, malformed
+      JSON, wrong normalized hash basis, wrong current/predecessor normalized
+      hash, declarations, duplicate file binding, and missing predecessor
+      bytes. Except for explicit unsafe-path cases, use a canonical safe
+      registry path and satisfy every earlier integrity check; re-self-hash and
+      rename when necessary so the targeted first blocker is stable. Operations
+      remain empty.
+  - id: V2S3-FM20
+    threat: rollback targets frozen preservation content
+    probe: >-
+      Make a target equal, ancestor, or descendant of a preservation path.
+      Rehearsal is BLOCKED with ROLLBACK_PRESERVATION_CONFLICT and proposes no
+      restore operation. Its 12 rows remain in canonical reporting order with
+      statuses PASS x7, NOT_APPLICABLE x3, FAIL, NOT_APPLICABLE; the three
+      earlier-listed file/preservation-binding rows were bypassed and must
+      never be fabricated as PASS from the blocker index.
+  - id: V2S3-FM21
+    threat: inert typed operation is converted into a command
+    probe: >-
+      Search output models/JSON and implementation AST for command, shell,
+      subprocess, copy, replace, delete, chmod, dispatch, callable, or command
+      string surfaces. None exist.
+  - id: V2S3-FM22
+    threat: explicit null, omission, or sequence order is normalized
+    probe: >-
+      Exercise explicit null source facts, omitted required keys, reordered
+      facts/rules/actions/bindings, and mapping-order-only changes. Null and
+      omission differ; required sequence changes fail; mapping order does not
+      change hashes.
+  - id: V2S3-FM23
+    threat: current time, locale, timezone, hash seed, or filesystem time changes bytes
+    probe: >-
+      Repeat under changed timezone, locale, PYTHONHASHSEED, mtimes, and command
+      time. Paths, hashes, artifact bytes, and stdout remain identical.
+  - id: V2S3-FM24
+    threat: concurrent or partial publication overwrites evidence
+    probe: >-
+      Exercise identical writers, differing winner, extra file, partial second
+      write, live lock, orphan lock, foreign temp, leaf creation race, and
+      rollback/adoption race. No foreign byte is replaced or deleted.
+  - id: V2S3-FM25
+    threat: WSL filesystem edge escapes closed errors
+    probe: >-
+      Under WSL exercise symlink, dangling symlink, FIFO/special when supported,
+      unreadable file, CRLF checkout, case collision, extreme depth, and
+      oversized input. Exact bounded errors occur with no raw exception.
+  - id: V2S3-FM26
+    threat: V2-S3 mutates authority or existing behavior
+    probe: >-
+      Hash/lstat registry, policy, declarations, preservation, V2-S2 inputs,
+      staging, frozen evidence, and RescueScreen before/after success, exit 8,
+      and failures; run byte-compatibility snapshots and all preservation
+      suites.
+  - id: V2S3-FM27
+    threat: network, service, database, workflow, or domain behavior enters SourceOps
+    probe: >-
+      Static imports and runtime monkeypatch sentinels prove no network,
+      subprocess, database, scheduler, workflow, external-root, or domain
+      package call occurs.
+
+test_author_contract:
+  panel:
+    planner: Sol
+    red_test_author: Codex 5.3
+    implementation_doer: Sonnet 5
+    independent_checker: Opus 5
+    final_authority: human adjudication
+    evidence_note: >-
+      V2-S2 showed Sonnet is the reliable implementation doer. V2-S3 assigns
+      Sonnet 5 that role explicitly; Codex 5.3 remains independent RED author,
+      Opus 5 remains independent checker, and neither model can grant human
+      approval.
+  red_stage_rules:
+    - tests are authored and observed failing before V2-S3 implementation
+    - implementation imports may be guarded only to produce a clear missing-implementation RED
+    - no existing assertion, fixture meaning, skip, xfail, expected byte, or selector is weakened
+    - every acceptance criterion and failure probe maps to at least one exact named test below
+    - every mapped test directly invokes every production surface required for its mapped id
+    - invoking an unrelated allowed function does not satisfy a mapped id
+    - spec inspection, local fixture/helper assertions, and private-helper calls are supplemental only and cannot satisfy a production surface
+    - expected hashes/bytes are independently recomputed from this specification, never implementation helpers
+    - complete representative artifact bytes and stdout are asserted, not only selected fields
+    - tests are sequential because production integrations share fixed .raptor parents and transaction roots
+    - no pytest-xdist or parallel invocation is allowed for the required command sequence
+  required_test_files:
+    - tests/sourceops/test_drift_planning_contract.py
+    - tests/sourceops/test_drift_planning_cli.py
+    - tests/sourceops/test_drift_planning_safety.py
+    - tests/sourceops/test_drift_planning_repository.py
+  minimum_test_groups:
+    - V2-S2 pair discovery, strict canonical JSON, schema, self-hash, filename, and cross-binding
+    - source/content/component fact universe, explicit null, summary, ordering, and outcome recomputation
+    - COMPONENT_CHECKSUM content facts with subject_type COMPONENT accepted under NOT_PROVIDED and COMPLETE projections, with forged component checksum baselines rejected
+    - valid COMPLETE component projection with empty file component_ids accepted and evaluated exactly/conservatively
+    - current registry/declaration/preservation/action/consumer/lineage preconditions
+    - materiality policy YAML/schema/hash/binding/rule truth table and conservative default
+    - no-change, non-material, material, pinned-history, and freshness context integrations
+    - action dispositions, routes, ownership, targets, prerequisites, dedupe, reason ids, and reserved exclusions
+    - null-predecessor and synthetic non-null rollback artifact/lineage/blocker/operation truth tables
+    - algorithmic non-null READY artifact with all 12 PASS checks and all five inert operation types
+    - safe-path blocker fixtures whose preceding checks pass and whose targeted check alone fails
+    - two-pass mutation, symlink/reparse/special/unreadable/limit safety
+    - canonical output hashes/bytes/paths/idempotency/atomicity/concurrency/collision
+    - CLI JSON, empty stderr, exact exit partition, and existing-command byte compatibility
+    - no-network/no-subprocess/no-domain-import and complete non-mutation guards
+
+  production_surface_non_vacuity:
+    rule: >-
+      Coverage is behavioral, not nominal. For each AC/FM id, every exact test
+      mapped below must directly invoke every category listed in
+      per_id_required_surfaces and assert the result relevant to that id. A
+      call to any other allowed production function cannot substitute.
+    categories:
+      INPUT:
+        exact_production_surface: load_v2_s2_artifact_pair
+        required_evidence: returned value or exact closed production failure is asserted
+      POLICY:
+        exact_production_surface: load_materiality_policy
+        required_evidence: returned policy or exact closed production failure is asserted
+      MATERIALITY:
+        exact_production_surface: evaluate_materiality
+        required_evidence: exact per-fact and aggregate production result or failure is asserted
+      ROUTING:
+        exact_production_surface: route_impact
+        required_evidence: exact production dispositions/routes or failure is asserted
+      ROLLBACK:
+        exact_production_surface: rehearse_rollback
+        required_evidence: exact production lineage/check/blocker/operation result is asserted
+      OUTPUT:
+        exact_production_surface: plan_drift
+        required_evidence: exact result and, when published, complete persisted production bytes are asserted
+      CLI:
+        exact_production_surface: python -m raptor.sourceops.cli
+        required_evidence: >-
+          Invoke the criterion-relevant literal subcommand through the real
+          module entry point and assert exact exit, stdout bytes, and empty
+          stderr. A shared subprocess byte-runner is allowed only as that
+          transport; a helper returning fabricated payloads is not.
+      MUTATION:
+        exact_production_surface: plan_drift
+        required_evidence: >-
+          Inject the criterion's mutation at an allowed public
+          loader/repository boundary during the real production operation and
+          assert the exact error, exit, and no mixed-input publication.
+    enforcement:
+      - the mapping-completeness meta-test parses this exact matrix
+      - every AC01 through AC26 and FM01 through FM27 appears exactly once
+      - direct calls must match the exact function for each listed category
+      - CLI calls must prove the literal criterion-relevant subcommand, not merely call an arbitrary local CLI helper
+      - a mapped test that reads this YAML, validates a hand-built object, calls only a local helper, imports the module, or calls a different public function is vacuous
+      - load_materiality_policy is criterion-relevant only where POLICY is required; using it as setup never satisfies INPUT, MATERIALITY, ROUTING, ROLLBACK, OUTPUT, CLI, or MUTATION
+      - each Opus-recheck named test below calls every listed exact function in that test body; fixtures may prepare inputs but cannot invoke a substitute surface or return a fabricated production result
+      - private implementation helpers, copied algorithms, fixtures, and static AST checks may strengthen but never replace required production calls
+      - all listed categories for an id are mandatory; extra relevant production calls are allowed
+    opus_recheck_per_test_requirements:
+      'tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac04_component_checksum_content_fact_is_projection_mode_independent':
+        exact_function_or_cli_calls: [load_v2_s2_artifact_pair, evaluate_materiality, plan_drift]
+        required_observable: >-
+          For otherwise identical valid COMPONENT_CHECKSUM content bindings,
+          both NOT_PROVIDED and COMPLETE projections load and evaluate
+          successfully and complete plan_drift without a fact-universe error;
+          the subject remains COMPONENT, the path remains
+          /content-bindings/..., and no component-projection cardinality rule
+          is applied to that fact.
+      'tests/sourceops/test_drift_planning_safety.py::test_v2s3_ac06_all_governing_inputs_pass_two_immutable_snapshots':
+        exact_function_or_cli_calls: [plan_drift]
+        required_observable: >-
+          Call plan_drift directly for real on-disk byte mutations introduced
+          after the first snapshot and before revalidation. Cover V2-S2
+          artifacts, registry, declarations, preservation files, policy, and
+          applicable rollback artifact/bound files; prove the bytes changed at
+          the production boundary, assert each exact mutation error/exit and
+          absence of published plan bytes, then restore the original bytes.
+      'tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac14_non_null_predecessor_lineage_and_record_bindings_are_exact':
+        exact_function_or_cli_calls: [rehearse_rollback]
+        required_observable: >-
+          Assert production lineage traversal plus exact current/predecessor
+          full hashes, normalized hashes, declaration sequences, chain order,
+          lifecycle, and immutable-predecessor behavior.
+      'tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac16_non_null_rollback_artifact_schema_hash_and_complete_bindings':
+        exact_function_or_cli_calls: [rehearse_rollback]
+        required_observable: >-
+          Assert the production rehearsal accepts the exact closed artifact,
+          filename/self-hash, normalized hashes, declaration refs, file
+          bindings, and every preservation binding; schema inspection alone is
+          insufficient.
+      'tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac16_algorithmic_content_address_has_no_hash_fixpoint':
+        exact_function_or_cli_calls: [rehearse_rollback]
+        required_observable: >-
+          Construct normalized hashes before the artifact hash and final path,
+          assert path-stability, then require production rehearsal READY; a
+          local self-hash assertion without rehearse_rollback is vacuous.
+      'tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac16_normative_cycle_free_example_constants_reproduce_independently':
+        exact_function_or_cli_calls: [rehearse_rollback]
+        required_observable: >-
+          Independently reproduce every published normative constant and exact
+          sequence without implementation helpers, materialize the resulting
+          fixture, and assert production rehearsal returns all 12 PASS rows.
+      'tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac18_ready_rehearsal_emits_only_inert_typed_operations':
+        exact_function_or_cli_calls: [rehearse_rollback]
+        required_observable: >-
+          Inspect the actual production operation objects and assert every
+          closed field, inert constant, and forbidden execution surface.
+      'tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac18_algorithmic_ready_rehearsal_passes_all_checks_and_operation_types':
+        exact_function_or_cli_calls: [rehearse_rollback]
+        required_observable: >-
+          Assert the exact 12 production PASS rows and complete ordered
+          operation-type sequence from an algorithmically built READY fixture.
+      'tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac19_output_pair_schema_hash_path_cross_reference_and_observed_at':
+        exact_function_or_cli_calls: [plan_drift]
+        required_observable: >-
+          Read both files actually published by plan_drift and assert their
+          complete canonical bytes, schemas, self-hashes, paths,
+          cross-references, source bindings, and inherited observed_at.
+      'tests/sourceops/test_drift_planning_safety.py::test_v2s3_fm07_each_governing_input_mutation_maps_to_its_exact_category':
+        exact_function_or_cli_calls: [plan_drift]
+        required_observable: >-
+          Call plan_drift directly once per governing input category and
+          mutate the real selected file bytes only between its two production
+          snapshots. Assert the changed bytes were presented to revalidation,
+          the exact category-specific error/exit won, no mixed or partial plan
+          bytes were published, and original bytes were restored.
+      'tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm09_policy_tamper_stale_binding_and_rule_ambiguity_exit_6':
+        exact_function_or_cli_calls: [load_materiality_policy]
+        required_observable: >-
+          Mutate the fixed policy bytes for hash, binding, and ambiguity cases
+          and assert each exact closed production policy failure; parsing a
+          copied mapping or calling another public function is insufficient.
+      'tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm10_unknown_fact_is_invalid_and_unfamiliar_valid_role_is_material':
+        exact_function_or_cli_calls: [load_v2_s2_artifact_pair, evaluate_materiality]
+        required_observable: >-
+          Assert the production input loader rejects the unknown fact and the
+          production evaluator assigns materiality to the separately valid
+          unfamiliar component role.
+      'tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm10_forged_component_checksum_content_baseline_is_rejected_for_both_projection_modes':
+        exact_function_or_cli_calls: [load_v2_s2_artifact_pair, evaluate_materiality, plan_drift]
+        required_observable: >-
+          First prove a valid COMPONENT_CHECKSUM content fact loads and
+          evaluates and plans successfully in each projection mode, then forge
+          its baseline checksum, rehash the V2-S2 artifacts, and assert the
+          production loader and plan_drift reject both before
+          evaluate_materiality can consume the forged pair.
+      'tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm11_no_change_and_non_material_change_remain_distinct':
+        exact_function_or_cli_calls: [evaluate_materiality]
+        required_observable: >-
+          Assert exact production per-fact evaluations, counts, aggregate
+          outcomes, rule ids, and rationale ids for both cases.
+      'tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm12_retrieved_at_truth_table_uses_freshness_and_historical_context':
+        exact_function_or_cli_calls: [evaluate_materiality]
+        required_observable: >-
+          Assert the production evaluator's exact three-context truth table,
+          including aggregate outcome and retrieved_at rule/rationale ids.
+      'tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm13_action_approval_execution_and_candidate_owner_laundering_fail':
+        exact_function_or_cli_calls: [route_impact, plan_drift]
+        required_observable: >-
+          Use a real valid material input carrying a changed candidate owner,
+          assert route_impact retains current-registry owners and inert
+          constants, and assert complete persisted plan_drift bytes do not
+          launder candidate ownership, approval, or execution.
+      'tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm15_route_reason_union_dedupe_and_order_are_byte_deterministic':
+        exact_function_or_cli_calls: [route_impact]
+        required_observable: >-
+          Feed multiple material reasons and perturbed permissible mapping
+          insertion order to production routing; assert one route per dedupe
+          key and exact stable route/reason canonical bytes.
+      'tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm16_stage_diff_is_evidenced_not_executed_or_routed':
+        exact_function_or_cli_calls: [route_impact]
+        required_observable: >-
+          Assert the exact production stage_diff disposition and reason on
+          NO_OBSERVED_CHANGE, NON_MATERIAL_CHANGE, and MATERIAL_CHANGE, with no
+          route or approval/execution claim in any case.
+      'tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm19_unsafe_tampered_or_unavailable_rollback_inputs_select_first_blocker':
+        exact_function_or_cli_calls: [rehearse_rollback]
+        required_observable: >-
+          Exercise every enumerated path/artifact/hash/binding/current-file/
+          predecessor-file/preservation-binding blocker through production,
+          assert the exact first blocker and actual-execution status vector,
+          and assert zero operations.
+      'tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm20_preservation_overlap_blocks_every_restore_operation':
+        exact_function_or_cli_calls: [rehearse_rollback]
+        required_observable: >-
+          Exercise equal, ancestor, and descendant preservation overlap
+          through production and assert the dedicated conflict blocker wins
+          before any restore operation or bypassed file/binding check.
+      'tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm20_preservation_conflict_reports_exact_execution_status_vector':
+        exact_function_or_cli_calls: [rehearse_rollback]
+        required_observable: >-
+          Assert the exact 12 check names and statuses in canonical reporting
+          order: PASS x7, NOT_APPLICABLE x3, FAIL, NOT_APPLICABLE.
+      'tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm22_explicit_null_omission_mapping_order_and_sequence_order_are_exact':
+        exact_function_or_cli_calls: [load_v2_s2_artifact_pair, load_materiality_policy, rehearse_rollback, plan_drift]
+        required_observable: >-
+          Drive a criterion-relevant null/omission/order case through each
+          named production surface and assert its real returned value, failure,
+          or persisted bytes. A successful policy load used only as setup does
+          not satisfy this four-surface requirement.
+    per_id_required_surfaces:
+      V2S3-AC01: [INPUT, CLI]
+      V2S3-AC02: [INPUT]
+      V2S3-AC03: [INPUT]
+      V2S3-AC04: [INPUT, MATERIALITY]
+      V2S3-AC05: [OUTPUT]
+      V2S3-AC06: [MUTATION]
+      V2S3-AC07: [POLICY]
+      V2S3-AC08: [MATERIALITY]
+      V2S3-AC09: [MATERIALITY]
+      V2S3-AC10: [MATERIALITY, OUTPUT]
+      V2S3-AC11: [ROUTING]
+      V2S3-AC12: [ROUTING, OUTPUT]
+      V2S3-AC13: [ROUTING, OUTPUT]
+      V2S3-AC14: [ROLLBACK]
+      V2S3-AC15: [ROLLBACK, OUTPUT]
+      V2S3-AC16: [ROLLBACK]
+      V2S3-AC17: [ROLLBACK, OUTPUT, CLI]
+      V2S3-AC18: [ROLLBACK]
+      V2S3-AC19: [OUTPUT]
+      V2S3-AC20: [OUTPUT]
+      V2S3-AC21: [CLI]
+      V2S3-AC22: [INPUT, POLICY, MATERIALITY, ROUTING, ROLLBACK, OUTPUT, CLI]
+      V2S3-AC23: [INPUT, OUTPUT]
+      V2S3-AC24: [MUTATION]
+      V2S3-AC25: [OUTPUT, CLI]
+      V2S3-AC26: [ROLLBACK, OUTPUT]
+      V2S3-FM01: [CLI]
+      V2S3-FM02: [INPUT]
+      V2S3-FM03: [INPUT]
+      V2S3-FM04: [INPUT]
+      V2S3-FM05: [INPUT]
+      V2S3-FM06: [OUTPUT]
+      V2S3-FM07: [MUTATION]
+      V2S3-FM08: [POLICY, CLI]
+      V2S3-FM09: [POLICY]
+      V2S3-FM10: [INPUT, MATERIALITY]
+      V2S3-FM11: [MATERIALITY]
+      V2S3-FM12: [MATERIALITY]
+      V2S3-FM13: [ROUTING, OUTPUT]
+      V2S3-FM14: [ROUTING, OUTPUT]
+      V2S3-FM15: [ROUTING]
+      V2S3-FM16: [ROUTING]
+      V2S3-FM17: [ROLLBACK, OUTPUT]
+      V2S3-FM18: [ROLLBACK, OUTPUT, CLI]
+      V2S3-FM19: [ROLLBACK]
+      V2S3-FM20: [ROLLBACK]
+      V2S3-FM21: [ROLLBACK]
+      V2S3-FM22: [INPUT, POLICY, ROLLBACK, OUTPUT]
+      V2S3-FM23: [OUTPUT, CLI]
+      V2S3-FM24: [OUTPUT]
+      V2S3-FM25: [INPUT, OUTPUT]
+      V2S3-FM26: [MUTATION, CLI]
+      V2S3-FM27: [OUTPUT]
+
+  acceptance_mapping:
+    V2S3-AC01:
+      - tests/sourceops/test_drift_planning_safety.py::test_v2s3_ac01_fixed_leaf_discovery_and_boundary_are_closed
+    V2S3-AC02:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac02_v2s2_artifacts_require_exact_canonical_schema_and_hashes
+    V2S3-AC03:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac03_pair_cross_bindings_recompute_before_interpretation
+    V2S3-AC04:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac04_source_content_component_fact_universe_is_independently_validated
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac04_complete_component_projection_without_file_anchors_is_accepted_and_evaluated
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac04_component_checksum_content_fact_is_projection_mode_independent
+    V2S3-AC05:
+      - tests/sourceops/test_drift_planning_repository.py::test_v2s3_ac05_current_registry_declarations_actions_edges_and_reserved_boundaries_fail_closed
+    V2S3-AC06:
+      - tests/sourceops/test_drift_planning_safety.py::test_v2s3_ac06_all_governing_inputs_pass_two_immutable_snapshots
+    V2S3-AC07:
+      - tests/sourceops/test_drift_planning_repository.py::test_v2s3_ac07_repository_policy_exact_mapping_hash_and_bindings_are_authoritative
+    V2S3-AC08:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac08_per_fact_materiality_and_aggregate_precedence_are_exact
+    V2S3-AC09:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac09_unknown_unmatched_and_ambiguous_inputs_never_become_non_material
+    V2S3-AC10:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac10_normative_no_change_non_material_material_and_historical_examples
+    V2S3-AC11:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac11_routes_follow_declared_actions_current_edges_dedupe_and_order
+    V2S3-AC12:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac12_all_routes_and_artifacts_are_unapproved_unexecuted_proposals
+    V2S3-AC13:
+      - tests/sourceops/test_drift_planning_repository.py::test_v2s3_ac13_reserved_consumers_cannot_be_routes_or_approvals
+    V2S3-AC14:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac14_non_null_predecessor_lineage_and_record_bindings_are_exact
+    V2S3-AC15:
+      - tests/sourceops/test_drift_planning_repository.py::test_v2s3_ac15_current_root_sources_are_no_predecessor_not_applicable
+    V2S3-AC16:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac16_non_null_rollback_artifact_schema_hash_and_complete_bindings
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac16_algorithmic_content_address_has_no_hash_fixpoint
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac16_normative_cycle_free_example_constants_reproduce_independently
+    V2S3-AC17:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac17_stable_rollback_blockers_publish_blocked_pair_and_exit_8
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac17_safe_blocker_fixtures_fail_only_at_targeted_integrity_check
+    V2S3-AC18:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac18_ready_rehearsal_emits_only_inert_typed_operations
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac18_algorithmic_ready_rehearsal_passes_all_checks_and_operation_types
+    V2S3-AC19:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac19_output_pair_schema_hash_path_cross_reference_and_observed_at
+    V2S3-AC20:
+      - tests/sourceops/test_drift_planning_safety.py::test_v2s3_ac20_transactional_pair_publication_is_idempotent_and_race_safe
+    V2S3-AC21:
+      - tests/sourceops/test_drift_planning_cli.py::test_v2s3_ac21_plan_drift_cli_json_stderr_and_exit_partition
+    V2S3-AC22:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_ac22_public_models_api_errors_and_dependencies_are_closed_typed_immutable
+    V2S3-AC23:
+      - tests/sourceops/test_drift_planning_safety.py::test_v2s3_ac23_limits_first_error_and_json_safe_details_are_deterministic
+    V2S3-AC24:
+      - tests/sourceops/test_drift_planning_repository.py::test_v2s3_ac24_success_blocked_and_failures_mutate_only_owned_generated_output
+    V2S3-AC25:
+      - tests/sourceops/test_drift_planning_repository.py::test_v2s3_ac25_v2s1_v2s2_and_existing_cli_behavior_are_preserved
+    V2S3-AC26:
+      - tests/sourceops/test_drift_planning_repository.py::test_v2s3_ac26_implementation_uses_only_synthetic_rehearsals_and_leaves_phase_handoff_external
+
+  failure_mapping:
+    V2S3-FM01:
+      - tests/sourceops/test_drift_planning_cli.py::test_v2s3_fm01_manifest_hash_is_the_only_input_selector
+    V2S3-FM02:
+      - tests/sourceops/test_drift_planning_safety.py::test_v2s3_fm02_links_reparses_and_special_input_entries_are_never_followed
+    V2S3-FM03:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm03_artifact_byte_hash_and_filename_tampering_are_distinct
+    V2S3-FM04:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm04_cross_paired_self_hashed_artifacts_are_rejected
+    V2S3-FM05:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm05_forged_fact_summary_tree_and_outcome_are_recomputed
+    V2S3-FM06:
+      - tests/sourceops/test_drift_planning_repository.py::test_v2s3_fm06_stale_registry_declaration_action_edge_and_preservation_fail_before_policy
+    V2S3-FM07:
+      - tests/sourceops/test_drift_planning_safety.py::test_v2s3_fm07_each_governing_input_mutation_maps_to_its_exact_category
+    V2S3-FM08:
+      - tests/sourceops/test_drift_planning_cli.py::test_v2s3_fm08_policy_threshold_and_path_overrides_are_usage_errors
+    V2S3-FM09:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm09_policy_tamper_stale_binding_and_rule_ambiguity_exit_6
+    V2S3-FM10:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm10_unknown_fact_is_invalid_and_unfamiliar_valid_role_is_material
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm10_forged_component_checksum_content_baseline_is_rejected_for_both_projection_modes
+    V2S3-FM11:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm11_no_change_and_non_material_change_remain_distinct
+    V2S3-FM12:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm12_retrieved_at_truth_table_uses_freshness_and_historical_context
+    V2S3-FM13:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm13_action_approval_execution_and_candidate_owner_laundering_fail
+    V2S3-FM14:
+      - tests/sourceops/test_drift_planning_repository.py::test_v2s3_fm14_reserved_consumer_route_and_approval_attempts_fail_closed
+    V2S3-FM15:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm15_route_reason_union_dedupe_and_order_are_byte_deterministic
+    V2S3-FM16:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm16_stage_diff_is_evidenced_not_executed_or_routed
+    V2S3-FM17:
+      - tests/sourceops/test_drift_planning_repository.py::test_v2s3_fm17_absent_legacy_rollback_paths_are_not_opened_for_root_sources
+    V2S3-FM18:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm18_missing_non_null_rollback_artifact_is_blocked_exit_8
+    V2S3-FM19:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm19_unsafe_tampered_or_unavailable_rollback_inputs_select_first_blocker
+    V2S3-FM20:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm20_preservation_overlap_blocks_every_restore_operation
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm20_preservation_conflict_reports_exact_execution_status_vector
+    V2S3-FM21:
+      - tests/sourceops/test_drift_planning_repository.py::test_v2s3_fm21_no_command_dispatch_copy_replace_delete_or_shell_surface_exists
+    V2S3-FM22:
+      - tests/sourceops/test_drift_planning_contract.py::test_v2s3_fm22_explicit_null_omission_mapping_order_and_sequence_order_are_exact
+    V2S3-FM23:
+      - tests/sourceops/test_drift_planning_cli.py::test_v2s3_fm23_time_locale_hash_seed_and_mtime_do_not_change_bytes
+    V2S3-FM24:
+      - tests/sourceops/test_drift_planning_safety.py::test_v2s3_fm24_concurrent_partial_locked_and_colliding_publications_preserve_foreign_bytes
+    V2S3-FM25:
+      - tests/sourceops/test_drift_planning_safety.py::test_v2s3_fm25_wsl_symlink_special_unreadable_crlf_case_depth_and_size_edges
+    V2S3-FM26:
+      - tests/sourceops/test_drift_planning_repository.py::test_v2s3_fm26_authority_hashes_and_existing_command_bytes_are_preserved
+    V2S3-FM27:
+      - tests/sourceops/test_drift_planning_repository.py::test_v2s3_fm27_network_service_database_workflow_and_domain_import_guards
+
+  WSL_execution_contract:
+    worktree: /mnt/d/AIProjects/raptor-worktrees/raptor-v2
+    python: /home/sdrona/raptor/bin/python
+    pythonpath: src
+    git_work_tree: /mnt/d/AIProjects/raptor-worktrees/raptor-v2
+    git_dir: /mnt/d/AIProjects/raptor/.git/worktrees/raptor-v2
+    git_config:
+      core.autocrlf: true
+      core.filemode: false
+    execution: strictly_sequential
+    no_parallel_pytest: true
+  minimum_WSL_commands:
+    - kind: TEST
+      command: >-
+        wsl.exe -e bash -lc "cd /mnt/d/AIProjects/raptor-worktrees/raptor-v2
+        && PYTHONPATH=src /home/sdrona/raptor/bin/python -m pytest
+        tests/sourceops/test_drift_planning_contract.py
+        tests/sourceops/test_drift_planning_cli.py
+        tests/sourceops/test_drift_planning_safety.py
+        tests/sourceops/test_drift_planning_repository.py -q"
+      expected_exit_after_implementation: 0
+    - kind: TEST
+      command: >-
+        wsl.exe -e bash -lc "cd /mnt/d/AIProjects/raptor-worktrees/raptor-v2
+        && PYTHONPATH=src /home/sdrona/raptor/bin/python -m pytest
+        tests/sourceops/test_registry_contract.py
+        tests/sourceops/test_registry_cli.py
+        tests/sourceops/test_repository_registry.py
+        tests/sourceops/test_import_and_network_boundary.py
+        tests/sourceops/test_staged_snapshot_contract.py
+        tests/sourceops/test_staged_snapshot_cli.py
+        tests/sourceops/test_staged_snapshot_safety.py -q"
+      expected_exit: 0
+    - kind: TEST
+      command: >-
+        wsl.exe -e bash -lc "cd /mnt/d/AIProjects/raptor-worktrees/raptor-v2
+        && PYTHONPATH=src /home/sdrona/raptor/bin/python -m pytest
+        tests/sourceops -q"
+      expected_exit: 0
+    - kind: TEST
+      command: >-
+        wsl.exe -e bash -lc "cd /mnt/d/AIProjects/raptor-worktrees/raptor-v2
+        && PYTHONPATH=src /home/sdrona/raptor/bin/python -m pytest
+        tests/external/test_mave_source_register.py
+        tests/atlas/test_source_registry_claims.py
+        tests/eval/test_core_annotation_bundle.py
+        tests/scorer/test_ac7_config.py -q"
+      expected_exit: 0
+    - kind: CLI_COMPATIBILITY
+      command: >-
+        wsl.exe -e bash -lc "cd /mnt/d/AIProjects/raptor-worktrees/raptor-v2
+        && PYTHONPATH=src /home/sdrona/raptor/bin/python -m
+        raptor.sourceops.cli validate --registry
+        configs/sourceops/source_registry.yaml"
+      expected_exit: 0
+      stdout_rule: byte-for-byte V2-S1 compatible
+    - kind: CLI_COMPATIBILITY
+      command: >-
+        wsl.exe -e bash -lc "cd /mnt/d/AIProjects/raptor-worktrees/raptor-v2
+        && PYTHONPATH=src /home/sdrona/raptor/bin/python -m
+        raptor.sourceops.cli status --registry
+        configs/sourceops/source_registry.yaml --consumer eval-gate"
+      expected_exit: 0
+      stdout_rule: byte-for-byte V2-S1 compatible
+    - kind: YAML_VALIDATION
+      command: >-
+        wsl.exe -e bash -lc "cd /mnt/d/AIProjects/raptor-worktrees/raptor-v2
+        && PYTHONPATH=src /home/sdrona/raptor/bin/python -c
+        \"import pathlib,sys,yaml; print(sys.executable);
+        [yaml.safe_load(pathlib.Path(p).read_text(encoding='utf-8')) for p in
+        ('configs/sourceops/source_registry.yaml',
+        'configs/sourceops/materiality_policy.yaml',
+        'docs/project/specs/raptor-v2-kickoff.yaml',
+        'docs/project/specs/raptor-v2-s3-drift-gates.yaml')]\""
+      expected_exit: 0
+      executable_stdout_contains: /home/sdrona/raptor/bin/python
+    - kind: GIT_VALIDATION
+      command: >-
+        wsl.exe -e bash -lc "cd /mnt/d/AIProjects/raptor-worktrees/raptor-v2
+        && GIT_WORK_TREE=/mnt/d/AIProjects/raptor-worktrees/raptor-v2
+        GIT_DIR=/mnt/d/AIProjects/raptor/.git/worktrees/raptor-v2
+        git -c core.autocrlf=true -c core.filemode=false --no-pager diff --check"
+      expected_exit: 0
+  cleanup_contract:
+    - fixture names include the test id plus a collision-resistant suffix
+    - cleanup runs in fixture finalizers after success, failure, and skip
+    - before deletion lstat every owned path and reject links/reparses/special entries
+    - delete only paths carrying the fixture's ownership marker in memory and canonical path
+    - never delete .raptor/sourceops/generated/staged-snapshots or drift-plans parents
+    - never delete a pre-existing leaf or a file not created by that test
+    - a cleanup failure fails the test and reports only canonical repository-relative paths
+  skip_policy:
+    xfail: forbidden
+    unconditional_skip: forbidden
+    WSL_core_cases_mandatory:
+      - symlink rejection
+      - dangling symlink rejection
+      - CRLF canonical behavior
+      - unreadable-read boundary through a deterministic public-boundary sentinel
+    conditional_physical_skip_allowed_only_for:
+      - creating a Windows junction/reparse point when the host denies the required privilege
+      - creating a FIFO/device when the mounted filesystem reports the feature unsupported
+      - physical chmod unreadability when DrvFS cannot enforce it
+    companion_rule: >-
+      Every conditionally skipped physical probe has a mandatory non-skipped
+      lstat/read-boundary simulation proving the same closed error. os.name,
+      CI, or WSL alone is not a skip reason.
+  independent_oracle_rules:
+    - canonical hashes are recomputed in test code written from this file
+    - policy expected mapping/hash is not imported from implementation
+    - route and blocker expected tables are literal test data from this authority
+    - no private implementation helper decides expected output
+    - representative tests compare complete persisted files and complete stdout bytes
+
+migration_compatibility_and_backout:
+  migration:
+    registry_schema: none
+    V2_S2_artifact_schema: none
+    rollback_input_artifact_schema: pre_publication_v1_authority_correction
+    V2_S3_output_artifact_schemas: pre_publication_v1_authority_correction
+    domain_declarations: none
+    data: none
+    database: none
+    service: none
+    scheduler: none
+  additive_changes:
+    - one checked-in materiality policy config
+    - one SourceOps planning module plus additive exports/CLI/models/helpers
+    - four new V2-S3 test files and optional tiny synthetic fixtures
+  compatibility:
+    - V2-S1 registry remains the current governance baseline
+    - V2-S2 artifacts remain immutable and are never upgraded in place
+    - validate, status, and verify-stage outputs/exits remain byte-compatible
+    - a V2-S2 pair bound to an old registry fails rather than auto-rebinding
+    - a policy bound to an old registry fails rather than auto-updating
+    - the materiality policy mapping/version/hash remains exactly unchanged
+    - >-
+      rollback input and V2-S3 output schema ids remain v1 for this correction
+      because no non-null artifact or V2-S3 output has been accepted or
+      published and the superseded contract admitted no READY artifact
+    - after the first accepted V2-S3 publication, breaking policy, rollback, output, or CLI changes require new schema/hash ids
+  rollback_artifact_migration_rule: >-
+    Current null-predecessor legacy paths remain untouched and may remain
+    absent. No checked-in or accepted non-null rollback artifact exists.
+    Synthetic/draft artifacts using registry_content_hash,
+    current_source_record_content_hash, or
+    predecessor_source_record_content_hash as rollback input fields are
+    incompatible and must be regenerated algorithmically with the normalized
+    v1 binding fields; they are never rewritten or trusted in place. A future
+    non-null lineage uses the corrected content-addressed JSON contract in a
+    separately approved registry admission. V2-S3 performs no migration or
+    unsafe registry repair.
+  backout: >-
+    Revert only V2-S3 policy/code/exports/CLI additions and V2-S3 tests.
+    Existing V2-S1/V2-S2 files and operator inputs remain untouched. Generated
+    V2-S3 artifacts may be retained for audit or removed manually by an
+    operator; V2-S3 has no automated deletion. No data, evidence, registry,
+    declaration, database, service, or rollback recovery is required.
+
+human_adjudication_points:
+  policy:
+    - accept or reject the exact materiality policy hash and rule set
+    - require a new policy version for any changed rule or registry binding
+  each_generated_plan:
+    - decide whether a proposed route should be authorized
+    - decide whether a blocked rollback prerequisite should be repaired in a separate change
+    - decide whether a ready rollback should ever be executed under a separate authority
+    - decide whether source promotion or lifecycle change is appropriate under a future spec
+    - decide scientific, legal, evidentiary, clinical, RescueScreen, and panel questions outside SourceOps
+  machine_default: no approval and no action
+
+open_questions_resolved_by_planning:
+  - question: arbitrary artifact paths versus fixed discovery
+    resolution: one --manifest-hash selects one exact final V2-S2 leaf; no path override
+  - question: trust V2-S2 successful outcome
+    resolution: independently validate both full artifacts and current baseline before interpretation
+  - question: checked-in versus CLI materiality thresholds
+    resolution: one versioned self-hashed config at configs/sourceops/materiality_policy.yaml
+  - question: policy registry binding
+    resolution: exact current registry hash; registry change requires policy re-adjudication
+  - question: non-material baseline
+    resolution: only non-historical, non-freshness-required retrieved_at-only change is non-material
+  - question: unknown or ambiguous facts
+    resolution: invalid fact structure or conservative material default; never non-material
+  - question: material versus non-material exit code
+    resolution: both are successful observation exit 0; JSON carries the result
+  - question: stage_diff route
+    resolution: validated V2-S2 input evidences the declared prerequisite; V2-S3 emits no redundant route or execution claim
+  - question: promotion action
+    resolution: absent from V2-S1 enum and forbidden in V2-S3 v1
+  - question: artifact count
+    resolution: exactly two combined assessment/plan artifacts, no executable manifest
+  - question: null predecessor and missing legacy rollback path
+    resolution: NO_PREDECESSOR/NOT_APPLICABLE, no read, no blocker, exit 0
+  - question: non-null predecessor missing rollback artifact
+    resolution: stable BLOCKED plan pair, no operations/rollback route, exit 8
+  - question: rollback artifact filename/hash cycle
+    resolution: >-
+      choose Option A; use the domain-separated normalized source-record
+      binding in the input artifact, omit cyclic full hashes there, retain
+      filename-own-hash, and emit normalized plus full hashes in V2-S3 plans
+  - question: COMPLETE component projection file anchoring
+    resolution: >-
+      none beyond V2-S2 authority; validate exact registry/projection facts,
+      then evaluate structurally valid unfamiliar or uncorroborated facts
+      conservatively
+  - question: mapped-test non-vacuity
+    resolution: >-
+      every AC/FM has exact required production-surface categories; unrelated
+      public calls, spec checks, and local-helper-only tests do not satisfy them
+  - question: V2-S3 creates rollback metadata
+    resolution: no; future source admission supplies it under separate approval
+  - question: rollback commands
+    resolution: none; only closed inert typed operations with executed=false
+  - question: current time
+    resolution: observed_at is inherited only from V2-S2
+  - question: concurrency
+    resolution: whole-leaf transaction semantics equivalent to proven V2-S2 behavior
+  - question: real source rehearsals in implementation acceptance
+    resolution: excluded; use current offline integration and synthetic rollback fixtures only
+
+v2_phase_rehearsal_handoff:
+  timing: after V2-S3 implementation publication and human acceptance
+  separate_rehearsals:
+    - one mutable source with a separately admitted immutable predecessor and rollback artifact
+    - one external-content-root refresh with its own bounded source-specific acquisition/staging authority
+  prerequisites:
+    - no network or source acquisition is added to V2-S3
+    - each candidate first passes V2-S2 and then V2-S3 offline
+    - each V2-S3 output remains proposal-only and is reviewed by a human
+    - preservation checks remain clean
+    - no promotion, rebuild, invalidation, regrounding, rerun, or rollback occurs without separate approval
+  implementation_acceptance_exclusion: >-
+    These real rehearsals are not embedded in V2-S3 RED or implementation
+    acceptance. Tests use synthetic/checked-in tiny fixtures and current
+    repository declarations only.
+  handoff_evidence:
+    - V2-S2 diff and verification refs
+    - V2-S3 impact plan ref
+    - V2-S3 rollback rehearsal plan ref
+    - human adjudication record outside the machine artifacts
+
+definition_of_done:
+  planner_stage:
+    - this file is the sole detailed V2-S3 authority
+    - kickoff V2-S3 entry points here and says planning complete
+    - only the two allowed documentation files differ
+    - both edited YAML files parse with WSL /home/sdrona/raptor/bin/python and yaml.safe_load
+    - WSL-normalized git diff --check succeeds with required worktree/git-dir/config
+    - no commit or push is made
+  red_stage:
+    - Codex 5.3 authors every mapped named test before implementation
+    - new tests fail for missing V2-S3 behavior, not for fixture or environment defects
+    - V2-S1/V2-S2 tests remain unchanged and green
+  implementation_stage:
+    - Sonnet 5 implements without weakening RED, V2-S1, or V2-S2
+    - production policy exactly matches the approved mapping and self-hash
+    - every acceptance criterion and falsifier probe passes
+    - all minimum WSL commands pass sequentially
+    - generated bytes are reproducible and only fixed output leaves change
+    - Opus 5 independently records PASS
+    - human adjudication accepts the policy hash and implementation
+  stop_conditions:
+    - published V2-S2 commit or current V2-S1 registry differs from the planning baseline unexpectedly
+    - implementation requires registry/declaration/preservation edits to make tests pass
+    - implementation requires network, external content, new dependency, scheduler, service, database, UI, API, or domain import
+    - an artifact or route would claim approval, execution, promotion, readiness, scientific/legal sufficiency, clinical authority, or RescueScreen/panel authorization
+    - fixed-path, no-follow, mutation, bounded-parser, or transactional publication guarantees cannot be demonstrated under WSL
+    - a doer proposes creating current missing rollback files for null-predecessor records
+  not_done_by_v2_s3:
+    - source acquisition, promotion, activation, or lifecycle change
+    - policy outcome approval
+    - benchmark rebuild or validation rerun
+    - packet invalidation or Atlas regrounding
+    - consumer block execution
+    - rollback or file restoration
+    - mutable-source or external-content-root real rehearsal
+    - evidence, classification, clinical, RescueScreen, or panel result

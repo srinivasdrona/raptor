@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import Any, Mapping
 
 JsonObject = dict[str, Any]
@@ -1017,3 +1018,586 @@ class ValidationResult:
         if self.consumer is not None:
             payload["consumer"] = self.consumer
         return payload
+
+
+# ---------------------------------------------------------------------------
+# V2-S3 drift planning models (additive).
+#
+# These types are produced by ``raptor.sourceops.drift_planning`` and never
+# parsed from untrusted external bytes directly (the drift-planning module
+# performs that validation itself and only then constructs these frozen
+# records), so most constructors here accept already-validated values rather
+# than repeating ``from_mapping``-style schema checks.
+# ---------------------------------------------------------------------------
+
+
+def freeze_json(value: Any) -> Any:
+    """Recursively convert a plain JSON-shaped value into an immutable form.
+
+    Mappings become read-only ``MappingProxyType`` views and lists become
+    tuples; scalars are returned unchanged. Used so public V2-S3 model
+    fields that carry open-ended JSON content (for example a V2-S2 fact's
+    ``before``/``after`` envelope) are never a bare mutable ``dict``/``list``.
+    """
+    if isinstance(value, Mapping):
+        return MappingProxyType({key: freeze_json(item) for key, item in value.items()})
+    if isinstance(value, (list, tuple)):
+        return tuple(freeze_json(item) for item in value)
+    return value
+
+
+def thaw_json(value: Any) -> Any:
+    """Inverse of :func:`freeze_json`: rebuild plain ``dict``/``list`` values
+    suitable for ``json.dumps`` from a frozen model field.
+    """
+    if isinstance(value, MappingProxyType):
+        return {key: thaw_json(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [thaw_json(item) for item in value]
+    return value
+
+
+@dataclass(frozen=True, slots=True)
+class FactPathSelector:
+    mode: str
+    values: tuple[str, ...]
+
+    def as_dict(self) -> JsonObject:
+        return {"mode": self.mode, "values": list(self.values)}
+
+
+@dataclass(frozen=True, slots=True)
+class MaterialitySelectors:
+    classifications: tuple[str, ...]
+    difference_kinds: tuple[str, ...]
+    fact_kinds: tuple[str, ...]
+    subject_types: tuple[str, ...]
+    fact_path: FactPathSelector
+    source_roles: tuple[str, ...]
+    source_lifecycles: tuple[str, ...]
+    consumer_freshness_profiles: tuple[str, ...]
+    record_kinds: tuple[str, ...]
+
+    def as_dict(self) -> JsonObject:
+        return {
+            "classifications": list(self.classifications),
+            "difference_kinds": list(self.difference_kinds),
+            "fact_kinds": list(self.fact_kinds),
+            "subject_types": list(self.subject_types),
+            "fact_path": self.fact_path.as_dict(),
+            "source_roles": list(self.source_roles),
+            "source_lifecycles": list(self.source_lifecycles),
+            "consumer_freshness_profiles": list(self.consumer_freshness_profiles),
+            "record_kinds": list(self.record_kinds),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class MaterialityRule:
+    priority: int
+    rule_id: str
+    rationale_id: str
+    selectors: MaterialitySelectors
+    outcome: str
+
+    def as_dict(self) -> JsonObject:
+        return {"priority": self.priority, "rule_id": self.rule_id, "rationale_id": self.rationale_id, "selectors": self.selectors.as_dict(), "outcome": self.outcome}
+
+
+@dataclass(frozen=True, slots=True)
+class MaterialityPolicy:
+    schema: str
+    policy_id: str
+    policy_version: str
+    policy_content_hash: str
+    hash_basis: str
+    approval_binding: Mapping[str, Any]
+    registry_binding: Mapping[str, Any]
+    artifact_binding: Mapping[str, Any]
+    evaluator: Mapping[str, Any]
+    rules: tuple[MaterialityRule, ...]
+    raw_mapping: Mapping[str, Any]
+
+    def as_dict(self) -> JsonObject:
+        return {
+            "schema": self.schema,
+            "policy_id": self.policy_id,
+            "policy_version": self.policy_version,
+            "policy_content_hash": self.policy_content_hash,
+            "hash_basis": self.hash_basis,
+            "approval_binding": thaw_json(self.approval_binding),
+            "registry_binding": thaw_json(self.registry_binding),
+            "artifact_binding": thaw_json(self.artifact_binding),
+            "evaluator": thaw_json(self.evaluator),
+            "rules": [item.as_dict() for item in self.rules],
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactReference:
+    path: str
+    content_hash: str
+    schema: str
+
+    def as_dict(self) -> JsonObject:
+        return {"path": self.path, "content_hash": self.content_hash, "schema": self.schema}
+
+
+@dataclass(frozen=True, slots=True)
+class V2S2ArtifactRef:
+    path: str
+    content_hash: str
+    schema: str
+
+    def as_dict(self) -> JsonObject:
+        return {"path": self.path, "content_hash": self.content_hash, "schema": self.schema}
+
+
+@dataclass(frozen=True, slots=True)
+class DiffFact:
+    difference_kind: str
+    fact_kind: str
+    subject_type: str
+    subject_id: str
+    fact_path: str
+    classification: str
+    before: Mapping[str, Any]
+    after: Mapping[str, Any]
+    provenance: Mapping[str, Any]
+    fact_id: str
+    fact_index: int
+
+    def locator(self) -> JsonObject:
+        return {
+            "difference_kind": self.difference_kind,
+            "fact_kind": self.fact_kind,
+            "subject_type": self.subject_type,
+            "subject_id": self.subject_id,
+            "fact_path": self.fact_path,
+            "classification": self.classification,
+        }
+
+    def as_dict(self) -> JsonObject:
+        payload = self.locator()
+        payload["before"] = thaw_json(self.before)
+        payload["after"] = thaw_json(self.after)
+        payload["provenance"] = thaw_json(self.provenance)
+        return payload
+
+
+@dataclass(frozen=True, slots=True)
+class V2S2ArtifactPair:
+    manifest_content_hash: str
+    source_id: str
+    observed_at: str
+    registry_content_hash: str
+    verification: Mapping[str, Any]
+    diff: Mapping[str, Any]
+    verification_ref: V2S2ArtifactRef
+    diff_ref: V2S2ArtifactRef
+    facts: tuple[DiffFact, ...]
+    stage_outcome: str
+
+    def as_dict(self) -> JsonObject:
+        return {
+            "manifest_content_hash": self.manifest_content_hash,
+            "source_id": self.source_id,
+            "observed_at": self.observed_at,
+            "registry_content_hash": self.registry_content_hash,
+            "verification": thaw_json(self.verification),
+            "diff": thaw_json(self.diff),
+            "verification_ref": self.verification_ref.as_dict(),
+            "diff_ref": self.diff_ref.as_dict(),
+            "facts": [item.as_dict() for item in self.facts],
+            "stage_outcome": self.stage_outcome,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class FactEvaluation:
+    fact_id: str
+    fact_index: int
+    fact_locator: Mapping[str, Any]
+    context: Mapping[str, Any]
+    evaluation: str
+    rule_id: str
+    rationale_id: str
+    conservative_default: bool
+
+    def as_dict(self) -> JsonObject:
+        return {
+            "fact_id": self.fact_id,
+            "fact_index": self.fact_index,
+            "fact_locator": thaw_json(self.fact_locator),
+            "context": thaw_json(self.context),
+            "evaluation": self.evaluation,
+            "rule_id": self.rule_id,
+            "rationale_id": self.rationale_id,
+            "conservative_default": self.conservative_default,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class MaterialityAssessment:
+    outcome: str
+    counts: Mapping[str, int]
+    evaluations: tuple[FactEvaluation, ...]
+    source_id: str
+    rule_id_priority_order: tuple[str, ...] = ()
+
+    def as_dict(self) -> JsonObject:
+        return {"outcome": self.outcome, "counts": thaw_json(self.counts), "evaluations": [item.as_dict() for item in self.evaluations]}
+
+
+@dataclass(frozen=True, slots=True)
+class ActionDisposition:
+    action: str
+    disposition: str
+    reason_id: str
+    route_ids: tuple[str, ...]
+
+    def as_dict(self) -> JsonObject:
+        return {"action": self.action, "disposition": self.disposition, "reason_id": self.reason_id, "route_ids": list(self.route_ids)}
+
+
+@dataclass(frozen=True, slots=True)
+class RoutePrerequisite:
+    prerequisite: str
+    status: str
+
+    def as_dict(self) -> JsonObject:
+        return {"prerequisite": self.prerequisite, "status": self.status}
+
+
+@dataclass(frozen=True, slots=True)
+class ProposedRoute:
+    route_id: str
+    action: str
+    state: str
+    source_id: str
+    target: Mapping[str, Any]
+    consumer_id: str | None
+    prerequisites: tuple[RoutePrerequisite, ...]
+    reason_fact_ids: tuple[str, ...]
+    reason_rule_ids: tuple[str, ...]
+    proposal_only: bool
+    approval_required: bool
+    approval_state: str
+    executed: bool
+
+    def as_dict(self) -> JsonObject:
+        return {
+            "route_id": self.route_id,
+            "action": self.action,
+            "state": self.state,
+            "source_id": self.source_id,
+            "target": thaw_json(self.target),
+            "consumer_id": self.consumer_id,
+            "prerequisites": [item.as_dict() for item in self.prerequisites],
+            "reason_fact_ids": list(self.reason_fact_ids),
+            "reason_rule_ids": list(self.reason_rule_ids),
+            "proposal_only": self.proposal_only,
+            "approval_required": self.approval_required,
+            "approval_state": self.approval_state,
+            "executed": self.executed,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ImpactRoutingResult:
+    source_declared_actions: tuple[str, ...]
+    action_dispositions: tuple[ActionDisposition, ...]
+    routes: tuple[ProposedRoute, ...]
+
+    def as_dict(self) -> JsonObject:
+        return {
+            "source_declared_actions": list(self.source_declared_actions),
+            "action_dispositions": [item.as_dict() for item in self.action_dispositions],
+            "routes": [item.as_dict() for item in self.routes],
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class RollbackFileBinding:
+    binding_id: str
+    predecessor_path: str
+    predecessor_content_byte_size: int
+    predecessor_canonical_lf_sha256: str
+    current_path: str
+    current_content_byte_size: int
+    current_canonical_lf_sha256: str
+
+    def as_dict(self) -> JsonObject:
+        return {
+            "binding_id": self.binding_id,
+            "predecessor_path": self.predecessor_path,
+            "predecessor_content_byte_size": self.predecessor_content_byte_size,
+            "predecessor_canonical_lf_sha256": self.predecessor_canonical_lf_sha256,
+            "current_path": self.current_path,
+            "current_content_byte_size": self.current_content_byte_size,
+            "current_canonical_lf_sha256": self.current_canonical_lf_sha256,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class PreservationBinding:
+    rule_id: str
+    path: str
+    content_byte_size: int
+    canonical_lf_sha256: str
+
+    def as_dict(self) -> JsonObject:
+        return {"rule_id": self.rule_id, "path": self.path, "content_byte_size": self.content_byte_size, "canonical_lf_sha256": self.canonical_lf_sha256}
+
+
+@dataclass(frozen=True, slots=True)
+class RollbackMetadataArtifact:
+    schema: str
+    artifact_content_hash: str
+    hash_basis: str
+    rollback_source_record_binding_hash_basis: str
+    current_source_id: str
+    current_rollback_source_record_binding_hash: str
+    predecessor_source_id: str | None
+    predecessor_rollback_source_record_binding_hash: str | None
+    current_declaration_refs: tuple[Mapping[str, Any], ...]
+    predecessor_declaration_refs: tuple[Mapping[str, Any], ...]
+    file_bindings: tuple[RollbackFileBinding, ...]
+    preservation_bindings: tuple[PreservationBinding, ...]
+
+    def as_dict(self) -> JsonObject:
+        return {
+            "schema": self.schema,
+            "artifact_content_hash": self.artifact_content_hash,
+            "hash_basis": self.hash_basis,
+            "rollback_source_record_binding_hash_basis": self.rollback_source_record_binding_hash_basis,
+            "current_source_id": self.current_source_id,
+            "current_rollback_source_record_binding_hash": self.current_rollback_source_record_binding_hash,
+            "predecessor_source_id": self.predecessor_source_id,
+            "predecessor_rollback_source_record_binding_hash": self.predecessor_rollback_source_record_binding_hash,
+            "current_declaration_refs": [thaw_json(item) for item in self.current_declaration_refs],
+            "predecessor_declaration_refs": [thaw_json(item) for item in self.predecessor_declaration_refs],
+            "file_bindings": [item.as_dict() for item in self.file_bindings],
+            "preservation_bindings": [item.as_dict() for item in self.preservation_bindings],
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class RollbackBlocker:
+    code: str
+    phase: str
+    subject: Any
+    expected: Any
+    actual: Any
+
+    def as_dict(self) -> JsonObject:
+        return {"code": self.code, "phase": self.phase, "subject": thaw_json(self.subject), "expected": thaw_json(self.expected), "actual": thaw_json(self.actual)}
+
+
+@dataclass(frozen=True, slots=True)
+class RollbackIntegrityCheck:
+    check: str
+    status: str
+
+    def as_dict(self) -> JsonObject:
+        return {"check": self.check, "status": self.status}
+
+
+@dataclass(frozen=True, slots=True)
+class ProposedRollbackOperation:
+    operation_id: str
+    sequence: int
+    operation_type: str
+    source_path: str | None
+    target_path: str | None
+    expected_source_hash: str | None
+    expected_target_hash: str | None
+    preservation_rule_id: str | None
+    proposal_only: bool
+    approval_required: bool
+    approval_state: str
+    executed: bool
+
+    def as_dict(self) -> JsonObject:
+        return {
+            "operation_id": self.operation_id,
+            "sequence": self.sequence,
+            "operation_type": self.operation_type,
+            "source_path": self.source_path,
+            "target_path": self.target_path,
+            "expected_source_hash": self.expected_source_hash,
+            "expected_target_hash": self.expected_target_hash,
+            "preservation_rule_id": self.preservation_rule_id,
+            "proposal_only": self.proposal_only,
+            "approval_required": self.approval_required,
+            "approval_state": self.approval_state,
+            "executed": self.executed,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class RollbackRehearsal:
+    outcome: str
+    reason_code: str
+    blocker: RollbackBlocker | None
+    rollback_route_eligible: bool
+    proposed_operations: tuple[ProposedRollbackOperation, ...]
+    lineage: Mapping[str, Any]
+    rollback_artifact_registry_path: str | None
+    rollback_artifact_status: str
+    rollback_artifact_content_hash: str | None
+    rollback_file_bindings: tuple[RollbackFileBinding, ...]
+    rollback_preservation_bindings: tuple[PreservationBinding, ...]
+    integrity_checks: tuple[RollbackIntegrityCheck, ...]
+
+    def rehearsal_dict(self) -> JsonObject:
+        return {
+            "outcome": self.outcome,
+            "reason_code": self.reason_code,
+            "blocker": None if self.blocker is None else self.blocker.as_dict(),
+            "rollback_route_eligible": self.rollback_route_eligible,
+            "proposed_operations": [item.as_dict() for item in self.proposed_operations],
+        }
+
+    def rollback_artifact_dict(self) -> JsonObject:
+        return {
+            "registry_path": self.rollback_artifact_registry_path,
+            "status": self.rollback_artifact_status,
+            "content_hash": self.rollback_artifact_content_hash,
+            "file_bindings": [item.as_dict() for item in self.rollback_file_bindings],
+            "preservation_bindings": [item.as_dict() for item in self.rollback_preservation_bindings],
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ImpactPlanArtifact:
+    schema: str
+    artifact_content_hash: str
+    hash_basis: str
+    observed_at: str
+    input_binding: Mapping[str, Any]
+    observation: Mapping[str, Any]
+    policy_evaluation: Mapping[str, Any]
+    proposal: Mapping[str, Any]
+    proposal_only: bool
+    approval_required: bool
+    approval_state: str
+    executed: bool
+    validation_ceiling: str
+
+    def as_dict(self) -> JsonObject:
+        return {
+            "schema": self.schema,
+            "artifact_content_hash": self.artifact_content_hash,
+            "hash_basis": self.hash_basis,
+            "observed_at": self.observed_at,
+            "input_binding": thaw_json(self.input_binding),
+            "observation": thaw_json(self.observation),
+            "policy_evaluation": thaw_json(self.policy_evaluation),
+            "proposal": thaw_json(self.proposal),
+            "proposal_only": self.proposal_only,
+            "approval_required": self.approval_required,
+            "approval_state": self.approval_state,
+            "executed": self.executed,
+            "validation_ceiling": self.validation_ceiling,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class RollbackPlanArtifact:
+    schema: str
+    artifact_content_hash: str
+    hash_basis: str
+    observed_at: str
+    input_binding: Mapping[str, Any]
+    impact_plan_content_hash: str
+    lineage: Mapping[str, Any]
+    rollback_artifact: Mapping[str, Any]
+    integrity_checks: tuple[RollbackIntegrityCheck, ...]
+    rehearsal: Mapping[str, Any]
+    proposal_only: bool
+    approval_required: bool
+    approval_state: str
+    executed: bool
+    validation_ceiling: str
+
+    def as_dict(self) -> JsonObject:
+        return {
+            "schema": self.schema,
+            "artifact_content_hash": self.artifact_content_hash,
+            "hash_basis": self.hash_basis,
+            "observed_at": self.observed_at,
+            "input_binding": thaw_json(self.input_binding),
+            "impact_plan_content_hash": self.impact_plan_content_hash,
+            "lineage": thaw_json(self.lineage),
+            "rollback_artifact": thaw_json(self.rollback_artifact),
+            "integrity_checks": [item.as_dict() for item in self.integrity_checks],
+            "rehearsal": thaw_json(self.rehearsal),
+            "proposal_only": self.proposal_only,
+            "approval_required": self.approval_required,
+            "approval_state": self.approval_state,
+            "executed": self.executed,
+            "validation_ceiling": self.validation_ceiling,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class PlanDriftCliResult:
+    schema: str
+    command: str
+    run_status: str
+    input_validity: str
+    baseline_validity: str
+    policy_validity: str
+    assessment_outcome: str
+    rollback_rehearsal_outcome: str
+    source_id: str | None
+    manifest_content_hash: str | None
+    diff_artifact_content_hash: str | None
+    verification_artifact_content_hash: str | None
+    registry_content_hash: str | None
+    policy_content_hash: str | None
+    impact_plan: ArtifactReference | None
+    rollback_plan: ArtifactReference | None
+    error: Mapping[str, Any] | None
+    proposal_only: bool
+    approval_required: bool
+    approval_state: str
+    executed: bool
+    validation_ceiling: str
+
+    def as_dict(self) -> JsonObject:
+        return {
+            "schema": self.schema,
+            "command": self.command,
+            "run_status": self.run_status,
+            "input_validity": self.input_validity,
+            "baseline_validity": self.baseline_validity,
+            "policy_validity": self.policy_validity,
+            "assessment_outcome": self.assessment_outcome,
+            "rollback_rehearsal_outcome": self.rollback_rehearsal_outcome,
+            "source_id": self.source_id,
+            "manifest_content_hash": self.manifest_content_hash,
+            "diff_artifact_content_hash": self.diff_artifact_content_hash,
+            "verification_artifact_content_hash": self.verification_artifact_content_hash,
+            "registry_content_hash": self.registry_content_hash,
+            "policy_content_hash": self.policy_content_hash,
+            "impact_plan": None if self.impact_plan is None else self.impact_plan.as_dict(),
+            "rollback_plan": None if self.rollback_plan is None else self.rollback_plan.as_dict(),
+            "error": None if self.error is None else thaw_json(self.error),
+            "proposal_only": self.proposal_only,
+            "approval_required": self.approval_required,
+            "approval_state": self.approval_state,
+            "executed": self.executed,
+            "validation_ceiling": self.validation_ceiling,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class PlanDriftResult:
+    exit_code: int
+    cli_result: PlanDriftCliResult
+
+    def __iter__(self):
+        yield self.exit_code
+        yield self.cli_result.as_dict()
