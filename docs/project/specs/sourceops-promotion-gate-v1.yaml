@@ -1,0 +1,1643 @@
+# SourceOps Promotion Gate v1 -- Sol planning contract.
+#
+# PLAN ONLY. This is a separate post-RAPTOR-v2 project. It is never V2-S4.
+# It authorizes future RED-test authoring, implementation, and independent
+# checking of a receipt-gated proposal generator. It authorizes no pilot run,
+# source activation, direct write to main, route execution, rollback restore,
+# evidence reinterpretation, auto-merge, or non-draft pull request.
+
+schema: raptor.sourceops.promotion_gate_spec.v1
+status: sol_planner_contract_ready_for_red_test_authoring
+project_id: sourceops-promotion-gate-v1
+title: Receipt-bound proposed source promotion branch and draft PR
+authority_file: docs/project/specs/sourceops-promotion-gate-v1.yaml
+v2_roadmap_file: docs/project/specs/raptor-v2-kickoff.yaml
+branch: design/sourceops-promotion-gate-v1
+base_commit: e640d65fd67ceed496adf3793eb8b58194836cc9
+planned_at: '2026-08-29T15:20:11+05:30'
+planner:
+  role: Sol planner
+  output: contract_only
+  production_code_authored: false
+  tests_authored: false
+  pilot_executed: false
+
+authority:
+  precedence:
+    - docs/DECISIONS.md
+    - docs/STRATEGY.md
+    - docs/EVALUATION.md
+    - docs/PROGRAM.md
+    - docs/ARCHITECTURE.md
+    - METHOD.md
+    - docs/prd/
+    - docs/project/specs/raptor-v2-kickoff.yaml
+    - docs/project/specs/raptor-v2-s2-staged-snapshot.yaml
+    - docs/project/specs/raptor-v2-s3-drift-gates.yaml
+    - docs/project/specs/sourceops-promotion-gate-v1.yaml
+  relationship_to_raptor_v2:
+    classification: separate_post_v2_project
+    is_v2_slice: false
+    forbidden_aliases:
+      - V2-S4
+      - RAPTOR-v2-S4
+      - automatic-promotion-slice
+    dependency: >-
+      The project consumes published V2-S2 and V2-S3 artifacts as immutable
+      inputs. It does not amend their schemas, hash bases, semantics, code, or
+      proposal-only ceilings.
+    reason: >-
+      V2 ends at deterministic observation, materiality evaluation, impact
+      routing, and rollback rehearsal. Turning an approved observation into a
+      repository branch and draft pull request introduces human-authorization,
+      git, and GitHub transaction boundaries that require a new project and
+      decision record.
+  decision_numbering_dependency:
+    this_decision: ADR-0021
+    reserved_predecessor: ADR-0020
+    reserved_for: ClinVar amendment on its separate worktree/branch
+    merge_order: ADR-0020_then_ADR-0021
+    rule: >-
+      ADR-0020 is intentionally absent from this branch baseline and reserved
+      for the ClinVar amendment expected to merge first. Before Promotion Gate
+      merges, rebase onto that result, require ADR-0020 to be present and
+      unchanged, retain this decision as ADR-0021, and stop on any numbering or
+      semantic collision.
+  conflict_rule: >-
+    A conflict with a higher-precedence authority is a defect in this file.
+    Future test authors, implementers, checkers, and operators must stop rather
+    than weaken V2-S2/V2-S3, frozen evidence, branch protection, or the human
+    approval boundary.
+  planning_only_change_scope:
+    allowed:
+      - docs/project/specs/sourceops-promotion-gate-v1.yaml
+      - docs/project/specs/raptor-v2-kickoff.yaml
+      - docs/PROGRAM.md
+      - docs/DECISIONS.md
+      - docs/RISK_REGISTER.md
+      - docs/project/TODOS.yaml
+    forbidden:
+      - src/
+      - tests/
+      - configs/
+      - data/
+      - .github/
+      - dependency manifests
+      - generated SourceOps artifacts
+  no_current_execution:
+    - no production implementation
+    - no RED tests
+    - no staged candidate
+    - no approval receipt
+    - no pilot
+    - no branch generation
+    - no commit
+    - no push
+    - no pull request
+
+planning_baseline:
+  repository:
+    branch: design/sourceops-promotion-gate-v1
+    commit: e640d65fd67ceed496adf3793eb8b58194836cc9
+    v2_merge_commit: e640d65fd67ceed496adf3793eb8b58194836cc9
+    protected_base_branch: main
+  v2_s1:
+    implementation_commit: a662276700f1138b1baf5581be8bc76e6e68e314
+    registry_path: configs/sourceops/source_registry.yaml
+    registry_schema: raptor.source_registry.v1
+    registry_hash_basis: raptor.source_registry_content_hash.v1
+    registry_content_hash: ef6995a8822c53a1bef228545b0a01c23963b79212967d3f3c15b66d54b02e90
+    source_record_hash_basis: raptor.sourceops.source_record_content_hash.v1
+  v2_s2:
+    implementation_commit: fd0abdf3dea009ef8d90114193c4e28c58ef864d
+    manifest_schema: raptor.sourceops.staged_snapshot_manifest.v1
+    manifest_hash_basis: raptor.sourceops.staged_snapshot_manifest_content_hash.v1
+    verification_schema: raptor.sourceops.staged_snapshot_verification.v1
+    verification_hash_basis: raptor.sourceops.staged_snapshot_verification_content_hash.v1
+    diff_schema: raptor.sourceops.staged_snapshot_diff.v1
+    diff_hash_basis: raptor.sourceops.staged_snapshot_diff_content_hash.v1
+    input_tree_hash_basis: raptor.sourceops.staged_snapshot_input_tree_content_hash.v1
+    generated_parent: .raptor/sourceops/generated/staged-snapshots
+  v2_s3:
+    implementation_commit: 6c3e554ec3fa21a5eaa74bae5482c1938faa0825
+    impact_schema: raptor.sourceops.drift_impact_plan.v1
+    impact_hash_basis: raptor.sourceops.drift_impact_plan_content_hash.v1
+    rollback_schema: raptor.sourceops.rollback_rehearsal_plan.v1
+    rollback_hash_basis: raptor.sourceops.rollback_rehearsal_plan_content_hash.v1
+    generated_parent: .raptor/sourceops/generated/drift-plans
+    materiality_policy_path: configs/sourceops/materiality_policy.yaml
+    materiality_policy_schema: raptor.sourceops.materiality_policy.v1
+    materiality_policy_hash: 8e6fb7cf254afdda56858308be94e2f2c3456df9e46c9b8fcb19cb0cf17297a5
+  exact_artifact_instance_rule: >-
+    This planning branch creates no V2-S2 or V2-S3 artifact instance. A future
+    invocation must receive and independently verify the exact manifest,
+    input-tree, verification, diff, impact-plan, and rollback-plan hashes
+    listed in one fresh human approval receipt. Discovery by "latest", source
+    id, timestamp, directory order, or partial hash is forbidden.
+  pilot_baseline:
+    source_id: atlas-tsc2-catalog-template
+    source_record_content_hash: 60afd65ec49ad3f91246dd19789d63bfed50366b211e29c783c958c1337e1b1a
+    lifecycle_state: METADATA_ONLY
+    consumers: []
+    declaration_path: configs/atlas/catalogs/tsc2/catalog.yaml
+    declaration_canonical_lf_sha256: b9d90a2d490cbb8bf7b49d59fd0bc5e98417eb847a7ba9febecd5c090a8f17e1
+    catalog_content_hash: 579035b38f168c67dcde89ace29af5f4ac4f1f6b34b5be38e7af0a88b6b3b514
+    version: 1.0.0-phase2-template
+    source_rows: 0
+    pilot_status: planned_not_run
+
+product_contract:
+  user: RAPTOR source-maintenance operator
+  goal: >-
+    Given one still-current repository baseline, one exact V2-S2 artifact
+    pair, one exact V2-S3 artifact pair, the unchanged staged candidate bytes,
+    and one fresh typed human approval receipt binding all of them, construct
+    one review-only git proposal, publish it only to a deterministic
+    non-protected proposal branch, and open exactly one draft pull request
+    against main.
+  authority_ceiling: >-
+    The gate proves only that a draft repository proposal matches a fresh
+    signed human receipt and the exact previously validated artifacts. It does
+    not prove source truth, legal permission, scientific sufficiency,
+    evidentiary meaning, policy correctness, consumer readiness, route
+    completion, validation, classification, or merge authorization.
+  only_permitted_persistent_outputs:
+    - one content-addressed local proposal record and exact patch
+    - one deterministic proposal branch below refs/heads/sourceops/proposals/
+    - one commit on that proposal branch
+    - one draft pull request targeting main
+  never_permitted_outputs_or_actions:
+    - direct write, commit, update, force-push, reset, or delete of main
+    - write to any protected branch or tag
+    - pull-request ready-for-review transition
+    - auto-merge enablement or merge
+    - route dispatch or execution
+    - benchmark rebuild
+    - policy review outcome
+    - packet invalidation
+    - Atlas regrounding
+    - validation rerun
+    - source activation or lifecycle transition
+    - rollback restoration or rollback-content write
+    - evidence parsing, scoring, synthesis, reinterpretation, or classification
+    - external source acquisition or access-control bypass
+
+scope:
+  exact_in:
+    - strict validation of one signed approval receipt
+    - exact re-validation of one V2-S2 manifest-bound pair
+    - exact re-validation of one V2-S3 diff-and-policy-bound pair
+    - two-pass immutability verification of staged candidate and governed inputs
+    - proposal of repository declaration bytes already observed by V2-S2
+    - mechanical source-record metadata projection from V2-S2 candidate facts
+    - mechanical registry self-hash update
+    - mechanical materiality-policy registry-binding/version/self-hash update with unchanged rules
+    - immutable receipt and cycle-free attestation records included in the proposed patch
+    - deterministic patch, tree, commit, proposal branch, and draft PR
+    - fail-closed replay, collision, stale approval, and partial transaction handling
+  exact_out:
+    - source downloading, scraping, API acquisition, archive extraction, or decompression
+    - promotion of unobserved files or inferred target paths
+    - committing SNAPSHOT_CONTENT or AUXILIARY_METADATA staged files
+    - arbitrary repository editing
+    - source-specific semantic parsing beyond existing V2 validations
+    - modification of V2-S1/V2-S2/V2-S3 generated artifacts
+    - mutation of rollback files or restoration from rollback files
+    - execution of any V2-S3 proposed route or operation
+    - GitHub issue, release, tag, deployment, workflow-dispatch, or merge operations
+    - non-draft pull requests
+    - evidence, clinical, patient-facing, submission, procurement, or RescueScreen work
+
+explicit_exclusions:
+  august_clinvar_prospective_validation:
+    excluded: true
+    protected_artifact: data/census/tsc_prospective_validation_2026-08_blocked_data.json
+    rules:
+      - the BLOCKED_DATA outcome remains immutable
+      - the frozen HTTP-404 URL is not retried by this project
+      - the alternate archive-root URL is not substituted
+      - no August ClinVar archive bytes, labels, rows, hashes, or scores are read
+      - no prospective status or authorization flag changes
+      - no pilot may use a ClinVar source, component, declaration, or candidate
+  access_blocked_mave:
+    excluded: true
+    source_id: tsc2-mave-source-register
+    protected_declaration: configs/external/mave_sources.yaml
+    rules:
+      - no access-blocked MAVE source or candidate is eligible for v1
+      - no credential, paywall, data-use, or missing-download condition is bypassed
+      - MAVE access state cannot be changed by a promotion receipt
+      - no MAVE bytes or Atlas access-blocked observations are committed
+      - eligibility requires a later source-specific accepted plan after lawful access is verified
+  evidence_and_domain:
+    - frozen R2 and tiered-v3 artifacts
+    - ACMG configs and policies
+    - PP3/BP4 activation
+    - Atlas claim promotion or panel selection
+    - RescueScreen
+    - clinical or research-scope authorization
+
+terminology:
+  proposal: >-
+    A hash-bound branch, commit, patch, and draft pull request that remains
+    unmerged and carries no readiness or execution claim.
+  promotion: >-
+    In this project name only, the transition from approved staged facts to a
+    reviewable repository proposal. It never means activation, merge,
+    evidence use, route execution, or lifecycle advancement.
+  exact_artifact_set: >-
+    One V2-S2 verification/diff pair and one V2-S3 impact/rollback pair whose
+    filenames, canonical bytes, self-hashes, schemas, pair bindings, and
+    transitive manifest/input-tree/registry/source/policy bindings all match.
+  approval_receipt: >-
+    A closed canonical JSON document carrying a human signature and binding
+    one exact base, source, candidate, policy set, artifact set, path mapping,
+    and proposal ceiling for a bounded time.
+  stale_approval: >-
+    A receipt that is expired, not yet valid, signed by an unapproved key,
+    bound to a moved base, changed input, changed policy, changed artifact,
+    changed source, changed target mapping, or an already-used conflicting
+    proposal.
+  replay: >-
+    A repeated invocation using the identical receipt and identical immutable
+    inputs. It may return the exact existing proposal without mutation; it may
+    never create a second branch or PR.
+
+future_repository_layout:
+  production_files_planned:
+    - configs/sourceops/promotion_policy.yaml
+    - configs/sourceops/approval_authority_policy.yaml
+    - src/raptor/sourceops/promotion.py
+    - src/raptor/sourceops/promotion_git.py
+    - src/raptor/sourceops/promotion_github.py
+    - tests/sourceops/test_promotion_contract.py
+    - tests/sourceops/test_promotion_safety.py
+    - tests/sourceops/test_promotion_git.py
+    - tests/sourceops/test_promotion_github.py
+  tracked_proposal_records:
+    approval_receipt: configs/sourceops/promotion-receipts/<receipt_content_hash>.json
+    proposal_attestation: configs/sourceops/promotion-attestations/<attestation_content_hash>.json
+  local_generated_parent: .raptor/sourceops/generated/promotion-proposals
+  local_transaction_parent: .raptor/sourceops/transactions/promotion
+  local_worktree_parent: .raptor/sourceops/worktrees/promotion
+  no_mutable_index: true
+  no_latest_pointer: true
+
+input_contract:
+  command_inputs:
+    required_exact:
+      - receipt_path
+      - staging_root
+      - v2_s2_verification_hash
+      - v2_s2_diff_hash
+      - v2_s3_impact_hash
+      - v2_s3_rollback_hash
+    hash_lexical_form: '^[0-9a-f]{64}$'
+    rules:
+      - every hash is a full lowercase SHA-256, never inferred from another argument
+      - receipt_path is repository-relative below .raptor/sourceops/approvals
+      - staging_root follows the exact V2-S2 staging-root contract
+      - no registry, policy, output, branch, base, remote, or target-path override exists
+      - no force, resume-with-new-inputs, skip-check, allow-stale, or non-draft option exists
+  exact_hash_chain:
+    candidate:
+      - manifest_content_hash
+      - input_tree_content_hash
+      - every verified staged-file content_sha256
+    source:
+      - source_record_content_hash
+      - every declaration_ref canonical_lf_sha256
+    baseline:
+      - base_commit
+      - base_tree_hash
+      - registry_content_hash
+    policies:
+      - materiality_policy_content_hash
+      - promotion_policy_content_hash
+      - approval_authority_policy_content_hash
+    v2_s2_artifacts:
+      - verification_artifact_content_hash
+      - diff_artifact_content_hash
+    v2_s3_artifacts:
+      - impact_artifact_content_hash
+      - rollback_artifact_content_hash
+  independent_validation_rule: >-
+    CLI arguments and receipt values are selectors, not proof. The gate
+    independently re-runs all relevant V2-S2/V2-S3 canonical-byte, self-hash,
+    filename, pair, baseline, source, policy, fact, summary, route, rollback,
+    and two-pass immutability checks before any write.
+
+approval_receipt_contract:
+  schema: raptor.sourceops.promotion_approval_receipt.v1
+  encoding: strict_canonical_JSON_UTF8_with_one_LF
+  top_level_required_exact:
+    - schema
+    - receipt_content_hash
+    - hash_basis
+    - approval_payload_hash
+    - receipt_id
+    - decision
+    - approver
+    - timing
+    - repository_binding
+    - source_binding
+    - candidate_binding
+    - policy_binding
+    - artifact_binding
+    - proposed_change
+    - constraints
+    - assertions
+    - signature
+  constants:
+    schema: raptor.sourceops.promotion_approval_receipt.v1
+    hash_basis: raptor.sourceops.promotion_approval_receipt_content_hash.v1
+    decision: APPROVE_PROPOSAL_ONLY
+  receipt_id:
+    type: identifier
+    semantics: signed_informational_metadata_only
+    uniqueness_enforced: false
+    forbidden_uses:
+      - branch identity
+      - output path identity
+      - replay identity
+      - collision identity
+      - global lookup
+    rule: >-
+      Different receipts may repeat receipt_id. The only enforced proposal and
+      replay identity is receipt_content_hash, which is observable in the
+      receipt filename, local transaction root, proposal branch, tracked
+      receipt record, attestation, and draft-PR lookup.
+  approver_required_exact:
+    - principal
+    - display_name
+    - role
+    - key_fingerprint
+    - authority_policy_content_hash
+  approver_rules:
+    - principal matches one enabled exact principal in the approval-authority policy
+    - display_name and role equal the matched principal row exactly
+    - key_fingerprint matches one currently acceptable key row for that principal exactly
+    - role is SOURCE_PROMOTION_APPROVER
+    - approver.authority_policy_content_hash and policy_binding.approval_authority_policy_content_hash equal each other and the current policy self-hash
+    - exactly one qualified approver and one valid signature are required
+    - no co-approval, source-owner exception, protected-path exception, or inferred authority exists in v1
+  timing_required_exact:
+    - approved_at
+    - approved_at_epoch_seconds
+    - not_before
+    - not_before_epoch_seconds
+    - expires_at
+    - expires_at_epoch_seconds
+  timing_rules:
+    - timestamps use UTC YYYY-MM-DDTHH:MM:SSZ
+    - each epoch value is a non-negative JSON integer, never bool
+    - each epoch value equals the exact Unix epoch conversion of its paired UTC timestamp
+    - not_before is not earlier than approved_at
+    - expires_at is later than not_before
+    - maximum validity is 24 hours
+    - every persistent local or remote write requires the complete trusted-time interval to be within the inclusive validity window
+    - trusted time and the exact 60-second uncertainty ceiling come only from trusted_time_contract
+  repository_binding_required_exact:
+    - repository
+    - remote
+    - base_branch
+    - base_commit
+    - base_tree_hash
+    - registry_content_hash
+  repository_constants:
+    base_branch: main
+    proposal_branch_prefix: sourceops/proposals/
+  source_binding_required_exact:
+    - source_id
+    - source_record_content_hash
+    - declaration_refs
+    - lifecycle_state
+    - consumer_ids
+  candidate_binding_required_exact:
+    - candidate_snapshot_id
+    - manifest_content_hash
+    - input_tree_content_hash
+    - staged_files
+  staged_file_binding_required_exact:
+    - file_id
+    - path
+    - role
+    - content_sha256
+    - content_byte_size
+  policy_binding_required_exact:
+    - materiality_policy_content_hash
+    - promotion_policy_content_hash
+    - approval_authority_policy_content_hash
+  artifact_binding_required_exact:
+    - v2_s2_verification_artifact_content_hash
+    - v2_s2_diff_artifact_content_hash
+    - v2_s3_impact_artifact_content_hash
+    - v2_s3_rollback_artifact_content_hash
+  proposed_change_required_exact:
+    - path_mappings
+    - proposed_registry_version
+    - proposed_materiality_policy_version
+    - expected_change_class
+  path_mapping_required_exact:
+    - candidate_file_id
+    - target_path
+    - expected_baseline_hash
+    - expected_candidate_hash
+  expected_change_classes:
+    - METADATA_OR_VERSION_ONLY
+    - DECLARATION_ONLY
+  constraints_required_exact:
+    - proposal_only
+    - draft_pr_only
+    - no_route_execution
+    - no_lifecycle_transition
+    - no_rollback_restore
+    - no_evidence_reinterpretation
+    - protected_paths_enforced
+  constraint_constants:
+    proposal_only: true
+    draft_pr_only: true
+    no_route_execution: true
+    no_lifecycle_transition: true
+    no_rollback_restore: true
+    no_evidence_reinterpretation: true
+    protected_paths_enforced: true
+  assertions_exact_in_order:
+    - I reviewed the exact candidate, source, baseline, policy, and artifact hashes in this receipt.
+    - I authorize only generation of the bound proposal branch, patch, commit, and draft pull request.
+    - I do not authorize merge, activation, route execution, rollback restoration, validation, or evidence reinterpretation.
+    - A changed hash, moved main branch, expired receipt, or protected-path mismatch requires a new approval.
+  signature_required_exact:
+    - method
+    - namespace
+    - signed_payload_sha256
+    - detached_signature
+  signature_constants:
+    method: SSH_SIGNATURE
+    namespace: raptor-sourceops-promotion-v1
+  payload_hash_algorithm: >-
+    Deep-copy the complete receipt mapping, remove receipt_content_hash and
+    signature, canonicalize as sorted-key compact JSON with preserved
+    sequences and no trailing LF, and compute lowercase SHA-256. The result
+    must equal approval_payload_hash.
+  signature_message: >-
+    The SSH signature covers the UTF-8 bytes
+    "raptor-sourceops-promotion-v1:<approval_payload_hash>\n".
+  receipt_hash_algorithm: >-
+    After signature verification, deep-copy the complete mapping, remove only
+    receipt_content_hash, canonicalize without a trailing LF, and compute
+    lowercase SHA-256. The result must equal receipt_content_hash and the
+    receipt filename.
+  rejection_rule: >-
+    Unknown fields, omitted fields, duplicate keys, aliases, alternative
+    signature methods, unapproved keys, invalid canonical bytes, mismatched
+    hashes, or false constraint values reject before any repository or remote
+    mutation.
+
+approval_authority_policy_contract:
+  path: configs/sourceops/approval_authority_policy.yaml
+  schema: raptor.sourceops.approval_authority_policy.v1
+  hash_basis: raptor.sourceops.approval_authority_policy_content_hash.v1
+  planned_status: create_during_future_implementation
+  encoding: strict_closed_YAML_canonical_JSON_hash
+  top_level_required_exact:
+    - schema
+    - policy_id
+    - policy_version
+    - policy_content_hash
+    - hash_basis
+    - signature_namespace
+    - required_role
+    - principals
+  constants:
+    schema: raptor.sourceops.approval_authority_policy.v1
+    policy_id: raptor-sourceops-promotion-approvers-v1
+    hash_basis: raptor.sourceops.approval_authority_policy_content_hash.v1
+    signature_namespace: raptor-sourceops-promotion-v1
+    required_role: SOURCE_PROMOTION_APPROVER
+  principal_required_exact:
+    - principal
+    - display_name
+    - role
+    - enabled
+    - keys
+  principal_rules:
+    - principals is non-empty and strictly sorted by principal
+    - principal values and display names are non-empty bounded strings
+    - principal is unique exactly and after Unicode casefold
+    - role equals SOURCE_PROMOTION_APPROVER
+    - enabled is an exact JSON boolean
+    - a disabled principal can validate no receipt regardless of key state
+  key_required_exact:
+    - key_fingerprint
+    - state
+    - valid_from
+    - valid_until
+    - replaces_key_fingerprint
+    - disabled_reason
+  key_fingerprint:
+    lexical_form: '^SHA256:[A-Za-z0-9+/]{43}$'
+    matching: exact_case_sensitive
+    uniqueness: global_exact_and_casefold
+  key_states:
+    ACTIVE:
+      accepted: true
+      valid_until: nullable
+      disabled_reason: null
+    ROTATING_OUT:
+      accepted: true_only_inside_its_closed_validity_interval
+      valid_until: required_non_null
+      disabled_reason: null
+    DISABLED:
+      accepted: false
+      valid_until: nullable
+      disabled_reason: required_non_empty
+  key_rules:
+    - keys is non-empty and strictly sorted by key_fingerprint
+    - valid_from and non-null valid_until use UTC YYYY-MM-DDTHH:MM:SSZ
+    - non-null valid_until is later than valid_from
+    - replaces_key_fingerprint is null or names another key in the same principal
+    - a key cannot replace itself
+    - replacement edges are acyclic
+    - ACTIVE and ROTATING_OUT require trusted time inside their validity interval
+    - DISABLED rejects regardless of dates
+  single_qualified_approver_rule: >-
+    One receipt contains exactly one approver block and one SSH signature. It
+    passes only when the current self-hashed policy contains that exact enabled
+    principal, exact required role, and exact currently acceptable fingerprint.
+    Source ownership is neither a qualification nor a disqualification. V1
+    defines no co-approval or protected-path waiver.
+  rotation_rule: >-
+    Rotation requires a new policy_version and policy_content_hash. A bounded
+    overlap may list the incoming key ACTIVE and the outgoing key ROTATING_OUT.
+    Because every receipt binds the current authority-policy hash, a policy
+    change makes an unused old receipt stale; no implicit migration occurs.
+  self_hash_rule: >-
+    Parse the closed JSON-compatible YAML mapping, deep-copy it, remove only
+    top-level policy_content_hash, serialize sorted-key compact canonical JSON
+    with preserved sequences and no trailing LF, compute lowercase SHA-256,
+    and require exact equality. Unknown fields, duplicate keys, aliases, tags,
+    invalid ordering, invalid rotation, or hash mismatch reject.
+  runtime_override: forbidden
+
+promotion_policy_contract:
+  schema: raptor.sourceops.promotion_policy.v1
+  path: configs/sourceops/promotion_policy.yaml
+  planned_status: create_during_future_implementation
+  properties:
+    - self-hashed closed schema
+    - exact repository and remote identity
+    - exact main branch and proposal prefix
+    - exact proposal-writable path classes
+    - exact always-protected paths
+    - absolute protected-path precedence with no receipt override
+    - exact git and GitHub operation allowlists
+    - exact receipt lifetime and size limits
+    - exact output and transaction roots
+    - exact commit identity and message template
+  change_rule: >-
+    Any policy semantic change requires a new policy version, new hash, RED
+    tests, independent checker review, and human acceptance. Runtime overrides
+    are forbidden.
+
+candidate_to_patch_contract:
+  candidate_file_eligibility:
+    required_role: CANDIDATE_DECLARATION
+    required_checksum_mode: CANONICAL_LF_TEXT
+    allowed_media_types:
+      - application/json
+      - application/x-yaml
+      - text/plain
+    rules:
+      - candidate_file_id appears exactly once in V2-S2 verification input_tree.files
+      - one V2-S2 DECLARATION_REF content binding maps it to the same target_path
+      - V2-S2 before hash equals receipt expected_baseline_hash
+      - V2-S2 after hash equals receipt expected_candidate_hash
+      - V2-S3 evaluated the corresponding facts under the exact bound policy
+      - the current target still has expected_baseline_hash
+      - staged bytes still have expected_candidate_hash
+      - target_path is an existing declaration_ref of the selected source
+      - no path inference, extension substitution, directory expansion, or globbing occurs
+  registry_projection:
+    selected_source_fields_replaced_from_v2_s2_candidate:
+      - display_name
+      - record_kind
+      - owner
+      - authoritative_locator
+      - licence
+      - release
+      - acquisition
+    selected_source_fields_preserved_byte_semantically:
+      - source_id
+      - lifecycle_state
+      - refresh
+      - consumers
+      - drift_policy
+      - rollback
+      - blocked_reasons
+      - missing_inputs
+      - unblock_condition
+      - reviewed_by
+      - reviewed_at
+    declaration_ref_rule: >-
+      Only mapped declaration_refs canonical_lf_sha256 values change, and each
+      becomes the exact V2-S2 candidate canonical hash. Paths, roles, authority
+      scopes, sequence, and unmapped hashes remain unchanged.
+    component_rule: >-
+      v1 does not modify registry components. A V2-S2 COMPLETE component
+      projection containing any changed, added, or removed component rejects
+      as COMPONENT_PROMOTION_OUT_OF_SCOPE.
+    registry_version_rule: >-
+      Replace registry_version only with the exact receipt-approved value,
+      then recompute registry_content_hash under the existing V2-S1 hash basis.
+      No timestamp is synthesized.
+  materiality_policy_projection:
+    allowed_changes:
+      - policy_version becomes the exact receipt-approved value
+      - registry_binding.registry_content_hash becomes the proposed registry hash
+      - policy_content_hash is recomputed
+    preserved:
+      - schema
+      - policy_id
+      - hash_basis
+      - approval_binding
+      - artifact_binding
+      - evaluator
+      - every rule, priority, selector, rationale, outcome, and sequence
+    no_reinterpretation_rule: >-
+      Any semantic difference outside the three allowed fields rejects. The
+      proposal rebinds the identical materiality policy to the proposed
+      registry; it does not change materiality.
+  audit_records:
+    receipt_copy: exact canonical receipt bytes
+    proposal_attestation: exact cycle-free tracked attestation
+    overwrite: forbidden
+
+v1_eligibility_contract:
+  evaluation_order:
+    - validate current registry and selected source
+    - compare receipt source binding with the current exact source record
+    - evaluate lifecycle allowlist
+    - canonicalize every receipt target path
+    - reject every protected-path intersection
+    - only then evaluate declaration/content bindings
+  eligible_source_lifecycles:
+    - METADATA_ONLY
+    - CONFIRM_PENDING
+    - VERIFIED_ACTIVE
+  ineligible_source_lifecycles:
+    - PINNED_HISTORICAL
+    - ACCESS_BLOCKED
+    - RETIRED
+  lifecycle_rule: >-
+    The current registry lifecycle and the receipt lifecycle must be identical
+    and in eligible_source_lifecycles. Every other known or unknown value fails
+    SOURCE_LIFECYCLE_INELIGIBLE before any local or remote write.
+  target_intersection_algorithm:
+    normalization:
+      - apply the repository canonical path grammar
+      - use forward-slash segments
+      - compare both exact Unicode strings and Unicode-casefolded segments
+    always_protected_intersection: >-
+      Treat an always_protected entry ending in "/" as a directory prefix and
+      every other entry as an exact file. Reject when the target equals an
+      entry, lies below a protected directory, or is an ancestor of any
+      protected entry.
+    protected_exact_path_intersection: >-
+      Reject when the target equals an exact_protected_artifact, is below it,
+      or is an ancestor of it.
+    result: RECEIPT_TARGET_PROTECTED
+  receipt_non_override_rule: >-
+    Receipt signature, approver role, target mapping, expected hashes, source
+    ownership, or any other receipt field can never waive or override lifecycle
+    or path protection. Protection is mechanical policy, not human-discretion
+    data. A future exception requires a new versioned project/policy contract,
+    not a v1 receipt.
+
+proposal_attestation_contract:
+  purpose: >-
+    Provide a tracked, content-addressed audit record without introducing a
+    hash cycle through the patch, tree, commit, branch, or pull request.
+  schema: raptor.sourceops.promotion_attestation.v1
+  hash_basis: raptor.sourceops.promotion_attestation_content_hash.v1
+  top_level_required_exact:
+    - schema
+    - attestation_content_hash
+    - hash_basis
+    - receipt_content_hash
+    - approval_payload_hash
+    - base_binding
+    - source_binding
+    - candidate_binding
+    - policy_binding
+    - artifact_binding
+    - mapped_declarations
+    - proposed_governance_hashes
+    - safety_ceiling
+  proposed_governance_hashes_required_exact:
+    - registry_content_hash
+    - source_record_content_hash
+    - materiality_policy_content_hash
+    - declaration_hashes
+  safety_ceiling_constants:
+    proposal_only: true
+    draft_pr_only: true
+    routes_executed: false
+    rollback_restored: false
+    evidence_reinterpreted: false
+    lifecycle_changed: false
+  forbidden_fields:
+    - attestation_path
+    - patch_content_hash
+    - patch_path
+    - tree_hash
+    - commit_hash
+    - branch_ref
+    - pull_request_number
+    - pull_request_url
+    - pull_request_body_hash
+  self_hash_rule: >-
+    Remove only attestation_content_hash and hash canonical JSON without the
+    trailing LF. The tracked filename is then derived from the resulting hash.
+  cycle_free_rule: >-
+    Neither the receipt nor the attestation contains any value derived from
+    patch bytes, the git tree, the commit, the branch, or the pull request.
+    The attestation may therefore be added to the patch before those objects
+    are computed without requiring a cryptographic fixpoint.
+
+proposal_manifest_contract:
+  persistence: local_generated_only_never_committed
+  schema: raptor.sourceops.promotion_proposal.v1
+  hash_basis: raptor.sourceops.promotion_proposal_content_hash.v1
+  top_level_required_exact:
+    - schema
+    - proposal_content_hash
+    - hash_basis
+    - receipt_content_hash
+    - approval_payload_hash
+    - attestation_content_hash
+    - repository
+    - base
+    - source
+    - candidate
+    - policies
+    - artifacts
+    - patch
+    - proposed_state
+    - branch
+    - commit
+    - pull_request
+    - safety
+    - status
+  base_required_exact:
+    - branch
+    - commit
+    - tree_hash
+    - registry_content_hash
+  artifacts_required_exact:
+    - v2_s2_verification
+    - v2_s2_diff
+    - v2_s3_impact
+    - v2_s3_rollback
+  artifact_ref_required_exact:
+    - path
+    - schema
+    - content_hash
+  patch_required_exact:
+    - path
+    - content_hash
+    - byte_size
+    - changed_paths
+  proposed_state_required_exact:
+    - tree_hash
+    - registry_content_hash
+    - source_record_content_hash
+    - materiality_policy_content_hash
+    - declaration_hashes
+  branch_required_exact:
+    - ref
+    - expected_base_commit
+    - protected
+  branch_constants:
+    protected: false
+  commit_required_exact:
+    - expected_tree_hash
+    - author_name
+    - author_email
+    - author_epoch_seconds
+    - author_utc_offset
+    - committer_name
+    - committer_email
+    - committer_epoch_seconds
+    - committer_utc_offset
+    - message
+    - commit_hash
+  pull_request_required_exact:
+    - base
+    - head
+    - draft
+    - title
+    - body_content_hash
+    - url
+    - number
+  pull_request_constants:
+    base: main
+    draft: true
+  safety_required_exact:
+    - exact_hashes_verified
+    - approval_fresh
+    - signature_verified
+    - approval_authority_verified
+    - lifecycle_eligible
+    - receipt_targets_unprotected
+    - trusted_time_verified
+    - commit_identity_pinned
+    - protected_paths_clean
+    - routes_not_executed
+    - rollback_not_restored
+    - evidence_not_reinterpreted
+    - main_not_mutated
+    - auto_merge_disabled
+  safety_value_rule: every value is true
+  statuses:
+    - DRAFT_PR_CREATED
+    - EXISTING_IDENTICAL_PROPOSAL
+    - STALE_EXISTING_PROPOSAL
+  hash_rule: >-
+    Remove only proposal_content_hash and hash canonical JSON without the
+    trailing LF. This final local-only record is created only after remote
+    verification, so it may bind patch, tree, commit, branch, and draft-PR
+    values without entering any of those objects. Partial states remain in the
+    receipt-scoped transaction journal; no existing proposal manifest is
+    overwritten.
+  cycle_free_rule: >-
+    The proposal manifest is not included in the patch, tree, commit, or PR
+    body. The PR body therefore does not bind proposal_content_hash. It may
+    bind the already-computed receipt, attestation, patch, tree, and commit
+    hashes.
+
+patch_and_commit_contract:
+  changed_path_order: Unicode_code_point_order
+  patch_format:
+    command_semantics: git_diff_full_index_binary_no_renames
+    prefixes: [a/, b/]
+    line_endings: LF
+    content_hash: SHA256_exact_patch_bytes
+    rename_detection: disabled
+  allowed_changed_path_classes:
+    - receipt-mapped selected-source declaration paths
+    - configs/sourceops/source_registry.yaml
+    - configs/sourceops/materiality_policy.yaml
+    - one receipt record path derived from receipt_content_hash
+    - one attestation record path derived from attestation_content_hash
+  exact_path_set_rule: >-
+    The changed path set must equal the mechanically expected set. Missing,
+    additional, case-colliding, renamed, copied, deleted, mode-changed,
+    symlinked, submodule, or special-file paths reject.
+  branch_name: refs/heads/sourceops/proposals/<receipt_content_hash>
+  branch_creation:
+    base: exact_receipt_base_commit
+    create_only: true
+    force: false
+    update_existing: false
+    delete_existing: false
+  commit:
+    count: exactly_one
+    parent_count: exactly_one
+    parent: exact_receipt_base_commit
+    author_name: RAPTOR SourceOps Proposal Bot
+    author_email: sourceops-proposal@users.noreply.github.com
+    committer_name: RAPTOR SourceOps Proposal Bot
+    committer_email: sourceops-proposal@users.noreply.github.com
+    author_epoch_seconds: receipt.timing.approved_at_epoch_seconds
+    author_utc_offset: '+0000'
+    committer_epoch_seconds: receipt.timing.approved_at_epoch_seconds
+    committer_utc_offset: '+0000'
+    message: 'chore(sourceops): propose <source_id> promotion [<receipt_hash_prefix>]'
+    signing: forbidden_in_v1_the_human_receipt_is_the_authorization_signature
+    environment_required_exact:
+      GIT_AUTHOR_NAME: RAPTOR SourceOps Proposal Bot
+      GIT_AUTHOR_EMAIL: sourceops-proposal@users.noreply.github.com
+      GIT_AUTHOR_DATE: '<approved_at_epoch_seconds> +0000'
+      GIT_COMMITTER_NAME: RAPTOR SourceOps Proposal Bot
+      GIT_COMMITTER_EMAIL: sourceops-proposal@users.noreply.github.com
+      GIT_COMMITTER_DATE: '<approved_at_epoch_seconds> +0000'
+    environment_rule: >-
+      Supply all six variables only to the commit-creation process, reject an
+      invalid epoch, and ignore or overwrite ambient Git identity/date values.
+      The resulting commit object is computed from the exact parent, tree,
+      UTF-8 message with one terminal LF, names, emails, epoch seconds, and
+      +0000 offsets. Locale, wall clock, filesystem time, and user Git config
+      cannot enter commit identity.
+  base_branch_mutation_guard:
+    before: record local and remote main commit
+    after: require both unchanged
+    direct_ref_write: forbidden
+    push_refspec_allowlist:
+      - HEAD:refs/heads/sourceops/proposals/<receipt_content_hash>
+
+protected_paths:
+  always_protected:
+    - .github/
+    - src/
+    - tests/
+    - docs/
+    - data/
+    - configs/acmg/
+    - configs/eval/tsc2.yaml
+    - configs/eval/tiered_gate_v3.yaml
+    - configs/eval/bp4pp3_predictor_policy.json
+    - configs/eval/core_annotation_bundle.yaml
+    - configs/external/mave_sources.yaml
+    - configs/sourceops/rollbacks/
+    - .raptor/sourceops/generated/staged-snapshots/
+    - .raptor/sourceops/generated/drift-plans/
+  exact_protected_artifacts:
+    - data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json
+    - data/census/tsc_tiered_readjudication_2026-07-21.json
+    - data/census/tsc_prospective_validation_2026-08_blocked_data.json
+  receipt_mapping_precedence:
+    rule: >-
+      Always/exact protection is evaluated before receipt target admission and
+      has absolute precedence. No receipt mapping or signature creates an
+      exception. If any required mechanically generated v1 path later
+      intersects this protected set, the whole proposal fails closed rather
+      than weakening protection.
+    allowed_overrides: []
+  git_object_protection:
+    - refs/heads/main
+    - refs/tags/
+    - refs/remotes/
+    - refs/notes/
+    - refs/replace/
+    - git configuration
+    - hooks
+    - submodules
+
+route_and_evidence_firewall:
+  v2_s3_impact_usage:
+    allowed:
+      - verify exact artifact and policy binding
+      - reproduce materiality outcome and proposed route list
+      - render the unchanged proposed routes as a non-executable draft PR checklist
+    forbidden:
+      - dispatch
+      - callback
+      - subprocess named by a route
+      - workflow trigger
+      - status mutation
+      - marking a prerequisite complete
+  v2_s3_rollback_usage:
+    allowed:
+      - verify exact artifact
+      - report READY, BLOCKED, or NOT_APPLICABLE mechanically in the draft PR
+    forbidden:
+      - read rollback content for restoration
+      - write rollback content
+      - copy, replace, delete, chmod, or restore a governed path
+      - create a rollback artifact
+      - execute a proposed rollback operation
+  evidence_usage:
+    allowed:
+      - hash and byte equality
+      - schema and closed-enum validation
+      - deterministic rendering of already-recorded facts
+    forbidden:
+      - domain parsing
+      - evidence weighing
+      - claim synthesis
+      - classification
+      - change in scientific or clinical meaning
+
+trusted_time_contract:
+  authority: GitHub_API_Date_header_cross_checked_with_local_UTC
+  request:
+    endpoint: 'https://api.github.com/repos/<receipt.repository_binding.repository>'
+    method: GET
+    allowlisted_host: api.github.com
+    tls_required: true
+    success_status: 200
+    date_header_count: exactly_one
+    date_header_format: IMF-fixdate_RFC7231_GMT
+    redirects: forbidden
+    fallback_time_source: none
+  sampling_order:
+    - capture local_before_epoch_seconds from timezone-aware local UTC
+    - capture monotonic_before_seconds
+    - perform the one allowlisted GitHub request and retain only bounded required headers/body fields
+    - capture monotonic_after_seconds immediately on response completion
+    - capture local_after_epoch_seconds from timezone-aware local UTC
+  exact_calculation:
+    github_date_epoch_seconds: parsed_start_of_the_Date_header_second
+    github_midpoint_epoch_seconds: github_date_epoch_seconds_plus_0.5
+    monotonic_round_trip_seconds: monotonic_after_seconds_minus_monotonic_before_seconds
+    local_midpoint_epoch_seconds: '(local_before_epoch_seconds + local_after_epoch_seconds) / 2'
+    local_elapsed_seconds: local_after_epoch_seconds_minus_local_before_epoch_seconds
+    clock_step_seconds: 'abs(local_elapsed_seconds - monotonic_round_trip_seconds)'
+    clock_delta_seconds: 'abs(local_midpoint_epoch_seconds - github_midpoint_epoch_seconds)'
+    uncertainty_seconds: 'clock_delta_seconds + (monotonic_round_trip_seconds / 2) + 0.5'
+    trusted_now_epoch_seconds: 'github_midpoint_epoch_seconds + (monotonic_round_trip_seconds / 2)'
+    trusted_lower_epoch_seconds: trusted_now_epoch_seconds_minus_uncertainty_seconds
+    trusted_upper_epoch_seconds: trusted_now_epoch_seconds_plus_uncertainty_seconds
+  fail_closed:
+    - missing, duplicate, malformed, non-GMT, or unparsable Date header
+    - non-200 response, redirect, TLS failure, timeout, or host mismatch
+    - negative or non-finite elapsed/calculated value
+    - local UTC moves backwards
+    - clock_step_seconds exceeds 1.0
+    - uncertainty_seconds exceeds 60.0
+    - trusted lower or upper bound falls outside receipt not_before/expires_at epochs
+  use_points:
+    - immediately before the first persistent local write
+    - immediately before proposal-branch creation
+    - immediately before draft-PR creation
+  reuse: forbidden_between_use_points
+  output_rule: >-
+    Record only the parsed Date value, the scalar calculation results listed
+    above, and PASS/FAIL in the ignored transaction journal and final local
+    proposal record. Never place response bodies, tokens, or unrelated headers
+    in artifacts, commits, or PR text.
+
+stale_approval_and_replay:
+  first_write_rejections:
+    - receipt outside validity window
+    - trusted-time request or calculation fails
+    - local or remote main differs from receipt base_commit
+    - base tree differs
+    - registry or source record differs
+    - any declaration baseline hash differs
+    - staged manifest, input tree, or file differs
+    - materiality, promotion, or authority policy differs
+    - any V2-S2 or V2-S3 artifact hash or transitive binding differs
+    - path mapping differs
+    - source lifecycle is outside the exact v1 allowlist
+    - any receipt target intersects an always-protected or exact-protected path
+    - source becomes excluded, access-blocked, or consumer-bearing contrary to receipt
+    - signature principal or key is not currently enabled
+  idempotent_replay:
+    before_expiry: >-
+      If the exact branch commit and exact draft PR already exist and every
+      binding remains current, return EXISTING_IDENTICAL_PROPOSAL without
+      rewriting local files, branch, PR title/body, labels, or timestamps.
+    after_expiry: >-
+      A read-only lookup may report an exact existing proposal. It may not
+      create, recreate, push, edit, or repair anything.
+    moved_main_after_creation: >-
+      Report STALE_EXISTING_PROPOSAL. Do not rebase, merge main, regenerate the
+      patch, update the branch, or refresh the approval. A new candidate cycle
+      and new receipt are required.
+  conflicts:
+    - same receipt hash with different branch commit
+    - existing branch with different commit
+    - existing PR with different head, base, draft state, title, or body hash
+    - multiple PRs for one receipt
+  conflict_result: fail_closed_no_mutation
+
+transaction_boundaries:
+  phase_0_read_validate:
+    writes: none
+    completes:
+      - receipt schema/hash/signature/freshness
+      - approval-authority-policy schema/hash/principal/key/rotation
+      - trusted GitHub/local time calculation
+      - exact V2-S2/V2-S3 validation
+      - current baseline and protected-path snapshots
+      - candidate and target mapping validation
+      - remote identity and main-head validation
+  phase_1_local_proposal:
+    boundary: receipt_content_hash
+    writes:
+      - one owned transaction journal
+      - one isolated owned worktree
+      - candidate declaration bytes
+      - mechanically derived registry and policy bindings
+      - receipt and attestation records
+      - exact patch
+      - one local proposal commit
+    publication_rule: >-
+      All files are created below fixed owned roots or the isolated proposal
+      worktree. Final local generated files publish atomically only after the
+      second complete immutable-input snapshot passes.
+  phase_2_remote_branch:
+    operation: create_exact_proposal_ref
+    precondition: phase_1_complete_and_approval_still_fresh
+    postcondition: remote ref equals exact proposal commit
+  phase_3_draft_pr:
+    operation: create_exact_draft_pr
+    precondition:
+      - remote branch exact
+      - remote main still equals approved base
+      - no existing conflicting PR
+    postcondition:
+      - exactly one draft PR
+      - base main
+      - head exact proposal branch
+      - auto-merge disabled
+  phase_4_verify_and_seal:
+    checks:
+      - reread remote branch and draft PR
+      - confirm main unchanged
+      - confirm draft true
+      - confirm no auto-merge request
+      - write final transaction state atomically
+  no_false_atomicity_claim: >-
+    Git and GitHub do not provide one cross-system transaction. The
+    implementation uses a receipt-scoped saga with explicit durable states,
+    idempotent replay, and no destructive compensation against foreign or
+    already-reviewed objects.
+  partial_failure:
+    before_remote_branch: remove only this run's uncommitted local temporary files and worktree
+    branch_created_pr_failed: retain exact branch, record PARTIAL_REMOTE_BRANCH, and allow fresh exact replay to create the draft PR
+    pr_created_final_verify_failed: retain branch and draft PR, record failure, and require human inspection
+    never:
+      - rewrite history
+      - force-push
+      - delete an existing PR
+      - close a PR
+      - mutate main
+      - restore rollback content
+
+git_and_github_adapter_contract:
+  external_program_allowlist:
+    - git
+    - ssh-keygen
+    - gh
+  git_allowlist:
+    - read repository identity, object, ref, tree, and diff data
+    - create isolated worktree and proposal branch
+    - add exact allowed paths
+    - create one commit
+    - push one create-only proposal refspec
+  git_forbidden:
+    - push to main
+    - force or force-with-lease
+    - reset of shared worktree
+    - checkout over operator work
+    - clean
+    - stash
+    - tag
+    - config mutation
+    - hook invocation outside normal git behavior
+    - commit amendment
+    - merge
+    - rebase
+    - cherry-pick
+    - revert
+  github_allowlist:
+    - authenticate identity check
+    - repository identity read
+    - read the single Date response header from the exact repository identity request
+    - main ref read
+    - proposal ref read
+    - pull request lookup
+    - create draft pull request
+    - reread created draft pull request
+  github_forbidden:
+    - merge pull request
+    - enable auto-merge
+    - mark ready for review
+    - approve review
+    - dismiss review
+    - update branch protection
+    - dispatch workflow
+    - create release
+    - create or update issue
+    - edit arbitrary PR
+  credential_rule: >-
+    Credentials come only from the execution environment, are never accepted
+    as CLI arguments, and never enter receipt, proposal, patch, stdout, logs,
+    commit, or PR body.
+
+draft_pr_contract:
+  title: 'SourceOps proposal: <source_id> @ <candidate_snapshot_id>'
+  body_sections_exact_order:
+    - Proposal-only ceiling
+    - Human approval receipt
+    - Exact V2-S2 artifacts
+    - Exact V2-S3 artifacts
+    - Baseline and candidate hashes
+    - Changed paths
+    - Materiality and inert route checklist
+    - Rollback rehearsal status
+    - Explicit exclusions
+    - Required CI and checker gates
+    - Human next steps
+  mandatory_language:
+    - Draft only; this PR is not approved for merge or activation.
+    - No V2-S3 route has been executed.
+    - No rollback content has been restored.
+    - No evidence has been reinterpreted.
+    - Main was not modified by the proposal generator.
+    - Auto-merge is disabled and unsupported.
+  forbidden_language:
+    - source approved
+    - source active
+    - evidence validated
+    - routes completed
+    - safe to merge
+    - automatic promotion
+  update_rule: >-
+    The gate creates the draft PR once. It never edits the PR after creation.
+    Any mismatch requires a new receipt and proposal.
+
+ci_and_checker_requirements:
+  build_sequence_later:
+    - stage: planner
+      owner: Sol
+      state: this_contract
+    - stage: red_test_author
+      owner: Gemini
+      rule: writes all new RED tests from this contract before production code
+    - stage: doer
+      owner: Claude Sonnet 5
+      rule: implements without weakening RED or V2 tests
+    - stage: checker
+      owner: GPT 5.x
+      rule: independently checks the exact implementation and pilot proposal
+    - stage: human
+      owner: repository source-promotion approver
+      rule: accepts or rejects exact checker and proposal hashes
+  required_ci:
+    - all V2-S1 registry tests
+    - all V2-S2 staged-snapshot tests
+    - all V2-S3 drift-planning tests
+    - promotion receipt schema, hash, signature, epoch-pair, and stale-window tests
+    - approval-authority-policy closed-schema, self-hash, principal, disabled, and key-rotation tests
+    - receipt-content-hash identity tests proving duplicate informational receipt_id values do not conflict
+    - trusted GitHub Date/local UTC calculation, boundary, clock-step, missing-header, and uncertainty tests
+    - lifecycle allowlist tests covering every known lifecycle and an unknown value
+    - receipt target tests covering exact, descendant, ancestor, and casefold intersections with every protected class
+    - exact artifact transitive-binding replay tests
+    - protected path and protected ref tests
+    - patch/tree/commit reproducibility tests with all six exact GIT_AUTHOR/GIT_COMMITTER environment variables
+    - git adapter allowlist and injection tests
+    - GitHub adapter draft-only and auto-merge-negative tests
+    - transaction crash-point and replay tests
+    - secret and token redaction tests
+    - static no-route-execution and no-evidence-import tests
+    - exact pilot contract test using synthetic receipt and repository fixture
+  draft_pr_checks:
+    - receipt signature and freshness valid at proposal creation
+    - authority-policy principal and key remain enabled and time-valid
+    - source lifecycle is eligible and every receipt target is outside all protected intersections
+    - base commit equals approved main
+    - proposal commit has exactly one approved parent
+    - exact changed path set
+    - proposed registry and policy hashes recompute
+    - materiality rules byte-semantically unchanged
+    - receipt and attestation records self-verify
+    - no protected artifact changed
+    - no workflow, CODEOWNERS, branch protection, or merge setting changed
+    - PR remains draft and auto-merge is absent
+  checker_verdict:
+    schema: raptor.sourceops.promotion_checker_verdict.v1
+    binds:
+      - implementation_commit
+      - receipt_content_hash
+      - proposal_content_hash
+      - patch_content_hash
+      - proposal_commit_hash
+      - CI run ids and conclusions
+    allowed_verdicts:
+      - PASS
+      - FAIL
+      - BLOCKED
+    authority_ceiling: >-
+      The checker validates mechanics and contract conformance only. PASS does
+      not approve source truth, evidence, activation, readiness, or merge.
+  merge_boundary:
+    gate_can_merge: false
+    checker_can_merge: false
+    CI_can_merge: false
+    human_merge_outside_project: >-
+      Any later move out of draft or merge is a separate human-controlled
+      repository action under branch protection and is not implemented by
+      SourceOps Promotion Gate v1.
+
+error_contract:
+  output: one canonical single-line JSON object on stdout
+  stderr: bounded_fixed_diagnostic_without_raw_exception_or_secret
+  no_failure_artifact_before_local_transaction: true
+  representative_codes:
+    - code: APPROVAL_RECEIPT_INVALID
+      phase: approval
+      exit: 2
+    - code: APPROVAL_SIGNATURE_INVALID
+      phase: approval
+      exit: 3
+    - code: APPROVAL_STALE
+      phase: approval
+      exit: 4
+    - code: BASE_BRANCH_MOVED
+      phase: baseline
+      exit: 5
+    - code: V2_S2_ARTIFACT_MISMATCH
+      phase: artifacts
+      exit: 6
+    - code: V2_S3_ARTIFACT_MISMATCH
+      phase: artifacts
+      exit: 7
+    - code: SOURCE_BASELINE_MISMATCH
+      phase: baseline
+      exit: 8
+    - code: POLICY_MISMATCH
+      phase: policy
+      exit: 9
+    - code: CANDIDATE_CHANGED
+      phase: candidate
+      exit: 10
+    - code: TARGET_MAPPING_INVALID
+      phase: patch
+      exit: 11
+    - code: PROTECTED_PATH_VIOLATION
+      phase: patch
+      exit: 12
+    - code: COMPONENT_PROMOTION_OUT_OF_SCOPE
+      phase: patch
+      exit: 13
+    - code: PROPOSAL_COLLISION
+      phase: replay
+      exit: 14
+    - code: REMOTE_BRANCH_PARTIAL
+      phase: remote_branch
+      exit: 15
+    - code: DRAFT_PR_CREATION_FAILED
+      phase: draft_pr
+      exit: 16
+    - code: REMOTE_STATE_UNSAFE
+      phase: verify
+      exit: 17
+    - code: SOURCE_LIFECYCLE_INELIGIBLE
+      phase: eligibility
+      exit: 18
+    - code: RECEIPT_TARGET_PROTECTED
+      phase: eligibility
+      exit: 19
+    - code: TRUSTED_TIME_UNAVAILABLE
+      phase: time
+      exit: 20
+    - code: TRUSTED_TIME_UNCERTAIN
+      phase: time
+      exit: 21
+    - code: APPROVAL_AUTHORITY_POLICY_INVALID
+      phase: approval
+      exit: 22
+    - code: INTERNAL_ERROR
+      phase: internal
+      exit: 70
+  fixed_subject_rule: >-
+    Error subjects may contain only validated source ids, receipt hashes,
+    approved canonical repository paths, and fixed phase names. They never
+    echo unsafe raw paths, command lines, tokens, signatures, or remote error
+    bodies.
+
+rollback_and_backout:
+  before_merge:
+    preferred: close the draft PR and delete the proposal branch manually after review
+    gate_behavior: no close_or_delete_operation
+    local_cleanup: remove only owned ignored transaction/worktree files after exact ownership checks
+  after_external_human_merge:
+    rule: >-
+      This gate does not restore files or execute V2-S3 rollback operations.
+      Backout requires a separately reviewed revert PR against the exact merged
+      commit under normal branch protection.
+    required_inputs_for_revert_plan:
+      - merged commit hash
+      - original receipt and proposal hashes
+      - current main hash
+      - fresh human approval
+    automatic_revert: forbidden
+  implementation_backout:
+    - revert future promotion-only code, tests, configs, and CLI registration
+    - retain immutable receipt/attestation records and already-created draft PRs for audit
+    - do not change V2-S1/V2-S2/V2-S3 artifacts or behavior
+    - no database or source-content restoration is required
+
+low_risk_real_pilot:
+  status: planned_not_authorized_not_run
+  source_id: atlas-tsc2-catalog-template
+  why_low_risk:
+    - lifecycle is METADATA_ONLY
+    - consumers is empty
+    - committed catalog contains sources: []
+    - no external content is referenced
+    - no evidence, candidate, classification, panel, or validation result changes
+  exact_allowed_change:
+    declaration: configs/atlas/catalogs/tsc2/catalog.yaml
+    field_change:
+      catalog_version:
+        before: 1.0.0-phase2-template
+        after: 1.0.1-phase2-template
+    mechanical_companions:
+      - recompute catalog_content_hash
+      - mirror the exact version and declaration hash in the selected registry source record
+      - apply the receipt-approved registry version and recompute registry_content_hash
+      - rebind an otherwise identical materiality policy to the proposed registry and recompute its hash
+      - add the exact signed receipt and cycle-free attestation records
+    invariants:
+      - sources remains []
+      - catalog_id remains tsc2
+      - disease_pack_binding remains byte-semantically identical
+      - content_root_policy remains byte-semantically identical
+      - no Atlas candidate or source row is added
+  prerequisites:
+    - future Gemini RED suite complete
+    - future Sonnet implementation complete
+    - future GPT checker PASS on implementation
+    - fresh signed receipt binding exact real V2-S2/V2-S3 artifact hashes
+    - clean main at the receipt-bound base commit
+    - branch protection and required CI available
+  pilot_outputs_only:
+    - proposal branch
+    - exact patch, receipt, attestation, and local proposal record
+    - draft PR
+  pilot_stop_conditions:
+    - any consumer appears
+    - source lifecycle is no longer METADATA_ONLY
+    - sources is non-empty
+    - any evidence or access-controlled path enters the diff
+    - any V2-S3 route is treated as completed
+    - approval, base, policy, candidate, or artifact hash is stale
+
+acceptance_criteria:
+  - id: PG-AC01
+    requirement: Project identity is post-V2 and no public surface calls it V2-S4.
+  - id: PG-AC02
+    requirement: All six candidate/source/baseline hash classes and all four exact V2 artifact hashes are independently verified.
+  - id: PG-AC03
+    requirement: The approval receipt is closed, canonical, self-hashed, human-signed, authority-checked, and fresh.
+  - id: PG-AC04
+    requirement: A moved main branch, changed candidate, changed source, changed policy, or changed artifact rejects before writes.
+  - id: PG-AC05
+    requirement: Only exact V2-S2 CANDIDATE_DECLARATION bytes can reach mapped declaration targets.
+  - id: PG-AC06
+    requirement: Registry changes are limited to the selected mechanical projection and self-hash.
+  - id: PG-AC07
+    requirement: Materiality-policy rules remain identical; only version, registry binding, and self-hash may change.
+  - id: PG-AC08
+    requirement: Changed paths equal the exact approved path set and every protected path remains unchanged.
+  - id: PG-AC09
+    requirement: Main, tags, other protected refs, git config, hooks, and submodules remain unchanged.
+  - id: PG-AC10
+    requirement: One receipt deterministically yields at most one branch, one commit, one patch, and one draft PR.
+  - id: PG-AC11
+    requirement: Identical replay is mutation-free; conflicting replay fails closed.
+  - id: PG-AC12
+    requirement: Expired approval cannot create, recreate, update, repair, or rebase a proposal.
+  - id: PG-AC13
+    requirement: Remote partial failure is durably recorded and never compensated by destructive mutation.
+  - id: PG-AC14
+    requirement: The PR is created draft, remains draft, and has no auto-merge request.
+  - id: PG-AC15
+    requirement: No code path can mark ready, approve, merge, dispatch a workflow, or modify branch protection.
+  - id: PG-AC16
+    requirement: V2-S3 routes are rendered only as inert checklist text and are never executed.
+  - id: PG-AC17
+    requirement: Rollback status is reported, but rollback bytes are never restored, created, copied, or changed.
+  - id: PG-AC18
+    requirement: No evidence or domain package is imported or invoked by promotion production code.
+  - id: PG-AC19
+    requirement: August ClinVar prospective validation and access-blocked MAVE inputs reject explicitly.
+  - id: PG-AC20
+    requirement: Secrets, credentials, and unsafe raw remote errors never leak; the approved receipt signature appears only in the receipt record.
+  - id: PG-AC21
+    requirement: Crash-point tests cover every local/remote transaction boundary and exact replay outcome.
+  - id: PG-AC22
+    requirement: Existing V2-S1/V2-S2/V2-S3 behavior and tests remain unchanged and green.
+  - id: PG-AC23
+    requirement: The planned metadata-only zero-source Atlas catalog pilot is the only v1 real pilot.
+  - id: PG-AC24
+    requirement: The pilot cannot run until the later Gemini, Sonnet, GPT, CI, and human gates all pass.
+  - id: PG-AC25
+    requirement: Checker PASS binds exact implementation, receipt, proposal, patch, commit, and CI hashes but does not authorize merge.
+  - id: PG-AC26
+    requirement: Every known and unknown source lifecycle is mechanically classified; PINNED_HISTORICAL, ACCESS_BLOCKED, RETIRED, and unknown values reject before writes.
+  - id: PG-AC27
+    requirement: Every receipt target intersecting an always-protected directory or exact protected artifact rejects, and no receipt field can override protection.
+  - id: PG-AC28
+    requirement: The approval-authority policy is closed, self-hashed, rotation-aware, and accepts exactly one signature from one enabled qualified principal/key.
+  - id: PG-AC29
+    requirement: receipt_content_hash alone identifies replay and proposal objects; receipt_id is signed informational metadata with no uniqueness behavior.
+  - id: PG-AC30
+    requirement: Commit author and committer names, emails, epoch seconds, +0000 offsets, message, parent, and tree are exact and supplied through the six pinned Git environment variables.
+  - id: PG-AC31
+    requirement: Each write boundary uses a fresh allowlisted GitHub Date header cross-check; the exact uncertainty calculation fails closed above 60 seconds or outside the receipt window.
+
+inversion_and_falsifier_probes:
+  - mutate one hex character in each required hash independently
+  - reuse a valid receipt against a different candidate snapshot
+  - reuse a valid receipt after main advances
+  - set receipt expiry one second before trusted current time
+  - sign with a disabled or wrong human key
+  - rotate the authority policy and replay an unused receipt bound to the old policy hash
+  - use a disabled principal, DISABLED key, expired ROTATING_OUT key, cyclic replacement, duplicate fingerprint, or wrong role
+  - insert one unknown receipt key
+  - give two different receipt hashes the same informational receipt_id and prove they do not conflict by id
+  - map a staged file to an unbound target path
+  - map a target equal to, below, above, or casefold-colliding with every protected path class
+  - select PINNED_HISTORICAL, ACCESS_BLOCKED, RETIRED, or an unknown lifecycle
+  - add a workflow, source file, test, doc, frozen artifact, rollback file, or MAVE path to the patch
+  - attempt a force push or main refspec
+  - inject ambient Git author/committer identity, date, offset, locale, or user config and prove the commit hash is unchanged
+  - return an existing branch with a different commit
+  - return two PRs for one receipt
+  - make the PR non-draft or attach auto-merge
+  - inject a route string that resembles a command
+  - provide a rollback plan containing proposed restore operations
+  - change one materiality selector while recomputing the policy hash
+  - change a registry lifecycle, consumer, drift action, or rollback field
+  - make the pilot catalog sources list non-empty
+  - include the August ClinVar BLOCKED_DATA artifact as a candidate
+  - select tsc2-mave-source-register or an access-blocked MAVE row
+  - crash before local publish, after branch push, and after PR creation
+  - replay an exact completed proposal after receipt expiry and assert read-only reporting only
+  - omit, duplicate, malform, or redirect the GitHub Date response
+  - make local UTC step relative to monotonic time or make calculated uncertainty exceed 60 seconds
+
+migration_compatibility_and_backout:
+  migrations:
+    database: none
+    V2_artifacts: none
+    registry_schema: none
+    V2_S2_schema: none
+    V2_S3_schema: none
+  additive_rules:
+    - new receipt, promotion-policy, authority-policy, proposal, and checker schemas are versioned
+    - existing V2 artifacts remain immutable and are never upgraded in place
+    - schema changes require new ids and hash bases
+    - existing SourceOps validate, status, verify-stage, and plan-drift behavior remains byte-compatible
+  removal: >-
+    Future implementation can be reverted without changing existing SourceOps
+    artifacts. Existing proposal branches and draft PRs remain ordinary git
+    and GitHub audit objects and are handled manually.
+
+open_questions_resolved_by_planning:
+  - question: Is this V2-S4?
+    resolution: No; it is a separate post-V2 project.
+  - question: Is a V2-S3 proposal enough to generate a branch?
+    resolution: No; a fresh signed human receipt bound to all exact hashes is mandatory.
+  - question: Can the gate select latest artifacts?
+    resolution: No; all four artifact hashes plus manifest and input-tree hashes are explicit.
+  - question: Can approval survive a moved main branch?
+    resolution: No; moved main makes the receipt stale and requires a new full cycle.
+  - question: Can the gate update an existing proposal?
+    resolution: No; exact replay returns it, while any mismatch requires a new receipt.
+  - question: Is receipt_id globally unique?
+    resolution: No; it is signed informational metadata. receipt_content_hash is the only enforced identity.
+  - question: Can a receipt waive path or lifecycle protection?
+    resolution: No; protected intersection and lifecycle eligibility run mechanically before mapping admission.
+  - question: Who may approve?
+    resolution: One signature from one enabled qualified principal/key in the exact current approval-authority policy; no co-approval or owner exception exists.
+  - question: What is trusted current time?
+    resolution: A fresh allowlisted GitHub API Date header cross-checked with local UTC and monotonic RTT under the exact 60-second uncertainty calculation.
+  - question: Can it execute impact or rollback routes?
+    resolution: No; routes and rollback operations are inert rendered facts only.
+  - question: Can it merge?
+    resolution: No; it cannot mark ready, approve, enable auto-merge, or merge.
+  - question: How is partial remote failure handled?
+    resolution: Receipt-scoped durable saga state and non-destructive exact replay.
+  - question: What is the first real pilot?
+    resolution: A version-only bump of the zero-source metadata-only Atlas catalog template.
+  - question: Are August ClinVar or blocked MAVE candidates eligible?
+    resolution: Explicitly no.
+
+definition_of_done:
+  planner_stage:
+    - this file is the sole detailed SourceOps Promotion Gate v1 authority
+    - V2 kickoff identifies it as a separate post-V2 successor and never V2-S4
+    - PROGRAM records the separate proposal gate after V2
+    - ADR-0021 records the decision and safety ceiling
+    - TODO graph contains one post-V2 implementation task after V2-S3
+    - risk register records stale/replayed approval and protected-ref/PR-state failures
+    - edited YAML parses in the required WSL raptor environment
+    - TODO import and DAG checks pass in that environment
+    - git diff --check passes
+    - changed files are planning, decision, risk, and TODO documentation only
+    - no pilot, commit, push, PR, or merge occurs
+  later_red_stage:
+    - Gemini authors every mapped RED test before production implementation
+    - tests fail for missing promotion behavior rather than fixture defects
+    - all V2 tests remain unchanged and green
+  later_implementation_stage:
+    - Sonnet 5 implements the exact narrow adapters and pure core
+    - no protected path, route, rollback, evidence, or merge boundary is weakened
+    - all CI and crash/replay tests pass
+  later_checker_stage:
+    - GPT independently verifies every acceptance criterion and falsifier
+    - checker verdict binds exact hashes
+  later_pilot_stage:
+    - only the metadata-only zero-source catalog version proposal runs
+    - output is one proposal branch, patch, and draft PR
+    - human separately decides whether any later ready/merge action occurs
+  stop_conditions:
+    - any request to label the project V2-S4
+    - inability to bind a typed human signature to every exact hash
+    - inability to validate the closed approval-authority policy and current signer/key state
+    - inability to obtain and cross-check trusted GitHub/local time within 60 seconds
+    - any receipt target protected-path intersection or ineligible lifecycle
+    - inability to prove main and protected paths remain unchanged
+    - need to reinterpret evidence or execute a route to build the patch
+    - need to restore rollback content
+    - need to enable auto-merge, mark ready, approve, or merge
+    - need to use August ClinVar prospective data or access-blocked MAVE sources
+    - inability to make replay and partial failures fail closed

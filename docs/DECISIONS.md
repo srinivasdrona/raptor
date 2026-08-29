@@ -8,11 +8,17 @@
 > **Authority note.** The maintained authority set now also includes `STRATEGY.md` Part II and
 > `EVALUATION.md`; preserved ADR bodies may retain split-era citations as historical text, with the
 > compatibility stubs and crosswalk below providing the current route.
+>
+> **Numbering reservation.** `ADR-0020` is reserved for the ClinVar amendment on its separate
+> branch and is expected to merge first. Promotion Gate intentionally remains `ADR-0021`; before
+> this branch merges it must rebase onto the ClinVar result, preserve `ADR-0020` unchanged, and
+> stop on any numbering or semantic collision.
 
 **Index**
 
 | ID | Title | Status | Date |
 |----|-------|--------|------|
+| [ADR-0021](#adr-0021--sourceops-promotion-gate-v1-is-a-receipt-bound-post-v2-draft-proposal-project-not-v2-s4) | SourceOps Promotion Gate v1 is a receipt-bound post-V2 draft-proposal project, not V2-S4 | Accepted | 2026-08-29 |
 | [ADR-0019](#adr-0019--versioned-atlas-interpretation-rubrics-a-scarcity-aware-post-hoc-contextual-layer-over-an-immutable-machine-result) | Versioned Atlas interpretation rubrics: a scarcity-aware post-hoc contextual layer over an immutable machine result | Accepted | 2026-08-15 |
 | [ADR-0018](#adr-0018--raptor-rescuescreen-a-gated-research-only-structural-rescue-track-downstream-of-reviewed-mechanism-evidence) | RAPTOR RescueScreen: a gated, research-only structural-rescue track downstream of reviewed mechanism evidence | Accepted | 2026-08-15 |
 | [ADR-0017](#adr-0017--dual-atlas-panel-products-a-post-result-technical-coverage-panel-separated-from-a-still-blocked-independent-validation-panel) | Dual Atlas panel products: a post-result technical-coverage panel separated from a still-blocked independent-validation panel | Accepted | 2026-08-15 |
@@ -41,6 +47,7 @@
 
 | ADR | Current risk linkage | Basis in current repo |
 |---|---|---|
+| **ADR-0021** | R-C7, R-D8, R-D1, H3 | Exact signed receipt/hash binding, a 24-hour stale window, create-only proposal refs, receipt-scoped saga replay, and immutable proposal records control stale or conflicting cross-system writes (R-C7); hard protected-path/ref rules plus draft-only/no-auto-merge/no-merge adapters keep proposal generation from becoming authorization (R-D8); the later Sol → Gemini → Sonnet → GPT sequence, preservation tests, and hash-bound checker verdict preserve the independent build gate (R-D1/H3). |
 | **ADR-0019** | R-A13, R-A14, R-A15, R-A2 | Versioned interpretation rubrics keep the audited `INFEASIBLE_PANEL` run byte-immutable and additively re-described rather than re-run or re-signed (R-A13); they record rare-disease source scarcity as a ceiling-lowering context that requires named expert adjudication rather than as a licence to weaken P2/D3 (R-A14); the mandatory machine+contextual outcome pair, the explicit `NONE_NO_PANEL_EXISTS` claim ceiling and the `POST_HOC` stamp block authorization overclaim and prospective-sounding prose (R-A15); and the nine non-waivable dimensions preserve the exact-span, provenance and classification/leakage firewalls that stop outcome-dependent reinterpretation from becoming circular evidence (R-A2). |
 | **ADR-0018** | R-G1, R-G2, R-A6, R-B2, R-D7 | RescueScreen is a separately versioned, research-only lane whose entry gates, closed output vocabulary, no-go states and eight firewalls keep every computational output a hypothesis, forbid compound/treatment/combination recommendation and vendor procurement, bar docking scores from being read as affinity or efficacy, and require per-artifact licence verification instead of an "everything is open" assumption; the ACMG/classification and Atlas-promotion firewalls preserve ADR-0009/ADR-0015 and the ADR-0010 vertical boundary. |
 | **ADR-0017** | R-A13, R-A15, R-A2, R-A14 | Splitting the technical-coverage engineering product from the independent-validation scientific product prevents post-result reinterpretation of the audited `INFEASIBLE_PANEL` run (R-A13), fixes an explicit machine-readable claim ceiling per product against authorization overclaim (R-A15), blocks the "relax P2/D3 after seeing the answer" validation mirage (R-A2), and records source scarcity as `BLOCKED_SOURCE_DIVERSITY` rather than as a failure or a licence to weaken constraints (R-A14). |
@@ -60,6 +67,103 @@
 | **ADR-0003** | R-D1 | Explicitly cited in the checker rubber-stamp / skipped-loop risk row. |
 | **ADR-0002** | — | Document-format ADR only; no direct current risk row cites it. |
 | **ADR-0001** | — *(partially superseded by ADR-0010)* | Historical strategy framing record; current linked risks are carried by ADR-0010 instead. |
+
+---
+
+## ADR-0021 — SourceOps Promotion Gate v1 is a receipt-bound post-V2 draft-proposal project, not V2-S4
+
+- **Status:** Accepted
+- **Date:** 2026-08-29
+- **Deciders:** @dronasrinivas (repository operator)
+- **Track:** `design/sourceops-promotion-gate-v1`
+- **Binds:** `docs/project/specs/sourceops-promotion-gate-v1.yaml`
+- **Depends on:** published V2-S2 (`fd0abdf`) and V2-S3 (`6c3e554`)
+- **Numbering/merge dependency:** `ADR-0020` is reserved for the separate ClinVar amendment and
+  must merge first; Promotion Gate then rebases, preserves it unchanged, and remains `ADR-0021`.
+
+### Context
+
+RAPTOR v2 deliberately ends before promotion. V2-S2 verifies an already-present staged candidate
+and emits immutable observation artifacts. V2-S3 independently verifies those artifacts, applies
+one exact materiality policy, emits inert downstream impact routes, and rehearses rollback
+read-only. Neither slice accepts a promotion approval, writes a domain declaration, touches git or
+GitHub, executes a route, restores rollback content, or changes evidence.
+
+The next safe boundary is therefore not another V2 slice. It introduces a materially different
+authority and failure surface: a human must approve one exact candidate/source/baseline/policy and
+artifact set; main may move between approval and use; git and GitHub form a non-atomic
+cross-system transaction; retries can duplicate or conflict; and a proposal tool could be
+misread as activation or merge authority.
+
+### Considered options
+
+1. **Call promotion V2-S4 and extend the existing phase.** Rejected: it collapses V2's
+   observation/planning ceiling into repository mutation and obscures the new human and remote
+   transaction boundary.
+2. **Let an operator manually copy staged files after reading V2-S3 output.** Rejected: there is
+   no typed binding between approval and the exact candidate, source, base, policy, or artifacts,
+   and no deterministic replay or protected-path control.
+3. **Apply an approved candidate directly to main.** Rejected: review, branch protection, CI,
+   checker separation, and backout would be bypassed.
+4. **Create a separate post-V2 receipt-gated proposal generator whose only remote effects are one
+   create-only proposal branch and one draft PR.** Adopted.
+
+### Decision
+
+Adopt option 4 under the following binding rules:
+
+1. The project is **SourceOps Promotion Gate v1**, a separate post-V2 project. It is never
+   `V2-S4`.
+2. A closed canonical, self-hashed, human-signed approval receipt binds the exact base commit/tree,
+   registry/source/declaration hashes, candidate manifest/input-tree/file hashes, materiality,
+   promotion and approval-authority-policy hashes, and all four V2-S2/V2-S3 artifact hashes. One
+   enabled qualified principal/key under that closed rotation-aware authority policy supplies the
+   sole signature; v1 defines no co-approval or source-owner exception.
+3. `receipt_content_hash` is the only enforced identity for replay, branch, records, and PR lookup.
+   `receipt_id` is signed informational metadata and has no global uniqueness contract.
+4. Approval is fresh for at most 24 hours. Each write boundary uses a fresh allowlisted GitHub API
+   `Date` header cross-checked with local UTC and monotonic round-trip time; the exact uncertainty
+   calculation fails closed above 60 seconds or when its full interval crosses the approval
+   window. A moved main branch or any changed bound hash rejects before a persistent write.
+   Exact completed replay is read-only; conflicting replay fails closed.
+5. The gate may create only a deterministic `sourceops/proposals/<receipt-hash>` branch, one exact
+   commit/patch, immutable receipt/attestation records, and one draft PR against main. Commit
+   identity pins author and committer names/emails, approved-at epoch seconds and `+0000` offsets
+   through exact `GIT_AUTHOR_*` and `GIT_COMMITTER_*` environment values.
+6. It has no operation for writing main, force-pushing, marking ready, approving, enabling
+   auto-merge, merging, changing branch protection, dispatching a workflow, or updating an
+   existing PR.
+7. V2-S3 routes and rollback operations remain inert. The gate never executes them, restores
+   rollback content, changes lifecycle/readiness, or reinterprets evidence.
+8. Protected paths and lifecycle eligibility fail closed before mapping admission. A receipt can
+   never override protection; any target intersecting an always/exact protected path and any
+   `PINNED_HISTORICAL`, `ACCESS_BLOCKED`, `RETIRED`, or unknown lifecycle rejects mechanically.
+   Eligible mappings remain limited to unprotected declaration paths plus tightly constrained
+   registry/materiality-policy bindings and immutable audit records.
+9. The August ClinVar prospective `BLOCKED_DATA` artifact and access-blocked MAVE sources are
+   explicitly ineligible.
+10. The sole v1 real pilot, after the established Sol → Gemini → Sonnet → GPT sequence and fresh
+   human approval, is a version-only proposal for the zero-source, `METADATA_ONLY` Atlas TSC2
+   catalog template. This ADR does not authorize running it.
+
+### Consequences
+
+- **Good:** approval is inseparable from exact bytes and artifacts; stale approvals cannot drift
+  onto a newer main; review happens through normal CI, checker, draft PR, and branch protection;
+  retries are deterministic and non-destructive.
+- **Cost:** signed-receipt/key governance and crash-safe git/GitHub saga handling add substantial
+  implementation and operational complexity for a deliberately narrow output.
+- **Limit:** a draft proposal is not source truth, activation, route completion, validation,
+  evidence, authorization, or permission to merge.
+- **Backout:** before merge, a human may close the draft and delete its proposal branch. After any
+  separate human merge, backout is a separately reviewed revert PR; the gate never restores files
+  or runs rollback operations.
+
+### Confirmation
+
+Planning only. The bound spec, roadmap/program handoff, risks, and TODO dependency exist. No
+production code, test, pilot, commit, push, PR, ready transition, auto-merge, or merge was
+authorized or performed by this decision.
 
 ---
 
