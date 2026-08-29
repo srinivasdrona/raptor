@@ -446,6 +446,95 @@ def test_adjacent_terminal_precedence_cases(case_id: str, kwargs: dict[str, Any]
     assert result["full_spectrum_terminal_outcome"] == expected_terminal
 
 
+@pytest.mark.parametrize(
+    ("case_id", "blocked_scope"),
+    (
+        (
+            "no-calls-not-applicable",
+            _scope(
+                actual_count=5,
+                called_count=0,
+                correct_calls=0,
+                min_count=36,
+                data_sufficiency="NO_CALLS",
+                conditional_performance="NOT_APPLICABLE",
+                policy_parity="BLOCKED",
+                reasons=["policy_block_even_without_calls"],
+            ),
+        ),
+        (
+            "underpowered-not-estimable",
+            _scope(
+                actual_count=20,
+                called_count=10,
+                correct_calls=9,
+                min_count=36,
+                data_sufficiency="UNDERPOWERED",
+                conditional_performance="NOT_ESTIMABLE",
+                policy_parity="BLOCKED",
+                reasons=["policy_block_even_when_underpowered"],
+            ),
+        ),
+    ),
+)
+def test_a3_blocked_forces_full_spectrum_blocked_policy_even_when_a1_or_a2_not_decisive(
+    case_id: str,
+    blocked_scope: dict[str, Any],
+) -> None:
+    _require_adjudication_contract()
+    scopes = _base_scopes()
+    scopes["missense:pathogenic"] = blocked_scope
+    result = _adjudicate(run_integrity="PASS", scopes=scopes)
+    assert result["full_spectrum_terminal_outcome"] == "BLOCKED_POLICY"
+    assert result["full_spectrum_status"] == "BLOCKED_POLICY"
+    assert result["full_spectrum_authorization"] == "NOT_AUTHORIZED"
+
+
+@pytest.mark.parametrize(
+    ("case_id", "narrow_blocked_scope"),
+    (
+        (
+            "narrow-no-calls",
+            _scope(
+                actual_count=5,
+                called_count=0,
+                correct_calls=0,
+                min_count=36,
+                data_sufficiency="NO_CALLS",
+                conditional_performance="NOT_APPLICABLE",
+                policy_parity="BLOCKED",
+                reasons=["narrow_policy_block_no_calls"],
+            ),
+        ),
+        (
+            "narrow-underpowered",
+            _scope(
+                actual_count=20,
+                called_count=10,
+                correct_calls=8,
+                min_count=36,
+                data_sufficiency="UNDERPOWERED",
+                conditional_performance="NOT_ESTIMABLE",
+                policy_parity="BLOCKED",
+                reasons=["narrow_policy_block_underpowered"],
+            ),
+        ),
+    ),
+)
+def test_a3_blocked_forces_narrow_scope_blocked_policy_even_when_not_estimable_by_calls(
+    case_id: str,
+    narrow_blocked_scope: dict[str, Any],
+) -> None:
+    _require_adjudication_contract()
+    scopes = _base_scopes()
+    scopes[NARROW_SCOPE] = narrow_blocked_scope
+    result = _adjudicate(run_integrity="PASS", scopes=scopes)
+    assert result["full_spectrum_terminal_outcome"] == "BLOCKED_POLICY"
+    assert result["narrow_scope"]["scope"] == NARROW_SCOPE
+    assert result["narrow_scope"]["terminal_outcome"] == "BLOCKED_POLICY"
+    assert result["narrow_scope"]["authorization_status"] == "NOT_AUTHORIZED"
+
+
 def test_full_spectrum_blocked_policy_and_narrow_scope_independence() -> None:
     _require_adjudication_contract()
     result = _adjudicate(

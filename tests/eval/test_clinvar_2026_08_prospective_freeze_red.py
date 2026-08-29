@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import json
 import os
 import socket
@@ -122,6 +123,107 @@ def _can_create_symlink(parent: Path) -> bool:
         probe_target.unlink(missing_ok=True)
 
 
+_FIFO_UNSUPPORTED_ERRNOS = {
+    code
+    for code in (
+        getattr(errno, "ENOTSUP", None),
+        getattr(errno, "EOPNOTSUPP", None),
+        getattr(errno, "ENOSYS", None),
+    )
+    if code is not None
+}
+
+_UNIX_UNSUPPORTED_ERRNOS = {
+    code
+    for code in (
+        getattr(errno, "EAFNOSUPPORT", None),
+        getattr(errno, "EPROTONOSUPPORT", None),
+        getattr(errno, "ENOTSUP", None),
+        getattr(errno, "EOPNOTSUPP", None),
+        getattr(errno, "ENOSYS", None),
+    )
+    if code is not None
+}
+
+_UNIX_PATH_LIMIT_ERRNOS = {
+    code
+    for code in (
+        getattr(errno, "ENAMETOOLONG", None),
+        getattr(errno, "EINVAL", None),
+    )
+    if code is not None
+}
+
+
+def _is_unix_path_length_error(exc: OSError) -> bool:
+    if exc.errno in _UNIX_PATH_LIMIT_ERRNOS:
+        return True
+    message = str(exc).lower()
+    return "path too long" in message or "name too long" in message
+
+
+def _probe_fifo_capability(parent: Path) -> tuple[bool, str]:
+    if not hasattr(os, "mkfifo"):
+        return False, "fifo creation unsupported: os.mkfifo unavailable"
+    probe = parent / "fifo-capability-probe"
+    probe.unlink(missing_ok=True)
+    try:
+        os.mkfifo(probe)
+    except OSError as exc:
+        if exc.errno in _FIFO_UNSUPPORTED_ERRNOS:
+            return False, f"fifo creation unsupported on this filesystem/runtime (errno={exc.errno})"
+        raise
+    finally:
+        probe.unlink(missing_ok=True)
+    return True, ""
+
+
+def _probe_unix_socket_capability_for_path(path: Path) -> tuple[bool, str]:
+    if not hasattr(socket, "AF_UNIX"):
+        return False, "unix sockets unsupported: socket.AF_UNIX unavailable"
+    parent = path.parent
+    parent.mkdir(parents=True, exist_ok=True)
+
+    short_probe = parent / "unix-socket-capability-probe.sock"
+    short_probe.unlink(missing_ok=True)
+    short_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        short_socket.bind(str(short_probe))
+    except OSError as exc:
+        if _is_unix_path_length_error(exc):
+            return False, "unix socket path length unsupported for this sandbox path"
+        if exc.errno in _UNIX_UNSUPPORTED_ERRNOS:
+            return False, f"unix sockets unsupported on this filesystem/runtime (errno={exc.errno})"
+        raise
+    finally:
+        short_socket.close()
+        short_probe.unlink(missing_ok=True)
+
+    required_total = len(os.fsencode(str(path)))
+    parent_total = len(os.fsencode(str(parent)))
+    probe_name_len = required_total - parent_total - 1
+    if probe_name_len <= 0:
+        return False, "unix socket path-length probe could not derive a valid filename"
+    if probe_name_len > 255:
+        return False, f"unix socket filename length unsupported for probe (bytes={probe_name_len})"
+    length_probe = parent / ("u" * probe_name_len)
+    length_probe.unlink(missing_ok=True)
+    length_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        length_socket.bind(str(length_probe))
+    except OSError as exc:
+        if _is_unix_path_length_error(exc):
+            return False, f"unix socket path length unsupported for this sandbox path (errno={exc.errno})"
+        if exc.errno in _UNIX_UNSUPPORTED_ERRNOS:
+            return False, f"unix sockets unsupported on this filesystem/runtime (errno={exc.errno})"
+        raise
+    finally:
+        length_socket.close()
+        length_probe.unlink(missing_ok=True)
+
+    return True, ""
+
+
 def _mutate_approval(
     approval: dict[str, Any],
     *,
@@ -155,6 +257,19 @@ def _mutate_approval(
     if overlay_hash is not None:
         mutated["overlay"]["canonical_lf_sha256"] = overlay_hash
     return mutated
+
+
+def _replace_once_in_file(path: Path, old: str, new: str) -> None:
+    text = path.read_text(encoding="utf-8")
+    count = text.count(old)
+    assert count == 1
+    path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+
+def _files_under(root: Path) -> list[Path]:
+    if not root.exists():
+        return []
+    return [entry for entry in root.rglob("*") if entry.is_file()]
 
 
 def test_freeze_api_contract_and_typed_stop_state_codes_exist() -> None:
@@ -641,15 +756,26 @@ def test_destination_boundary_probes_cover_traversal_symlink_fifo_specialfile(de
         elif destination_case == "dangling-symlink":
             os.symlink(sandbox.root / "missing-target.json", destination)
         elif destination_case == "fifo":
-            if not hasattr(os, "mkfifo"):
-                pytest.skip("fifo creation unsupported")
-            os.mkfifo(destination)
+            fifo_supported, fifo_reason = _probe_fifo_capability(destination.parent)
+            if not fifo_supported:
+                pytest.skip(fifo_reason)
+            try:
+                os.mkfifo(destination)
+            except OSError as exc:
+                if exc.errno in _FIFO_UNSUPPORTED_ERRNOS:
+                    pytest.skip(f"fifo creation unsupported for destination path (errno={exc.errno})")
+                raise
         elif destination_case == "special-socket-file":
-            if not hasattr(socket, "AF_UNIX"):
-                pytest.skip("unix sockets unsupported")
+            unix_supported, unix_reason = _probe_unix_socket_capability_for_path(destination)
+            if not unix_supported:
+                pytest.skip(unix_reason)
             unix_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             try:
                 unix_socket.bind(str(destination))
+            except OSError as exc:
+                if exc.errno in _UNIX_UNSUPPORTED_ERRNOS or _is_unix_path_length_error(exc):
+                    pytest.skip(f"unix socket destination unsupported in this environment (errno={exc.errno})")
+                raise
             finally:
                 unix_socket.close()
         else:  # pragma: no cover
@@ -793,18 +919,46 @@ def test_concurrent_writer_allows_dual_idempotent_or_typed_single_stop() -> None
     invalid_error = require_exception("ProspectiveInvalidStateError")
     with prospective_sandbox("concurrency") as sandbox:
         approval = build_approval_record(sandbox)
-        shared_transport = InjectedTransport(
-            head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
-            body_by_url={sandbox.exact_url: sandbox.archive_bytes},
-        )
+        start_barrier = threading.Barrier(2)
+        worker_entered = [threading.Event(), threading.Event()]
+
+        class _LatchedConcurrentTransport(InjectedTransport):
+            def __init__(self) -> None:
+                super().__init__(
+                    head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+                    body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+                )
+                self.first_get_entered = threading.Event()
+                self.second_get_entered = threading.Event()
+                self.release_get = threading.Event()
+
+            def stream_get(self, url: str, chunk_bytes: int):  # type: ignore[override]
+                with self._lock:
+                    self.get_calls.append((url, chunk_bytes))
+                    ordinal = len(self.get_calls)
+                if url not in self._body_by_url:
+                    raise AssertionError(f"unexpected GET URL: {url}")
+                if ordinal == 1:
+                    self.first_get_entered.set()
+                elif ordinal == 2:
+                    self.second_get_entered.set()
+                self.release_get.wait(timeout=10)
+                payload = self._body_by_url[url]
+                step = max(1, min(chunk_bytes, 17))
+                for idx in range(0, len(payload), step):
+                    yield payload[idx : idx + step]
+
+        shared_transport = _LatchedConcurrentTransport()
         shared_date_lookup = _published_date_lookup_ok(sandbox.exact_url)
         shared_md5_lookup = _official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes)
         results: list[dict[str, Any]] = []
         errors: list[BaseException] = []
         lock = threading.Lock()
 
-        def _worker() -> None:
+        def _worker(index: int) -> None:
             try:
+                worker_entered[index].set()
+                start_barrier.wait(timeout=10)
                 out = execute_transport_and_raw_freeze(
                     sandbox,
                     approval_record=approval,
@@ -818,16 +972,24 @@ def test_concurrent_writer_allows_dual_idempotent_or_typed_single_stop() -> None
                 with lock:
                     errors.append(exc)
 
-        t1 = threading.Thread(target=_worker, daemon=True)
-        t2 = threading.Thread(target=_worker, daemon=True)
+        t1 = threading.Thread(target=_worker, args=(0,), daemon=True)
+        t2 = threading.Thread(target=_worker, args=(1,), daemon=True)
         t1.start()
         t2.start()
+
+        assert worker_entered[0].wait(timeout=10)
+        assert worker_entered[1].wait(timeout=10)
+        assert shared_transport.first_get_entered.wait(timeout=10)
+        shared_transport.second_get_entered.wait(timeout=2)
+        shared_transport.release_get.set()
+
         t1.join(timeout=30)
         t2.join(timeout=30)
 
         assert len(results) + len(errors) == 2
         assert len(results) >= 1
         assert len(shared_transport.get_calls) == 1
+        assert not shared_transport.second_get_entered.is_set()
         if len(results) == 2:
             for item in results:
                 assert item["stage_status"] == "TRANSPORT_AND_RAW_FROZEN"
@@ -839,9 +1001,9 @@ def test_concurrent_writer_allows_dual_idempotent_or_typed_single_stop() -> None
         transport_record = assert_record_content_hash(sandbox.transport_record_path)
         raw_record = assert_record_content_hash(sandbox.raw_record_path)
         for item in results:
-            if "transport_record_content_hash" in item:
+            if item.get("transport_record_content_hash") is not None:
                 assert item["transport_record_content_hash"] == transport_record["content_hash"]
-            if "raw_record_content_hash" in item:
+            if item.get("raw_record_content_hash") is not None:
                 assert item["raw_record_content_hash"] == raw_record["content_hash"]
 
 
@@ -923,6 +1085,924 @@ def test_validate_pre_data_approval_closed_schema_and_non_vacuous_values() -> No
                     first_archive_get_at=first_get_at,
                 )
             assert_stop_state(exc.value, expected_stop)
+
+
+def test_transport_record_dotdot_escape_is_invalid_and_writes_nowhere() -> None:
+    _require_freeze_contract_symbols()
+    with prospective_sandbox("transport-dotdot-escape") as sandbox:
+        approval = build_approval_record(sandbox)
+        escaped_transport_path = sandbox.repo_root / ".." / "escaped-transport-freeze.json"
+        outside_candidate = escaped_transport_path.resolve()
+        assert not outside_candidate.exists()
+        transport = InjectedTransport(
+            head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+            body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+        )
+        result = execute_transport_and_raw_freeze(
+            sandbox,
+            approval_record=approval,
+            transport=transport,
+            published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+            official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+            transport_record_path=escaped_transport_path,
+        )
+        assert result["terminal_outcome"] == "INVALID"
+        assert isinstance(result.get("reason_code"), str) and result["reason_code"]
+        assert transport.head_calls == []
+        assert transport.get_calls == []
+        assert not outside_candidate.exists()
+        _assert_no_records_created(sandbox.raw_record_path)
+
+
+def test_malicious_dataset_filename_traversal_is_invalid_and_never_downloaded() -> None:
+    _require_freeze_contract_symbols()
+    with prospective_sandbox("filename-traversal-boundary") as sandbox:
+        _replace_once_in_file(
+            sandbox.spec_path,
+            "filename: variant_summary_2026-08.txt.gz",
+            "filename: ../escaped-raw-archive.txt.gz",
+        )
+        approval = build_approval_record(sandbox)
+        transport = InjectedTransport(
+            head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+            body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+        )
+        result = execute_transport_and_raw_freeze(
+            sandbox,
+            approval_record=approval,
+            transport=transport,
+            published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+            official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+        )
+        assert result["terminal_outcome"] == "INVALID"
+        assert isinstance(result.get("reason_code"), str) and result["reason_code"]
+        assert transport.get_calls == []
+        assert not (sandbox.external_root / "escaped-raw-archive.txt.gz").exists()
+        assert _files_under(sandbox.external_root) == []
+        _assert_no_records_created(sandbox.raw_record_path)
+
+
+def test_stream_aborts_on_first_content_length_overflow_and_cleans_destination() -> None:
+    _require_freeze_contract_symbols()
+    with prospective_sandbox("stream-overflow-abort") as sandbox:
+        approval = build_approval_record(sandbox)
+        expected_len = len(sandbox.archive_bytes)
+        first_half = sandbox.archive_bytes[: expected_len // 2]
+        second_half = sandbox.archive_bytes[expected_len // 2 :]
+        overflow_chunk = b"overflow!"
+        tail_chunks = [b"tail-1", b"tail-2", b"tail-3"]
+
+        class _OverflowTransport:
+            def __init__(self) -> None:
+                self.head_calls: list[str] = []
+                self.get_calls: list[tuple[str, int]] = []
+                self.tail_chunks_consumed = 0
+
+            def head(self, url: str) -> dict[str, Any]:
+                self.head_calls.append(url)
+                return make_head_payload(sandbox)
+
+            def stream_get(self, url: str, chunk_bytes: int):
+                self.get_calls.append((url, chunk_bytes))
+                for idx, chunk in enumerate([first_half, second_half, overflow_chunk, *tail_chunks]):
+                    if idx >= 3:
+                        self.tail_chunks_consumed += 1
+                    yield chunk
+
+        transport = _OverflowTransport()
+        result = execute_transport_and_raw_freeze(
+            sandbox,
+            approval_record=approval,
+            transport=transport,
+            published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+            official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+        )
+        assert result["terminal_outcome"] == "BLOCKED_DATA"
+        assert result["reason_code"] == "RAW_LENGTH_MISMATCH"
+        assert transport.tail_chunks_consumed == 0
+        assert _files_under(sandbox.external_root) == []
+        _assert_no_records_created(sandbox.raw_record_path)
+
+
+def test_md5_mismatch_cleans_partial_raw_artifacts() -> None:
+    _require_freeze_contract_symbols()
+    with prospective_sandbox("md5-mismatch-cleanup") as sandbox:
+        approval = build_approval_record(sandbox)
+        transport = InjectedTransport(
+            head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+            body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+        )
+        result = execute_transport_and_raw_freeze(
+            sandbox,
+            approval_record=approval,
+            transport=transport,
+            published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+            official_md5_lookup=InjectedLookup(
+                {
+                    sandbox.exact_url: {
+                        "official_md5": "0" * 32,
+                        "source_identity": "ncbi-official-md5-manifest-2026-08",
+                    }
+                }
+            ),
+        )
+        assert result["terminal_outcome"] == "BLOCKED_DATA"
+        assert result["reason_code"] == "OFFICIAL_MD5_MISMATCH"
+        assert _files_under(sandbox.external_root) == []
+        _assert_no_records_created(sandbox.raw_record_path)
+
+
+@pytest.mark.parametrize(
+    ("case_id", "mutate_records"),
+    (
+        (
+            "transport-link-mismatch",
+            lambda transport_record, raw_record: raw_record.__setitem__("transport_record_content_hash", "f" * 64),
+        ),
+        (
+            "registration-id-mismatch",
+            lambda transport_record, raw_record: raw_record.__setitem__("registration_id", "drifted-registration-id"),
+        ),
+        (
+            "run-scope-id-mismatch",
+            lambda transport_record, raw_record: raw_record.__setitem__("run_scope_id", "drifted-run-scope-id"),
+        ),
+    ),
+)
+def test_restart_reuse_requires_chain_and_identity_match(
+    case_id: str,
+    mutate_records: Callable[[dict[str, Any], dict[str, Any]], None],
+) -> None:
+    _require_freeze_contract_symbols()
+    with prospective_sandbox(f"reuse-identity-{case_id}") as sandbox:
+        approval = build_approval_record(sandbox)
+        first = execute_transport_and_raw_freeze(
+            sandbox,
+            approval_record=approval,
+            transport=InjectedTransport(
+                head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+                body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+            ),
+            published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+            official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+        )
+        assert first["stage_status"] == "TRANSPORT_AND_RAW_FROZEN"
+
+        transport_record = assert_record_content_hash(sandbox.transport_record_path)
+        raw_record = assert_record_content_hash(sandbox.raw_record_path)
+        mutate_records(transport_record, raw_record)
+        transport_record["content_hash"] = canonical_json_content_hash(transport_record)
+        raw_record["content_hash"] = canonical_json_content_hash(raw_record)
+        sandbox.transport_record_path.write_text(
+            json.dumps(transport_record, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+        sandbox.raw_record_path.write_text(
+            json.dumps(raw_record, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+
+        second_transport = InjectedTransport(
+            head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+            body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+        )
+        second = execute_transport_and_raw_freeze(
+            sandbox,
+            approval_record=approval,
+            transport=second_transport,
+            published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+            official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+        )
+        assert second["terminal_outcome"] == "INVALID"
+        assert isinstance(second.get("reason_code"), str) and second["reason_code"]
+        assert second.get("idempotent_reuse") is not True
+        assert second_transport.head_calls == []
+        assert second_transport.get_calls == []
+
+
+@pytest.mark.parametrize(
+    ("case_id", "mutate"),
+    (
+        (
+            "overlay-required-registration-id-drift",
+            lambda sandbox: _replace_once_in_file(
+                sandbox.overlay_path,
+                "registration_id: \"clinvar-2026-08-amendment-v2\"",
+                "registration_id: \"clinvar-2026-08-amendment-v2-drift\"",
+            ),
+        ),
+        (
+            "overlay-base-config-hash-drift",
+            lambda sandbox: _replace_once_in_file(
+                sandbox.overlay_path,
+                "base_config_canonical_lf_sha256: \"45358c2e66d09d8ba32937b1d2751659f382a8444679fdd0244bbde3b63f7206\"",
+                "base_config_canonical_lf_sha256: \"0000000000000000000000000000000000000000000000000000000000000000\"",
+            ),
+        ),
+        (
+            "overlay-exact-url-alias",
+            lambda sandbox: _replace_once_in_file(
+                sandbox.overlay_path,
+                "exact_archive_url: \"https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08.txt.gz\"",
+                "exact_archive_url: \"https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08-alias.txt.gz\"",
+            ),
+        ),
+        (
+            "dataset-registration-exact-url-alias",
+            lambda sandbox: _replace_once_in_file(
+                sandbox.spec_path,
+                "  exact_url: https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08.txt.gz",
+                "  exact_url: https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08-alias.txt.gz",
+            ),
+        ),
+        (
+            "request-url-must-equal-alias",
+            lambda sandbox: _replace_once_in_file(
+                sandbox.spec_path,
+                "    request_url_must_equal: https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08.txt.gz",
+                "    request_url_must_equal: https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08-alias.txt.gz",
+            ),
+        ),
+    ),
+)
+def test_execution_rejects_overlay_required_value_or_url_coherence_drift_before_network(
+    case_id: str,
+    mutate: Callable[[Any], None],
+) -> None:
+    _require_freeze_contract_symbols()
+    alias_url = "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08-alias.txt.gz"
+    with prospective_sandbox(f"overlay-url-coherence-{case_id}") as sandbox:
+        mutate(sandbox)
+        approval = build_approval_record(sandbox)
+        head_payload = make_head_payload(sandbox)
+        transport = InjectedTransport(
+            head_by_url={
+                sandbox.exact_url: head_payload,
+                alias_url: {**head_payload, "final_url": sandbox.required_final_url},
+            },
+            body_by_url={sandbox.exact_url: sandbox.archive_bytes, alias_url: sandbox.archive_bytes},
+        )
+        result = execute_transport_and_raw_freeze(
+            sandbox,
+            approval_record=approval,
+            transport=transport,
+            published_archive_date_lookup=InjectedLookup(
+                {
+                    sandbox.exact_url: {
+                        "published_archive_date": "2026-08-06",
+                        "source_identity": "ncbi-published-archive-index-2026-08",
+                    },
+                    alias_url: {
+                        "published_archive_date": "2026-08-06",
+                        "source_identity": "ncbi-published-archive-index-2026-08",
+                    },
+                }
+            ),
+            official_md5_lookup=InjectedLookup(
+                {
+                    sandbox.exact_url: {
+                        "official_md5": md5_hex(sandbox.archive_bytes),
+                        "source_identity": "ncbi-official-md5-manifest-2026-08",
+                    },
+                    alias_url: {
+                        "official_md5": md5_hex(sandbox.archive_bytes),
+                        "source_identity": "ncbi-official-md5-manifest-2026-08",
+                    },
+                }
+            ),
+        )
+        assert result["terminal_outcome"] == "INVALID"
+        assert isinstance(result.get("reason_code"), str) and result["reason_code"]
+        assert transport.head_calls == []
+        assert transport.get_calls == []
+        _assert_no_records_created(sandbox.transport_record_path, sandbox.raw_record_path)
+
+
+def test_execute_path_must_consult_merge_overlay_before_transport_calls() -> None:
+    _require_freeze_contract_symbols()
+    module = require_module()
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    original = getattr(module, "merge_prospective_overlay")
+    calls: list[dict[str, Any]] = []
+    with prospective_sandbox("execute-merge-overlay-call") as sandbox:
+        expected = {
+            "registration_spec_path": sandbox.spec_path,
+            "prospective_overlay_path": sandbox.overlay_path,
+            "base_eval_config_path": sandbox.base_eval_config_path,
+        }
+
+        def _sentinel_merge(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            arg_names = ("registration_spec_path", "prospective_overlay_path", "base_eval_config_path")
+            observed = dict(kwargs)
+            if args:
+                assert len(args) == len(arg_names)
+                observed.update({name: value for name, value in zip(arg_names, args)})
+            calls.append({"args": list(args), "kwargs": dict(kwargs), "observed": dict(observed)})
+            assert set(observed.keys()) == set(arg_names)
+            for name, expected_path in expected.items():
+                assert Path(str(observed[name])) == expected_path
+            raise invalid_error("merge_prospective_overlay must be called on the execute path")
+
+        setattr(module, "merge_prospective_overlay", _sentinel_merge)
+        try:
+            approval = build_approval_record(sandbox)
+            transport = InjectedTransport(
+                head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+                body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+            )
+            with pytest.raises(invalid_error) as exc:
+                execute_transport_and_raw_freeze(
+                    sandbox,
+                    approval_record=approval,
+                    transport=transport,
+                    published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+                    official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+                )
+            assert getattr(exc.value, "code", None) == "INVALID"
+            assert len(calls) == 1
+            assert transport.head_calls == []
+            assert transport.get_calls == []
+        finally:
+            setattr(module, "merge_prospective_overlay", original)
+
+
+@pytest.mark.parametrize("target_record", ("transport", "raw"))
+def test_non_utf8_existing_freeze_record_is_typed_invalid(target_record: str) -> None:
+    _require_freeze_contract_symbols()
+    with prospective_sandbox(f"non-utf8-existing-{target_record}") as sandbox:
+        approval = build_approval_record(sandbox)
+        first = execute_transport_and_raw_freeze(
+            sandbox,
+            approval_record=approval,
+            transport=InjectedTransport(
+                head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+                body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+            ),
+            published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+            official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+        )
+        assert first["stage_status"] == "TRANSPORT_AND_RAW_FROZEN"
+        target_path = sandbox.transport_record_path if target_record == "transport" else sandbox.raw_record_path
+        target_path.write_bytes(b"\xff\xfe\xfa")
+        second_transport = InjectedTransport(
+            head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+            body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+        )
+        second = execute_transport_and_raw_freeze(
+            sandbox,
+            approval_record=approval,
+            transport=second_transport,
+            published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+            official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+        )
+        assert second["terminal_outcome"] == "INVALID"
+        assert isinstance(second.get("reason_code"), str) and second["reason_code"]
+        assert second_transport.head_calls == []
+        assert second_transport.get_calls == []
+
+
+@pytest.mark.parametrize(
+    ("case_id", "mutate_during_get"),
+    (
+        ("overlay-deleted", lambda sandbox: sandbox.overlay_path.unlink()),
+        (
+            "spec-unreadable",
+            lambda sandbox: (
+                sandbox.spec_path.unlink(),
+                sandbox.spec_path.mkdir(parents=True, exist_ok=False),
+            ),
+        ),
+    ),
+)
+def test_overlay_or_spec_unreadable_during_get_is_typed_invalid_and_cleans_raw_artifacts(
+    case_id: str,
+    mutate_during_get: Callable[[Any], Any],
+) -> None:
+    _require_freeze_contract_symbols()
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    with prospective_sandbox(f"spec-overlay-unreadable-{case_id}") as sandbox:
+        approval = build_approval_record(sandbox)
+        transport = InjectedTransport(
+            head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+            body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+            on_get_start=lambda: mutate_during_get(sandbox),
+        )
+        caught: BaseException | None = None
+        result: dict[str, Any] | None = None
+        try:
+            result = execute_transport_and_raw_freeze(
+                sandbox,
+                approval_record=approval,
+                transport=transport,
+                published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+                official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+            )
+        except BaseException as exc:  # noqa: BLE001
+            caught = exc
+
+        if caught is None:
+            assert result is not None
+            assert result["terminal_outcome"] == "INVALID"
+            assert isinstance(result.get("reason_code"), str) and result["reason_code"]
+        elif isinstance(caught, invalid_error):
+            assert getattr(caught, "code", None) == "INVALID"
+            reason_text = getattr(caught, "reason", "")
+            assert isinstance(reason_text, str) and reason_text.strip()
+        else:  # pragma: no cover - this is the regression condition under checker findings
+            pytest.fail(f"must surface typed INVALID on spec/overlay unreadability during GET, got {type(caught).__name__}")
+
+        assert not sandbox.raw_record_path.exists()
+        assert _files_under(sandbox.external_root) == []
+
+
+def test_executor_rejects_approval_after_recorded_get_time_without_external_timestamp() -> None:
+    _require_freeze_contract_symbols()
+    stop_error = require_exception("ProspectiveStopStateError")
+    with prospective_sandbox("internal-first-get-time-check") as sandbox:
+        approval = build_approval_record(sandbox)
+        first_transport = InjectedTransport(
+            head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+            body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+        )
+        first = execute_transport_and_raw_freeze(
+            sandbox,
+            approval_record=approval,
+            transport=first_transport,
+            published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+            official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+        )
+        assert first["stage_status"] == "TRANSPORT_AND_RAW_FROZEN"
+
+        stale_approval = _mutate_approval(approval, approved_at="2099-01-01T00:00:00Z")
+        second_transport = InjectedTransport(
+            head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+            body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+        )
+        with pytest.raises(stop_error) as exc:
+            execute_transport_and_raw_freeze(
+                sandbox,
+                approval_record=stale_approval,
+                transport=second_transport,
+                published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+                official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+            )
+        assert_stop_state(exc.value, "PRE_DATA_DRIFT")
+        assert second_transport.head_calls == []
+        assert second_transport.get_calls == []
+
+
+def test_transport_record_binds_pre_data_approval_identity_and_get_timeline() -> None:
+    _require_freeze_contract_symbols()
+    with prospective_sandbox("transport-record-approval-binding") as sandbox:
+        approval = build_approval_record(sandbox)
+        result = execute_transport_and_raw_freeze(
+            sandbox,
+            approval_record=approval,
+            transport=InjectedTransport(
+                head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+                body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+            ),
+            published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+            official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+        )
+        assert result["stage_status"] == "TRANSPORT_AND_RAW_FROZEN"
+        transport_record = assert_record_content_hash(sandbox.transport_record_path)
+        expected_approval_hash = canonical_json_content_hash(approval)
+        assert transport_record["approval_content_hash"] == expected_approval_hash
+        assert transport_record["approval_approver"] == approval["approver"]
+        assert transport_record["approval_approved_at"] == approval["approved_at"]
+        assert isinstance(transport_record.get("first_archive_get_at"), str) and transport_record["first_archive_get_at"]
+        timeline = transport_record.get("timeline")
+        assert isinstance(timeline, list) and timeline
+        event_names = {item.get("event") for item in timeline if isinstance(item, dict)}
+        assert "approval_verified" in event_names
+        assert "archive_get_started" in event_names
+
+
+@pytest.mark.parametrize(
+    ("case_id", "mutate"),
+    (
+        (
+            "wrong-approval-schema",
+            lambda approval: {**approval, "schema": "raptor.eval.pre_data_approval.v9"},
+        ),
+        (
+            "x64-worker-arch-invalid",
+            lambda approval: {
+                **approval,
+                "x64_freeze": {**approval["x64_freeze"], "worker_arch": "arm64"},
+            },
+        ),
+        (
+            "x64-bias-commit-invalid",
+            lambda approval: {
+                **approval,
+                "x64_freeze": {**approval["x64_freeze"], "bias_commit": "0" * 40},
+            },
+        ),
+        (
+            "x64-resource-manifest-invalid",
+            lambda approval: {
+                **approval,
+                "x64_freeze": {**approval["x64_freeze"], "resource_manifest_sha256": "broken"},
+            },
+        ),
+    ),
+)
+def test_validate_pre_data_approval_rejects_schema_or_x64_freeze_drift_as_pre_data_drift(
+    case_id: str,
+    mutate: Callable[[dict[str, Any]], dict[str, Any]],
+) -> None:
+    _require_freeze_contract_symbols()
+    stop_error = require_exception("ProspectiveStopStateError")
+    with prospective_sandbox(f"approval-schema-x64-drift-{case_id}") as sandbox:
+        approval = build_approval_record(sandbox)
+        with pytest.raises(stop_error) as exc:
+            validate_pre_data_approval(sandbox, approval_record=mutate(approval), first_archive_get_at=None)
+        assert_stop_state(exc.value, "PRE_DATA_DRIFT")
+
+
+def test_symlink_dotdot_escape_is_invalid_destination_outside_allowed_root_and_no_outside_write() -> None:
+    _require_freeze_contract_symbols()
+    with prospective_sandbox("symlink-dotdot-escape") as sandbox:
+        if not _can_create_symlink(sandbox.root):
+            pytest.skip("symlink creation unsupported in this environment")
+        approval = build_approval_record(sandbox)
+        allowed = sandbox.repo_root / "allowed"
+        allowed.mkdir(parents=True, exist_ok=True)
+        outside_inner = sandbox.root / "outside" / "inner"
+        outside_inner.mkdir(parents=True, exist_ok=True)
+        evil_link = allowed / "evil-link"
+        os.symlink(outside_inner, evil_link)
+
+        destination = allowed / "evil-link" / ".." / "pwned.json"
+        outside_candidate = outside_inner.parent / "pwned.json"
+        inside_lexical_candidate = allowed / "pwned.json"
+        assert not outside_candidate.exists()
+        assert not inside_lexical_candidate.exists()
+
+        transport = InjectedTransport(
+            head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+            body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+        )
+        result = execute_transport_and_raw_freeze(
+            sandbox,
+            approval_record=approval,
+            transport=transport,
+            published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+            official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+            transport_record_path=destination,
+        )
+        assert result["terminal_outcome"] == "INVALID"
+        assert result["reason_code"] == "DESTINATION_OUTSIDE_ALLOWED_ROOT"
+        assert transport.head_calls == []
+        assert transport.get_calls == []
+        assert not outside_candidate.exists()
+        assert not inside_lexical_candidate.exists()
+        _assert_no_records_created(sandbox.raw_record_path)
+
+
+def test_out_of_root_record_peek_data_never_preempts_destination_invalid() -> None:
+    _require_freeze_contract_symbols()
+    stop_error = require_exception("ProspectiveStopStateError")
+    with prospective_sandbox("outside-peek-never-preempts-boundary") as sandbox:
+        approval = build_approval_record(sandbox)
+        outside_transport_record = sandbox.root / "outside-transport-record.json"
+        outside_transport_record.write_text(
+            json.dumps(
+                {
+                    "first_archive_get_at": "2026-08-29T09:00:00Z",
+                    "content_hash": "invalid",
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        transport = InjectedTransport(
+            head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+            body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+        )
+        try:
+            result = execute_transport_and_raw_freeze(
+                sandbox,
+                approval_record=approval,
+                transport=transport,
+                published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+                official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+                transport_record_path=outside_transport_record,
+            )
+        except stop_error as exc:
+            pytest.fail(f"destination boundary must win before first_archive_get_at peek; got {exc!r}")
+        assert result["terminal_outcome"] == "INVALID"
+        assert result["reason_code"] == "DESTINATION_OUTSIDE_ALLOWED_ROOT"
+        assert transport.head_calls == []
+        assert transport.get_calls == []
+        _assert_no_records_created(sandbox.raw_record_path)
+
+
+def test_fifo_outside_allowed_root_returns_typed_invalid_without_hang_or_network() -> None:
+    _require_freeze_contract_symbols()
+    stop_error = require_exception("ProspectiveStopStateError")
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    with prospective_sandbox("fifo-outside-root-boundary") as sandbox:
+        outside_dir = sandbox.root / "outside-fifo"
+        outside_dir.mkdir(parents=True, exist_ok=True)
+        fifo_supported, fifo_reason = _probe_fifo_capability(outside_dir)
+        if not fifo_supported:
+            pytest.skip(fifo_reason)
+        fifo_path = outside_dir / "transport-record.fifo"
+        os.mkfifo(fifo_path)
+
+        transport = InjectedTransport(
+            head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+            body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+        )
+        result_box: dict[str, Any] = {}
+        error_box: dict[str, BaseException] = {}
+
+        def _run() -> None:
+            try:
+                result_box["value"] = execute_transport_and_raw_freeze(
+                    sandbox,
+                    approval_record=build_approval_record(sandbox),
+                    transport=transport,
+                    published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+                    official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+                    transport_record_path=fifo_path,
+                )
+            except BaseException as exc:  # noqa: BLE001
+                error_box["value"] = exc
+
+        worker = threading.Thread(target=_run, daemon=True)
+        worker.start()
+        worker.join(timeout=5)
+        assert not worker.is_alive(), "executor hung on FIFO path instead of prompt boundary INVALID"
+        if "value" in error_box:
+            err = error_box["value"]
+            if isinstance(err, stop_error):
+                pytest.fail(f"boundary INVALID must preempt PRE_DATA stop-state logic; got {err!r}")
+            if isinstance(err, invalid_error):
+                assert getattr(err, "code", None) == "INVALID"
+            else:
+                raise err
+        else:
+            result = result_box["value"]
+            assert result["terminal_outcome"] == "INVALID"
+            assert result["reason_code"] == "DESTINATION_OUTSIDE_ALLOWED_ROOT"
+        assert transport.head_calls == []
+        assert transport.get_calls == []
+        _assert_no_records_created(sandbox.transport_record_path, sandbox.raw_record_path)
+
+
+def test_first_archive_get_at_trusted_only_after_valid_record_self_hash() -> None:
+    _require_freeze_contract_symbols()
+    stop_error = require_exception("ProspectiveStopStateError")
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    problems: list[str] = []
+
+    with prospective_sandbox("peek-first-get-untrusted-with-bad-hash") as sandbox:
+        approval = _mutate_approval(build_approval_record(sandbox), approved_at="2026-08-29T11:00:00Z")
+        poisoned = {
+            "first_archive_get_at": "2026-08-29T10:00:00Z",
+            "content_hash": "bad-hash",
+        }
+        sandbox.transport_record_path.parent.mkdir(parents=True, exist_ok=True)
+        poisoned_bytes = (json.dumps(poisoned, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+        sandbox.transport_record_path.write_bytes(poisoned_bytes)
+        transport = InjectedTransport(
+            head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+            body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+        )
+        caught: BaseException | None = None
+        result: dict[str, Any] | None = None
+        try:
+            result = execute_transport_and_raw_freeze(
+                sandbox,
+                approval_record=approval,
+                transport=transport,
+                published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+                official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+            )
+        except BaseException as exc:  # noqa: BLE001
+            caught = exc
+
+        if isinstance(caught, stop_error):
+            problems.append(
+                f"corrupt registered-path transport record must yield typed INVALID, not stop-state: {caught!r}"
+            )
+        elif isinstance(caught, invalid_error):
+            if getattr(caught, "code", None) != "INVALID":
+                problems.append(f"invalid exception must carry code INVALID, got {getattr(caught, 'code', None)!r}")
+            reason_text = getattr(caught, "reason", "")
+            if not (isinstance(reason_text, str) and reason_text.strip()):
+                problems.append("invalid exception must carry a non-blank reason")
+        elif caught is not None:
+            problems.append(f"unexpected exception type for corrupt registered-path record: {type(caught).__name__}")
+        else:
+            if result is None:
+                problems.append("executor returned neither result nor exception for corrupt registered-path record")
+            else:
+                if result.get("terminal_outcome") != "INVALID":
+                    problems.append(
+                        f"corrupt registered-path record must return terminal_outcome INVALID, got {result.get('terminal_outcome')!r}"
+                    )
+                if result.get("reason_code") != "TRANSPORT_RECORD_CORRUPT":
+                    problems.append(
+                        f"corrupt registered-path record must return reason TRANSPORT_RECORD_CORRUPT, got {result.get('reason_code')!r}"
+                    )
+        if transport.head_calls != []:
+            problems.append(f"corrupt record path must stop before HEAD; observed {transport.head_calls!r}")
+        if transport.get_calls != []:
+            problems.append(f"corrupt record path must stop before GET; observed {transport.get_calls!r}")
+        if sandbox.transport_record_path.read_bytes() != poisoned_bytes:
+            problems.append("corrupt existing transport record must not be overwritten")
+        if sandbox.raw_record_path.exists():
+            problems.append("corrupt existing transport record must not produce a new raw record")
+
+    with prospective_sandbox("peek-first-get-trusted-with-good-hash") as sandbox:
+        approval = _mutate_approval(build_approval_record(sandbox), approved_at="2026-08-29T11:00:00Z")
+        trusted = {"first_archive_get_at": "2026-08-29T10:00:00Z"}
+        trusted["content_hash"] = canonical_json_content_hash(trusted)
+        sandbox.transport_record_path.parent.mkdir(parents=True, exist_ok=True)
+        sandbox.transport_record_path.write_text(
+            json.dumps(trusted, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+        transport = InjectedTransport(
+            head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+            body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+        )
+        with pytest.raises(stop_error) as exc:
+            execute_transport_and_raw_freeze(
+                sandbox,
+                approval_record=approval,
+                transport=transport,
+                published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+                official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+            )
+        assert_stop_state(exc.value, "PRE_DATA_DRIFT")
+        assert transport.head_calls == []
+        assert transport.get_calls == []
+    if problems:
+        pytest.fail("\n".join(problems))
+
+
+def test_first_run_future_approval_is_pre_data_drift_before_any_network_or_record_write() -> None:
+    _require_freeze_contract_symbols()
+    stop_error = require_exception("ProspectiveStopStateError")
+    with prospective_sandbox("future-approval-first-run") as sandbox:
+        approval = build_approval_record(sandbox, approved_at="2099-01-01T00:00:00Z")
+        transport = InjectedTransport(
+            head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+            body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+        )
+        with pytest.raises(stop_error) as exc:
+            execute_transport_and_raw_freeze(
+                sandbox,
+                approval_record=approval,
+                transport=transport,
+                published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+                official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+            )
+        assert_stop_state(exc.value, "PRE_DATA_DRIFT")
+        assert transport.head_calls == []
+        assert transport.get_calls == []
+        _assert_no_records_created(sandbox.transport_record_path, sandbox.raw_record_path)
+
+
+@pytest.mark.parametrize(
+    ("case_id", "mutate_overlay"),
+    (
+        (
+            "wrong-overlay-schema",
+            lambda sandbox: _replace_once_in_file(
+                sandbox.overlay_path,
+                'schema: "raptor.eval.prospective_dataset_overlay.v1"',
+                'schema: "raptor.eval.prospective_dataset_overlay.v9"',
+            ),
+        ),
+        (
+            "historical-labels-snapshot",
+            lambda sandbox: _replace_once_in_file(
+                sandbox.overlay_path,
+                'effective_labels_snapshot: "clinvar_2026-08-monthly-amendment-v2"',
+                'effective_labels_snapshot: "clinvar_2026-07-07"',
+            ),
+        ),
+        (
+            "wrong-base-config-path",
+            lambda sandbox: _replace_once_in_file(
+                sandbox.overlay_path,
+                'base_config_path: "configs/eval/tsc2.yaml"',
+                'base_config_path: "configs/eval/tsc2_other.yaml"',
+            ),
+        ),
+        (
+            "wrong-transport-freeze-record-path",
+            lambda sandbox: _replace_once_in_file(
+                sandbox.overlay_path,
+                'transport_freeze_record: "data/census/tsc_prospective_validation_2026-08_amendment_v2_transport_freeze.json"',
+                'transport_freeze_record: "data/census/rogue_transport_freeze.json"',
+            ),
+        ),
+        (
+            "wrong-raw-freeze-record-path",
+            lambda sandbox: _replace_once_in_file(
+                sandbox.overlay_path,
+                'raw_freeze_record: "data/census/tsc_prospective_validation_2026-08_amendment_v2_raw_freeze.json"',
+                'raw_freeze_record: "data/census/rogue_raw_freeze.json"',
+            ),
+        ),
+    ),
+)
+def test_overlay_required_values_are_rejected_by_merge_and_executor_before_network(
+    case_id: str,
+    mutate_overlay: Callable[[Any], None],
+) -> None:
+    _require_freeze_contract_symbols()
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    with prospective_sandbox(f"overlay-required-values-{case_id}") as sandbox:
+        mutate_overlay(sandbox)
+        approval = build_approval_record(sandbox)
+
+        with pytest.raises(invalid_error) as exc_merge:
+            merge_overlay(sandbox)
+        assert getattr(exc_merge.value, "code", None) == "INVALID"
+
+        transport = InjectedTransport(
+            head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+            body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+        )
+        caught: BaseException | None = None
+        result: dict[str, Any] | None = None
+        try:
+            result = execute_transport_and_raw_freeze(
+                sandbox,
+                approval_record=approval,
+                transport=transport,
+                published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+                official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+            )
+        except BaseException as exc:  # noqa: BLE001
+            caught = exc
+
+        if caught is None:
+            assert result is not None
+            assert result["terminal_outcome"] == "INVALID"
+            assert isinstance(result.get("reason_code"), str) and result["reason_code"]
+        elif isinstance(caught, invalid_error):
+            assert getattr(caught, "code", None) == "INVALID"
+        else:
+            raise caught
+
+        assert transport.head_calls == []
+        assert transport.get_calls == []
+        _assert_no_records_created(sandbox.transport_record_path, sandbox.raw_record_path)
+
+
+def test_executor_rejects_alternate_in_root_record_paths_and_only_allows_registered_paths() -> None:
+    _require_freeze_contract_symbols()
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    with prospective_sandbox("alternate-in-root-record-paths") as sandbox:
+        approval = build_approval_record(sandbox)
+        alt_transport = sandbox.repo_root / "data" / "census" / "alternate_transport_freeze.json"
+        alt_raw = sandbox.repo_root / "data" / "census" / "alternate_raw_freeze.json"
+        transport = InjectedTransport(
+            head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
+            body_by_url={sandbox.exact_url: sandbox.archive_bytes},
+        )
+        caught: BaseException | None = None
+        result: dict[str, Any] | None = None
+        try:
+            result = execute_transport_and_raw_freeze(
+                sandbox,
+                approval_record=approval,
+                transport=transport,
+                published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+                official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+                transport_record_path=alt_transport,
+                raw_record_path=alt_raw,
+            )
+        except BaseException as exc:  # noqa: BLE001
+            caught = exc
+
+        if caught is None:
+            assert result is not None
+            assert result["terminal_outcome"] == "INVALID"
+            assert isinstance(result.get("reason_code"), str) and result["reason_code"]
+        elif isinstance(caught, invalid_error):
+            assert getattr(caught, "code", None) == "INVALID"
+        else:
+            raise caught
+
+        assert transport.head_calls == []
+        assert transport.get_calls == []
+        assert not alt_transport.exists()
+        assert not alt_raw.exists()
+        assert not sandbox.transport_record_path.exists()
+        assert not sandbox.raw_record_path.exists()
 
 
 def test_historical_blocked_data_artifact_is_immutable() -> None:
