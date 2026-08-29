@@ -54,15 +54,20 @@ authority:
       decision record.
   decision_numbering_dependency:
     this_decision: ADR-0021
-    reserved_predecessor: ADR-0020
-    reserved_for: ClinVar amendment on its separate worktree/branch
+    predecessor: ADR-0020
+    predecessor_status: merged
+    predecessor_merge_commit: 5d0862d47da7e9c47e4aa4367201b5eec619b59b
+    integration_commit: 6f79be5ee9fdbc5b60d7aa60b701d91c25cf63b5
     merge_order: ADR-0020_then_ADR-0021
     rule: >-
-      ADR-0020 is intentionally absent from this branch baseline and reserved
-      for the ClinVar amendment expected to merge first. Before Promotion Gate
-      merges, rebase onto that result, require ADR-0020 to be present and
-      unchanged, retain this decision as ADR-0021, and stop on any numbering or
-      semantic collision.
+      ADR-0020 (ClinVar amendment) merged first on origin/main at commit
+      5d0862d47da7e9c47e4aa4367201b5eec619b59b. design/sourceops-promotion-gate-v1
+      integrated that result via merge commit
+      6f79be5ee9fdbc5b60d7aa60b701d91c25cf63b5, never a rebase, preserving
+      ADR-0020 unchanged; ADR-0021 remains this decision and follows it in
+      docs/DECISIONS.md with no numbering or semantic collision. Any future
+      origin/main drift must likewise be integrated by merge commit, never a
+      rebase.
   conflict_rule: >-
     A conflict with a higher-precedence authority is a defect in this file.
     Future test authors, implementers, checkers, and operators must stop rather
