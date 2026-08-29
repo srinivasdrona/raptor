@@ -129,7 +129,7 @@ repository. Their checksums and operator contracts are recorded under
 
 ## Development
 
-The package requires Python 3.11+:
+The package requires Python 3.12+:
 
 ```bash
 python -m pip install -e ".[dev]"
