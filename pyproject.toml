@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "raptor"
 version = "0.1.0"
 description = "RAPTOR: TSC1/TSC2 variant curation pipeline (KB schema & provenance ledger, PRD-03)."
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "PyYAML>=6.0",
     "bioutils>=0.6.0",
