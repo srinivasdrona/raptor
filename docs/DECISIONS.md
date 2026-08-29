@@ -13,6 +13,7 @@
 
 | ID | Title | Status | Date |
 |----|-------|--------|------|
+| [ADR-0020](#adr-0020--adr-0013-prospective-amendment-v2-new-registration-for-the-corrected-2026-08-clinvar-archive-url) | ADR-0013 prospective amendment v2: new registration for the corrected 2026-08 ClinVar archive URL | Accepted | 2026-08-29 |
 | [ADR-0019](#adr-0019--versioned-atlas-interpretation-rubrics-a-scarcity-aware-post-hoc-contextual-layer-over-an-immutable-machine-result) | Versioned Atlas interpretation rubrics: a scarcity-aware post-hoc contextual layer over an immutable machine result | Accepted | 2026-08-15 |
 | [ADR-0018](#adr-0018--raptor-rescuescreen-a-gated-research-only-structural-rescue-track-downstream-of-reviewed-mechanism-evidence) | RAPTOR RescueScreen: a gated, research-only structural-rescue track downstream of reviewed mechanism evidence | Accepted | 2026-08-15 |
 | [ADR-0017](#adr-0017--dual-atlas-panel-products-a-post-result-technical-coverage-panel-separated-from-a-still-blocked-independent-validation-panel) | Dual Atlas panel products: a post-result technical-coverage panel separated from a still-blocked independent-validation panel | Accepted | 2026-08-15 |
@@ -41,6 +42,7 @@
 
 | ADR | Current risk linkage | Basis in current repo |
 |---|---|---|
+| **ADR-0020** | R-A2, R-A11, R-A13, R-A15 | A second, explicit pre-data registration prevents the now-known correct archive location from being substituted into the terminal ADR-0013 attempt (R-A2/R-A13), binds the exact URL and policy/config identities before archive access (R-A11), and keeps every authorization surface false until the preregistered outcome mapping and PRE-DATA approval requirements are satisfied (R-A15). |
 | **ADR-0019** | R-A13, R-A14, R-A15, R-A2 | Versioned interpretation rubrics keep the audited `INFEASIBLE_PANEL` run byte-immutable and additively re-described rather than re-run or re-signed (R-A13); they record rare-disease source scarcity as a ceiling-lowering context that requires named expert adjudication rather than as a licence to weaken P2/D3 (R-A14); the mandatory machine+contextual outcome pair, the explicit `NONE_NO_PANEL_EXISTS` claim ceiling and the `POST_HOC` stamp block authorization overclaim and prospective-sounding prose (R-A15); and the nine non-waivable dimensions preserve the exact-span, provenance and classification/leakage firewalls that stop outcome-dependent reinterpretation from becoming circular evidence (R-A2). |
 | **ADR-0018** | R-G1, R-G2, R-A6, R-B2, R-D7 | RescueScreen is a separately versioned, research-only lane whose entry gates, closed output vocabulary, no-go states and eight firewalls keep every computational output a hypothesis, forbid compound/treatment/combination recommendation and vendor procurement, bar docking scores from being read as affinity or efficacy, and require per-artifact licence verification instead of an "everything is open" assumption; the ACMG/classification and Atlas-promotion firewalls preserve ADR-0009/ADR-0015 and the ADR-0010 vertical boundary. |
 | **ADR-0017** | R-A13, R-A15, R-A2, R-A14 | Splitting the technical-coverage engineering product from the independent-validation scientific product prevents post-result reinterpretation of the audited `INFEASIBLE_PANEL` run (R-A13), fixes an explicit machine-readable claim ceiling per product against authorization overclaim (R-A15), blocks the "relax P2/D3 after seeing the answer" validation mirage (R-A2), and records source scarcity as `BLOCKED_SOURCE_DIVERSITY` rather than as a failure or a licence to weaken constraints (R-A14). |
@@ -60,6 +62,126 @@
 | **ADR-0003** | R-D1 | Explicitly cited in the checker rubber-stamp / skipped-loop risk row. |
 | **ADR-0002** | — | Document-format ADR only; no direct current risk row cites it. |
 | **ADR-0001** | — *(partially superseded by ADR-0010)* | Historical strategy framing record; current linked risks are carried by ADR-0010 instead. |
+
+---
+
+## ADR-0020 — ADR-0013 prospective amendment v2: new registration for the corrected 2026-08 ClinVar archive URL
+
+- **Status:** Accepted
+- **Date:** 2026-08-29
+- **Deciders:** @dronasrinivas (operator, acting domain owner)
+- **Planner:** Sol
+- **Track:** `validation/clinvar-2026-08-amendment-v2`
+- **Supersedes:** only the dataset locator for a future, second prospective attempt. It does not
+  repair, replace, reopen, relabel or supersede the terminal ADR-0013 `BLOCKED_DATA` result, its
+  committed artifact or its published release.
+- **Binds:** `docs/project/specs/clinvar-2026-08-prospective-amendment-v2.yaml`
+
+### Context
+
+The first ADR-0013 prospective attempt preregistered
+`https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary/variant_summary_2026-08.txt.gz`.
+That exact URL returned HTTP 404, so the attempt correctly terminated as `BLOCKED_DATA`. The
+same filename was observed at the archive root, but the registered contract prohibited
+substitution. The immutable result is
+`data/census/tsc_prospective_validation_2026-08_blocked_data.json`; it records that no archive
+GET, archive hashing, label or row inspection, benchmark derivation or scoring occurred.
+
+The correct NCBI object is now known to be
+`https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08.txt.gz`,
+but 2026-08-06 and 441792560 are not registered content identity. The immutable blocked artifact
+records an HTTP HEAD observation at 2026-08-06T22:05:32Z with HTTP 200,
+`Last-Modified: 2026-08-06T04:05:02Z` and `Content-Length: 441792560`. Those are transport
+metadata only: Last-Modified is not an official release date, Content-Length is not a checksum,
+and neither proves the archive bytes. Using that object under the original attempt would convert
+a precommitted data-selection failure into an outcome-dependent repair. That would erase the
+falsifiable boundary the first registration was designed to create.
+
+The current production surfaces also cannot execute this new attempt unchanged:
+`scripts/build_tsc_benchmark.py` and `configs/eval/tsc2.yaml` are pinned to the 2026-07-07
+snapshot, while `raptor.eval.tiered_gate.decide_tiered_gate` is deliberately post-hoc-only and
+cannot emit prospective authorization. The amendment therefore partitions
+`configs/eval/tsc2.yaml#labels_snapshot` and its July checksum comments as historical dataset
+identity while locking every other parsed scoring-semantic field. A later additive, hash-frozen
+prospective overlay may replace only the effective `labels_snapshot`; transport and raw
+checksums enter through separately immutable freeze records, never through an unregistered
+override or a post-data config edit. These are implementation blockers, not permission to edit
+the old registration or access the archive early.
+
+### Considered options
+
+1. Correct the URL inside ADR-0013 or its frozen config and rerun the original attempt. Rejected:
+   this rewrites an Accepted decision and changes a terminal result after data availability is
+   known.
+2. Treat the root-path object as an equivalent transport substitution. Rejected: the first
+   contract explicitly prohibited substitution, and equivalence cannot be asserted after the
+   registered URL failed.
+3. Create a new, explicit prospective registration before any archive GET, content hash, label
+   inspection, benchmark derivation or scoring. Accepted.
+4. Abandon prospective validation permanently. Rejected: the data-location defect can be
+   addressed without weakening the original outcome if the next attempt is independently
+   registered and visibly versioned.
+
+### Decision
+
+Adopt option 3 and bind the Sol-authored amendment contract. The new registration names exactly
+one archive URL; admits no alias, mirror, redirect to a different path, weekly release or later
+monthly archive; records the prior HEAD metadata only as exact stage-1 transport comparisons;
+and locks the existing policy axes, thresholds, split, criterion map, disabled PP3/BP4 posture,
+masking policy and scoring-semantic projection at base commit
+`e640d65fd67ceed496adf3793eb8b58194836cc9`.
+
+Before PRE-DATA approval, implementation must create the contract's exact prospective
+eval-overlay path. Runtime resolution verifies the whole historical config, removes only the
+historical `labels_snapshot` from the scoring-semantics projection, and overlays only the
+registered August snapshot ID. The approved overlay is then immutable. Stage 1 and stage 2 write
+separate transport/raw freeze records; they do not edit the overlay. Any other dataset or checksum
+override is forbidden.
+
+This is a **new prospective registration**, not a repair or substitution:
+
+- the first `BLOCKED_DATA` artifact and release remain authoritative and byte-unchanged;
+- the new run receives a new registration ID, implementation freeze, data freeze, run ID and
+  report;
+- no result from the second attempt may be described as the outcome of the first attempt; and
+- any drift from this amendment after approval requires another explicit pre-data amendment,
+  never an in-place edit.
+
+The amendment is planning-only. Its current execution state is
+`AWAITING_PRE_DATA_APPROVAL`. Before the first archive GET, a named owner must record
+`APPROVED_PRE_DATA` against the reviewed contract hash, implementation commit and test evidence,
+while attesting that archive bytes, archive hashes, labels, rows, benchmark and scores remain
+unaccessed. Missing approval, implementation gaps, hash drift or a false attestation is a hard
+stop.
+
+After approval, execution must follow the contract's ordered freeze/acquire/derive/mask/score/
+adjudicate/report sequence. The terminal vocabulary is exactly `PASS`, `FAIL`,
+`NOT_ESTIMABLE`, `BLOCKED_POLICY`, `BLOCKED_DATA` or `INVALID`. These terminal projections never
+replace ADR-0013's independent A0–A6 axes. `BLOCKED_POLICY` is not a performance `FAIL`, and an
+A0 run-integrity failure is `INVALID`, not `FAIL`. If any required scope is policy-blocked, full
+spectrum is `BLOCKED_POLICY` and `NOT_AUTHORIZED`; other scope axes remain visible and an
+independently clear truncating-pathogenic `PASS` may still authorize only that research-evidence
+scope. `BLOCKED_DATA` or global `INVALID` authorizes nothing. No outcome authorizes clinical
+classification, a VUS worklist or a ClinVar submission.
+
+### Consequences
+
+- The old ADR-0013 attempt remains terminal `BLOCKED_DATA`; its artifact is not edited.
+- The correct URL is fixed prospectively for a distinct attempt before archive content access.
+- Prior Last-Modified and Content-Length values are stage-1 transport expectations only; current
+  HEAD must match HTTP 200, exact final URL, `2026-08-06T04:05:02Z` and 441792560 exactly before
+  any archive-body GET, but a match still does not prove content identity. The separately
+  NCBI-published archive date and official MD5 must also be frozen; neither may be inferred from
+  HEAD metadata.
+- Production implementation and an execution-ready freeze are required later, but are outside
+  this planning change and may not alter registered semantics.
+- The prospective eval overlay must be approved before data access and may change only effective
+  dataset identity; checksum binding occurs through immutable stage records.
+- `APPROVED_PRE_DATA` is not yet recorded, so archive GET, hashing, labels, benchmark derivation
+  and scoring remain prohibited.
+- A narrow truncating-pathogenic `PASS` may authorize only the preregistered research-evidence
+  scope even when full spectrum is `FAIL`, `NOT_ESTIMABLE` or `BLOCKED_POLICY`; all
+  clinical/external surfaces remain prohibited.
 
 ---
 
