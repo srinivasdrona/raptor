@@ -1670,3 +1670,64 @@ todos:
   - atlas-rubric-v2-readjudication
   - engagement-recruit-molecular-geneticist
   created: '2026-08-15'
+- id: register-clinvar-2026-08-amendment-v2
+  title: Registering the corrected ClinVar prospective amendment
+  description: 'Track: ADR-0013 PROSPECTIVE AMENDMENT / PLANNING ONLY. Completed a new
+    Sol-authored registration for the exact archive-root URL
+    https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08.txt.gz,
+    plus the immutable artifact''s 2026-08-06T22:05:32Z HTTP HEAD observation
+    (Last-Modified 2026-08-06T04:05:02Z, Content-Length 441792560) as transport metadata only,
+    not content identity. The contract preserves the first attempt and
+    data/census/tsc_prospective_validation_2026-08_blocked_data.json unchanged; preserves
+    independent A0-A6 axes; adds distinct INVALID and BLOCKED_POLICY terminals; partitions the
+    historical tsc2.yaml labels_snapshot from locked scoring semantics; defines an immutable
+    prospective overlay/freeze-record lifecycle; and records a complete false-valued data-access
+    attestation. This is a new prospective registration, not a repair or substitution. No archive
+    GET, archive hash, label inspection, benchmark derivation, scoring, production implementation
+    or execution occurred.'
+  status: done
+  depends_on:
+  - validate-tiered-gate-prospectively
+  created: '2026-08-29'
+- id: prepare-clinvar-2026-08-amendment-v2-execution
+  title: Preparing the amended ClinVar prospective execution
+  description: 'Implement and test an additive execution path for
+    docs/project/specs/clinvar-2026-08-prospective-amendment-v2.yaml without editing the
+    historical ADR-0013 locator or artifact. Add the exact registered prospective eval overlay,
+    separate transport/raw freeze manifests, and runtime rejection of every unregistered
+    labels_snapshot/checksum override; remove executable-path dependence on hard-coded 2026-07-07
+    identity/checksums; add a prospective tiered adjudicator preserving A0-A6 with distinct
+    INVALID, BLOCKED_POLICY and performance FAIL; preserve locked thresholds and policy hashes;
+    prove label isolation; and freeze the implementation commit, x64 BIAS 3.0.0, Nirvana 3.18.1
+    and resource manifests. Do not request the archive or inspect labels.'
+  status: pending
+  depends_on:
+  - register-clinvar-2026-08-amendment-v2
+  created: '2026-08-29'
+- id: approve-clinvar-2026-08-amendment-v2-pre-data
+  title: Approving the amended ClinVar run before data access
+  description: 'A named owner must record APPROVED_PRE_DATA or REJECTED_PRE_DATA against the
+    reviewed registration hash, ADR, prospective overlay hash, tsc2 scoring-semantics projection,
+    implementation commit, config hashes, protected-test evidence, x64 tool/resource freeze and
+    a complete false-valued attestation for archive GET, archive hash, labels, rows, benchmark and
+    scoring. Missing approval, drift, implementation gaps or any early access is a hard stop; no
+    waiver or in-place edit is permitted.'
+  status: pending
+  depends_on:
+  - prepare-clinvar-2026-08-amendment-v2-execution
+  created: '2026-08-29'
+- id: run-report-clinvar-2026-08-amendment-v2
+  title: Freezing, running and reporting the amended ClinVar validation
+  description: 'Only after APPROVED_PRE_DATA, follow the registered sequence: transport
+    freeze with exact HTTP 200/final-URL/Last-Modified/Content-Length comparison; exact archive
+    freeze after separately obtaining the NCBI-published archive date and official MD5; then GET
+    and raw MD5/SHA-256 freeze; GRCh38 TSC1/TSC2 benchmark and split freeze; held-out masking and
+    label-free x64 scoring; terminal adjudication; immutable new report. Preserve every A0-A6
+    axis and report full spectrum and truncating-pathogenic independently using exactly PASS,
+    FAIL, NOT_ESTIMABLE, BLOCKED_POLICY, BLOCKED_DATA or INVALID. A policy block is not a
+    performance failure, an integrity failure is INVALID, and no outcome authorizes clinical
+    classification, VUS worklist or ClinVar submission.'
+  status: pending
+  depends_on:
+  - approve-clinvar-2026-08-amendment-v2-pre-data
+  created: '2026-08-29'
