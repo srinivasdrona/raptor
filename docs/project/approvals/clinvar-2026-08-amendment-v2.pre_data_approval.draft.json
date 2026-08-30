@@ -39,11 +39,11 @@
   },
   "scoring_semantics_projection_sha256": "a19f0b1825a3b5b9c5886cc783750cd907045601447cfd132329d3ab9b9e10b5",
   "implementation_freeze": {
-    "_note": "Honest placeholder: prospective_freeze.py and prospective_exact_source_transport.py are still uncommitted working-tree edits on this branch, so there is no real commit that could be pinned here without lying about reachability/hash coherence. raptor.eval.prospective_freeze.validate_pre_data_approval rejects NOT_YET_COMMITTED for any APPROVED_PRE_DATA decision by construction (PRE_DATA_IMPLEMENTATION_NOT_READY) -- this draft's own 'decision' is not APPROVED_PRE_DATA anyway. Once these modules are committed, replace 'commit' with the real 40-hex commit id and 'module_hashes' values with each module's real canonical-LF sha256 as committed at that commit (git show <commit>:<path>), never the ambient worktree bytes.",
-    "commit": "NOT_YET_COMMITTED",
+    "_note": "Repinned to the real committed implementation (was NOT_YET_COMMITTED). 'commit' is the exact 40-hex commit id; each module_hashes value is that module's canonical-LF SHA-256 computed from 'git show <commit>:<path>' (the exact committed blob, never ambient/checked-out worktree bytes -- disk bytes differ from the blob by CRLF/LF checkout normalization only, confirmed byte-identical after canonicalization).",
+    "commit": "9ac9f90d39abfbc6df6b9a51902ad71148674b31",
     "module_hashes": {
-      "raptor.eval.prospective_freeze": "NOT_YET_COMMITTED",
-      "raptor.eval.prospective_exact_source_transport": "NOT_YET_COMMITTED"
+      "raptor.eval.prospective_freeze": "73e416c8230ad2be332920801e7131824f4ceecc9b190085333d9f1f6dc56f04",
+      "raptor.eval.prospective_exact_source_transport": "615faa77a6fef3c5a46da50daa028183026f593641c85ad5012914cc9445cafa"
     }
   },
   "immutable_inputs_verified": true,
