@@ -330,19 +330,27 @@ Nirvana/BIAS annotation bundle exist; ClinVar census/benchmark inputs are frozen
 MaveDB cliPE dataset is available only as non-gating orthogonal evidence. These artifacts do not
 constitute a live refresh system, and PP3/BP4 automation remains disabled.
 
+**SourceOps v2 boundary:** V2-S1 through V2-S3 were merged at `e640d65`. They end at the
+registry, offline staged verification/diff, deterministic materiality/impact proposals, and
+read-only rollback rehearsal. **SourceOps Promotion Gate v1 is a separate post-V2 project, never
+V2-S4.** Its planning contract is
+`docs/project/specs/sourceops-promotion-gate-v1.yaml`.
+
 | Order | Expansion layer | Durable tasks | Admission rule |
 |---:|---|---|---|
 | 1 | **Control plane** — source owner, authoritative URL, licence, release, checksum, acquisition, cadence, consumers, drift and rollback | `sourceops-version-refresh-registry`, `governance-data-rights-privacy` | No ingestion or activation before identity/licence/provenance are explicit. |
 | 2 | **Open literature + functional evidence** — PubMed/LitVar/PMC citation stack; IGVF VAMP-seq/SGE, CAGI7 and legacy-assay access | `sources-add-literature-stack`, `assurance-expand-orthogonal-validation` | Claims remain span-grounded, non-gating and review-bound; access/licence gaps fail closed. |
-| 3 | **Safe refresh machinery** — detect, download, verify, stage and diff; materiality, packet invalidation, benchmark rebuild and rollback | `sourceops-automated-refresh-validation`, `sourceops-drift-revalidation-gates` | Never silently replace a production or historical source. |
-| 4 | **Current annotation refresh** — stage current ClinVar, gnomAD, dbNSFP, MANE, dbSNP and reference bundle on x64 | `sources-stage-annotation-refresh` | Promotion occurs only after the control-plane and drift gates; frozen R2 remains immutable. |
-| 5 | **Separate evidence/modalities** — splice, difficult regions, SV/CNV | `sources-add-splice-track`, `sources-audit-difficult-regions`, `sources-design-sv-cnv-track` | Each receives its own consequence routing, calibration, benchmark and no-double-counting policy. |
-| 6 | **Clinical/commercial sources** — phenotype/penetrance and licensed/vendor feeds | `clinical-phenotype-penetrance-track`, `sources-evaluate-commercial-sources` | Patient-level data waits for privacy/consent controls; commercial feeds require proven incremental value and permitted use. |
+| 3 | **Safe refresh analysis** — verify an operator-supplied stage, diff it, evaluate materiality, propose impact routes and rehearse rollback read-only | `sourceops-automated-refresh-validation`, `sourceops-drift-revalidation-gates` | V2 executes no promotion, invalidation, rebuild, rerun or rollback. |
+| 4 | **Post-V2 promotion proposal gate** — fresh signed human receipt bound to exact candidate/source/baseline/policy/V2 artifact hashes | `sourceops-promotion-gate-v1` | Create only a deterministic proposal branch, patch and draft PR; never write main, mark ready, auto-merge, merge, execute routes, restore rollback content or reinterpret evidence. |
+| 5 | **Current annotation refresh** — stage current ClinVar, gnomAD, dbNSFP, MANE, dbSNP and reference bundle on x64 | `sources-stage-annotation-refresh` | Any later promotion requires a separately approved gate cycle; frozen R2 remains immutable. |
+| 6 | **Separate evidence/modalities** — splice, difficult regions, SV/CNV | `sources-add-splice-track`, `sources-audit-difficult-regions`, `sources-design-sv-cnv-track` | Each receives its own consequence routing, calibration, benchmark and no-double-counting policy. |
+| 7 | **Clinical/commercial sources** — phenotype/penetrance and licensed/vendor feeds | `clinical-phenotype-penetrance-track`, `sources-evaluate-commercial-sources` | Patient-level data waits for privacy/consent controls; commercial feeds require proven incremental value and permitted use. |
 
 **Completion definition:** every admitted source is registered and reproducible; every refresh is
 staged and diffed; every material change names its downstream invalidations and revalidation;
-rollback is tested; literature/functional claims resolve to exact sources and spans; and no modality
-is inserted into the small-variant scorer merely because its data is available.
+rollback is tested; any repository proposal is receipt-bound and draft-only; literature/functional
+claims resolve to exact sources and spans; and no modality is inserted into the small-variant
+scorer merely because its data is available.
 
 ## Operations (Current Run)
 

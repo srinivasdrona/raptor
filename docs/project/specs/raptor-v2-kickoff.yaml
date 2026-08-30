@@ -258,9 +258,25 @@ phase_definition:
       - a live network scheduler
       - Prefect, LiteLLM, Ollama, or SQLite service deployment
       - automatic source promotion
+      - approval-receipt handling, proposal branches, patches, or draft pull requests
       - a new evidence run
       - a package major-version bump
       - any RescueScreen stage
+  post_v2_successor:
+    project_id: sourceops-promotion-gate-v1
+    status: separate_planning_contract
+    spec: docs/project/specs/sourceops-promotion-gate-v1.yaml
+    maps_to_todo: sourceops-promotion-gate-v1
+    depends_on: [V2-S3]
+    classification: separate_post_v2_project
+    explicitly_not: V2-S4
+    boundary: >-
+      V2 remains complete at verified staged observations, materiality and
+      impact proposals, and read-only rollback rehearsal. The successor may
+      later consume exact V2-S2/V2-S3 hashes plus a fresh typed human approval
+      receipt to create only a proposal branch, patch, and draft pull request.
+      It cannot amend V2, execute routes, restore rollback content, reinterpret
+      evidence, write main, enable auto-merge, or merge.
 
 first_implementation_slice:
   id: V2-S1

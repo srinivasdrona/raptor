@@ -339,6 +339,7 @@ todos:
   status: pending
   depends_on:
   - sourceops-drift-revalidation-gates
+  - sourceops-promotion-gate-v1
   - sources-add-literature-stack
   - assurance-expand-orthogonal-validation
   - sources-stage-annotation-refresh
@@ -419,31 +420,50 @@ todos:
   created: '2026-07-31'
 - id: sourceops-version-refresh-registry
   title: Creating live source-version and refresh registry
-  description: 'Track: SOURCE-OPS. Define source owner, URL, license, pin, checksum, update
-    cadence, freshness SLA, acquisition method, provenance, downstream consumers, revalidation
-    trigger and rollback for every active source.'
-  status: pending
+  description: 'Track: SOURCE-OPS / RAPTOR-V2-S1. Completed and merged in `a662276`: the
+    seven-record SourceOps registry, strict offline validator, consumer readiness report,
+    declaration/hash binding, freshness, licence, drift-action and rollback metadata contracts.
+    This records governance state only and performs no fetch, promotion or evidence action.'
+  status: done
   depends_on: []
   created: '2026-07-19'
 - id: sourceops-automated-refresh-validation
-  title: Automating staged source refresh and validation
-  description: 'Track: SOURCE-OPS. Implement detect-download-verify-stage-diff-test-promote
-    workflow for approved sources, never silently replacing production data; integrate
-    source-specific sanity checks and deterministic manifests.'
-  status: pending
+  title: Verifying staged source snapshots and deterministic diffs
+  description: 'Track: SOURCE-OPS / RAPTOR-V2-S2. Completed and merged in `fd0abdf`: validates
+    an already-present operator-supplied stage offline, binds it to one exact registry baseline,
+    and emits deterministic content-addressed verification and fact-diff artifacts. It performs
+    no download, materiality decision, promotion, lifecycle change or downstream action.'
+  status: done
   depends_on:
   - sourceops-version-refresh-registry
   - sources-pin-core-annotation-bundle
   created: '2026-07-19'
 - id: sourceops-drift-revalidation-gates
   title: Adding source-drift revalidation gates
-  description: 'Track: SOURCE-OPS / ASSURANCE. Define materiality thresholds and CI gates
-    that determine when refreshed ClinVar, gnomAD, dbNSFP, MANE or other data require benchmark
-    rebuild, policy review, packet invalidation or rollback.'
-  status: pending
+  description: 'Track: SOURCE-OPS / ASSURANCE / RAPTOR-V2-S3. Completed and merged in `6c3e554`:
+    independently validates the exact V2-S2 pair, applies the hash-bound materiality policy,
+    emits inert impact routes and a read-only rollback rehearsal, and executes nothing. This is
+    the final RAPTOR-v2 slice.'
+  status: done
   depends_on:
   - sourceops-automated-refresh-validation
   created: '2026-07-19'
+- id: sourceops-promotion-gate-v1
+  title: Building receipt-gated source promotion proposals
+  description: 'Track: SOURCE-OPS / POST-V2. Planning contract complete at
+    docs/project/specs/sourceops-promotion-gate-v1.yaml. This is a separate post-V2 project,
+    never V2-S4. Future implementation must consume exact V2-S2/V2-S3 artifact hashes plus a
+    fresh typed human approval receipt bound to candidate/source/baseline/policy/artifact hashes;
+    generate only one deterministic proposal branch, patch and draft PR; and never write main,
+    mark ready, auto-merge, merge, execute routes, restore rollback content, change lifecycle or
+    reinterpret evidence. The only v1 real pilot is a version-only proposal for the zero-source
+    METADATA_ONLY Atlas catalog template. August ClinVar prospective validation and
+    access-blocked MAVE sources are excluded. Implementation has not started and no pilot is
+    authorized.'
+  status: pending
+  depends_on:
+  - sourceops-drift-revalidation-gates
+  created: '2026-08-29'
 - id: sources-stage-annotation-refresh
   title: Staging the current small-variant annotation refresh
   description: 'Track: SOURCE-COVERAGE / SOURCE-OPS. Stage, but do not silently promote,
