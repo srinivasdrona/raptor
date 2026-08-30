@@ -52,6 +52,7 @@ import json
 import os
 import re
 import stat
+import subprocess
 import threading
 import uuid
 from datetime import date, datetime, timezone
@@ -243,7 +244,120 @@ def _canonical_lf_sha256_path(path: Path) -> str:
 
 
 def _git_blob_sha1(raw: bytes) -> str:
-    return hashlib.sha1(b"blob " + str(len(raw)).encode("utf-8") + b"\0" + raw).hexdigest()
+    """Canonical (cross-EOL-correct) git blob SHA-1: canonicalizes `raw` to
+    LF line endings BEFORE applying the `git hash-object` blob-header
+    formula. A raw-bytes-only formula would diverge from the real
+    committed git blob identity the moment a checkout's line endings
+    differ from the committed content's own EOL convention (e.g. a CRLF
+    Windows checkout of a file whose repository blob is CRLF-normalized
+    on `git add`/commit), producing a false PRE_DATA_DRIFT purely from EOL
+    style. Canonicalizing first makes the check EOL-style-independent
+    while still catching every real (semantic) content drift, since only
+    the line-ending bytes are normalized away -- everything else that
+    changes still changes the canonical bytes, and therefore this hash."""
+    canonical = _canonical_lf_bytes(raw)
+    return hashlib.sha1(b"blob " + str(len(canonical)).encode("utf-8") + b"\0" + canonical).hexdigest()
+
+
+#: This module's own repository root (`src/raptor/eval/prospective_freeze.py`
+#: is three directories below it) -- used only as a LAST-RESORT git-metadata
+#: discovery fallback when `GIT_DIR`/`GIT_WORK_TREE` are not explicitly set
+#: (e.g. a plain, non-worktree checkout of the real repository, unlike this
+#: repo's linked-worktree layout whose `.git` FILE cannot otherwise be
+#: resolved by a bare `-C <path>` invocation).
+_THIS_MODULE_REPO_ROOT = Path(__file__).resolve().parents[3]
+
+_COMMIT_SHA1_RE = re.compile(r"^[0-9a-f]{40}$")
+_MODULE_HASH_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _git_command_prefix() -> list[str]:
+    git_dir = os.environ.get("GIT_DIR")
+    git_work_tree = os.environ.get("GIT_WORK_TREE")
+    if git_dir and git_work_tree:
+        return ["git", "--git-dir", git_dir, "--work-tree", git_work_tree]
+    return ["git", "-C", str(_THIS_MODULE_REPO_ROOT)]
+
+
+def _run_git(*args: str) -> "subprocess.CompletedProcess[bytes] | None":
+    """Runs a read-only git subprocess, never raising. Returns `None` only
+    when git itself could not even be invoked (a genuinely unusable
+    environment) -- never conflated with a real, negative git verdict (a
+    resolvable object that is simply absent, or the wrong content)."""
+    try:
+        return subprocess.run(
+            [*_git_command_prefix(), "--no-pager", *args],
+            check=False,
+            capture_output=True,
+        )
+    except OSError:
+        return None
+
+
+def _module_relative_path(module_name: str) -> Path:
+    return (Path("src") / Path(*module_name.split("."))).with_suffix(".py")
+
+
+def _implementation_freeze_module_hash_failure(commit: str, module_hashes: Mapping[str, Any]) -> str | None:
+    """Verifies every `module_hashes` entry against the ACTUAL committed
+    blob content at `commit` -- always read via `git show <commit>:<path>`,
+    NEVER the ambient worktree's own files, so a checked-out-but-uncommitted
+    edit can never masquerade as a frozen, approved implementation. Only
+    called once `commit` itself has already been confirmed reachable."""
+    for module_name, expected_hash in module_hashes.items():
+        module_rel = _module_relative_path(module_name)
+        shown = _run_git("show", f"{commit}:{module_rel.as_posix()}")
+        if shown is None or shown.returncode != 0:
+            return f"implementation_freeze module {module_name!r} is not present in the committed tree at {commit}"
+        if _canonical_lf_sha256_bytes(shown.stdout) != expected_hash:
+            return f"implementation_freeze module {module_name!r} canonical-LF sha256 does not match commit {commit}"
+    return None
+
+
+def _implementation_freeze_failure_reason(implementation_freeze: Mapping[str, Any]) -> str | None:
+    """Returns a human-readable `PRE_DATA_IMPLEMENTATION_NOT_READY` reason,
+    or `None` if `implementation_freeze` is acceptable.
+
+    `commit == "NOT_YET_COMMITTED"` is always rejected here -- an
+    `APPROVED_PRE_DATA` decision can never be backed by a not-yet-committed
+    implementation. A `commit` that fails the closed 40-hex-lowercase
+    format, or whose `module_hashes` fail the closed 64-hex-lowercase
+    format, is likewise rejected outright (neither is one of the two
+    schema-level allowed shapes: `NOT_YET_COMMITTED`, or a real commit
+    id). Verification is fail-closed throughout: a commit this git
+    metadata cannot resolve, and a git invocation that could not even be
+    made (git itself unavailable/unusable), are both rejected exactly
+    like a resolvable commit whose committed tree is missing or
+    mismatched -- there is no "cannot verify, so accept" branch anywhere
+    in this path, and no ambient-worktree fallback either (content is
+    always read via `git show <commit>:<path>`, never the live checkout's
+    own files)."""
+    commit = implementation_freeze.get("commit")
+    module_hashes = implementation_freeze.get("module_hashes")
+    if commit == "NOT_YET_COMMITTED":
+        return (
+            "implementation_freeze.commit is NOT_YET_COMMITTED; APPROVED_PRE_DATA requires a "
+            "committed, verifiable implementation"
+        )
+    if not isinstance(commit, str) or not _COMMIT_SHA1_RE.match(commit):
+        return "implementation_freeze.commit must be NOT_YET_COMMITTED or a 40-hex lowercase commit id"
+    if not isinstance(module_hashes, Mapping) or not module_hashes:
+        return "implementation_freeze.module_hashes must be a non-empty mapping"
+    for module_name, expected_hash in module_hashes.items():
+        if not isinstance(module_name, str) or not module_name.strip():
+            return "implementation_freeze.module_hashes has a blank module name"
+        if not isinstance(expected_hash, str) or not _MODULE_HASH_SHA256_RE.match(expected_hash):
+            return f"implementation_freeze.module_hashes[{module_name!r}] must be a 64-hex lowercase sha256 string"
+
+    commit_probe = _run_git("cat-file", "-e", f"{commit}^{{commit}}")
+    if commit_probe is None:
+        return (
+            f"implementation_freeze.commit {commit!r} could not be verified: git is unavailable or "
+            "the configured git metadata is unusable"
+        )
+    if commit_probe.returncode != 0:
+        return f"implementation_freeze.commit {commit!r} is not a reachable commit in the configured git metadata"
+    return _implementation_freeze_module_hash_failure(commit, module_hashes)
 
 
 def _content_hash(payload: Mapping[str, Any], *, key: str = "content_hash") -> str:
@@ -772,6 +886,9 @@ def _validate_approval_record(
         raise ProspectiveStopStateError("PRE_DATA_REVIEW_REQUIRED", "approval implementation_freeze block schema invalid")
     if not implementation_freeze.get("commit") or not isinstance(implementation_freeze.get("module_hashes"), Mapping):
         raise ProspectiveStopStateError("PRE_DATA_REVIEW_REQUIRED", "approval implementation_freeze content invalid")
+    implementation_freeze_failure = _implementation_freeze_failure_reason(implementation_freeze)
+    if implementation_freeze_failure is not None:
+        raise ProspectiveStopStateError("PRE_DATA_IMPLEMENTATION_NOT_READY", implementation_freeze_failure)
 
     if approval_record.get("immutable_inputs_verified") is not True:
         raise ProspectiveStopStateError(
@@ -1203,6 +1320,22 @@ def execute_transport_and_raw_freeze(
         raw_boundary_reason = _validate_destination_boundary(raw_archive_path, allowed_root=allowed_external_root)
         if raw_boundary_reason is not None:
             return {"stage_status": "BLOCKED", "terminal_outcome": "INVALID", "reason_code": raw_boundary_reason}
+
+        # Run-scope destination freshness: `allowed_external_root` is
+        # explicitly permitted to already hold content from unrelated prior
+        # runs (it is never required to be globally empty) -- but THIS
+        # run's own freshly minted `run_scope_id` subdirectory must be
+        # unclaimed. Anything already present there (a directory or the
+        # exact archive leaf path) is never reused or silently overwritten;
+        # it is a typed INVALID, checked (and any real GET refused) before
+        # the transport freeze record is even written, and before the
+        # archive is ever requested.
+        if _lstat_or_none(raw_archive_dir) is not None or _lstat_or_none(raw_archive_path) is not None:
+            return {
+                "stage_status": "BLOCKED",
+                "terminal_outcome": "INVALID",
+                "reason_code": "RUN_SCOPE_DESTINATION_NOT_FRESH",
+            }
 
         first_archive_get_at_value = _utcnow_iso()
         timeline.append({"event": "archive_get_started", "at": first_archive_get_at_value})

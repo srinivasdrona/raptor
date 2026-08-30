@@ -1,0 +1,108 @@
+{
+  "_readme": [
+    "This is a DRAFT execution-preparation artifact, not a PRE-DATA approval.",
+    "It is not consumed by raptor.eval.prospective_freeze.validate_pre_data_approval",
+    "or execute_transport_and_raw_freeze, is not wired into any loader, and its",
+    "'decision' value is deliberately NOT a member of",
+    "pre_data_approval.allowed_decisions (APPROVED_PRE_DATA / REJECTED_PRE_DATA),",
+    "so it can never be mistaken for, or accidentally accepted as, a real",
+    "approval record even if a future caller pointed at this file by mistake.",
+    "Fields that COULD be verified locally, offline, without any archive or",
+    "network access were verified and are recorded with their real values and",
+    "evidence below. The single field that cannot be completed from this host",
+    "-- x64_freeze -- is left as an explicit pending placeholder: this host is",
+    "aarch64 (ARM Queen / WSL2), not the ADR-0008-designated x86_64 worker,",
+    "and raptor.eval.prospective_freeze.assert_runtime_boundary rejects it by",
+    "construction. Completing this record requires re-running the same",
+    "verification on the actual ADR-0008 x64 worker and recording its true",
+    "BIAS commit, Nirvana banner, and resource-manifest hash -- never",
+    "fabricating them here."
+  ],
+  "schema": "raptor.eval.pre_data_approval.v1",
+  "decision": "DRAFT_PENDING_ADR_0008_X64_WORKER_VERIFICATION",
+  "_decision_note": "Not APPROVED_PRE_DATA. Only @dronasrinivas may change this to APPROVED_PRE_DATA, and only after the x64_freeze block below is replaced with real, verified values from the ADR-0008 designated worker.",
+  "approver": "@dronasrinivas",
+  "approved_at": null,
+  "registration": {
+    "id": "clinvar-2026-08-amendment-v2",
+    "path": "docs/project/specs/clinvar-2026-08-prospective-amendment-v2.yaml",
+    "git_blob_sha1": "479e8623698dbdb6a6034cc72a65f52727372134",
+    "canonical_lf_sha256": "582c8e8eb0fe5f44ae7b5e93774eb126d2cbd1b8a2a8f88a7cfdea64731b69e2"
+  },
+  "adr": {
+    "id": "ADR-0020",
+    "decision_ref": "docs/DECISIONS.md#adr-0020--adr-0013-prospective-amendment-v2-new-registration-for-the-corrected-2026-08-clinvar-archive-url"
+  },
+  "overlay": {
+    "path": "configs/eval/tsc2_clinvar_2026_08_amendment_v2.overlay.yaml",
+    "canonical_lf_sha256": "2826cd4b01bf08e2bf2a3eb13ad2eed73a3cf302c0b9ef41cbbf99fa9fb6ee48"
+  },
+  "scoring_semantics_projection_sha256": "a19f0b1825a3b5b9c5886cc783750cd907045601447cfd132329d3ab9b9e10b5",
+  "implementation_freeze": {
+    "_note": "Honest placeholder: prospective_freeze.py and prospective_exact_source_transport.py are still uncommitted working-tree edits on this branch, so there is no real commit that could be pinned here without lying about reachability/hash coherence. raptor.eval.prospective_freeze.validate_pre_data_approval rejects NOT_YET_COMMITTED for any APPROVED_PRE_DATA decision by construction (PRE_DATA_IMPLEMENTATION_NOT_READY) -- this draft's own 'decision' is not APPROVED_PRE_DATA anyway. Once these modules are committed, replace 'commit' with the real 40-hex commit id and 'module_hashes' values with each module's real canonical-LF sha256 as committed at that commit (git show <commit>:<path>), never the ambient worktree bytes.",
+    "commit": "NOT_YET_COMMITTED",
+    "module_hashes": {
+      "raptor.eval.prospective_freeze": "NOT_YET_COMMITTED",
+      "raptor.eval.prospective_exact_source_transport": "NOT_YET_COMMITTED"
+    }
+  },
+  "immutable_inputs_verified": true,
+  "_immutable_inputs_verification_evidence": {
+    "method": "WSL2 raptor venv, offline: canonical_lf_sha256 recomputed from disk bytes; git_blob_sha1 recomputed via 'git rev-parse HEAD:<path>' (GIT_DIR/GIT_WORK_TREE explicit) to correctly account for .gitattributes 'text eol=crlf' normalization",
+    "verified_at_commit": "c039383b098cbce89411e10c0b61d9b707c31eb9",
+    "result": "all 12 immutable_inputs entries, the historical_terminal_result artifact, and the tsc2_scoring_semantics_projection sha256 matched their registration-spec pins exactly; 0 mismatches",
+    "paths_verified": [
+      "configs/eval/tsc2.yaml",
+      "configs/eval/tiered_gate_v3.yaml",
+      "configs/acmg/tsc.yaml",
+      "configs/acmg/strength_policy.yaml",
+      "configs/eval/bias_strength_ladder.yaml",
+      "configs/eval/bp4pp3_predictor_policy.json",
+      "configs/eval/bias_lineage.yaml",
+      "configs/eval/mask.yaml",
+      "configs/eval/predictor_aggregation.yaml",
+      "configs/eval/export.yaml",
+      "configs/ingest/tsc.yaml",
+      "configs/packet/candidate_direction.yaml",
+      "data/census/tsc_prospective_validation_2026-08_blocked_data.json"
+    ]
+  },
+  "protected_tests_verified": true,
+  "_protected_tests_verification_evidence": {
+    "command": "PYTHONPATH=src python -m pytest tests/eval/test_clinvar_2026_08_prospective_freeze_red.py tests/eval/test_clinvar_2026_08_prospective_adjudication_red.py tests/eval/test_tiered_prospective_registration.py -q",
+    "environment": "WSL2 Ubuntu 24.04, /home/sdrona/raptor/bin/python (venv 'raptor'), explicit GIT_DIR=/mnt/d/AIProjects/raptor/.git/worktrees/clinvar-2026-08-freeze-run-v2 GIT_WORK_TREE=/mnt/d/AIProjects/raptor-worktrees/clinvar-2026-08-freeze-run-v2",
+    "result": "108 passed, 3 skipped, 0 failed",
+    "network_or_archive_access": false
+  },
+  "x64_freeze": {
+    "_status": "NOT_YET_VERIFIED_PENDING_ADR_0008_X64_WORKER",
+    "_blocking_reason": "This execution-preparation session ran only in WSL2 (uname -m = aarch64; python is /home/sdrona/raptor/bin/python, platform.machine() = aarch64). raptor.eval.prospective_freeze.assert_runtime_boundary requires worker_arch == 'x86_64', worker_designation == 'adr-0008-designated-x64-worker', a matching pinned bias_commit and nirvana_banner, and a real 64-hex resource_manifest_sha256. None of these can be truthfully produced on this host; Nirvana was not run and no BIAS/Nirvana identity was inspected here.",
+    "_required_pinned_values_once_verified_on_the_real_worker": {
+      "worker_designation": "adr-0008-designated-x64-worker",
+      "worker_arch": "x86_64",
+      "bias_commit": "ade13f206f3e2c2efe3ec92715d974645fc8da8f",
+      "nirvana_banner": "3.18.1-0-g05f88047",
+      "resource_manifest_sha256": "<64-hex sha256 of the real x64 resource manifest -- unknown from this host>"
+    }
+  },
+  "scope": {
+    "allow_transport_freeze": true,
+    "allow_exact_registered_archive_get": true,
+    "allow_substitute_archive": false,
+    "allow_threshold_change": false,
+    "allow_label_dependent_implementation_change": false,
+    "allow_clinical_use": false,
+    "allow_label_inspection": false,
+    "allow_scoring": false
+  },
+  "pre_data_access_attestation": {
+    "archive_get_requested": false,
+    "archive_content_downloaded": false,
+    "archive_bytes_hashed": false,
+    "archive_decompressed": false,
+    "labels_inspected": false,
+    "rows_inspected": false,
+    "benchmark_derived": false,
+    "scoring_performed": false
+  }
+}

@@ -5,6 +5,8 @@ import gzip
 import hashlib
 import io
 import json
+import os
+import re
 import shutil
 import subprocess
 import threading
@@ -22,6 +24,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SPEC_SOURCE_PATH = REPO_ROOT / "docs" / "project" / "specs" / "clinvar-2026-08-prospective-amendment-v2.yaml"
 BASE_CONFIG_SOURCE_PATH = REPO_ROOT / "configs" / "eval" / "tsc2.yaml"
 HISTORICAL_BLOCKED_PATH = REPO_ROOT / "data" / "census" / "tsc_prospective_validation_2026-08_blocked_data.json"
+_DEFAULT_IMPLEMENTATION_FREEZE_MODULES: tuple[str, ...] = ("raptor.eval.prospective_freeze",)
+_GIT_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 
 try:
     import raptor.eval.prospective_freeze as _prospective_freeze
@@ -65,8 +69,123 @@ def canonical_lf_sha256_path(path: Path) -> str:
     return sha256_hex(canonical_lf_bytes(path.read_bytes()))
 
 
+def _git_blob_sha1(raw: bytes) -> str:
+    canonical = canonical_lf_bytes(raw)
+    return hashlib.sha1(b"blob " + str(len(canonical)).encode("utf-8") + b"\0" + canonical).hexdigest()
+
+
 def git_blob_sha1(raw: bytes) -> str:
-    return hashlib.sha1(b"blob " + str(len(raw)).encode("utf-8") + b"\0" + raw).hexdigest()
+    return _git_blob_sha1(raw)
+
+
+def _stderr_text(raw: bytes) -> str:
+    text = raw.decode("utf-8", errors="replace").strip()
+    return text if text else "<empty>"
+
+
+def _require_git_metadata() -> tuple[str, str]:
+    git_dir = os.environ.get("GIT_DIR")
+    git_work_tree = os.environ.get("GIT_WORK_TREE")
+    if not git_dir or not git_work_tree:
+        pytest.fail(
+            "build_approval_record requires explicit GIT_DIR and GIT_WORK_TREE for committed implementation_freeze hashes",
+            pytrace=False,
+        )
+    return git_dir, git_work_tree
+
+
+def _run_git_with_worktree(*args: str) -> subprocess.CompletedProcess[bytes]:
+    git_dir, git_work_tree = _require_git_metadata()
+    cmd = ["git", "--no-pager", "--git-dir", git_dir, "--work-tree", git_work_tree, *args]
+    try:
+        return subprocess.run(
+            cmd,
+            cwd=git_work_tree,
+            check=False,
+            capture_output=True,
+        )
+    except OSError as exc:  # pragma: no cover - platform-specific process launch failure
+        pytest.fail(f"git unusable while resolving implementation_freeze: {exc}", pytrace=False)
+
+
+def _require_git_success(result: subprocess.CompletedProcess[bytes], *, context: str) -> None:
+    if result.returncode == 0:
+        return
+    pytest.fail(
+        f"{context}: git command failed with rc={result.returncode}; stderr={_stderr_text(result.stderr)}",
+        pytrace=False,
+    )
+
+
+def _module_to_relpath(module_name: str) -> str:
+    return (Path("src") / Path(*module_name.split("."))).with_suffix(".py").as_posix()
+
+
+def _resolve_commit(commitish: str = "HEAD") -> str:
+    head = _run_git_with_worktree("rev-parse", "--verify", commitish)
+    _require_git_success(head, context=f"resolving implementation_freeze commit {commitish!r}")
+    commit = head.stdout.decode("utf-8", errors="replace").strip()
+    if not _GIT_COMMIT_RE.fullmatch(commit):
+        pytest.fail(f"resolved {commitish!r} is not a lowercase 40-hex SHA: {commit!r}", pytrace=False)
+    return commit
+
+
+def _normalize_module_names(module_names: tuple[str, ...] | list[str] | None) -> tuple[str, ...]:
+    selected = tuple(module_names) if module_names is not None else _DEFAULT_IMPLEMENTATION_FREEZE_MODULES
+    if not selected:
+        pytest.fail("implementation_freeze module list must be non-empty", pytrace=False)
+    normalized: list[str] = []
+    for module_name in selected:
+        if not isinstance(module_name, str) or not module_name.strip():
+            pytest.fail("implementation_freeze module list contains a blank module name", pytrace=False)
+        normalized_name = module_name.strip()
+        if normalized_name not in normalized:
+            normalized.append(normalized_name)
+    return tuple(normalized)
+
+
+def resolve_committed_implementation_freeze(
+    commitish: str = "HEAD",
+    *,
+    module_names: tuple[str, ...] | list[str] | None = None,
+) -> dict[str, Any]:
+    commit = _resolve_commit(commitish)
+    commit_probe = _run_git_with_worktree("cat-file", "-e", f"{commit}" + "^{commit}")
+    _require_git_success(commit_probe, context=f"probing implementation_freeze commit {commit}")
+
+    required_modules = _normalize_module_names(module_names)
+    module_hashes: dict[str, str] = {}
+    missing_modules: list[str] = []
+    missing_errors: list[str] = []
+    for module_name in required_modules:
+        module_path = _module_to_relpath(module_name)
+        shown = _run_git_with_worktree("show", f"{commit}:{module_path}")
+        if shown.returncode != 0:
+            missing_modules.append(module_name)
+            missing_errors.append(f"{module_name}<{module_path}> stderr={_stderr_text(shown.stderr)}")
+            continue
+        module_hashes[module_name] = sha256_hex(canonical_lf_bytes(shown.stdout))
+    if missing_modules:
+        pytest.fail(
+            "implementation_freeze committed-tree fixture is incomplete for declared modules: "
+            f"commit={commit} missing={missing_modules!r}; details={' | '.join(missing_errors)}",
+            pytrace=False,
+        )
+    if not module_hashes:
+        pytest.fail(
+            "implementation_freeze committed-tree fixture cannot be generated: "
+            f"commit {commit} had no resolvable module hashes for declared modules {list(required_modules)!r}",
+            pytrace=False,
+        )
+    return {"commit": commit, "module_hashes": module_hashes}
+
+
+def draft_placeholder_implementation_freeze(module_names: tuple[str, ...] | list[str] | None = None) -> dict[str, Any]:
+    required_modules = _normalize_module_names(module_names)
+    return {
+        "commit": "NOT_YET_COMMITTED",
+        "module_hashes": {module_name: "NOT_YET_COMMITTED" for module_name in required_modules},
+    }
 
 
 def canonical_json_content_hash(payload: dict[str, Any], *, key: str = "content_hash") -> str:
@@ -184,7 +303,7 @@ def prospective_sandbox(name: str, *, archive_bytes: bytes | None = None) -> Ite
             f"content_length_bytes_must_equal: {len(archive)}",
         )
         spec_path.parent.mkdir(parents=True, exist_ok=True)
-        spec_path.write_text(spec_text, encoding="utf-8")
+        spec_path.write_bytes(canonical_lf_bytes(spec_text.encode("utf-8")))
         spec = load_yaml(spec_path)
 
         required_values = spec["prospective_eval_overlay_lifecycle"]["required_values"]
@@ -227,6 +346,7 @@ def build_approval_record(
     attestation_overrides: dict[str, bool] | None = None,
     scope_overrides: dict[str, bool] | None = None,
 ) -> dict[str, Any]:
+    implementation_freeze = resolve_committed_implementation_freeze()
     spec_raw = sandbox.spec_path.read_bytes()
     attestation = {
         "archive_get_requested": False,
@@ -272,10 +392,7 @@ def build_approval_record(
             "canonical_lf_sha256": canonical_lf_sha256_path(sandbox.overlay_path),
         },
         "scoring_semantics_projection_sha256": sandbox.spec["authority_partition"]["tsc2_scoring_semantics_projection"]["sha256"],
-        "implementation_freeze": {
-            "commit": "f" * 40,
-            "module_hashes": {"raptor.eval.prospective_freeze": "0" * 64},
-        },
+        "implementation_freeze": implementation_freeze,
         "immutable_inputs_verified": immutable_inputs_verified,
         "protected_tests_verified": protected_tests_verified,
         "x64_freeze": {
