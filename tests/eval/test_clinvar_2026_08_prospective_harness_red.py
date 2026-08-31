@@ -12,11 +12,13 @@ import subprocess
 import sys
 import types
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import pytest
 
+import tests.eval._clinvar_2026_08_prospective_red_helpers as prospective_red_helpers
 from tests.eval._clinvar_2026_08_prospective_red_helpers import (
     REPO_ROOT,
     assert_stop_state,
@@ -101,9 +103,35 @@ def _execute_argv(
 
 def _invoke_main(harness: Any, argv: list[str]) -> tuple[int | None, BaseException | None]:
     try:
-        return harness.main(argv), None
+        with _with_resolved_git_env_for_harness():
+            return harness.main(argv), None
     except BaseException as exc:  # noqa: BLE001
         return None, exc
+
+
+@contextmanager
+def _with_resolved_git_env_for_harness() -> Iterator[None]:
+    git_dir = os.environ.get("GIT_DIR")
+    git_work_tree = os.environ.get("GIT_WORK_TREE")
+    if git_dir and git_work_tree:
+        yield
+        return
+    resolved_git_dir, resolved_work_tree = prospective_red_helpers._resolve_git_metadata()
+    prior_git_dir = os.environ.get("GIT_DIR")
+    prior_git_work_tree = os.environ.get("GIT_WORK_TREE")
+    os.environ["GIT_DIR"] = resolved_git_dir
+    os.environ["GIT_WORK_TREE"] = resolved_work_tree
+    try:
+        yield
+    finally:
+        if prior_git_dir is None:
+            os.environ.pop("GIT_DIR", None)
+        else:
+            os.environ["GIT_DIR"] = prior_git_dir
+        if prior_git_work_tree is None:
+            os.environ.pop("GIT_WORK_TREE", None)
+        else:
+            os.environ["GIT_WORK_TREE"] = prior_git_work_tree
 
 
 def _can_create_symlink(parent: Path) -> bool:
@@ -206,10 +234,7 @@ def _stderr_text(raw: bytes) -> str:
 
 
 def _git_worktree_flags() -> list[str]:
-    git_dir = os.environ.get("GIT_DIR")
-    git_work_tree = os.environ.get("GIT_WORK_TREE")
-    if not git_dir or not git_work_tree:
-        pytest.fail("implementation-freeze tests require explicit GIT_DIR and GIT_WORK_TREE environment metadata")
+    git_dir, git_work_tree = prospective_red_helpers._resolve_git_metadata()
     return ["--git-dir", git_dir, "--work-tree", git_work_tree]
 
 
@@ -1163,7 +1188,6 @@ def test_validate_pre_data_approval_rejects_approved_not_yet_committed_implement
 
 
 def test_validate_pre_data_approval_rejects_approved_reachable_commit_with_stale_module_hashes() -> None:
-    validate = require_api("validate_pre_data_approval")
     stop_error = require_exception("ProspectiveStopStateError")
     stale_commit = "c039383b098cbce89411e10c0b61d9b707c31eb9"
     commit_probe = _run_git_with_worktree("cat-file", "-e", f"{stale_commit}" + "^{commit}")
@@ -1193,16 +1217,54 @@ def test_validate_pre_data_approval_rejects_approved_reachable_commit_with_stale
             },
         }
         with pytest.raises(stop_error) as exc:
-            validate(
-                registration_spec_path=sandbox.spec_path,
-                prospective_overlay_path=sandbox.overlay_path,
+            prospective_red_helpers.validate_pre_data_approval(
+                sandbox,
                 approval_record=approval,
                 first_archive_get_at=None,
             )
         assert_stop_state(exc.value, "PRE_DATA_IMPLEMENTATION_NOT_READY")
+        reason = str(getattr(exc.value, "reason", ""))
+        assert reason
+        assert (
+            "canonical-lf sha256 does not match commit" in reason.lower()
+            or "is not present in the committed tree" in reason.lower()
+        )
+        assert "not a reachable commit" not in reason.lower()
+        assert "could not be verified: git is unavailable" not in reason.lower()
 
 
-def test_committed_implementation_freeze_resolution_strictly_rejects_missing_required_modules() -> None:
+def test_helper_git_metadata_resolution_supports_no_env_checkout_forms_and_strict_declared_modules(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("GIT_DIR", raising=False)
+    monkeypatch.delenv("GIT_WORK_TREE", raising=False)
+
+    linked_git_dir, linked_work_tree = prospective_red_helpers._resolve_git_metadata()
+    assert Path(linked_work_tree) == REPO_ROOT
+    assert Path(linked_git_dir).is_dir()
+
+    dot_git = REPO_ROOT / ".git"
+    if dot_git.is_file():
+        gitdir_raw = prospective_red_helpers._parse_linked_worktree_gitdir_pointer(dot_git)
+        translated = prospective_red_helpers._translate_windows_drive_to_wsl(gitdir_raw)
+        if translated is not None:
+            assert Path(translated).is_dir()
+    elif dot_git.is_dir():
+        assert Path(linked_git_dir) == dot_git
+    else:
+        pytest.fail(f"unexpected checkout metadata form at {dot_git}")
+
+    synthetic_checkout = tmp_path / "synthetic-standard-checkout"
+    synthetic_checkout.mkdir(parents=True, exist_ok=False)
+    synthetic_git_dir = synthetic_checkout / ".git"
+    synthetic_git_dir.mkdir()
+    monkeypatch.setattr(prospective_red_helpers, "REPO_ROOT", synthetic_checkout)
+    standard_git_dir, standard_work_tree = prospective_red_helpers._resolve_git_metadata()
+    assert Path(standard_git_dir) == synthetic_git_dir
+    assert Path(standard_work_tree) == synthetic_checkout
+
+    monkeypatch.setattr(prospective_red_helpers, "REPO_ROOT", REPO_ROOT)
     stale_commit = "c039383b098cbce89411e10c0b61d9b707c31eb9"
     commit_probe = _run_git_with_worktree("cat-file", "-e", f"{stale_commit}" + "^{commit}")
     _assert_git_usable(commit_probe, context="strict implementation_freeze commit probe")
@@ -1222,7 +1284,6 @@ def test_committed_implementation_freeze_resolution_strictly_rejects_missing_req
 def test_validate_pre_data_approval_rejects_approved_unresolvable_implementation_commit_without_network(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    validate = require_api("validate_pre_data_approval")
     stop_error = require_exception("ProspectiveStopStateError")
     unresolvable_commit = hashlib.sha1(uuid.uuid4().bytes).hexdigest()
     commit_probe = _run_git_with_worktree("cat-file", "-e", f"{unresolvable_commit}" + "^{commit}")
@@ -1250,13 +1311,17 @@ def test_validate_pre_data_approval_rejects_approved_unresolvable_implementation
             "module_hashes": copy.deepcopy(approval["implementation_freeze"]["module_hashes"]),
         }
         with pytest.raises(stop_error) as exc:
-            validate(
-                registration_spec_path=sandbox.spec_path,
-                prospective_overlay_path=sandbox.overlay_path,
+            prospective_red_helpers.validate_pre_data_approval(
+                sandbox,
                 approval_record=approval,
                 first_archive_get_at=None,
             )
         assert_stop_state(exc.value, "PRE_DATA_IMPLEMENTATION_NOT_READY")
+        reason = str(getattr(exc.value, "reason", ""))
+        assert "not a reachable commit" in reason.lower()
+        assert "canonical-lf sha256 does not match commit" not in reason.lower()
+        assert "is not present in the committed tree" not in reason.lower()
+        assert "could not be verified: git is unavailable" not in reason.lower()
     assert network_calls == []
 
 

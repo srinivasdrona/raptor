@@ -12,6 +12,7 @@ from typing import Any, Callable
 import pytest
 import yaml
 
+import tests.eval._clinvar_2026_08_prospective_red_helpers as prospective_red_helpers
 from tests.eval._clinvar_2026_08_prospective_red_helpers import (
     HISTORICAL_BLOCKED_PATH,
     REPO_ROOT,
@@ -2015,9 +2016,10 @@ def test_historical_blocked_data_artifact_is_immutable() -> None:
         pytest.fail("spec must parse to a mapping")
     recorded = spec["historical_terminal_result"]
     rel = str(recorded["path"]).replace("\\", "/")
+    git_dir, git_work_tree = prospective_red_helpers._resolve_git_metadata()
     resolved = subprocess.run(
-        ["git", "rev-parse", f"HEAD:{rel}"],
-        cwd=str(REPO_ROOT),
+        ["git", "--no-pager", "--git-dir", git_dir, "--work-tree", git_work_tree, "rev-parse", f"HEAD:{rel}"],
+        cwd=git_work_tree,
         check=False,
         capture_output=True,
         text=True,

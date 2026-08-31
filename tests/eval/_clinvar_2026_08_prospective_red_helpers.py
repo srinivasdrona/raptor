@@ -26,6 +26,7 @@ BASE_CONFIG_SOURCE_PATH = REPO_ROOT / "configs" / "eval" / "tsc2.yaml"
 HISTORICAL_BLOCKED_PATH = REPO_ROOT / "data" / "census" / "tsc_prospective_validation_2026-08_blocked_data.json"
 _DEFAULT_IMPLEMENTATION_FREEZE_MODULES: tuple[str, ...] = ("raptor.eval.prospective_freeze",)
 _GIT_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
+_WINDOWS_DRIVE_PATH_RE = re.compile(r"^(?P<drive>[A-Za-z]):[\\\\/](?P<tail>.*)$")
 
 try:
     import raptor.eval.prospective_freeze as _prospective_freeze
@@ -83,19 +84,109 @@ def _stderr_text(raw: bytes) -> str:
     return text if text else "<empty>"
 
 
-def _require_git_metadata() -> tuple[str, str]:
-    git_dir = os.environ.get("GIT_DIR")
-    git_work_tree = os.environ.get("GIT_WORK_TREE")
-    if not git_dir or not git_work_tree:
+def _translate_windows_drive_to_wsl(path_text: str) -> str | None:
+    match = _WINDOWS_DRIVE_PATH_RE.match(path_text.strip())
+    if not match:
+        return None
+    drive = match.group("drive").lower()
+    tail = match.group("tail").replace("\\", "/").lstrip("/")
+    if tail:
+        return f"/mnt/{drive}/{tail}"
+    return f"/mnt/{drive}"
+
+
+def _parse_linked_worktree_gitdir_pointer(pointer_file: Path) -> str:
+    try:
+        raw_text = pointer_file.read_text(encoding="utf-8")
+    except OSError as exc:
+        pytest.fail(f"unable to read linked-worktree git metadata pointer {pointer_file}: {exc}", pytrace=False)
+    lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+    if len(lines) != 1 or not lines[0].lower().startswith("gitdir:"):
         pytest.fail(
-            "build_approval_record requires explicit GIT_DIR and GIT_WORK_TREE for committed implementation_freeze hashes",
+            f"linked-worktree git metadata pointer {pointer_file} must contain exactly one 'gitdir:' line",
             pytrace=False,
         )
-    return git_dir, git_work_tree
+    gitdir_raw = lines[0][len("gitdir:") :].strip()
+    if not gitdir_raw or "\x00" in gitdir_raw:
+        pytest.fail(f"linked-worktree git metadata pointer {pointer_file} has an invalid gitdir value", pytrace=False)
+    return gitdir_raw
+
+
+def _resolve_gitdir_from_pointer(*, repo_root: Path, gitdir_raw: str, pointer_file: Path) -> Path:
+    candidates: list[Path] = []
+    direct = Path(gitdir_raw)
+    candidates.append(direct)
+    if not direct.is_absolute():
+        candidates.append(repo_root / direct)
+    translated = _translate_windows_drive_to_wsl(gitdir_raw)
+    if translated:
+        candidates.append(Path(translated))
+
+    seen: set[str] = set()
+    checked: list[str] = []
+    for candidate in candidates:
+        key = str(candidate)
+        if key in seen:
+            continue
+        seen.add(key)
+        checked.append(key)
+        if candidate.is_dir():
+            return candidate
+    pytest.fail(
+        f"linked-worktree gitdir from {pointer_file} did not resolve to an existing directory; "
+        f"raw={gitdir_raw!r}, candidates={checked!r}",
+        pytrace=False,
+    )
+
+
+def _resolve_git_metadata() -> tuple[str, str]:
+    git_dir = os.environ.get("GIT_DIR")
+    git_work_tree = os.environ.get("GIT_WORK_TREE")
+    if git_dir and git_work_tree:
+        return git_dir, git_work_tree
+
+    dot_git = REPO_ROOT / ".git"
+    if dot_git.is_dir():
+        return str(dot_git), str(REPO_ROOT)
+    if dot_git.is_file():
+        gitdir_raw = _parse_linked_worktree_gitdir_pointer(dot_git)
+        gitdir = _resolve_gitdir_from_pointer(repo_root=REPO_ROOT, gitdir_raw=gitdir_raw, pointer_file=dot_git)
+        return str(gitdir), str(REPO_ROOT)
+
+    pytest.fail(
+        f"unable to resolve git metadata: neither env override nor checkout metadata is valid at {dot_git}",
+        pytrace=False,
+    )
+
+
+@contextmanager
+def _with_resolved_git_env() -> Iterator[None]:
+    git_dir = os.environ.get("GIT_DIR")
+    git_work_tree = os.environ.get("GIT_WORK_TREE")
+    if git_dir and git_work_tree:
+        yield
+        return
+
+    resolved_git_dir, resolved_work_tree = _resolve_git_metadata()
+    prior_git_dir = os.environ.get("GIT_DIR")
+    prior_git_work_tree = os.environ.get("GIT_WORK_TREE")
+    os.environ["GIT_DIR"] = resolved_git_dir
+    os.environ["GIT_WORK_TREE"] = resolved_work_tree
+    try:
+        yield
+    finally:
+        if prior_git_dir is None:
+            os.environ.pop("GIT_DIR", None)
+        else:
+            os.environ["GIT_DIR"] = prior_git_dir
+        if prior_git_work_tree is None:
+            os.environ.pop("GIT_WORK_TREE", None)
+        else:
+            os.environ["GIT_WORK_TREE"] = prior_git_work_tree
 
 
 def _run_git_with_worktree(*args: str) -> subprocess.CompletedProcess[bytes]:
-    git_dir, git_work_tree = _require_git_metadata()
+    git_dir, git_work_tree = _resolve_git_metadata()
     cmd = ["git", "--no-pager", "--git-dir", git_dir, "--work-tree", git_work_tree, *args]
     try:
         return subprocess.run(
@@ -508,26 +599,27 @@ def execute_transport_and_raw_freeze(
             default_runtime_identity = copy.deepcopy(freeze_block)
     if default_runtime_identity is None:
         default_runtime_identity = runtime_identity_ok()
-    result = run(
-        registration_spec_path=sandbox.spec_path,
-        prospective_overlay_path=sandbox.overlay_path,
-        base_eval_config_path=sandbox.base_eval_config_path,
-        approval_record=copy.deepcopy(approval_record) if isinstance(approval_record, dict) else approval_record,
-        allowed_repo_root=sandbox.repo_root,
-        allowed_external_root=sandbox.external_root,
-        transport_freeze_record_path=transport_record_path or sandbox.transport_record_path,
-        raw_freeze_record_path=raw_record_path or sandbox.raw_record_path,
-        transport=transport,
-        published_archive_date_lookup=published_archive_date_lookup,
-        official_md5_lookup=official_md5_lookup,
-        runtime_identity=default_runtime_identity,
-        cli_overrides=cli_overrides or {},
-        env_overrides=env_overrides or {},
-        label_reader=label_reader,
-        benchmark_builder=benchmark_builder,
-        scoring_runner=scoring_runner,
-        first_archive_get_at=first_archive_get_at,
-    )
+    with _with_resolved_git_env():
+        result = run(
+            registration_spec_path=sandbox.spec_path,
+            prospective_overlay_path=sandbox.overlay_path,
+            base_eval_config_path=sandbox.base_eval_config_path,
+            approval_record=copy.deepcopy(approval_record) if isinstance(approval_record, dict) else approval_record,
+            allowed_repo_root=sandbox.repo_root,
+            allowed_external_root=sandbox.external_root,
+            transport_freeze_record_path=transport_record_path or sandbox.transport_record_path,
+            raw_freeze_record_path=raw_record_path or sandbox.raw_record_path,
+            transport=transport,
+            published_archive_date_lookup=published_archive_date_lookup,
+            official_md5_lookup=official_md5_lookup,
+            runtime_identity=default_runtime_identity,
+            cli_overrides=cli_overrides or {},
+            env_overrides=env_overrides or {},
+            label_reader=label_reader,
+            benchmark_builder=benchmark_builder,
+            scoring_runner=scoring_runner,
+            first_archive_get_at=first_archive_get_at,
+        )
     if not isinstance(result, dict):
         pytest.fail("execute_transport_and_raw_freeze must return a mapping")
     return result
@@ -540,12 +632,13 @@ def validate_pre_data_approval(
     first_archive_get_at: str | None = None,
 ) -> dict[str, Any]:
     fn = require_api("validate_pre_data_approval")
-    out = fn(
-        registration_spec_path=sandbox.spec_path,
-        prospective_overlay_path=sandbox.overlay_path,
-        approval_record=copy.deepcopy(approval_record),
-        first_archive_get_at=first_archive_get_at,
-    )
+    with _with_resolved_git_env():
+        out = fn(
+            registration_spec_path=sandbox.spec_path,
+            prospective_overlay_path=sandbox.overlay_path,
+            approval_record=copy.deepcopy(approval_record),
+            first_archive_get_at=first_archive_get_at,
+        )
     if not isinstance(out, dict):
         pytest.fail("validate_pre_data_approval must return a mapping")
     return out
