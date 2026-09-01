@@ -26,9 +26,11 @@ files are present under `D:\\raptor-x64\\CHECKSUMS`:
     python scripts\\compute_adr0008_resource_manifest_sha256.py
 
 The printed `resource_manifest_sha256` is the exact, and only, value a human
-approver may paste into a `pre_data_approval` record's `x64_freeze` block —
+approver may paste into a `scoring_stage_approval` record's `x64_freeze` block —
 never a fabricated or copied-from-elsewhere value (see the module docstring
-of `raptor.eval.prospective_freeze` and its `assert_runtime_boundary`).
+of `raptor.eval.prospective_freeze` and its `assert_runtime_boundary`). This
+value has no bearing on, and is never required for, `pre_data_approval` /
+ClinVar archive acquisition.
 """
 from __future__ import annotations
 

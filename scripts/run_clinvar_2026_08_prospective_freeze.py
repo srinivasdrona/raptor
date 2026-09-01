@@ -27,9 +27,16 @@ following are true, checked in this exact order:
    schema `raptor.eval.pre_data_approval.v1`, `decision ==
    "APPROVED_PRE_DATA"`, approver `@dronasrinivas`, matching spec/overlay
    hashes, non-vacuous `immutable_inputs_verified` /
-   `protected_tests_verified`, an `x64_freeze` block that passes
-   `assert_runtime_boundary`, and an all-`False`
-   `pre_data_access_attestation`.
+   `protected_tests_verified`, and an all-`False`
+   `pre_data_access_attestation`. This record deliberately has NO
+   `x64_freeze` block and is never checked against
+   `assert_runtime_boundary` -- consistent with item 2 above, ClinVar
+   archive acquisition has no x86-only requirement. The separate, later
+   x64/BIAS/Nirvana/resource-manifest gate
+   (`raptor.eval.prospective_freeze.validate_scoring_stage_approval`) is
+   out of scope for this script; it is required only before ADR-0020
+   stage 4 (BIAS/Nirvana execution or label-dependent evaluation), which
+   this script never performs.
 5. `--allowed-external-root` passes preflight (see `_preflight_external_root`):
    it must already exist, be a plain directory (never a symlink/reparse
    point), resolve to itself, sit outside the repository root, and be

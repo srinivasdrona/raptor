@@ -341,9 +341,11 @@ implementation_freeze_required_before_approval:
   - prospective eval-overlay canonical-LF SHA-256
   - tsc2 scoring-semantics projection SHA-256
   - test command and result
-  - x64 BIAS 3.0.0 commit ade13f206f3e2c2efe3ec92715d974645fc8da8f
-  - Nirvana 3.18.1 runtime banner 3.18.1-0-g05f88047
-  - x64 resource manifests and checksums
+  # NOTE: x64/BIAS/Nirvana/resource-manifest freeze identities are NOT part
+  # of this acquisition-stage freeze record. They are pinned separately in
+  # `scoring_stage_approval.approval_record_must_include` below, gating
+  # ADR-0020 stage 4 only -- ClinVar archive acquisition (stages 1-2) has no
+  # x86-only requirement.
 
 pre_data_approval:
   current_state: AWAITING_PRE_DATA_APPROVAL
@@ -359,7 +361,6 @@ pre_data_approval:
   - implementation commit and module hashes
   - immutable input verification
   - protected-test evidence
-  - x64 tool and resource freeze identities
   - timestamp strictly before first archive GET
   - complete false-valued pre-data access attestation
   approved_scope: >-
@@ -370,12 +371,47 @@ pre_data_approval:
     PRE_DATA_REVIEW_REQUIRED: approval record missing
     PRE_DATA_REJECTED: owner recorded REJECTED_PRE_DATA
     PRE_DATA_IMPLEMENTATION_NOT_READY: required additive implementation or tests missing
-    PRE_DATA_DRIFT: contract, policy, config, code, tool or resource identity differs from its freeze
+    PRE_DATA_DRIFT: contract, policy, config or code identity differs from its freeze
     PRE_DATA_ATTESTATION_BREACH: any archive bytes, archive hash, labels, rows, benchmark or score accessed early
   stop_rule: >-
     In every stop state, request no archive GET and produce no validation
     result. Resolution requires a reviewed pre-data change; in-place waiver is
     forbidden.
+
+scoring_stage_approval:
+  current_state: AWAITING_SCORING_STAGE_APPROVAL
+  approver_required: '@dronasrinivas'
+  independent_of_pre_data_approval: >-
+    This is a SEPARATE, LATER approval from pre_data_approval above. It gates
+    ONLY ADR-0020 stage 4 (4_MASK_AND_LABEL_FREE_SCORE) -- no BIAS/Nirvana
+    execution or label-dependent evaluation may run before it is recorded and
+    verified. It has no bearing on, and is never required for, ClinVar
+    archive acquisition (stages 1-2), which has no x86-only requirement.
+  required_before:
+  - any BIAS/Nirvana execution
+  - any label-dependent evaluation
+  allowed_decisions:
+  - APPROVED_SCORING_STAGE
+  - REJECTED_SCORING_STAGE
+  approval_record_must_include:
+  - registration id
+  - approver and approval timestamp
+  - x64 BIAS 3.0.0 commit ade13f206f3e2c2efe3ec92715d974645fc8da8f
+  - Nirvana 3.18.1 runtime banner 3.18.1-0-g05f88047
+  - x64 resource manifests and checksums (ADR-0008 resource_manifest_sha256)
+  approved_scope: >-
+    APPROVED_SCORING_STAGE permits stage 4 (mask-and-label-free score) to run
+    on the designated x64 worker under the pinned BIAS/Nirvana/resource
+    identities. It does not permit a substitute worker, tool version or
+    resource-manifest set.
+  failure_outcome: INVALID
+  stop_rule: >-
+    A missing approval record, schema breach, or any runtime-identity
+    mismatch (worker designation, architecture, BIAS commit, Nirvana banner,
+    or resource-manifest SHA-256) is an A0 run-integrity failure raised as
+    INVALID -- never a PRE_DATA_* stop state and never reported as a
+    performance FAIL. Resolution requires a reviewed scoring-stage change;
+    in-place waiver is forbidden.
 
 ordered_execution_after_approval:
   - stage: 1_TRANSPORT_FREEZE
@@ -409,6 +445,7 @@ ordered_execution_after_approval:
     failure_outcome: BLOCKED_DATA
   - stage: 4_MASK_AND_LABEL_FREE_SCORE
     actions:
+    - Verify scoring_stage_approval (validate_scoring_stage_approval) before any of the following.
     - Export holdout identities without labels.
     - Rebuild and verify all registered ClinVar-derived masked resources.
     - Run the frozen x64 BIAS/Nirvana path under ADR-0008.
@@ -580,7 +617,7 @@ known_blockers:
 - The historical tiered config contains the incorrect locator and must remain unchanged.
 - The additive implementation, protected tests and execution freeze do not yet exist.
 - Official archive checksum and raw SHA-256 remain intentionally unfrozen until after approval.
-- The x64 BIAS/Nirvana worker and resource freeze must be reverified for the new run.
+- The x64 BIAS/Nirvana worker and resource freeze must be reverified via scoring_stage_approval before stage 4 -- independent of, and later than, PRE-DATA approval above.
 
 change_control:
   after_pre_data_approval:

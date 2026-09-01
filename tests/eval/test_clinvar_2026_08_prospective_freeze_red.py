@@ -21,6 +21,7 @@ from tests.eval._clinvar_2026_08_prospective_red_helpers import (
     assert_record_content_hash,
     assert_stop_state,
     build_approval_record,
+    build_scoring_stage_approval_record,
     canonical_json_content_hash,
     canonical_lf_sha256_path,
     execute_transport_and_raw_freeze,
@@ -32,7 +33,9 @@ from tests.eval._clinvar_2026_08_prospective_red_helpers import (
     require_api,
     require_exception,
     require_module,
+    runtime_identity_ok,
     validate_pre_data_approval,
+    validate_scoring_stage_approval,
 )
 
 
@@ -304,7 +307,6 @@ def test_stage12_success_returns_stage_scoped_status_and_never_terminal_pass() -
             transport=transport,
             published_archive_date_lookup=published_lookup,
             official_md5_lookup=md5_lookup,
-            runtime_identity=approval["x64_freeze"],
             label_reader=_forbidden("label_reader"),
             benchmark_builder=_forbidden("benchmark_builder"),
             scoring_runner=_forbidden("scoring_runner"),
@@ -313,7 +315,8 @@ def test_stage12_success_returns_stage_scoped_status_and_never_terminal_pass() -
         assert result["stage_status"] == "TRANSPORT_AND_RAW_FROZEN"
         assert result.get("terminal_outcome") is None
         assert result["transport_metadata_not_content_identity"] is True
-        assert result["runtime_identity"] == approval["x64_freeze"]
+        assert "runtime_identity" not in result
+        assert "x64_freeze" not in approval
         assert result["download_chunk_bytes"] > 0
         assert result["download_chunk_bytes"] <= max_chunk
         assert published_lookup.calls == [sandbox.exact_url]
@@ -397,32 +400,48 @@ def test_executor_pre_data_stop_states_are_typed_and_zero_network(
         ("nirvana_banner", "3.18.1"),
         ("resource_manifest_sha256", "deadbeef"),
         ("worker_designation", "other-worker"),
+        ("worker_arch", "arm64"),
     ),
 )
-def test_runtime_identity_drift_is_pre_data_drift_with_zero_network(field_name: str, drifted_value: str) -> None:
+def test_scoring_stage_approval_runtime_identity_drift_is_invalid_with_zero_network(
+    field_name: str, drifted_value: str
+) -> None:
+    """`validate_scoring_stage_approval` -- the SEPARATE, LATER ADR-0020
+    stage 4 gate -- rejects x64_freeze identity drift as INVALID (A0
+    run-integrity), never a PRE_DATA_* stop state. This gate is never
+    consulted by `execute_transport_and_raw_freeze` (stages 1-2), which is
+    why this test never constructs a transport at all."""
     _require_freeze_contract_symbols()
-    stop_error = require_exception("ProspectiveStopStateError")
-    with prospective_sandbox(f"runtime-drift-{field_name}") as sandbox:
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    with prospective_sandbox(f"scoring-stage-runtime-drift-{field_name}") as sandbox:
+        approval = build_scoring_stage_approval_record(sandbox, x64_freeze_overrides={field_name: drifted_value})
+        with pytest.raises(invalid_error) as exc:
+            validate_scoring_stage_approval(sandbox, approval_record=approval)
+        assert exc.value.code == "INVALID"
+
+
+def test_scoring_stage_approval_never_consulted_by_stage12_acquisition() -> None:
+    """Acquisition (stages 1-2) never requires, reads, or checks x64/BIAS/
+    Nirvana identity -- `execute_transport_and_raw_freeze` accepts no
+    `runtime_identity` parameter and a `pre_data_approval` record has no
+    `x64_freeze` key at all."""
+    _require_freeze_contract_symbols()
+    with prospective_sandbox("scoring-stage-not-consulted") as sandbox:
         approval = build_approval_record(sandbox)
-        runtime_identity = dict(approval["x64_freeze"])
-        runtime_identity[field_name] = drifted_value
+        assert "x64_freeze" not in approval
         transport = InjectedTransport(
             head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
             body_by_url={sandbox.exact_url: sandbox.archive_bytes},
         )
-        with pytest.raises(stop_error) as exc:
-            execute_transport_and_raw_freeze(
-                sandbox,
-                approval_record=approval,
-                transport=transport,
-                published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
-                official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
-                runtime_identity=runtime_identity,
-            )
-        assert_stop_state(exc.value, "PRE_DATA_DRIFT")
-        assert transport.head_calls == []
-        assert transport.get_calls == []
-        _assert_no_records_created(sandbox.transport_record_path, sandbox.raw_record_path)
+        result = execute_transport_and_raw_freeze(
+            sandbox,
+            approval_record=approval,
+            transport=transport,
+            published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+            official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+        )
+        assert result["stage_status"] == "TRANSPORT_AND_RAW_FROZEN"
+        assert "runtime_identity" not in result
 
 
 @pytest.mark.parametrize(
@@ -1587,19 +1606,51 @@ def test_transport_record_binds_pre_data_approval_identity_and_get_timeline() ->
             "wrong-approval-schema",
             lambda approval: {**approval, "schema": "raptor.eval.pre_data_approval.v9"},
         ),
+    ),
+)
+def test_validate_pre_data_approval_rejects_schema_drift_as_pre_data_drift(
+    case_id: str,
+    mutate: Callable[[dict[str, Any]], dict[str, Any]],
+) -> None:
+    _require_freeze_contract_symbols()
+    stop_error = require_exception("ProspectiveStopStateError")
+    with prospective_sandbox(f"approval-schema-drift-{case_id}") as sandbox:
+        approval = build_approval_record(sandbox)
+        with pytest.raises(stop_error) as exc:
+            validate_pre_data_approval(sandbox, approval_record=mutate(approval), first_archive_get_at=None)
+        assert_stop_state(exc.value, "PRE_DATA_DRIFT")
+
+
+@pytest.mark.parametrize(
+    ("case_id", "mutate"),
+    (
+        (
+            "wrong-schema",
+            lambda approval: {**approval, "schema": "raptor.eval.scoring_stage_approval.v9"},
+        ),
+        (
+            "wrong-registration-id",
+            lambda approval: {**approval, "registration_id": "some-other-registration"},
+        ),
+        (
+            "blank-approver",
+            lambda approval: {**approval, "approver": "  "},
+        ),
+        (
+            "blank-approved-at",
+            lambda approval: {**approval, "approved_at": ""},
+        ),
+        (
+            "invalid-approved-at",
+            lambda approval: {**approval, "approved_at": "not-a-timestamp"},
+        ),
         (
             "x64-worker-arch-invalid",
-            lambda approval: {
-                **approval,
-                "x64_freeze": {**approval["x64_freeze"], "worker_arch": "arm64"},
-            },
+            lambda approval: {**approval, "x64_freeze": {**approval["x64_freeze"], "worker_arch": "arm64"}},
         ),
         (
             "x64-bias-commit-invalid",
-            lambda approval: {
-                **approval,
-                "x64_freeze": {**approval["x64_freeze"], "bias_commit": "0" * 40},
-            },
+            lambda approval: {**approval, "x64_freeze": {**approval["x64_freeze"], "bias_commit": "0" * 40}},
         ),
         (
             "x64-resource-manifest-invalid",
@@ -1608,19 +1659,39 @@ def test_transport_record_binds_pre_data_approval_identity_and_get_timeline() ->
                 "x64_freeze": {**approval["x64_freeze"], "resource_manifest_sha256": "broken"},
             },
         ),
+        (
+            "x64-freeze-missing-key",
+            lambda approval: {
+                **approval,
+                "x64_freeze": {k: v for k, v in approval["x64_freeze"].items() if k != "worker_arch"},
+            },
+        ),
     ),
 )
-def test_validate_pre_data_approval_rejects_schema_or_x64_freeze_drift_as_pre_data_drift(
+def test_validate_scoring_stage_approval_rejects_schema_or_x64_freeze_drift_as_invalid(
     case_id: str,
     mutate: Callable[[dict[str, Any]], dict[str, Any]],
 ) -> None:
+    """`validate_scoring_stage_approval` is the SEPARATE, LATER ADR-0020
+    stage 4 gate. Any schema, registration_id, approver/timestamp, or
+    x64_freeze identity breach raises `ProspectiveInvalidStateError`
+    (`.code == "INVALID"`) -- never a `PRE_DATA_*` stop state."""
     _require_freeze_contract_symbols()
-    stop_error = require_exception("ProspectiveStopStateError")
-    with prospective_sandbox(f"approval-schema-x64-drift-{case_id}") as sandbox:
-        approval = build_approval_record(sandbox)
-        with pytest.raises(stop_error) as exc:
-            validate_pre_data_approval(sandbox, approval_record=mutate(approval), first_archive_get_at=None)
-        assert_stop_state(exc.value, "PRE_DATA_DRIFT")
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    with prospective_sandbox(f"scoring-stage-schema-drift-{case_id}") as sandbox:
+        approval = build_scoring_stage_approval_record(sandbox)
+        with pytest.raises(invalid_error) as exc:
+            validate_scoring_stage_approval(sandbox, approval_record=mutate(approval))
+        assert exc.value.code == "INVALID"
+
+
+def test_validate_scoring_stage_approval_accepts_valid_record() -> None:
+    _require_freeze_contract_symbols()
+    with prospective_sandbox("scoring-stage-valid") as sandbox:
+        approval = build_scoring_stage_approval_record(sandbox)
+        result = validate_scoring_stage_approval(sandbox, approval_record=approval)
+        assert result["schema"] == "raptor.eval.scoring_stage_approval.v1"
+        assert result["x64_freeze"] == runtime_identity_ok()
 
 
 def test_symlink_dotdot_escape_is_invalid_destination_outside_allowed_root_and_no_outside_write() -> None:

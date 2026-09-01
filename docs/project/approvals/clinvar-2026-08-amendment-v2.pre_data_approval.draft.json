@@ -9,18 +9,26 @@
     "approval record even if a future caller pointed at this file by mistake.",
     "Fields that COULD be verified locally, offline, without any archive or",
     "network access were verified and are recorded with their real values and",
-    "evidence below. The single field that cannot be completed from this host",
-    "-- x64_freeze -- is left as an explicit pending placeholder: this host is",
-    "aarch64 (ARM Queen / WSL2), not the ADR-0008-designated x86_64 worker,",
-    "and raptor.eval.prospective_freeze.assert_runtime_boundary rejects it by",
-    "construction. Completing this record requires re-running the same",
-    "verification on the actual ADR-0008 x64 worker and recording its true",
-    "BIAS commit, Nirvana banner, and resource-manifest hash -- never",
-    "fabricating them here."
+    "evidence below.",
+    "GOVERNANCE CORRECTION: this record no longer includes an 'x64_freeze'",
+    "block. PRE-DATA approval (this record) gates ONLY ClinVar archive",
+    "acquisition (ADR-0020 stages 1-2), which has no x86-only requirement --",
+    "see raptor.eval.prospective_freeze module docstring and",
+    "docs/project/specs/clinvar-2026-08-prospective-amendment-v2.yaml",
+    "'pre_data_approval'. The ADR-0008 x64 worker / BIAS / Nirvana / resource-",
+    "manifest identity check is a SEPARATE, LATER, mandatory gate before",
+    "ADR-0020 stage 4 (BIAS/Nirvana execution or label-dependent evaluation)",
+    "-- see the sibling draft file",
+    "clinvar-2026-08-amendment-v2.scoring_stage_approval.draft.json and",
+    "raptor.eval.prospective_freeze.validate_scoring_stage_approval. That",
+    "sibling file is, and remains, unapproved and unverified from this host",
+    "for the same reason as before (this host is aarch64, not the ADR-0008",
+    "designated x86_64 worker); it does not block, and is not required for,",
+    "this PRE-DATA record."
   ],
   "schema": "raptor.eval.pre_data_approval.v1",
-  "decision": "DRAFT_PENDING_ADR_0008_X64_WORKER_VERIFICATION",
-  "_decision_note": "Not APPROVED_PRE_DATA. Only @dronasrinivas may change this to APPROVED_PRE_DATA, and only after the x64_freeze block below is replaced with real, verified values from the ADR-0008 designated worker.",
+  "decision": "DRAFT_PENDING_HUMAN_PRE_DATA_APPROVAL",
+  "_decision_note": "All technical prerequisites recorded below (immutable inputs, protected tests, implementation freeze) are verified. Not APPROVED_PRE_DATA. Only @dronasrinivas may change 'decision' to APPROVED_PRE_DATA and set a real 'approved_at' timestamp strictly before the first archive GET -- that explicit human governance action is the only thing still pending for this record.",
   "approver": "@dronasrinivas",
   "approved_at": null,
   "registration": {
@@ -73,17 +81,6 @@
     "environment": "WSL2 Ubuntu 24.04, /home/sdrona/raptor/bin/python (venv 'raptor'), explicit GIT_DIR=/mnt/d/AIProjects/raptor/.git/worktrees/clinvar-2026-08-freeze-run-v2 GIT_WORK_TREE=/mnt/d/AIProjects/raptor-worktrees/clinvar-2026-08-freeze-run-v2",
     "result": "108 passed, 3 skipped, 0 failed",
     "network_or_archive_access": false
-  },
-  "x64_freeze": {
-    "_status": "NOT_YET_VERIFIED_PENDING_ADR_0008_X64_WORKER",
-    "_blocking_reason": "This execution-preparation session ran only in WSL2 (uname -m = aarch64; python is /home/sdrona/raptor/bin/python, platform.machine() = aarch64). raptor.eval.prospective_freeze.assert_runtime_boundary requires worker_arch == 'x86_64', worker_designation == 'adr-0008-designated-x64-worker', a matching pinned bias_commit and nirvana_banner, and a real 64-hex resource_manifest_sha256. None of these can be truthfully produced on this host; Nirvana was not run and no BIAS/Nirvana identity was inspected here.",
-    "_required_pinned_values_once_verified_on_the_real_worker": {
-      "worker_designation": "adr-0008-designated-x64-worker",
-      "worker_arch": "x86_64",
-      "bias_commit": "ade13f206f3e2c2efe3ec92715d974645fc8da8f",
-      "nirvana_banner": "3.18.1-0-g05f88047",
-      "resource_manifest_sha256": "<64-hex sha256, computed ONLY by running 'python scripts\\compute_adr0008_resource_manifest_sha256.py' on the real ADR-0008 x64 worker per docs/ops/adr-0008-resource-manifest-digest.md -- unknown from this host, and never to be fabricated or copied from another registration/run>"
-    }
   },
   "scope": {
     "allow_transport_freeze": true,

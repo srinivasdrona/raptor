@@ -25,7 +25,6 @@ from tests.eval._clinvar_2026_08_prospective_red_helpers import (
     build_approval_record,
     draft_placeholder_implementation_freeze,
     resolve_committed_implementation_freeze,
-    runtime_identity_ok,
     prospective_sandbox,
     require_api,
     require_exception,
@@ -1110,7 +1109,6 @@ def test_validate_pre_data_approval_rejects_draft_decision_after_commentary_remo
     cleaned = _strip_commentary_keys(payload)
     if not isinstance(cleaned, dict):
         pytest.fail("cleaned draft approval must remain a mapping")
-    cleaned["x64_freeze"] = runtime_identity_ok()
 
     validate = require_api("validate_pre_data_approval")
     stop_error = require_exception("ProspectiveStopStateError")

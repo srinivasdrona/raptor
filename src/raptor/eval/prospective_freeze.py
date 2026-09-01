@@ -10,7 +10,7 @@ locator, or `configs/eval/tsc2.yaml#labels_snapshot` in place -- dataset
 identity for THIS registration flows only through the registered,
 hash-pinned prospective eval-overlay (`merge_prospective_overlay`).
 
-Three independent surfaces live here, all fail-closed and all sharing the
+Four independent surfaces live here, all fail-closed and all sharing the
 same typed error/stop-state vocabulary:
 
 * `validate_pre_data_approval` / the internal approval gate inside
@@ -19,7 +19,16 @@ same typed error/stop-state vocabulary:
   hash-drift, unimplemented-protection, non-vacuous-attestation or
   approval-vs-first-GET timing breach raises a typed
   `ProspectiveStopStateError` (`.code`/`.stop_state` one of
-  `PRE_DATA_STOP_STATES`) BEFORE any network call.
+  `PRE_DATA_STOP_STATES`) BEFORE any network call. This gate governs ONLY
+  ADR-0020 stages 1-2 (transport freeze + raw archive acquisition) and
+  requires exactly the prospective dataset/source identity (registration +
+  overlay hash-pins), an approval timestamp strictly before the first
+  archive GET, and the existing exact-source transport/hash-chain
+  protections (stage-1 HEAD comparison, official MD5, raw SHA-256). It
+  never requires, reads, or checks x64/BIAS/Nirvana identity -- ClinVar
+  archive acquisition has no x86-only requirement (see
+  `docs/ops/adr-0008-resource-manifest-digest.md` "Non-goals" and
+  `scripts/run_clinvar_2026_08_prospective_freeze.py`'s module docstring).
 * `execute_transport_and_raw_freeze` -- stage 1 (`HEAD` + published-date +
   official-MD5-source verification) and stage 2 (bounded streamed GET of
   ONLY the exact registered archive, raw hashing) of the contract's ordered
@@ -31,6 +40,15 @@ same typed error/stop-state vocabulary:
   callers for the same freeze-record pair), and every destination write is
   boundary-checked (no traversal, no symlink-follow, no special file) and
   atomic (temp-write + `os.replace`, crash leaves no partial artifact).
+* `validate_scoring_stage_approval` / `assert_runtime_boundary` -- the
+  SEPARATE, LATER gate for ADR-0020 stage 4 (`4_MASK_AND_LABEL_FREE_SCORE`):
+  the mandatory ADR-0008 x64 worker / BIAS / Nirvana / resource-manifest
+  identity check that MUST pass before any BIAS/Nirvana execution or
+  label-dependent evaluation. It is deliberately independent of, and never
+  consulted by, stages 1-2 above. A schema breach or runtime-identity
+  mismatch here raises `ProspectiveInvalidStateError` (`.code == "INVALID"`,
+  an A0 run-integrity failure per the registration spec's stage 4 rule),
+  never a `PRE_DATA_*` stop state.
 * `adjudicate_prospective_outcomes` -- the ADR-0020 A0-A6 per-scope axis
   projection, the closed six-value terminal-outcome vocabulary, and the
   full-spectrum/narrow-scope precedence and authorization mapping. It
@@ -77,6 +95,7 @@ __all__ = [
     "assert_runtime_boundary",
     "resource_manifest_entries",
     "compute_resource_manifest_sha256",
+    "validate_scoring_stage_approval",
     "merge_prospective_overlay",
     "validate_pre_data_approval",
     "execute_transport_and_raw_freeze",
@@ -170,8 +189,8 @@ _A5_TO_SCOPE_TERMINAL: dict[str, str] = {
 }
 
 #: ADR-0008 pinned x64 worker/tool identity dimensions
-#: (`freeze_record_must_pin`: "x64 BIAS 3.0.0 commit ..."; "Nirvana 3.18.1
-#: runtime banner ...").
+#: (`scoring_stage_approval.approval_record_must_include`: "x64 BIAS 3.0.0
+#: commit ..."; "Nirvana 3.18.1 runtime banner ...").
 _RUNTIME_IDENTITY_KEYS = frozenset(
     {"worker_designation", "worker_arch", "bias_commit", "nirvana_banner", "resource_manifest_sha256"}
 )
@@ -625,6 +644,17 @@ def assert_runtime_boundary(*, runtime_identity: Mapping[str, Any]) -> None:
     (`.code == "INVALID"`) on any missing/extra key or any dimension
     mismatch; returns `None` on success.
 
+    This is the ADR-0020 stage 4 (`4_MASK_AND_LABEL_FREE_SCORE`) gate --
+    the mandatory pre-condition for any BIAS/Nirvana execution or
+    label-dependent evaluation. It is called by `validate_scoring_stage_approval`
+    (below) and is deliberately NEVER called by `validate_pre_data_approval`
+    or `execute_transport_and_raw_freeze` (ADR-0020 stages 1-2, ClinVar
+    archive acquisition): archive acquisition has no x86-only requirement
+    and never needs, reads, or checks x64/BIAS/Nirvana identity. Keeping
+    this a standalone function (rather than inlining it into either gate)
+    is what lets the two governance boundaries stay independently callable,
+    independently testable, and impossible to accidentally conflate.
+
     `resource_manifest_sha256` is checked here only for FORMAT (64-character
     lowercase hex) -- unlike `bias_commit`/`nirvana_banner`, its concrete
     pinned VALUE is not known in this repository, because it can only be
@@ -634,7 +664,7 @@ def assert_runtime_boundary(*, runtime_identity: Mapping[str, Any]) -> None:
     (below) defines EXACTLY how that value must be computed, and
     `docs/ops/adr-0008-resource-manifest-digest.md` is the human-readable
     spec; a human approver runs it on the real worker and pins the result
-    into a specific `pre_data_approval` record's `x64_freeze` block -- this
+    into a `scoring_stage_approval` record's `x64_freeze` block -- this
     function never invents or accepts a value it cannot independently
     verify."""
     if not isinstance(runtime_identity, Mapping) or set(runtime_identity.keys()) != _RUNTIME_IDENTITY_KEYS:
@@ -722,6 +752,75 @@ def compute_resource_manifest_sha256(checksums_dir: Path | str) -> str:
     }
     canonical = json.dumps(envelope, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     return _sha256_hex(canonical)
+
+
+# ---------------------------------------------------------------------------
+# ADR-0020 stage 4 scoring-stage gate: SEPARATE from, and later than,
+# pre_data_approval / execute_transport_and_raw_freeze (stages 1-2). This is
+# the sole place x64/BIAS/Nirvana identity is required or checked.
+# ---------------------------------------------------------------------------
+
+#: Schema id for the `scoring_stage_approval` record (see
+#: `docs/ops/adr-0008-resource-manifest-digest.md` and
+#: `docs/project/specs/clinvar-2026-08-prospective-amendment-v2.yaml`
+#: `scoring_stage_approval`). Deliberately a DIFFERENT schema id from
+#: `raptor.eval.pre_data_approval.v1` -- these are two independent
+#: approvals gating two independent, non-overlapping stages, and a record
+#: of one schema can never be mistaken for, or silently accepted as, the
+#: other.
+_SCORING_STAGE_APPROVAL_SCHEMA_ID = "raptor.eval.scoring_stage_approval.v1"
+_SCORING_STAGE_APPROVAL_TOP_KEYS = frozenset({"schema", "registration_id", "approver", "approved_at", "x64_freeze"})
+
+
+def validate_scoring_stage_approval(
+    *, registration_id: str, approval_record: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Validate `approval_record` against the closed
+    `raptor.eval.scoring_stage_approval.v1` schema for `registration_id`.
+
+    This is the MANDATORY gate before any BIAS/Nirvana execution or
+    label-dependent evaluation (ADR-0020 stage 4
+    `4_MASK_AND_LABEL_FREE_SCORE`) -- it is a separate, later gate from
+    `validate_pre_data_approval` / `execute_transport_and_raw_freeze`
+    (stages 1-2, ClinVar archive acquisition), which never require or check
+    x64/BIAS/Nirvana identity. Any schema breach, `registration_id`
+    mismatch, blank approver/timestamp, or `x64_freeze` identity mismatch
+    (via `assert_runtime_boundary`) raises `ProspectiveInvalidStateError`
+    (`.code == "INVALID"`) -- matching the registration spec's stage 4 rule
+    that manifest/tool/resource identity drift is an A0 run-integrity
+    failure, never a `PRE_DATA_*` stop state and never reported as a
+    performance FAIL. Returns a shallow copy of `approval_record` on
+    success."""
+    if not isinstance(approval_record, Mapping) or set(approval_record.keys()) != _SCORING_STAGE_APPROVAL_TOP_KEYS:
+        raise ProspectiveInvalidStateError(
+            f"scoring_stage_approval record top-level keys must be exactly {sorted(_SCORING_STAGE_APPROVAL_TOP_KEYS)!r}"
+        )
+    if approval_record.get("schema") != _SCORING_STAGE_APPROVAL_SCHEMA_ID:
+        raise ProspectiveInvalidStateError(
+            f"scoring_stage_approval schema must be {_SCORING_STAGE_APPROVAL_SCHEMA_ID!r}, "
+            f"got {approval_record.get('schema')!r}"
+        )
+    if approval_record.get("registration_id") != registration_id:
+        raise ProspectiveInvalidStateError(
+            "scoring_stage_approval registration_id does not match the registration this scoring run is for"
+        )
+    approver = approval_record.get("approver")
+    if not isinstance(approver, str) or not approver.strip():
+        raise ProspectiveInvalidStateError("scoring_stage_approval approver must be a non-blank string")
+    approved_at = approval_record.get("approved_at")
+    if not isinstance(approved_at, str) or not approved_at.strip():
+        raise ProspectiveInvalidStateError("scoring_stage_approval approved_at must be a non-blank timestamp")
+    try:
+        _parse_iso_utc(approved_at)
+    except ValueError as exc:
+        raise ProspectiveInvalidStateError(
+            f"scoring_stage_approval approved_at is not a valid timestamp: {approved_at!r}"
+        ) from exc
+    x64_freeze = approval_record.get("x64_freeze")
+    if not isinstance(x64_freeze, Mapping) or set(x64_freeze.keys()) != _RUNTIME_IDENTITY_KEYS:
+        raise ProspectiveInvalidStateError("scoring_stage_approval x64_freeze block schema invalid")
+    assert_runtime_boundary(runtime_identity=x64_freeze)
+    return dict(approval_record)
 
 
 # ---------------------------------------------------------------------------
@@ -845,6 +944,12 @@ def merge_prospective_overlay(
 
 # ---------------------------------------------------------------------------
 # PRE-DATA approval: closed schema + non-vacuous-value validation.
+#
+# This gates ONLY ADR-0020 stages 1-2 (transport freeze + raw archive
+# acquisition). It deliberately does NOT require or check x64/BIAS/Nirvana
+# identity -- ClinVar archive acquisition has no x86-only requirement. That
+# boundary is enforced later, and separately, by `validate_scoring_stage_approval`
+# / `assert_runtime_boundary` above, before ADR-0020 stage 4.
 # ---------------------------------------------------------------------------
 
 _APPROVAL_SCHEMA_ID = "raptor.eval.pre_data_approval.v1"
@@ -862,7 +967,6 @@ _APPROVAL_TOP_KEYS = frozenset(
         "implementation_freeze",
         "immutable_inputs_verified",
         "protected_tests_verified",
-        "x64_freeze",
         "scope",
         "pre_data_access_attestation",
     }
@@ -1003,15 +1107,10 @@ def _validate_approval_record(
             "PRE_DATA_IMPLEMENTATION_NOT_READY", "protected_tests_verified must be True before PRE-DATA approval"
         )
 
-    x64_freeze = approval_record.get("x64_freeze")
-    if not isinstance(x64_freeze, Mapping) or set(x64_freeze.keys()) != _RUNTIME_IDENTITY_KEYS:
-        raise ProspectiveStopStateError("PRE_DATA_REVIEW_REQUIRED", "approval x64_freeze block schema invalid")
-    try:
-        assert_runtime_boundary(runtime_identity=x64_freeze)
-    except ProspectiveInvalidStateError as exc:
-        raise ProspectiveStopStateError(
-            "PRE_DATA_DRIFT", f"approval x64_freeze does not match the pinned ADR-0008 runtime identity: {exc.reason}"
-        ) from exc
+    # Deliberately NO x64/BIAS/Nirvana identity check here -- PRE_DATA
+    # approval gates ONLY ClinVar archive acquisition (ADR-0020 stages 1-2),
+    # which has no x86-only requirement. See `validate_scoring_stage_approval`
+    # for the separate, later gate that governs ADR-0020 stage 4.
 
     scope = approval_record.get("scope")
     if not isinstance(scope, Mapping) or set(scope.keys()) != _APPROVAL_SCOPE_KEYS:
@@ -1207,7 +1306,6 @@ def execute_transport_and_raw_freeze(
     transport: Any,
     published_archive_date_lookup: Callable[[str], Any],
     official_md5_lookup: Callable[[str], Any],
-    runtime_identity: Mapping[str, Any] | None = None,
     cli_overrides: Mapping[str, Any] | None = None,
     env_overrides: Mapping[str, str] | None = None,
     label_reader: Any = None,
@@ -1219,8 +1317,13 @@ def execute_transport_and_raw_freeze(
     and stage 2 (bounded streamed GET of only the exact registered archive +
     raw hashing) of the ADR-0020 ordered execution sequence. Never invokes
     `label_reader`/`benchmark_builder`/`scoring_runner` (stage 3+ is a
-    separate, later additive surface). See module docstring for the full
-    fail-closed contract."""
+    separate, later additive surface). NEVER requires, reads, or checks
+    x64/BIAS/Nirvana identity -- there is no `runtime_identity` parameter
+    and no `assert_runtime_boundary` call anywhere in this function, by
+    design: ClinVar archive acquisition has no x86-only requirement. That
+    boundary is enforced later, and separately, by
+    `validate_scoring_stage_approval` before ADR-0020 stage 4. See module
+    docstring for the full fail-closed contract."""
     cli_overrides = cli_overrides or {}
     env_overrides = env_overrides or {}
     if cli_overrides or env_overrides:
@@ -1343,15 +1446,6 @@ def execute_transport_and_raw_freeze(
     )
     timeline: list[dict[str, str]] = [{"event": "approval_verified", "at": _utcnow_iso()}]
 
-    approved_runtime_identity = validated_approval["x64_freeze"]
-    if runtime_identity is None:
-        runtime_identity = approved_runtime_identity
-    if dict(runtime_identity) != dict(approved_runtime_identity):
-        raise ProspectiveStopStateError(
-            "PRE_DATA_DRIFT", "runtime_identity does not match the approved x64_freeze identity"
-        )
-    assert_runtime_boundary(runtime_identity=runtime_identity)
-
     # Item 9: the concurrency-control lock is keyed by the run-scope identity
     # (registration_id + exact_url), never by the caller-chosen destination
     # paths -- two concurrent callers targeting DIFFERENT record paths for
@@ -1380,7 +1474,6 @@ def execute_transport_and_raw_freeze(
                     "stage_status": "TRANSPORT_AND_RAW_FROZEN",
                     "terminal_outcome": None,
                     "transport_metadata_not_content_identity": True,
-                    "runtime_identity": dict(runtime_identity),
                     "download_chunk_bytes": MAX_DOWNLOAD_CHUNK_BYTES,
                     "raw_archive_path": raw_record.get("raw_archive_path"),
                     "run_scope_id": raw_record.get("run_scope_id"),
@@ -1550,7 +1643,6 @@ def execute_transport_and_raw_freeze(
             "stage_status": "TRANSPORT_AND_RAW_FROZEN",
             "terminal_outcome": None,
             "transport_metadata_not_content_identity": True,
-            "runtime_identity": dict(runtime_identity),
             "download_chunk_bytes": chunk_bytes,
             "raw_archive_path": raw_record["raw_archive_path"],
             "run_scope_id": run_scope_id,

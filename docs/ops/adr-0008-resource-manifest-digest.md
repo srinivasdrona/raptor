@@ -5,14 +5,25 @@
 > what bytes `x64_freeze.resource_manifest_sha256` hashes, so the field
 > `raptor.eval.prospective_freeze.assert_runtime_boundary` currently validates only
 > for FORMAT (64-character lowercase hex) has one, single, reproducible meaning
-> whenever a human approver pins a real value into a `pre_data_approval` record.
+> whenever a human approver pins a real value into a `scoring_stage_approval` record.
 > It does not itself authorize any archive access, run BIAS/Nirvana, or approve
-> anything — see the registration spec's `pre_data_approval` block and
-> `docs/project/approvals/clinvar-2026-08-amendment-v2.pre_data_approval.draft.json`.
+> anything — see the registration spec's `scoring_stage_approval` block and
+> `docs/project/approvals/clinvar-2026-08-amendment-v2.scoring_stage_approval.draft.json`.
+>
+> **Governance boundary**: `x64_freeze`/`resource_manifest_sha256` gate ONLY
+> ADR-0020 stage 4 (`4_MASK_AND_LABEL_FREE_SCORE` — BIAS/Nirvana execution and
+> label-dependent evaluation), validated by
+> `raptor.eval.prospective_freeze.validate_scoring_stage_approval`. They are a
+> SEPARATE, LATER gate from `pre_data_approval`
+> (`docs/project/approvals/clinvar-2026-08-amendment-v2.pre_data_approval.draft.json`),
+> which governs ONLY ClinVar archive acquisition (stages 1-2) and never
+> requires, reads, or checks x64/BIAS/Nirvana identity — ClinVar archive
+> acquisition has no x86-only requirement.
 
 ## Why this exists
 
-`freeze_record_must_pin` (`docs/project/specs/clinvar-2026-08-prospective-amendment-v2.yaml`)
+`scoring_stage_approval.approval_record_must_include`
+(`docs/project/specs/clinvar-2026-08-prospective-amendment-v2.yaml`)
 requires "x64 resource manifests and checksums" alongside the pinned BIAS commit and
 Nirvana runtime banner. `assert_runtime_boundary` already enforces the closed
 `_RUNTIME_IDENTITY_KEYS` shape and rejects a malformed `resource_manifest_sha256`
@@ -151,10 +162,12 @@ hosts, and must never be used to produce a real pinned value.
 
 The script prints a JSON report containing the per-manifest breakdown and the
 final `resource_manifest_sha256`. That printed value is the only value a
-human approver (`@dronasrinivas`) may paste into a specific `pre_data_approval`
+human approver (`@dronasrinivas`) may paste into a specific `scoring_stage_approval`
 record's `x64_freeze.resource_manifest_sha256` field — never a fabricated
 value, never a value copied from a different registration or a different run,
-and this document does not itself change any draft approval to `APPROVED_PRE_DATA`.
+and this document does not itself change any draft approval to `APPROVED_SCORING_STAGE`.
+Pasting this value has no bearing on, and is never required for,
+`pre_data_approval` / ClinVar archive acquisition (stages 1-2).
 
 ## Non-goals
 
@@ -164,6 +177,12 @@ and this document does not itself change any draft approval to `APPROVED_PRE_DAT
   step in `configs/eval/core_annotation_bundle.yaml` — a separate, much more
   expensive, operation). It only pins the identity of the three *frozen
   baseline manifests* used as that recompute's comparison target.
+- This digest, `x64_freeze`, and `validate_scoring_stage_approval` do **not**
+  gate, and are never consulted by, `validate_pre_data_approval` or
+  `execute_transport_and_raw_freeze` (ClinVar archive acquisition, ADR-0020
+  stages 1-2). ClinVar archive acquisition has no x86-only requirement; this
+  contract is exclusively a stage-4 (BIAS/Nirvana execution and
+  label-dependent evaluation) gate.
 - `assert_runtime_boundary` is **not** changed by this document: it still
   only checks that `resource_manifest_sha256` is syntactically a 64-character
   lowercase hex string. A concrete expected value cannot be pinned in code

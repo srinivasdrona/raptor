@@ -486,15 +486,32 @@ def build_approval_record(
         "implementation_freeze": implementation_freeze,
         "immutable_inputs_verified": immutable_inputs_verified,
         "protected_tests_verified": protected_tests_verified,
-        "x64_freeze": {
-            "worker_designation": "adr-0008-designated-x64-worker",
-            "worker_arch": "x86_64",
-            "bias_commit": "ade13f206f3e2c2efe3ec92715d974645fc8da8f",
-            "nirvana_banner": "3.18.1-0-g05f88047",
-            "resource_manifest_sha256": "1" * 64,
-        },
         "scope": scope,
         "pre_data_access_attestation": attestation,
+    }
+
+
+def build_scoring_stage_approval_record(
+    sandbox: ProspectiveSandbox,
+    *,
+    approver: str = "@dronasrinivas",
+    approved_at: str = "2026-08-29T10:00:00Z",
+    registration_id: str | None = None,
+    x64_freeze_overrides: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Builds a valid `raptor.eval.scoring_stage_approval.v1` record -- the
+    SEPARATE, LATER gate for ADR-0020 stage 4 (BIAS/Nirvana execution,
+    label-dependent evaluation). Independent of `build_approval_record`
+    (`pre_data_approval`, stages 1-2) above."""
+    x64_freeze = runtime_identity_ok()
+    if x64_freeze_overrides:
+        x64_freeze = {**x64_freeze, **x64_freeze_overrides}
+    return {
+        "schema": "raptor.eval.scoring_stage_approval.v1",
+        "registration_id": registration_id if registration_id is not None else sandbox.spec["registration"]["id"],
+        "approver": approver,
+        "approved_at": approved_at,
+        "x64_freeze": x64_freeze,
     }
 
 
@@ -583,7 +600,6 @@ def execute_transport_and_raw_freeze(
     official_md5_lookup: Any,
     transport_record_path: Path | None = None,
     raw_record_path: Path | None = None,
-    runtime_identity: dict[str, Any] | None = None,
     cli_overrides: dict[str, Any] | None = None,
     env_overrides: dict[str, str] | None = None,
     label_reader: Any = None,
@@ -592,13 +608,6 @@ def execute_transport_and_raw_freeze(
     first_archive_get_at: str | None = None,
 ) -> dict[str, Any]:
     run = require_api("execute_transport_and_raw_freeze")
-    default_runtime_identity = runtime_identity
-    if default_runtime_identity is None and isinstance(approval_record, dict):
-        freeze_block = approval_record.get("x64_freeze")
-        if isinstance(freeze_block, dict):
-            default_runtime_identity = copy.deepcopy(freeze_block)
-    if default_runtime_identity is None:
-        default_runtime_identity = runtime_identity_ok()
     with _with_resolved_git_env():
         result = run(
             registration_spec_path=sandbox.spec_path,
@@ -612,7 +621,6 @@ def execute_transport_and_raw_freeze(
             transport=transport,
             published_archive_date_lookup=published_archive_date_lookup,
             official_md5_lookup=official_md5_lookup,
-            runtime_identity=default_runtime_identity,
             cli_overrides=cli_overrides or {},
             env_overrides=env_overrides or {},
             label_reader=label_reader,
@@ -641,6 +649,26 @@ def validate_pre_data_approval(
         )
     if not isinstance(out, dict):
         pytest.fail("validate_pre_data_approval must return a mapping")
+    return out
+
+
+def validate_scoring_stage_approval(
+    sandbox: ProspectiveSandbox,
+    *,
+    approval_record: dict[str, Any],
+    registration_id: str | None = None,
+) -> dict[str, Any]:
+    """Wraps `raptor.eval.prospective_freeze.validate_scoring_stage_approval`
+    -- the SEPARATE, LATER ADR-0020 stage 4 gate (BIAS/Nirvana execution,
+    label-dependent evaluation). Independent of `validate_pre_data_approval`
+    above."""
+    fn = require_api("validate_scoring_stage_approval")
+    out = fn(
+        registration_id=registration_id if registration_id is not None else sandbox.spec["registration"]["id"],
+        approval_record=copy.deepcopy(approval_record),
+    )
+    if not isinstance(out, dict):
+        pytest.fail("validate_scoring_stage_approval must return a mapping")
     return out
 
 
