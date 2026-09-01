@@ -34,6 +34,7 @@ from tests.eval._clinvar_2026_08_prospective_red_helpers import (
     require_exception,
     require_module,
     runtime_identity_ok,
+    sha256_hex,
     validate_pre_data_approval,
     validate_scoring_stage_approval,
 )
