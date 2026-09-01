@@ -71,8 +71,8 @@
   "registration": {
     "id": "clinvar-2026-08-amendment-v3",
     "path": "docs/project/specs/clinvar-2026-08-prospective-amendment-v3.yaml",
-    "git_blob_sha1": "PENDING_FINAL_COMMIT",
-    "canonical_lf_sha256": "PENDING_FINAL_COMMIT"
+    "git_blob_sha1": "c0b064c881d5480c9364da320a1f3d4608aac154",
+    "canonical_lf_sha256": "09f371e8a8d326dbb1c0d763f3bf10f821f5365e1263c503de1528588832d5cf"
   },
   "adr": {
     "id": "ADR-0022",
@@ -80,25 +80,25 @@
   },
   "overlay": {
     "path": "configs/eval/tsc2_clinvar_2026_08_amendment_v3.overlay.yaml",
-    "canonical_lf_sha256": "PENDING_FINAL_COMMIT"
+    "canonical_lf_sha256": "0fdece9333d55ab4eb6a58efb43a2133d6df612a0041439ee9a373942024fbf8"
   },
   "implementation_freeze": {
     "_note": "Repinned to the real committed implementation. 'commit' is the exact 40-hex commit id; module_hashes and file_hashes are canonical-LF SHA-256 values computed from 'git show <commit>:<path>'. This draft is still not an approval.",
-    "commit": "NOT_YET_COMMITTED",
+    "commit": "974634ac4364ab394a6cab10241af24ccd9d44db",
     "module_hashes": {
-      "raptor.eval.prospective_freeze": "PENDING_FINAL_COMMIT",
-      "raptor.eval.prospective_exact_source_transport": "PENDING_FINAL_COMMIT",
-      "raptor.eval.prospective_exact_source_metadata_lookups": "PENDING_FINAL_COMMIT"
+      "raptor.eval.prospective_freeze": "edbfd285508c4863e565023d2332f70144daed909c4ee95a44acd14ad0b25db4",
+      "raptor.eval.prospective_exact_source_transport": "3fdb24deef050fd2ea2b6643942ad187107f277f51f2ae165c736f766504d16e",
+      "raptor.eval.prospective_exact_source_metadata_lookups": "18d745df77a1788d5fdb34ccc76ae51511be689306c01aaf100402cbb412c225"
     },
     "file_hashes": {
-      "scripts/run_clinvar_2026_08_prospective_freeze.py": "PENDING_FINAL_COMMIT"
+      "scripts/run_clinvar_2026_08_prospective_freeze.py": "6b336f6045e2ce2d382ec48f9cd3ad2a255934a50e33449f5b3381ae90cc3d5c"
     }
   },
   "protected_tests_verified": true,
   "_protected_tests_verification_evidence": {
     "command": "PYTHONPATH=src python -m pytest tests/eval/test_clinvar_2026_08_exact_source_metadata_lookups_red.py tests/eval/test_clinvar_2026_08_exact_source_transport_red.py tests/eval/test_clinvar_2026_08_prospective_freeze_red.py tests/eval/test_clinvar_2026_08_prospective_harness_red.py tests/eval/test_clinvar_2026_08_prospective_adjudication_red.py tests/eval/test_adr0008_resource_manifest_digest.py -q",
     "environment": "WSL2 Ubuntu, /home/sdrona/raptor/bin/python (venv 'raptor'), worktree D:/AIProjects/raptor-worktrees/clinvar-x64-manifest-contract",
-    "result": "PENDING_V3_VALIDATION",
+    "result": "204 passed, 3 skipped, 0 failed",
     "network_or_archive_access": false
   },
   "scope": {
