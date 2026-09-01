@@ -533,17 +533,25 @@ def test_execute_hard_wired_metadata_lookups_reached_with_no_caller_selected_imp
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Independent review finding #1 (round 5), negative test: with the
-    real (unpatched) `prospective_exact_source_metadata_lookups` module and
-    a real `build_transport()`-shaped transport reaching the real HEAD
-    check, confirmed live `--execute` reaches the ONE hard-wired
-    production `published_archive_date_lookup` -- which always raises
-    `MetadataLookupNotYetImplementedError` -- and refuses typed
-    (`PUBLISHED_ARCHIVE_DATE_LOOKUP_FAILED`), never with a raw traceback,
-    and, critically, WITHOUT `importlib.import_module` ever being called
-    for anything: there is no module:callable resolution step left in this
-    script at all, so no caller-selected/non-production-owned code can run
-    in this window no matter what."""
+    """Independent review finding #1 (round 5)/round 6 real-implementation
+    update. With a real `build_transport()`-shaped transport reaching the
+    real HEAD check, confirmed live `--execute` reaches the ONE hard-wired
+    production `published_archive_date_lookup` -- left completely
+    UNPATCHED here, since it is pure offline spec-file reading with no
+    network of any kind -- and it now (round 6) succeeds, returning the
+    real spec-pinned `published_archive_date`/`source_identity` rather
+    than raising. Only `official_md5_lookup` (the one lookup port that
+    genuinely performs a network GET) is patched, with a fake returning
+    the correct MD5 of this test's own in-memory archive bytes -- so this
+    test never opens a real socket, consistent with this whole suite's
+    'no live network access of any kind' requirement, while still proving
+    the REAL, unmodified `published_archive_date_lookup` ran (its output
+    is asserted against the sandbox's own spec-pinned values below, not a
+    fixture literal). Critically, this run completes with WITHOUT
+    `importlib.import_module` ever being called for anything: there is no
+    module:callable resolution step left in this script at all, so no
+    caller-selected/non-production-owned code can run in this window no
+    matter what."""
     harness = _load_harness_module()
     with prospective_sandbox("harness-hard-wired-lookup-reached") as sandbox:
         approval = build_approval_record(sandbox)
@@ -557,6 +565,19 @@ def test_execute_hard_wired_metadata_lookups_reached_with_no_caller_selected_imp
         monkeypatch.setattr(harness.prospective_exact_source_transport, "build_transport", lambda **_kwargs: transport)
         monkeypatch.setattr(harness.platform, "machine", lambda: "x86_64")
         monkeypatch.setattr(harness.sys, "executable", "/home/sdrona/raptor/bin/python")
+
+        # `published_archive_date_lookup` is deliberately left REAL/unpatched
+        # (offline, no network). Only `official_md5_lookup` -- the one port
+        # that genuinely performs a network GET -- is patched here, purely
+        # to keep this test fully offline; it returns the correct digest of
+        # `sandbox.archive_bytes` so the real download-and-hash verification
+        # in `execute_transport_and_raw_freeze` succeeds on its own merits.
+        expected_md5 = hashlib.md5(sandbox.archive_bytes).hexdigest()
+        monkeypatch.setattr(
+            harness.prospective_exact_source_metadata_lookups,
+            "official_md5_lookup",
+            lambda _url: {"official_md5": expected_md5, "source_identity": "fake-md5-for-offline-test"},
+        )
 
         factory_calls, import_calls, constructor_calls, network_calls = _transport_resolution_spies(monkeypatch)
 
@@ -576,14 +597,32 @@ def test_execute_hard_wired_metadata_lookups_reached_with_no_caller_selected_imp
         captured = capsys.readouterr()
         output = captured.out + captured.err
         assert exc is None
-        assert rc == 3
-        assert "PUBLISHED_ARCHIVE_DATE_LOOKUP_FAILED" in output
+        assert rc == 0
+        assert "TRANSPORT_AND_RAW_FROZEN" in output
         assert "Traceback (most recent call last)" not in output
         assert import_calls == []
         assert network_calls == []
-        assert transport.get_calls == []
-        assert not sandbox.transport_record_path.exists()
-        assert not sandbox.raw_record_path.exists()
+        assert transport.head_calls == [sandbox.exact_url]
+        assert transport.get_calls == [(sandbox.exact_url, harness.prospective_freeze.MAX_DOWNLOAD_CHUNK_BYTES)]
+        assert sandbox.transport_record_path.exists()
+        assert sandbox.raw_record_path.exists()
+
+        # Proves the REAL, unmodified `published_archive_date_lookup` ran:
+        # its result is compared dynamically against the sandbox's own
+        # spec-pinned values, never a fixture literal duplicated in this
+        # test file.
+        pins = sandbox.spec["dataset_registration"]["metadata_source_pins"]
+        transport_record = json.loads(sandbox.transport_record_path.read_text(encoding="utf-8"))
+        assert transport_record["published_archive_date"] == str(pins["published_archive_date"]) == "2026-08-06"
+        assert transport_record["published_archive_date_source_identity"] == str(
+            pins["published_archive_date_authority"]
+        )
+        assert transport_record["official_md5"] == expected_md5
+        assert transport_record["official_md5_source_identity"] == "fake-md5-for-offline-test"
+
+        raw_record = json.loads(sandbox.raw_record_path.read_text(encoding="utf-8"))
+        assert raw_record["computed_md5"] == expected_md5
+        assert raw_record["official_md5"] == expected_md5
 
 
 @pytest.mark.parametrize(

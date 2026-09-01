@@ -68,13 +68,13 @@ following are true, checked in this exact order:
    hard-wired -- to `raptor.eval.prospective_exact_source_metadata_lookups
    .published_archive_date_lookup`/`.official_md5_lookup`, the one
    production-owned module for both ports, imported statically at the top
-   of this file. Neither port's production implementation performs a
-   real NCBI query yet (both always raise
-   `MetadataLookupNotYetImplementedError`, fail-closed, since neither
-   port's real-world NCBI metadata source has ever been ratified by this
-   contract -- see that module's docstring); a real implementation must
-   land there via a dedicated, reviewed change, never via a CLI-selected
-   substitute.
+   of this file. Both ports now have a real, working production
+   implementation (round 6): the published-archive-date lookup returns a
+   pinned, versioned spec constant (never a runtime NCBI-docs fetch, never
+   an inference from the live HTTP `Last-Modified` header); the official-
+   MD5 lookup performs exactly one bounded, redirect-refusing,
+   TLS-verified HTTPS GET against the one pinned adjacent `.md5` checksum
+   URL. See that module's docstring for the full policy.
 
 Independent review finding (live-transport-bypass, round 5): before this
 round, the two lookup ports above were resolved from CLI-supplied

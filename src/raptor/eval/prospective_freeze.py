@@ -101,7 +101,7 @@ import threading
 import uuid
 from datetime import date, datetime, timezone
 from email.utils import parsedate_to_datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Iterator, Mapping
 
 import yaml
@@ -116,6 +116,8 @@ __all__ = [
     "RESOURCE_MANIFEST_DIGEST_SCHEMA",
     "RESOURCE_MANIFEST_ENTRIES",
     "DESIGNATED_X64_WORKER_ROOT",
+    "REQUIRED_IMPLEMENTATION_FREEZE_MODULES",
+    "REQUIRED_IMPLEMENTATION_FREEZE_FILES",
     "ProspectiveContractError",
     "ProspectiveStopStateError",
     "ProspectiveInvalidStateError",
@@ -523,6 +525,21 @@ _THIS_MODULE_REPO_ROOT = Path(__file__).resolve().parents[3]
 _COMMIT_SHA1_RE = re.compile(r"^[0-9a-f]{40}$")
 _MODULE_HASH_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
+#: Every acquisition-critical module must be pinned. Editing one after
+#: approval is intentionally a hard stop requiring a fresh approval.
+REQUIRED_IMPLEMENTATION_FREEZE_MODULES: tuple[str, ...] = (
+    "raptor.eval.prospective_freeze",
+    "raptor.eval.prospective_exact_source_transport",
+    "raptor.eval.prospective_exact_source_metadata_lookups",
+)
+
+#: The operator entry point controls which production callables reach the
+#: acquisition API, so its exact committed and on-disk bytes are part of the
+#: same implementation freeze.
+REQUIRED_IMPLEMENTATION_FREEZE_FILES: tuple[str, ...] = (
+    "scripts/run_clinvar_2026_08_prospective_freeze.py",
+)
+
 
 def _git_command_prefix() -> list[str]:
     git_dir = os.environ.get("GIT_DIR")
@@ -551,6 +568,17 @@ def _module_relative_path(module_name: str) -> Path:
     return (Path("src") / Path(*module_name.split("."))).with_suffix(".py")
 
 
+def _freeze_file_relative_path(file_path: str) -> Path | None:
+    if not isinstance(file_path, str) or not file_path or "\\" in file_path:
+        return None
+    pure_path = PurePosixPath(file_path)
+    if pure_path.is_absolute() or any(part in {"", ".", ".."} for part in pure_path.parts):
+        return None
+    if pure_path.as_posix() != file_path:
+        return None
+    return Path(*pure_path.parts)
+
+
 def _implementation_freeze_module_hash_failure(commit: str, module_hashes: Mapping[str, Any]) -> str | None:
     """Verifies every `module_hashes` entry against the ACTUAL committed
     blob content at `commit` -- always read via `git show <commit>:<path>`,
@@ -567,6 +595,19 @@ def _implementation_freeze_module_hash_failure(commit: str, module_hashes: Mappi
     return None
 
 
+def _implementation_freeze_file_hash_failure(commit: str, file_hashes: Mapping[str, Any]) -> str | None:
+    for file_path, expected_hash in file_hashes.items():
+        file_rel = _freeze_file_relative_path(file_path)
+        if file_rel is None:
+            return f"implementation_freeze file path {file_path!r} is not a normalized repository-relative path"
+        shown = _run_git("show", f"{commit}:{file_rel.as_posix()}")
+        if shown is None or shown.returncode != 0:
+            return f"implementation_freeze file {file_path!r} is not present in the committed tree at {commit}"
+        if _canonical_lf_sha256_bytes(shown.stdout) != expected_hash:
+            return f"implementation_freeze file {file_path!r} canonical-LF sha256 does not match commit {commit}"
+    return None
+
+
 def _read_executing_module_bytes(module_name: str) -> bytes:
     """Reads the CURRENTLY LOADED/EXECUTING file bytes for `module_name` in
     THIS process, via `importlib.import_module` + `Path(module.__file__)
@@ -579,6 +620,24 @@ def _read_executing_module_bytes(module_name: str) -> bytes:
     if not module_file:
         raise ImportError(f"module {module_name!r} has no resolvable __file__ in this process")
     return Path(module_file).read_bytes()
+
+
+def _read_executing_file_bytes(file_path: str) -> bytes:
+    file_rel = _freeze_file_relative_path(file_path)
+    if file_rel is None:
+        raise OSError(f"file path {file_path!r} is not a normalized repository-relative path")
+    candidate = _THIS_MODULE_REPO_ROOT / file_rel
+    if candidate.is_symlink():
+        raise OSError(f"file path {file_path!r} must not be a symlink")
+    resolved_root = _THIS_MODULE_REPO_ROOT.resolve()
+    resolved_candidate = candidate.resolve(strict=True)
+    try:
+        resolved_candidate.relative_to(resolved_root)
+    except ValueError as exc:
+        raise OSError(f"file path {file_path!r} resolves outside the repository root") from exc
+    if not resolved_candidate.is_file():
+        raise OSError(f"file path {file_path!r} is not a regular file")
+    return resolved_candidate.read_bytes()
 
 
 def _implementation_freeze_executing_code_failure(module_hashes: Mapping[str, Any]) -> str | None:
@@ -607,6 +666,20 @@ def _implementation_freeze_executing_code_failure(module_hashes: Mapping[str, An
     return None
 
 
+def _implementation_freeze_executing_file_failure(file_hashes: Mapping[str, Any]) -> str | None:
+    for file_path, expected_hash in file_hashes.items():
+        try:
+            actual_bytes = _read_executing_file_bytes(file_path)
+        except OSError as exc:
+            return f"implementation_freeze file {file_path!r} could not be read from the running checkout: {exc}"
+        if _canonical_lf_sha256_bytes(actual_bytes) != expected_hash:
+            return (
+                f"implementation_freeze file {file_path!r} canonical-LF sha256 does not match the file "
+                "ACTUALLY used by the running checkout right now"
+            )
+    return None
+
+
 def _implementation_freeze_failure_reason(implementation_freeze: Mapping[str, Any]) -> str | None:
     """Returns a human-readable `PRE_DATA_IMPLEMENTATION_NOT_READY` reason,
     or `None` if `implementation_freeze` is acceptable.
@@ -624,9 +697,14 @@ def _implementation_freeze_failure_reason(implementation_freeze: Mapping[str, An
     mismatched -- there is no "cannot verify, so accept" branch anywhere
     in this path, and no ambient-worktree fallback either (content is
     always read via `git show <commit>:<path>`, never the live checkout's
-    own files)."""
+    own files). `module_hashes` must additionally include an entry for
+    EVERY module named in `REQUIRED_IMPLEMENTATION_FREEZE_MODULES` (round
+    6) -- omitting the metadata-lookups module (or any other required
+    module) is rejected exactly like a malformed hash, never silently
+    accepted as a partial freeze."""
     commit = implementation_freeze.get("commit")
     module_hashes = implementation_freeze.get("module_hashes")
+    file_hashes = implementation_freeze.get("file_hashes")
     if commit == "NOT_YET_COMMITTED":
         return (
             "implementation_freeze.commit is NOT_YET_COMMITTED; APPROVED_PRE_DATA requires a "
@@ -636,11 +714,34 @@ def _implementation_freeze_failure_reason(implementation_freeze: Mapping[str, An
         return "implementation_freeze.commit must be NOT_YET_COMMITTED or a 40-hex lowercase commit id"
     if not isinstance(module_hashes, Mapping) or not module_hashes:
         return "implementation_freeze.module_hashes must be a non-empty mapping"
+    if not isinstance(file_hashes, Mapping) or not file_hashes:
+        return "implementation_freeze.file_hashes must be a non-empty mapping"
     for module_name, expected_hash in module_hashes.items():
         if not isinstance(module_name, str) or not module_name.strip():
             return "implementation_freeze.module_hashes has a blank module name"
         if not isinstance(expected_hash, str) or not _MODULE_HASH_SHA256_RE.match(expected_hash):
             return f"implementation_freeze.module_hashes[{module_name!r}] must be a 64-hex lowercase sha256 string"
+    missing_required = [name for name in REQUIRED_IMPLEMENTATION_FREEZE_MODULES if name not in module_hashes]
+    if missing_required:
+        return (
+            "implementation_freeze.module_hashes is missing required module(s) "
+            f"{missing_required!r}; every module in REQUIRED_IMPLEMENTATION_FREEZE_MODULES must be "
+            "pinned -- this is never an optional freeze-record omission"
+        )
+    for file_path, expected_hash in file_hashes.items():
+        if _freeze_file_relative_path(file_path) is None:
+            return (
+                f"implementation_freeze.file_hashes key {file_path!r} must be a normalized "
+                "repository-relative POSIX path"
+            )
+        if not isinstance(expected_hash, str) or not _MODULE_HASH_SHA256_RE.match(expected_hash):
+            return f"implementation_freeze.file_hashes[{file_path!r}] must be a 64-hex lowercase sha256 string"
+    missing_required_files = [name for name in REQUIRED_IMPLEMENTATION_FREEZE_FILES if name not in file_hashes]
+    if missing_required_files:
+        return (
+            "implementation_freeze.file_hashes is missing required file(s) "
+            f"{missing_required_files!r}; every file in REQUIRED_IMPLEMENTATION_FREEZE_FILES must be pinned"
+        )
 
     commit_probe = _run_git("cat-file", "-e", f"{commit}^{{commit}}")
     if commit_probe is None:
@@ -653,12 +754,18 @@ def _implementation_freeze_failure_reason(implementation_freeze: Mapping[str, An
     git_failure = _implementation_freeze_module_hash_failure(commit, module_hashes)
     if git_failure is not None:
         return git_failure
+    git_file_failure = _implementation_freeze_file_hash_failure(commit, file_hashes)
+    if git_file_failure is not None:
+        return git_file_failure
     # Binds approval to the code ACTUALLY executing right now, not merely to
     # a historical commit reference: a technically-valid, reachable commit
     # whose committed tree matches is not sufficient on its own if the file
     # has since been edited in the running checkout without a fresh
     # approval (independent review finding).
-    return _implementation_freeze_executing_code_failure(module_hashes)
+    executing_module_failure = _implementation_freeze_executing_code_failure(module_hashes)
+    if executing_module_failure is not None:
+        return executing_module_failure
+    return _implementation_freeze_executing_file_failure(file_hashes)
 
 
 def _content_hash(payload: Mapping[str, Any], *, key: str = "content_hash") -> str:
@@ -1411,7 +1518,7 @@ _APPROVAL_TOP_KEYS = frozenset(
 _APPROVAL_REGISTRATION_KEYS = frozenset({"id", "path", "git_blob_sha1", "canonical_lf_sha256"})
 _APPROVAL_ADR_KEYS = frozenset({"id", "decision_ref"})
 _APPROVAL_OVERLAY_KEYS = frozenset({"path", "canonical_lf_sha256"})
-_APPROVAL_IMPLEMENTATION_FREEZE_KEYS = frozenset({"commit", "module_hashes"})
+_APPROVAL_IMPLEMENTATION_FREEZE_KEYS = frozenset({"commit", "module_hashes", "file_hashes"})
 _APPROVAL_SCOPE_KEYS = frozenset(
     {
         "allow_transport_freeze",
@@ -1532,7 +1639,11 @@ def _validate_approval_record(
         or set(implementation_freeze.keys()) != _APPROVAL_IMPLEMENTATION_FREEZE_KEYS
     ):
         raise ProspectiveStopStateError("PRE_DATA_REVIEW_REQUIRED", "approval implementation_freeze block schema invalid")
-    if not implementation_freeze.get("commit") or not isinstance(implementation_freeze.get("module_hashes"), Mapping):
+    if (
+        not implementation_freeze.get("commit")
+        or not isinstance(implementation_freeze.get("module_hashes"), Mapping)
+        or not isinstance(implementation_freeze.get("file_hashes"), Mapping)
+    ):
         raise ProspectiveStopStateError("PRE_DATA_REVIEW_REQUIRED", "approval implementation_freeze content invalid")
     implementation_freeze_failure = _implementation_freeze_failure_reason(implementation_freeze)
     if implementation_freeze_failure is not None:
@@ -1962,13 +2073,15 @@ def execute_transport_and_raw_freeze(
             terminal, reason_code = head_outcome
             return {"stage_status": "BLOCKED", "terminal_outcome": terminal, "reason_code": reason_code}
 
-        # Either lookup port may legitimately raise (the hard-wired
-        # production implementation in `prospective_exact_source_metadata_
-        # lookups` always does, until a real NCBI integration lands there --
-        # see that module's docstring). A raised exception must never
-        # propagate out of this function as a raw, untyped traceback: it is
-        # always a typed, fail-closed BLOCKED/INVALID result instead, exactly
-        # like every other acquisition-readiness gap in this function.
+        # Either lookup port may legitimately raise -- a spec-configuration
+        # defect, an unregistered/mismatched URL, or (for the official-MD5
+        # port) a network/redirect/size/parse/filename policy rejection
+        # (see `raptor.eval.prospective_exact_source_metadata_lookups`'s
+        # own docstring for the full closed policy). A raised exception
+        # must never propagate out of this function as a raw, untyped
+        # traceback: it is always a typed, fail-closed BLOCKED/INVALID
+        # result instead, exactly like every other acquisition-readiness
+        # gap in this function.
         try:
             published_result = published_archive_date_lookup(exact_url)
         except Exception:  # noqa: BLE001 - any lookup-port failure fails closed, typed, never a raw traceback

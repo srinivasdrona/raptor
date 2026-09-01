@@ -86,8 +86,41 @@ dataset_registration:
     content_length_bytes_must_equal: 441792560
     missing_or_mismatch_outcome: BLOCKED_DATA
     comparison_success_means: transport metadata continuity only; content identity remains unproven
+  metadata_source_pins:
+    published_archive_date: '2026-08-06'
+    published_archive_date_authority: >-
+      NCBI ClinVar tab_delimited archive maintenance-and-use documentation
+      (https://www.ncbi.nlm.nih.gov/clinvar/docs/maintenance_use/) and the
+      tab_delimited archive README
+      (https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/README) both
+      state that monthly archive copies publish on the first Thursday of
+      the month. 2026-08's first Thursday is 2026-08-06, matching this
+      registration's own prior_head_observation.last_modified_date and
+      stage_1_head_comparison.last_modified_must_equal pins above. This is
+      a versioned, reviewed registration fact read from THIS spec file by
+      raptor.eval.prospective_exact_source_metadata_lookups
+      .published_archive_date_lookup, never a runtime fetch of NCBI's
+      general documentation pages and never an inference from the live
+      HTTP HEAD response (Last-Modified is transport metadata only -- see
+      prior_head_observation.evidentiary_role above).
+    official_md5_url: https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08.txt.gz.md5
+    official_md5_expected_filename: variant_summary_2026-08.txt.gz
+    official_md5_source_note: >-
+      Public NCBI ClinVar clients use an adjacent "<archive>.md5" companion
+      convention; this is the ONLY allowed checksum URL for this
+      registration's exact archive object -- no alternate URL, fallback or
+      directory listing is ever consulted. The checksum digest itself is a
+      live fact this repository cannot pin ahead of time (NCBI publishes
+      it only in this companion file alongside the live monthly archive);
+      the URL it is fetched from, and every policy constraint around that
+      fetch (exact URL, no redirect, TLS-verified, no proxy/auth, strict
+      timeout, small hard response-size ceiling, exact 32-hex parsing,
+      and -- when a filename is present in the response -- an exact match
+      against official_md5_expected_filename above), are pinned and
+      closed exactly like dataset_registration.exact_url itself. See
+      raptor.eval.prospective_exact_source_metadata_lookups
+      .official_md5_lookup.
   unknown_until_post_approval_freeze:
-    ncbi_published_archive_date: UNFROZEN
     official_md5: UNFROZEN
     raw_sha256: UNFROZEN
   mismatch_rule: >-
@@ -313,6 +346,7 @@ implementation_freeze_required_before_approval:
   - Implement the exact prospective eval-overlay lifecycle without changing locked scoring semantics.
   - Remove executable-path dependence on the hard-coded 2026-07-07 snapshot and checksums.
   - Verify exact URL/final URL and exact observed HEAD Last-Modified/Content-Length as transport continuity only.
+  - Implement the published-archive-date and official-MD5 lookup ports as a single, hard-wired, production-owned module bound to dataset_registration.metadata_source_pins -- no CLI-selectable substitute, no runtime-resolved import.
   - Require and freeze the NCBI-published MD5, then verify computed MD5 and raw SHA-256.
   - Prevent decompression or label parsing until the raw archive freeze record is durably written.
   - Build the GRCh38 TSC1/TSC2 benchmark and deterministic split from the frozen archive.
@@ -334,9 +368,10 @@ implementation_freeze_required_before_approval:
   - full-spectrum BLOCKED_POLICY authorization behavior
   - terminal outcome truth table
   - narrow-scope independence from full-spectrum outcome
+  - hard-wired single production-owned metadata-lookup module reached with zero caller-selected import before GET; pinned published-archive-date and bounded, exact-URL-only official-MD5-checksum lookup
   freeze_record_must_pin:
   - implementation commit
-  - implementation module hashes (also bound to the code actually executing, not the commit reference alone)
+  - implementation module and operator-harness file hashes (also bound to the code and file bytes actually used, not the commit reference alone; MUST include every entry in raptor.eval.prospective_freeze.REQUIRED_IMPLEMENTATION_FREEZE_MODULES and REQUIRED_IMPLEMENTATION_FREEZE_FILES)
   - immutable input hashes (scoring-stage evidence only -- see scoring_stage_approval; never part of pre_data_approval)
   - prospective eval-overlay canonical-LF SHA-256
   - tsc2 scoring-semantics projection SHA-256
@@ -346,17 +381,23 @@ implementation_freeze_required_before_approval:
   # `scoring_stage_approval.approval_record_must_include` below, gating
   # ADR-0020 stage 4 only -- ClinVar archive acquisition (stages 1-2) has no
   # x86-only requirement.
-  # NOTE: "implementation module hashes" binds APPROVED_PRE_DATA to BOTH the
+  # NOTE: implementation module/file hashes bind APPROVED_PRE_DATA to BOTH the
   # named historical commit's committed tree content AND the bytes actually
   # loaded/executing in the validating process right now
-  # (raptor.eval.prospective_freeze._implementation_freeze_executing_code_failure).
+  # (raptor.eval.prospective_freeze implementation-freeze checks).
   # A technically-reachable commit reference whose content no longer matches
   # what is actually running (e.g. a post-commit edit with no fresh
   # approval) fails this check even though the git-history comparison alone
   # would have passed. Once this amendment is merged, the draft's
   # implementation_freeze.commit must be repinned to the final merged
-  # commit and module_hashes recomputed against that commit's content --
+  # commit and module_hashes/file_hashes recomputed against that commit's content --
   # never fabricated ahead of that merge.
+  # NOTE (round 6): `module_hashes` missing ANY entry in
+  # `raptor.eval.prospective_freeze.REQUIRED_IMPLEMENTATION_FREEZE_MODULES`
+  # is `PRE_DATA_IMPLEMENTATION_NOT_READY`, not a silently-accepted partial
+  # freeze -- the metadata-lookup module's own identity materially affects
+  # confirmed live `--execute` behavior exactly as much as the transport
+  # module's does, so it can never be an optional freeze-record omission.
 
 pre_data_approval:
   current_state: AWAITING_PRE_DATA_APPROVAL
@@ -368,7 +409,7 @@ pre_data_approval:
   - registration id, path, Git blob and canonical-LF SHA-256
   - ADR-0020 identity
   - prospective eval-overlay path and canonical-LF SHA-256
-  - implementation commit and module hashes (bound to actually-executing code, not the commit reference alone)
+  - implementation commit, module hashes and operator-harness file hash (bound to actually-used bytes, not the commit reference alone)
   - protected-test evidence
   - timestamp strictly before first archive GET
   - complete false-valued pre-data access attestation

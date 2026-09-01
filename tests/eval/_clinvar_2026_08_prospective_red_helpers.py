@@ -24,27 +24,33 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SPEC_SOURCE_PATH = REPO_ROOT / "docs" / "project" / "specs" / "clinvar-2026-08-prospective-amendment-v2.yaml"
 BASE_CONFIG_SOURCE_PATH = REPO_ROOT / "configs" / "eval" / "tsc2.yaml"
 HISTORICAL_BLOCKED_PATH = REPO_ROOT / "data" / "census" / "tsc_prospective_validation_2026-08_blocked_data.json"
-#: `raptor.eval.prospective_exact_source_transport` (not `prospective_freeze`)
-#: is the default here because `resolve_committed_implementation_freeze`
-#: builds `module_hashes` from `git show HEAD:<path>` while the production
-#: `_implementation_freeze_executing_code_failure` check (independent
-#: review finding #4) additionally requires those same hashes to match the
-#: bytes ACTUALLY loaded/executing in this process right now. A module
-#: edited in the current, uncommitted worktree (`prospective_freeze` itself,
-#: while this contract is being developed) can never satisfy both
-#: simultaneously pre-commit, so the default happy-path fixture module must
-#: be one NOT edited in this round. See
-#: `test_implementation_freeze_executing_code_mismatch_*` for a dedicated,
-#: commit-independent negative test of the executing-code check itself,
-#: using a monkeypatched seam rather than real git/commit state.
-_DEFAULT_IMPLEMENTATION_FREEZE_MODULES: tuple[str, ...] = ("raptor.eval.prospective_exact_source_transport",)
-_GIT_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
-_WINDOWS_DRIVE_PATH_RE = re.compile(r"^(?P<drive>[A-Za-z]):[\\\\/](?P<tail>.*)$")
 
 try:
     import raptor.eval.prospective_freeze as _prospective_freeze
 except ImportError:
     _prospective_freeze = None
+
+#: These defaults are sourced from the production
+#: `raptor.eval.prospective_freeze.REQUIRED_IMPLEMENTATION_FREEZE_MODULES`
+#: and `REQUIRED_IMPLEMENTATION_FREEZE_FILES` constants when importable,
+#: with RED-phase fallbacks so fixtures cannot silently drift from the
+#: production acquisition-critical surface.
+_DEFAULT_IMPLEMENTATION_FREEZE_MODULES: tuple[str, ...] = getattr(
+    _prospective_freeze,
+    "REQUIRED_IMPLEMENTATION_FREEZE_MODULES",
+    (
+        "raptor.eval.prospective_freeze",
+        "raptor.eval.prospective_exact_source_transport",
+        "raptor.eval.prospective_exact_source_metadata_lookups",
+    ),
+)
+_DEFAULT_IMPLEMENTATION_FREEZE_FILES: tuple[str, ...] = getattr(
+    _prospective_freeze,
+    "REQUIRED_IMPLEMENTATION_FREEZE_FILES",
+    ("scripts/run_clinvar_2026_08_prospective_freeze.py",),
+)
+_GIT_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
+_WINDOWS_DRIVE_PATH_RE = re.compile(r"^(?P<drive>[A-Za-z]):[\\\\/](?P<tail>.*)$")
 
 
 def require_module() -> Any:
@@ -248,10 +254,25 @@ def _normalize_module_names(module_names: tuple[str, ...] | list[str] | None) ->
     return tuple(normalized)
 
 
+def _normalize_file_paths(file_paths: tuple[str, ...] | list[str] | None) -> tuple[str, ...]:
+    selected = tuple(file_paths) if file_paths is not None else _DEFAULT_IMPLEMENTATION_FREEZE_FILES
+    if not selected:
+        pytest.fail("implementation_freeze file list must be non-empty", pytrace=False)
+    normalized: list[str] = []
+    for file_path in selected:
+        if not isinstance(file_path, str) or not file_path.strip():
+            pytest.fail("implementation_freeze file list contains a blank path", pytrace=False)
+        normalized_path = file_path.strip().replace("\\", "/")
+        if normalized_path not in normalized:
+            normalized.append(normalized_path)
+    return tuple(normalized)
+
+
 def resolve_committed_implementation_freeze(
     commitish: str = "HEAD",
     *,
     module_names: tuple[str, ...] | list[str] | None = None,
+    file_paths: tuple[str, ...] | list[str] | None = None,
 ) -> dict[str, Any]:
     commit = _resolve_commit(commitish)
     commit_probe = _run_git_with_worktree("cat-file", "-e", f"{commit}" + "^{commit}")
@@ -281,14 +302,34 @@ def resolve_committed_implementation_freeze(
             f"commit {commit} had no resolvable module hashes for declared modules {list(required_modules)!r}",
             pytrace=False,
         )
-    return {"commit": commit, "module_hashes": module_hashes}
+    required_files = _normalize_file_paths(file_paths)
+    file_hashes: dict[str, str] = {}
+    missing_files: list[str] = []
+    for file_path in required_files:
+        shown = _run_git_with_worktree("show", f"{commit}:{file_path}")
+        if shown.returncode != 0:
+            missing_files.append(file_path)
+            continue
+        file_hashes[file_path] = sha256_hex(canonical_lf_bytes(shown.stdout))
+    if missing_files:
+        pytest.fail(
+            "implementation_freeze committed-tree fixture is incomplete for declared files: "
+            f"commit={commit} missing={missing_files!r}",
+            pytrace=False,
+        )
+    return {"commit": commit, "module_hashes": module_hashes, "file_hashes": file_hashes}
 
 
-def draft_placeholder_implementation_freeze(module_names: tuple[str, ...] | list[str] | None = None) -> dict[str, Any]:
+def draft_placeholder_implementation_freeze(
+    module_names: tuple[str, ...] | list[str] | None = None,
+    file_paths: tuple[str, ...] | list[str] | None = None,
+) -> dict[str, Any]:
     required_modules = _normalize_module_names(module_names)
+    required_files = _normalize_file_paths(file_paths)
     return {
         "commit": "NOT_YET_COMMITTED",
         "module_hashes": {module_name: "NOT_YET_COMMITTED" for module_name in required_modules},
+        "file_hashes": {file_path: "NOT_YET_COMMITTED" for file_path in required_files},
     }
 
 
