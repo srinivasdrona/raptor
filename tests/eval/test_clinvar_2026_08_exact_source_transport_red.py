@@ -22,7 +22,7 @@ _REDIRECT_POLICY_REASON = "REDIRECT_NOT_ALLOWED"
 
 
 def _registration_contract() -> dict[str, str]:
-    spec_path = REPO_ROOT / "docs" / "project" / "specs" / "clinvar-2026-08-prospective-amendment-v2.yaml"
+    spec_path = REPO_ROOT / "docs" / "project" / "specs" / "clinvar-2026-08-prospective-amendment-v3.yaml"
     if not spec_path.is_file():
         pytest.fail(f"missing registration spec at {spec_path}")
     loaded = yaml.safe_load(spec_path.read_text(encoding="utf-8"))

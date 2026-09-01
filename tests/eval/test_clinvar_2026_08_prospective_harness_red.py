@@ -32,11 +32,11 @@ from tests.eval._clinvar_2026_08_prospective_red_helpers import (
 )
 
 SCRIPT_PATH = REPO_ROOT / "scripts" / "run_clinvar_2026_08_prospective_freeze.py"
-SPEC_PATH = REPO_ROOT / "docs" / "project" / "specs" / "clinvar-2026-08-prospective-amendment-v2.yaml"
-OVERLAY_PATH = REPO_ROOT / "configs" / "eval" / "tsc2_clinvar_2026_08_amendment_v2.overlay.yaml"
+SPEC_PATH = REPO_ROOT / "docs" / "project" / "specs" / "clinvar-2026-08-prospective-amendment-v3.yaml"
+OVERLAY_PATH = REPO_ROOT / "configs" / "eval" / "tsc2_clinvar_2026_08_amendment_v3.overlay.yaml"
 BASE_CONFIG_PATH = REPO_ROOT / "configs" / "eval" / "tsc2.yaml"
-DRAFT_APPROVAL_PATH = REPO_ROOT / "docs" / "project" / "approvals" / "clinvar-2026-08-amendment-v2.pre_data_approval.draft.json"
-EXTERNAL_ROOT_DOC_PATH = REPO_ROOT / "docs" / "ops" / "clinvar-2026-08-amendment-v2-external-content-root.md"
+DRAFT_APPROVAL_PATH = REPO_ROOT / "docs" / "project" / "approvals" / "clinvar-2026-08-amendment-v3.pre_data_approval.draft.json"
+EXTERNAL_ROOT_DOC_PATH = REPO_ROOT / "docs" / "ops" / "clinvar-2026-08-amendment-v3-external-content-root.md"
 
 
 class _StubTransport:
@@ -198,7 +198,13 @@ def _patch_metadata_lookups(
     if published_lookup is None:
         published_lookup = lambda _url: {"published_archive_date": "2026-08-06", "source_identity": "fake-published"}
     if official_md5_lookup is None:
-        official_md5_lookup = lambda _url: {"official_md5": "0" * 32, "source_identity": "fake-md5"}
+        official_md5_lookup = lambda _url: {
+            "official_md5": None,
+            "upstream_checksum_available": False,
+            "source_identity": "fake-archive-index",
+            "unavailable_reason": "not published",
+            "verification_mode": "EXACT_URL_HEAD_CONTINUITY_PLUS_LOCAL_SHA256_MD5",
+        }
     monkeypatch.setattr(
         harness.prospective_exact_source_metadata_lookups, "published_archive_date_lookup", published_lookup
     )
@@ -566,18 +572,10 @@ def test_execute_hard_wired_metadata_lookups_reached_with_no_caller_selected_imp
         monkeypatch.setattr(harness.platform, "machine", lambda: "x86_64")
         monkeypatch.setattr(harness.sys, "executable", "/home/sdrona/raptor/bin/python")
 
-        # `published_archive_date_lookup` is deliberately left REAL/unpatched
-        # (offline, no network). Only `official_md5_lookup` -- the one port
-        # that genuinely performs a network GET -- is patched here, purely
-        # to keep this test fully offline; it returns the correct digest of
-        # `sandbox.archive_bytes` so the real download-and-hash verification
-        # in `execute_transport_and_raw_freeze` succeeds on its own merits.
+        # Both metadata lookups are deliberately left real and unpatched.
+        # V3 reads only pinned registration facts; neither lookup opens a
+        # socket.
         expected_md5 = hashlib.md5(sandbox.archive_bytes).hexdigest()
-        monkeypatch.setattr(
-            harness.prospective_exact_source_metadata_lookups,
-            "official_md5_lookup",
-            lambda _url: {"official_md5": expected_md5, "source_identity": "fake-md5-for-offline-test"},
-        )
 
         factory_calls, import_calls, constructor_calls, network_calls = _transport_resolution_spies(monkeypatch)
 
@@ -617,12 +615,15 @@ def test_execute_hard_wired_metadata_lookups_reached_with_no_caller_selected_imp
         assert transport_record["published_archive_date_source_identity"] == str(
             pins["published_archive_date_authority"]
         )
-        assert transport_record["official_md5"] == expected_md5
-        assert transport_record["official_md5_source_identity"] == "fake-md5-for-offline-test"
+        assert transport_record["upstream_checksum_available"] is False
+        assert transport_record["upstream_checksum_source_identity"] == str(
+            pins["upstream_checksum_evidence_url"]
+        )
 
         raw_record = json.loads(sandbox.raw_record_path.read_text(encoding="utf-8"))
         assert raw_record["computed_md5"] == expected_md5
-        assert raw_record["official_md5"] == expected_md5
+        assert raw_record["upstream_checksum_available"] is False
+        assert raw_record["upstream_checksum_verified"] is False
 
 
 @pytest.mark.parametrize(
@@ -793,7 +794,7 @@ def test_execute_handles_overlay_load_or_shape_errors_with_typed_refusal(
             sandbox.overlay_path.write_text("schema: [\n", encoding="utf-8")
         elif case_id == "missing-overlay-required-key":
             text = sandbox.overlay_path.read_text(encoding="utf-8")
-            needle = 'transport_freeze_record: "data/census/tsc_prospective_validation_2026-08_amendment_v2_transport_freeze.json"\n'
+            needle = 'transport_freeze_record: "data/census/tsc_prospective_validation_2026-08_amendment_v3_transport_freeze.json"\n'
             if needle not in text:
                 pytest.fail("expected transport_freeze_record key in overlay fixture")
             sandbox.overlay_path.write_text(text.replace(needle, "", 1), encoding="utf-8")
@@ -939,7 +940,13 @@ def test_execute_success_forwards_registered_paths_and_unset_stage3_ports(
         call_order: list[str] = []
         sentinel_transport = _StubTransport()
         published_lookup = lambda _url: {"published_archive_date": "2026-08-06", "source_identity": "fake-published"}
-        official_md5_lookup = lambda _url: {"official_md5": "0" * 32, "source_identity": "fake-md5"}
+        official_md5_lookup = lambda _url: {
+            "official_md5": None,
+            "upstream_checksum_available": False,
+            "source_identity": "fake-archive-index",
+            "unavailable_reason": "not published",
+            "verification_mode": "EXACT_URL_HEAD_CONTINUITY_PLUS_LOCAL_SHA256_MD5",
+        }
 
         def _build_transport() -> Any:
             call_order.append("resolve_transport")

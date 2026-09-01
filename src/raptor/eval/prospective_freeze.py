@@ -1,5 +1,5 @@
-"""ADR-0020 / `docs/project/specs/clinvar-2026-08-prospective-amendment-v2.yaml`
--- the ADR-0013 prospective amendment v2 PRE-DATA freeze/adjudication
+"""ADR-0022 / `docs/project/specs/clinvar-2026-08-prospective-amendment-v3.yaml`
+-- the ADR-0013 prospective amendment v3 PRE-DATA freeze/adjudication
 boundary (`raptor.eval.prospective_freeze`).
 
 This module is the ADDITIVE, later implementation the amendment planning
@@ -20,11 +20,12 @@ same typed error/stop-state vocabulary:
   approval-vs-first-GET timing breach raises a typed
   `ProspectiveStopStateError` (`.code`/`.stop_state` one of
   `PRE_DATA_STOP_STATES`) BEFORE any network call. This gate governs ONLY
-  ADR-0020 stages 1-2 (transport freeze + raw archive acquisition) and
+  ADR-0022 stages 1-2 (transport freeze + raw archive acquisition) and
   requires exactly the prospective dataset/source identity (registration +
   overlay hash-pins), an approval timestamp strictly before the first
   archive GET, and the existing exact-source transport/hash-chain
-  protections (stage-1 HEAD comparison, official MD5, raw SHA-256). It
+  protections (stage-1 HEAD comparison plus locally computed MD5 and raw
+  SHA-256, with upstream-checksum unavailability recorded explicitly). It
   never requires, reads, or checks x64/BIAS/Nirvana identity -- ClinVar
   archive acquisition has no x86-only requirement (see
   `docs/ops/adr-0008-resource-manifest-digest.md` "Non-goals" and
@@ -41,7 +42,7 @@ same typed error/stop-state vocabulary:
   boundary-checked (no traversal, no symlink-follow, no special file) and
   atomic (temp-write + `os.replace`, crash leaves no partial artifact).
 * `validate_scoring_stage_approval` / `assert_runtime_boundary` -- the
-  SEPARATE, LATER gate for ADR-0020 stage 4 (`4_MASK_AND_LABEL_FREE_SCORE`):
+  SEPARATE, LATER gate for ADR-0022 stage 4 (`4_MASK_AND_LABEL_FREE_SCORE`):
   the mandatory ADR-0008 x64 worker / BIAS / Nirvana / resource-manifest
   identity check that MUST pass before any BIAS/Nirvana execution or
   label-dependent evaluation. It is deliberately independent of, and never
@@ -69,7 +70,7 @@ same typed error/stop-state vocabulary:
   `ProspectiveInvalidStateError` (`.code == "INVALID"`, an A0 run-integrity
   failure per the registration spec's stage 4 rule), never a `PRE_DATA_*`
   stop state.
-* `adjudicate_prospective_outcomes` -- the ADR-0020 A0-A6 per-scope axis
+* `adjudicate_prospective_outcomes` -- the ADR-0022 A0-A6 per-scope axis
   projection, the closed six-value terminal-outcome vocabulary, and the
   full-spectrum/narrow-scope precedence and authorization mapping. It
   trusts (never recomputes) each scope's pre-derived A1/A2/A3 verdict --
@@ -84,7 +85,9 @@ same typed error/stop-state vocabulary:
 Nothing in this module ever performs a real archive GET, HEAD, or lookup:
 `transport`, `published_archive_date_lookup`, and `official_md5_lookup` are
 always caller-injected ports (`transport=None` is a hard `INVALID`, never a
-live-network fallback -- there is no default HTTP implementation here).
+live-network fallback -- there is no default HTTP implementation here). The
+historically named `official_md5_lookup` port now carries the v3 registration's
+pinned fact that NCBI publishes no checksum for monthly archive copies.
 """
 from __future__ import annotations
 
@@ -231,6 +234,7 @@ _PINNED_BIAS_COMMIT = "ade13f206f3e2c2efe3ec92715d974645fc8da8f"
 _PINNED_NIRVANA_BANNER = "3.18.1-0-g05f88047"
 _HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 _MD5_HEX_RE = re.compile(r"^[0-9a-fA-F]{32}$")
+_LOCAL_CHECKSUM_VERIFICATION_MODE = "EXACT_URL_HEAD_CONTINUITY_PLUS_LOCAL_SHA256_MD5"
 
 #: The ops-documented root directory of the ADR-0008 designated x64 worker
 #: (`docs/ops/devbox-bias-nirvana-handoff.md`,
@@ -442,7 +446,7 @@ RESOURCE_MANIFEST_ENTRIES: tuple[tuple[str, str], ...] = (
 
 
 class ProspectiveContractError(Exception):
-    """Base class for every typed ADR-0020 prospective-freeze contract failure."""
+    """Base class for every typed ADR-0022 prospective-freeze contract failure."""
 
 
 class ProspectiveStopStateError(ProspectiveContractError):
@@ -963,8 +967,25 @@ def _check_existing_freeze(
         return {"kind": "CORRUPT", "reason_code": "RUN_SCOPE_ID_CHAIN_MISMATCH"}
     if transport_record.get("registration_id") != current_registration_id:
         return {"kind": "CORRUPT", "reason_code": "REGISTRATION_ID_DRIFT"}
-    if raw_record.get("computed_md5") != raw_record.get("official_md5"):
-        return {"kind": "DATA_MISMATCH", "reason_code": "OFFICIAL_MD5_MISMATCH"}
+    if not isinstance(raw_record.get("computed_md5"), str) or not _MD5_HEX_RE.fullmatch(
+        str(raw_record.get("computed_md5"))
+    ):
+        return {"kind": "CORRUPT", "reason_code": "RAW_COMPUTED_MD5_INVALID"}
+    if not isinstance(raw_record.get("raw_sha256"), str) or not _HEX64_RE.fullmatch(
+        str(raw_record.get("raw_sha256"))
+    ):
+        return {"kind": "CORRUPT", "reason_code": "RAW_SHA256_INVALID"}
+    if (
+        transport_record.get("upstream_checksum_available") is not False
+        or raw_record.get("upstream_checksum_available") is not False
+        or raw_record.get("upstream_checksum_verified") is not False
+    ):
+        return {"kind": "CORRUPT", "reason_code": "UPSTREAM_CHECKSUM_POLICY_INVALID"}
+    if (
+        transport_record.get("content_verification_mode") != _LOCAL_CHECKSUM_VERIFICATION_MODE
+        or raw_record.get("content_verification_mode") != _LOCAL_CHECKSUM_VERIFICATION_MODE
+    ):
+        return {"kind": "CORRUPT", "reason_code": "CONTENT_VERIFICATION_MODE_INVALID"}
     return {"kind": "REUSE", "transport_record": transport_record, "raw_record": raw_record}
 
 
@@ -1006,11 +1027,11 @@ def assert_runtime_boundary(*, runtime_identity: Mapping[str, Any]) -> None:
     (`.code == "INVALID"`) on any missing/extra key or any dimension
     mismatch; returns `None` on success.
 
-    This is the ADR-0020 stage 4 (`4_MASK_AND_LABEL_FREE_SCORE`) gate --
+    This is the ADR-0022 stage 4 (`4_MASK_AND_LABEL_FREE_SCORE`) gate --
     the mandatory pre-condition for any BIAS/Nirvana execution or
     label-dependent evaluation. It is called by `validate_scoring_stage_approval`
     (below) and is deliberately NEVER called by `validate_pre_data_approval`
-    or `execute_transport_and_raw_freeze` (ADR-0020 stages 1-2, ClinVar
+    or `execute_transport_and_raw_freeze` (ADR-0022 stages 1-2, ClinVar
     archive acquisition): archive acquisition has no x86-only requirement
     and never needs, reads, or checks x64/BIAS/Nirvana identity. Keeping
     this a standalone function (rather than inlining it into either gate)
@@ -1117,14 +1138,14 @@ def compute_resource_manifest_sha256(checksums_dir: Path | str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# ADR-0020 stage 4 scoring-stage gate: SEPARATE from, and later than,
+# ADR-0022 stage 4 scoring-stage gate: SEPARATE from, and later than,
 # pre_data_approval / execute_transport_and_raw_freeze (stages 1-2). This is
 # the sole place x64/BIAS/Nirvana identity is required or checked.
 # ---------------------------------------------------------------------------
 
 #: Schema id for the `scoring_stage_approval` record (see
 #: `docs/ops/adr-0008-resource-manifest-digest.md` and
-#: `docs/project/specs/clinvar-2026-08-prospective-amendment-v2.yaml`
+#: `docs/project/specs/clinvar-2026-08-prospective-amendment-v3.yaml`
 #: `scoring_stage_approval`). Deliberately a DIFFERENT schema id from
 #: `raptor.eval.pre_data_approval.v1` -- these are two independent
 #: approvals gating two independent, non-overlapping stages, and a record
@@ -1199,7 +1220,7 @@ def validate_scoring_stage_approval(
     AND cross-check its claimed `x64_freeze` pins against an INDEPENDENTLY
     OBSERVED runtime identity for the CURRENT run. This is the MANDATORY
     gate before any BIAS/Nirvana execution or label-dependent evaluation
-    (ADR-0020 stage 4 `4_MASK_AND_LABEL_FREE_SCORE`) -- it is a separate,
+    (ADR-0022 stage 4 `4_MASK_AND_LABEL_FREE_SCORE`) -- it is a separate,
     later gate from `validate_pre_data_approval` /
     `execute_transport_and_raw_freeze` (stages 1-2, ClinVar archive
     acquisition), which never require or check x64/BIAS/Nirvana identity.
@@ -1405,10 +1426,10 @@ def _overlay_coherence_reason(*, spec: Mapping[str, Any], overlay: Mapping[str, 
     code on drift, `None` when coherent.
 
     Deliberately checks ONLY dataset/URL identity -- never scoring-semantics
-    or base-eval-config hashes. Acquisition (ADR-0020 stages 1-2) never
+    or base-eval-config hashes. Acquisition (ADR-0022 stages 1-2) never
     reads or depends on scoring semantics; that verification belongs solely
     to `merge_prospective_overlay`, invoked only when the effective eval
-    config is actually built for ADR-0020 stage 3+ scoring, never as a
+    config is actually built for ADR-0022 stage 3+ scoring, never as a
     precondition for archive acquisition."""
     required_values_reason = _overlay_required_values_reason(spec=spec, overlay=overlay)
     if required_values_reason is not None:
@@ -1491,11 +1512,11 @@ def merge_prospective_overlay(
 # ---------------------------------------------------------------------------
 # PRE-DATA approval: closed schema + non-vacuous-value validation.
 #
-# This gates ONLY ADR-0020 stages 1-2 (transport freeze + raw archive
+# This gates ONLY ADR-0022 stages 1-2 (transport freeze + raw archive
 # acquisition). It deliberately does NOT require or check x64/BIAS/Nirvana
 # identity -- ClinVar archive acquisition has no x86-only requirement. That
 # boundary is enforced later, and separately, by `validate_scoring_stage_approval`
-# / `assert_runtime_boundary` above, before ADR-0020 stage 4.
+# / `assert_runtime_boundary` above, before ADR-0022 stage 4.
 # ---------------------------------------------------------------------------
 
 _APPROVAL_SCHEMA_ID = "raptor.eval.pre_data_approval.v1"
@@ -1610,7 +1631,7 @@ def _validate_approval_record(
     adr = approval_record.get("adr")
     if not isinstance(adr, Mapping) or set(adr.keys()) != _APPROVAL_ADR_KEYS:
         raise ProspectiveStopStateError("PRE_DATA_REVIEW_REQUIRED", "approval adr block schema invalid")
-    if adr.get("id") != "ADR-0020" or adr.get("decision_ref") != spec["registration"]["decision"]:
+    if adr.get("id") != "ADR-0022" or adr.get("decision_ref") != spec["registration"]["decision"]:
         raise ProspectiveStopStateError(
             "PRE_DATA_REVIEW_REQUIRED", "approval adr identity does not match the registration spec"
         )
@@ -1625,12 +1646,12 @@ def _validate_approval_record(
         )
 
     # Deliberately NO scoring-semantics/base-eval-config verification here --
-    # PRE_DATA approval gates ONLY ClinVar archive acquisition (ADR-0020
+    # PRE_DATA approval gates ONLY ClinVar archive acquisition (ADR-0022
     # stages 1-2), which never reads or depends on scoring semantics. That
     # concern is enforced exclusively by `merge_prospective_overlay`'s own
     # pins against the overlay document (`base_config_canonical_lf_sha256`,
     # `base_scoring_semantics_projection_sha256`), invoked only when the
-    # effective eval config is actually built for ADR-0020 stage 3+ scoring
+    # effective eval config is actually built for ADR-0022 stage 3+ scoring
     # -- never here, and never as a precondition for archive acquisition.
 
     implementation_freeze = approval_record.get("implementation_freeze")
@@ -1655,7 +1676,7 @@ def _validate_approval_record(
     # ClinVar archive acquisition never reads or depends on any of it, so
     # acquisition-stage (pre_data) approval never requires or verifies it;
     # that check belongs solely to `validate_scoring_stage_approval` (see
-    # `_immutable_inputs_failure_reason`), gating ADR-0020 stage 4.
+    # `_immutable_inputs_failure_reason`), gating ADR-0022 stage 4.
 
     if approval_record.get("protected_tests_verified") is not True:
         raise ProspectiveStopStateError(
@@ -1663,9 +1684,9 @@ def _validate_approval_record(
         )
 
     # Deliberately NO x64/BIAS/Nirvana identity check here -- PRE_DATA
-    # approval gates ONLY ClinVar archive acquisition (ADR-0020 stages 1-2),
+    # approval gates ONLY ClinVar archive acquisition (ADR-0022 stages 1-2),
     # which has no x86-only requirement. See `validate_scoring_stage_approval`
-    # for the separate, later gate that governs ADR-0020 stage 4.
+    # for the separate, later gate that governs ADR-0022 stage 4.
 
     scope = approval_record.get("scope")
     if not isinstance(scope, Mapping) or set(scope.keys()) != _APPROVAL_SCOPE_KEYS:
@@ -1799,13 +1820,17 @@ def _verify_published_date(result: Any) -> tuple[str, str] | None:
 
 def _verify_official_md5_source(result: Any) -> tuple[str, str] | None:
     if not isinstance(result, Mapping):
-        return ("BLOCKED_DATA", "OFFICIAL_MD5_SOURCE_MISSING")
+        return ("BLOCKED_DATA", "UPSTREAM_CHECKSUM_SOURCE_MISSING")
     source_identity = result.get("source_identity")
     if not isinstance(source_identity, str) or not source_identity.strip():
-        return ("BLOCKED_DATA", "OFFICIAL_MD5_SOURCE_MISSING")
-    official_md5 = result.get("official_md5")
-    if not isinstance(official_md5, str) or not _MD5_HEX_RE.fullmatch(official_md5):
-        return ("BLOCKED_DATA", "OFFICIAL_MD5_MALFORMED")
+        return ("BLOCKED_DATA", "UPSTREAM_CHECKSUM_SOURCE_MISSING")
+    if result.get("official_md5") is not None or result.get("upstream_checksum_available") is not False:
+        return ("BLOCKED_DATA", "UPSTREAM_CHECKSUM_POLICY_MALFORMED")
+    unavailable_reason = result.get("unavailable_reason")
+    if not isinstance(unavailable_reason, str) or not unavailable_reason.strip():
+        return ("BLOCKED_DATA", "UPSTREAM_CHECKSUM_POLICY_MALFORMED")
+    if result.get("verification_mode") != _LOCAL_CHECKSUM_VERIFICATION_MODE:
+        return ("BLOCKED_DATA", "UPSTREAM_CHECKSUM_POLICY_MALFORMED")
     return None
 
 
@@ -1868,16 +1893,16 @@ def execute_transport_and_raw_freeze(
     first_archive_get_at: str | None = None,
     transport_identity_pin: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Stage 1 (`HEAD` + published-date + official-MD5-source verification)
+    """Stage 1 (`HEAD` + published-date + checksum-policy verification)
     and stage 2 (bounded streamed GET of only the exact registered archive +
-    raw hashing) of the ADR-0020 ordered execution sequence. Never invokes
+    raw hashing) of the ADR-0022 ordered execution sequence. Never invokes
     `label_reader`/`benchmark_builder`/`scoring_runner` (stage 3+ is a
     separate, later additive surface). NEVER requires, reads, or checks
     x64/BIAS/Nirvana identity -- there is no `runtime_identity` parameter
     and no `assert_runtime_boundary` call anywhere in this function, by
     design: ClinVar archive acquisition has no x86-only requirement. That
     boundary is enforced later, and separately, by
-    `validate_scoring_stage_approval` before ADR-0020 stage 4.
+    `validate_scoring_stage_approval` before ADR-0022 stage 4.
 
     Likewise NEVER reads a base eval config and NEVER verifies
     scoring-semantics/base-config hashes -- there is no
@@ -1885,7 +1910,7 @@ def execute_transport_and_raw_freeze(
     call anywhere in this function, by design: acquisition never depends on
     scoring semantics. That verification belongs solely to
     `merge_prospective_overlay`, called only when the effective eval config
-    is actually built for ADR-0020 stage 3+ scoring. See module docstring
+    is actually built for ADR-0022 stage 3+ scoring. See module docstring
     for the full fail-closed contract.
 
     `transport_identity_pin` (optional; from `capture_transport_identity_pin`,
@@ -1909,7 +1934,7 @@ def execute_transport_and_raw_freeze(
 
     Either lookup port raising any exception is a typed, fail-closed
     `BLOCKED`/`INVALID` result (`PUBLISHED_ARCHIVE_DATE_LOOKUP_FAILED`/
-    `OFFICIAL_MD5_LOOKUP_FAILED`), never a raw propagated exception."""
+    `CHECKSUM_POLICY_LOOKUP_FAILED`), never a raw propagated exception."""
     cli_overrides = cli_overrides or {}
     env_overrides = env_overrides or {}
     if cli_overrides or env_overrides:
@@ -2055,8 +2080,11 @@ def execute_transport_and_raw_freeze(
                     "stage_status": "TRANSPORT_AND_RAW_FROZEN",
                     "terminal_outcome": None,
                     "transport_metadata_not_content_identity": True,
+                    "content_verification_mode": raw_record.get("content_verification_mode"),
                     "download_chunk_bytes": MAX_DOWNLOAD_CHUNK_BYTES,
                     "raw_archive_path": raw_record.get("raw_archive_path"),
+                    "computed_md5": raw_record.get("computed_md5"),
+                    "raw_sha256": raw_record.get("raw_sha256"),
                     "run_scope_id": raw_record.get("run_scope_id"),
                     "idempotent_reuse": True,
                     "transport_record_content_hash": transport_record.get("content_hash"),
@@ -2074,10 +2102,9 @@ def execute_transport_and_raw_freeze(
             return {"stage_status": "BLOCKED", "terminal_outcome": terminal, "reason_code": reason_code}
 
         # Either lookup port may legitimately raise -- a spec-configuration
-        # defect, an unregistered/mismatched URL, or (for the official-MD5
-        # port) a network/redirect/size/parse/filename policy rejection
-        # (see `raptor.eval.prospective_exact_source_metadata_lookups`'s
-        # own docstring for the full closed policy). A raised exception
+        # defect or an unregistered/mismatched URL (see
+        # `raptor.eval.prospective_exact_source_metadata_lookups`'s own
+        # docstring for the full closed policy). A raised exception
         # must never propagate out of this function as a raw, untyped
         # traceback: it is always a typed, fail-closed BLOCKED/INVALID
         # result instead, exactly like every other acquisition-readiness
@@ -2096,16 +2123,16 @@ def execute_transport_and_raw_freeze(
             return {"stage_status": "BLOCKED", "terminal_outcome": terminal, "reason_code": reason_code}
 
         try:
-            md5_result = official_md5_lookup(exact_url)
+            checksum_policy_result = official_md5_lookup(exact_url)
         except Exception:  # noqa: BLE001 - any lookup-port failure fails closed, typed, never a raw traceback
             return {
                 "stage_status": "BLOCKED",
                 "terminal_outcome": "INVALID",
-                "reason_code": "OFFICIAL_MD5_LOOKUP_FAILED",
+                "reason_code": "CHECKSUM_POLICY_LOOKUP_FAILED",
             }
-        md5_outcome = _verify_official_md5_source(md5_result)
-        if md5_outcome is not None:
-            terminal, reason_code = md5_outcome
+        checksum_policy_outcome = _verify_official_md5_source(checksum_policy_result)
+        if checksum_policy_outcome is not None:
+            terminal, reason_code = checksum_policy_outcome
             return {"stage_status": "BLOCKED", "terminal_outcome": terminal, "reason_code": reason_code}
 
         # Item 1: reject a malicious/unsafe dataset filename before any
@@ -2154,8 +2181,10 @@ def execute_transport_and_raw_freeze(
             "transport_metadata_not_content_identity": True,
             "published_archive_date": published_result["published_archive_date"],
             "published_archive_date_source_identity": published_result["source_identity"],
-            "official_md5": str(md5_result["official_md5"]).lower(),
-            "official_md5_source_identity": md5_result["source_identity"],
+            "upstream_checksum_available": False,
+            "upstream_checksum_source_identity": checksum_policy_result["source_identity"],
+            "upstream_checksum_unavailable_reason": checksum_policy_result["unavailable_reason"],
+            "content_verification_mode": checksum_policy_result["verification_mode"],
             "approval_content_hash": _content_hash(dict(validated_approval)),
             "approval_approver": validated_approval["approver"],
             "approval_approved_at": validated_approval["approved_at"],
@@ -2198,15 +2227,6 @@ def execute_transport_and_raw_freeze(
             _discard_tmp_download()
             return {"stage_status": "BLOCKED", "terminal_outcome": "BLOCKED_DATA", "reason_code": "RAW_LENGTH_MISMATCH"}
 
-        official_md5 = str(md5_result["official_md5"]).lower()
-        if computed_md5 != official_md5:
-            _discard_tmp_download()
-            return {
-                "stage_status": "BLOCKED",
-                "terminal_outcome": "BLOCKED_DATA",
-                "reason_code": "OFFICIAL_MD5_MISMATCH",
-            }
-
         # Item 6: the TOCTOU overlay/spec re-check must itself be treated as
         # fail-closed -- if the overlay or spec became unreadable (deleted,
         # replaced by a directory, permission loss) DURING the GET, that is
@@ -2244,8 +2264,12 @@ def execute_transport_and_raw_freeze(
             "raw_archive_path": str(raw_archive_path.resolve()),
             "byte_length": byte_length,
             "computed_md5": computed_md5,
-            "official_md5": official_md5,
             "raw_sha256": raw_sha256,
+            "upstream_checksum_available": False,
+            "upstream_checksum_verified": False,
+            "upstream_checksum_source_identity": checksum_policy_result["source_identity"],
+            "upstream_checksum_unavailable_reason": checksum_policy_result["unavailable_reason"],
+            "content_verification_mode": checksum_policy_result["verification_mode"],
             "transport_record_content_hash": transport_record["content_hash"],
             "recorded_at": _utcnow_iso(),
         }
@@ -2261,8 +2285,11 @@ def execute_transport_and_raw_freeze(
             "stage_status": "TRANSPORT_AND_RAW_FROZEN",
             "terminal_outcome": None,
             "transport_metadata_not_content_identity": True,
+            "content_verification_mode": raw_record["content_verification_mode"],
             "download_chunk_bytes": chunk_bytes,
             "raw_archive_path": raw_record["raw_archive_path"],
+            "computed_md5": computed_md5,
+            "raw_sha256": raw_sha256,
             "run_scope_id": run_scope_id,
             "idempotent_reuse": False,
             "transport_record_content_hash": transport_record["content_hash"],
@@ -2393,7 +2420,7 @@ def adjudicate_prospective_outcomes(
     nirvana_banner_probe: Callable[[], str] | None = None,
     resource_manifest_location_probe: Callable[[], "str | Path"] | None = None,
 ) -> dict[str, Any]:
-    """ADR-0020 A0-A6 per-scope adjudication. Trusts (never recomputes) each
+    """ADR-0022 A0-A6 per-scope adjudication. Trusts (never recomputes) each
     scope's pre-derived A1/A2/A3 verdict; derives A4 (`"{correct}/{actual}"`),
     A5 (`A5_PRECEDENCE`) and A6, then the closed six-value terminal-outcome/
     full-spectrum/narrow-scope precedence and authorization mapping. Raises

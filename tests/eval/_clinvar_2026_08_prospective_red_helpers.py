@@ -21,7 +21,7 @@ import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SPEC_SOURCE_PATH = REPO_ROOT / "docs" / "project" / "specs" / "clinvar-2026-08-prospective-amendment-v2.yaml"
+SPEC_SOURCE_PATH = REPO_ROOT / "docs" / "project" / "specs" / "clinvar-2026-08-prospective-amendment-v3.yaml"
 BASE_CONFIG_SOURCE_PATH = REPO_ROOT / "configs" / "eval" / "tsc2.yaml"
 HISTORICAL_BLOCKED_PATH = REPO_ROOT / "data" / "census" / "tsc_prospective_validation_2026-08_blocked_data.json"
 
@@ -571,7 +571,7 @@ def build_approval_record(
             "canonical_lf_sha256": canonical_lf_sha256_path(sandbox.spec_path),
         },
         "adr": {
-            "id": "ADR-0020",
+            "id": "ADR-0022",
             "decision_ref": sandbox.spec["registration"]["decision"],
         },
         "overlay": {
@@ -597,7 +597,7 @@ def build_scoring_stage_approval_record(
     immutable_inputs_verified: bool = True,
 ) -> dict[str, Any]:
     """Builds a valid `raptor.eval.scoring_stage_approval.v1` record -- the
-    SEPARATE, LATER gate for ADR-0020 stage 4 (BIAS/Nirvana execution,
+    SEPARATE, LATER gate for ADR-0022 stage 4 (BIAS/Nirvana execution,
     label-dependent evaluation). Independent of `build_approval_record`
     (`pre_data_approval`, stages 1-2) above.
 
@@ -820,7 +820,7 @@ def validate_scoring_stage_approval(
     resource_manifest_location_probe: Callable[[], "str | Path"] | None = None,
 ) -> dict[str, Any]:
     """Wraps `raptor.eval.prospective_freeze.validate_scoring_stage_approval`
-    -- the SEPARATE, LATER ADR-0020 stage 4 gate (BIAS/Nirvana execution,
+    -- the SEPARATE, LATER ADR-0022 stage 4 gate (BIAS/Nirvana execution,
     label-dependent evaluation). Independent of `validate_pre_data_approval`
     above. Defaults `allowed_repo_root` to `sandbox.repo_root` (which
     `_copy_immutable_inputs` pre-populated with the real scoring-stage

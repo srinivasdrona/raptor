@@ -1,5 +1,5 @@
-"""raptor.eval.prospective_exact_source_transport -- the ADR-0020 /
-`docs/project/specs/clinvar-2026-08-prospective-amendment-v2.yaml`
+"""raptor.eval.prospective_exact_source_transport -- the ADR-0022 /
+`docs/project/specs/clinvar-2026-08-prospective-amendment-v3.yaml`
 EXACT-single-source HTTPS transport for `raptor.eval.prospective_freeze
 .execute_transport_and_raw_freeze`'s injected `transport` port.
 
@@ -57,7 +57,7 @@ __all__ = [
 #: file's great-grandparent (mirrors `raptor.census.cli.REPO_ROOT`).
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _REGISTRATION_SPEC_PATH = (
-    _REPO_ROOT / "docs" / "project" / "specs" / "clinvar-2026-08-prospective-amendment-v2.yaml"
+    _REPO_ROOT / "docs" / "project" / "specs" / "clinvar-2026-08-prospective-amendment-v3.yaml"
 )
 
 #: Closed transport-policy reason-code vocabulary.
@@ -235,7 +235,7 @@ def build_transport(
     get_timeout_seconds: float = 60,
     max_chunk_bytes: int = MAX_DOWNLOAD_CHUNK_BYTES,
 ) -> _ExactSourceTransport:
-    """Build the ADR-0020 `clinvar-2026-08-amendment-v2` exact-single-source
+    """Build the ADR-0022 `clinvar-2026-08-amendment-v3` exact-single-source
     HTTPS transport. Every hook is injectable (`connection_factory`,
     `socket_module`, `tls_context_factory`) so offline tests never open a
     real socket; the defaults (`http.client.HTTPSConnection`,

@@ -72,6 +72,45 @@
 
 ---
 
+## ADR-0022 — ClinVar August 2026 amendment v3 freezes local digests because NCBI does not publish archive checksums
+
+- **Status:** Accepted
+- **Date:** 2026-09-01
+- **Owner:** `@dronasrinivas`
+- **Binds:** `docs/project/specs/clinvar-2026-08-prospective-amendment-v3.yaml`
+
+### Context
+
+The owner-authorized amendment-v2 stage 1 run validated the exact archive
+HEAD, then stopped with `OFFICIAL_MD5_LOOKUP_FAILED`. The assumed adjacent
+`variant_summary_2026-08.txt.gz.md5` URL returned HTTP 404. NCBI's official
+`tab_delimited/archive/` index lists the monthly archive objects but no
+per-object checksum files or checksum manifest. Adjacent `.md5` files exist
+only for the rolling files in the parent directory and cannot authenticate
+the older monthly archive. No archive body GET occurred, no bytes were hashed,
+and no transport or raw-freeze record was written by amendment v2.
+
+### Decision
+
+Create amendment v3 as a new registration rather than editing the approved v2
+contract. V3 preserves the exact archive URL, exact final URL, HTTP status,
+`Last-Modified`, `Content-Length`, release date, scoring semantics, masking
+policy, thresholds, and no-substitution rule.
+
+V3 records that no upstream checksum is available. After exact-URL and
+preregistered HEAD continuity checks, acquisition streams the archive once,
+requires the exact byte length, and computes local SHA-256 and MD5 before
+atomically freezing the raw object. The records must explicitly state that
+neither digest is upstream-verified. SHA-256 is the durable content identity
+for all later consumers; MD5 is retained only as an additional locally
+computed diagnostic digest.
+
+The v3 implementation and overlay require a new hash-bound
+`APPROVED_PRE_DATA` record before the archive GET. The later x64
+BIAS/Nirvana/scoring approval remains separate.
+
+---
+
 ## ADR-0020 — ADR-0013 prospective amendment v2: new registration for the corrected 2026-08 ClinVar archive URL
 
 - **Status:** Accepted

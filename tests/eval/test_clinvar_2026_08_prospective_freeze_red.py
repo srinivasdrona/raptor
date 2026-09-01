@@ -50,12 +50,15 @@ def _published_date_lookup_ok(url: str) -> InjectedLookup:
     )
 
 
-def _official_md5_lookup_ok(url: str, archive_bytes: bytes) -> InjectedLookup:
+def _official_md5_lookup_ok(url: str, _archive_bytes: bytes) -> InjectedLookup:
     return InjectedLookup(
         {
             url: {
-                "official_md5": md5_hex(archive_bytes),
-                "source_identity": "ncbi-official-md5-manifest-2026-08",
+                "official_md5": None,
+                "upstream_checksum_available": False,
+                "source_identity": "ncbi-clinvar-monthly-archive-index",
+                "unavailable_reason": "NCBI does not publish checksums for monthly archive copies",
+                "verification_mode": "EXACT_URL_HEAD_CONTINUITY_PLUS_LOCAL_SHA256_MD5",
             }
         }
     )
@@ -333,6 +336,12 @@ def test_stage12_success_returns_stage_scoped_status_and_never_terminal_pass() -
         assert transport_record["status"] == "TRANSPORT_FROZEN"
         assert raw_record["status"] == "RAW_ARCHIVE_FROZEN"
         assert raw_record["computed_md5"] == md5_hex(sandbox.archive_bytes)
+        assert raw_record["raw_sha256"] == sha256_hex(sandbox.archive_bytes)
+        assert raw_record["upstream_checksum_available"] is False
+        assert raw_record["upstream_checksum_verified"] is False
+        assert raw_record["content_verification_mode"] == "EXACT_URL_HEAD_CONTINUITY_PLUS_LOCAL_SHA256_MD5"
+        assert result["computed_md5"] == raw_record["computed_md5"]
+        assert result["raw_sha256"] == raw_record["raw_sha256"]
 
 
 @pytest.mark.parametrize(
@@ -408,7 +417,7 @@ def test_executor_pre_data_stop_states_are_typed_and_zero_network(
 def test_scoring_stage_approval_runtime_identity_drift_is_invalid_with_zero_network(
     field_name: str, drifted_value: str
 ) -> None:
-    """`validate_scoring_stage_approval` -- the SEPARATE, LATER ADR-0020
+    """`validate_scoring_stage_approval` -- the SEPARATE, LATER ADR-0022
     stage 4 gate -- rejects x64_freeze identity drift as INVALID (A0
     run-integrity), never a PRE_DATA_* stop state. This gate is never
     consulted by `execute_transport_and_raw_freeze` (stages 1-2), which is
@@ -602,8 +611,8 @@ def test_head_header_missing_duplicate_malformed_and_mismatch_cases(
         ("head-final-url", 200, "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary/variant_summary_2026-08.txt.gz", "ok", "ok", "HEAD_FINAL_URL_MISMATCH", 0),
         ("published-date-missing", 200, None, "missing", "ok", "PUBLISHED_ARCHIVE_DATE_MISSING", 0),
         ("published-date-malformed", 200, None, "malformed", "ok", "PUBLISHED_ARCHIVE_DATE_MALFORMED", 0),
-        ("official-md5-source-missing", 200, None, "ok", "source-missing", "OFFICIAL_MD5_SOURCE_MISSING", 0),
-        ("official-md5-mismatch", 200, None, "ok", "mismatch", "OFFICIAL_MD5_MISMATCH", 1),
+        ("upstream-checksum-source-missing", 200, None, "ok", "source-missing", "UPSTREAM_CHECKSUM_SOURCE_MISSING", 0),
+        ("upstream-checksum-policy-malformed", 200, None, "ok", "malformed", "UPSTREAM_CHECKSUM_POLICY_MALFORMED", 0),
     ),
 )
 def test_url_head_date_or_checksum_source_mismatch_cases_are_blocked_data(
@@ -639,13 +648,26 @@ def test_url_head_date_or_checksum_source_mismatch_cases_are_blocked_data(
 
         md5_lookup = _official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes)
         if md5_payload == "source-missing":
-            md5_lookup = InjectedLookup({sandbox.exact_url: {"official_md5": md5_hex(sandbox.archive_bytes), "source_identity": ""}})
-        elif md5_payload == "mismatch":
+            md5_lookup = InjectedLookup(
+                {
+                    sandbox.exact_url: {
+                        "official_md5": None,
+                        "upstream_checksum_available": False,
+                        "source_identity": "",
+                        "unavailable_reason": "not published",
+                        "verification_mode": "EXACT_URL_HEAD_CONTINUITY_PLUS_LOCAL_SHA256_MD5",
+                    }
+                }
+            )
+        elif md5_payload == "malformed":
             md5_lookup = InjectedLookup(
                 {
                     sandbox.exact_url: {
                         "official_md5": "0" * 32,
-                        "source_identity": "ncbi-official-md5-manifest-2026-08",
+                        "upstream_checksum_available": True,
+                        "source_identity": "ncbi-clinvar-monthly-archive-index",
+                        "unavailable_reason": "not published",
+                        "verification_mode": "EXACT_URL_HEAD_CONTINUITY_PLUS_LOCAL_SHA256_MD5",
                     }
                 }
             )
@@ -946,7 +968,7 @@ def test_restart_idempotence_and_hash_chain_distinguish_data_mismatch_vs_corrupt
         assert sandbox.raw_record_path.read_bytes() == raw_bytes
 
         raw_payload = json.loads(sandbox.raw_record_path.read_text(encoding="utf-8"))
-        raw_payload["official_md5"] = "0" * 32
+        raw_payload["content_verification_mode"] = "UNSAFE"
         raw_payload["content_hash"] = canonical_json_content_hash(raw_payload)
         sandbox.raw_record_path.write_text(json.dumps(raw_payload, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
         blocked = execute_transport_and_raw_freeze(
@@ -959,7 +981,8 @@ def test_restart_idempotence_and_hash_chain_distinguish_data_mismatch_vs_corrupt
             published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
             official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
         )
-        assert blocked["terminal_outcome"] == "BLOCKED_DATA"
+        assert blocked["terminal_outcome"] == "INVALID"
+        assert blocked["reason_code"] == "CONTENT_VERIFICATION_MODE_INVALID"
 
         corrupted_payload = json.loads(sandbox.raw_record_path.read_text(encoding="utf-8"))
         corrupted_payload["content_hash"] = "f" * 64
@@ -1372,34 +1395,6 @@ def test_stream_aborts_on_first_content_length_overflow_and_cleans_destination()
         _assert_no_records_created(sandbox.raw_record_path)
 
 
-def test_md5_mismatch_cleans_partial_raw_artifacts() -> None:
-    _require_freeze_contract_symbols()
-    with prospective_sandbox("md5-mismatch-cleanup") as sandbox:
-        approval = build_approval_record(sandbox)
-        transport = InjectedTransport(
-            head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
-            body_by_url={sandbox.exact_url: sandbox.archive_bytes},
-        )
-        result = execute_transport_and_raw_freeze(
-            sandbox,
-            approval_record=approval,
-            transport=transport,
-            published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
-            official_md5_lookup=InjectedLookup(
-                {
-                    sandbox.exact_url: {
-                        "official_md5": "0" * 32,
-                        "source_identity": "ncbi-official-md5-manifest-2026-08",
-                    }
-                }
-            ),
-        )
-        assert result["terminal_outcome"] == "BLOCKED_DATA"
-        assert result["reason_code"] == "OFFICIAL_MD5_MISMATCH"
-        assert _files_under(sandbox.external_root) == []
-        _assert_no_records_created(sandbox.raw_record_path)
-
-
 @pytest.mark.parametrize(
     ("case_id", "mutate_records"),
     (
@@ -1475,8 +1470,8 @@ def test_restart_reuse_requires_chain_and_identity_match(
             "overlay-required-registration-id-drift",
             lambda sandbox: _replace_once_in_file(
                 sandbox.overlay_path,
-                "registration_id: \"clinvar-2026-08-amendment-v2\"",
-                "registration_id: \"clinvar-2026-08-amendment-v2-drift\"",
+                "registration_id: \"clinvar-2026-08-amendment-v3\"",
+                "registration_id: \"clinvar-2026-08-amendment-v3-drift\"",
             ),
         ),
         (
@@ -1549,12 +1544,18 @@ def test_execution_rejects_overlay_required_value_or_url_coherence_drift_before_
             official_md5_lookup=InjectedLookup(
                 {
                     sandbox.exact_url: {
-                        "official_md5": md5_hex(sandbox.archive_bytes),
-                        "source_identity": "ncbi-official-md5-manifest-2026-08",
+                        "official_md5": None,
+                        "upstream_checksum_available": False,
+                        "source_identity": "ncbi-clinvar-monthly-archive-index",
+                        "unavailable_reason": "not published",
+                        "verification_mode": "EXACT_URL_HEAD_CONTINUITY_PLUS_LOCAL_SHA256_MD5",
                     },
                     alias_url: {
-                        "official_md5": md5_hex(sandbox.archive_bytes),
-                        "source_identity": "ncbi-official-md5-manifest-2026-08",
+                        "official_md5": None,
+                        "upstream_checksum_available": False,
+                        "source_identity": "ncbi-clinvar-monthly-archive-index",
+                        "unavailable_reason": "not published",
+                        "verification_mode": "EXACT_URL_HEAD_CONTINUITY_PLUS_LOCAL_SHA256_MD5",
                     },
                 }
             ),
@@ -1568,10 +1569,10 @@ def test_execution_rejects_overlay_required_value_or_url_coherence_drift_before_
 
 def test_execute_path_never_consults_merge_overlay_or_scoring_semantics() -> None:
     """Finding #4 (acquisition/scoring-config boundary): `execute_transport_
-    and_raw_freeze` (ADR-0020 stages 1-2) must NEVER call
+    and_raw_freeze` (ADR-0022 stages 1-2) must NEVER call
     `merge_prospective_overlay` and must NEVER verify scoring-semantics or
     base-eval-config hashes -- that verification belongs solely to
-    `merge_prospective_overlay`, invoked only for ADR-0020 stage 3+
+    `merge_prospective_overlay`, invoked only for ADR-0022 stage 3+
     scoring. This replaces the historical (pre-fix) test that required the
     opposite behavior."""
     _require_freeze_contract_symbols()
@@ -1852,7 +1853,7 @@ def test_validate_scoring_stage_approval_rejects_schema_or_x64_freeze_drift_as_i
     case_id: str,
     mutate: Callable[[dict[str, Any]], dict[str, Any]],
 ) -> None:
-    """`validate_scoring_stage_approval` is the SEPARATE, LATER ADR-0020
+    """`validate_scoring_stage_approval` is the SEPARATE, LATER ADR-0022
     stage 4 gate. Any schema, registration_id, approver/timestamp, or
     x64_freeze identity breach raises `ProspectiveInvalidStateError`
     (`.code == "INVALID"`) -- never a `PRE_DATA_*` stop state."""
@@ -2328,7 +2329,7 @@ def test_first_run_future_approval_is_pre_data_drift_before_any_network_or_recor
             "historical-labels-snapshot",
             lambda sandbox: _replace_once_in_file(
                 sandbox.overlay_path,
-                'effective_labels_snapshot: "clinvar_2026-08-monthly-amendment-v2"',
+                'effective_labels_snapshot: "clinvar_2026-08-monthly-amendment-v3"',
                 'effective_labels_snapshot: "clinvar_2026-07-07"',
             ),
         ),
@@ -2344,7 +2345,7 @@ def test_first_run_future_approval_is_pre_data_drift_before_any_network_or_recor
             "wrong-transport-freeze-record-path",
             lambda sandbox: _replace_once_in_file(
                 sandbox.overlay_path,
-                'transport_freeze_record: "data/census/tsc_prospective_validation_2026-08_amendment_v2_transport_freeze.json"',
+                'transport_freeze_record: "data/census/tsc_prospective_validation_2026-08_amendment_v3_transport_freeze.json"',
                 'transport_freeze_record: "data/census/rogue_transport_freeze.json"',
             ),
         ),
@@ -2352,7 +2353,7 @@ def test_first_run_future_approval_is_pre_data_drift_before_any_network_or_recor
             "wrong-raw-freeze-record-path",
             lambda sandbox: _replace_once_in_file(
                 sandbox.overlay_path,
-                'raw_freeze_record: "data/census/tsc_prospective_validation_2026-08_amendment_v2_raw_freeze.json"',
+                'raw_freeze_record: "data/census/tsc_prospective_validation_2026-08_amendment_v3_raw_freeze.json"',
                 'raw_freeze_record: "data/census/rogue_raw_freeze.json"',
             ),
         ),
@@ -2448,7 +2449,7 @@ def test_executor_rejects_alternate_in_root_record_paths_and_only_allows_registe
 
 def test_historical_blocked_data_artifact_is_immutable() -> None:
     spec = yaml.safe_load(
-        (REPO_ROOT / "docs" / "project" / "specs" / "clinvar-2026-08-prospective-amendment-v2.yaml").read_text(
+        (REPO_ROOT / "docs" / "project" / "specs" / "clinvar-2026-08-prospective-amendment-v3.yaml").read_text(
             encoding="utf-8"
         )
     )

@@ -1,176 +1,65 @@
-"""raptor.eval.prospective_exact_source_metadata_lookups -- the ADR-0020
-hard-wired, production-owned implementations of the
-`published_archive_date_lookup`/`official_md5_lookup` ports consumed by
-`raptor.eval.prospective_freeze.execute_transport_and_raw_freeze`.
+"""Pinned metadata policy for the ClinVar August 2026 prospective freeze.
 
-Independent review finding (live-transport-bypass, round 5): confirmed
-live `--execute` acquisition must import/execute ZERO caller-selected
-Python/plugin code before the real archive GET. This module is the ONE
-production implementation for both ports. It is imported *statically* --
-a plain `import` statement at the top of
-`scripts/run_clinvar_2026_08_prospective_freeze.py`, resolved once at
-Python's own module-load time, never from a runtime string -- and there
-is no CLI option, environment variable, or config value anywhere in this
-repository that can substitute a different module for either port during
-a confirmed live `--execute` run. `--published-archive-date-lookup`/
-`--official-md5-lookup` were removed from the CLI entirely (not merely
-defaulted): supplying either flag is an "unrecognized arguments" argparse
-failure before anything else runs. See that script's module docstring
-for the full history of this finding.
+The monthly archive object is fetched only through
+``prospective_exact_source_transport``. NCBI publishes adjacent MD5 files for
+the rolling ClinVar files, but its monthly ``tab_delimited/archive/`` index
+does not publish checksums for archived copies. The earlier v2 registration
+incorrectly assumed that ``<archive>.md5`` existed; the authorized v2 run
+confirmed that the URL returns HTTP 404 before any archive body GET.
 
-Round 6 (this module): both ports are now REAL, working implementations,
-never permanent fail-closed stubs:
+For the v3 registration this module provides two static, production-owned
+lookups:
 
-* `published_archive_date_lookup` returns a PINNED, versioned, reviewed
-  registration constant -- `dataset_registration.metadata_source_pins
-  .published_archive_date`/`.published_archive_date_authority` in
-  `docs/project/specs/clinvar-2026-08-prospective-amendment-v2.yaml`,
-  read fresh (never cached) on every call, exactly like
-  `raptor.eval.prospective_exact_source_transport._load_registered_contract`
-  reads `dataset_registration.exact_url`. It NEVER infers the date from
-  the live HTTP `Last-Modified` header (that is transport metadata only,
-  per `dataset_registration.prior_head_observation.evidentiary_role`) and
-  NEVER fetches NCBI's general maintenance/use documentation pages at
-  execution time -- the authoritative evidence for this registration's
-  one pinned date (NCBI's tab_delimited maintenance-and-use documentation
-  and archive README both describe a first-Thursday-of-month monthly
-  release cycle; 2026-08's first Thursday is 2026-08-06, matching this
-  registration's own preregistered HEAD observation) was reviewed once,
-  by a human, and is recorded as a spec constant -- never re-derived at
-  runtime.
-* `official_md5_lookup` performs exactly ONE bounded, read-only HTTPS GET
-  against the ONE pinned checksum URL
-  (`dataset_registration.metadata_source_pins.official_md5_url` -- the
-  public NCBI ClinVar adjacent "<archive>.md5" companion convention for
-  this registration's exact archive object; there is no alternate URL,
-  fallback, or directory listing this function will ever consult). The
-  checksum digest itself is a genuinely live fact this repository cannot
-  pin ahead of time (NCBI publishes it only in that companion file
-  alongside the live monthly archive) -- unlike the transport's own
-  archive GET, a real network call is therefore unavoidable here, but
-  every policy constraint around it is closed and pinned exactly like
-  the main transport: the URL (exact match against the registered
-  archive URL for the incoming `url` argument, and the ONE pinned
-  checksum URL for the actual GET), no redirect (any 3xx response is
-  rejected before its body is read), TLS certificate verification always
-  on (`ssl.create_default_context`, `CERT_REQUIRED`), no proxy (this
-  module never reads `HTTP_PROXY`/`HTTPS_PROXY`, and `http.client
-  .HTTPSConnection` performs no proxying on its own) and no
-  `Authorization`/`Proxy-Authorization` header, a strict bounded timeout,
-  a small hard response-size ceiling (the body is read via one single
-  bounded `read()` call, never an unbounded read), exact 32-hex MD5
-  parsing, and -- when the response includes a filename (the common
-  `md5sum`-style `"<hex>  <filename>"`/`"<hex> *<filename>"` output
-  format) -- an exact match against
-  `metadata_source_pins.official_md5_expected_filename`. A bare hex
-  digest with no filename at all is also accepted (some servers publish
-  only the digest); there is no partial/fuzzy filename match in either
-  direction.
+* ``published_archive_date_lookup`` returns the pinned release date and its
+  reviewed authority.
+* ``official_md5_lookup`` retains the historical port name for API
+  compatibility, but returns the pinned fact that no upstream checksum is
+  available and that content must be frozen using the exact URL, the
+  preregistered HEAD continuity checks, and locally computed SHA-256 and MD5.
 
-Both ports' network/TLS hooks (`official_md5_lookup`'s `connection_factory`/
-`tls_context_factory` keyword parameters) are caller-injectable purely as
-an offline-test seam, exactly like `prospective_exact_source_transport
-.build_transport`'s own hooks -- the real defaults
-(`http.client.HTTPSConnection`, `ssl.create_default_context`) are the ONLY
-real network path this module ever provides, and the live CLI
-(`scripts/run_clinvar_2026_08_prospective_freeze.py`) never passes either
-keyword: it calls `official_md5_lookup(exact_url)` with only the one
-positional port argument, so there is no CLI flag, environment variable,
-or config value anywhere that can select a different network
-implementation for a confirmed live `--execute` run. Tests that need to
-observe the CLI's own end-to-end wiring patch this module's two
-attributes directly with `monkeypatch.setattr` -- a known, static,
-production-owned symbol, never a dynamically-resolved `"module:callable"`
-string.
+Neither lookup opens a socket. The live archive GET remains hard-wired to the
+separate exact-source transport.
 """
 from __future__ import annotations
 
-import http.client
 import re
-import ssl
 from datetime import date
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 from urllib.parse import urlsplit
 
 import yaml
 
 __all__ = [
-    "MetadataLookupError",
+    "CONTENT_VERIFICATION_MODE",
     "MetadataLookupConfigurationError",
+    "MetadataLookupError",
     "MetadataLookupPolicyError",
     "URL_POLICY_REASON",
-    "REDIRECT_POLICY_REASON",
-    "STATUS_POLICY_REASON",
-    "SIZE_POLICY_REASON",
-    "PARSE_POLICY_REASON",
-    "FILENAME_POLICY_REASON",
-    "published_archive_date_lookup",
     "official_md5_lookup",
+    "published_archive_date_lookup",
 ]
 
-#: This file's fixed location is `<repo>/src/raptor/eval/
-#: prospective_exact_source_metadata_lookups.py`, so the repo root is
-#: always this file's great-grandparent (mirrors
-#: `prospective_exact_source_transport._REPO_ROOT`).
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _REGISTRATION_SPEC_PATH = (
-    _REPO_ROOT / "docs" / "project" / "specs" / "clinvar-2026-08-prospective-amendment-v2.yaml"
+    _REPO_ROOT / "docs" / "project" / "specs" / "clinvar-2026-08-prospective-amendment-v3.yaml"
 )
 
-#: Closed lookup-policy reason-code vocabulary (mirrors
-#: `prospective_exact_source_transport`'s own closed vocabulary shape).
 URL_POLICY_REASON = "EXACT_REGISTERED_URL_REQUIRED"
-REDIRECT_POLICY_REASON = "REDIRECT_NOT_ALLOWED"
-STATUS_POLICY_REASON = "CHECKSUM_STATUS_NOT_OK"
-SIZE_POLICY_REASON = "CHECKSUM_RESPONSE_TOO_LARGE"
-PARSE_POLICY_REASON = "CHECKSUM_RESPONSE_UNPARSEABLE"
-FILENAME_POLICY_REASON = "CHECKSUM_FILENAME_MISMATCH"
-
-_REDIRECT_STATUS_CODES = frozenset({301, 302, 303, 307, 308})
-
-#: A small, hard, non-configurable response-size ceiling for the checksum
-#: GET -- a legitimate `.md5` companion file is well under 100 bytes; this
-#: is deliberately generous headroom while still being "small" (never an
-#: unbounded read of any kind).
-_MAX_MD5_RESPONSE_BYTES = 4096
-
-#: Strict, non-configurable request timeout for the checksum GET.
-_MD5_GET_TIMEOUT_SECONDS = 30.0
-
+CONTENT_VERIFICATION_MODE = "EXACT_URL_HEAD_CONTINUITY_PLUS_LOCAL_SHA256_MD5"
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-#: Standard `md5sum`-family output: a bare 32-hex digest, optionally
-#: followed by whitespace and an (optionally `*`-prefixed, "binary mode")
-#: filename. Matches the WHOLE (already-stripped) response text -- no
-#: partial match, no trailing garbage tolerated.
-_MD5_LINE_RE = re.compile(r"^([0-9a-fA-F]{32})(?:[ \t]+\*?(\S+))?$")
 
 
 class MetadataLookupError(Exception):
-    """Base class for every typed `prospective_exact_source_metadata_lookups`
-    failure (registration-spec configuration failures are never a policy
-    rejection -- see `MetadataLookupConfigurationError`)."""
+    """Base class for metadata policy failures."""
 
 
 class MetadataLookupConfigurationError(MetadataLookupError):
-    """The registration spec itself is missing, malformed, or missing a
-    required `metadata_source_pins` entry -- a repository configuration
-    defect, never a per-call policy rejection. Both lookup ports still
-    fail closed on this (never a silent default), but callers should
-    never see this in normal operation once the spec is correctly
-    pinned."""
+    """Raised when the pinned registration metadata is missing or malformed."""
 
 
 class MetadataLookupPolicyError(MetadataLookupError):
-    """A closed lookup-policy rejection -- an unregistered/mismatched
-    archive URL (`URL_POLICY_REASON`), a disallowed checksum-GET redirect
-    (`REDIRECT_POLICY_REASON`), a non-200 checksum status
-    (`STATUS_POLICY_REASON`), an oversized checksum response
-    (`SIZE_POLICY_REASON`), an unparseable checksum body
-    (`PARSE_POLICY_REASON`), or a checksum-response filename that does
-    not match the registered archive filename (`FILENAME_POLICY_REASON`).
-    `.reason_code` is always one of the closed reason codes above;
-    `.reason` is always a non-blank human-readable string."""
+    """Raised when a caller requests metadata for any unregistered URL."""
 
     def __init__(self, reason_code: str, reason: str) -> None:
         if not isinstance(reason, str) or not reason.strip():
@@ -180,30 +69,22 @@ class MetadataLookupPolicyError(MetadataLookupError):
         super().__init__(f"{reason_code}: {reason}")
 
 
-def _load_registered_metadata_pins() -> dict[str, str]:
-    """Read `dataset_registration.exact_url` and
-    `dataset_registration.metadata_source_pins` fresh from the
-    registration spec -- never cached, never defaulted, never supplied by
-    a caller. Raises `MetadataLookupConfigurationError` (never a policy
-    error) if the spec is missing or malformed: a broken pin is a
-    configuration failure, not a per-call policy rejection."""
+def _load_registered_metadata_pins() -> dict[str, Any]:
     try:
-        raw = _REGISTRATION_SPEC_PATH.read_text(encoding="utf-8")
+        loaded = yaml.safe_load(_REGISTRATION_SPEC_PATH.read_text(encoding="utf-8"))
     except OSError as exc:
         raise MetadataLookupConfigurationError(f"unable to read registration spec: {exc}") from exc
-    try:
-        loaded = yaml.safe_load(raw)
     except yaml.YAMLError as exc:
         raise MetadataLookupConfigurationError(f"registration spec is not valid YAML: {exc}") from exc
     if not isinstance(loaded, dict):
         raise MetadataLookupConfigurationError("registration spec must parse to a mapping")
+
     dataset_registration = loaded.get("dataset_registration")
     if not isinstance(dataset_registration, dict):
         raise MetadataLookupConfigurationError("registration spec missing dataset_registration mapping")
-    registered_url_value = dataset_registration.get("exact_url")
-    if not isinstance(registered_url_value, str) or not registered_url_value:
+    registered_url = dataset_registration.get("exact_url")
+    if not isinstance(registered_url, str) or not registered_url:
         raise MetadataLookupConfigurationError("dataset_registration.exact_url must be a non-blank string")
-    registered_url = registered_url_value
     parsed_registered_url = urlsplit(registered_url)
     if (
         parsed_registered_url.scheme != "https"
@@ -215,7 +96,8 @@ def _load_registered_metadata_pins() -> dict[str, str]:
         or parsed_registered_url.fragment
     ):
         raise MetadataLookupConfigurationError(
-            "dataset_registration.exact_url must be the pinned direct NCBI HTTPS URL without credentials, port, query, or fragment"
+            "dataset_registration.exact_url must be the pinned direct NCBI HTTPS URL "
+            "without credentials, port, query, or fragment"
         )
 
     pins = dataset_registration.get("metadata_source_pins")
@@ -235,69 +117,67 @@ def _load_registered_metadata_pins() -> dict[str, str]:
         raise MetadataLookupConfigurationError(
             "metadata_source_pins.published_archive_date must be a real calendar date"
         ) from exc
+
     published_archive_date_authority = pins.get("published_archive_date_authority")
     if not isinstance(published_archive_date_authority, str) or not published_archive_date_authority.strip():
         raise MetadataLookupConfigurationError(
             "metadata_source_pins.published_archive_date_authority must be a non-blank string"
         )
 
-    official_md5_url = pins.get("official_md5_url")
-    parsed_md5_url = urlsplit(str(official_md5_url))
+    if pins.get("upstream_checksum_available") is not False:
+        raise MetadataLookupConfigurationError(
+            "metadata_source_pins.upstream_checksum_available must be false for this archive registration"
+        )
+
+    checksum_evidence_url = pins.get("upstream_checksum_evidence_url")
+    expected_evidence_url = registered_url.rsplit("/", 1)[0] + "/"
+    parsed_evidence_url = urlsplit(str(checksum_evidence_url))
     if (
-        parsed_md5_url.scheme != "https"
-        or parsed_md5_url.hostname != parsed_registered_url.hostname
-        or not parsed_md5_url.path
-        or parsed_md5_url.username is not None
-        or parsed_md5_url.password is not None
-        or parsed_md5_url.port is not None
-        or parsed_md5_url.query
-        or parsed_md5_url.fragment
-        or str(official_md5_url) != f"{registered_url}.md5"
+        checksum_evidence_url != expected_evidence_url
+        or parsed_evidence_url.scheme != "https"
+        or parsed_evidence_url.hostname != parsed_registered_url.hostname
+        or parsed_evidence_url.username is not None
+        or parsed_evidence_url.password is not None
+        or parsed_evidence_url.port is not None
+        or parsed_evidence_url.query
+        or parsed_evidence_url.fragment
     ):
         raise MetadataLookupConfigurationError(
-            "metadata_source_pins.official_md5_url must be exactly dataset_registration.exact_url + '.md5'"
+            "metadata_source_pins.upstream_checksum_evidence_url must be the exact parent archive index URL"
         )
-    official_md5_expected_filename = pins.get("official_md5_expected_filename")
-    if not isinstance(official_md5_expected_filename, str) or not official_md5_expected_filename.strip():
+
+    unavailable_reason = pins.get("upstream_checksum_unavailable_reason")
+    if not isinstance(unavailable_reason, str) or not unavailable_reason.strip():
         raise MetadataLookupConfigurationError(
-            "metadata_source_pins.official_md5_expected_filename must be a non-blank string"
+            "metadata_source_pins.upstream_checksum_unavailable_reason must be a non-blank string"
+        )
+
+    verification_mode = pins.get("content_verification_mode")
+    if verification_mode != CONTENT_VERIFICATION_MODE:
+        raise MetadataLookupConfigurationError(
+            "metadata_source_pins.content_verification_mode must equal "
+            f"{CONTENT_VERIFICATION_MODE!r}"
         )
 
     return {
         "registered_url": registered_url,
         "published_archive_date": published_archive_date,
         "published_archive_date_authority": published_archive_date_authority,
-        "official_md5_url": str(official_md5_url),
-        "official_md5_host": parsed_md5_url.hostname,
-        "official_md5_path": parsed_md5_url.path,
-        "official_md5_expected_filename": official_md5_expected_filename,
+        "upstream_checksum_available": False,
+        "upstream_checksum_evidence_url": checksum_evidence_url,
+        "upstream_checksum_unavailable_reason": unavailable_reason,
+        "content_verification_mode": verification_mode,
     }
 
 
-def _require_registered_url(url: str, pins: dict[str, str]) -> None:
+def _require_registered_url(url: str, pins: dict[str, Any]) -> None:
     if url != pins["registered_url"]:
         raise MetadataLookupPolicyError(
             URL_POLICY_REASON, f"url is not the exact registered archive URL: {url!r}"
         )
 
 
-def _first_header(raw_headers: Any, name: str) -> str | None:
-    name_lower = name.lower()
-    for entry in raw_headers or ():
-        if isinstance(entry, (list, tuple)) and len(entry) == 2 and str(entry[0]).lower() == name_lower:
-            return str(entry[1])
-    return None
-
-
 def published_archive_date_lookup(url: str) -> dict[str, Any]:
-    """Hard-wired production `published_archive_date_lookup` port. Rejects
-    any `url` other than the exact registered archive URL
-    (`URL_POLICY_REASON`) before returning anything. On success, returns
-    the PINNED `metadata_source_pins.published_archive_date`/
-    `.published_archive_date_authority` read fresh from the registration
-    spec -- never inferred from a live HTTP response, never fetched from
-    a general documentation page at execution time. Never opens a
-    socket."""
     pins = _load_registered_metadata_pins()
     _require_registered_url(url, pins)
     return {
@@ -306,78 +186,19 @@ def published_archive_date_lookup(url: str) -> dict[str, Any]:
     }
 
 
-def official_md5_lookup(
-    url: str,
-    *,
-    connection_factory: Callable[..., Any] = http.client.HTTPSConnection,
-    tls_context_factory: Callable[[], Any] = ssl.create_default_context,
-) -> dict[str, Any]:
-    """Hard-wired production `official_md5_lookup` port. Rejects any `url`
-    other than the exact registered archive URL (`URL_POLICY_REASON`)
-    before opening any connection. On success, performs exactly ONE
-    bounded, read-only HTTPS GET against the ONE pinned
-    `metadata_source_pins.official_md5_url` -- no alternate URL, fallback,
-    or directory listing is ever consulted -- and returns the parsed
-    32-hex MD5 digest plus the checksum URL itself as `source_identity`.
+def official_md5_lookup(url: str) -> dict[str, Any]:
+    """Return the pinned absence of an upstream checksum.
 
-    `connection_factory`/`tls_context_factory` are caller-injectable
-    purely as an offline-test seam (mirrors
-    `prospective_exact_source_transport.build_transport`'s own hooks); the
-    live CLI never passes either keyword, so confirmed live `--execute`
-    always uses the real defaults (`http.client.HTTPSConnection`,
-    `ssl.create_default_context` -- TLS verification always on)."""
+    The name is retained because ``execute_transport_and_raw_freeze`` already
+    exposes this internal port. ``official_md5`` is deliberately ``None`` and
+    must never be presented as an NCBI-verified digest.
+    """
     pins = _load_registered_metadata_pins()
     _require_registered_url(url, pins)
-
-    context = tls_context_factory()
-    if (
-        getattr(context, "check_hostname", None) is not True
-        or getattr(context, "verify_mode", None) != ssl.CERT_REQUIRED
-    ):
-        raise MetadataLookupConfigurationError(
-            "official MD5 HTTPS transport requires hostname checking and CERT_REQUIRED certificate verification"
-        )
-    conn = connection_factory(pins["official_md5_host"], timeout=_MD5_GET_TIMEOUT_SECONDS, context=context)
-    try:
-        conn.request("GET", pins["official_md5_path"], headers={})
-        response = conn.getresponse()
-        status = int(response.status)
-        if status in _REDIRECT_STATUS_CODES:
-            location = _first_header(response.getheaders(), "location")
-            raise MetadataLookupPolicyError(
-                REDIRECT_POLICY_REASON,
-                f"checksum GET redirected (status={status}, location={location!r}); "
-                "no redirect is ever followed, on- or off-host/path alike",
-            )
-        if status != 200:
-            raise MetadataLookupPolicyError(
-                STATUS_POLICY_REASON, f"checksum GET returned non-200, non-redirect status={status}"
-            )
-        # One single bounded read -- never an unbounded `response.read()`.
-        # Requesting one byte past the ceiling lets an over-length body be
-        # detected and rejected without ever trusting an unbounded read.
-        raw = response.read(_MAX_MD5_RESPONSE_BYTES + 1)
-        if len(raw) > _MAX_MD5_RESPONSE_BYTES:
-            raise MetadataLookupPolicyError(
-                SIZE_POLICY_REASON, f"checksum response exceeded the {_MAX_MD5_RESPONSE_BYTES}-byte ceiling"
-            )
-    finally:
-        conn.close()
-
-    try:
-        text = raw.decode("ascii")
-    except UnicodeDecodeError as exc:
-        raise MetadataLookupPolicyError(PARSE_POLICY_REASON, f"checksum response is not ASCII: {exc}") from exc
-    match = _MD5_LINE_RE.match(text.strip())
-    if match is None:
-        raise MetadataLookupPolicyError(
-            PARSE_POLICY_REASON, f"checksum response is not a recognizable md5 line: {text.strip()!r}"
-        )
-    official_md5, filename = match.group(1).lower(), match.group(2)
-    if filename is not None and filename != pins["official_md5_expected_filename"]:
-        raise MetadataLookupPolicyError(
-            FILENAME_POLICY_REASON,
-            f"checksum filename {filename!r} does not match the registered archive filename "
-            f"{pins['official_md5_expected_filename']!r}",
-        )
-    return {"official_md5": official_md5, "source_identity": pins["official_md5_url"]}
+    return {
+        "official_md5": None,
+        "upstream_checksum_available": False,
+        "source_identity": pins["upstream_checksum_evidence_url"],
+        "unavailable_reason": pins["upstream_checksum_unavailable_reason"],
+        "verification_mode": pins["content_verification_mode"],
+    }

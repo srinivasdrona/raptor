@@ -1,112 +1,19 @@
 #!/usr/bin/env python
-"""Execution-preparation harness for ADR-0020 / `docs/project/specs/
-clinvar-2026-08-prospective-amendment-v2.yaml` stage 1/2 (transport freeze +
-raw archive freeze), wrapping `raptor.eval.prospective_freeze
-.execute_transport_and_raw_freeze`.
+"""Execute ADR-0022 stage 1/2 for the August 2026 ClinVar archive.
 
-This script is INERT by construction, on every host, until ALL of the
-following are true, checked in this exact order:
+The default mode is an offline approval report. Live execution requires
+``--execute``, the WSL2 ``raptor`` venv, a valid owner approval record, and a
+writable off-repository external root.
 
-1. `--execute` is passed (default is a dry-run status report only -- no
-   filesystem writes outside the freeze-record paths, no network calls, no
-   transport resolution).
-2. The running interpreter is the WSL2 `raptor` venv policy interpreter,
-   `sys.executable == "/home/sdrona/raptor/bin/python"` -- checked here,
-   unconditionally, before anything else (including argument completeness
-   and the approval record), as this repository's standing RAPTOR
-   execution-environment policy: every RAPTOR Python entry point runs
-   inside that one WSL2 venv, never a native/Windows interpreter and never
-   gated on host CPU architecture (stage 1/2 -- transport + raw archive
-   freeze -- has no x86-only requirement; only the later BIAS-2015/Nirvana
-   ADR-0008 stage does, and that stage is out of scope here).
-3. Every required `--execute` option is present (`--approval-record`,
-   `--allowed-external-root`). Finding #3 (independent review): production
-   transport is HARD-WIRED to
-   `raptor.eval.prospective_exact_source_transport.build_transport()` --
-   there is no `--transport-factory` (or any other) CLI option, config
-   value, or environment variable capable of substituting a different
-   transport for a confirmed live `--execute` run. This closes the
-   arbitrary-live-transport-substitution vulnerability: a caller can no
-   longer point real execution at anything other than the one safe,
-   redirect-refusing, exact-URL-only, TLS-always-on transport this
-   repository ships. Finding #1 (independent review, round 5): the two
-   metadata lookup ports are hard-wired the SAME way -- there is no
-   `--published-archive-date-lookup`/`--official-md5-lookup` (or any
-   other) CLI option, config value, or environment variable either;
-   supplying either flag is now an "unrecognized arguments" argparse
-   failure, checked before anything else in this script even runs.
-4. `--approval-record <path>` points at a JSON file that
-   `raptor.eval.prospective_freeze.validate_pre_data_approval` accepts --
-   schema `raptor.eval.pre_data_approval.v1`, `decision ==
-   "APPROVED_PRE_DATA"`, approver `@dronasrinivas`, matching spec/overlay
-   hashes, non-vacuous `immutable_inputs_verified` /
-   `protected_tests_verified`, and an all-`False`
-   `pre_data_access_attestation`. This record deliberately has NO
-   `x64_freeze` block and is never checked against
-   `assert_runtime_boundary` -- consistent with item 2 above, ClinVar
-   archive acquisition has no x86-only requirement. The separate, later
-   x64/BIAS/Nirvana/resource-manifest gate
-   (`raptor.eval.prospective_freeze.validate_scoring_stage_approval`) is
-   out of scope for this script; it is required only before ADR-0020
-   stage 4 (BIAS/Nirvana execution or label-dependent evaluation), which
-   this script never performs.
-5. `--allowed-external-root` passes preflight (see `_preflight_external_root`):
-   it must already exist, be a plain directory (never a symlink/reparse
-   point), resolve to itself, sit outside the repository root, and be
-   writable. It is explicitly allowed to already contain content from
-   unrelated prior runs -- only this run's own freshly generated
-   run-scope destination is required to be unclaimed, and that freshness
-   check lives in `raptor.eval.prospective_freeze
-   .execute_transport_and_raw_freeze` itself, not here.
-6. A real network transport is always the ONE hard-wired production
-   implementation, `prospective_exact_source_transport.build_transport()`
-   -- called with no arguments, so every hook (`connection_factory`,
-   `socket_module`, `tls_context_factory`) is that function's own real
-   default (`http.client.HTTPSConnection`, `ssl.create_default_context`
-   with TLS verification always on). Both external lookups
-   (`published_archive_date_lookup`/`official_md5_lookup`) are ALSO
-   hard-wired -- to `raptor.eval.prospective_exact_source_metadata_lookups
-   .published_archive_date_lookup`/`.official_md5_lookup`, the one
-   production-owned module for both ports, imported statically at the top
-   of this file. Both ports now have a real, working production
-   implementation (round 6): the published-archive-date lookup returns a
-   pinned, versioned spec constant (never a runtime NCBI-docs fetch, never
-   an inference from the live HTTP `Last-Modified` header); the official-
-   MD5 lookup performs exactly one bounded, redirect-refusing,
-   TLS-verified HTTPS GET against the one pinned adjacent `.md5` checksum
-   URL. See that module's docstring for the full policy.
+The exact-source HTTPS transport and both metadata-policy lookups are
+statically wired; no CLI option, environment variable, or import string can
+replace them. The v3 checksum policy records that NCBI publishes no checksum
+for monthly archive copies. The exact archive is therefore length-checked and
+frozen with locally computed SHA-256 and MD5; neither digest is represented as
+an upstream NCBI checksum.
 
-Independent review finding (live-transport-bypass, round 5): before this
-round, the two lookup ports above were resolved from CLI-supplied
-`--published-archive-date-lookup`/`--official-md5-lookup`
-`"module:callable"` strings via `importlib.import_module`, run AFTER
-`build_transport()` returned but BEFORE the real archive GET -- the only
-window in this script where non-production-owned code executed at all.
-Merely capturing a transport-identity pin afterward was an incomplete
-defense: importing arbitrary caller-selected code is dangerous regardless
-of what happens to `transport` specifically (that code could open its own
-sockets, mutate unrelated module globals, replace
-`prospective_freeze.execute_transport_and_raw_freeze` itself, etc.). Both
-CLI options, and the `_resolve_import_target` dynamic-import helper that
-served them, have been removed entirely -- confirmed live `--execute`
-imports/executes ZERO caller-selected Python/plugin code before the real
-GET. The transport-identity-pin defense described next is retained purely
-as defense-in-depth, not as the primary answer to that vulnerability.
-
-Transport-tamper defense-in-depth: this script still captures a
-`capture_transport_identity_pin(transport)` identity pin IMMEDIATELY after
-`build_transport()` returns and passes it to
-`execute_transport_and_raw_freeze`, which re-verifies it twice (on entry,
-and again immediately before the real streamed GET) and refuses with
-`TRANSPORT_IDENTITY_TAMPERED` on any mismatch -- before any network call.
-With both lookup ports now hard-wired (no caller-selected import path
-remains at all), this guards only against a hypothetical future
-regression, not a live vulnerability.
-
-Even with every one of the above satisfied, this script never invokes
-`label_reader`/`benchmark_builder`/`scoring_runner` -- stage 3+ (label
-read, benchmark build, masking, scoring) is out of scope for stage 1/2 and
-is a separate, later additive surface; both are always left unset.
+This script never decompresses the archive, reads labels or rows, builds a
+benchmark, or runs BIAS/Nirvana/scoring.
 """
 from __future__ import annotations
 
@@ -123,8 +30,8 @@ import raptor.eval.prospective_exact_source_transport as prospective_exact_sourc
 import raptor.eval.prospective_freeze as prospective_freeze
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SPEC_PATH = REPO_ROOT / "docs" / "project" / "specs" / "clinvar-2026-08-prospective-amendment-v2.yaml"
-DEFAULT_OVERLAY_PATH = REPO_ROOT / "configs" / "eval" / "tsc2_clinvar_2026_08_amendment_v2.overlay.yaml"
+DEFAULT_SPEC_PATH = REPO_ROOT / "docs" / "project" / "specs" / "clinvar-2026-08-prospective-amendment-v3.yaml"
+DEFAULT_OVERLAY_PATH = REPO_ROOT / "configs" / "eval" / "tsc2_clinvar_2026_08_amendment_v3.overlay.yaml"
 DEFAULT_BASE_CONFIG_PATH = REPO_ROOT / "configs" / "eval" / "tsc2.yaml"
 
 #: This repository's standing RAPTOR Python execution-environment policy:
@@ -241,7 +148,7 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         default=None,
         help="Off-repo root for the raw archive GET destination (see docs/ops/"
-        "clinvar-2026-08-amendment-v2-external-content-root.md). Required with --execute.",
+        "clinvar-2026-08-amendment-v3-external-content-root.md). Required with --execute.",
     )
     parser.add_argument("--transport-freeze-record", type=Path, default=None)
     parser.add_argument("--raw-freeze-record", type=Path, default=None)
