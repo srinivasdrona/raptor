@@ -69,10 +69,14 @@ __all__ = [
     "TERMINAL_OUTCOME_VOCAB",
     "A5_PRECEDENCE",
     "FULL_SPECTRUM_PRECEDENCE",
+    "RESOURCE_MANIFEST_DIGEST_SCHEMA",
+    "RESOURCE_MANIFEST_ENTRIES",
     "ProspectiveContractError",
     "ProspectiveStopStateError",
     "ProspectiveInvalidStateError",
     "assert_runtime_boundary",
+    "resource_manifest_entries",
+    "compute_resource_manifest_sha256",
     "merge_prospective_overlay",
     "validate_pre_data_approval",
     "execute_transport_and_raw_freeze",
@@ -179,6 +183,29 @@ _HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 _MD5_HEX_RE = re.compile(r"^[0-9a-fA-F]{32}$")
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _DIGITS_RE = re.compile(r"^[0-9]+$")
+
+#: Schema id for the `resource_manifest_sha256` canonical digest envelope
+#: (`docs/ops/adr-0008-resource-manifest-digest.md`). Domain-separated and
+#: versioned: this literal string is itself bound into the hashed bytes, so
+#: a future, deliberate change to the envelope shape is made by bumping this
+#: string (a new schema id can never collide with a v1 digest) rather than
+#: by silently reinterpreting an existing `resource_manifest_sha256` value.
+RESOURCE_MANIFEST_DIGEST_SCHEMA = "raptor.eval.adr0008_resource_manifest_digest.v1"
+
+#: The three pinned checksum-manifest files `resource_manifest_sha256` binds,
+#: as `(id, filename)` pairs in this EXACT pinned order. Sourced from
+#: `configs/eval/core_annotation_bundle.yaml`
+#: `x64_handoff_requirements.items` (`nirvana_full_manifest`,
+#: `nirvana_updates_manifest`, `bias_data_manifest`) and
+#: `docs/ops/masked-heldout-bias-rerun-handoff.md` §4/§9, which together
+#: identify these as the frozen baselines for the ADR-0008 x64 worker's
+#: Nirvana GRCh38 data root and BIAS hg38 data root. This tuple's order is
+#: itself part of the contract (see `compute_resource_manifest_sha256`).
+RESOURCE_MANIFEST_ENTRIES: tuple[tuple[str, str], ...] = (
+    ("nirvana_full_manifest", "nirvana-grch38-full.sha256.txt"),
+    ("nirvana_updates_manifest", "nirvana-grch38-updates.sha256.txt"),
+    ("bias_data_manifest", "bias-hg38-data.sha256.txt"),
+)
 
 
 # ---------------------------------------------------------------------------
@@ -596,7 +623,20 @@ def assert_runtime_boundary(*, runtime_identity: Mapping[str, Any]) -> None:
     """Verify `runtime_identity` against the ADR-0008 pinned x64 worker/BIAS/
     Nirvana identity dimensions. Raises `ProspectiveInvalidStateError`
     (`.code == "INVALID"`) on any missing/extra key or any dimension
-    mismatch; returns `None` on success."""
+    mismatch; returns `None` on success.
+
+    `resource_manifest_sha256` is checked here only for FORMAT (64-character
+    lowercase hex) -- unlike `bias_commit`/`nirvana_banner`, its concrete
+    pinned VALUE is not known in this repository, because it can only be
+    produced by actually reading the three resource-bundle checksum-manifest
+    files that live solely on the ADR-0008 x64 worker (never checked into,
+    or copied into, this repository). `compute_resource_manifest_sha256`
+    (below) defines EXACTLY how that value must be computed, and
+    `docs/ops/adr-0008-resource-manifest-digest.md` is the human-readable
+    spec; a human approver runs it on the real worker and pins the result
+    into a specific `pre_data_approval` record's `x64_freeze` block -- this
+    function never invents or accepts a value it cannot independently
+    verify."""
     if not isinstance(runtime_identity, Mapping) or set(runtime_identity.keys()) != _RUNTIME_IDENTITY_KEYS:
         raise ProspectiveInvalidStateError(
             f"runtime_identity must define exactly {sorted(_RUNTIME_IDENTITY_KEYS)!r}"
@@ -618,6 +658,70 @@ def assert_runtime_boundary(*, runtime_identity: Mapping[str, Any]) -> None:
         raise ProspectiveInvalidStateError(
             "runtime_identity.resource_manifest_sha256 must be a 64-character lowercase hex SHA-256"
         )
+
+
+def resource_manifest_entries(checksums_dir: Path | str) -> list[dict[str, str]]:
+    """Reads the three `RESOURCE_MANIFEST_ENTRIES` files under
+    `checksums_dir`, in their pinned order, and returns one
+    `{"id", "filename", "sha256"}` dict per entry. `sha256` is the RAW-BYTE
+    SHA-256 of that exact file: `Path.read_bytes()` is a binary read that
+    never applies any text-mode newline translation, so this value is
+    identical on Windows and Linux for byte-identical files -- the digest
+    contract never depends on which OS recomputed it, only on the bytes
+    themselves. READ-ONLY: opens nothing but these three small
+    checksum-manifest text files -- never the multi-GB Nirvana/BIAS
+    annotation-data bundles the manifests describe, and never anything
+    outside `checksums_dir`.
+
+    Fails closed with a plain `FileNotFoundError` the instant any one of the
+    three pinned filenames is absent from `checksums_dir` -- a rename of a
+    pinned file is indistinguishable from, and rejected exactly like, a
+    missing file (there is no fuzzy/best-effort filename match)."""
+    base = Path(checksums_dir)
+    entries: list[dict[str, str]] = []
+    for entry_id, filename in RESOURCE_MANIFEST_ENTRIES:
+        path = base / filename
+        if not path.is_file():
+            raise FileNotFoundError(f"resource manifest file missing for {entry_id!r}: expected {path}")
+        entries.append({"id": entry_id, "filename": filename, "sha256": _sha256_hex(path.read_bytes())})
+    return entries
+
+
+def compute_resource_manifest_sha256(checksums_dir: Path | str) -> str:
+    """Computes the ADR-0008 `x64_freeze.resource_manifest_sha256` digest
+    (full spec: `docs/ops/adr-0008-resource-manifest-digest.md`) from the
+    three pinned checksum-manifest files under `checksums_dir`.
+
+    Builds the canonical envelope
+    `{"schema": RESOURCE_MANIFEST_DIGEST_SCHEMA, "manifests":
+    resource_manifest_entries(checksums_dir)}`, serializes it with this
+    module's standard canonical-JSON convention (`sort_keys=True,
+    separators=(",", ":")`, `ensure_ascii=False`, UTF-8 -- see
+    `_content_hash`), and returns the SHA-256 hex digest of those exact
+    canonical bytes.
+
+    This single value binds, together, the three manifests':
+    - IDENTITY -- each entry's fixed `id` (`RESOURCE_MANIFEST_ENTRIES`);
+    - ORDER -- `manifests` is a JSON array, and `json.dumps` never reorders
+      array elements even under `sort_keys=True` (that flag only sorts each
+      object's own keys), so the pinned tuple order is preserved verbatim
+      into the hashed bytes;
+    - CONTENT -- each entry's raw-byte SHA-256 (`resource_manifest_entries`).
+
+    A rename, a reorder (impossible here without also renaming, since the
+    id -> filename mapping is fixed), a swap of which manifest's bytes sit
+    behind which identity, or any single changed byte in any one manifest
+    all change this digest. This function only READS the three manifest
+    text files; it never touches the (multi-GB) Nirvana/BIAS data bundles
+    those manifests describe, never contacts a network, and never runs BIAS
+    or Nirvana -- preserving this module's fail-closed, no-live-I/O posture
+    (see the module docstring)."""
+    envelope = {
+        "schema": RESOURCE_MANIFEST_DIGEST_SCHEMA,
+        "manifests": resource_manifest_entries(checksums_dir),
+    }
+    canonical = json.dumps(envelope, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return _sha256_hex(canonical)
 
 
 # ---------------------------------------------------------------------------
