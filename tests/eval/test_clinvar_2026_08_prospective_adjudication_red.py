@@ -48,6 +48,29 @@ def _scoring_stage_gate_checksums() -> Iterator[None]:
         shutil.rmtree(_GATE_CHECKSUMS_DIR, ignore_errors=True)
 
 
+#: A non-blank, past-dated (relative to this repository's actual clock)
+#: `first_scoring_execution_at`, strictly AFTER `_valid_scoring_stage_
+#: approval_record`'s `approved_at` ("2026-08-29T10:00:00Z") -- the
+#: mandatory, immutable timestamp `validate_scoring_stage_approval` (and
+#: therefore `adjudicate_prospective_outcomes`, which calls it first and
+#: unconditionally) requires. Kept local rather than imported from the
+#: shared test helpers because this file exercises `adjudicate_prospective_
+#: outcomes` directly against the real repo root, never through the
+#: sandbox-based wrappers those helpers provide for the other two red test
+#: files.
+_DEFAULT_FIRST_SCORING_EXECUTION_AT = "2026-08-29T12:00:00Z"
+
+
+def _const_probe(value: Any) -> Any:
+    """Returns a zero-arg callable that always returns `value` -- used to
+    supply `adjudicate_prospective_outcomes`'s `*_probe` test-only
+    overrides from plain fixture values so the mandatory scoring-stage
+    gate's independent observation/recomputation matches this file's known-
+    good fixtures by default, without every call site needing to repeat a
+    lambda."""
+    return lambda: value
+
+
 def _valid_scoring_stage_approval_record() -> dict[str, Any]:
     module = require_module()
     digest = module.compute_resource_manifest_sha256(_GATE_CHECKSUMS_DIR)
@@ -58,6 +81,7 @@ def _valid_scoring_stage_approval_record() -> dict[str, Any]:
         "approver": "@dronasrinivas",
         "approved_at": "2026-08-29T10:00:00Z",
         "x64_freeze": {**observed_runtime_identity_ok(), "resource_manifest_sha256": digest},
+        "immutable_inputs_verified": True,
     }
 
 
@@ -130,11 +154,16 @@ def _adjudicate(
     registration_id: str | None = None,
     registration_spec_path: Path | None = None,
     scoring_stage_approval_record: dict[str, Any] | None = None,
-    observed_runtime_identity: dict[str, Any] | None = None,
-    resource_manifest_checksums_dir: Path | None = None,
-    first_scoring_execution_at: str | None = None,
+    allowed_repo_root: Path | None = None,
+    first_scoring_execution_at: str | None = _DEFAULT_FIRST_SCORING_EXECUTION_AT,
+    worker_designation_probe: Any = None,
+    worker_arch_probe: Any = None,
+    bias_commit_probe: Any = None,
+    nirvana_banner_probe: Any = None,
+    resource_manifest_location_probe: Any = None,
 ) -> dict[str, Any]:
     fn = require_api("adjudicate_prospective_outcomes")
+    ok_identity = observed_runtime_identity_ok()
     result = fn(
         registration_id=registration_id if registration_id is not None else _REGISTRATION_ID,
         registration_spec_path=registration_spec_path or _REGISTRATION_SPEC_PATH,
@@ -143,10 +172,7 @@ def _adjudicate(
             if scoring_stage_approval_record is not None
             else _valid_scoring_stage_approval_record()
         ),
-        observed_runtime_identity=(
-            dict(observed_runtime_identity) if observed_runtime_identity is not None else observed_runtime_identity_ok()
-        ),
-        resource_manifest_checksums_dir=resource_manifest_checksums_dir or _GATE_CHECKSUMS_DIR,
+        allowed_repo_root=allowed_repo_root or REPO_ROOT,
         first_scoring_execution_at=first_scoring_execution_at,
         run_integrity=run_integrity,
         stage12_outcome=stage12_outcome,
@@ -156,6 +182,21 @@ def _adjudicate(
         cli_overrides=cli_overrides or {},
         env_overrides=env_overrides or {},
         transport_metadata_not_content_identity=transport_metadata_not_content_identity,
+        # `adjudicate_prospective_outcomes` forwards these verbatim to
+        # `validate_scoring_stage_approval`, which uses them to
+        # INDEPENDENTLY OBSERVE runtime identity -- never a caller-supplied
+        # plain mapping. Defaulting each to this file's own known-good
+        # fixture values (never the pinned literals directly) means
+        # ordinary calls exercise the real observation/recomputation
+        # plumbing end-to-end while still passing; an explicit override
+        # simulates a genuinely different observation for negative tests.
+        worker_designation_probe=worker_designation_probe or _const_probe(ok_identity["worker_designation"]),
+        worker_arch_probe=worker_arch_probe or _const_probe(ok_identity["worker_arch"]),
+        bias_commit_probe=bias_commit_probe or _const_probe(ok_identity["bias_commit"]),
+        nirvana_banner_probe=nirvana_banner_probe or _const_probe(ok_identity["nirvana_banner"]),
+        resource_manifest_location_probe=(
+            resource_manifest_location_probe or _const_probe(_GATE_CHECKSUMS_DIR)
+        ),
     )
     if not isinstance(result, dict):
         pytest.fail("adjudicate_prospective_outcomes must return a mapping")
@@ -754,14 +795,64 @@ def test_wrong_approver_on_scoring_stage_approval_blocks_adjudication() -> None:
 
 def test_mismatched_observed_runtime_identity_blocks_adjudication() -> None:
     """Even a correctly-shaped, correctly-recomputed-matching approval
-    record is rejected if the SEPARATE `observed_runtime_identity` input
-    (never trusted from the approval record) itself fails the pinned
-    ADR-0008 constants."""
+    record is rejected if the SEPARATE, independently OBSERVED runtime
+    identity -- supplied only via the `*_probe` parameters, never a
+    caller-supplied plain mapping and never trusted from the approval
+    record -- itself fails the pinned ADR-0008 constants."""
     _require_adjudication_contract()
     invalid_error = require_exception("ProspectiveInvalidStateError")
-    bad_observed = {**observed_runtime_identity_ok(), "bias_commit": "0" * 40}
     with pytest.raises(invalid_error) as exc:
-        _adjudicate(observed_runtime_identity=bad_observed)
+        _adjudicate(bias_commit_probe=lambda: "0" * 40)
+    assert getattr(exc.value, "code", None) == "INVALID"
+
+
+# ---------------------------------------------------------------------------
+# Mandatory, immutable `first_scoring_execution_at` gate wired into
+# adjudication (independent-review findings #2/#3): the SAME anti-
+# fabrication/mandatory-timestamp guarantees `validate_scoring_stage_
+# approval` provides standalone must hold when called from
+# `adjudicate_prospective_outcomes` -- there must be no code path here
+# that reaches an outcome (including BLOCKED_DATA/FAIL/INVALID-from-other-
+# causes, and in particular never PASS/AUTHORIZED_RESEARCH_ONLY) with a
+# missing, blank, future-dated, or post-scoring approval timestamp.
+# ---------------------------------------------------------------------------
+
+
+def test_missing_first_scoring_execution_at_blocks_adjudication_even_for_pass_shape() -> None:
+    """A missing (`None`/blank) `first_scoring_execution_at` must block
+    adjudication before any axis is inspected -- true even for a call
+    shape that would otherwise resolve to full-spectrum PASS."""
+    _require_adjudication_contract()
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    with pytest.raises(invalid_error) as exc_none:
+        _adjudicate(first_scoring_execution_at=None)
+    assert getattr(exc_none.value, "code", None) == "INVALID"
+    with pytest.raises(invalid_error) as exc_blank:
+        _adjudicate(first_scoring_execution_at="   ")
+    assert getattr(exc_blank.value, "code", None) == "INVALID"
+
+
+def test_future_dated_first_scoring_execution_at_blocks_adjudication() -> None:
+    """A future-dated `first_scoring_execution_at` -- i.e. a scoring run
+    that, by definition, has not actually happened yet -- must never permit
+    `adjudicate_prospective_outcomes` to produce PASS, AUTHORIZED_RESEARCH_
+    ONLY, or any other outcome."""
+    _require_adjudication_contract()
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    with pytest.raises(invalid_error) as exc:
+        _adjudicate(first_scoring_execution_at="2999-01-01T00:00:00Z")
+    assert getattr(exc.value, "code", None) == "INVALID"
+
+
+def test_first_scoring_execution_at_not_strictly_after_approved_at_blocks_adjudication() -> None:
+    """A `first_scoring_execution_at` at-or-before the approval's own
+    `approved_at` (scoring supposedly executed before, or simultaneously
+    with, its own approval) must block adjudication: approval must
+    strictly precede the first scoring execution it authorizes."""
+    _require_adjudication_contract()
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    with pytest.raises(invalid_error) as exc:
+        _adjudicate(first_scoring_execution_at="2026-08-29T10:00:00Z")  # == approved_at
     assert getattr(exc.value, "code", None) == "INVALID"
 
 

@@ -132,6 +132,105 @@ values by design — operators must treat the three manifest files, once
 generated, as immutable inputs to be copied (not regenerated) across hosts
 whenever a specific pinned digest value must be reproduced.
 
+## Independent runtime-identity observation (worker designation / BIAS commit / Nirvana banner)
+
+`bias_commit`/`nirvana_banner`/`worker_designation` are pinned literal
+constants in this repository (`_PINNED_BIAS_COMMIT`, `_PINNED_NIRVANA_BANNER`,
+`_PINNED_WORKER_DESIGNATION` in `raptor.eval.prospective_freeze`), but a
+caller cannot be trusted to simply *assert* that the current process is
+running on the real ADR-0008 worker and reports those values — a caller on
+any other host could otherwise supply exactly those pinned literals as a
+plain "observed identity" argument and always pass. `observe_runtime_identity`
+closes this by independently OBSERVING each dimension itself, never
+accepting it as a caller-supplied mapping:
+
+- `worker_arch` — `platform.machine()`, read directly from the running
+  interpreter/host; never normalized toward the pinned value.
+- `worker_designation`, `bias_commit`, `nirvana_banner` — each read from one
+  small, single-purpose, single-value marker text file under
+  `DESIGNATED_X64_WORKER_ROOT` (`D:\raptor-x64` — the same root already
+  documented for `CHECKSUMS\` and `VERSIONS.md`):
+
+  | Dimension | Marker file |
+  |---|---|
+  | `worker_designation` | `D:\raptor-x64\WORKER_DESIGNATION.txt` |
+  | `bias_commit` | `D:\raptor-x64\BIAS_COMMIT.txt` |
+  | `nirvana_banner` | `D:\raptor-x64\NIRVANA_BANNER.txt` |
+
+  Each file's entire (stripped) text content is the observed value for that
+  dimension. This is a minimal, explicit, machine-readable extension of the
+  already-documented free-form `D:\raptor-x64\VERSIONS.md` convention
+  (`docs/ops/devbox-bias-nirvana-handoff.md`) — one small text file per
+  dimension so each can be probed with a plain file read, no markdown
+  parsing. An operator maintaining the real ADR-0008 worker keeps these
+  three files' contents equal to the pinned constants above (updating them
+  only when a genuinely new, re-approved BIAS/Nirvana version is installed);
+  a missing or blank marker file is observed as an
+  `UNOBSERVABLE:<reason>`-prefixed sentinel string, **never** silently
+  treated as a match with the pinned value.
+
+`validate_scoring_stage_approval`/`adjudicate_prospective_outcomes` call
+`observe_runtime_identity` with their own default probes unless a caller
+supplies an explicit `*_probe` override — overrides exist ONLY so this
+repository's own test suite can exercise the mechanism without a real
+ADR-0008 worker filesystem; production/CLI callers must never override any
+of them. On any host that is not the real designated worker (this WSL2
+dev/CI environment included), the default probes genuinely observe a
+non-matching value, and `assert_runtime_boundary` then fails closed — a
+fabricated approval record containing exactly the pinned literal constants
+still cannot pass, because it is compared against this run's own real
+observation, not against itself.
+
+## Designated resource-manifest location (never a caller-chosen directory)
+
+`resource_manifest_sha256` is likewise always recomputed against the ONE
+designated location, `D:\raptor-x64\CHECKSUMS` (`DESIGNATED_X64_WORKER_ROOT`
+/ `CHECKSUMS`, matching `scripts/compute_adr0008_resource_manifest_sha256.py`'s
+`DEFAULT_CHECKSUMS_DIR`), via `resource_manifest_location_probe` (defaulting
+to that fixed path). A caller cannot bind a scoring-stage approval to
+manifests copied to an arbitrary, non-designated directory and have that
+count as observation of the real worker's resource state; the location
+probe override exists only for this repository's own tests.
+
+## Scoring-stage `immutable_inputs_verified` (never a bare claimed boolean)
+
+`scoring_stage_approval.immutable_inputs_verified` gates the registration
+spec's `immutable_inputs` list (`configs/eval/tsc2.yaml`, ACMG criterion/
+strength policy, the BIAS strength ladder/lineage, masking/predictor-
+aggregation policy, ...) — these are exclusively SCORING-stage inputs, never
+part of ClinVar archive acquisition (`pre_data_approval` never requires or
+checks this flag; see that section's boundary-correction note). A claimed
+`immutable_inputs_verified: true` is never trusted on its own:
+`validate_scoring_stage_approval` independently recomputes every entry's
+canonical-LF SHA-256 and git-blob SHA-1 from the actual current repository
+file bytes and compares against the spec's own pins, exactly mirroring how
+`resource_manifest_sha256` itself is never accepted as a claim.
+
+## Mandatory `first_scoring_execution_at`
+
+`first_scoring_execution_at` is a required, immutable timestamp argument to
+`validate_scoring_stage_approval`/`adjudicate_prospective_outcomes` — never
+optional, and never silently skipped when absent. An absent/blank value, a
+malformed timestamp, a future-dated timestamp, or `approved_at` at or after
+`first_scoring_execution_at` all raise `ProspectiveInvalidStateError`
+(`INVALID`) before any outcome is produced.
+
+## Executing-code binding (`implementation_freeze`)
+
+`pre_data_approval.implementation_freeze` no longer verifies only that
+`module_hashes` matches the NAMED historical `commit`'s committed tree
+content (via `git show <commit>:<path>`). It additionally verifies that the
+SAME declared hashes match the bytes actually loaded/executing in the
+validating process right now (`importlib.import_module(...).​__file__`, read
+directly from disk). Both checks must pass: a technically-reachable commit
+whose committed content no longer matches what is actually running (for
+example a post-commit edit made without a fresh approval) now fails this
+check even though the git-history comparison alone would have passed.
+Once this amendment is actually merged, the draft's `implementation_freeze.commit`
+must be repinned to the final merged commit and `module_hashes` recomputed
+against that commit's content — this document does not itself perform, or
+imply, that repinning ahead of a real merge.
+
 ## Operator usage (read-only, x64 worker only)
 
 `scripts/compute_adr0008_resource_manifest_sha256.py` wraps

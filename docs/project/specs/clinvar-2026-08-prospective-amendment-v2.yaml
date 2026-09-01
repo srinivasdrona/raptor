@@ -336,8 +336,8 @@ implementation_freeze_required_before_approval:
   - narrow-scope independence from full-spectrum outcome
   freeze_record_must_pin:
   - implementation commit
-  - implementation module hashes
-  - immutable input hashes
+  - implementation module hashes (also bound to the code actually executing, not the commit reference alone)
+  - immutable input hashes (scoring-stage evidence only -- see scoring_stage_approval; never part of pre_data_approval)
   - prospective eval-overlay canonical-LF SHA-256
   - tsc2 scoring-semantics projection SHA-256
   - test command and result
@@ -346,6 +346,17 @@ implementation_freeze_required_before_approval:
   # `scoring_stage_approval.approval_record_must_include` below, gating
   # ADR-0020 stage 4 only -- ClinVar archive acquisition (stages 1-2) has no
   # x86-only requirement.
+  # NOTE: "implementation module hashes" binds APPROVED_PRE_DATA to BOTH the
+  # named historical commit's committed tree content AND the bytes actually
+  # loaded/executing in the validating process right now
+  # (raptor.eval.prospective_freeze._implementation_freeze_executing_code_failure).
+  # A technically-reachable commit reference whose content no longer matches
+  # what is actually running (e.g. a post-commit edit with no fresh
+  # approval) fails this check even though the git-history comparison alone
+  # would have passed. Once this amendment is merged, the draft's
+  # implementation_freeze.commit must be repinned to the final merged
+  # commit and module_hashes recomputed against that commit's content --
+  # never fabricated ahead of that merge.
 
 pre_data_approval:
   current_state: AWAITING_PRE_DATA_APPROVAL
@@ -357,8 +368,7 @@ pre_data_approval:
   - registration id, path, Git blob and canonical-LF SHA-256
   - ADR-0020 identity
   - prospective eval-overlay path and canonical-LF SHA-256
-  - implementation commit and module hashes
-  - immutable input verification
+  - implementation commit and module hashes (bound to actually-executing code, not the commit reference alone)
   - protected-test evidence
   - timestamp strictly before first archive GET
   - complete false-valued pre-data access attestation
@@ -367,6 +377,14 @@ pre_data_approval:
   # 1-2) never reads scoring semantics; that verification belongs solely to
   # raptor.eval.prospective_freeze.merge_prospective_overlay, invoked only
   # when building the effective eval config for ADR-0020 stage 3+ scoring.
+  # NOTE (independent review, boundary correction): pre-data approval also
+  # never includes or verifies `immutable_inputs` (tsc2.yaml, ACMG/BIAS
+  # strength/lineage policy, masking/predictor-aggregation policy, ...).
+  # Every one of those inputs is a SCORING-stage concern; ClinVar archive
+  # acquisition never reads or depends on any of them. That verification
+  # (an itemized, independently-recomputed hash check, never a bare claimed
+  # boolean) belongs solely to `scoring_stage_approval.approval_record_must_include`
+  # below, gating ADR-0020 stage 4.
   approved_scope: >-
     APPROVED_PRE_DATA permits transport freeze and then GET of only the exact
     registered archive. It does not permit a substitute, threshold change,
@@ -404,17 +422,33 @@ scoring_stage_approval:
   - x64 BIAS 3.0.0 commit ade13f206f3e2c2efe3ec92715d974645fc8da8f
   - Nirvana 3.18.1 runtime banner 3.18.1-0-g05f88047
   - x64 resource manifests and checksums (ADR-0008 resource_manifest_sha256)
+  - immutable input verification (tsc2.yaml, ACMG/BIAS strength and lineage policy, masking/predictor-aggregation policy, ...)
+  - immutable first-scoring-execution timestamp, strictly after approval timestamp
   verification_rule: >-
-    The approval record's claimed x64_freeze block is never trusted as-is.
-    raptor.eval.prospective_freeze.validate_scoring_stage_approval requires a
-    separately observed runtime identity (worker designation, architecture,
-    BIAS commit, Nirvana banner) as an independent input, and always
-    recomputes resource_manifest_sha256 from the three pinned resource-
-    manifest checksum files rather than reading any claimed value. Approval
-    is accepted only when the claimed x64_freeze block is byte-for-byte
-    identical to the observed-plus-recomputed identity; a well-formed,
-    all-zero, or otherwise fabricated digest that does not match a real
-    recomputation always fails closed.
+    The approval record's claimed x64_freeze block, its claimed
+    immutable_inputs_verified flag, and any caller-supplied "observed
+    runtime identity" are never trusted as-is.
+    raptor.eval.prospective_freeze.validate_scoring_stage_approval always
+    independently OBSERVES worker designation, architecture, BIAS commit
+    and Nirvana banner (platform.machine() plus a read of the three
+    dedicated marker files under the ADR-0008 designated x64 worker root --
+    never a caller-claimed value), always independently RECOMPUTES
+    resource_manifest_sha256 from the three pinned resource-manifest
+    checksum files at that one designated location, and always
+    independently RECOMPUTES every immutable_inputs entry's hash from the
+    actual current repository file bytes. Approval is accepted only when
+    the claimed x64_freeze block is byte-for-byte identical to the
+    observed-plus-recomputed identity and every immutable_inputs entry
+    matches its recomputation; a well-formed, all-zero, or otherwise
+    fabricated digest that does not match a real recomputation always
+    fails closed, and a static pinned literal supplied on a
+    non-designated runtime always fails closed too, because that
+    runtime's own independent observation genuinely differs.
+  first_scoring_execution_at_rule: >-
+    first_scoring_execution_at is a MANDATORY, immutable timestamp -- not
+    optional. Absent/blank, malformed, future-dated, or at/after
+    approved_at all fail closed with INVALID; a post-scoring or
+    future-dated approval can never pass.
   approved_scope: >-
     APPROVED_SCORING_STAGE permits stage 4 (mask-and-label-free score) to run
     on the designated x64 worker under the pinned BIAS/Nirvana/resource
@@ -423,8 +457,10 @@ scoring_stage_approval:
   failure_outcome: INVALID
   stop_rule: >-
     A missing approval record, schema breach, non-APPROVED_SCORING_STAGE
-    decision, wrong approver, approval timestamp at or after first scoring
-    execution, or any runtime-identity mismatch (worker designation,
+    decision, wrong approver, a missing/future/mistimed
+    first_scoring_execution_at (including approval timestamp at or after
+    first scoring execution), an immutable_inputs mismatch, or any
+    runtime-identity mismatch (worker designation,
     architecture, BIAS commit, Nirvana banner, or resource-manifest SHA-256,
     including a claimed digest that fails to match independent
     recomputation) is an A0 run-integrity failure raised as INVALID -- never

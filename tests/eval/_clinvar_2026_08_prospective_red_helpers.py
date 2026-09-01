@@ -24,7 +24,20 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SPEC_SOURCE_PATH = REPO_ROOT / "docs" / "project" / "specs" / "clinvar-2026-08-prospective-amendment-v2.yaml"
 BASE_CONFIG_SOURCE_PATH = REPO_ROOT / "configs" / "eval" / "tsc2.yaml"
 HISTORICAL_BLOCKED_PATH = REPO_ROOT / "data" / "census" / "tsc_prospective_validation_2026-08_blocked_data.json"
-_DEFAULT_IMPLEMENTATION_FREEZE_MODULES: tuple[str, ...] = ("raptor.eval.prospective_freeze",)
+#: `raptor.eval.prospective_exact_source_transport` (not `prospective_freeze`)
+#: is the default here because `resolve_committed_implementation_freeze`
+#: builds `module_hashes` from `git show HEAD:<path>` while the production
+#: `_implementation_freeze_executing_code_failure` check (independent
+#: review finding #4) additionally requires those same hashes to match the
+#: bytes ACTUALLY loaded/executing in this process right now. A module
+#: edited in the current, uncommitted worktree (`prospective_freeze` itself,
+#: while this contract is being developed) can never satisfy both
+#: simultaneously pre-commit, so the default happy-path fixture module must
+#: be one NOT edited in this round. See
+#: `test_implementation_freeze_executing_code_mismatch_*` for a dedicated,
+#: commit-independent negative test of the executing-code check itself,
+#: using a monkeypatched seam rather than real git/commit state.
+_DEFAULT_IMPLEMENTATION_FREEZE_MODULES: tuple[str, ...] = ("raptor.eval.prospective_exact_source_transport",)
 _GIT_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _WINDOWS_DRIVE_PATH_RE = re.compile(r"^(?P<drive>[A-Za-z]):[\\\\/](?P<tail>.*)$")
 
@@ -373,6 +386,29 @@ def _overlay_text(required_values: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _copy_immutable_inputs(spec: dict[str, Any], *, repo_root: Path) -> None:
+    """Copies every file the registration spec's `immutable_inputs` mapping
+    declares from the REAL repository root into the sandbox's own
+    `repo_root`, byte-for-byte, so `validate_scoring_stage_approval`'s
+    independent recomputation of each entry's canonical-LF SHA-256/git-blob
+    SHA-1 (`_immutable_inputs_failure_reason`) matches the spec's pinned
+    values by construction. These are exclusively SCORING-stage config
+    inputs (tsc2.yaml, ACMG/BIAS/masking/predictor-aggregation policy, ...)
+    -- never touched by acquisition (`pre_data_approval`) -- so copying them
+    here only supports scoring-stage-approval tests; it has no bearing on
+    the separate acquisition-stage sandbox content."""
+    immutable_inputs = spec.get("immutable_inputs")
+    if not isinstance(immutable_inputs, dict) or not immutable_inputs:
+        pytest.fail("registration spec immutable_inputs must be a non-empty mapping")
+    for rel_path in immutable_inputs:
+        source = REPO_ROOT / str(rel_path)
+        destination = repo_root / str(rel_path)
+        if not source.is_file():
+            pytest.fail(f"immutable_inputs source file missing from repository: {source}")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+
+
 def write_resource_manifest_checksums(directory: Path, *, contents: dict[str, bytes] | None = None) -> Path:
     """Writes the three ADR-0008 pinned resource-manifest checksum files
     (`RESOURCE_MANIFEST_ENTRIES`) into `directory` with deterministic
@@ -414,6 +450,7 @@ def prospective_sandbox(name: str, *, archive_bytes: bytes | None = None) -> Ite
         spec_path.parent.mkdir(parents=True, exist_ok=True)
         spec_path.write_bytes(canonical_lf_bytes(spec_text.encode("utf-8")))
         spec = load_yaml(spec_path)
+        _copy_immutable_inputs(spec, repo_root=repo_root)
 
         required_values = spec["prospective_eval_overlay_lifecycle"]["required_values"]
         if not isinstance(required_values, dict):
@@ -451,7 +488,6 @@ def build_approval_record(
     decision: str = "APPROVED_PRE_DATA",
     approver: str = "@dronasrinivas",
     approved_at: str = "2026-08-29T10:00:00Z",
-    immutable_inputs_verified: bool = True,
     protected_tests_verified: bool = True,
     attestation_overrides: dict[str, bool] | None = None,
     scope_overrides: dict[str, bool] | None = None,
@@ -502,7 +538,6 @@ def build_approval_record(
             "canonical_lf_sha256": canonical_lf_sha256_path(sandbox.overlay_path),
         },
         "implementation_freeze": implementation_freeze,
-        "immutable_inputs_verified": immutable_inputs_verified,
         "protected_tests_verified": protected_tests_verified,
         "scope": scope,
         "pre_data_access_attestation": attestation,
@@ -518,6 +553,7 @@ def build_scoring_stage_approval_record(
     registration_id: str | None = None,
     resource_manifest_checksums_dir: Path | None = None,
     x64_freeze_overrides: dict[str, Any] | None = None,
+    immutable_inputs_verified: bool = True,
 ) -> dict[str, Any]:
     """Builds a valid `raptor.eval.scoring_stage_approval.v1` record -- the
     SEPARATE, LATER gate for ADR-0020 stage 4 (BIAS/Nirvana execution,
@@ -529,11 +565,15 @@ def build_scoring_stage_approval_record(
     `sandbox.resource_manifest_checksums_dir`, pre-populated with
     deterministic fixture bytes) -- so this record passes
     `validate_scoring_stage_approval`'s anti-fabrication cross-check by
-    construction whenever the caller also passes the matching
-    `observed_runtime_identity`/`resource_manifest_checksums_dir` (see
-    `validate_scoring_stage_approval` wrapper below). `x64_freeze_overrides`
-    lets a caller deliberately fabricate/mismatch a claimed pin for negative
-    tests."""
+    construction whenever the caller also passes matching `*_probe`
+    overrides (see the `validate_scoring_stage_approval` wrapper below,
+    which defaults every probe to these same known-good values).
+    `x64_freeze_overrides` lets a caller deliberately fabricate/mismatch a
+    claimed pin for negative tests. `immutable_inputs_verified` defaults to
+    `True` -- this is exclusively a SCORING-stage flag (never part of
+    `build_approval_record`/`pre_data_approval`; see that function's own
+    boundary-correction note) and is independently recomputed, never
+    trusted as a bare claim, by `validate_scoring_stage_approval`."""
     module = require_module()
     checksums_dir = resource_manifest_checksums_dir or sandbox.resource_manifest_checksums_dir
     x64_freeze = {
@@ -549,6 +589,7 @@ def build_scoring_stage_approval_record(
         "approver": approver,
         "approved_at": approved_at,
         "x64_freeze": x64_freeze,
+        "immutable_inputs_verified": immutable_inputs_verified,
     }
 
 
@@ -657,6 +698,7 @@ def execute_transport_and_raw_freeze(
     benchmark_builder: Any = None,
     scoring_runner: Any = None,
     first_archive_get_at: str | None = None,
+    transport_identity_pin: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     run = require_api("execute_transport_and_raw_freeze")
     with _with_resolved_git_env():
@@ -677,6 +719,7 @@ def execute_transport_and_raw_freeze(
             benchmark_builder=benchmark_builder,
             scoring_runner=scoring_runner,
             first_archive_get_at=first_archive_get_at,
+            transport_identity_pin=transport_identity_pin,
         )
     if not isinstance(result, dict):
         pytest.fail("execute_transport_and_raw_freeze must return a mapping")
@@ -702,36 +745,69 @@ def validate_pre_data_approval(
     return out
 
 
+#: A default, non-blank, past-dated (relative to this repository's frozen
+#: fixture "now") `first_scoring_execution_at` -- strictly after
+#: `build_scoring_stage_approval_record`'s default `approved_at`
+#: ("2026-08-29T10:00:00Z") -- so callers that only want to mutate
+#: `approval_record` get a passing timestamp pair without repeating it at
+#: every call site. Pass an explicit override (including `None`/blank/
+#: future-dated) to exercise the mandatory-timestamp negative cases.
+DEFAULT_FIRST_SCORING_EXECUTION_AT = "2026-08-29T12:00:00Z"
+
+
+def _const_probe(value: Any) -> Callable[[], Any]:
+    """Returns a zero-arg callable that always returns `value` -- used to
+    supply `validate_scoring_stage_approval`'s `*_probe` test-only overrides
+    from plain fixture values (`observed_runtime_identity_ok()` /
+    `sandbox.resource_manifest_checksums_dir`) without repeating a lambda
+    at every call site."""
+    return lambda: value
+
+
 def validate_scoring_stage_approval(
     sandbox: ProspectiveSandbox,
     *,
     approval_record: dict[str, Any],
     registration_id: str | None = None,
     registration_spec_path: Path | None = None,
-    observed_runtime_identity: dict[str, Any] | None = None,
-    resource_manifest_checksums_dir: Path | None = None,
-    first_scoring_execution_at: str | None = None,
+    allowed_repo_root: Path | None = None,
+    first_scoring_execution_at: str | None = DEFAULT_FIRST_SCORING_EXECUTION_AT,
+    worker_designation_probe: Callable[[], str] | None = None,
+    worker_arch_probe: Callable[[], str] | None = None,
+    bias_commit_probe: Callable[[], str] | None = None,
+    nirvana_banner_probe: Callable[[], str] | None = None,
+    resource_manifest_location_probe: Callable[[], "str | Path"] | None = None,
 ) -> dict[str, Any]:
     """Wraps `raptor.eval.prospective_freeze.validate_scoring_stage_approval`
     -- the SEPARATE, LATER ADR-0020 stage 4 gate (BIAS/Nirvana execution,
     label-dependent evaluation). Independent of `validate_pre_data_approval`
-    above. Defaults `observed_runtime_identity` and
-    `resource_manifest_checksums_dir` to the sandbox's own known-good
-    fixtures (`observed_runtime_identity_ok()` /
-    `sandbox.resource_manifest_checksums_dir`) so callers that only want to
-    mutate `approval_record` (e.g. `build_scoring_stage_approval_record`'s
-    `x64_freeze_overrides`) get the correct anti-fabrication cross-check
-    inputs without repeating them at every call site."""
+    above. Defaults `allowed_repo_root` to `sandbox.repo_root` (which
+    `_copy_immutable_inputs` pre-populated with the real scoring-stage
+    config files) and every `*_probe` to a constant probe returning the
+    sandbox's own known-good fixture values (`observed_runtime_identity_ok()`
+    / `sandbox.resource_manifest_checksums_dir`) -- never a caller-supplied
+    plain mapping, mirroring production's own probe-based API -- so callers
+    that only want to mutate `approval_record` (e.g.
+    `build_scoring_stage_approval_record`'s `x64_freeze_overrides`) get the
+    correct anti-fabrication cross-check inputs without repeating them at
+    every call site. Pass an explicit `*_probe` override to simulate a
+    genuinely different observation (test-only; production/CLI callers
+    never override any of these)."""
     fn = require_api("validate_scoring_stage_approval")
+    ok_identity = observed_runtime_identity_ok()
     out = fn(
         registration_id=registration_id if registration_id is not None else sandbox.spec["registration"]["id"],
         registration_spec_path=registration_spec_path or sandbox.spec_path,
         approval_record=copy.deepcopy(approval_record),
-        observed_runtime_identity=(
-            dict(observed_runtime_identity) if observed_runtime_identity is not None else observed_runtime_identity_ok()
-        ),
-        resource_manifest_checksums_dir=resource_manifest_checksums_dir or sandbox.resource_manifest_checksums_dir,
+        allowed_repo_root=allowed_repo_root or sandbox.repo_root,
         first_scoring_execution_at=first_scoring_execution_at,
+        worker_designation_probe=worker_designation_probe or _const_probe(ok_identity["worker_designation"]),
+        worker_arch_probe=worker_arch_probe or _const_probe(ok_identity["worker_arch"]),
+        bias_commit_probe=bias_commit_probe or _const_probe(ok_identity["bias_commit"]),
+        nirvana_banner_probe=nirvana_banner_probe or _const_probe(ok_identity["nirvana_banner"]),
+        resource_manifest_location_probe=(
+            resource_manifest_location_probe or _const_probe(sandbox.resource_manifest_checksums_dir)
+        ),
     )
     if not isinstance(out, dict):
         pytest.fail("validate_scoring_stage_approval must return a mapping")

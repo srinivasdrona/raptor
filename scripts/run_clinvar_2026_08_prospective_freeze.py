@@ -67,6 +67,20 @@ following are true, checked in this exact order:
    the exact-source archive; the two lookups are narrow, side-effect-free
    read ports over already-published NCBI metadata.
 
+Transport-tamper defense (independent review finding): the two lookup
+options above ARE still caller-selected, dynamically-imported code, and
+`_resolve_import_target` (and the modules/callables it resolves) run AFTER
+`build_transport()` but BEFORE the real archive GET -- the only window in
+this script where non-production-owned code executes at all. To close the
+possibility of that code monkeypatching `_ExactSourceTransport.stream_get`
+(or `.head`) to silently substitute the download source, this script
+captures a `capture_transport_identity_pin(transport)` identity pin
+IMMEDIATELY after `build_transport()` returns, strictly before either
+lookup is imported, and passes it to `execute_transport_and_raw_freeze`,
+which re-verifies it twice (on entry, and again immediately before the
+real streamed GET) and refuses with `TRANSPORT_IDENTITY_TAMPERED` on any
+mismatch -- before any network call.
+
 Even with every one of the above satisfied, this script never invokes
 `label_reader`/`benchmark_builder`/`scoring_runner` -- stage 3+ (label
 read, benchmark build, masking, scoring) is out of scope for stage 1/2 and
@@ -308,6 +322,17 @@ def main(argv: list[str] | None = None) -> int:
     # so every hook is that function's own real default.
     transport = prospective_exact_source_transport.build_transport()
 
+    # Transport-tamper defense (independent review finding): the identity
+    # pin is captured HERE, immediately after `build_transport()` returns
+    # and strictly BEFORE the two `_resolve_import_target` calls below --
+    # the only place in this script that imports/calls caller-selected code
+    # ("module:callable" specs). `execute_transport_and_raw_freeze` re-
+    # verifies this pin twice (on entry, and again immediately before the
+    # real streamed GET) and refuses with TRANSPORT_IDENTITY_TAMPERED if
+    # either lookup callable monkeypatched the transport's class methods in
+    # the meantime.
+    transport_identity_pin = prospective_freeze.capture_transport_identity_pin(transport)
+
     try:
         published_archive_date_lookup = _resolve_import_target(args.published_archive_date_lookup)
     except (ImportError, ModuleNotFoundError) as exc:
@@ -368,6 +393,7 @@ def main(argv: list[str] | None = None) -> int:
             label_reader=None,
             benchmark_builder=None,
             scoring_runner=None,
+            transport_identity_pin=transport_identity_pin,
         )
     except prospective_freeze.ProspectiveContractError as exc:
         print(f"REFUSED: {exc}", file=sys.stderr)
