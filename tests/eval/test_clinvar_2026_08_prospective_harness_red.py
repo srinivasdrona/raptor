@@ -66,12 +66,14 @@ def _execute_argv(
     base_config: Path,
     allowed_repo_root: Path,
     allowed_external_root: Path,
-    transport_factory: str = "_harness_fake_injections:build_transport",
     published_archive_date_lookup: str | None = DEFAULT_PUBLISHED_LOOKUP_SPEC,
     official_md5_lookup: str | None = DEFAULT_OFFICIAL_MD5_LOOKUP_SPEC,
     transport_record: Path | None = None,
     raw_record: Path | None = None,
 ) -> list[str]:
+    # Finding #3: there is no `--transport-factory` (or any other) CLI option
+    # any more -- production/executable acquisition is hard-wired to
+    # `prospective_exact_source_transport.build_transport()`.
     argv = [
         "--execute",
         "--approval-record",
@@ -86,8 +88,6 @@ def _execute_argv(
         str(allowed_repo_root),
         "--allowed-external-root",
         str(allowed_external_root),
-        "--transport-factory",
-        transport_factory,
     ]
     if published_archive_date_lookup is not None:
         argv.extend(["--published-archive-date-lookup", published_archive_date_lookup])
@@ -166,18 +166,18 @@ def _install_fake_injections_module(
     monkeypatch: pytest.MonkeyPatch,
     *,
     module_name: str = "_harness_fake_injections",
-    transport_factory: Any | None = None,
     published_lookup: Any | None = None,
     official_md5_lookup: Any | None = None,
 ) -> types.ModuleType:
+    # Finding #3: the harness no longer resolves a transport factory via any
+    # dynamic 'module:callable' spec (there is no `--transport-factory`
+    # option), so this fake module only ever needs to provide the two
+    # lookup ports; `build_transport` plumbing was removed entirely.
     fake_module = types.ModuleType(module_name)
-    if transport_factory is None:
-        transport_factory = lambda: object()
     if published_lookup is None:
         published_lookup = lambda _url: {"published_archive_date": "2026-08-06", "source_identity": "fake-published"}
     if official_md5_lookup is None:
         official_md5_lookup = lambda _url: {"official_md5": "0" * 32, "source_identity": "fake-md5"}
-    fake_module.build_transport = transport_factory
     fake_module.published_archive_date_lookup = published_lookup
     fake_module.official_md5_lookup = official_md5_lookup
     monkeypatch.setitem(sys.modules, module_name, fake_module)
@@ -278,7 +278,11 @@ def test_harness_is_inert_without_execute(monkeypatch: pytest.MonkeyPatch) -> No
     harness = _load_harness_module()
     resolved: list[str] = []
     executed: list[dict[str, Any]] = []
-    monkeypatch.setattr(harness, "_resolve_transport_factory", lambda spec: resolved.append(spec) or object())
+    monkeypatch.setattr(
+        harness.prospective_exact_source_transport,
+        "build_transport",
+        lambda **_kwargs: resolved.append("build_transport") or object(),
+    )
     monkeypatch.setattr(
         harness.prospective_freeze,
         "execute_transport_and_raw_freeze",
@@ -334,12 +338,12 @@ def test_execute_rejects_native_windows_python_before_transport_import(
         _write_json(approval_path, build_approval_record(sandbox))
         factory_calls, import_calls, constructor_calls, network_calls = _transport_resolution_spies(monkeypatch)
 
-        def _record_factory(spec: str) -> Any:
-            factory_calls.append(spec)
-            constructor_calls.append(spec)
+        def _record_factory(**_kwargs: Any) -> Any:
+            factory_calls.append("build_transport")
+            constructor_calls.append("build_transport")
             return object()
 
-        monkeypatch.setattr(harness, "_resolve_transport_factory", _record_factory)
+        monkeypatch.setattr(harness.prospective_exact_source_transport, "build_transport", _record_factory)
         monkeypatch.setattr(harness.platform, "machine", lambda: "x86_64")
         monkeypatch.setattr(harness.sys, "executable", "C:\\Python312\\python.exe")
 
@@ -406,12 +410,12 @@ def test_execute_external_root_preflight_rejects_invalid_root_before_transport_i
 
         factory_calls, import_calls, constructor_calls, network_calls = _transport_resolution_spies(monkeypatch)
 
-        def _record_factory(spec: str) -> Any:
-            factory_calls.append(spec)
-            constructor_calls.append(spec)
+        def _record_factory(**_kwargs: Any) -> Any:
+            factory_calls.append("build_transport")
+            constructor_calls.append("build_transport")
             return object()
 
-        monkeypatch.setattr(harness, "_resolve_transport_factory", _record_factory)
+        monkeypatch.setattr(harness.prospective_exact_source_transport, "build_transport", _record_factory)
         monkeypatch.setattr(harness.platform, "machine", lambda: "x86_64")
         monkeypatch.setattr(harness.sys, "executable", "/home/sdrona/raptor/bin/python")
 
@@ -458,12 +462,12 @@ def test_execute_requires_both_lookup_injection_options_before_transport_resolut
         _write_json(approval_path, build_approval_record(sandbox))
         factory_calls, import_calls, constructor_calls, network_calls = _transport_resolution_spies(monkeypatch)
 
-        def _record_factory(spec: str) -> Any:
-            factory_calls.append(spec)
-            constructor_calls.append(spec)
+        def _record_factory(**_kwargs: Any) -> Any:
+            factory_calls.append("build_transport")
+            constructor_calls.append("build_transport")
             return object()
 
-        monkeypatch.setattr(harness, "_resolve_transport_factory", _record_factory)
+        monkeypatch.setattr(harness.prospective_exact_source_transport, "build_transport", _record_factory)
         monkeypatch.setattr(harness.platform, "machine", lambda: "x86_64")
         monkeypatch.setattr(harness.sys, "executable", "/home/sdrona/raptor/bin/python")
 
@@ -510,12 +514,12 @@ def test_execute_real_validator_rejections_return_rc2_without_transport_activity
         _install_fake_injections_module(monkeypatch)
         factory_calls, import_calls, constructor_calls, network_calls = _transport_resolution_spies(monkeypatch)
 
-        def _record_factory(spec: str) -> Any:
-            factory_calls.append(spec)
-            constructor_calls.append(spec)
+        def _record_factory(**_kwargs: Any) -> Any:
+            factory_calls.append("build_transport")
+            constructor_calls.append("build_transport")
             return object()
 
-        monkeypatch.setattr(harness, "_resolve_transport_factory", _record_factory)
+        monkeypatch.setattr(harness.prospective_exact_source_transport, "build_transport", _record_factory)
         monkeypatch.setattr(harness.platform, "machine", lambda: "x86_64")
         monkeypatch.setattr(harness.sys, "executable", "/home/sdrona/raptor/bin/python")
 
@@ -586,12 +590,12 @@ def test_execute_handles_approval_file_read_failures_with_typed_refusal_and_no_t
         _install_fake_injections_module(monkeypatch)
         factory_calls, import_calls, constructor_calls, network_calls = _transport_resolution_spies(monkeypatch)
 
-        def _record_factory(spec: str) -> Any:
-            factory_calls.append(spec)
-            constructor_calls.append(spec)
+        def _record_factory(**_kwargs: Any) -> Any:
+            factory_calls.append("build_transport")
+            constructor_calls.append("build_transport")
             return object()
 
-        monkeypatch.setattr(harness, "_resolve_transport_factory", _record_factory)
+        monkeypatch.setattr(harness.prospective_exact_source_transport, "build_transport", _record_factory)
         monkeypatch.setattr(harness.platform, "machine", lambda: "x86_64")
         monkeypatch.setattr(harness.sys, "executable", "/home/sdrona/raptor/bin/python")
 
@@ -629,96 +633,64 @@ def test_execute_handles_approval_file_read_failures_with_typed_refusal_and_no_t
 
 
 @pytest.mark.parametrize(
-    ("case_id", "transport_spec", "published_spec", "official_spec", "expected_fragments", "expected_transport_ctor_calls"),
+    ("case_id", "published_spec", "official_spec", "expected_fragments"),
     (
         (
-            "transport-module-import-error",
-            "__missing_transport_module__:build_transport",
-            "_harness_resolution_faults:published_archive_date_lookup",
-            "_harness_resolution_faults:official_md5_lookup",
-            ("transport", "module", "import"),
-            0,
-        ),
-        (
-            "transport-attribute-error",
-            "_harness_resolution_faults:missing_transport_factory",
-            "_harness_resolution_faults:published_archive_date_lookup",
-            "_harness_resolution_faults:official_md5_lookup",
-            ("transport", "attribute", "missing_transport_factory"),
-            0,
-        ),
-        (
-            "transport-constructor-error",
-            "_harness_resolution_faults:build_transport_raises",
-            "_harness_resolution_faults:published_archive_date_lookup",
-            "_harness_resolution_faults:official_md5_lookup",
-            ("transport", "constructor", "boom"),
-            1,
-        ),
-        (
             "published-lookup-module-import-error",
-            "_harness_resolution_faults:build_transport",
             "__missing_lookup_module__:published_archive_date_lookup",
             "_harness_resolution_faults:official_md5_lookup",
             ("published", "lookup", "module", "import"),
-            1,
         ),
         (
             "published-lookup-attribute-error",
-            "_harness_resolution_faults:build_transport",
             "_harness_resolution_faults:missing_published_lookup",
             "_harness_resolution_faults:official_md5_lookup",
             ("published", "lookup", "attribute", "missing_published_lookup"),
-            1,
         ),
         (
             "official-lookup-module-import-error",
-            "_harness_resolution_faults:build_transport",
             "_harness_resolution_faults:published_archive_date_lookup",
             "__missing_lookup_module__:official_md5_lookup",
             ("official", "md5", "lookup", "module", "import"),
-            1,
         ),
         (
             "official-lookup-attribute-error",
-            "_harness_resolution_faults:build_transport",
             "_harness_resolution_faults:published_archive_date_lookup",
             "_harness_resolution_faults:missing_official_md5_lookup",
             ("official", "md5", "lookup", "attribute", "missing_official_md5_lookup"),
-            1,
         ),
     ),
 )
-def test_execute_handles_transport_and_lookup_resolution_errors_with_typed_refusal(
+def test_execute_handles_lookup_resolution_errors_with_typed_refusal(
     case_id: str,
-    transport_spec: str,
     published_spec: str,
     official_spec: str,
     expected_fragments: tuple[str, ...],
-    expected_transport_ctor_calls: int,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    # Finding #3: transport resolution can no longer fail via any CLI-
+    # injected spec at all -- production/executable acquisition is
+    # hard-wired to `prospective_exact_source_transport.build_transport()`.
+    # Only the two lookup ports remain dynamically resolved via
+    # 'module:callable' specs, so this test now exercises only their
+    # failure modes.
     harness = _load_harness_module()
     with prospective_sandbox(f"harness-resolution-errors-{case_id}") as sandbox:
         transport_ctor_calls = {"count": 0}
 
-        def _build_transport() -> Any:
+        def _build_transport(**_kwargs: Any) -> Any:
             transport_ctor_calls["count"] += 1
             return object()
 
-        def _build_transport_raises() -> Any:
-            transport_ctor_calls["count"] += 1
-            raise RuntimeError("boom from transport constructor")
+        monkeypatch.setattr(harness.prospective_exact_source_transport, "build_transport", _build_transport)
 
         faults = _install_fake_injections_module(
             monkeypatch,
             module_name="_harness_resolution_faults",
-            transport_factory=_build_transport,
             published_lookup=lambda _url: {"published_archive_date": "2026-08-06", "source_identity": "fake-published"},
             official_md5_lookup=lambda _url: {"official_md5": "0" * 32, "source_identity": "fake-md5"},
         )
-        faults.build_transport_raises = _build_transport_raises
 
         approval_path = sandbox.root / "approval.json"
         _write_json(approval_path, build_approval_record(sandbox))
@@ -736,14 +708,17 @@ def test_execute_handles_transport_and_lookup_resolution_errors_with_typed_refus
                 base_config=sandbox.base_eval_config_path,
                 allowed_repo_root=sandbox.repo_root,
                 allowed_external_root=sandbox.external_root,
-                transport_factory=transport_spec,
                 published_archive_date_lookup=published_spec,
                 official_md5_lookup=official_spec,
             ),
         )
         captured = capsys.readouterr()
         assert network_calls == []
-        assert transport_ctor_calls["count"] == expected_transport_ctor_calls
+        # The hard-wired transport is always constructed before either
+        # lookup is resolved (see run_clinvar_2026_08_prospective_freeze.py
+        # main()), so it is called exactly once regardless of which lookup
+        # fails.
+        assert transport_ctor_calls["count"] == 1
         _assert_typed_nonzero_without_traceback(
             rc=rc,
             exc=exc,
@@ -753,7 +728,7 @@ def test_execute_handles_transport_and_lookup_resolution_errors_with_typed_refus
         )
         assert factory_calls == []
         assert constructor_calls == []
-        assert "_harness_resolution_faults" in import_calls or "__missing" in transport_spec or "__missing" in published_spec or "__missing" in official_spec
+        assert "_harness_resolution_faults" in import_calls or "__missing" in published_spec or "__missing" in official_spec
 
 
 @pytest.mark.parametrize(
@@ -774,11 +749,11 @@ def test_execute_handles_overlay_load_or_shape_errors_with_typed_refusal(
         _install_fake_injections_module(monkeypatch)
         transport_ctor_calls = {"count": 0}
 
-        def _record_factory(spec: str) -> Any:
+        def _record_factory(**_kwargs: Any) -> Any:
             transport_ctor_calls["count"] += 1
             return object()
 
-        monkeypatch.setattr(harness, "_resolve_transport_factory", _record_factory)
+        monkeypatch.setattr(harness.prospective_exact_source_transport, "build_transport", _record_factory)
         factory_calls, import_calls, constructor_calls, network_calls = _transport_resolution_spies(monkeypatch)
         monkeypatch.setattr(harness.platform, "machine", lambda: "x86_64")
         monkeypatch.setattr(harness.sys, "executable", "/home/sdrona/raptor/bin/python")
@@ -851,13 +826,13 @@ def test_execute_handles_executor_transport_errors_with_typed_output_and_no_raw_
         factory_calls, import_calls, constructor_calls, network_calls = _transport_resolution_spies(monkeypatch)
         transport_ctor_calls = {"count": 0}
 
-        def _record_factory(spec: str) -> Any:
-            factory_calls.append(spec)
-            constructor_calls.append(spec)
+        def _record_factory(**_kwargs: Any) -> Any:
+            factory_calls.append("build_transport")
+            constructor_calls.append("build_transport")
             transport_ctor_calls["count"] += 1
             return object()
 
-        monkeypatch.setattr(harness, "_resolve_transport_factory", _record_factory)
+        monkeypatch.setattr(harness.prospective_exact_source_transport, "build_transport", _record_factory)
         monkeypatch.setattr(harness.platform, "machine", lambda: "x86_64")
         monkeypatch.setattr(harness.sys, "executable", "/home/sdrona/raptor/bin/python")
 
@@ -939,9 +914,9 @@ def test_execute_success_forwards_registered_paths_and_unset_stage3_ports(
             call_order.append("resolve_transport")
             return sentinel_transport
 
+        monkeypatch.setattr(harness.prospective_exact_source_transport, "build_transport", _build_transport)
         _install_fake_injections_module(
             monkeypatch,
-            transport_factory=_build_transport,
             published_lookup=published_lookup,
             official_md5_lookup=official_md5_lookup,
         )
@@ -962,9 +937,11 @@ def test_execute_success_forwards_registered_paths_and_unset_stage3_ports(
 
         def _fake_execute(**kwargs: Any) -> dict[str, Any]:
             call_order.append("execute")
+            # Finding #4: acquisition never forwards base_eval_config_path
+            # (or any scoring-semantics identity) to execute_transport_and_raw_freeze.
+            assert "base_eval_config_path" not in kwargs
             assert Path(kwargs["registration_spec_path"]) == sandbox.spec_path
             assert Path(kwargs["prospective_overlay_path"]) == sandbox.overlay_path
-            assert Path(kwargs["base_eval_config_path"]) == sandbox.base_eval_config_path
             assert kwargs["approval_record"] == approval
             assert Path(kwargs["allowed_repo_root"]) == sandbox.repo_root
             assert Path(kwargs["allowed_external_root"]) == sandbox.external_root
@@ -1034,7 +1011,7 @@ def test_execute_typed_exit_for_blocked_or_invalid_results_is_nonzero_with_reaso
             "validate_pre_data_approval",
             lambda **_kwargs: copy.deepcopy(approval),
         )
-        monkeypatch.setattr(harness, "_resolve_transport_factory", lambda _spec: object())
+        monkeypatch.setattr(harness.prospective_exact_source_transport, "build_transport", lambda **_kwargs: object())
         monkeypatch.setattr(
             harness.prospective_freeze,
             "execute_transport_and_raw_freeze",

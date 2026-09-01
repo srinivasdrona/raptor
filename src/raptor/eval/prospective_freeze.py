@@ -45,17 +45,30 @@ same typed error/stop-state vocabulary:
   the mandatory ADR-0008 x64 worker / BIAS / Nirvana / resource-manifest
   identity check that MUST pass before any BIAS/Nirvana execution or
   label-dependent evaluation. It is deliberately independent of, and never
-  consulted by, stages 1-2 above. A schema breach or runtime-identity
-  mismatch here raises `ProspectiveInvalidStateError` (`.code == "INVALID"`,
-  an A0 run-integrity failure per the registration spec's stage 4 rule),
-  never a `PRE_DATA_*` stop state.
+  consulted by, stages 1-2 above. It never trusts the approval record's
+  claimed `x64_freeze` block on its own: it requires a separately supplied
+  `observed_runtime_identity` (never copied from the approval record) and
+  always independently RECOMPUTES `resource_manifest_sha256` from the
+  actual current manifest files via `compute_resource_manifest_sha256` --
+  never accepting it as a claim -- then requires the approval record's
+  claimed pins to equal that observed/recomputed identity exactly. A
+  merely well-formed but fabricated claimed digest (e.g. all-zero) is
+  therefore always rejected. A schema breach, wrong decision/approver,
+  mistimed approval, or any observed-vs-claimed identity mismatch raises
+  `ProspectiveInvalidStateError` (`.code == "INVALID"`, an A0 run-integrity
+  failure per the registration spec's stage 4 rule), never a `PRE_DATA_*`
+  stop state.
 * `adjudicate_prospective_outcomes` -- the ADR-0020 A0-A6 per-scope axis
   projection, the closed six-value terminal-outcome vocabulary, and the
   full-spectrum/narrow-scope precedence and authorization mapping. It
   trusts (never recomputes) each scope's pre-derived A1/A2/A3 verdict --
   it only validates the closed enum, derives A4/A5/A6, and applies the
   registered precedence -- so it can never itself read a label, a
-  benchmark row, or a score.
+  benchmark row, or a score. Its VERY FIRST action, unconditionally, is
+  calling `validate_scoring_stage_approval`: no outcome dict of any kind
+  (including `PASS`/`AUTHORIZED_RESEARCH_ONLY`) can ever be produced
+  without a validated, anti-fabrication-checked scoring-stage approval and
+  observed runtime identity.
 
 Nothing in this module ever performs a real archive GET, HEAD, or lookup:
 `transport`, `published_archive_date_lookup`, and `official_md5_lookup` are
@@ -769,28 +782,68 @@ def compute_resource_manifest_sha256(checksums_dir: Path | str) -> str:
 #: of one schema can never be mistaken for, or silently accepted as, the
 #: other.
 _SCORING_STAGE_APPROVAL_SCHEMA_ID = "raptor.eval.scoring_stage_approval.v1"
-_SCORING_STAGE_APPROVAL_TOP_KEYS = frozenset({"schema", "registration_id", "approver", "approved_at", "x64_freeze"})
+_SCORING_STAGE_APPROVAL_TOP_KEYS = frozenset(
+    {"schema", "registration_id", "decision", "approver", "approved_at", "x64_freeze"}
+)
+
+#: The runtime-identity dimensions a caller can independently OBSERVE about
+#: the process it is actually running in (worker designation/arch, and the
+#: BIAS/Nirvana identity that process itself reports). Deliberately EXCLUDES
+#: `resource_manifest_sha256`: that dimension is never accepted as a caller
+#: claim here -- it is always independently recomputed by this function from
+#: `resource_manifest_checksums_dir` via `compute_resource_manifest_sha256`,
+#: never trusted from any input mapping.
+_OBSERVED_RUNTIME_IDENTITY_KEYS = frozenset({"worker_designation", "worker_arch", "bias_commit", "nirvana_banner"})
 
 
 def validate_scoring_stage_approval(
-    *, registration_id: str, approval_record: Mapping[str, Any]
+    *,
+    registration_id: str,
+    registration_spec_path: "str | Path",
+    approval_record: Mapping[str, Any],
+    observed_runtime_identity: Mapping[str, Any],
+    resource_manifest_checksums_dir: "str | Path",
+    first_scoring_execution_at: str | None = None,
 ) -> dict[str, Any]:
     """Validate `approval_record` against the closed
-    `raptor.eval.scoring_stage_approval.v1` schema for `registration_id`.
+    `raptor.eval.scoring_stage_approval.v1` schema for `registration_id`,
+    AND cross-check its claimed `x64_freeze` pins against an independently
+    observed/recomputed runtime identity for the CURRENT run. This is the
+    MANDATORY gate before any BIAS/Nirvana execution or label-dependent
+    evaluation (ADR-0020 stage 4 `4_MASK_AND_LABEL_FREE_SCORE`) -- it is a
+    separate, later gate from `validate_pre_data_approval` /
+    `execute_transport_and_raw_freeze` (stages 1-2, ClinVar archive
+    acquisition), which never require or check x64/BIAS/Nirvana identity.
 
-    This is the MANDATORY gate before any BIAS/Nirvana execution or
-    label-dependent evaluation (ADR-0020 stage 4
-    `4_MASK_AND_LABEL_FREE_SCORE`) -- it is a separate, later gate from
-    `validate_pre_data_approval` / `execute_transport_and_raw_freeze`
-    (stages 1-2, ClinVar archive acquisition), which never require or check
-    x64/BIAS/Nirvana identity. Any schema breach, `registration_id`
-    mismatch, blank approver/timestamp, or `x64_freeze` identity mismatch
-    (via `assert_runtime_boundary`) raises `ProspectiveInvalidStateError`
-    (`.code == "INVALID"`) -- matching the registration spec's stage 4 rule
-    that manifest/tool/resource identity drift is an A0 run-integrity
-    failure, never a `PRE_DATA_*` stop state and never reported as a
-    performance FAIL. Returns a shallow copy of `approval_record` on
-    success."""
+    Deliberately never trusts the approval record's `x64_freeze` block on
+    its own -- a claimed value there, however well-formed (including an
+    all-zero or otherwise fabricated `resource_manifest_sha256`), is only
+    EVIDENCE to be checked, never a source of truth:
+
+    * `observed_runtime_identity` (`worker_designation`, `worker_arch`,
+      `bias_commit`, `nirvana_banner`) must be supplied by the caller from
+      what THIS process actually observes about its own execution
+      environment -- never copied from the approval record.
+    * `resource_manifest_sha256` is never accepted as a claim at all: it is
+      always recomputed here, from scratch, via
+      `compute_resource_manifest_sha256(resource_manifest_checksums_dir)`
+      against the three pinned checksum-manifest files' actual current
+      bytes.
+    * The combined observed+recomputed identity is checked against the
+      ADR-0008 pinned constants via `assert_runtime_boundary`, and then the
+      approval record's claimed `x64_freeze` must equal that observed
+      identity EXACTLY -- a mismatch in any single dimension (including a
+      claimed digest that does not match the real recomputation) fails
+      closed.
+
+    Any schema breach, wrong/missing `decision` (a `REJECTED_SCORING_STAGE`
+    decision is rejected explicitly and distinctly), wrong approver, blank
+    or mistimed `approved_at`, or any identity mismatch raises
+    `ProspectiveInvalidStateError` (`.code == "INVALID"`) -- matching the
+    registration spec's stage 4 rule that manifest/tool/resource identity
+    drift is an A0 run-integrity failure, never a `PRE_DATA_*` stop state
+    and never reported as a performance FAIL. Returns a shallow copy of
+    `approval_record` on success."""
     if not isinstance(approval_record, Mapping) or set(approval_record.keys()) != _SCORING_STAGE_APPROVAL_TOP_KEYS:
         raise ProspectiveInvalidStateError(
             f"scoring_stage_approval record top-level keys must be exactly {sorted(_SCORING_STAGE_APPROVAL_TOP_KEYS)!r}"
@@ -804,22 +857,86 @@ def validate_scoring_stage_approval(
         raise ProspectiveInvalidStateError(
             "scoring_stage_approval registration_id does not match the registration this scoring run is for"
         )
+
+    spec = _load_yaml(Path(registration_spec_path))
+    stage_spec = spec["scoring_stage_approval"]
+    allowed_decisions = set(stage_spec["allowed_decisions"])
+    approver_required = stage_spec["approver_required"]
+
+    decision = approval_record.get("decision")
+    if decision == "REJECTED_SCORING_STAGE":
+        raise ProspectiveInvalidStateError("scoring_stage_approval owner recorded REJECTED_SCORING_STAGE")
+    if decision != "APPROVED_SCORING_STAGE" or decision not in allowed_decisions:
+        raise ProspectiveInvalidStateError(
+            f"scoring_stage_approval decision must be APPROVED_SCORING_STAGE, got {decision!r}"
+        )
+
     approver = approval_record.get("approver")
     if not isinstance(approver, str) or not approver.strip():
         raise ProspectiveInvalidStateError("scoring_stage_approval approver must be a non-blank string")
+    if approver != approver_required:
+        raise ProspectiveInvalidStateError(f"scoring_stage_approval approver must be exactly {approver_required!r}")
+
     approved_at = approval_record.get("approved_at")
     if not isinstance(approved_at, str) or not approved_at.strip():
         raise ProspectiveInvalidStateError("scoring_stage_approval approved_at must be a non-blank timestamp")
     try:
-        _parse_iso_utc(approved_at)
+        approved_at_dt = _parse_iso_utc(approved_at)
     except ValueError as exc:
         raise ProspectiveInvalidStateError(
             f"scoring_stage_approval approved_at is not a valid timestamp: {approved_at!r}"
         ) from exc
+    if first_scoring_execution_at is not None:
+        try:
+            first_execution_dt = _parse_iso_utc(first_scoring_execution_at)
+        except ValueError as exc:
+            raise ProspectiveInvalidStateError(
+                f"first_scoring_execution_at is not a valid timestamp: {first_scoring_execution_at!r}"
+            ) from exc
+        if approved_at_dt >= first_execution_dt:
+            raise ProspectiveInvalidStateError(
+                "scoring_stage_approval approved_at must be strictly before first_scoring_execution_at"
+            )
+
     x64_freeze = approval_record.get("x64_freeze")
     if not isinstance(x64_freeze, Mapping) or set(x64_freeze.keys()) != _RUNTIME_IDENTITY_KEYS:
         raise ProspectiveInvalidStateError("scoring_stage_approval x64_freeze block schema invalid")
-    assert_runtime_boundary(runtime_identity=x64_freeze)
+
+    if (
+        not isinstance(observed_runtime_identity, Mapping)
+        or set(observed_runtime_identity.keys()) != _OBSERVED_RUNTIME_IDENTITY_KEYS
+    ):
+        raise ProspectiveInvalidStateError(
+            f"observed_runtime_identity must define exactly {sorted(_OBSERVED_RUNTIME_IDENTITY_KEYS)!r}"
+        )
+
+    try:
+        observed_resource_manifest_sha256 = compute_resource_manifest_sha256(resource_manifest_checksums_dir)
+    except OSError as exc:
+        raise ProspectiveInvalidStateError(
+            f"could not recompute resource_manifest_sha256 from {resource_manifest_checksums_dir!r}: {exc}"
+        ) from exc
+
+    full_observed_identity = dict(observed_runtime_identity)
+    full_observed_identity["resource_manifest_sha256"] = observed_resource_manifest_sha256
+
+    # `assert_runtime_boundary` checks this INDEPENDENTLY OBSERVED/RECOMPUTED
+    # identity -- never the approval record's claimed `x64_freeze` -- against
+    # the pinned worker/BIAS/Nirvana constants and the resource digest's hex
+    # format.
+    assert_runtime_boundary(runtime_identity=full_observed_identity)
+
+    # The anti-fabrication binding: the approval record's CLAIMED x64_freeze
+    # pins must equal THIS run's independently observed/recomputed identity,
+    # byte-for-byte. A merely well-formed but fabricated claimed digest (an
+    # all-zero digest, or any other 64-hex value not actually produced by
+    # recomputation) is rejected here, because it can never equal the real
+    # recomputed value.
+    if dict(x64_freeze) != full_observed_identity:
+        raise ProspectiveInvalidStateError(
+            "scoring_stage_approval x64_freeze does not match the independently observed/recomputed runtime identity"
+        )
+
     return dict(approval_record)
 
 
@@ -846,29 +963,24 @@ def _overlay_required_values_reason(*, spec: Mapping[str, Any], overlay: Mapping
     return None
 
 
-def _overlay_coherence_reason(
-    *, spec: Mapping[str, Any], overlay: Mapping[str, Any], base_eval_config_path: Path
-) -> str | None:
+def _overlay_coherence_reason(*, spec: Mapping[str, Any], overlay: Mapping[str, Any]) -> str | None:
     """Cheap, side-effect-free pre-check of the overlay/spec coherence
     invariants `execute_transport_and_raw_freeze` must reject BEFORE any
-    network call (every registered required-value pin, plus base-config
-    hash pin and 3-way exact-URL equality across
-    overlay/dataset_registration/stage_1). Returns a reason code on drift,
-    `None` when coherent. Deliberately does not itself call
-    `merge_prospective_overlay` -- see that function's own (overlapping but
-    authoritative) checks, which the caller still invokes once this
-    pre-check passes."""
+    network call (every registered required-value pin, plus 3-way exact-URL
+    equality across overlay/dataset_registration/stage_1). Returns a reason
+    code on drift, `None` when coherent.
+
+    Deliberately checks ONLY dataset/URL identity -- never scoring-semantics
+    or base-eval-config hashes. Acquisition (ADR-0020 stages 1-2) never
+    reads or depends on scoring semantics; that verification belongs solely
+    to `merge_prospective_overlay`, invoked only when the effective eval
+    config is actually built for ADR-0020 stage 3+ scoring, never as a
+    precondition for archive acquisition."""
     required_values_reason = _overlay_required_values_reason(spec=spec, overlay=overlay)
     if required_values_reason is not None:
         return required_values_reason
     if overlay.get("registration_id") != spec["registration"]["id"]:
         return "OVERLAY_REGISTRATION_ID_DRIFT"
-    try:
-        base_raw = Path(base_eval_config_path).read_bytes()
-    except OSError:
-        return "BASE_EVAL_CONFIG_UNREADABLE"
-    if overlay.get("base_config_canonical_lf_sha256") != _canonical_lf_sha256_bytes(base_raw):
-        return "OVERLAY_BASE_CONFIG_HASH_DRIFT"
     dataset_registration = spec["dataset_registration"]
     stage1 = dataset_registration["stage_1_head_comparison"]
     overlay_url = overlay.get("exact_archive_url")
@@ -963,7 +1075,6 @@ _APPROVAL_TOP_KEYS = frozenset(
         "registration",
         "adr",
         "overlay",
-        "scoring_semantics_projection_sha256",
         "implementation_freeze",
         "immutable_inputs_verified",
         "protected_tests_verified",
@@ -1080,11 +1191,14 @@ def _validate_approval_record(
             "PRE_DATA_DRIFT", "approval overlay canonical_lf_sha256 does not match the current overlay bytes"
         )
 
-    projection_sha256 = spec["authority_partition"]["tsc2_scoring_semantics_projection"]["sha256"]
-    if approval_record.get("scoring_semantics_projection_sha256") != projection_sha256:
-        raise ProspectiveStopStateError(
-            "PRE_DATA_DRIFT", "approval scoring_semantics_projection_sha256 does not match the registration spec"
-        )
+    # Deliberately NO scoring-semantics/base-eval-config verification here --
+    # PRE_DATA approval gates ONLY ClinVar archive acquisition (ADR-0020
+    # stages 1-2), which never reads or depends on scoring semantics. That
+    # concern is enforced exclusively by `merge_prospective_overlay`'s own
+    # pins against the overlay document (`base_config_canonical_lf_sha256`,
+    # `base_scoring_semantics_projection_sha256`), invoked only when the
+    # effective eval config is actually built for ADR-0020 stage 3+ scoring
+    # -- never here, and never as a precondition for archive acquisition.
 
     implementation_freeze = approval_record.get("implementation_freeze")
     if (
@@ -1297,7 +1411,6 @@ def execute_transport_and_raw_freeze(
     *,
     registration_spec_path: "str | Path",
     prospective_overlay_path: "str | Path",
-    base_eval_config_path: "str | Path",
     approval_record: Mapping[str, Any] | None,
     allowed_repo_root: "str | Path",
     allowed_external_root: "str | Path",
@@ -1322,8 +1435,16 @@ def execute_transport_and_raw_freeze(
     and no `assert_runtime_boundary` call anywhere in this function, by
     design: ClinVar archive acquisition has no x86-only requirement. That
     boundary is enforced later, and separately, by
-    `validate_scoring_stage_approval` before ADR-0020 stage 4. See module
-    docstring for the full fail-closed contract."""
+    `validate_scoring_stage_approval` before ADR-0020 stage 4.
+
+    Likewise NEVER reads a base eval config and NEVER verifies
+    scoring-semantics/base-config hashes -- there is no
+    `base_eval_config_path` parameter and no `merge_prospective_overlay`
+    call anywhere in this function, by design: acquisition never depends on
+    scoring semantics. That verification belongs solely to
+    `merge_prospective_overlay`, called only when the effective eval config
+    is actually built for ADR-0020 stage 3+ scoring. See module docstring
+    for the full fail-closed contract."""
     cli_overrides = cli_overrides or {}
     env_overrides = env_overrides or {}
     if cli_overrides or env_overrides:
@@ -1362,23 +1483,12 @@ def execute_transport_and_raw_freeze(
     dataset_registration = spec["dataset_registration"]
     stage1 = dataset_registration["stage_1_head_comparison"]
 
-    # Item 5: overlay/spec coherence MUST be rejected before any network call
-    # (every registered required-value pin, base-config hash pin, 3-way
-    # exact-URL equality). `merge_prospective_overlay` is always invoked
-    # afterward (never skipped, never aliased) -- its own raise only
-    # propagates for a sandbox this pre-check already found coherent (e.g. a
-    # monkeypatched sentinel), never as a substitute for this typed-return
-    # path.
-    coherence_reason = _overlay_coherence_reason(
-        spec=spec, overlay=overlay, base_eval_config_path=Path(base_eval_config_path)
-    )
+    # Item 5: overlay/spec coherence (dataset/URL identity ONLY -- never
+    # scoring-semantics or base-eval-config hashes, which are out of scope
+    # for acquisition) MUST be rejected before any network call.
+    coherence_reason = _overlay_coherence_reason(spec=spec, overlay=overlay)
     if coherence_reason is not None:
         return {"stage_status": "BLOCKED", "terminal_outcome": "INVALID", "reason_code": coherence_reason}
-    merge_prospective_overlay(
-        registration_spec_path=spec_path,
-        prospective_overlay_path=overlay_path,
-        base_eval_config_path=base_eval_config_path,
-    )
     exact_url = str(overlay["exact_archive_url"])
 
     # Item 4: the caller-supplied transport/raw record paths must be exactly
@@ -1756,6 +1866,11 @@ def _scope_terminal_for_aggregation(axes: Mapping[str, Any]) -> str:
 
 def adjudicate_prospective_outcomes(
     *,
+    registration_id: str,
+    registration_spec_path: "str | Path",
+    scoring_stage_approval_record: Mapping[str, Any],
+    observed_runtime_identity: Mapping[str, Any],
+    resource_manifest_checksums_dir: "str | Path",
     run_integrity: str,
     stage12_outcome: str | None,
     scopes: Mapping[str, Any],
@@ -1764,13 +1879,37 @@ def adjudicate_prospective_outcomes(
     cli_overrides: Mapping[str, Any] | None = None,
     env_overrides: Mapping[str, str] | None = None,
     transport_metadata_not_content_identity: bool = True,
+    first_scoring_execution_at: str | None = None,
 ) -> dict[str, Any]:
     """ADR-0020 A0-A6 per-scope adjudication. Trusts (never recomputes) each
     scope's pre-derived A1/A2/A3 verdict; derives A4 (`"{correct}/{actual}"`),
     A5 (`A5_PRECEDENCE`) and A6, then the closed six-value terminal-outcome/
     full-spectrum/narrow-scope precedence and authorization mapping. Raises
     `ProspectiveInvalidStateError` on any override input, missing metadata
-    note, missing/unknown axis value, or unresolvable axis combination."""
+    note, missing/unknown axis value, or unresolvable axis combination.
+
+    MANDATORY scoring-stage gate: the very first thing this function does,
+    unconditionally and before any other input is even inspected, is call
+    `validate_scoring_stage_approval` with `scoring_stage_approval_record`
+    and `observed_runtime_identity` (never trusting either on its own --
+    see that function's anti-fabrication cross-check against an
+    independently recomputed ADR-0008 resource-manifest digest). A missing,
+    fabricated, or mismatched scoring-stage approval/runtime-identity raises
+    `ProspectiveInvalidStateError` here and NO outcome dict of any kind
+    (including `BLOCKED_DATA`/`FAIL`/`INVALID`, and in particular never
+    `PASS` or `AUTHORIZED_RESEARCH_ONLY`) is ever returned. This is a hard
+    structural precondition, not a conditional check keyed off the eventual
+    outcome -- there is no code path in this function that can produce a
+    result without first passing this gate."""
+    validate_scoring_stage_approval(
+        registration_id=registration_id,
+        registration_spec_path=registration_spec_path,
+        approval_record=scoring_stage_approval_record,
+        observed_runtime_identity=observed_runtime_identity,
+        resource_manifest_checksums_dir=resource_manifest_checksums_dir,
+        first_scoring_execution_at=first_scoring_execution_at,
+    )
+
     cli_overrides = cli_overrides or {}
     env_overrides = env_overrides or {}
     if cli_overrides or env_overrides:

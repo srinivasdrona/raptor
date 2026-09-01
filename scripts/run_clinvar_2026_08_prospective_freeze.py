@@ -20,8 +20,17 @@ following are true, checked in this exact order:
    freeze -- has no x86-only requirement; only the later BIAS-2015/Nirvana
    ADR-0008 stage does, and that stage is out of scope here).
 3. Every required `--execute` option is present (`--approval-record`,
-   `--allowed-external-root`, `--transport-factory`,
-   `--published-archive-date-lookup`, `--official-md5-lookup`).
+   `--allowed-external-root`, `--published-archive-date-lookup`,
+   `--official-md5-lookup`). Finding #3 (independent review): production
+   transport is HARD-WIRED to
+   `raptor.eval.prospective_exact_source_transport.build_transport()` --
+   there is no `--transport-factory` (or any other) CLI option, config
+   value, or environment variable capable of substituting a different
+   transport for a confirmed live `--execute` run. This closes the
+   arbitrary-live-transport-substitution vulnerability: a caller can no
+   longer point real execution at anything other than the one safe,
+   redirect-refusing, exact-URL-only, TLS-always-on transport this
+   repository ships.
 4. `--approval-record <path>` points at a JSON file that
    `raptor.eval.prospective_freeze.validate_pre_data_approval` accepts --
    schema `raptor.eval.pre_data_approval.v1`, `decision ==
@@ -45,13 +54,18 @@ following are true, checked in this exact order:
    run-scope destination is required to be unclaimed, and that freshness
    check lives in `raptor.eval.prospective_freeze
    .execute_transport_and_raw_freeze` itself, not here.
-6. A real network transport and both external lookups are resolved via
-   `--transport-factory`/`--published-archive-date-lookup`/
-   `--official-md5-lookup` ("module:callable" specs). This harness
-   deliberately ships with **no built-in HTTP implementation or lookup** --
-   `execute_transport_and_raw_freeze` itself requires an injected
-   `transport` and has "no default live transport" (see its module
-   docstring); wiring real ones is an explicit, separate, later step.
+6. A real network transport is always the ONE hard-wired production
+   implementation, `prospective_exact_source_transport.build_transport()`
+   -- called with no arguments, so every hook (`connection_factory`,
+   `socket_module`, `tls_context_factory`) is that function's own real
+   default (`http.client.HTTPSConnection`, `ssl.create_default_context`
+   with TLS verification always on). Both external lookups
+   (`published_archive_date_lookup`/`official_md5_lookup`) are still
+   resolved via `--published-archive-date-lookup`/`--official-md5-lookup`
+   ("module:callable" specs) -- only the transport is hard-wired, because
+   only the transport can actually perform network GET/HEAD I/O against
+   the exact-source archive; the two lookups are narrow, side-effect-free
+   read ports over already-published NCBI metadata.
 
 Even with every one of the above satisfied, this script never invokes
 `label_reader`/`benchmark_builder`/`scoring_runner` -- stage 3+ (label
@@ -105,14 +119,6 @@ def _resolve_import_target(spec: str) -> Any:
     module_name, _, attr_name = spec.partition(":")
     module = importlib.import_module(module_name)
     return getattr(module, attr_name)
-
-
-def _resolve_transport_factory(spec: str) -> Any:
-    """Import `module:callable` and call it with no arguments to build a
-    transport. There is no built-in factory -- see module docstring item 6.
-    """
-    factory = _resolve_import_target(spec)
-    return factory()
 
 
 def _assert_wsl_python_policy() -> None:
@@ -215,13 +221,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--transport-freeze-record", type=Path, default=None)
     parser.add_argument("--raw-freeze-record", type=Path, default=None)
     parser.add_argument(
-        "--transport-factory",
-        type=str,
-        default=None,
-        help="'module:callable' returning a transport implementing head()/stream_get(). "
-        "No default is provided -- see module docstring item 6. Required with --execute.",
-    )
-    parser.add_argument(
         "--published-archive-date-lookup",
         type=str,
         default=None,
@@ -260,8 +259,6 @@ def main(argv: list[str] | None = None) -> int:
         missing_options.append("--approval-record")
     if args.allowed_external_root is None:
         missing_options.append("--allowed-external-root")
-    if args.transport_factory is None:
-        missing_options.append("--transport-factory")
     if args.published_archive_date_lookup is None:
         missing_options.append("--published-archive-date-lookup")
     if args.official_md5_lookup is None:
@@ -304,17 +301,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"REFUSED: {root_refusal}", file=sys.stderr)
         return 2
 
-    try:
-        transport = _resolve_transport_factory(args.transport_factory)
-    except (ImportError, ModuleNotFoundError) as exc:
-        print(f"REFUSED: transport factory module import failed ({args.transport_factory!r}): {exc}", file=sys.stderr)
-        return 2
-    except AttributeError as exc:
-        print(f"REFUSED: transport factory attribute missing ({args.transport_factory!r}): {exc}", file=sys.stderr)
-        return 2
-    except Exception as exc:  # noqa: BLE001 - any caller-supplied constructor failure must be typed, not crash
-        print(f"REFUSED: transport factory constructor failed ({args.transport_factory!r}): {exc}", file=sys.stderr)
-        return 2
+    # Finding #3: production transport is HARD-WIRED to the one safe,
+    # exact-source implementation -- no CLI option, environment variable,
+    # or config value can select a different transport for a confirmed
+    # live --execute run. `build_transport()` is called with no arguments,
+    # so every hook is that function's own real default.
+    transport = prospective_exact_source_transport.build_transport()
 
     try:
         published_archive_date_lookup = _resolve_import_target(args.published_archive_date_lookup)
@@ -365,7 +357,6 @@ def main(argv: list[str] | None = None) -> int:
         result = prospective_freeze.execute_transport_and_raw_freeze(
             registration_spec_path=args.registration_spec,
             prospective_overlay_path=args.overlay,
-            base_eval_config_path=args.base_config,
             approval_record=approval_record,
             allowed_repo_root=args.allowed_repo_root,
             allowed_external_root=args.allowed_external_root,

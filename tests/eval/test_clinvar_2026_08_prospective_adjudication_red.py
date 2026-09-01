@@ -1,15 +1,64 @@
 from __future__ import annotations
 
 import copy
-from typing import Any
+import shutil
+import uuid
+from pathlib import Path
+from typing import Any, Iterator
 
 import pytest
 
-from tests.eval._clinvar_2026_08_prospective_red_helpers import require_api, require_exception
+from tests.eval._clinvar_2026_08_prospective_red_helpers import (
+    REPO_ROOT,
+    SPEC_SOURCE_PATH,
+    load_yaml,
+    observed_runtime_identity_ok,
+    require_api,
+    require_exception,
+    require_module,
+    write_resource_manifest_checksums,
+)
 
 
 REQUIRED_SCOPES = ("missense:pathogenic", "missense:benign", "truncating:pathogenic")
 NARROW_SCOPE = "truncating:pathogenic"
+
+#: The real, committed registration spec -- read-only here (never mutated
+#: by this file). It already defines `scoring_stage_approval.approver_
+#: required` / `allowed_decisions`, which the mandatory gate call inside
+#: `adjudicate_prospective_outcomes` loads and checks.
+_REGISTRATION_SPEC_PATH = SPEC_SOURCE_PATH
+_REGISTRATION_ID = load_yaml(SPEC_SOURCE_PATH)["registration"]["id"]
+
+#: A fixed, module-scoped scratch directory (never a system temp dir, per
+#: this repo's own sandbox convention -- see `prospective_sandbox` in the
+#: shared test helpers) holding the three ADR-0008 pinned resource-manifest
+#: checksum files with deterministic fixture bytes, so the mandatory
+#: scoring-stage gate's independent digest recomputation has real files to
+#: read. Populated once per test module by the autouse fixture below.
+_GATE_CHECKSUMS_DIR = REPO_ROOT / ".raptor" / "pytest-red" / f"adjudication-gate-{uuid.uuid4().hex}"
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _scoring_stage_gate_checksums() -> Iterator[None]:
+    write_resource_manifest_checksums(_GATE_CHECKSUMS_DIR)
+    try:
+        yield
+    finally:
+        shutil.rmtree(_GATE_CHECKSUMS_DIR, ignore_errors=True)
+
+
+def _valid_scoring_stage_approval_record() -> dict[str, Any]:
+    module = require_module()
+    digest = module.compute_resource_manifest_sha256(_GATE_CHECKSUMS_DIR)
+    return {
+        "schema": "raptor.eval.scoring_stage_approval.v1",
+        "registration_id": _REGISTRATION_ID,
+        "decision": "APPROVED_SCORING_STAGE",
+        "approver": "@dronasrinivas",
+        "approved_at": "2026-08-29T10:00:00Z",
+        "x64_freeze": {**observed_runtime_identity_ok(), "resource_manifest_sha256": digest},
+    }
 
 
 def _scope(
@@ -78,9 +127,27 @@ def _adjudicate(
     cli_overrides: dict[str, Any] | None = None,
     env_overrides: dict[str, str] | None = None,
     transport_metadata_not_content_identity: bool = True,
+    registration_id: str | None = None,
+    registration_spec_path: Path | None = None,
+    scoring_stage_approval_record: dict[str, Any] | None = None,
+    observed_runtime_identity: dict[str, Any] | None = None,
+    resource_manifest_checksums_dir: Path | None = None,
+    first_scoring_execution_at: str | None = None,
 ) -> dict[str, Any]:
     fn = require_api("adjudicate_prospective_outcomes")
     result = fn(
+        registration_id=registration_id if registration_id is not None else _REGISTRATION_ID,
+        registration_spec_path=registration_spec_path or _REGISTRATION_SPEC_PATH,
+        scoring_stage_approval_record=(
+            copy.deepcopy(scoring_stage_approval_record)
+            if scoring_stage_approval_record is not None
+            else _valid_scoring_stage_approval_record()
+        ),
+        observed_runtime_identity=(
+            dict(observed_runtime_identity) if observed_runtime_identity is not None else observed_runtime_identity_ok()
+        ),
+        resource_manifest_checksums_dir=resource_manifest_checksums_dir or _GATE_CHECKSUMS_DIR,
+        first_scoring_execution_at=first_scoring_execution_at,
         run_integrity=run_integrity,
         stage12_outcome=stage12_outcome,
         scopes=copy.deepcopy(scopes or _base_scopes()),
@@ -616,3 +683,94 @@ def test_missing_axis_or_unknown_axis_value_is_typed_invalid() -> None:
     with pytest.raises(invalid_error) as exc_unknown:
         _adjudicate(scopes=unknown_axis)
     assert getattr(exc_unknown.value, "code", None) == "INVALID"
+
+
+# ---------------------------------------------------------------------------
+# Finding #2: the scoring-stage gate is a MANDATORY precondition for
+# `adjudicate_prospective_outcomes` -- no outcome dict of any kind
+# (including PASS/AUTHORIZED_RESEARCH_ONLY, but also BLOCKED_DATA/FAIL/
+# INVALID-from-other-causes) can ever be produced without it passing first.
+# ---------------------------------------------------------------------------
+
+
+def test_missing_scoring_stage_approval_blocks_every_call_shape_including_pass() -> None:
+    """A missing/malformed scoring-stage approval must fail closed BEFORE
+    any axis is even inspected -- true for a call shape that would
+    otherwise resolve to full-spectrum PASS/AUTHORIZED_RESEARCH_ONLY, and
+    equally true for shapes that would otherwise resolve to BLOCKED_DATA or
+    INVALID via `run_integrity`/`stage12_outcome`. No return value is ever
+    produced in any case."""
+    _require_adjudication_contract()
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+
+    with pytest.raises(invalid_error) as exc_pass_shape:
+        _adjudicate(scoring_stage_approval_record={})
+    assert getattr(exc_pass_shape.value, "code", None) == "INVALID"
+
+    with pytest.raises(invalid_error) as exc_blocked_shape:
+        _adjudicate(scoring_stage_approval_record={}, stage12_outcome="BLOCKED_DATA")
+    assert getattr(exc_blocked_shape.value, "code", None) == "INVALID"
+
+    with pytest.raises(invalid_error) as exc_invalid_shape:
+        _adjudicate(scoring_stage_approval_record={}, run_integrity="INVALID")
+    assert getattr(exc_invalid_shape.value, "code", None) == "INVALID"
+
+
+def test_fabricated_scoring_stage_digest_blocks_adjudication_even_when_well_formed() -> None:
+    """A `scoring_stage_approval_record` whose claimed `x64_freeze.
+    resource_manifest_sha256` is well-formed 64-lowercase-hex but does NOT
+    match the independently recomputed manifest digest must never allow
+    `adjudicate_prospective_outcomes` to reach an outcome -- the same
+    anti-fabrication guarantee `validate_scoring_stage_approval` provides
+    standalone must hold when wired into adjudication."""
+    _require_adjudication_contract()
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    fabricated = _valid_scoring_stage_approval_record()
+    fabricated["x64_freeze"] = {**fabricated["x64_freeze"], "resource_manifest_sha256": "0" * 64}
+    with pytest.raises(invalid_error) as exc:
+        _adjudicate(scoring_stage_approval_record=fabricated)
+    assert getattr(exc.value, "code", None) == "INVALID"
+
+
+def test_rejected_scoring_stage_decision_blocks_adjudication() -> None:
+    _require_adjudication_contract()
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    rejected = _valid_scoring_stage_approval_record()
+    rejected["decision"] = "REJECTED_SCORING_STAGE"
+    with pytest.raises(invalid_error) as exc:
+        _adjudicate(scoring_stage_approval_record=rejected)
+    assert getattr(exc.value, "code", None) == "INVALID"
+
+
+def test_wrong_approver_on_scoring_stage_approval_blocks_adjudication() -> None:
+    _require_adjudication_contract()
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    wrong_approver = _valid_scoring_stage_approval_record()
+    wrong_approver["approver"] = "@someone-else"
+    with pytest.raises(invalid_error) as exc:
+        _adjudicate(scoring_stage_approval_record=wrong_approver)
+    assert getattr(exc.value, "code", None) == "INVALID"
+
+
+def test_mismatched_observed_runtime_identity_blocks_adjudication() -> None:
+    """Even a correctly-shaped, correctly-recomputed-matching approval
+    record is rejected if the SEPARATE `observed_runtime_identity` input
+    (never trusted from the approval record) itself fails the pinned
+    ADR-0008 constants."""
+    _require_adjudication_contract()
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    bad_observed = {**observed_runtime_identity_ok(), "bias_commit": "0" * 40}
+    with pytest.raises(invalid_error) as exc:
+        _adjudicate(observed_runtime_identity=bad_observed)
+    assert getattr(exc.value, "code", None) == "INVALID"
+
+
+def test_valid_scoring_stage_gate_permits_full_spectrum_pass_and_narrow_authorization() -> None:
+    """The positive-control counterpart to the negative gate tests above --
+    a correctly matching approval/observed-identity/checksums-dir gate
+    permits the ordinary PASS/AUTHORIZED_RESEARCH_ONLY adjudication path
+    identical to before the gate was wired in."""
+    _require_adjudication_contract()
+    result = _adjudicate()
+    assert result["full_spectrum_terminal_outcome"] == "PASS"
+    assert result["narrow_scope"]["authorization_status"] == "AUTHORIZED_RESEARCH_ONLY"

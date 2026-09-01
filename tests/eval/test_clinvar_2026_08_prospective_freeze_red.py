@@ -28,6 +28,7 @@ from tests.eval._clinvar_2026_08_prospective_red_helpers import (
     make_head_payload,
     md5_hex,
     merge_overlay,
+    observed_runtime_identity_ok,
     prospective_sandbox,
     projection_sha256_excluding_labels_snapshot,
     require_api,
@@ -1398,52 +1399,64 @@ def test_execution_rejects_overlay_required_value_or_url_coherence_drift_before_
         _assert_no_records_created(sandbox.transport_record_path, sandbox.raw_record_path)
 
 
-def test_execute_path_must_consult_merge_overlay_before_transport_calls() -> None:
+def test_execute_path_never_consults_merge_overlay_or_scoring_semantics() -> None:
+    """Finding #4 (acquisition/scoring-config boundary): `execute_transport_
+    and_raw_freeze` (ADR-0020 stages 1-2) must NEVER call
+    `merge_prospective_overlay` and must NEVER verify scoring-semantics or
+    base-eval-config hashes -- that verification belongs solely to
+    `merge_prospective_overlay`, invoked only for ADR-0020 stage 3+
+    scoring. This replaces the historical (pre-fix) test that required the
+    opposite behavior."""
     _require_freeze_contract_symbols()
     module = require_module()
-    invalid_error = require_exception("ProspectiveInvalidStateError")
+
+    def _forbidden_merge(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        pytest.fail("execute_transport_and_raw_freeze must never call merge_prospective_overlay")
+
     original = getattr(module, "merge_prospective_overlay")
-    calls: list[dict[str, Any]] = []
-    with prospective_sandbox("execute-merge-overlay-call") as sandbox:
-        expected = {
-            "registration_spec_path": sandbox.spec_path,
-            "prospective_overlay_path": sandbox.overlay_path,
-            "base_eval_config_path": sandbox.base_eval_config_path,
-        }
-
-        def _sentinel_merge(*args: Any, **kwargs: Any) -> dict[str, Any]:
-            arg_names = ("registration_spec_path", "prospective_overlay_path", "base_eval_config_path")
-            observed = dict(kwargs)
-            if args:
-                assert len(args) == len(arg_names)
-                observed.update({name: value for name, value in zip(arg_names, args)})
-            calls.append({"args": list(args), "kwargs": dict(kwargs), "observed": dict(observed)})
-            assert set(observed.keys()) == set(arg_names)
-            for name, expected_path in expected.items():
-                assert Path(str(observed[name])) == expected_path
-            raise invalid_error("merge_prospective_overlay must be called on the execute path")
-
-        setattr(module, "merge_prospective_overlay", _sentinel_merge)
-        try:
+    setattr(module, "merge_prospective_overlay", _forbidden_merge)
+    try:
+        with prospective_sandbox("execute-never-merges-overlay") as sandbox:
             approval = build_approval_record(sandbox)
             transport = InjectedTransport(
                 head_by_url={sandbox.exact_url: make_head_payload(sandbox)},
                 body_by_url={sandbox.exact_url: sandbox.archive_bytes},
             )
-            with pytest.raises(invalid_error) as exc:
-                execute_transport_and_raw_freeze(
-                    sandbox,
-                    approval_record=approval,
-                    transport=transport,
-                    published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
-                    official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
-                )
-            assert getattr(exc.value, "code", None) == "INVALID"
-            assert len(calls) == 1
-            assert transport.head_calls == []
-            assert transport.get_calls == []
-        finally:
-            setattr(module, "merge_prospective_overlay", original)
+            result = execute_transport_and_raw_freeze(
+                sandbox,
+                approval_record=approval,
+                transport=transport,
+                published_archive_date_lookup=_published_date_lookup_ok(sandbox.exact_url),
+                official_md5_lookup=_official_md5_lookup_ok(sandbox.exact_url, sandbox.archive_bytes),
+            )
+            assert result["stage_status"] == "TRANSPORT_AND_RAW_FROZEN"
+    finally:
+        setattr(module, "merge_prospective_overlay", original)
+
+
+def test_execute_transport_and_raw_freeze_signature_has_no_base_eval_config_path_param() -> None:
+    """`execute_transport_and_raw_freeze` must accept no
+    `base_eval_config_path` parameter at all -- acquisition never reads a
+    base eval config."""
+    _require_freeze_contract_symbols()
+    module = require_module()
+    import inspect
+
+    signature = inspect.signature(module.execute_transport_and_raw_freeze)
+    assert "base_eval_config_path" not in signature.parameters
+
+
+def test_pre_data_approval_record_has_no_scoring_semantics_projection_field() -> None:
+    """`pre_data_approval` records no longer carry
+    `scoring_semantics_projection_sha256` -- that concern moved entirely to
+    `merge_prospective_overlay` (stage 3+ scoring), never pre-data
+    acquisition approval."""
+    _require_freeze_contract_symbols()
+    with prospective_sandbox("pre-data-approval-no-scoring-semantics-field") as sandbox:
+        approval = build_approval_record(sandbox)
+        assert "scoring_semantics_projection_sha256" not in approval
+        validated = validate_pre_data_approval(sandbox, approval_record=approval)
+        assert "scoring_semantics_projection_sha256" not in validated
 
 
 @pytest.mark.parametrize("target_record", ("transport", "raw"))
@@ -1691,7 +1704,136 @@ def test_validate_scoring_stage_approval_accepts_valid_record() -> None:
         approval = build_scoring_stage_approval_record(sandbox)
         result = validate_scoring_stage_approval(sandbox, approval_record=approval)
         assert result["schema"] == "raptor.eval.scoring_stage_approval.v1"
-        assert result["x64_freeze"] == runtime_identity_ok()
+        assert result["decision"] == "APPROVED_SCORING_STAGE"
+        module = require_module()
+        expected_digest = module.compute_resource_manifest_sha256(sandbox.resource_manifest_checksums_dir)
+        assert result["x64_freeze"] == runtime_identity_ok(resource_manifest_sha256=expected_digest)
+
+
+@pytest.mark.parametrize(
+    ("case_id", "mutate"),
+    (
+        ("rejected-decision", lambda approval: {**approval, "decision": "REJECTED_SCORING_STAGE"}),
+        ("unknown-decision", lambda approval: {**approval, "decision": "APPROVED"}),
+        ("missing-decision", lambda approval: {k: v for k, v in approval.items() if k != "decision"}),
+        ("wrong-approver", lambda approval: {**approval, "approver": "@someone-else"}),
+    ),
+)
+def test_validate_scoring_stage_approval_requires_explicit_decision_and_exact_approver(
+    case_id: str,
+    mutate: Callable[[dict[str, Any]], dict[str, Any]],
+) -> None:
+    """Finding #1 (anti-fabrication): `validate_scoring_stage_approval`
+    requires the explicit `APPROVED_SCORING_STAGE` decision (a recorded
+    `REJECTED_SCORING_STAGE` is rejected distinctly from an unknown/missing
+    decision) and the exact `approver_required` from the binding spec --
+    never merely a well-formed/non-blank string."""
+    _require_freeze_contract_symbols()
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    with prospective_sandbox(f"scoring-stage-decision-approver-{case_id}") as sandbox:
+        approval = build_scoring_stage_approval_record(sandbox)
+        with pytest.raises(invalid_error) as exc:
+            validate_scoring_stage_approval(sandbox, approval_record=mutate(approval))
+        assert exc.value.code == "INVALID"
+
+
+def test_validate_scoring_stage_approval_requires_approval_before_first_scoring_execution() -> None:
+    """Finding #1: an `approved_at` that is not strictly before
+    `first_scoring_execution_at` is rejected -- mirrors the pre_data
+    approval-vs-first-GET timing pattern, applied to the scoring-stage
+    gate's approval-vs-first-execution timing."""
+    _require_freeze_contract_symbols()
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    with prospective_sandbox("scoring-stage-timing") as sandbox:
+        approval = build_scoring_stage_approval_record(sandbox, approved_at="2026-08-29T10:00:00Z")
+        with pytest.raises(invalid_error) as exc:
+            validate_scoring_stage_approval(
+                sandbox,
+                approval_record=approval,
+                first_scoring_execution_at="2026-08-29T09:00:00Z",
+            )
+        assert exc.value.code == "INVALID"
+        # A first-execution timestamp strictly AFTER approval is accepted.
+        validate_scoring_stage_approval(
+            sandbox,
+            approval_record=approval,
+            first_scoring_execution_at="2026-08-29T11:00:00Z",
+        )
+
+
+@pytest.mark.parametrize(
+    "fabricated_digest",
+    ("0" * 64, "f" * 64, "1234567890abcdef" * 4),
+)
+def test_validate_scoring_stage_approval_rejects_fabricated_digest_that_does_not_match_recomputation(
+    fabricated_digest: str,
+) -> None:
+    """Finding #1 (the core anti-fabrication requirement): a claimed
+    `resource_manifest_sha256` that is well-formed 64-lowercase-hex --
+    including an all-zero digest -- MUST NOT pass unless it exactly equals
+    the value independently RECOMPUTED from the real manifest files. This
+    is the central regression guard for the reviewed vulnerability (a
+    merely well-formed claimed digest previously always passed FORMAT-only
+    validation)."""
+    _require_freeze_contract_symbols()
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    with prospective_sandbox("scoring-stage-fabricated-digest") as sandbox:
+        approval = build_scoring_stage_approval_record(
+            sandbox, x64_freeze_overrides={"resource_manifest_sha256": fabricated_digest}
+        )
+        with pytest.raises(invalid_error) as exc:
+            validate_scoring_stage_approval(sandbox, approval_record=approval)
+        assert exc.value.code == "INVALID"
+
+
+def test_validate_scoring_stage_approval_rejects_when_recomputed_manifest_bytes_changed() -> None:
+    """The claimed digest is checked against a digest RECOMPUTED from the
+    manifest files at validation time -- if those files' bytes change after
+    the approval record was built (drift), the approval no longer matches
+    and is rejected, even though the claimed digest itself never changed."""
+    _require_freeze_contract_symbols()
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    with prospective_sandbox("scoring-stage-manifest-drift") as sandbox:
+        approval = build_scoring_stage_approval_record(sandbox)
+        # Mutate one pinned manifest file's bytes AFTER the approval was
+        # built against the original bytes.
+        module = require_module()
+        _entry_id, filename = module.RESOURCE_MANIFEST_ENTRIES[0]
+        target = sandbox.resource_manifest_checksums_dir / filename
+        target.write_bytes(target.read_bytes() + b"\x00mutated")
+        with pytest.raises(invalid_error) as exc:
+            validate_scoring_stage_approval(sandbox, approval_record=approval)
+        assert exc.value.code == "INVALID"
+
+
+def test_validate_scoring_stage_approval_rejects_malformed_or_missing_observed_runtime_identity() -> None:
+    """`observed_runtime_identity` is a separate, mandatory input -- never
+    trusted from the approval record. A missing key, extra key, or
+    non-mapping value is rejected."""
+    _require_freeze_contract_symbols()
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    with prospective_sandbox("scoring-stage-bad-observed-identity") as sandbox:
+        approval = build_scoring_stage_approval_record(sandbox)
+        bad_observed = {k: v for k, v in observed_runtime_identity_ok().items() if k != "worker_arch"}
+        with pytest.raises(invalid_error) as exc:
+            validate_scoring_stage_approval(sandbox, approval_record=approval, observed_runtime_identity=bad_observed)
+        assert exc.value.code == "INVALID"
+
+
+def test_validate_scoring_stage_approval_rejects_observed_identity_that_fails_pinned_constants() -> None:
+    """Even when the CLAIMED `x64_freeze` is internally self-consistent, an
+    `observed_runtime_identity` that itself does not match the ADR-0008
+    pinned worker/BIAS/Nirvana constants is rejected -- `assert_runtime_
+    boundary` is applied to the observed/recomputed identity, not only the
+    equality cross-check."""
+    _require_freeze_contract_symbols()
+    invalid_error = require_exception("ProspectiveInvalidStateError")
+    with prospective_sandbox("scoring-stage-bad-observed-constants") as sandbox:
+        bad_observed = {**observed_runtime_identity_ok(), "worker_arch": "arm64"}
+        approval = build_scoring_stage_approval_record(sandbox, x64_freeze_overrides={"worker_arch": "arm64"})
+        with pytest.raises(invalid_error) as exc:
+            validate_scoring_stage_approval(sandbox, approval_record=approval, observed_runtime_identity=bad_observed)
+        assert exc.value.code == "INVALID"
 
 
 def test_symlink_dotdot_escape_is_invalid_destination_outside_allowed_root_and_no_outside_write() -> None:

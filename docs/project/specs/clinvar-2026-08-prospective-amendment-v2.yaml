@@ -357,12 +357,16 @@ pre_data_approval:
   - registration id, path, Git blob and canonical-LF SHA-256
   - ADR-0020 identity
   - prospective eval-overlay path and canonical-LF SHA-256
-  - tsc2 scoring-semantics projection SHA-256
   - implementation commit and module hashes
   - immutable input verification
   - protected-test evidence
   - timestamp strictly before first archive GET
   - complete false-valued pre-data access attestation
+  # NOTE: pre-data approval never includes or verifies tsc2 scoring-semantics
+  # projection SHA-256 or any base eval config identity. Acquisition (stages
+  # 1-2) never reads scoring semantics; that verification belongs solely to
+  # raptor.eval.prospective_freeze.merge_prospective_overlay, invoked only
+  # when building the effective eval config for ADR-0020 stage 3+ scoring.
   approved_scope: >-
     APPROVED_PRE_DATA permits transport freeze and then GET of only the exact
     registered archive. It does not permit a substitute, threshold change,
@@ -395,10 +399,22 @@ scoring_stage_approval:
   - REJECTED_SCORING_STAGE
   approval_record_must_include:
   - registration id
+  - explicit decision (APPROVED_SCORING_STAGE or REJECTED_SCORING_STAGE)
   - approver and approval timestamp
   - x64 BIAS 3.0.0 commit ade13f206f3e2c2efe3ec92715d974645fc8da8f
   - Nirvana 3.18.1 runtime banner 3.18.1-0-g05f88047
   - x64 resource manifests and checksums (ADR-0008 resource_manifest_sha256)
+  verification_rule: >-
+    The approval record's claimed x64_freeze block is never trusted as-is.
+    raptor.eval.prospective_freeze.validate_scoring_stage_approval requires a
+    separately observed runtime identity (worker designation, architecture,
+    BIAS commit, Nirvana banner) as an independent input, and always
+    recomputes resource_manifest_sha256 from the three pinned resource-
+    manifest checksum files rather than reading any claimed value. Approval
+    is accepted only when the claimed x64_freeze block is byte-for-byte
+    identical to the observed-plus-recomputed identity; a well-formed,
+    all-zero, or otherwise fabricated digest that does not match a real
+    recomputation always fails closed.
   approved_scope: >-
     APPROVED_SCORING_STAGE permits stage 4 (mask-and-label-free score) to run
     on the designated x64 worker under the pinned BIAS/Nirvana/resource
@@ -406,12 +422,18 @@ scoring_stage_approval:
     resource-manifest set.
   failure_outcome: INVALID
   stop_rule: >-
-    A missing approval record, schema breach, or any runtime-identity
-    mismatch (worker designation, architecture, BIAS commit, Nirvana banner,
-    or resource-manifest SHA-256) is an A0 run-integrity failure raised as
-    INVALID -- never a PRE_DATA_* stop state and never reported as a
-    performance FAIL. Resolution requires a reviewed scoring-stage change;
-    in-place waiver is forbidden.
+    A missing approval record, schema breach, non-APPROVED_SCORING_STAGE
+    decision, wrong approver, approval timestamp at or after first scoring
+    execution, or any runtime-identity mismatch (worker designation,
+    architecture, BIAS commit, Nirvana banner, or resource-manifest SHA-256,
+    including a claimed digest that fails to match independent
+    recomputation) is an A0 run-integrity failure raised as INVALID -- never
+    a PRE_DATA_* stop state and never reported as a performance FAIL.
+    Resolution requires a reviewed scoring-stage change; in-place waiver is
+    forbidden. This gate is mandatory before any label-dependent
+    adjudication (raptor.eval.prospective_freeze.adjudicate_prospective_outcomes
+    invokes it unconditionally as its first action; no outcome, including
+    PASS or AUTHORIZED_RESEARCH_ONLY, may be emitted without it).
 
 ordered_execution_after_approval:
   - stage: 1_TRANSPORT_FREEZE

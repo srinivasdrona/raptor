@@ -24,7 +24,14 @@
     "sibling file is, and remains, unapproved and unverified from this host",
     "for the same reason as before (this host is aarch64, not the ADR-0008",
     "designated x86_64 worker); it does not block, and is not required for,",
-    "this PRE-DATA record."
+    "this PRE-DATA record.",
+    "SCOPE CORRECTION: this record also no longer includes a",
+    "'scoring_semantics_projection_sha256' field. PRE-DATA approval never",
+    "reads or depends on scoring semantics or the base eval config -- that",
+    "verification belongs solely to raptor.eval.prospective_freeze",
+    ".merge_prospective_overlay, invoked only when the effective eval config",
+    "is actually built for ADR-0020 stage 3+ scoring, never as a",
+    "precondition for ClinVar archive acquisition (stages 1-2)."
   ],
   "schema": "raptor.eval.pre_data_approval.v1",
   "decision": "DRAFT_PENDING_HUMAN_PRE_DATA_APPROVAL",
@@ -45,7 +52,6 @@
     "path": "configs/eval/tsc2_clinvar_2026_08_amendment_v2.overlay.yaml",
     "canonical_lf_sha256": "2826cd4b01bf08e2bf2a3eb13ad2eed73a3cf302c0b9ef41cbbf99fa9fb6ee48"
   },
-  "scoring_semantics_projection_sha256": "a19f0b1825a3b5b9c5886cc783750cd907045601447cfd132329d3ab9b9e10b5",
   "implementation_freeze": {
     "_note": "Repinned to the real committed implementation (was NOT_YET_COMMITTED). 'commit' is the exact 40-hex commit id; each module_hashes value is that module's canonical-LF SHA-256 computed from 'git show <commit>:<path>' (the exact committed blob, never ambient/checked-out worktree bytes -- disk bytes differ from the blob by CRLF/LF checkout normalization only, confirmed byte-identical after canonicalization).",
     "commit": "9ac9f90d39abfbc6df6b9a51902ad71148674b31",

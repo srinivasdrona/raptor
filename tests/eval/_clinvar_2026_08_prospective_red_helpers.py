@@ -335,6 +335,7 @@ class ProspectiveSandbox:
     base_eval_config_path: Path
     transport_record_path: Path
     raw_record_path: Path
+    resource_manifest_checksums_dir: Path
     spec: dict[str, Any]
     overlay: dict[str, Any]
     archive_bytes: bytes
@@ -372,6 +373,21 @@ def _overlay_text(required_values: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def write_resource_manifest_checksums(directory: Path, *, contents: dict[str, bytes] | None = None) -> Path:
+    """Writes the three ADR-0008 pinned resource-manifest checksum files
+    (`RESOURCE_MANIFEST_ENTRIES`) into `directory` with deterministic
+    fixture bytes, so tests can exercise
+    `validate_scoring_stage_approval`'s independent resource-manifest-digest
+    RECOMPUTATION without any real x64 Nirvana/BIAS resource bundle.
+    Returns `directory`."""
+    module = require_module()
+    directory.mkdir(parents=True, exist_ok=True)
+    for _entry_id, filename in module.RESOURCE_MANIFEST_ENTRIES:
+        payload = (contents or {}).get(filename, f"{filename}-fixture-bytes".encode("utf-8"))
+        (directory / filename).write_bytes(payload)
+    return directory
+
+
 @contextmanager
 def prospective_sandbox(name: str, *, archive_bytes: bytes | None = None) -> Iterator[ProspectiveSandbox]:
     archive = archive_bytes if archive_bytes is not None else default_archive_bytes()
@@ -380,9 +396,11 @@ def prospective_sandbox(name: str, *, archive_bytes: bytes | None = None) -> Ite
     external_root = root / "external-content-root"
     spec_path = repo_root / "docs" / "project" / "specs" / SPEC_SOURCE_PATH.name
     base_eval_config_path = repo_root / "configs" / "eval" / "tsc2.yaml"
+    resource_manifest_checksums_dir = root / "resource-manifest-checksums"
     root.mkdir(parents=True, exist_ok=False)
     try:
         external_root.mkdir(parents=True, exist_ok=False)
+        write_resource_manifest_checksums(resource_manifest_checksums_dir)
         base_eval_config_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(BASE_CONFIG_SOURCE_PATH, base_eval_config_path)
 
@@ -418,6 +436,7 @@ def prospective_sandbox(name: str, *, archive_bytes: bytes | None = None) -> Ite
             base_eval_config_path=base_eval_config_path,
             transport_record_path=transport_record_path,
             raw_record_path=raw_record_path,
+            resource_manifest_checksums_dir=resource_manifest_checksums_dir,
             spec=spec,
             overlay=overlay,
             archive_bytes=archive,
@@ -482,7 +501,6 @@ def build_approval_record(
             "path": str(sandbox.overlay_path.relative_to(sandbox.repo_root)).replace("\\", "/"),
             "canonical_lf_sha256": canonical_lf_sha256_path(sandbox.overlay_path),
         },
-        "scoring_semantics_projection_sha256": sandbox.spec["authority_partition"]["tsc2_scoring_semantics_projection"]["sha256"],
         "implementation_freeze": implementation_freeze,
         "immutable_inputs_verified": immutable_inputs_verified,
         "protected_tests_verified": protected_tests_verified,
@@ -494,21 +512,40 @@ def build_approval_record(
 def build_scoring_stage_approval_record(
     sandbox: ProspectiveSandbox,
     *,
+    decision: str = "APPROVED_SCORING_STAGE",
     approver: str = "@dronasrinivas",
     approved_at: str = "2026-08-29T10:00:00Z",
     registration_id: str | None = None,
+    resource_manifest_checksums_dir: Path | None = None,
     x64_freeze_overrides: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Builds a valid `raptor.eval.scoring_stage_approval.v1` record -- the
     SEPARATE, LATER gate for ADR-0020 stage 4 (BIAS/Nirvana execution,
     label-dependent evaluation). Independent of `build_approval_record`
-    (`pre_data_approval`, stages 1-2) above."""
-    x64_freeze = runtime_identity_ok()
+    (`pre_data_approval`, stages 1-2) above.
+
+    By default, `x64_freeze.resource_manifest_sha256` is the REAL digest
+    recomputed from `resource_manifest_checksums_dir` (default:
+    `sandbox.resource_manifest_checksums_dir`, pre-populated with
+    deterministic fixture bytes) -- so this record passes
+    `validate_scoring_stage_approval`'s anti-fabrication cross-check by
+    construction whenever the caller also passes the matching
+    `observed_runtime_identity`/`resource_manifest_checksums_dir` (see
+    `validate_scoring_stage_approval` wrapper below). `x64_freeze_overrides`
+    lets a caller deliberately fabricate/mismatch a claimed pin for negative
+    tests."""
+    module = require_module()
+    checksums_dir = resource_manifest_checksums_dir or sandbox.resource_manifest_checksums_dir
+    x64_freeze = {
+        **observed_runtime_identity_ok(),
+        "resource_manifest_sha256": module.compute_resource_manifest_sha256(checksums_dir),
+    }
     if x64_freeze_overrides:
         x64_freeze = {**x64_freeze, **x64_freeze_overrides}
     return {
         "schema": "raptor.eval.scoring_stage_approval.v1",
         "registration_id": registration_id if registration_id is not None else sandbox.spec["registration"]["id"],
+        "decision": decision,
         "approver": approver,
         "approved_at": approved_at,
         "x64_freeze": x64_freeze,
@@ -581,14 +618,28 @@ def make_head_payload(
     }
 
 
-def runtime_identity_ok() -> dict[str, Any]:
+def observed_runtime_identity_ok() -> dict[str, Any]:
+    """The 4 runtime-identity dimensions a process can OBSERVE directly
+    about its own execution (worker designation/arch, BIAS/Nirvana tool
+    identity). Deliberately excludes `resource_manifest_sha256`, which
+    `validate_scoring_stage_approval` never accepts as an observed claim --
+    it is always independently recomputed from the actual manifest files."""
     return {
         "worker_designation": "adr-0008-designated-x64-worker",
         "worker_arch": "x86_64",
         "bias_commit": "ade13f206f3e2c2efe3ec92715d974645fc8da8f",
         "nirvana_banner": "3.18.1-0-g05f88047",
-        "resource_manifest_sha256": "1" * 64,
     }
+
+
+def runtime_identity_ok(resource_manifest_sha256: str = "1" * 64) -> dict[str, Any]:
+    """Full 5-key runtime-identity block: `observed_runtime_identity_ok()`
+    plus a `resource_manifest_sha256`. The default digest is a fixed
+    placeholder suitable only for FORMAT-level checks; pass the real
+    recomputed digest (e.g. via
+    `require_module().compute_resource_manifest_sha256(...)`) whenever
+    asserting an EXACT expected `x64_freeze` value."""
+    return {**observed_runtime_identity_ok(), "resource_manifest_sha256": resource_manifest_sha256}
 
 
 def execute_transport_and_raw_freeze(
@@ -612,7 +663,6 @@ def execute_transport_and_raw_freeze(
         result = run(
             registration_spec_path=sandbox.spec_path,
             prospective_overlay_path=sandbox.overlay_path,
-            base_eval_config_path=sandbox.base_eval_config_path,
             approval_record=copy.deepcopy(approval_record) if isinstance(approval_record, dict) else approval_record,
             allowed_repo_root=sandbox.repo_root,
             allowed_external_root=sandbox.external_root,
@@ -657,15 +707,31 @@ def validate_scoring_stage_approval(
     *,
     approval_record: dict[str, Any],
     registration_id: str | None = None,
+    registration_spec_path: Path | None = None,
+    observed_runtime_identity: dict[str, Any] | None = None,
+    resource_manifest_checksums_dir: Path | None = None,
+    first_scoring_execution_at: str | None = None,
 ) -> dict[str, Any]:
     """Wraps `raptor.eval.prospective_freeze.validate_scoring_stage_approval`
     -- the SEPARATE, LATER ADR-0020 stage 4 gate (BIAS/Nirvana execution,
     label-dependent evaluation). Independent of `validate_pre_data_approval`
-    above."""
+    above. Defaults `observed_runtime_identity` and
+    `resource_manifest_checksums_dir` to the sandbox's own known-good
+    fixtures (`observed_runtime_identity_ok()` /
+    `sandbox.resource_manifest_checksums_dir`) so callers that only want to
+    mutate `approval_record` (e.g. `build_scoring_stage_approval_record`'s
+    `x64_freeze_overrides`) get the correct anti-fabrication cross-check
+    inputs without repeating them at every call site."""
     fn = require_api("validate_scoring_stage_approval")
     out = fn(
         registration_id=registration_id if registration_id is not None else sandbox.spec["registration"]["id"],
+        registration_spec_path=registration_spec_path or sandbox.spec_path,
         approval_record=copy.deepcopy(approval_record),
+        observed_runtime_identity=(
+            dict(observed_runtime_identity) if observed_runtime_identity is not None else observed_runtime_identity_ok()
+        ),
+        resource_manifest_checksums_dir=resource_manifest_checksums_dir or sandbox.resource_manifest_checksums_dir,
+        first_scoring_execution_at=first_scoring_execution_at,
     )
     if not isinstance(out, dict):
         pytest.fail("validate_scoring_stage_approval must return a mapping")

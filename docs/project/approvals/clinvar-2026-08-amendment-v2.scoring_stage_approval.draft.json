@@ -28,11 +28,12 @@
     "another registration/run."
   ],
   "schema": "DRAFT_NOT_A_REAL_SCORING_STAGE_APPROVAL_SCHEMA",
-  "_schema_note": "Once approved for real, 'schema' must be exactly 'raptor.eval.scoring_stage_approval.v1' and this record must be closed to exactly {schema, registration_id, approver, approved_at, x64_freeze} -- no other keys.",
+  "_schema_note": "Once approved for real, 'schema' must be exactly 'raptor.eval.scoring_stage_approval.v1' and this record must be closed to exactly {schema, registration_id, decision, approver, approved_at, x64_freeze} -- no other keys. 'decision' must then be exactly 'APPROVED_SCORING_STAGE' (the only other allowed value, 'REJECTED_SCORING_STAGE', is rejected distinctly and never authorizes stage 4).",
   "registration_id": "clinvar-2026-08-amendment-v2",
+  "decision": null,
   "approver": null,
   "approved_at": null,
-  "_decision_note": "Not APPROVED_SCORING_STAGE. Only @dronasrinivas may approve this, and only after 'x64_freeze.resource_manifest_sha256' below is replaced with the real digest computed on the ADR-0008 designated x64 worker -- never fabricated or copied from another run.",
+  "_decision_note": "Not APPROVED_SCORING_STAGE. Only @dronasrinivas may approve this, and only after 'x64_freeze.resource_manifest_sha256' below is replaced with the real digest computed on the ADR-0008 designated x64 worker -- never fabricated or copied from another run. raptor.eval.prospective_freeze.validate_scoring_stage_approval independently RECOMPUTES resource_manifest_sha256 from the three pinned manifest files and rejects this record unless the claimed digest here exactly equals that recomputation; a merely well-formed (e.g. all-zero) placeholder or fabricated value can never pass.",
   "x64_freeze": {
     "_status": "NOT_YET_VERIFIED_PENDING_ADR_0008_X64_WORKER",
     "_blocking_reason": "This execution-preparation session ran only in WSL2 (uname -m = aarch64; python is /home/sdrona/raptor/bin/python, platform.machine() = aarch64). raptor.eval.prospective_freeze.assert_runtime_boundary requires worker_arch == 'x86_64', worker_designation == 'adr-0008-designated-x64-worker', a matching pinned bias_commit and nirvana_banner, and a real 64-hex resource_manifest_sha256. None of these can be truthfully produced on this host; Nirvana was not run and no BIAS/Nirvana identity was inspected here.",
