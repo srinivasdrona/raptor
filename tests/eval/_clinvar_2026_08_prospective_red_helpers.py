@@ -5,6 +5,8 @@ import gzip
 import hashlib
 import io
 import json
+import os
+import re
 import shutil
 import subprocess
 import threading
@@ -22,6 +24,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SPEC_SOURCE_PATH = REPO_ROOT / "docs" / "project" / "specs" / "clinvar-2026-08-prospective-amendment-v2.yaml"
 BASE_CONFIG_SOURCE_PATH = REPO_ROOT / "configs" / "eval" / "tsc2.yaml"
 HISTORICAL_BLOCKED_PATH = REPO_ROOT / "data" / "census" / "tsc_prospective_validation_2026-08_blocked_data.json"
+_DEFAULT_IMPLEMENTATION_FREEZE_MODULES: tuple[str, ...] = ("raptor.eval.prospective_freeze",)
+_GIT_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
+_WINDOWS_DRIVE_PATH_RE = re.compile(r"^(?P<drive>[A-Za-z]):[\\\\/](?P<tail>.*)$")
 
 try:
     import raptor.eval.prospective_freeze as _prospective_freeze
@@ -65,8 +70,213 @@ def canonical_lf_sha256_path(path: Path) -> str:
     return sha256_hex(canonical_lf_bytes(path.read_bytes()))
 
 
+def _git_blob_sha1(raw: bytes) -> str:
+    canonical = canonical_lf_bytes(raw)
+    return hashlib.sha1(b"blob " + str(len(canonical)).encode("utf-8") + b"\0" + canonical).hexdigest()
+
+
 def git_blob_sha1(raw: bytes) -> str:
-    return hashlib.sha1(b"blob " + str(len(raw)).encode("utf-8") + b"\0" + raw).hexdigest()
+    return _git_blob_sha1(raw)
+
+
+def _stderr_text(raw: bytes) -> str:
+    text = raw.decode("utf-8", errors="replace").strip()
+    return text if text else "<empty>"
+
+
+def _translate_windows_drive_to_wsl(path_text: str) -> str | None:
+    match = _WINDOWS_DRIVE_PATH_RE.match(path_text.strip())
+    if not match:
+        return None
+    drive = match.group("drive").lower()
+    tail = match.group("tail").replace("\\", "/").lstrip("/")
+    if tail:
+        return f"/mnt/{drive}/{tail}"
+    return f"/mnt/{drive}"
+
+
+def _parse_linked_worktree_gitdir_pointer(pointer_file: Path) -> str:
+    try:
+        raw_text = pointer_file.read_text(encoding="utf-8")
+    except OSError as exc:
+        pytest.fail(f"unable to read linked-worktree git metadata pointer {pointer_file}: {exc}", pytrace=False)
+    lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+    if len(lines) != 1 or not lines[0].lower().startswith("gitdir:"):
+        pytest.fail(
+            f"linked-worktree git metadata pointer {pointer_file} must contain exactly one 'gitdir:' line",
+            pytrace=False,
+        )
+    gitdir_raw = lines[0][len("gitdir:") :].strip()
+    if not gitdir_raw or "\x00" in gitdir_raw:
+        pytest.fail(f"linked-worktree git metadata pointer {pointer_file} has an invalid gitdir value", pytrace=False)
+    return gitdir_raw
+
+
+def _resolve_gitdir_from_pointer(*, repo_root: Path, gitdir_raw: str, pointer_file: Path) -> Path:
+    candidates: list[Path] = []
+    direct = Path(gitdir_raw)
+    candidates.append(direct)
+    if not direct.is_absolute():
+        candidates.append(repo_root / direct)
+    translated = _translate_windows_drive_to_wsl(gitdir_raw)
+    if translated:
+        candidates.append(Path(translated))
+
+    seen: set[str] = set()
+    checked: list[str] = []
+    for candidate in candidates:
+        key = str(candidate)
+        if key in seen:
+            continue
+        seen.add(key)
+        checked.append(key)
+        if candidate.is_dir():
+            return candidate
+    pytest.fail(
+        f"linked-worktree gitdir from {pointer_file} did not resolve to an existing directory; "
+        f"raw={gitdir_raw!r}, candidates={checked!r}",
+        pytrace=False,
+    )
+
+
+def _resolve_git_metadata() -> tuple[str, str]:
+    git_dir = os.environ.get("GIT_DIR")
+    git_work_tree = os.environ.get("GIT_WORK_TREE")
+    if git_dir and git_work_tree:
+        return git_dir, git_work_tree
+
+    dot_git = REPO_ROOT / ".git"
+    if dot_git.is_dir():
+        return str(dot_git), str(REPO_ROOT)
+    if dot_git.is_file():
+        gitdir_raw = _parse_linked_worktree_gitdir_pointer(dot_git)
+        gitdir = _resolve_gitdir_from_pointer(repo_root=REPO_ROOT, gitdir_raw=gitdir_raw, pointer_file=dot_git)
+        return str(gitdir), str(REPO_ROOT)
+
+    pytest.fail(
+        f"unable to resolve git metadata: neither env override nor checkout metadata is valid at {dot_git}",
+        pytrace=False,
+    )
+
+
+@contextmanager
+def _with_resolved_git_env() -> Iterator[None]:
+    git_dir = os.environ.get("GIT_DIR")
+    git_work_tree = os.environ.get("GIT_WORK_TREE")
+    if git_dir and git_work_tree:
+        yield
+        return
+
+    resolved_git_dir, resolved_work_tree = _resolve_git_metadata()
+    prior_git_dir = os.environ.get("GIT_DIR")
+    prior_git_work_tree = os.environ.get("GIT_WORK_TREE")
+    os.environ["GIT_DIR"] = resolved_git_dir
+    os.environ["GIT_WORK_TREE"] = resolved_work_tree
+    try:
+        yield
+    finally:
+        if prior_git_dir is None:
+            os.environ.pop("GIT_DIR", None)
+        else:
+            os.environ["GIT_DIR"] = prior_git_dir
+        if prior_git_work_tree is None:
+            os.environ.pop("GIT_WORK_TREE", None)
+        else:
+            os.environ["GIT_WORK_TREE"] = prior_git_work_tree
+
+
+def _run_git_with_worktree(*args: str) -> subprocess.CompletedProcess[bytes]:
+    git_dir, git_work_tree = _resolve_git_metadata()
+    cmd = ["git", "--no-pager", "--git-dir", git_dir, "--work-tree", git_work_tree, *args]
+    try:
+        return subprocess.run(
+            cmd,
+            cwd=git_work_tree,
+            check=False,
+            capture_output=True,
+        )
+    except OSError as exc:  # pragma: no cover - platform-specific process launch failure
+        pytest.fail(f"git unusable while resolving implementation_freeze: {exc}", pytrace=False)
+
+
+def _require_git_success(result: subprocess.CompletedProcess[bytes], *, context: str) -> None:
+    if result.returncode == 0:
+        return
+    pytest.fail(
+        f"{context}: git command failed with rc={result.returncode}; stderr={_stderr_text(result.stderr)}",
+        pytrace=False,
+    )
+
+
+def _module_to_relpath(module_name: str) -> str:
+    return (Path("src") / Path(*module_name.split("."))).with_suffix(".py").as_posix()
+
+
+def _resolve_commit(commitish: str = "HEAD") -> str:
+    head = _run_git_with_worktree("rev-parse", "--verify", commitish)
+    _require_git_success(head, context=f"resolving implementation_freeze commit {commitish!r}")
+    commit = head.stdout.decode("utf-8", errors="replace").strip()
+    if not _GIT_COMMIT_RE.fullmatch(commit):
+        pytest.fail(f"resolved {commitish!r} is not a lowercase 40-hex SHA: {commit!r}", pytrace=False)
+    return commit
+
+
+def _normalize_module_names(module_names: tuple[str, ...] | list[str] | None) -> tuple[str, ...]:
+    selected = tuple(module_names) if module_names is not None else _DEFAULT_IMPLEMENTATION_FREEZE_MODULES
+    if not selected:
+        pytest.fail("implementation_freeze module list must be non-empty", pytrace=False)
+    normalized: list[str] = []
+    for module_name in selected:
+        if not isinstance(module_name, str) or not module_name.strip():
+            pytest.fail("implementation_freeze module list contains a blank module name", pytrace=False)
+        normalized_name = module_name.strip()
+        if normalized_name not in normalized:
+            normalized.append(normalized_name)
+    return tuple(normalized)
+
+
+def resolve_committed_implementation_freeze(
+    commitish: str = "HEAD",
+    *,
+    module_names: tuple[str, ...] | list[str] | None = None,
+) -> dict[str, Any]:
+    commit = _resolve_commit(commitish)
+    commit_probe = _run_git_with_worktree("cat-file", "-e", f"{commit}" + "^{commit}")
+    _require_git_success(commit_probe, context=f"probing implementation_freeze commit {commit}")
+
+    required_modules = _normalize_module_names(module_names)
+    module_hashes: dict[str, str] = {}
+    missing_modules: list[str] = []
+    missing_errors: list[str] = []
+    for module_name in required_modules:
+        module_path = _module_to_relpath(module_name)
+        shown = _run_git_with_worktree("show", f"{commit}:{module_path}")
+        if shown.returncode != 0:
+            missing_modules.append(module_name)
+            missing_errors.append(f"{module_name}<{module_path}> stderr={_stderr_text(shown.stderr)}")
+            continue
+        module_hashes[module_name] = sha256_hex(canonical_lf_bytes(shown.stdout))
+    if missing_modules:
+        pytest.fail(
+            "implementation_freeze committed-tree fixture is incomplete for declared modules: "
+            f"commit={commit} missing={missing_modules!r}; details={' | '.join(missing_errors)}",
+            pytrace=False,
+        )
+    if not module_hashes:
+        pytest.fail(
+            "implementation_freeze committed-tree fixture cannot be generated: "
+            f"commit {commit} had no resolvable module hashes for declared modules {list(required_modules)!r}",
+            pytrace=False,
+        )
+    return {"commit": commit, "module_hashes": module_hashes}
+
+
+def draft_placeholder_implementation_freeze(module_names: tuple[str, ...] | list[str] | None = None) -> dict[str, Any]:
+    required_modules = _normalize_module_names(module_names)
+    return {
+        "commit": "NOT_YET_COMMITTED",
+        "module_hashes": {module_name: "NOT_YET_COMMITTED" for module_name in required_modules},
+    }
 
 
 def canonical_json_content_hash(payload: dict[str, Any], *, key: str = "content_hash") -> str:
@@ -184,7 +394,7 @@ def prospective_sandbox(name: str, *, archive_bytes: bytes | None = None) -> Ite
             f"content_length_bytes_must_equal: {len(archive)}",
         )
         spec_path.parent.mkdir(parents=True, exist_ok=True)
-        spec_path.write_text(spec_text, encoding="utf-8")
+        spec_path.write_bytes(canonical_lf_bytes(spec_text.encode("utf-8")))
         spec = load_yaml(spec_path)
 
         required_values = spec["prospective_eval_overlay_lifecycle"]["required_values"]
@@ -227,6 +437,7 @@ def build_approval_record(
     attestation_overrides: dict[str, bool] | None = None,
     scope_overrides: dict[str, bool] | None = None,
 ) -> dict[str, Any]:
+    implementation_freeze = resolve_committed_implementation_freeze()
     spec_raw = sandbox.spec_path.read_bytes()
     attestation = {
         "archive_get_requested": False,
@@ -272,10 +483,7 @@ def build_approval_record(
             "canonical_lf_sha256": canonical_lf_sha256_path(sandbox.overlay_path),
         },
         "scoring_semantics_projection_sha256": sandbox.spec["authority_partition"]["tsc2_scoring_semantics_projection"]["sha256"],
-        "implementation_freeze": {
-            "commit": "f" * 40,
-            "module_hashes": {"raptor.eval.prospective_freeze": "0" * 64},
-        },
+        "implementation_freeze": implementation_freeze,
         "immutable_inputs_verified": immutable_inputs_verified,
         "protected_tests_verified": protected_tests_verified,
         "x64_freeze": {
@@ -391,26 +599,27 @@ def execute_transport_and_raw_freeze(
             default_runtime_identity = copy.deepcopy(freeze_block)
     if default_runtime_identity is None:
         default_runtime_identity = runtime_identity_ok()
-    result = run(
-        registration_spec_path=sandbox.spec_path,
-        prospective_overlay_path=sandbox.overlay_path,
-        base_eval_config_path=sandbox.base_eval_config_path,
-        approval_record=copy.deepcopy(approval_record) if isinstance(approval_record, dict) else approval_record,
-        allowed_repo_root=sandbox.repo_root,
-        allowed_external_root=sandbox.external_root,
-        transport_freeze_record_path=transport_record_path or sandbox.transport_record_path,
-        raw_freeze_record_path=raw_record_path or sandbox.raw_record_path,
-        transport=transport,
-        published_archive_date_lookup=published_archive_date_lookup,
-        official_md5_lookup=official_md5_lookup,
-        runtime_identity=default_runtime_identity,
-        cli_overrides=cli_overrides or {},
-        env_overrides=env_overrides or {},
-        label_reader=label_reader,
-        benchmark_builder=benchmark_builder,
-        scoring_runner=scoring_runner,
-        first_archive_get_at=first_archive_get_at,
-    )
+    with _with_resolved_git_env():
+        result = run(
+            registration_spec_path=sandbox.spec_path,
+            prospective_overlay_path=sandbox.overlay_path,
+            base_eval_config_path=sandbox.base_eval_config_path,
+            approval_record=copy.deepcopy(approval_record) if isinstance(approval_record, dict) else approval_record,
+            allowed_repo_root=sandbox.repo_root,
+            allowed_external_root=sandbox.external_root,
+            transport_freeze_record_path=transport_record_path or sandbox.transport_record_path,
+            raw_freeze_record_path=raw_record_path or sandbox.raw_record_path,
+            transport=transport,
+            published_archive_date_lookup=published_archive_date_lookup,
+            official_md5_lookup=official_md5_lookup,
+            runtime_identity=default_runtime_identity,
+            cli_overrides=cli_overrides or {},
+            env_overrides=env_overrides or {},
+            label_reader=label_reader,
+            benchmark_builder=benchmark_builder,
+            scoring_runner=scoring_runner,
+            first_archive_get_at=first_archive_get_at,
+        )
     if not isinstance(result, dict):
         pytest.fail("execute_transport_and_raw_freeze must return a mapping")
     return result
@@ -423,12 +632,13 @@ def validate_pre_data_approval(
     first_archive_get_at: str | None = None,
 ) -> dict[str, Any]:
     fn = require_api("validate_pre_data_approval")
-    out = fn(
-        registration_spec_path=sandbox.spec_path,
-        prospective_overlay_path=sandbox.overlay_path,
-        approval_record=copy.deepcopy(approval_record),
-        first_archive_get_at=first_archive_get_at,
-    )
+    with _with_resolved_git_env():
+        out = fn(
+            registration_spec_path=sandbox.spec_path,
+            prospective_overlay_path=sandbox.overlay_path,
+            approval_record=copy.deepcopy(approval_record),
+            first_archive_get_at=first_archive_get_at,
+        )
     if not isinstance(out, dict):
         pytest.fail("validate_pre_data_approval must return a mapping")
     return out
