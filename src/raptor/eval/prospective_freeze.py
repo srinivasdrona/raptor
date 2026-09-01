@@ -282,11 +282,17 @@ _UNOBSERVABLE_SENTINEL_PREFIX = "UNOBSERVABLE:"
 
 
 def _default_worker_arch_probe() -> str:
-    """Returns `platform.machine()` verbatim (never normalized/mapped to the
-    pinned literal) -- `assert_runtime_boundary` compares this raw value
-    against `_PINNED_WORKER_ARCH` exactly, so a non-x64 host's real,
-    unmodified architecture string always fails that comparison closed."""
-    return platform.machine()
+    """Observe the host architecture and canonicalize only known x64 names.
+
+    Native Windows CPython reports ``AMD64`` while Linux x64 reports
+    ``x86_64``. Both identify the ADR-0008 architecture, so map that closed
+    equivalence class to the pinned value. Every other value is returned
+    unchanged and therefore still fails the runtime-boundary comparison.
+    """
+    machine = platform.machine()
+    if machine.lower() in _X64_MACHINE_NAMES:
+        return _PINNED_WORKER_ARCH
+    return machine
 
 
 def _read_marker_file_or_sentinel(path: Path, *, dimension: str) -> str:
@@ -344,8 +350,9 @@ def observe_runtime_identity(
     """Independently OBSERVES `worker_designation`/`worker_arch`/
     `bias_commit`/`nirvana_banner` for the CURRENT run by calling each
     probe (defaulting to genuine system inspection: `platform.machine()`
-    for `worker_arch`, and a read of one of the three narrow marker files
-    under `DESIGNATED_X64_WORKER_ROOT` for the other three dimensions).
+    for `worker_arch`, canonicalizing only the known `AMD64`/`x86_64`
+    spellings, and a read of one of the three narrow marker files under
+    `DESIGNATED_X64_WORKER_ROOT` for the other three dimensions).
 
     This function -- not a caller-supplied plain mapping -- is what
     `validate_scoring_stage_approval` uses by default to obtain

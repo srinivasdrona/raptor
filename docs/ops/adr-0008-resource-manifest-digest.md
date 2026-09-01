@@ -145,7 +145,9 @@ closes this by independently OBSERVING each dimension itself, never
 accepting it as a caller-supplied mapping:
 
 - `worker_arch` — `platform.machine()`, read directly from the running
-  interpreter/host; never normalized toward the pinned value.
+  interpreter/host. The closed x64 equivalence class `AMD64`/`x86_64` is
+  canonicalized to the approval vocabulary's `x86_64`; every other value is
+  preserved and therefore fails the boundary check.
 - `worker_designation`, `bias_commit`, `nirvana_banner` — each read from one
   small, single-purpose, single-value marker text file under
   `DESIGNATED_X64_WORKER_ROOT` (`D:\raptor-x64` — the same root already

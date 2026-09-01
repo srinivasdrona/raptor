@@ -22,6 +22,7 @@ from raptor.eval.prospective_freeze import (
     ProspectiveInvalidStateError,
     assert_runtime_boundary,
     compute_resource_manifest_sha256,
+    observe_runtime_identity,
     resource_manifest_entries,
 )
 
@@ -240,6 +241,36 @@ def test_assert_runtime_boundary_still_rejects_a_non_hex_resource_manifest_value
     }
     with pytest.raises(ProspectiveInvalidStateError):
         assert_runtime_boundary(runtime_identity=runtime_identity)
+
+
+@pytest.mark.parametrize("reported_machine", ["AMD64", "amd64", "x86_64"])
+def test_runtime_identity_canonicalizes_native_x64_architecture_names(
+    monkeypatch: pytest.MonkeyPatch,
+    reported_machine: str,
+) -> None:
+    monkeypatch.setattr("raptor.eval.prospective_freeze.platform.machine", lambda: reported_machine)
+
+    observed = observe_runtime_identity(
+        worker_designation_probe=lambda: "adr-0008-designated-x64-worker",
+        bias_commit_probe=lambda: "ade13f206f3e2c2efe3ec92715d974645fc8da8f",
+        nirvana_banner_probe=lambda: "3.18.1-0-g05f88047",
+    )
+
+    assert observed["worker_arch"] == "x86_64"
+
+
+def test_runtime_identity_does_not_canonicalize_non_x64_architecture(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("raptor.eval.prospective_freeze.platform.machine", lambda: "aarch64")
+
+    observed = observe_runtime_identity(
+        worker_designation_probe=lambda: "adr-0008-designated-x64-worker",
+        bias_commit_probe=lambda: "ade13f206f3e2c2efe3ec92715d974645fc8da8f",
+        nirvana_banner_probe=lambda: "3.18.1-0-g05f88047",
+    )
+
+    assert observed["worker_arch"] == "aarch64"
 
 
 def test_operator_script_matches_the_library_function(tmp_path: Path) -> None:

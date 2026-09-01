@@ -51,6 +51,210 @@ result unless byte length, SHA-256, and MD5 match the frozen values above. Never
 accept an alternate path, mirror, later release, substitute, or redirect to a
 different path.
 
+## Recover the existing x64 worker
+
+The July runs already proved that this worker can execute Nirvana, BIAS and the
+RAPTOR parser. Reuse that installation. Do not reinstall the 58.7-GB annotation
+bundle merely because the new v3 handoff paths or marker files are absent.
+
+Three absences reported by the first v3 attempt are expected setup differences,
+not reasons to abandon the run:
+
+1. `/home/sdrona/raptor/bin/python` is the ARM development-host interpreter. It
+   is not required on this Windows x64 worker.
+2. The acquisition host's
+   `D:\raptor-external\prospective-freeze\...` directory is host-local. The x64
+   worker must copy or independently retrieve the exact frozen bytes into its
+   own run root.
+3. The three narrow marker files are a new machine-readable projection of the
+   already-provisioned worker identity. Materialize them only after verifying
+   the existing BIAS checkout, Nirvana installation and checksum manifests.
+
+Do not run `scripts\run_clinvar_2026_08_prospective_freeze.py --execute` on this
+worker. Stages 1-2 already completed on the acquisition host, and that operator
+correctly enforces the acquisition host's WSL policy. This worker starts at
+stage 3.
+
+### 1. Locate and update the existing checkout
+
+The prior x64 handoff used `D:\raptor\repo`; some later sessions used
+`D:\raptor`. Resolve the real checkout rather than assuming either:
+
+```powershell
+$ErrorActionPreference = "Stop"
+
+if (Test-Path -LiteralPath "D:\raptor\repo\.git") {
+    $repo = "D:\raptor\repo"
+} elseif (Test-Path -LiteralPath "D:\raptor\.git") {
+    $repo = "D:\raptor"
+} else {
+    throw "Existing RAPTOR checkout not found at D:\raptor\repo or D:\raptor"
+}
+
+git -C $repo status --short
+if ($LASTEXITCODE -ne 0) { throw "Cannot inspect RAPTOR checkout" }
+
+git -C $repo fetch origin
+if ($LASTEXITCODE -ne 0) { throw "Could not fetch origin" }
+
+git -C $repo switch fix/clinvar-archive-checksum-policy
+if ($LASTEXITCODE -ne 0) {
+    git -C $repo switch --track origin/fix/clinvar-archive-checksum-policy
+}
+if ($LASTEXITCODE -ne 0) { throw "Could not switch to the ClinVar v3 branch" }
+
+git -C $repo pull --ff-only
+if ($LASTEXITCODE -ne 0) { throw "ClinVar v3 branch is not fast-forwardable" }
+
+git -C $repo merge-base --is-ancestor `
+  34c3c0a2b6ed9b1756d5abd65b4e53450e2c3d34 HEAD
+if ($LASTEXITCODE -ne 0) { throw "Checkout does not contain the frozen acquisition evidence" }
+```
+
+Do not reset, clean or overwrite a dirty checkout. Use a new Git worktree if
+unrelated local changes prevent the branch switch.
+
+### 2. Use a native Windows x64 Python environment
+
+The earlier formal x64 gate used a native Python 3.12 virtual environment under
+`D:\raptor-x64\masked-heldout-2026-07-12`. Reuse its interpreter as a bootstrap
+when present; otherwise use the installed x64 `py -3.12` launcher. Create a new
+run-local venv so the historical environment remains untouched:
+
+```powershell
+$runRoot = "D:\raptor-x64\prospective-freeze\clinvar-2026-08-amendment-v3"
+$venv = Join-Path $runRoot "validation-venv"
+$priorPython = "D:\raptor-x64\masked-heldout-2026-07-12\gate-venv-2026-07-21\Scripts\python.exe"
+
+New-Item -ItemType Directory -Force -Path $runRoot | Out-Null
+
+if (-not (Test-Path -LiteralPath (Join-Path $venv "Scripts\python.exe"))) {
+    if (Test-Path -LiteralPath $priorPython) {
+        & $priorPython -m venv $venv
+    } elseif (Get-Command py.exe -ErrorAction SilentlyContinue) {
+        py -3.12 -m venv $venv
+    } else {
+        throw "No existing native x64 Python 3.12 interpreter was found"
+    }
+}
+
+$python = Join-Path $venv "Scripts\python.exe"
+& $python -m pip install --quiet -e "$repo[dev]"
+if ($LASTEXITCODE -ne 0) { throw "Could not install RAPTOR into the run-local venv" }
+
+& $python -c "import platform,sys; print(sys.executable); print(platform.machine()); assert platform.machine().lower() in {'amd64','x86_64'}"
+if ($LASTEXITCODE -ne 0) { throw "Python interpreter is not native x64" }
+```
+
+Native Windows reports `platform.machine()` as `AMD64`; RAPTOR canonicalizes
+that known x64 spelling to the approval record's `x86_64`. Do not create WSL or
+look for `/home/sdrona/raptor/bin/python` on this worker.
+
+### 3. Materialize the frozen archive on x64
+
+Prefer copying the already-frozen archive. If it cannot be transferred, retrieve
+the exact URL without following redirects and promote the temporary file only
+after all frozen identity checks pass:
+
+```powershell
+$url = "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08.txt.gz"
+$runScope = "f2d3291b67404153aae1c129a2b973db"
+$archiveDir = Join-Path $runRoot $runScope
+$archive = Join-Path $archiveDir "variant_summary_2026-08.txt.gz"
+$candidate = $archive
+
+New-Item -ItemType Directory -Force -Path $archiveDir | Out-Null
+
+if (-not (Test-Path -LiteralPath $archive -PathType Leaf)) {
+    $partial = "$archive.partial"
+    if (Test-Path -LiteralPath $partial) {
+        throw "Refusing to overwrite stale partial download: $partial"
+    }
+    $transport = & curl.exe --fail --silent --show-error `
+      --proto "=https" `
+      --output $partial `
+      --write-out "%{http_code}|%{url_effective}" `
+      $url
+    if ($LASTEXITCODE -ne 0 -or $transport -ne "200|$url") {
+        throw "Exact archive transport failed or redirected: $transport"
+    }
+    $candidate = $partial
+}
+
+if ((Get-Item -LiteralPath $candidate).Length -ne 441792560) {
+    throw "Archive byte-length mismatch"
+}
+if ((Get-FileHash -Algorithm SHA256 -LiteralPath $candidate).Hash.ToLowerInvariant() -ne `
+    "230ba6d5ac0869bfb46fecb8d19bd8dbfa9a133bfda2e3f8f5b5b662ae7bf500") {
+    throw "Archive SHA-256 mismatch"
+}
+if ((Get-FileHash -Algorithm MD5 -LiteralPath $candidate).Hash.ToLowerInvariant() -ne `
+    "2d6b8fcec81f20c9db443818d3fa4500") {
+    throw "Archive MD5 mismatch"
+}
+if ($candidate -ne $archive) {
+    Move-Item -LiteralPath $candidate -Destination $archive
+}
+```
+
+The stage 3 operator may consume this x64 path only after comparing its bytes to
+the committed raw-freeze record. The host-local path recorded by stages 1-2 is
+provenance, not a requirement that every worker mount the acquisition host's
+filesystem.
+
+### 4. Materialize marker files from the verified installation
+
+The absence of marker files does not mean BIAS or Nirvana is absent. Verify the
+installation that produced
+`D:\raptor-x64\sample_tsc_nirvana.json.gz`,
+`D:\raptor-x64\sample.bias_output.tsv`, and the July masked held-out result.
+Then create the markers:
+
+```powershell
+$x64Root = "D:\raptor-x64"
+$biasRoot = Join-Path $x64Root "BIAS-2015"
+$versions = Join-Path $x64Root "VERSIONS.md"
+$checksums = Join-Path $x64Root "CHECKSUMS"
+
+$biasCommit = (git -C $biasRoot rev-parse HEAD).Trim()
+if ($biasCommit -ne "ade13f206f3e2c2efe3ec92715d974645fc8da8f") {
+    throw "Installed BIAS checkout is not the pinned commit: $biasCommit"
+}
+
+if (-not (Test-Path -LiteralPath $versions -PathType Leaf)) {
+    throw "Existing x64 VERSIONS.md is missing"
+}
+$versionText = Get-Content -LiteralPath $versions -Raw
+if ($versionText -notmatch ([regex]::Escape("3.18.1-0-g05f88047"))) {
+    throw "VERSIONS.md does not attest the pinned Nirvana banner"
+}
+
+$requiredManifests = @(
+    "nirvana-grch38-full.sha256.txt",
+    "nirvana-grch38-updates.sha256.txt",
+    "bias-hg38-data.sha256.txt"
+)
+foreach ($name in $requiredManifests) {
+    if (-not (Test-Path -LiteralPath (Join-Path $checksums $name) -PathType Leaf)) {
+        throw "Missing frozen resource manifest: $name"
+    }
+}
+
+Set-Content -LiteralPath (Join-Path $x64Root "WORKER_DESIGNATION.txt") `
+  -Encoding ascii -NoNewline -Value "adr-0008-designated-x64-worker"
+Set-Content -LiteralPath (Join-Path $x64Root "BIAS_COMMIT.txt") `
+  -Encoding ascii -NoNewline -Value $biasCommit
+Set-Content -LiteralPath (Join-Path $x64Root "NIRVANA_BANNER.txt") `
+  -Encoding ascii -NoNewline -Value "3.18.1-0-g05f88047"
+
+& $python (Join-Path $repo "scripts\compute_adr0008_resource_manifest_sha256.py")
+if ($LASTEXITCODE -ne 0) { throw "Resource-manifest digest computation failed" }
+```
+
+If the BIAS checkout, Nirvana version evidence, installed data, or any of the
+three checksum manifests is genuinely absent, that is a real
+`BLOCKED_TOOLCHAIN` condition. Missing marker files alone are not.
+
 ## Goal
 
 Complete registered stages 3 through 6:
@@ -113,7 +317,8 @@ Read before execution:
 - `docs/ops/devbox-bias-nirvana-handoff.md`
 - `docs/ops/masked-heldout-bias-rerun-handoff.md`
 
-Confirm the process is AMD64/x86_64. Verify these marker files:
+Confirm the process is AMD64/x86_64 using the native run-local Python above.
+Verify the marker files materialized from the existing installation:
 
 | File | Exact content |
 |---|---|
@@ -130,8 +335,8 @@ Recompute and compare the installed resource files against:
 Then run on the real x64 worker, without `--allow-non-x64-host`:
 
 ```powershell
-cd D:\raptor
-python scripts\compute_adr0008_resource_manifest_sha256.py
+Set-Location $repo
+& $python scripts\compute_adr0008_resource_manifest_sha256.py
 ```
 
 Use only the digest printed by that command.
