@@ -56,13 +56,13 @@
     "recorded pins were computed against an earlier draft of this same",
     "spec text and would otherwise be stale.",
     "EXECUTING-COMMIT GUIDANCE (independent review finding #4): 'implementation_",
-    "freeze.commit'/'module_hashes' below still pin an EARLIER commit from this",
+    "freeze.commit'/'module_hashes'/'file_hashes' below pin an EARLIER commit from this",
     "same PR, not the final commit this branch merges as. raptor.eval.",
     "prospective_freeze._implementation_freeze_executing_code_failure",
     "independently reverifies module_hashes against the bytes ACTUALLY loaded",
     "in the running process (not just the named commit's git-show content),",
     "so real APPROVED_PRE_DATA approval MUST re-pin 'commit' to the final",
-    "merged commit and recompute module_hashes against that commit's",
+    "merged commit and recompute module_hashes/file_hashes against that commit's",
     "'git show <commit>:<path>' bytes AFTER merge, immediately before setting",
     "'approved_at' -- never fabricating an approval against a stale pin. If",
     "the running code and the pinned commit diverge for any reason, this is",
@@ -77,8 +77,8 @@
   "registration": {
     "id": "clinvar-2026-08-amendment-v2",
     "path": "docs/project/specs/clinvar-2026-08-prospective-amendment-v2.yaml",
-    "git_blob_sha1": "ec9408b7602bd0e4677778f610fe9e5024f63f04",
-    "canonical_lf_sha256": "4aabcbc7324cbc4b67ec2b16fe9f51baa78ed843a89d6aae5f9fe41c3fa3cc01"
+    "git_blob_sha1": "187922881a841fdb389455191198be5668a34a27",
+    "canonical_lf_sha256": "610c247a8cdc43ceaf39c13166b8eee3cc4052b146a831a01f7e066a519765f9"
   },
   "adr": {
     "id": "ADR-0020",
@@ -89,18 +89,22 @@
     "canonical_lf_sha256": "2826cd4b01bf08e2bf2a3eb13ad2eed73a3cf302c0b9ef41cbbf99fa9fb6ee48"
   },
   "implementation_freeze": {
-    "_note": "Repinned to the real committed implementation (was NOT_YET_COMMITTED). 'commit' is the exact 40-hex commit id; each module_hashes value is that module's canonical-LF SHA-256 computed from 'git show <commit>:<path>' (the exact committed blob, never ambient/checked-out worktree bytes -- disk bytes differ from the blob by CRLF/LF checkout normalization only, confirmed byte-identical after canonicalization).",
-    "commit": "9ac9f90d39abfbc6df6b9a51902ad71148674b31",
+    "_note": "Repinned to the real committed implementation. 'commit' is the exact 40-hex commit id; module_hashes and file_hashes are canonical-LF SHA-256 values computed from 'git show <commit>:<path>'. This draft is still not an approval.",
+    "commit": "1965683c165fdf1101c539bf2d8c9fc464eab5cd",
     "module_hashes": {
-      "raptor.eval.prospective_freeze": "73e416c8230ad2be332920801e7131824f4ceecc9b190085333d9f1f6dc56f04",
-      "raptor.eval.prospective_exact_source_transport": "615faa77a6fef3c5a46da50daa028183026f593641c85ad5012914cc9445cafa"
+      "raptor.eval.prospective_freeze": "73b174f339792020b7296fbc8dd7d412b832d6d01a521445d459ae245adde5e7",
+      "raptor.eval.prospective_exact_source_transport": "615faa77a6fef3c5a46da50daa028183026f593641c85ad5012914cc9445cafa",
+      "raptor.eval.prospective_exact_source_metadata_lookups": "f14e375ea4364de354052027cef25f6c6c784236757a8924371eb1ef373d4ca5"
+    },
+    "file_hashes": {
+      "scripts/run_clinvar_2026_08_prospective_freeze.py": "8b937e459915f633ec093ead1748823f1922f5b522543967d4513e2cea7c0b08"
     }
   },
   "protected_tests_verified": true,
   "_protected_tests_verification_evidence": {
-    "command": "PYTHONPATH=src python -m pytest tests/eval/test_clinvar_2026_08_prospective_freeze_red.py tests/eval/test_clinvar_2026_08_prospective_adjudication_red.py tests/eval/test_tiered_prospective_registration.py -q",
-    "environment": "WSL2 Ubuntu 24.04, /home/sdrona/raptor/bin/python (venv 'raptor'), explicit GIT_DIR=/mnt/d/AIProjects/raptor/.git/worktrees/clinvar-2026-08-freeze-run-v2 GIT_WORK_TREE=/mnt/d/AIProjects/raptor-worktrees/clinvar-2026-08-freeze-run-v2",
-    "result": "108 passed, 3 skipped, 0 failed",
+    "command": "PYTHONPATH=src python -m pytest tests/eval/test_clinvar_2026_08_exact_source_metadata_lookups_red.py tests/eval/test_clinvar_2026_08_exact_source_transport_red.py tests/eval/test_clinvar_2026_08_prospective_freeze_red.py tests/eval/test_clinvar_2026_08_prospective_harness_red.py tests/eval/test_clinvar_2026_08_prospective_adjudication_red.py tests/eval/test_adr0008_resource_manifest_digest.py -q",
+    "environment": "WSL2 Ubuntu, /home/sdrona/raptor/bin/python (venv 'raptor'), worktree D:/AIProjects/raptor-worktrees/clinvar-x64-manifest-contract",
+    "result": "210 passed, 3 skipped, 0 failed",
     "network_or_archive_access": false
   },
   "scope": {

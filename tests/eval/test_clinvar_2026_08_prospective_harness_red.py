@@ -1147,13 +1147,17 @@ def test_draft_implementation_freeze_is_placeholder_or_commit_coherent_tree() ->
         pytest.fail("draft implementation_freeze block must be a mapping")
     commit = implementation_freeze.get("commit")
     module_hashes = implementation_freeze.get("module_hashes")
+    file_hashes = implementation_freeze.get("file_hashes")
     if not isinstance(commit, str) or not commit.strip():
         pytest.fail("draft implementation_freeze.commit must be non-blank")
     if not isinstance(module_hashes, dict) or not module_hashes:
         pytest.fail("draft implementation_freeze.module_hashes must be a non-empty mapping")
+    if not isinstance(file_hashes, dict) or not file_hashes:
+        pytest.fail("draft implementation_freeze.file_hashes must be a non-empty mapping")
 
     if commit == "NOT_YET_COMMITTED":
         assert all(isinstance(v, str) and v for v in module_hashes.values())
+        assert all(isinstance(v, str) and v for v in file_hashes.values())
         return
 
     commit_probe = _run_git_with_worktree("cat-file", "-e", f"{commit}" + "^{commit}")
@@ -1173,6 +1177,18 @@ def test_draft_implementation_freeze_is_placeholder_or_commit_coherent_tree() ->
         if shown.returncode != 0:
             pytest.fail(
                 f"module {module_name!r} not present in committed tree {commit}; "
+                f"stderr={_stderr_text(shown.stderr)}"
+            )
+        assert _sha256_hex(_canonical_lf_bytes(shown.stdout)) == expected_hash
+
+    for file_path, expected_hash in file_hashes.items():
+        assert isinstance(file_path, str) and file_path.strip()
+        assert isinstance(expected_hash, str) and len(expected_hash) == 64
+        shown = _run_git_with_worktree("show", f"{commit}:{file_path}")
+        _assert_git_usable(shown, context=f"draft implementation_freeze file probe {file_path!r}")
+        if shown.returncode != 0:
+            pytest.fail(
+                f"file {file_path!r} not present in committed tree {commit}; "
                 f"stderr={_stderr_text(shown.stderr)}"
             )
         assert _sha256_hex(_canonical_lf_bytes(shown.stdout)) == expected_hash
