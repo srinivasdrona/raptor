@@ -1221,7 +1221,9 @@ def test_validate_pre_data_approval_rejects_approved_reachable_commit_with_stale
             "module_hashes": {
                 "raptor.eval.prospective_freeze": "0" * 64,
                 "raptor.eval.prospective_exact_source_transport": "1" * 64,
+                "raptor.eval.prospective_exact_source_metadata_lookups": "2" * 64,
             },
+            "file_hashes": copy.deepcopy(approval["implementation_freeze"]["file_hashes"]),
         }
         with pytest.raises(stop_error) as exc:
             prospective_red_helpers.validate_pre_data_approval(
@@ -1238,6 +1240,32 @@ def test_validate_pre_data_approval_rejects_approved_reachable_commit_with_stale
         )
         assert "not a reachable commit" not in reason.lower()
         assert "could not be verified: git is unavailable" not in reason.lower()
+
+
+@pytest.mark.parametrize(
+    ("hash_group", "required_name"),
+    [
+        ("module_hashes", "raptor.eval.prospective_freeze"),
+        ("module_hashes", "raptor.eval.prospective_exact_source_metadata_lookups"),
+        ("file_hashes", "scripts/run_clinvar_2026_08_prospective_freeze.py"),
+    ],
+)
+def test_validate_pre_data_approval_rejects_missing_acquisition_implementation_pin(
+    hash_group: str,
+    required_name: str,
+) -> None:
+    stop_error = require_exception("ProspectiveStopStateError")
+    with prospective_sandbox(f"approval-missing-pin-{hash_group}") as sandbox:
+        approval = build_approval_record(sandbox, decision="APPROVED_PRE_DATA")
+        del approval["implementation_freeze"][hash_group][required_name]
+        with pytest.raises(stop_error) as exc:
+            prospective_red_helpers.validate_pre_data_approval(
+                sandbox,
+                approval_record=approval,
+                first_archive_get_at=None,
+            )
+        assert_stop_state(exc.value, "PRE_DATA_IMPLEMENTATION_NOT_READY")
+        assert required_name in str(getattr(exc.value, "reason", ""))
 
 
 def test_helper_git_metadata_resolution_supports_no_env_checkout_forms_and_strict_declared_modules(
@@ -1316,6 +1344,7 @@ def test_validate_pre_data_approval_rejects_approved_unresolvable_implementation
         approval["implementation_freeze"] = {
             "commit": unresolvable_commit,
             "module_hashes": copy.deepcopy(approval["implementation_freeze"]["module_hashes"]),
+            "file_hashes": copy.deepcopy(approval["implementation_freeze"]["file_hashes"]),
         }
         with pytest.raises(stop_error) as exc:
             prospective_red_helpers.validate_pre_data_approval(

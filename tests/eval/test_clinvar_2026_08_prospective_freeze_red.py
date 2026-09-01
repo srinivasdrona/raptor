@@ -1307,8 +1307,8 @@ def test_malicious_dataset_filename_traversal_is_invalid_and_never_downloaded() 
     with prospective_sandbox("filename-traversal-boundary") as sandbox:
         _replace_once_in_file(
             sandbox.spec_path,
-            "filename: variant_summary_2026-08.txt.gz",
-            "filename: ../escaped-raw-archive.txt.gz",
+            "\n  filename: variant_summary_2026-08.txt.gz",
+            "\n  filename: ../escaped-raw-archive.txt.gz",
         )
         approval = build_approval_record(sandbox)
         transport = InjectedTransport(

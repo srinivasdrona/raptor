@@ -714,8 +714,8 @@ def _implementation_freeze_failure_reason(implementation_freeze: Mapping[str, An
         return "implementation_freeze.commit must be NOT_YET_COMMITTED or a 40-hex lowercase commit id"
     if not isinstance(module_hashes, Mapping) or not module_hashes:
         return "implementation_freeze.module_hashes must be a non-empty mapping"
-    if not isinstance(file_hashes, Mapping) or not file_hashes:
-        return "implementation_freeze.file_hashes must be a non-empty mapping"
+    if not isinstance(file_hashes, Mapping):
+        return "implementation_freeze.file_hashes must be a mapping"
     for module_name, expected_hash in module_hashes.items():
         if not isinstance(module_name, str) or not module_name.strip():
             return "implementation_freeze.module_hashes has a blank module name"
