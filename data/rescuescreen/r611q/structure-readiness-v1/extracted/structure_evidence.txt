@@ -1,0 +1,12 @@
+E001 | UniProt P49815 sequence residue 611 is R (Arg).
+E002 | 7DL2 model 1 TSC2 entity 2 auth A/asym B label_seq 562/auth_seq 611 is wild-type ARG with 11 expected heavy-atom records, alt_id '.', and occupancy 1.00.
+E003 | 7DL2 model 1 TSC2 entity 2 auth B/asym C label_seq 562/auth_seq 611 is wild-type ARG with 11 expected heavy-atom records, alt_id '.', and occupancy 1.00.
+E004 | 7DL2 validation auth A/asym B label_seq 562 reports Q_score 0.303, residue_inclusion 1.0000, and rotamer mpp80.
+E005 | 7DL2 validation auth B/asym C label_seq 562 reports Q_score 0.268, residue_inclusion 0.8182, and rotamer mtt180.
+E006 | 9CE3 model 1 TSC2 entity 1 auth A/asym A and auth B/asym B label_seq 619/auth_seq 611 are wild-type ARG with 11 expected heavy-atom records, alt_id '.', and occupancy 1.00.
+E007 | 9CE3 validation auth A/asym A label_seq 619 reports Q_score 0.454, residue_inclusion 0.8182, and rotamer mtm180; auth B/asym B reports Q_score 0.483, residue_inclusion 1.0000, and rotamer mtm180.
+E008 | PDBe deposited entry summaries report ligand=0 and water=0 for both 7DL2 and 9CE3; this is deposited inventory only and does not establish non-ligandability.
+E009 | PMC7804450 reports: "The structure was determined by cryo-EM single particle reconstruction, and the cryo-EM map was refined to an overall resolution of 4.4 Å (Fig. 1b ). The core and two wings were locally refined to 3.6, 3.9, and 4.1 Å resolution, respectively"
+E010 | PMC11578170 reports: "Here, focused refinement and classification stepped along the 40 nm length of the TSC:WIPI3 complex enabled us to achieve a final composite reconstruction with an average nominal resolution of 2.8 Å"
+E011 | The scoped primary-article XML contains no R611 or R611Q statement, and the scoped coordinates contain wild-type ARG611 rather than a GLN mutant structure.
+E012 | No coordinate contact calculation is included in this pack; a direct Arg611-TSC1 contact or salt bridge, a pocket, and ligandability remain unsupported or unmeasured.

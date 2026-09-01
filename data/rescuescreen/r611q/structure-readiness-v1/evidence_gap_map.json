@@ -1,0 +1,23 @@
+{
+  "gates": [
+    {
+      "evidence_status": "PACK_EVIDENCE_READY_FOR_HUMAN_REVIEW",
+      "gap": "Exact RefSeq-to-PDB-construct equivalence remains unverified.",
+      "gate_id": "EG-2",
+      "gate_status": "NOT_SATISFIED"
+    },
+    {
+      "evidence_status": "PACK_EVIDENCE_READY_FOR_HUMAN_REVIEW",
+      "gap": "Human review is required for structure coverage and uncertainty assessment.",
+      "gate_id": "EG-3",
+      "gate_status": "NOT_SATISFIED"
+    }
+  ],
+  "human_review_state": "PENDING",
+  "schema": "rescuescreen.r611q.structure_evidence_gap_map.v1",
+  "unresolved_evidence": [
+    "No R611Q mutant structure in scoped sources.",
+    "Direct Arg611-TSC1 contact or salt bridge unmeasured.",
+    "Pocket and ligandability unmeasured."
+  ]
+}

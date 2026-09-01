@@ -1460,6 +1460,23 @@ todos:
   depends_on:
   - rescuescreen-r611q-literature-baseline
   created: '2026-08-17'
+- id: rescuescreen-r611q-structure-readiness-pack
+  title: Building the R611Q structure-readiness evidence pack
+  description: 'Track: RESCUESCREEN / EVIDENCE (exploratory, non-Atlas).
+    Completed 2026-08-21. A deterministic, stdlib-only builder validates the
+    frozen UniProt, PDB, PDBe, wwPDB validation and primary-article sources and
+    writes the hash-bound pack at data/rescuescreen/r611q/structure-readiness-v1/.
+    It records wild-type coordinate coverage, chain/numbering hazards,
+    copy-specific raw validation metrics, deposited inventory and bounded
+    publication context with exact evidence spans. It does not establish a
+    RefSeq-to-construct equivalence, mutant structure, direct contact, pocket or
+    ligandability; EG-1 through EG-5 remain NOT_SATISFIED, Gate 8 remains
+    BLOCKED_HUMAN_REVIEW, accepted_claim_count remains 0, and no RescueScreen
+    stage is authorized.'
+  status: done
+  depends_on:
+  - rescuescreen-r611q-synthesis-package
+  created: '2026-08-21'
 - id: rescuescreen-mechanism-structure-gate
   title: Verifying the RescueScreen mechanism and structure entry gate
   description: 'Track: RESCUESCREEN / ENTRY (research-only; asserts no clinical result and

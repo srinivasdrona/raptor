@@ -1,0 +1,78 @@
+{
+  "limitations": [
+    "PDBe mapping ranges and coordinate residue labels support a UniProt-context crosswalk but do not provide an explicit residue-by-residue RefSeq NP_000539.2-to-PDB-construct alignment; exact RefSeq-to-PDB-construct equivalence remains unverified.",
+    "The construct/isoform display offsets are context only and must not be used as residue-offset arithmetic to claim exact RefSeq-to-construct equivalence.",
+    "Human review remains required for EG-2."
+  ],
+  "schema": "rescuescreen.r611q.structure_identity_mapping.v1",
+  "structure_crosswalks": [
+    {
+      "copies": [
+        {
+          "auth_asym_id": "A",
+          "auth_seq_id": 611,
+          "label_asym_id": "B",
+          "label_seq_id": 562
+        },
+        {
+          "auth_asym_id": "B",
+          "auth_seq_id": 611,
+          "label_asym_id": "C",
+          "label_seq_id": 562
+        }
+      ],
+      "entity_id": 2,
+      "pdb_id": "7DL2",
+      "pdbe_uniprot_mapping": {
+        "label_end": 1692,
+        "label_start": 1,
+        "reported_identity": 0.96,
+        "uniprot_end": 1807,
+        "uniprot_start": 50
+      },
+      "target_display_offset": "+49"
+    },
+    {
+      "copies": [
+        {
+          "auth_asym_id": "A",
+          "auth_seq_id": 611,
+          "label_asym_id": "A",
+          "label_seq_id": 619
+        },
+        {
+          "auth_asym_id": "B",
+          "auth_seq_id": 611,
+          "label_asym_id": "B",
+          "label_seq_id": 619
+        }
+      ],
+      "entity_id": 1,
+      "pdb_id": "9CE3",
+      "pdbe_uniprot_mapping": {
+        "label_end": 1792,
+        "label_start": 10,
+        "reported_identity": 0.99,
+        "uniprot_end": 1807,
+        "uniprot_start": 2
+      },
+      "target_display_offset": "-8"
+    }
+  ],
+  "variant_crosswalk": {
+    "gene": "TSC2",
+    "refseq_protein": "NP_000539.2:p.Arg611Gln",
+    "refseq_transcript": "NM_000548.5:c.1832G>A",
+    "spdi": "NC_000016.10:2070570:G:A",
+    "uniprot_accession": "P49815",
+    "uniprot_residue": {
+      "one_letter": "R",
+      "position": 611,
+      "three_letter": "ARG"
+    },
+    "uniprot_validation": {
+      "fasta": "raw/uniprot-P49815.fasta",
+      "json": "raw/uniprot-P49815.json"
+    }
+  }
+}
