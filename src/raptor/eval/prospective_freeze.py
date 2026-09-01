@@ -10,7 +10,7 @@ locator, or `configs/eval/tsc2.yaml#labels_snapshot` in place -- dataset
 identity for THIS registration flows only through the registered,
 hash-pinned prospective eval-overlay (`merge_prospective_overlay`).
 
-Three independent surfaces live here, all fail-closed and all sharing the
+Four independent surfaces live here, all fail-closed and all sharing the
 same typed error/stop-state vocabulary:
 
 * `validate_pre_data_approval` / the internal approval gate inside
@@ -19,7 +19,16 @@ same typed error/stop-state vocabulary:
   hash-drift, unimplemented-protection, non-vacuous-attestation or
   approval-vs-first-GET timing breach raises a typed
   `ProspectiveStopStateError` (`.code`/`.stop_state` one of
-  `PRE_DATA_STOP_STATES`) BEFORE any network call.
+  `PRE_DATA_STOP_STATES`) BEFORE any network call. This gate governs ONLY
+  ADR-0020 stages 1-2 (transport freeze + raw archive acquisition) and
+  requires exactly the prospective dataset/source identity (registration +
+  overlay hash-pins), an approval timestamp strictly before the first
+  archive GET, and the existing exact-source transport/hash-chain
+  protections (stage-1 HEAD comparison, official MD5, raw SHA-256). It
+  never requires, reads, or checks x64/BIAS/Nirvana identity -- ClinVar
+  archive acquisition has no x86-only requirement (see
+  `docs/ops/adr-0008-resource-manifest-digest.md` "Non-goals" and
+  `scripts/run_clinvar_2026_08_prospective_freeze.py`'s module docstring).
 * `execute_transport_and_raw_freeze` -- stage 1 (`HEAD` + published-date +
   official-MD5-source verification) and stage 2 (bounded streamed GET of
   ONLY the exact registered archive, raw hashing) of the contract's ordered
@@ -31,13 +40,46 @@ same typed error/stop-state vocabulary:
   callers for the same freeze-record pair), and every destination write is
   boundary-checked (no traversal, no symlink-follow, no special file) and
   atomic (temp-write + `os.replace`, crash leaves no partial artifact).
+* `validate_scoring_stage_approval` / `assert_runtime_boundary` -- the
+  SEPARATE, LATER gate for ADR-0020 stage 4 (`4_MASK_AND_LABEL_FREE_SCORE`):
+  the mandatory ADR-0008 x64 worker / BIAS / Nirvana / resource-manifest
+  identity check that MUST pass before any BIAS/Nirvana execution or
+  label-dependent evaluation. It is deliberately independent of, and never
+  consulted by, stages 1-2 above. It never trusts the approval record's
+  claimed `x64_freeze` block, its claimed `immutable_inputs_verified` flag,
+  or any caller-supplied "observed identity" mapping: it always calls
+  `observe_runtime_identity` itself (worker designation/BIAS commit/Nirvana
+  banner independently read from dedicated marker files under
+  `DESIGNATED_X64_WORKER_ROOT`, architecture from `platform.machine()`),
+  always independently RECOMPUTES `resource_manifest_sha256` from the
+  actual manifest files at the one designated checksums location via
+  `compute_resource_manifest_sha256`, and always independently RECOMPUTES
+  every `immutable_inputs` entry's hash from the current repository file
+  bytes -- never accepting any of these as a claim -- then requires the
+  approval record's claimed pins to equal that observed/recomputed
+  identity exactly. A merely well-formed but fabricated claimed digest
+  (e.g. all-zero) is therefore always rejected, and a static pinned
+  literal supplied on a non-designated runtime is rejected too, because
+  that runtime's own independent observation genuinely differs. It also
+  requires a mandatory, immutable `first_scoring_execution_at` timestamp
+  strictly after `approved_at`; a missing, malformed, future-dated, or
+  mistimed value is always rejected. A schema breach, wrong decision/
+  approver, mistimed approval/execution timestamp, immutable-inputs
+  mismatch, or any observed-vs-claimed identity mismatch raises
+  `ProspectiveInvalidStateError` (`.code == "INVALID"`, an A0 run-integrity
+  failure per the registration spec's stage 4 rule), never a `PRE_DATA_*`
+  stop state.
 * `adjudicate_prospective_outcomes` -- the ADR-0020 A0-A6 per-scope axis
   projection, the closed six-value terminal-outcome vocabulary, and the
   full-spectrum/narrow-scope precedence and authorization mapping. It
   trusts (never recomputes) each scope's pre-derived A1/A2/A3 verdict --
   it only validates the closed enum, derives A4/A5/A6, and applies the
   registered precedence -- so it can never itself read a label, a
-  benchmark row, or a score.
+  benchmark row, or a score. Its VERY FIRST action, unconditionally, is
+  calling `validate_scoring_stage_approval`: no outcome dict of any kind
+  (including `PASS`/`AUTHORIZED_RESEARCH_ONLY`) can ever be produced
+  without a validated, anti-fabrication-checked scoring-stage approval and
+  observed runtime identity.
 
 Nothing in this module ever performs a real archive GET, HEAD, or lookup:
 `transport`, `published_archive_date_lookup`, and `official_md5_lookup` are
@@ -48,8 +90,10 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import importlib
 import json
 import os
+import platform
 import re
 import stat
 import subprocess
@@ -57,7 +101,7 @@ import threading
 import uuid
 from datetime import date, datetime, timezone
 from email.utils import parsedate_to_datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Iterator, Mapping
 
 import yaml
@@ -69,10 +113,20 @@ __all__ = [
     "TERMINAL_OUTCOME_VOCAB",
     "A5_PRECEDENCE",
     "FULL_SPECTRUM_PRECEDENCE",
+    "RESOURCE_MANIFEST_DIGEST_SCHEMA",
+    "RESOURCE_MANIFEST_ENTRIES",
+    "DESIGNATED_X64_WORKER_ROOT",
+    "REQUIRED_IMPLEMENTATION_FREEZE_MODULES",
+    "REQUIRED_IMPLEMENTATION_FREEZE_FILES",
     "ProspectiveContractError",
     "ProspectiveStopStateError",
     "ProspectiveInvalidStateError",
     "assert_runtime_boundary",
+    "resource_manifest_entries",
+    "compute_resource_manifest_sha256",
+    "observe_runtime_identity",
+    "capture_transport_identity_pin",
+    "validate_scoring_stage_approval",
     "merge_prospective_overlay",
     "validate_pre_data_approval",
     "execute_transport_and_raw_freeze",
@@ -166,8 +220,8 @@ _A5_TO_SCOPE_TERMINAL: dict[str, str] = {
 }
 
 #: ADR-0008 pinned x64 worker/tool identity dimensions
-#: (`freeze_record_must_pin`: "x64 BIAS 3.0.0 commit ..."; "Nirvana 3.18.1
-#: runtime banner ...").
+#: (`scoring_stage_approval.approval_record_must_include`: "x64 BIAS 3.0.0
+#: commit ..."; "Nirvana 3.18.1 runtime banner ...").
 _RUNTIME_IDENTITY_KEYS = frozenset(
     {"worker_designation", "worker_arch", "bias_commit", "nirvana_banner", "resource_manifest_sha256"}
 )
@@ -177,8 +231,209 @@ _PINNED_BIAS_COMMIT = "ade13f206f3e2c2efe3ec92715d974645fc8da8f"
 _PINNED_NIRVANA_BANNER = "3.18.1-0-g05f88047"
 _HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 _MD5_HEX_RE = re.compile(r"^[0-9a-fA-F]{32}$")
+
+#: The ops-documented root directory of the ADR-0008 designated x64 worker
+#: (`docs/ops/devbox-bias-nirvana-handoff.md`,
+#: `docs/ops/masked-heldout-bias-rerun-handoff.md` §4,
+#: `configs/eval/core_annotation_bundle.yaml`
+#: `x64_handoff_requirements.items[*].x64_path`,
+#: `scripts/compute_adr0008_resource_manifest_sha256.py`
+#: `DEFAULT_CHECKSUMS_DIR`). This is the ONE designated resource location
+#: `observe_runtime_identity`'s default probes read from -- never a
+#: caller-chosen directory -- so a caller cannot bind a scoring-stage
+#: approval to manifests/markers copied to an arbitrary, non-designated
+#: path.
+DESIGNATED_X64_WORKER_ROOT = r"D:\raptor-x64"
+_DEFAULT_RESOURCE_MANIFEST_CHECKSUMS_DIR = str(Path(DESIGNATED_X64_WORKER_ROOT) / "CHECKSUMS")
+
+#: The three narrow, machine-readable marker files this module's default
+#: probes read to independently OBSERVE worker designation / BIAS commit /
+#: Nirvana runtime banner on the ADR-0008 designated x64 worker. These are a
+#: minimal, explicit extension of the already-documented
+#: `D:\raptor-x64\VERSIONS.md` free-form convention
+#: (`docs/ops/devbox-bias-nirvana-handoff.md`) -- one small, single-purpose,
+#: single-value text file per dimension, so each can be independently
+#: probed by a plain file read with no markdown parsing. See
+#: `docs/ops/adr-0008-resource-manifest-digest.md` "Independent
+#: runtime-identity observation" for the full convention and how a human
+#: operator populates them.
+_WORKER_DESIGNATION_MARKER_FILENAME = "WORKER_DESIGNATION.txt"
+_BIAS_COMMIT_MARKER_FILENAME = "BIAS_COMMIT.txt"
+_NIRVANA_BANNER_MARKER_FILENAME = "NIRVANA_BANNER.txt"
+
+#: The x64/AMD64 `platform.machine()` spellings this module treats as the
+#: pinned x86_64 architecture (mirrors
+#: `scripts/compute_adr0008_resource_manifest_sha256.py` `_X64_MACHINE_NAMES`
+#: -- kept identical so the CLI utility and this module's own runtime-arch
+#: observation can never silently diverge on what counts as "x64").
+_X64_MACHINE_NAMES = frozenset({"x86_64", "amd64"})
+
+#: A clearly-non-matching sentinel prefix `_default_*_probe` functions
+#: return when their marker file is absent/unreadable/blank -- NEVER the
+#: pinned expected value. This guarantees a non-designated host (this WSL2
+#: dev/test environment included) can never silently "observe" the correct
+#: answer merely because nothing was found; absence must fail the pin
+#: comparison, not be treated as "cannot verify, so accept".
+_UNOBSERVABLE_SENTINEL_PREFIX = "UNOBSERVABLE:"
+
+
+def _default_worker_arch_probe() -> str:
+    """Returns `platform.machine()` verbatim (never normalized/mapped to the
+    pinned literal) -- `assert_runtime_boundary` compares this raw value
+    against `_PINNED_WORKER_ARCH` exactly, so a non-x64 host's real,
+    unmodified architecture string always fails that comparison closed."""
+    return platform.machine()
+
+
+def _read_marker_file_or_sentinel(path: Path, *, dimension: str) -> str:
+    """Reads a single-line marker file and returns its stripped text, or a
+    `_UNOBSERVABLE_SENTINEL_PREFIX`-prefixed sentinel (embedding `dimension`
+    and `path` for a useful failure message) if the file is missing,
+    unreadable, or blank. Never raises, and never falls back to any pinned
+    literal -- an absent marker is observed as itself absent, not silently
+    treated as a match."""
+    try:
+        text = path.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        return f"{_UNOBSERVABLE_SENTINEL_PREFIX} {dimension} marker file unreadable at {path}: {exc}"
+    if not text:
+        return f"{_UNOBSERVABLE_SENTINEL_PREFIX} {dimension} marker file is blank at {path}"
+    return text
+
+
+def _default_worker_designation_probe() -> str:
+    return _read_marker_file_or_sentinel(
+        Path(DESIGNATED_X64_WORKER_ROOT) / _WORKER_DESIGNATION_MARKER_FILENAME, dimension="worker_designation"
+    )
+
+
+def _default_bias_commit_probe() -> str:
+    return _read_marker_file_or_sentinel(
+        Path(DESIGNATED_X64_WORKER_ROOT) / _BIAS_COMMIT_MARKER_FILENAME, dimension="bias_commit"
+    )
+
+
+def _default_nirvana_banner_probe() -> str:
+    return _read_marker_file_or_sentinel(
+        Path(DESIGNATED_X64_WORKER_ROOT) / _NIRVANA_BANNER_MARKER_FILENAME, dimension="nirvana_banner"
+    )
+
+
+def _default_resource_manifest_location_probe() -> str:
+    """Returns the ONE designated resource-manifest checksums directory
+    (`_DEFAULT_RESOURCE_MANIFEST_CHECKSUMS_DIR`) -- never a caller-supplied
+    path. Binding manifests to this fixed, documented location (rather than
+    accepting an arbitrary directory argument) is what prevents a caller
+    from recomputing `resource_manifest_sha256` from manifests copied to a
+    non-designated path and having that count as observation of the real
+    worker."""
+    return _DEFAULT_RESOURCE_MANIFEST_CHECKSUMS_DIR
+
+
+def observe_runtime_identity(
+    *,
+    worker_designation_probe: Callable[[], str] | None = None,
+    worker_arch_probe: Callable[[], str] | None = None,
+    bias_commit_probe: Callable[[], str] | None = None,
+    nirvana_banner_probe: Callable[[], str] | None = None,
+) -> dict[str, str]:
+    """Independently OBSERVES `worker_designation`/`worker_arch`/
+    `bias_commit`/`nirvana_banner` for the CURRENT run by calling each
+    probe (defaulting to genuine system inspection: `platform.machine()`
+    for `worker_arch`, and a read of one of the three narrow marker files
+    under `DESIGNATED_X64_WORKER_ROOT` for the other three dimensions).
+
+    This function -- not a caller-supplied plain mapping -- is what
+    `validate_scoring_stage_approval` uses by default to obtain
+    `observed_runtime_identity`. Unlike a plain caller-claimed value, a
+    caller cannot make this function "observe" the pinned answer merely by
+    asserting it: on any host that is not the real ADR-0008 designated x64
+    worker, the default probes return the host's REAL `platform.machine()`
+    value and/or an `_UNOBSERVABLE_SENTINEL_PREFIX`-prefixed sentinel (the
+    marker files are simply absent), and `assert_runtime_boundary` then
+    fails closed on that real mismatch. Explicit probe overrides exist only
+    so this mechanism itself can be exercised in tests without requiring a
+    real ADR-0008 worker filesystem; production/CLI callers must never
+    override any of these four probes."""
+    designation_probe = worker_designation_probe or _default_worker_designation_probe
+    arch_probe = worker_arch_probe or _default_worker_arch_probe
+    bias_probe = bias_commit_probe or _default_bias_commit_probe
+    nirvana_probe = nirvana_banner_probe or _default_nirvana_banner_probe
+    return {
+        "worker_designation": designation_probe(),
+        "worker_arch": arch_probe(),
+        "bias_commit": bias_probe(),
+        "nirvana_banner": nirvana_probe(),
+    }
+
+
+def capture_transport_identity_pin(transport: Any) -> dict[str, Any]:
+    """Captures an identity "pin" for `transport` -- its concrete class and
+    that class's currently-bound `head`/`stream_get` function objects --
+    immediately after a transport is constructed (e.g. right after
+    `raptor.eval.prospective_exact_source_transport.build_transport()`
+    returns), before either lookup port is even called.
+
+    `execute_transport_and_raw_freeze` re-verifies this pin against the
+    SAME `transport` object at two later points (immediately on entry, and
+    again immediately before the real streamed GET) via
+    `_transport_identity_pin_mismatch`. If either check finds the
+    transport's class or its `head`/`stream_get` methods no longer match
+    this pin -- e.g. something monkeypatched `type(transport).stream_get`
+    in between -- execution is refused with `TRANSPORT_IDENTITY_TAMPERED`
+    before any network call. Independent review (round 5) additionally
+    closed the specific vulnerability this pin was originally layered on
+    top of: confirmed live `--execute` no longer imports ANY
+    caller-selected Python/plugin code at all before the real GET (the
+    `--published-archive-date-lookup`/`--official-md5-lookup`
+    `"module:callable"` CLI options were removed; both ports are now
+    hard-wired to `raptor.eval.prospective_exact_source_metadata_lookups`,
+    a single production-owned, statically-imported module -- see that
+    module's docstring). This pin therefore remains purely as
+    defense-in-depth against any future regression, not as the primary
+    defense against a live import vulnerability."""
+    transport_type = type(transport)
+    return {
+        "transport_type": transport_type,
+        "head": transport_type.head,
+        "stream_get": transport_type.stream_get,
+    }
+
+
+def _transport_identity_pin_mismatch(transport: Any, pin: Mapping[str, Any]) -> bool:
+    transport_type = type(transport)
+    return (
+        transport_type is not pin.get("transport_type")
+        or transport_type.head is not pin.get("head")
+        or transport_type.stream_get is not pin.get("stream_get")
+    )
+
+
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _DIGITS_RE = re.compile(r"^[0-9]+$")
+
+#: Schema id for the `resource_manifest_sha256` canonical digest envelope
+#: (`docs/ops/adr-0008-resource-manifest-digest.md`). Domain-separated and
+#: versioned: this literal string is itself bound into the hashed bytes, so
+#: a future, deliberate change to the envelope shape is made by bumping this
+#: string (a new schema id can never collide with a v1 digest) rather than
+#: by silently reinterpreting an existing `resource_manifest_sha256` value.
+RESOURCE_MANIFEST_DIGEST_SCHEMA = "raptor.eval.adr0008_resource_manifest_digest.v1"
+
+#: The three pinned checksum-manifest files `resource_manifest_sha256` binds,
+#: as `(id, filename)` pairs in this EXACT pinned order. Sourced from
+#: `configs/eval/core_annotation_bundle.yaml`
+#: `x64_handoff_requirements.items` (`nirvana_full_manifest`,
+#: `nirvana_updates_manifest`, `bias_data_manifest`) and
+#: `docs/ops/masked-heldout-bias-rerun-handoff.md` §4/§9, which together
+#: identify these as the frozen baselines for the ADR-0008 x64 worker's
+#: Nirvana GRCh38 data root and BIAS hg38 data root. This tuple's order is
+#: itself part of the contract (see `compute_resource_manifest_sha256`).
+RESOURCE_MANIFEST_ENTRIES: tuple[tuple[str, str], ...] = (
+    ("nirvana_full_manifest", "nirvana-grch38-full.sha256.txt"),
+    ("nirvana_updates_manifest", "nirvana-grch38-updates.sha256.txt"),
+    ("bias_data_manifest", "bias-hg38-data.sha256.txt"),
+)
 
 
 # ---------------------------------------------------------------------------
@@ -270,6 +525,21 @@ _THIS_MODULE_REPO_ROOT = Path(__file__).resolve().parents[3]
 _COMMIT_SHA1_RE = re.compile(r"^[0-9a-f]{40}$")
 _MODULE_HASH_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
+#: Every acquisition-critical module must be pinned. Editing one after
+#: approval is intentionally a hard stop requiring a fresh approval.
+REQUIRED_IMPLEMENTATION_FREEZE_MODULES: tuple[str, ...] = (
+    "raptor.eval.prospective_freeze",
+    "raptor.eval.prospective_exact_source_transport",
+    "raptor.eval.prospective_exact_source_metadata_lookups",
+)
+
+#: The operator entry point controls which production callables reach the
+#: acquisition API, so its exact committed and on-disk bytes are part of the
+#: same implementation freeze.
+REQUIRED_IMPLEMENTATION_FREEZE_FILES: tuple[str, ...] = (
+    "scripts/run_clinvar_2026_08_prospective_freeze.py",
+)
+
 
 def _git_command_prefix() -> list[str]:
     git_dir = os.environ.get("GIT_DIR")
@@ -298,6 +568,17 @@ def _module_relative_path(module_name: str) -> Path:
     return (Path("src") / Path(*module_name.split("."))).with_suffix(".py")
 
 
+def _freeze_file_relative_path(file_path: str) -> Path | None:
+    if not isinstance(file_path, str) or not file_path or "\\" in file_path:
+        return None
+    pure_path = PurePosixPath(file_path)
+    if pure_path.is_absolute() or any(part in {"", ".", ".."} for part in pure_path.parts):
+        return None
+    if pure_path.as_posix() != file_path:
+        return None
+    return Path(*pure_path.parts)
+
+
 def _implementation_freeze_module_hash_failure(commit: str, module_hashes: Mapping[str, Any]) -> str | None:
     """Verifies every `module_hashes` entry against the ACTUAL committed
     blob content at `commit` -- always read via `git show <commit>:<path>`,
@@ -311,6 +592,91 @@ def _implementation_freeze_module_hash_failure(commit: str, module_hashes: Mappi
             return f"implementation_freeze module {module_name!r} is not present in the committed tree at {commit}"
         if _canonical_lf_sha256_bytes(shown.stdout) != expected_hash:
             return f"implementation_freeze module {module_name!r} canonical-LF sha256 does not match commit {commit}"
+    return None
+
+
+def _implementation_freeze_file_hash_failure(commit: str, file_hashes: Mapping[str, Any]) -> str | None:
+    for file_path, expected_hash in file_hashes.items():
+        file_rel = _freeze_file_relative_path(file_path)
+        if file_rel is None:
+            return f"implementation_freeze file path {file_path!r} is not a normalized repository-relative path"
+        shown = _run_git("show", f"{commit}:{file_rel.as_posix()}")
+        if shown is None or shown.returncode != 0:
+            return f"implementation_freeze file {file_path!r} is not present in the committed tree at {commit}"
+        if _canonical_lf_sha256_bytes(shown.stdout) != expected_hash:
+            return f"implementation_freeze file {file_path!r} canonical-LF sha256 does not match commit {commit}"
+    return None
+
+
+def _read_executing_module_bytes(module_name: str) -> bytes:
+    """Reads the CURRENTLY LOADED/EXECUTING file bytes for `module_name` in
+    THIS process, via `importlib.import_module` + `Path(module.__file__)
+    .read_bytes()`. This is a deliberately narrow seam (tests may monkeypatch
+    this exact function to simulate "the actually running code differs from
+    what is registered", independent of real git/commit state) -- production
+    code never overrides it."""
+    module = importlib.import_module(module_name)
+    module_file = getattr(module, "__file__", None)
+    if not module_file:
+        raise ImportError(f"module {module_name!r} has no resolvable __file__ in this process")
+    return Path(module_file).read_bytes()
+
+
+def _read_executing_file_bytes(file_path: str) -> bytes:
+    file_rel = _freeze_file_relative_path(file_path)
+    if file_rel is None:
+        raise OSError(f"file path {file_path!r} is not a normalized repository-relative path")
+    candidate = _THIS_MODULE_REPO_ROOT / file_rel
+    if candidate.is_symlink():
+        raise OSError(f"file path {file_path!r} must not be a symlink")
+    resolved_root = _THIS_MODULE_REPO_ROOT.resolve()
+    resolved_candidate = candidate.resolve(strict=True)
+    try:
+        resolved_candidate.relative_to(resolved_root)
+    except ValueError as exc:
+        raise OSError(f"file path {file_path!r} resolves outside the repository root") from exc
+    if not resolved_candidate.is_file():
+        raise OSError(f"file path {file_path!r} is not a regular file")
+    return resolved_candidate.read_bytes()
+
+
+def _implementation_freeze_executing_code_failure(module_hashes: Mapping[str, Any]) -> str | None:
+    """Verifies every `module_hashes` entry against the bytes ACTUALLY
+    loaded/executing in THIS process right now (`_read_executing_module_bytes`),
+    independent of the `_implementation_freeze_module_hash_failure` git-commit
+    check above. Both checks must pass: `implementation_freeze.commit` names
+    a real, reachable commit whose committed content matches the declared
+    hash, AND the code genuinely running in this process right now ALSO
+    matches that same declared hash. This closes the gap where an approval
+    could pin a real, historical commit that used to be correct, while the
+    file was edited afterward without a fresh approval -- the previous
+    git-only check could never detect that divergence, because it never
+    looked at what code is actually executing."""
+    for module_name, expected_hash in module_hashes.items():
+        try:
+            actual_bytes = _read_executing_module_bytes(module_name)
+        except (ImportError, OSError) as exc:
+            return f"implementation_freeze module {module_name!r} could not be loaded from the running process: {exc}"
+        if _canonical_lf_sha256_bytes(actual_bytes) != expected_hash:
+            return (
+                f"implementation_freeze module {module_name!r} canonical-LF sha256 does not match the code "
+                "ACTUALLY executing in this process right now (registered implementation differs from what "
+                "is running)"
+            )
+    return None
+
+
+def _implementation_freeze_executing_file_failure(file_hashes: Mapping[str, Any]) -> str | None:
+    for file_path, expected_hash in file_hashes.items():
+        try:
+            actual_bytes = _read_executing_file_bytes(file_path)
+        except OSError as exc:
+            return f"implementation_freeze file {file_path!r} could not be read from the running checkout: {exc}"
+        if _canonical_lf_sha256_bytes(actual_bytes) != expected_hash:
+            return (
+                f"implementation_freeze file {file_path!r} canonical-LF sha256 does not match the file "
+                "ACTUALLY used by the running checkout right now"
+            )
     return None
 
 
@@ -331,9 +697,14 @@ def _implementation_freeze_failure_reason(implementation_freeze: Mapping[str, An
     mismatched -- there is no "cannot verify, so accept" branch anywhere
     in this path, and no ambient-worktree fallback either (content is
     always read via `git show <commit>:<path>`, never the live checkout's
-    own files)."""
+    own files). `module_hashes` must additionally include an entry for
+    EVERY module named in `REQUIRED_IMPLEMENTATION_FREEZE_MODULES` (round
+    6) -- omitting the metadata-lookups module (or any other required
+    module) is rejected exactly like a malformed hash, never silently
+    accepted as a partial freeze."""
     commit = implementation_freeze.get("commit")
     module_hashes = implementation_freeze.get("module_hashes")
+    file_hashes = implementation_freeze.get("file_hashes")
     if commit == "NOT_YET_COMMITTED":
         return (
             "implementation_freeze.commit is NOT_YET_COMMITTED; APPROVED_PRE_DATA requires a "
@@ -343,11 +714,34 @@ def _implementation_freeze_failure_reason(implementation_freeze: Mapping[str, An
         return "implementation_freeze.commit must be NOT_YET_COMMITTED or a 40-hex lowercase commit id"
     if not isinstance(module_hashes, Mapping) or not module_hashes:
         return "implementation_freeze.module_hashes must be a non-empty mapping"
+    if not isinstance(file_hashes, Mapping):
+        return "implementation_freeze.file_hashes must be a mapping"
     for module_name, expected_hash in module_hashes.items():
         if not isinstance(module_name, str) or not module_name.strip():
             return "implementation_freeze.module_hashes has a blank module name"
         if not isinstance(expected_hash, str) or not _MODULE_HASH_SHA256_RE.match(expected_hash):
             return f"implementation_freeze.module_hashes[{module_name!r}] must be a 64-hex lowercase sha256 string"
+    missing_required = [name for name in REQUIRED_IMPLEMENTATION_FREEZE_MODULES if name not in module_hashes]
+    if missing_required:
+        return (
+            "implementation_freeze.module_hashes is missing required module(s) "
+            f"{missing_required!r}; every module in REQUIRED_IMPLEMENTATION_FREEZE_MODULES must be "
+            "pinned -- this is never an optional freeze-record omission"
+        )
+    for file_path, expected_hash in file_hashes.items():
+        if _freeze_file_relative_path(file_path) is None:
+            return (
+                f"implementation_freeze.file_hashes key {file_path!r} must be a normalized "
+                "repository-relative POSIX path"
+            )
+        if not isinstance(expected_hash, str) or not _MODULE_HASH_SHA256_RE.match(expected_hash):
+            return f"implementation_freeze.file_hashes[{file_path!r}] must be a 64-hex lowercase sha256 string"
+    missing_required_files = [name for name in REQUIRED_IMPLEMENTATION_FREEZE_FILES if name not in file_hashes]
+    if missing_required_files:
+        return (
+            "implementation_freeze.file_hashes is missing required file(s) "
+            f"{missing_required_files!r}; every file in REQUIRED_IMPLEMENTATION_FREEZE_FILES must be pinned"
+        )
 
     commit_probe = _run_git("cat-file", "-e", f"{commit}^{{commit}}")
     if commit_probe is None:
@@ -357,7 +751,21 @@ def _implementation_freeze_failure_reason(implementation_freeze: Mapping[str, An
         )
     if commit_probe.returncode != 0:
         return f"implementation_freeze.commit {commit!r} is not a reachable commit in the configured git metadata"
-    return _implementation_freeze_module_hash_failure(commit, module_hashes)
+    git_failure = _implementation_freeze_module_hash_failure(commit, module_hashes)
+    if git_failure is not None:
+        return git_failure
+    git_file_failure = _implementation_freeze_file_hash_failure(commit, file_hashes)
+    if git_file_failure is not None:
+        return git_file_failure
+    # Binds approval to the code ACTUALLY executing right now, not merely to
+    # a historical commit reference: a technically-valid, reachable commit
+    # whose committed tree matches is not sufficient on its own if the file
+    # has since been edited in the running checkout without a fresh
+    # approval (independent review finding).
+    executing_module_failure = _implementation_freeze_executing_code_failure(module_hashes)
+    if executing_module_failure is not None:
+        return executing_module_failure
+    return _implementation_freeze_executing_file_failure(file_hashes)
 
 
 def _content_hash(payload: Mapping[str, Any], *, key: str = "content_hash") -> str:
@@ -596,7 +1004,31 @@ def assert_runtime_boundary(*, runtime_identity: Mapping[str, Any]) -> None:
     """Verify `runtime_identity` against the ADR-0008 pinned x64 worker/BIAS/
     Nirvana identity dimensions. Raises `ProspectiveInvalidStateError`
     (`.code == "INVALID"`) on any missing/extra key or any dimension
-    mismatch; returns `None` on success."""
+    mismatch; returns `None` on success.
+
+    This is the ADR-0020 stage 4 (`4_MASK_AND_LABEL_FREE_SCORE`) gate --
+    the mandatory pre-condition for any BIAS/Nirvana execution or
+    label-dependent evaluation. It is called by `validate_scoring_stage_approval`
+    (below) and is deliberately NEVER called by `validate_pre_data_approval`
+    or `execute_transport_and_raw_freeze` (ADR-0020 stages 1-2, ClinVar
+    archive acquisition): archive acquisition has no x86-only requirement
+    and never needs, reads, or checks x64/BIAS/Nirvana identity. Keeping
+    this a standalone function (rather than inlining it into either gate)
+    is what lets the two governance boundaries stay independently callable,
+    independently testable, and impossible to accidentally conflate.
+
+    `resource_manifest_sha256` is checked here only for FORMAT (64-character
+    lowercase hex) -- unlike `bias_commit`/`nirvana_banner`, its concrete
+    pinned VALUE is not known in this repository, because it can only be
+    produced by actually reading the three resource-bundle checksum-manifest
+    files that live solely on the ADR-0008 x64 worker (never checked into,
+    or copied into, this repository). `compute_resource_manifest_sha256`
+    (below) defines EXACTLY how that value must be computed, and
+    `docs/ops/adr-0008-resource-manifest-digest.md` is the human-readable
+    spec; a human approver runs it on the real worker and pins the result
+    into a `scoring_stage_approval` record's `x64_freeze` block -- this
+    function never invents or accepts a value it cannot independently
+    verify."""
     if not isinstance(runtime_identity, Mapping) or set(runtime_identity.keys()) != _RUNTIME_IDENTITY_KEYS:
         raise ProspectiveInvalidStateError(
             f"runtime_identity must define exactly {sorted(_RUNTIME_IDENTITY_KEYS)!r}"
@@ -618,6 +1050,328 @@ def assert_runtime_boundary(*, runtime_identity: Mapping[str, Any]) -> None:
         raise ProspectiveInvalidStateError(
             "runtime_identity.resource_manifest_sha256 must be a 64-character lowercase hex SHA-256"
         )
+
+
+def resource_manifest_entries(checksums_dir: Path | str) -> list[dict[str, str]]:
+    """Reads the three `RESOURCE_MANIFEST_ENTRIES` files under
+    `checksums_dir`, in their pinned order, and returns one
+    `{"id", "filename", "sha256"}` dict per entry. `sha256` is the RAW-BYTE
+    SHA-256 of that exact file: `Path.read_bytes()` is a binary read that
+    never applies any text-mode newline translation, so this value is
+    identical on Windows and Linux for byte-identical files -- the digest
+    contract never depends on which OS recomputed it, only on the bytes
+    themselves. READ-ONLY: opens nothing but these three small
+    checksum-manifest text files -- never the multi-GB Nirvana/BIAS
+    annotation-data bundles the manifests describe, and never anything
+    outside `checksums_dir`.
+
+    Fails closed with a plain `FileNotFoundError` the instant any one of the
+    three pinned filenames is absent from `checksums_dir` -- a rename of a
+    pinned file is indistinguishable from, and rejected exactly like, a
+    missing file (there is no fuzzy/best-effort filename match)."""
+    base = Path(checksums_dir)
+    entries: list[dict[str, str]] = []
+    for entry_id, filename in RESOURCE_MANIFEST_ENTRIES:
+        path = base / filename
+        if not path.is_file():
+            raise FileNotFoundError(f"resource manifest file missing for {entry_id!r}: expected {path}")
+        entries.append({"id": entry_id, "filename": filename, "sha256": _sha256_hex(path.read_bytes())})
+    return entries
+
+
+def compute_resource_manifest_sha256(checksums_dir: Path | str) -> str:
+    """Computes the ADR-0008 `x64_freeze.resource_manifest_sha256` digest
+    (full spec: `docs/ops/adr-0008-resource-manifest-digest.md`) from the
+    three pinned checksum-manifest files under `checksums_dir`.
+
+    Builds the canonical envelope
+    `{"schema": RESOURCE_MANIFEST_DIGEST_SCHEMA, "manifests":
+    resource_manifest_entries(checksums_dir)}`, serializes it with this
+    module's standard canonical-JSON convention (`sort_keys=True,
+    separators=(",", ":")`, `ensure_ascii=False`, UTF-8 -- see
+    `_content_hash`), and returns the SHA-256 hex digest of those exact
+    canonical bytes.
+
+    This single value binds, together, the three manifests':
+    - IDENTITY -- each entry's fixed `id` (`RESOURCE_MANIFEST_ENTRIES`);
+    - ORDER -- `manifests` is a JSON array, and `json.dumps` never reorders
+      array elements even under `sort_keys=True` (that flag only sorts each
+      object's own keys), so the pinned tuple order is preserved verbatim
+      into the hashed bytes;
+    - CONTENT -- each entry's raw-byte SHA-256 (`resource_manifest_entries`).
+
+    A rename, a reorder (impossible here without also renaming, since the
+    id -> filename mapping is fixed), a swap of which manifest's bytes sit
+    behind which identity, or any single changed byte in any one manifest
+    all change this digest. This function only READS the three manifest
+    text files; it never touches the (multi-GB) Nirvana/BIAS data bundles
+    those manifests describe, never contacts a network, and never runs BIAS
+    or Nirvana -- preserving this module's fail-closed, no-live-I/O posture
+    (see the module docstring)."""
+    envelope = {
+        "schema": RESOURCE_MANIFEST_DIGEST_SCHEMA,
+        "manifests": resource_manifest_entries(checksums_dir),
+    }
+    canonical = json.dumps(envelope, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return _sha256_hex(canonical)
+
+
+# ---------------------------------------------------------------------------
+# ADR-0020 stage 4 scoring-stage gate: SEPARATE from, and later than,
+# pre_data_approval / execute_transport_and_raw_freeze (stages 1-2). This is
+# the sole place x64/BIAS/Nirvana identity is required or checked.
+# ---------------------------------------------------------------------------
+
+#: Schema id for the `scoring_stage_approval` record (see
+#: `docs/ops/adr-0008-resource-manifest-digest.md` and
+#: `docs/project/specs/clinvar-2026-08-prospective-amendment-v2.yaml`
+#: `scoring_stage_approval`). Deliberately a DIFFERENT schema id from
+#: `raptor.eval.pre_data_approval.v1` -- these are two independent
+#: approvals gating two independent, non-overlapping stages, and a record
+#: of one schema can never be mistaken for, or silently accepted as, the
+#: other.
+_SCORING_STAGE_APPROVAL_SCHEMA_ID = "raptor.eval.scoring_stage_approval.v1"
+_SCORING_STAGE_APPROVAL_TOP_KEYS = frozenset(
+    {"schema", "registration_id", "decision", "approver", "approved_at", "x64_freeze", "immutable_inputs_verified"}
+)
+
+#: The runtime-identity dimensions `observe_runtime_identity` returns
+#: (worker designation/arch, and the BIAS/Nirvana identity that process
+#: itself reports). Deliberately EXCLUDES `resource_manifest_sha256`: that
+#: dimension is never accepted as a claim at all -- it is always
+#: independently recomputed by this function from the designated resource
+#: location via `compute_resource_manifest_sha256`, never trusted from any
+#: input.
+_OBSERVED_RUNTIME_IDENTITY_KEYS = frozenset({"worker_designation", "worker_arch", "bias_commit", "nirvana_banner"})
+
+
+def _immutable_inputs_failure_reason(*, spec: Mapping[str, Any], allowed_repo_root: "str | Path") -> str | None:
+    """Independently RECOMPUTES every `immutable_inputs` entry's
+    canonical-LF SHA-256 and git-blob SHA-1 from the actual current file
+    bytes under `allowed_repo_root`, and compares each against the
+    registration spec's own pinned values. Returns the first mismatch
+    reason, or `None` when every entry matches.
+
+    These are SCORING-stage inputs (evaluation criteria/thresholds/points,
+    ACMG criterion/strength policy, BIAS strength ladder/lineage,
+    masking/predictor-aggregation policy, ...) -- this check belongs solely
+    to `validate_scoring_stage_approval`, never to the acquisition-stage
+    `pre_data_approval` gate, because ClinVar archive acquisition never
+    reads or depends on any of them. A merely claimed
+    `immutable_inputs_verified: true` schema flag is never trusted on its
+    own; this recomputation is what that claim must actually match."""
+    immutable_inputs = spec.get("immutable_inputs")
+    if not isinstance(immutable_inputs, Mapping) or not immutable_inputs:
+        return "registration spec immutable_inputs must be a non-empty mapping"
+    root = Path(allowed_repo_root)
+    for rel_path, expected in immutable_inputs.items():
+        if not isinstance(expected, Mapping):
+            return f"registration spec immutable_inputs[{rel_path!r}] must be a mapping"
+        expected_lf_sha256 = expected.get("canonical_lf_sha256")
+        expected_blob_sha1 = expected.get("git_blob_sha1")
+        candidate = root / str(rel_path)
+        try:
+            raw = candidate.read_bytes()
+        except OSError as exc:
+            return f"immutable_inputs[{rel_path!r}] file is missing or unreadable at {candidate}: {exc}"
+        if _canonical_lf_sha256_bytes(raw) != expected_lf_sha256:
+            return f"immutable_inputs[{rel_path!r}] canonical_lf_sha256 does not match the current file bytes"
+        if _git_blob_sha1(raw) != expected_blob_sha1:
+            return f"immutable_inputs[{rel_path!r}] git_blob_sha1 does not match the current file bytes"
+    return None
+
+
+def validate_scoring_stage_approval(
+    *,
+    registration_id: str,
+    registration_spec_path: "str | Path",
+    approval_record: Mapping[str, Any],
+    allowed_repo_root: "str | Path",
+    first_scoring_execution_at: str,
+    worker_designation_probe: Callable[[], str] | None = None,
+    worker_arch_probe: Callable[[], str] | None = None,
+    bias_commit_probe: Callable[[], str] | None = None,
+    nirvana_banner_probe: Callable[[], str] | None = None,
+    resource_manifest_location_probe: Callable[[], "str | Path"] | None = None,
+) -> dict[str, Any]:
+    """Validate `approval_record` against the closed
+    `raptor.eval.scoring_stage_approval.v1` schema for `registration_id`,
+    AND cross-check its claimed `x64_freeze` pins against an INDEPENDENTLY
+    OBSERVED runtime identity for the CURRENT run. This is the MANDATORY
+    gate before any BIAS/Nirvana execution or label-dependent evaluation
+    (ADR-0020 stage 4 `4_MASK_AND_LABEL_FREE_SCORE`) -- it is a separate,
+    later gate from `validate_pre_data_approval` /
+    `execute_transport_and_raw_freeze` (stages 1-2, ClinVar archive
+    acquisition), which never require or check x64/BIAS/Nirvana identity.
+
+    Deliberately never trusts the approval record's `x64_freeze` block, nor
+    any caller-supplied "observed identity" value, on its own -- a claimed
+    value, however well-formed (including an all-zero or otherwise
+    fabricated `resource_manifest_sha256`, or a static pinned literal
+    supplied by a caller on a non-designated host), is only EVIDENCE to be
+    checked, never a source of truth:
+
+    * `worker_designation`/`worker_arch`/`bias_commit`/`nirvana_banner` are
+      always independently OBSERVED by `observe_runtime_identity` -- via
+      `platform.machine()` and a read of the three narrow marker files
+      under `DESIGNATED_X64_WORKER_ROOT` by default -- never accepted as a
+      plain input mapping. The `*_probe` parameters exist ONLY so this
+      mechanism can be exercised in tests without a real ADR-0008 worker
+      filesystem; production/CLI callers must never override them.
+    * `resource_manifest_sha256` is never accepted as a claim at all: it is
+      always recomputed here, from scratch, against the three pinned
+      checksum-manifest files' actual current bytes at the ONE designated
+      resource location (`resource_manifest_location_probe`, defaulting to
+      `DESIGNATED_X64_WORKER_ROOT`/CHECKSUMS -- never a caller-chosen
+      directory).
+    * `immutable_inputs_verified` is likewise never accepted as a bare
+      claim: `_immutable_inputs_failure_reason` independently recomputes
+      every scoring-stage config input's hash against `allowed_repo_root`'s
+      actual current bytes.
+    * The combined observed+recomputed identity is checked against the
+      ADR-0008 pinned constants via `assert_runtime_boundary`, and then the
+      approval record's claimed `x64_freeze` must equal that observed
+      identity EXACTLY -- a mismatch in any single dimension fails closed.
+    * `first_scoring_execution_at` is a MANDATORY, immutable timestamp (not
+      optional): absent/blank, malformed, future-dated, or at/after
+      `approved_at` all fail closed -- a post-scoring or future-dated
+      approval can never pass.
+
+    Any schema breach, wrong/missing `decision` (a `REJECTED_SCORING_STAGE`
+    decision is rejected explicitly and distinctly), wrong approver, blank
+    or mistimed `approved_at`/`first_scoring_execution_at`, or any identity
+    mismatch raises `ProspectiveInvalidStateError` (`.code == "INVALID"`) --
+    matching the registration spec's stage 4 rule that manifest/tool/
+    resource identity drift is an A0 run-integrity failure, never a
+    `PRE_DATA_*` stop state and never reported as a performance FAIL.
+    Returns a shallow copy of `approval_record` on success."""
+    if not isinstance(approval_record, Mapping) or set(approval_record.keys()) != _SCORING_STAGE_APPROVAL_TOP_KEYS:
+        raise ProspectiveInvalidStateError(
+            f"scoring_stage_approval record top-level keys must be exactly {sorted(_SCORING_STAGE_APPROVAL_TOP_KEYS)!r}"
+        )
+    if approval_record.get("schema") != _SCORING_STAGE_APPROVAL_SCHEMA_ID:
+        raise ProspectiveInvalidStateError(
+            f"scoring_stage_approval schema must be {_SCORING_STAGE_APPROVAL_SCHEMA_ID!r}, "
+            f"got {approval_record.get('schema')!r}"
+        )
+    if approval_record.get("registration_id") != registration_id:
+        raise ProspectiveInvalidStateError(
+            "scoring_stage_approval registration_id does not match the registration this scoring run is for"
+        )
+
+    spec = _load_yaml(Path(registration_spec_path))
+    stage_spec = spec["scoring_stage_approval"]
+    allowed_decisions = set(stage_spec["allowed_decisions"])
+    approver_required = stage_spec["approver_required"]
+
+    decision = approval_record.get("decision")
+    if decision == "REJECTED_SCORING_STAGE":
+        raise ProspectiveInvalidStateError("scoring_stage_approval owner recorded REJECTED_SCORING_STAGE")
+    if decision != "APPROVED_SCORING_STAGE" or decision not in allowed_decisions:
+        raise ProspectiveInvalidStateError(
+            f"scoring_stage_approval decision must be APPROVED_SCORING_STAGE, got {decision!r}"
+        )
+
+    approver = approval_record.get("approver")
+    if not isinstance(approver, str) or not approver.strip():
+        raise ProspectiveInvalidStateError("scoring_stage_approval approver must be a non-blank string")
+    if approver != approver_required:
+        raise ProspectiveInvalidStateError(f"scoring_stage_approval approver must be exactly {approver_required!r}")
+
+    approved_at = approval_record.get("approved_at")
+    if not isinstance(approved_at, str) or not approved_at.strip():
+        raise ProspectiveInvalidStateError("scoring_stage_approval approved_at must be a non-blank timestamp")
+    try:
+        approved_at_dt = _parse_iso_utc(approved_at)
+    except ValueError as exc:
+        raise ProspectiveInvalidStateError(
+            f"scoring_stage_approval approved_at is not a valid timestamp: {approved_at!r}"
+        ) from exc
+
+    # Mandatory, immutable first-scoring-execution timestamp (independent
+    # review finding): absent/blank, malformed, future-dated, or at/after
+    # `approved_at` all fail closed. There is no optional/None branch here
+    # -- a caller cannot omit this timestamp to skip the timing check.
+    if not isinstance(first_scoring_execution_at, str) or not first_scoring_execution_at.strip():
+        raise ProspectiveInvalidStateError(
+            "first_scoring_execution_at is mandatory and must be a non-blank immutable timestamp"
+        )
+    try:
+        first_execution_dt = _parse_iso_utc(first_scoring_execution_at)
+    except ValueError as exc:
+        raise ProspectiveInvalidStateError(
+            f"first_scoring_execution_at is not a valid timestamp: {first_scoring_execution_at!r}"
+        ) from exc
+    if first_execution_dt > datetime.now(timezone.utc):
+        raise ProspectiveInvalidStateError(
+            "first_scoring_execution_at must not be in the future"
+        )
+    if approved_at_dt >= first_execution_dt:
+        raise ProspectiveInvalidStateError(
+            "scoring_stage_approval approved_at must be strictly before first_scoring_execution_at"
+        )
+
+    x64_freeze = approval_record.get("x64_freeze")
+    if not isinstance(x64_freeze, Mapping) or set(x64_freeze.keys()) != _RUNTIME_IDENTITY_KEYS:
+        raise ProspectiveInvalidStateError("scoring_stage_approval x64_freeze block schema invalid")
+
+    if approval_record.get("immutable_inputs_verified") is not True:
+        raise ProspectiveInvalidStateError(
+            "scoring_stage_approval immutable_inputs_verified must be True"
+        )
+    immutable_inputs_failure = _immutable_inputs_failure_reason(spec=spec, allowed_repo_root=allowed_repo_root)
+    if immutable_inputs_failure is not None:
+        raise ProspectiveInvalidStateError(
+            f"scoring_stage_approval immutable_inputs_verified claim does not match recomputation: "
+            f"{immutable_inputs_failure}"
+        )
+
+    # `observed_runtime_identity` is NEVER accepted as a caller-supplied
+    # plain mapping -- it is always produced by `observe_runtime_identity`,
+    # whose default probes genuinely inspect this process/host. A caller
+    # cannot make this "observe" the pinned answer merely by asserting it.
+    observed_runtime_identity = observe_runtime_identity(
+        worker_designation_probe=worker_designation_probe,
+        worker_arch_probe=worker_arch_probe,
+        bias_commit_probe=bias_commit_probe,
+        nirvana_banner_probe=nirvana_banner_probe,
+    )
+    if set(observed_runtime_identity.keys()) != _OBSERVED_RUNTIME_IDENTITY_KEYS:
+        raise ProspectiveInvalidStateError(
+            f"observed_runtime_identity must define exactly {sorted(_OBSERVED_RUNTIME_IDENTITY_KEYS)!r}"
+        )
+
+    resource_manifest_checksums_dir = (resource_manifest_location_probe or _default_resource_manifest_location_probe)()
+    try:
+        observed_resource_manifest_sha256 = compute_resource_manifest_sha256(resource_manifest_checksums_dir)
+    except OSError as exc:
+        raise ProspectiveInvalidStateError(
+            f"could not recompute resource_manifest_sha256 from {resource_manifest_checksums_dir!r}: {exc}"
+        ) from exc
+
+    full_observed_identity = dict(observed_runtime_identity)
+    full_observed_identity["resource_manifest_sha256"] = observed_resource_manifest_sha256
+
+    # `assert_runtime_boundary` checks this INDEPENDENTLY OBSERVED/RECOMPUTED
+    # identity -- never the approval record's claimed `x64_freeze` -- against
+    # the pinned worker/BIAS/Nirvana constants and the resource digest's hex
+    # format.
+    assert_runtime_boundary(runtime_identity=full_observed_identity)
+
+    # The anti-fabrication binding: the approval record's CLAIMED x64_freeze
+    # pins must equal THIS run's independently observed/recomputed identity,
+    # byte-for-byte. A merely well-formed but fabricated claimed digest (an
+    # all-zero digest, or any other 64-hex value not actually produced by
+    # recomputation), OR a static pinned literal supplied on a
+    # non-designated runtime (whose OWN observation will genuinely differ),
+    # is rejected here, because it can never equal the real recomputed
+    # value.
+    if dict(x64_freeze) != full_observed_identity:
+        raise ProspectiveInvalidStateError(
+            "scoring_stage_approval x64_freeze does not match the independently observed/recomputed runtime identity"
+        )
+
+    return dict(approval_record)
 
 
 # ---------------------------------------------------------------------------
@@ -643,29 +1397,24 @@ def _overlay_required_values_reason(*, spec: Mapping[str, Any], overlay: Mapping
     return None
 
 
-def _overlay_coherence_reason(
-    *, spec: Mapping[str, Any], overlay: Mapping[str, Any], base_eval_config_path: Path
-) -> str | None:
+def _overlay_coherence_reason(*, spec: Mapping[str, Any], overlay: Mapping[str, Any]) -> str | None:
     """Cheap, side-effect-free pre-check of the overlay/spec coherence
     invariants `execute_transport_and_raw_freeze` must reject BEFORE any
-    network call (every registered required-value pin, plus base-config
-    hash pin and 3-way exact-URL equality across
-    overlay/dataset_registration/stage_1). Returns a reason code on drift,
-    `None` when coherent. Deliberately does not itself call
-    `merge_prospective_overlay` -- see that function's own (overlapping but
-    authoritative) checks, which the caller still invokes once this
-    pre-check passes."""
+    network call (every registered required-value pin, plus 3-way exact-URL
+    equality across overlay/dataset_registration/stage_1). Returns a reason
+    code on drift, `None` when coherent.
+
+    Deliberately checks ONLY dataset/URL identity -- never scoring-semantics
+    or base-eval-config hashes. Acquisition (ADR-0020 stages 1-2) never
+    reads or depends on scoring semantics; that verification belongs solely
+    to `merge_prospective_overlay`, invoked only when the effective eval
+    config is actually built for ADR-0020 stage 3+ scoring, never as a
+    precondition for archive acquisition."""
     required_values_reason = _overlay_required_values_reason(spec=spec, overlay=overlay)
     if required_values_reason is not None:
         return required_values_reason
     if overlay.get("registration_id") != spec["registration"]["id"]:
         return "OVERLAY_REGISTRATION_ID_DRIFT"
-    try:
-        base_raw = Path(base_eval_config_path).read_bytes()
-    except OSError:
-        return "BASE_EVAL_CONFIG_UNREADABLE"
-    if overlay.get("base_config_canonical_lf_sha256") != _canonical_lf_sha256_bytes(base_raw):
-        return "OVERLAY_BASE_CONFIG_HASH_DRIFT"
     dataset_registration = spec["dataset_registration"]
     stage1 = dataset_registration["stage_1_head_comparison"]
     overlay_url = overlay.get("exact_archive_url")
@@ -741,6 +1490,12 @@ def merge_prospective_overlay(
 
 # ---------------------------------------------------------------------------
 # PRE-DATA approval: closed schema + non-vacuous-value validation.
+#
+# This gates ONLY ADR-0020 stages 1-2 (transport freeze + raw archive
+# acquisition). It deliberately does NOT require or check x64/BIAS/Nirvana
+# identity -- ClinVar archive acquisition has no x86-only requirement. That
+# boundary is enforced later, and separately, by `validate_scoring_stage_approval`
+# / `assert_runtime_boundary` above, before ADR-0020 stage 4.
 # ---------------------------------------------------------------------------
 
 _APPROVAL_SCHEMA_ID = "raptor.eval.pre_data_approval.v1"
@@ -754,11 +1509,8 @@ _APPROVAL_TOP_KEYS = frozenset(
         "registration",
         "adr",
         "overlay",
-        "scoring_semantics_projection_sha256",
         "implementation_freeze",
-        "immutable_inputs_verified",
         "protected_tests_verified",
-        "x64_freeze",
         "scope",
         "pre_data_access_attestation",
     }
@@ -766,7 +1518,7 @@ _APPROVAL_TOP_KEYS = frozenset(
 _APPROVAL_REGISTRATION_KEYS = frozenset({"id", "path", "git_blob_sha1", "canonical_lf_sha256"})
 _APPROVAL_ADR_KEYS = frozenset({"id", "decision_ref"})
 _APPROVAL_OVERLAY_KEYS = frozenset({"path", "canonical_lf_sha256"})
-_APPROVAL_IMPLEMENTATION_FREEZE_KEYS = frozenset({"commit", "module_hashes"})
+_APPROVAL_IMPLEMENTATION_FREEZE_KEYS = frozenset({"commit", "module_hashes", "file_hashes"})
 _APPROVAL_SCOPE_KEYS = frozenset(
     {
         "allow_transport_freeze",
@@ -872,11 +1624,14 @@ def _validate_approval_record(
             "PRE_DATA_DRIFT", "approval overlay canonical_lf_sha256 does not match the current overlay bytes"
         )
 
-    projection_sha256 = spec["authority_partition"]["tsc2_scoring_semantics_projection"]["sha256"]
-    if approval_record.get("scoring_semantics_projection_sha256") != projection_sha256:
-        raise ProspectiveStopStateError(
-            "PRE_DATA_DRIFT", "approval scoring_semantics_projection_sha256 does not match the registration spec"
-        )
+    # Deliberately NO scoring-semantics/base-eval-config verification here --
+    # PRE_DATA approval gates ONLY ClinVar archive acquisition (ADR-0020
+    # stages 1-2), which never reads or depends on scoring semantics. That
+    # concern is enforced exclusively by `merge_prospective_overlay`'s own
+    # pins against the overlay document (`base_config_canonical_lf_sha256`,
+    # `base_scoring_semantics_projection_sha256`), invoked only when the
+    # effective eval config is actually built for ADR-0020 stage 3+ scoring
+    # -- never here, and never as a precondition for archive acquisition.
 
     implementation_freeze = approval_record.get("implementation_freeze")
     if (
@@ -884,30 +1639,33 @@ def _validate_approval_record(
         or set(implementation_freeze.keys()) != _APPROVAL_IMPLEMENTATION_FREEZE_KEYS
     ):
         raise ProspectiveStopStateError("PRE_DATA_REVIEW_REQUIRED", "approval implementation_freeze block schema invalid")
-    if not implementation_freeze.get("commit") or not isinstance(implementation_freeze.get("module_hashes"), Mapping):
+    if (
+        not implementation_freeze.get("commit")
+        or not isinstance(implementation_freeze.get("module_hashes"), Mapping)
+        or not isinstance(implementation_freeze.get("file_hashes"), Mapping)
+    ):
         raise ProspectiveStopStateError("PRE_DATA_REVIEW_REQUIRED", "approval implementation_freeze content invalid")
     implementation_freeze_failure = _implementation_freeze_failure_reason(implementation_freeze)
     if implementation_freeze_failure is not None:
         raise ProspectiveStopStateError("PRE_DATA_IMPLEMENTATION_NOT_READY", implementation_freeze_failure)
 
-    if approval_record.get("immutable_inputs_verified") is not True:
-        raise ProspectiveStopStateError(
-            "PRE_DATA_IMPLEMENTATION_NOT_READY", "immutable_inputs_verified must be True before PRE-DATA approval"
-        )
+    # Deliberately NO `immutable_inputs_verified` check here -- the spec's
+    # `immutable_inputs` list (tsc2.yaml, ACMG/BIAS/masking/predictor-
+    # aggregation policy, ...) is entirely SCORING-stage input identity.
+    # ClinVar archive acquisition never reads or depends on any of it, so
+    # acquisition-stage (pre_data) approval never requires or verifies it;
+    # that check belongs solely to `validate_scoring_stage_approval` (see
+    # `_immutable_inputs_failure_reason`), gating ADR-0020 stage 4.
+
     if approval_record.get("protected_tests_verified") is not True:
         raise ProspectiveStopStateError(
             "PRE_DATA_IMPLEMENTATION_NOT_READY", "protected_tests_verified must be True before PRE-DATA approval"
         )
 
-    x64_freeze = approval_record.get("x64_freeze")
-    if not isinstance(x64_freeze, Mapping) or set(x64_freeze.keys()) != _RUNTIME_IDENTITY_KEYS:
-        raise ProspectiveStopStateError("PRE_DATA_REVIEW_REQUIRED", "approval x64_freeze block schema invalid")
-    try:
-        assert_runtime_boundary(runtime_identity=x64_freeze)
-    except ProspectiveInvalidStateError as exc:
-        raise ProspectiveStopStateError(
-            "PRE_DATA_DRIFT", f"approval x64_freeze does not match the pinned ADR-0008 runtime identity: {exc.reason}"
-        ) from exc
+    # Deliberately NO x64/BIAS/Nirvana identity check here -- PRE_DATA
+    # approval gates ONLY ClinVar archive acquisition (ADR-0020 stages 1-2),
+    # which has no x86-only requirement. See `validate_scoring_stage_approval`
+    # for the separate, later gate that governs ADR-0020 stage 4.
 
     scope = approval_record.get("scope")
     if not isinstance(scope, Mapping) or set(scope.keys()) != _APPROVAL_SCOPE_KEYS:
@@ -1094,7 +1852,6 @@ def execute_transport_and_raw_freeze(
     *,
     registration_spec_path: "str | Path",
     prospective_overlay_path: "str | Path",
-    base_eval_config_path: "str | Path",
     approval_record: Mapping[str, Any] | None,
     allowed_repo_root: "str | Path",
     allowed_external_root: "str | Path",
@@ -1103,20 +1860,56 @@ def execute_transport_and_raw_freeze(
     transport: Any,
     published_archive_date_lookup: Callable[[str], Any],
     official_md5_lookup: Callable[[str], Any],
-    runtime_identity: Mapping[str, Any] | None = None,
     cli_overrides: Mapping[str, Any] | None = None,
     env_overrides: Mapping[str, str] | None = None,
     label_reader: Any = None,
     benchmark_builder: Any = None,
     scoring_runner: Any = None,
     first_archive_get_at: str | None = None,
+    transport_identity_pin: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Stage 1 (`HEAD` + published-date + official-MD5-source verification)
     and stage 2 (bounded streamed GET of only the exact registered archive +
     raw hashing) of the ADR-0020 ordered execution sequence. Never invokes
     `label_reader`/`benchmark_builder`/`scoring_runner` (stage 3+ is a
-    separate, later additive surface). See module docstring for the full
-    fail-closed contract."""
+    separate, later additive surface). NEVER requires, reads, or checks
+    x64/BIAS/Nirvana identity -- there is no `runtime_identity` parameter
+    and no `assert_runtime_boundary` call anywhere in this function, by
+    design: ClinVar archive acquisition has no x86-only requirement. That
+    boundary is enforced later, and separately, by
+    `validate_scoring_stage_approval` before ADR-0020 stage 4.
+
+    Likewise NEVER reads a base eval config and NEVER verifies
+    scoring-semantics/base-config hashes -- there is no
+    `base_eval_config_path` parameter and no `merge_prospective_overlay`
+    call anywhere in this function, by design: acquisition never depends on
+    scoring semantics. That verification belongs solely to
+    `merge_prospective_overlay`, called only when the effective eval config
+    is actually built for ADR-0020 stage 3+ scoring. See module docstring
+    for the full fail-closed contract.
+
+    `transport_identity_pin` (optional; from `capture_transport_identity_pin`,
+    captured by the caller immediately after constructing `transport` and
+    before either lookup port has run) is re-verified against `transport`
+    TWICE if supplied: immediately on entry (catching tampering that
+    happened between pin capture and this call), and again immediately
+    before the real streamed GET (catching tampering performed by
+    `published_archive_date_lookup`/`official_md5_lookup` themselves,
+    which both run after `transport.head()` but before the GET). Either
+    mismatch returns `TRANSPORT_IDENTITY_TAMPERED` before any network
+    call. `None` (the default) skips this check entirely, for callers
+    that never claim to be a confirmed-live execution path. This pin is
+    defense-in-depth: confirmed live `--execute` (see
+    `scripts/run_clinvar_2026_08_prospective_freeze.py` and
+    `raptor.eval.prospective_exact_source_metadata_lookups`) no longer
+    imports any caller-selected Python/plugin code at all before the real
+    GET -- both lookup ports are hard-wired to one production-owned,
+    statically-imported module, closing the underlying vulnerability this
+    pin was originally layered on top of.
+
+    Either lookup port raising any exception is a typed, fail-closed
+    `BLOCKED`/`INVALID` result (`PUBLISHED_ARCHIVE_DATE_LOOKUP_FAILED`/
+    `OFFICIAL_MD5_LOOKUP_FAILED`), never a raw propagated exception."""
     cli_overrides = cli_overrides or {}
     env_overrides = env_overrides or {}
     if cli_overrides or env_overrides:
@@ -1127,6 +1920,12 @@ def execute_transport_and_raw_freeze(
         raise ProspectiveInvalidStateError(
             "execute_transport_and_raw_freeze requires an injected transport; there is no default live transport"
         )
+    if transport_identity_pin is not None and _transport_identity_pin_mismatch(transport, transport_identity_pin):
+        return {
+            "stage_status": "BLOCKED",
+            "terminal_outcome": "INVALID",
+            "reason_code": "TRANSPORT_IDENTITY_TAMPERED",
+        }
 
     spec_path = Path(registration_spec_path)
     overlay_path = Path(prospective_overlay_path)
@@ -1155,23 +1954,12 @@ def execute_transport_and_raw_freeze(
     dataset_registration = spec["dataset_registration"]
     stage1 = dataset_registration["stage_1_head_comparison"]
 
-    # Item 5: overlay/spec coherence MUST be rejected before any network call
-    # (every registered required-value pin, base-config hash pin, 3-way
-    # exact-URL equality). `merge_prospective_overlay` is always invoked
-    # afterward (never skipped, never aliased) -- its own raise only
-    # propagates for a sandbox this pre-check already found coherent (e.g. a
-    # monkeypatched sentinel), never as a substitute for this typed-return
-    # path.
-    coherence_reason = _overlay_coherence_reason(
-        spec=spec, overlay=overlay, base_eval_config_path=Path(base_eval_config_path)
-    )
+    # Item 5: overlay/spec coherence (dataset/URL identity ONLY -- never
+    # scoring-semantics or base-eval-config hashes, which are out of scope
+    # for acquisition) MUST be rejected before any network call.
+    coherence_reason = _overlay_coherence_reason(spec=spec, overlay=overlay)
     if coherence_reason is not None:
         return {"stage_status": "BLOCKED", "terminal_outcome": "INVALID", "reason_code": coherence_reason}
-    merge_prospective_overlay(
-        registration_spec_path=spec_path,
-        prospective_overlay_path=overlay_path,
-        base_eval_config_path=base_eval_config_path,
-    )
     exact_url = str(overlay["exact_archive_url"])
 
     # Item 4: the caller-supplied transport/raw record paths must be exactly
@@ -1239,15 +2027,6 @@ def execute_transport_and_raw_freeze(
     )
     timeline: list[dict[str, str]] = [{"event": "approval_verified", "at": _utcnow_iso()}]
 
-    approved_runtime_identity = validated_approval["x64_freeze"]
-    if runtime_identity is None:
-        runtime_identity = approved_runtime_identity
-    if dict(runtime_identity) != dict(approved_runtime_identity):
-        raise ProspectiveStopStateError(
-            "PRE_DATA_DRIFT", "runtime_identity does not match the approved x64_freeze identity"
-        )
-    assert_runtime_boundary(runtime_identity=runtime_identity)
-
     # Item 9: the concurrency-control lock is keyed by the run-scope identity
     # (registration_id + exact_url), never by the caller-chosen destination
     # paths -- two concurrent callers targeting DIFFERENT record paths for
@@ -1276,7 +2055,6 @@ def execute_transport_and_raw_freeze(
                     "stage_status": "TRANSPORT_AND_RAW_FROZEN",
                     "terminal_outcome": None,
                     "transport_metadata_not_content_identity": True,
-                    "runtime_identity": dict(runtime_identity),
                     "download_chunk_bytes": MAX_DOWNLOAD_CHUNK_BYTES,
                     "raw_archive_path": raw_record.get("raw_archive_path"),
                     "run_scope_id": raw_record.get("run_scope_id"),
@@ -1295,13 +2073,36 @@ def execute_transport_and_raw_freeze(
             terminal, reason_code = head_outcome
             return {"stage_status": "BLOCKED", "terminal_outcome": terminal, "reason_code": reason_code}
 
-        published_result = published_archive_date_lookup(exact_url)
+        # Either lookup port may legitimately raise -- a spec-configuration
+        # defect, an unregistered/mismatched URL, or (for the official-MD5
+        # port) a network/redirect/size/parse/filename policy rejection
+        # (see `raptor.eval.prospective_exact_source_metadata_lookups`'s
+        # own docstring for the full closed policy). A raised exception
+        # must never propagate out of this function as a raw, untyped
+        # traceback: it is always a typed, fail-closed BLOCKED/INVALID
+        # result instead, exactly like every other acquisition-readiness
+        # gap in this function.
+        try:
+            published_result = published_archive_date_lookup(exact_url)
+        except Exception:  # noqa: BLE001 - any lookup-port failure fails closed, typed, never a raw traceback
+            return {
+                "stage_status": "BLOCKED",
+                "terminal_outcome": "INVALID",
+                "reason_code": "PUBLISHED_ARCHIVE_DATE_LOOKUP_FAILED",
+            }
         published_outcome = _verify_published_date(published_result)
         if published_outcome is not None:
             terminal, reason_code = published_outcome
             return {"stage_status": "BLOCKED", "terminal_outcome": terminal, "reason_code": reason_code}
 
-        md5_result = official_md5_lookup(exact_url)
+        try:
+            md5_result = official_md5_lookup(exact_url)
+        except Exception:  # noqa: BLE001 - any lookup-port failure fails closed, typed, never a raw traceback
+            return {
+                "stage_status": "BLOCKED",
+                "terminal_outcome": "INVALID",
+                "reason_code": "OFFICIAL_MD5_LOOKUP_FAILED",
+            }
         md5_outcome = _verify_official_md5_source(md5_result)
         if md5_outcome is not None:
             terminal, reason_code = md5_outcome
@@ -1369,6 +2170,20 @@ def execute_transport_and_raw_freeze(
             raise
         except Exception as exc:
             raise ProspectiveInvalidStateError(f"transport freeze record write failed: {exc}") from exc
+
+        # Item 1 (independent review): re-verify the transport identity pin
+        # immediately before the real streamed GET -- this is the point
+        # that specifically catches tampering performed by
+        # `published_archive_date_lookup`/`official_md5_lookup` themselves
+        # (both already invoked above, between `transport.head()` and
+        # here). A mismatch refuses the GET outright; nothing above this
+        # point performed a real archive download.
+        if transport_identity_pin is not None and _transport_identity_pin_mismatch(transport, transport_identity_pin):
+            return {
+                "stage_status": "BLOCKED",
+                "terminal_outcome": "INVALID",
+                "reason_code": "TRANSPORT_IDENTITY_TAMPERED",
+            }
 
         expected_length = int(stage1["content_length_bytes_must_equal"])
         tmp_path, byte_length, raw_sha256, computed_md5 = _stream_download_and_hash(
@@ -1446,7 +2261,6 @@ def execute_transport_and_raw_freeze(
             "stage_status": "TRANSPORT_AND_RAW_FROZEN",
             "terminal_outcome": None,
             "transport_metadata_not_content_identity": True,
-            "runtime_identity": dict(runtime_identity),
             "download_chunk_bytes": chunk_bytes,
             "raw_archive_path": raw_record["raw_archive_path"],
             "run_scope_id": run_scope_id,
@@ -1560,6 +2374,11 @@ def _scope_terminal_for_aggregation(axes: Mapping[str, Any]) -> str:
 
 def adjudicate_prospective_outcomes(
     *,
+    registration_id: str,
+    registration_spec_path: "str | Path",
+    scoring_stage_approval_record: Mapping[str, Any],
+    allowed_repo_root: "str | Path",
+    first_scoring_execution_at: str,
     run_integrity: str,
     stage12_outcome: str | None,
     scopes: Mapping[str, Any],
@@ -1568,13 +2387,48 @@ def adjudicate_prospective_outcomes(
     cli_overrides: Mapping[str, Any] | None = None,
     env_overrides: Mapping[str, str] | None = None,
     transport_metadata_not_content_identity: bool = True,
+    worker_designation_probe: Callable[[], str] | None = None,
+    worker_arch_probe: Callable[[], str] | None = None,
+    bias_commit_probe: Callable[[], str] | None = None,
+    nirvana_banner_probe: Callable[[], str] | None = None,
+    resource_manifest_location_probe: Callable[[], "str | Path"] | None = None,
 ) -> dict[str, Any]:
     """ADR-0020 A0-A6 per-scope adjudication. Trusts (never recomputes) each
     scope's pre-derived A1/A2/A3 verdict; derives A4 (`"{correct}/{actual}"`),
     A5 (`A5_PRECEDENCE`) and A6, then the closed six-value terminal-outcome/
     full-spectrum/narrow-scope precedence and authorization mapping. Raises
     `ProspectiveInvalidStateError` on any override input, missing metadata
-    note, missing/unknown axis value, or unresolvable axis combination."""
+    note, missing/unknown axis value, or unresolvable axis combination.
+
+    MANDATORY scoring-stage gate: the very first thing this function does,
+    unconditionally and before any other input is even inspected, is call
+    `validate_scoring_stage_approval` with `scoring_stage_approval_record`
+    -- never trusting it on its own -- which independently OBSERVES the
+    runtime identity (via the `*_probe` parameters, forwarded verbatim; see
+    `observe_runtime_identity`) and independently RECOMPUTES the
+    resource-manifest digest and the scoring-stage `immutable_inputs`
+    hashes, rather than accepting any caller-claimed value. A missing,
+    fabricated, or mismatched scoring-stage approval/runtime-identity/
+    immutable-input, or a missing/future/mistimed `first_scoring_execution_at`,
+    raises `ProspectiveInvalidStateError` here and NO outcome dict of any
+    kind (including `BLOCKED_DATA`/`FAIL`/`INVALID`, and in particular
+    never `PASS` or `AUTHORIZED_RESEARCH_ONLY`) is ever returned. This is a
+    hard structural precondition, not a conditional check keyed off the
+    eventual outcome -- there is no code path in this function that can
+    produce a result without first passing this gate."""
+    validate_scoring_stage_approval(
+        registration_id=registration_id,
+        registration_spec_path=registration_spec_path,
+        approval_record=scoring_stage_approval_record,
+        allowed_repo_root=allowed_repo_root,
+        first_scoring_execution_at=first_scoring_execution_at,
+        worker_designation_probe=worker_designation_probe,
+        worker_arch_probe=worker_arch_probe,
+        bias_commit_probe=bias_commit_probe,
+        nirvana_banner_probe=nirvana_banner_probe,
+        resource_manifest_location_probe=resource_manifest_location_probe,
+    )
+
     cli_overrides = cli_overrides or {}
     env_overrides = env_overrides or {}
     if cli_overrides or env_overrides:

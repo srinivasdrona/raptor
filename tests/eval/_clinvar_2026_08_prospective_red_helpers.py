@@ -24,14 +24,33 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SPEC_SOURCE_PATH = REPO_ROOT / "docs" / "project" / "specs" / "clinvar-2026-08-prospective-amendment-v2.yaml"
 BASE_CONFIG_SOURCE_PATH = REPO_ROOT / "configs" / "eval" / "tsc2.yaml"
 HISTORICAL_BLOCKED_PATH = REPO_ROOT / "data" / "census" / "tsc_prospective_validation_2026-08_blocked_data.json"
-_DEFAULT_IMPLEMENTATION_FREEZE_MODULES: tuple[str, ...] = ("raptor.eval.prospective_freeze",)
-_GIT_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
-_WINDOWS_DRIVE_PATH_RE = re.compile(r"^(?P<drive>[A-Za-z]):[\\\\/](?P<tail>.*)$")
 
 try:
     import raptor.eval.prospective_freeze as _prospective_freeze
 except ImportError:
     _prospective_freeze = None
+
+#: These defaults are sourced from the production
+#: `raptor.eval.prospective_freeze.REQUIRED_IMPLEMENTATION_FREEZE_MODULES`
+#: and `REQUIRED_IMPLEMENTATION_FREEZE_FILES` constants when importable,
+#: with RED-phase fallbacks so fixtures cannot silently drift from the
+#: production acquisition-critical surface.
+_DEFAULT_IMPLEMENTATION_FREEZE_MODULES: tuple[str, ...] = getattr(
+    _prospective_freeze,
+    "REQUIRED_IMPLEMENTATION_FREEZE_MODULES",
+    (
+        "raptor.eval.prospective_freeze",
+        "raptor.eval.prospective_exact_source_transport",
+        "raptor.eval.prospective_exact_source_metadata_lookups",
+    ),
+)
+_DEFAULT_IMPLEMENTATION_FREEZE_FILES: tuple[str, ...] = getattr(
+    _prospective_freeze,
+    "REQUIRED_IMPLEMENTATION_FREEZE_FILES",
+    ("scripts/run_clinvar_2026_08_prospective_freeze.py",),
+)
+_GIT_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
+_WINDOWS_DRIVE_PATH_RE = re.compile(r"^(?P<drive>[A-Za-z]):[\\\\/](?P<tail>.*)$")
 
 
 def require_module() -> Any:
@@ -235,10 +254,25 @@ def _normalize_module_names(module_names: tuple[str, ...] | list[str] | None) ->
     return tuple(normalized)
 
 
+def _normalize_file_paths(file_paths: tuple[str, ...] | list[str] | None) -> tuple[str, ...]:
+    selected = tuple(file_paths) if file_paths is not None else _DEFAULT_IMPLEMENTATION_FREEZE_FILES
+    if not selected:
+        pytest.fail("implementation_freeze file list must be non-empty", pytrace=False)
+    normalized: list[str] = []
+    for file_path in selected:
+        if not isinstance(file_path, str) or not file_path.strip():
+            pytest.fail("implementation_freeze file list contains a blank path", pytrace=False)
+        normalized_path = file_path.strip().replace("\\", "/")
+        if normalized_path not in normalized:
+            normalized.append(normalized_path)
+    return tuple(normalized)
+
+
 def resolve_committed_implementation_freeze(
     commitish: str = "HEAD",
     *,
     module_names: tuple[str, ...] | list[str] | None = None,
+    file_paths: tuple[str, ...] | list[str] | None = None,
 ) -> dict[str, Any]:
     commit = _resolve_commit(commitish)
     commit_probe = _run_git_with_worktree("cat-file", "-e", f"{commit}" + "^{commit}")
@@ -268,14 +302,34 @@ def resolve_committed_implementation_freeze(
             f"commit {commit} had no resolvable module hashes for declared modules {list(required_modules)!r}",
             pytrace=False,
         )
-    return {"commit": commit, "module_hashes": module_hashes}
+    required_files = _normalize_file_paths(file_paths)
+    file_hashes: dict[str, str] = {}
+    missing_files: list[str] = []
+    for file_path in required_files:
+        shown = _run_git_with_worktree("show", f"{commit}:{file_path}")
+        if shown.returncode != 0:
+            missing_files.append(file_path)
+            continue
+        file_hashes[file_path] = sha256_hex(canonical_lf_bytes(shown.stdout))
+    if missing_files:
+        pytest.fail(
+            "implementation_freeze committed-tree fixture is incomplete for declared files: "
+            f"commit={commit} missing={missing_files!r}",
+            pytrace=False,
+        )
+    return {"commit": commit, "module_hashes": module_hashes, "file_hashes": file_hashes}
 
 
-def draft_placeholder_implementation_freeze(module_names: tuple[str, ...] | list[str] | None = None) -> dict[str, Any]:
+def draft_placeholder_implementation_freeze(
+    module_names: tuple[str, ...] | list[str] | None = None,
+    file_paths: tuple[str, ...] | list[str] | None = None,
+) -> dict[str, Any]:
     required_modules = _normalize_module_names(module_names)
+    required_files = _normalize_file_paths(file_paths)
     return {
         "commit": "NOT_YET_COMMITTED",
         "module_hashes": {module_name: "NOT_YET_COMMITTED" for module_name in required_modules},
+        "file_hashes": {file_path: "NOT_YET_COMMITTED" for file_path in required_files},
     }
 
 
@@ -335,6 +389,7 @@ class ProspectiveSandbox:
     base_eval_config_path: Path
     transport_record_path: Path
     raw_record_path: Path
+    resource_manifest_checksums_dir: Path
     spec: dict[str, Any]
     overlay: dict[str, Any]
     archive_bytes: bytes
@@ -372,6 +427,44 @@ def _overlay_text(required_values: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _copy_immutable_inputs(spec: dict[str, Any], *, repo_root: Path) -> None:
+    """Copies every file the registration spec's `immutable_inputs` mapping
+    declares from the REAL repository root into the sandbox's own
+    `repo_root`, byte-for-byte, so `validate_scoring_stage_approval`'s
+    independent recomputation of each entry's canonical-LF SHA-256/git-blob
+    SHA-1 (`_immutable_inputs_failure_reason`) matches the spec's pinned
+    values by construction. These are exclusively SCORING-stage config
+    inputs (tsc2.yaml, ACMG/BIAS/masking/predictor-aggregation policy, ...)
+    -- never touched by acquisition (`pre_data_approval`) -- so copying them
+    here only supports scoring-stage-approval tests; it has no bearing on
+    the separate acquisition-stage sandbox content."""
+    immutable_inputs = spec.get("immutable_inputs")
+    if not isinstance(immutable_inputs, dict) or not immutable_inputs:
+        pytest.fail("registration spec immutable_inputs must be a non-empty mapping")
+    for rel_path in immutable_inputs:
+        source = REPO_ROOT / str(rel_path)
+        destination = repo_root / str(rel_path)
+        if not source.is_file():
+            pytest.fail(f"immutable_inputs source file missing from repository: {source}")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+
+
+def write_resource_manifest_checksums(directory: Path, *, contents: dict[str, bytes] | None = None) -> Path:
+    """Writes the three ADR-0008 pinned resource-manifest checksum files
+    (`RESOURCE_MANIFEST_ENTRIES`) into `directory` with deterministic
+    fixture bytes, so tests can exercise
+    `validate_scoring_stage_approval`'s independent resource-manifest-digest
+    RECOMPUTATION without any real x64 Nirvana/BIAS resource bundle.
+    Returns `directory`."""
+    module = require_module()
+    directory.mkdir(parents=True, exist_ok=True)
+    for _entry_id, filename in module.RESOURCE_MANIFEST_ENTRIES:
+        payload = (contents or {}).get(filename, f"{filename}-fixture-bytes".encode("utf-8"))
+        (directory / filename).write_bytes(payload)
+    return directory
+
+
 @contextmanager
 def prospective_sandbox(name: str, *, archive_bytes: bytes | None = None) -> Iterator[ProspectiveSandbox]:
     archive = archive_bytes if archive_bytes is not None else default_archive_bytes()
@@ -380,9 +473,11 @@ def prospective_sandbox(name: str, *, archive_bytes: bytes | None = None) -> Ite
     external_root = root / "external-content-root"
     spec_path = repo_root / "docs" / "project" / "specs" / SPEC_SOURCE_PATH.name
     base_eval_config_path = repo_root / "configs" / "eval" / "tsc2.yaml"
+    resource_manifest_checksums_dir = root / "resource-manifest-checksums"
     root.mkdir(parents=True, exist_ok=False)
     try:
         external_root.mkdir(parents=True, exist_ok=False)
+        write_resource_manifest_checksums(resource_manifest_checksums_dir)
         base_eval_config_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(BASE_CONFIG_SOURCE_PATH, base_eval_config_path)
 
@@ -396,6 +491,7 @@ def prospective_sandbox(name: str, *, archive_bytes: bytes | None = None) -> Ite
         spec_path.parent.mkdir(parents=True, exist_ok=True)
         spec_path.write_bytes(canonical_lf_bytes(spec_text.encode("utf-8")))
         spec = load_yaml(spec_path)
+        _copy_immutable_inputs(spec, repo_root=repo_root)
 
         required_values = spec["prospective_eval_overlay_lifecycle"]["required_values"]
         if not isinstance(required_values, dict):
@@ -418,6 +514,7 @@ def prospective_sandbox(name: str, *, archive_bytes: bytes | None = None) -> Ite
             base_eval_config_path=base_eval_config_path,
             transport_record_path=transport_record_path,
             raw_record_path=raw_record_path,
+            resource_manifest_checksums_dir=resource_manifest_checksums_dir,
             spec=spec,
             overlay=overlay,
             archive_bytes=archive,
@@ -432,7 +529,6 @@ def build_approval_record(
     decision: str = "APPROVED_PRE_DATA",
     approver: str = "@dronasrinivas",
     approved_at: str = "2026-08-29T10:00:00Z",
-    immutable_inputs_verified: bool = True,
     protected_tests_verified: bool = True,
     attestation_overrides: dict[str, bool] | None = None,
     scope_overrides: dict[str, bool] | None = None,
@@ -482,19 +578,59 @@ def build_approval_record(
             "path": str(sandbox.overlay_path.relative_to(sandbox.repo_root)).replace("\\", "/"),
             "canonical_lf_sha256": canonical_lf_sha256_path(sandbox.overlay_path),
         },
-        "scoring_semantics_projection_sha256": sandbox.spec["authority_partition"]["tsc2_scoring_semantics_projection"]["sha256"],
         "implementation_freeze": implementation_freeze,
-        "immutable_inputs_verified": immutable_inputs_verified,
         "protected_tests_verified": protected_tests_verified,
-        "x64_freeze": {
-            "worker_designation": "adr-0008-designated-x64-worker",
-            "worker_arch": "x86_64",
-            "bias_commit": "ade13f206f3e2c2efe3ec92715d974645fc8da8f",
-            "nirvana_banner": "3.18.1-0-g05f88047",
-            "resource_manifest_sha256": "1" * 64,
-        },
         "scope": scope,
         "pre_data_access_attestation": attestation,
+    }
+
+
+def build_scoring_stage_approval_record(
+    sandbox: ProspectiveSandbox,
+    *,
+    decision: str = "APPROVED_SCORING_STAGE",
+    approver: str = "@dronasrinivas",
+    approved_at: str = "2026-08-29T10:00:00Z",
+    registration_id: str | None = None,
+    resource_manifest_checksums_dir: Path | None = None,
+    x64_freeze_overrides: dict[str, Any] | None = None,
+    immutable_inputs_verified: bool = True,
+) -> dict[str, Any]:
+    """Builds a valid `raptor.eval.scoring_stage_approval.v1` record -- the
+    SEPARATE, LATER gate for ADR-0020 stage 4 (BIAS/Nirvana execution,
+    label-dependent evaluation). Independent of `build_approval_record`
+    (`pre_data_approval`, stages 1-2) above.
+
+    By default, `x64_freeze.resource_manifest_sha256` is the REAL digest
+    recomputed from `resource_manifest_checksums_dir` (default:
+    `sandbox.resource_manifest_checksums_dir`, pre-populated with
+    deterministic fixture bytes) -- so this record passes
+    `validate_scoring_stage_approval`'s anti-fabrication cross-check by
+    construction whenever the caller also passes matching `*_probe`
+    overrides (see the `validate_scoring_stage_approval` wrapper below,
+    which defaults every probe to these same known-good values).
+    `x64_freeze_overrides` lets a caller deliberately fabricate/mismatch a
+    claimed pin for negative tests. `immutable_inputs_verified` defaults to
+    `True` -- this is exclusively a SCORING-stage flag (never part of
+    `build_approval_record`/`pre_data_approval`; see that function's own
+    boundary-correction note) and is independently recomputed, never
+    trusted as a bare claim, by `validate_scoring_stage_approval`."""
+    module = require_module()
+    checksums_dir = resource_manifest_checksums_dir or sandbox.resource_manifest_checksums_dir
+    x64_freeze = {
+        **observed_runtime_identity_ok(),
+        "resource_manifest_sha256": module.compute_resource_manifest_sha256(checksums_dir),
+    }
+    if x64_freeze_overrides:
+        x64_freeze = {**x64_freeze, **x64_freeze_overrides}
+    return {
+        "schema": "raptor.eval.scoring_stage_approval.v1",
+        "registration_id": registration_id if registration_id is not None else sandbox.spec["registration"]["id"],
+        "decision": decision,
+        "approver": approver,
+        "approved_at": approved_at,
+        "x64_freeze": x64_freeze,
+        "immutable_inputs_verified": immutable_inputs_verified,
     }
 
 
@@ -564,14 +700,28 @@ def make_head_payload(
     }
 
 
-def runtime_identity_ok() -> dict[str, Any]:
+def observed_runtime_identity_ok() -> dict[str, Any]:
+    """The 4 runtime-identity dimensions a process can OBSERVE directly
+    about its own execution (worker designation/arch, BIAS/Nirvana tool
+    identity). Deliberately excludes `resource_manifest_sha256`, which
+    `validate_scoring_stage_approval` never accepts as an observed claim --
+    it is always independently recomputed from the actual manifest files."""
     return {
         "worker_designation": "adr-0008-designated-x64-worker",
         "worker_arch": "x86_64",
         "bias_commit": "ade13f206f3e2c2efe3ec92715d974645fc8da8f",
         "nirvana_banner": "3.18.1-0-g05f88047",
-        "resource_manifest_sha256": "1" * 64,
     }
+
+
+def runtime_identity_ok(resource_manifest_sha256: str = "1" * 64) -> dict[str, Any]:
+    """Full 5-key runtime-identity block: `observed_runtime_identity_ok()`
+    plus a `resource_manifest_sha256`. The default digest is a fixed
+    placeholder suitable only for FORMAT-level checks; pass the real
+    recomputed digest (e.g. via
+    `require_module().compute_resource_manifest_sha256(...)`) whenever
+    asserting an EXACT expected `x64_freeze` value."""
+    return {**observed_runtime_identity_ok(), "resource_manifest_sha256": resource_manifest_sha256}
 
 
 def execute_transport_and_raw_freeze(
@@ -583,27 +733,19 @@ def execute_transport_and_raw_freeze(
     official_md5_lookup: Any,
     transport_record_path: Path | None = None,
     raw_record_path: Path | None = None,
-    runtime_identity: dict[str, Any] | None = None,
     cli_overrides: dict[str, Any] | None = None,
     env_overrides: dict[str, str] | None = None,
     label_reader: Any = None,
     benchmark_builder: Any = None,
     scoring_runner: Any = None,
     first_archive_get_at: str | None = None,
+    transport_identity_pin: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     run = require_api("execute_transport_and_raw_freeze")
-    default_runtime_identity = runtime_identity
-    if default_runtime_identity is None and isinstance(approval_record, dict):
-        freeze_block = approval_record.get("x64_freeze")
-        if isinstance(freeze_block, dict):
-            default_runtime_identity = copy.deepcopy(freeze_block)
-    if default_runtime_identity is None:
-        default_runtime_identity = runtime_identity_ok()
     with _with_resolved_git_env():
         result = run(
             registration_spec_path=sandbox.spec_path,
             prospective_overlay_path=sandbox.overlay_path,
-            base_eval_config_path=sandbox.base_eval_config_path,
             approval_record=copy.deepcopy(approval_record) if isinstance(approval_record, dict) else approval_record,
             allowed_repo_root=sandbox.repo_root,
             allowed_external_root=sandbox.external_root,
@@ -612,13 +754,13 @@ def execute_transport_and_raw_freeze(
             transport=transport,
             published_archive_date_lookup=published_archive_date_lookup,
             official_md5_lookup=official_md5_lookup,
-            runtime_identity=default_runtime_identity,
             cli_overrides=cli_overrides or {},
             env_overrides=env_overrides or {},
             label_reader=label_reader,
             benchmark_builder=benchmark_builder,
             scoring_runner=scoring_runner,
             first_archive_get_at=first_archive_get_at,
+            transport_identity_pin=transport_identity_pin,
         )
     if not isinstance(result, dict):
         pytest.fail("execute_transport_and_raw_freeze must return a mapping")
@@ -641,6 +783,75 @@ def validate_pre_data_approval(
         )
     if not isinstance(out, dict):
         pytest.fail("validate_pre_data_approval must return a mapping")
+    return out
+
+
+#: A default, non-blank, past-dated (relative to this repository's frozen
+#: fixture "now") `first_scoring_execution_at` -- strictly after
+#: `build_scoring_stage_approval_record`'s default `approved_at`
+#: ("2026-08-29T10:00:00Z") -- so callers that only want to mutate
+#: `approval_record` get a passing timestamp pair without repeating it at
+#: every call site. Pass an explicit override (including `None`/blank/
+#: future-dated) to exercise the mandatory-timestamp negative cases.
+DEFAULT_FIRST_SCORING_EXECUTION_AT = "2026-08-29T12:00:00Z"
+
+
+def _const_probe(value: Any) -> Callable[[], Any]:
+    """Returns a zero-arg callable that always returns `value` -- used to
+    supply `validate_scoring_stage_approval`'s `*_probe` test-only overrides
+    from plain fixture values (`observed_runtime_identity_ok()` /
+    `sandbox.resource_manifest_checksums_dir`) without repeating a lambda
+    at every call site."""
+    return lambda: value
+
+
+def validate_scoring_stage_approval(
+    sandbox: ProspectiveSandbox,
+    *,
+    approval_record: dict[str, Any],
+    registration_id: str | None = None,
+    registration_spec_path: Path | None = None,
+    allowed_repo_root: Path | None = None,
+    first_scoring_execution_at: str | None = DEFAULT_FIRST_SCORING_EXECUTION_AT,
+    worker_designation_probe: Callable[[], str] | None = None,
+    worker_arch_probe: Callable[[], str] | None = None,
+    bias_commit_probe: Callable[[], str] | None = None,
+    nirvana_banner_probe: Callable[[], str] | None = None,
+    resource_manifest_location_probe: Callable[[], "str | Path"] | None = None,
+) -> dict[str, Any]:
+    """Wraps `raptor.eval.prospective_freeze.validate_scoring_stage_approval`
+    -- the SEPARATE, LATER ADR-0020 stage 4 gate (BIAS/Nirvana execution,
+    label-dependent evaluation). Independent of `validate_pre_data_approval`
+    above. Defaults `allowed_repo_root` to `sandbox.repo_root` (which
+    `_copy_immutable_inputs` pre-populated with the real scoring-stage
+    config files) and every `*_probe` to a constant probe returning the
+    sandbox's own known-good fixture values (`observed_runtime_identity_ok()`
+    / `sandbox.resource_manifest_checksums_dir`) -- never a caller-supplied
+    plain mapping, mirroring production's own probe-based API -- so callers
+    that only want to mutate `approval_record` (e.g.
+    `build_scoring_stage_approval_record`'s `x64_freeze_overrides`) get the
+    correct anti-fabrication cross-check inputs without repeating them at
+    every call site. Pass an explicit `*_probe` override to simulate a
+    genuinely different observation (test-only; production/CLI callers
+    never override any of these)."""
+    fn = require_api("validate_scoring_stage_approval")
+    ok_identity = observed_runtime_identity_ok()
+    out = fn(
+        registration_id=registration_id if registration_id is not None else sandbox.spec["registration"]["id"],
+        registration_spec_path=registration_spec_path or sandbox.spec_path,
+        approval_record=copy.deepcopy(approval_record),
+        allowed_repo_root=allowed_repo_root or sandbox.repo_root,
+        first_scoring_execution_at=first_scoring_execution_at,
+        worker_designation_probe=worker_designation_probe or _const_probe(ok_identity["worker_designation"]),
+        worker_arch_probe=worker_arch_probe or _const_probe(ok_identity["worker_arch"]),
+        bias_commit_probe=bias_commit_probe or _const_probe(ok_identity["bias_commit"]),
+        nirvana_banner_probe=nirvana_banner_probe or _const_probe(ok_identity["nirvana_banner"]),
+        resource_manifest_location_probe=(
+            resource_manifest_location_probe or _const_probe(sandbox.resource_manifest_checksums_dir)
+        ),
+    )
+    if not isinstance(out, dict):
+        pytest.fail("validate_scoring_stage_approval must return a mapping")
     return out
 
 
