@@ -20,8 +20,7 @@ following are true, checked in this exact order:
    freeze -- has no x86-only requirement; only the later BIAS-2015/Nirvana
    ADR-0008 stage does, and that stage is out of scope here).
 3. Every required `--execute` option is present (`--approval-record`,
-   `--allowed-external-root`, `--published-archive-date-lookup`,
-   `--official-md5-lookup`). Finding #3 (independent review): production
+   `--allowed-external-root`). Finding #3 (independent review): production
    transport is HARD-WIRED to
    `raptor.eval.prospective_exact_source_transport.build_transport()` --
    there is no `--transport-factory` (or any other) CLI option, config
@@ -30,7 +29,12 @@ following are true, checked in this exact order:
    arbitrary-live-transport-substitution vulnerability: a caller can no
    longer point real execution at anything other than the one safe,
    redirect-refusing, exact-URL-only, TLS-always-on transport this
-   repository ships.
+   repository ships. Finding #1 (independent review, round 5): the two
+   metadata lookup ports are hard-wired the SAME way -- there is no
+   `--published-archive-date-lookup`/`--official-md5-lookup` (or any
+   other) CLI option, config value, or environment variable either;
+   supplying either flag is now an "unrecognized arguments" argparse
+   failure, checked before anything else in this script even runs.
 4. `--approval-record <path>` points at a JSON file that
    `raptor.eval.prospective_freeze.validate_pre_data_approval` accepts --
    schema `raptor.eval.pre_data_approval.v1`, `decision ==
@@ -60,26 +64,44 @@ following are true, checked in this exact order:
    `socket_module`, `tls_context_factory`) is that function's own real
    default (`http.client.HTTPSConnection`, `ssl.create_default_context`
    with TLS verification always on). Both external lookups
-   (`published_archive_date_lookup`/`official_md5_lookup`) are still
-   resolved via `--published-archive-date-lookup`/`--official-md5-lookup`
-   ("module:callable" specs) -- only the transport is hard-wired, because
-   only the transport can actually perform network GET/HEAD I/O against
-   the exact-source archive; the two lookups are narrow, side-effect-free
-   read ports over already-published NCBI metadata.
+   (`published_archive_date_lookup`/`official_md5_lookup`) are ALSO
+   hard-wired -- to `raptor.eval.prospective_exact_source_metadata_lookups
+   .published_archive_date_lookup`/`.official_md5_lookup`, the one
+   production-owned module for both ports, imported statically at the top
+   of this file. Neither port's production implementation performs a
+   real NCBI query yet (both always raise
+   `MetadataLookupNotYetImplementedError`, fail-closed, since neither
+   port's real-world NCBI metadata source has ever been ratified by this
+   contract -- see that module's docstring); a real implementation must
+   land there via a dedicated, reviewed change, never via a CLI-selected
+   substitute.
 
-Transport-tamper defense (independent review finding): the two lookup
-options above ARE still caller-selected, dynamically-imported code, and
-`_resolve_import_target` (and the modules/callables it resolves) run AFTER
-`build_transport()` but BEFORE the real archive GET -- the only window in
-this script where non-production-owned code executes at all. To close the
-possibility of that code monkeypatching `_ExactSourceTransport.stream_get`
-(or `.head`) to silently substitute the download source, this script
-captures a `capture_transport_identity_pin(transport)` identity pin
-IMMEDIATELY after `build_transport()` returns, strictly before either
-lookup is imported, and passes it to `execute_transport_and_raw_freeze`,
-which re-verifies it twice (on entry, and again immediately before the
-real streamed GET) and refuses with `TRANSPORT_IDENTITY_TAMPERED` on any
-mismatch -- before any network call.
+Independent review finding (live-transport-bypass, round 5): before this
+round, the two lookup ports above were resolved from CLI-supplied
+`--published-archive-date-lookup`/`--official-md5-lookup`
+`"module:callable"` strings via `importlib.import_module`, run AFTER
+`build_transport()` returned but BEFORE the real archive GET -- the only
+window in this script where non-production-owned code executed at all.
+Merely capturing a transport-identity pin afterward was an incomplete
+defense: importing arbitrary caller-selected code is dangerous regardless
+of what happens to `transport` specifically (that code could open its own
+sockets, mutate unrelated module globals, replace
+`prospective_freeze.execute_transport_and_raw_freeze` itself, etc.). Both
+CLI options, and the `_resolve_import_target` dynamic-import helper that
+served them, have been removed entirely -- confirmed live `--execute`
+imports/executes ZERO caller-selected Python/plugin code before the real
+GET. The transport-identity-pin defense described next is retained purely
+as defense-in-depth, not as the primary answer to that vulnerability.
+
+Transport-tamper defense-in-depth: this script still captures a
+`capture_transport_identity_pin(transport)` identity pin IMMEDIATELY after
+`build_transport()` returns and passes it to
+`execute_transport_and_raw_freeze`, which re-verifies it twice (on entry,
+and again immediately before the real streamed GET) and refuses with
+`TRANSPORT_IDENTITY_TAMPERED` on any mismatch -- before any network call.
+With both lookup ports now hard-wired (no caller-selected import path
+remains at all), this guards only against a hypothetical future
+regression, not a live vulnerability.
 
 Even with every one of the above satisfied, this script never invokes
 `label_reader`/`benchmark_builder`/`scoring_runner` -- stage 3+ (label
@@ -89,7 +111,6 @@ is a separate, later additive surface; both are always left unset.
 from __future__ import annotations
 
 import argparse
-import importlib
 import json
 import os
 import platform
@@ -97,6 +118,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import raptor.eval.prospective_exact_source_metadata_lookups as prospective_exact_source_metadata_lookups
 import raptor.eval.prospective_exact_source_transport as prospective_exact_source_transport
 import raptor.eval.prospective_freeze as prospective_freeze
 
@@ -122,17 +144,6 @@ def _load_json(path: Path) -> dict[str, Any]:
     if not isinstance(loaded, dict):
         raise ValueError(f"expected a JSON object at {path}")
     return loaded
-
-
-def _resolve_import_target(spec: str) -> Any:
-    """Import `module:attr` and return the attribute itself, uncalled --
-    used for the `published_archive_date_lookup`/`official_md5_lookup`
-    ports, which are callables supplied directly (not zero-arg factories)."""
-    if ":" not in spec:
-        raise ValueError("option must be 'module:attribute'")
-    module_name, _, attr_name = spec.partition(":")
-    module = importlib.import_module(module_name)
-    return getattr(module, attr_name)
 
 
 def _assert_wsl_python_policy() -> None:
@@ -234,18 +245,6 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--transport-freeze-record", type=Path, default=None)
     parser.add_argument("--raw-freeze-record", type=Path, default=None)
-    parser.add_argument(
-        "--published-archive-date-lookup",
-        type=str,
-        default=None,
-        help="'module:callable' -- the published_archive_date_lookup port. Required with --execute.",
-    )
-    parser.add_argument(
-        "--official-md5-lookup",
-        type=str,
-        default=None,
-        help="'module:callable' -- the official_md5_lookup port. Required with --execute.",
-    )
     args = parser.parse_args(argv)
 
     if not args.execute:
@@ -259,9 +258,12 @@ def main(argv: list[str] | None = None) -> int:
     # Everything below only runs with --execute, strictly in this order:
     # (1) WSL python policy -- unconditional, before anything else is even
     #     inspected; (2) required-option completeness; (3) real approval
-    #     validation; (4) external-root preflight; (5) transport/lookup
-    #     resolution (the only step allowed to import/call caller-supplied
-    #     code); (6) execute_transport_and_raw_freeze itself.
+    #     validation; (4) external-root preflight; (5) transport
+    #     construction (hard-wired; no caller-selected code runs here or
+    #     anywhere else in this script before the real GET -- both metadata
+    #     lookup ports are likewise hard-wired module-level references, not
+    #     resolved from any CLI input); (6) execute_transport_and_raw_freeze
+    #     itself.
     try:
         _assert_wsl_python_policy()
     except HarnessEnvironmentError as exc:
@@ -273,10 +275,6 @@ def main(argv: list[str] | None = None) -> int:
         missing_options.append("--approval-record")
     if args.allowed_external_root is None:
         missing_options.append("--allowed-external-root")
-    if args.published_archive_date_lookup is None:
-        missing_options.append("--published-archive-date-lookup")
-    if args.official_md5_lookup is None:
-        missing_options.append("--official-md5-lookup")
     if missing_options:
         print(
             "REFUSED: --execute requires all of the following options, missing: " + ", ".join(missing_options),
@@ -322,46 +320,22 @@ def main(argv: list[str] | None = None) -> int:
     # so every hook is that function's own real default.
     transport = prospective_exact_source_transport.build_transport()
 
-    # Transport-tamper defense (independent review finding): the identity
-    # pin is captured HERE, immediately after `build_transport()` returns
-    # and strictly BEFORE the two `_resolve_import_target` calls below --
-    # the only place in this script that imports/calls caller-selected code
-    # ("module:callable" specs). `execute_transport_and_raw_freeze` re-
-    # verifies this pin twice (on entry, and again immediately before the
-    # real streamed GET) and refuses with TRANSPORT_IDENTITY_TAMPERED if
-    # either lookup callable monkeypatched the transport's class methods in
-    # the meantime.
+    # Transport-tamper defense-in-depth: the identity pin is captured HERE,
+    # immediately after `build_transport()` returns. `execute_transport_
+    # and_raw_freeze` re-verifies this pin twice (on entry, and again
+    # immediately before the real streamed GET) and refuses with
+    # TRANSPORT_IDENTITY_TAMPERED on any mismatch. This is defense-in-depth
+    # only: independent review finding #1 (round 5) removed the underlying
+    # vulnerability entirely -- neither metadata lookup port below is
+    # resolved from any CLI input, module:callable string, or other
+    # runtime-selectable source. Both are fixed, statically-imported
+    # module-level references to raptor.eval.prospective_exact_source_
+    # metadata_lookups (imported at the top of this file); no caller-
+    # selected Python/plugin code executes anywhere in this script before
+    # the real GET.
     transport_identity_pin = prospective_freeze.capture_transport_identity_pin(transport)
-
-    try:
-        published_archive_date_lookup = _resolve_import_target(args.published_archive_date_lookup)
-    except (ImportError, ModuleNotFoundError) as exc:
-        print(
-            f"REFUSED: published archive date lookup module import failed ({args.published_archive_date_lookup!r}): {exc}",
-            file=sys.stderr,
-        )
-        return 2
-    except AttributeError as exc:
-        print(
-            f"REFUSED: published archive date lookup attribute missing ({args.published_archive_date_lookup!r}): {exc}",
-            file=sys.stderr,
-        )
-        return 2
-
-    try:
-        official_md5_lookup = _resolve_import_target(args.official_md5_lookup)
-    except (ImportError, ModuleNotFoundError) as exc:
-        print(
-            f"REFUSED: official md5 lookup module import failed ({args.official_md5_lookup!r}): {exc}",
-            file=sys.stderr,
-        )
-        return 2
-    except AttributeError as exc:
-        print(
-            f"REFUSED: official md5 lookup attribute missing ({args.official_md5_lookup!r}): {exc}",
-            file=sys.stderr,
-        )
-        return 2
+    published_archive_date_lookup = prospective_exact_source_metadata_lookups.published_archive_date_lookup
+    official_md5_lookup = prospective_exact_source_metadata_lookups.official_md5_lookup
 
     try:
         overlay = prospective_freeze._load_yaml(args.overlay)  # noqa: SLF001 - read-only path resolution

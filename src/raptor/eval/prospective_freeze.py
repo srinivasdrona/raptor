@@ -370,21 +370,26 @@ def capture_transport_identity_pin(transport: Any) -> dict[str, Any]:
     that class's currently-bound `head`/`stream_get` function objects --
     immediately after a transport is constructed (e.g. right after
     `raptor.eval.prospective_exact_source_transport.build_transport()`
-    returns), BEFORE any caller-selected code (a `published_archive_date_lookup`
-    / `official_md5_lookup` "module:callable" import, or any other
-    dynamically-resolved code) has had a chance to run.
+    returns), before either lookup port is even called.
 
     `execute_transport_and_raw_freeze` re-verifies this pin against the
     SAME `transport` object at two later points (immediately on entry, and
     again immediately before the real streamed GET) via
     `_transport_identity_pin_mismatch`. If either check finds the
     transport's class or its `head`/`stream_get` methods no longer match
-    this pin -- e.g. a caller-selected lookup module monkeypatched
-    `type(transport).stream_get` in between -- execution is refused with
-    `TRANSPORT_IDENTITY_TAMPERED` before any network call, closing the
-    confirmed-live-execution transport-tamper vulnerability (independent
-    review finding): no caller-selected Python/plugin code may mutate the
-    hard-wired transport's behavior undetected."""
+    this pin -- e.g. something monkeypatched `type(transport).stream_get`
+    in between -- execution is refused with `TRANSPORT_IDENTITY_TAMPERED`
+    before any network call. Independent review (round 5) additionally
+    closed the specific vulnerability this pin was originally layered on
+    top of: confirmed live `--execute` no longer imports ANY
+    caller-selected Python/plugin code at all before the real GET (the
+    `--published-archive-date-lookup`/`--official-md5-lookup`
+    `"module:callable"` CLI options were removed; both ports are now
+    hard-wired to `raptor.eval.prospective_exact_source_metadata_lookups`,
+    a single production-owned, statically-imported module -- see that
+    module's docstring). This pin therefore remains purely as
+    defense-in-depth against any future regression, not as the primary
+    defense against a live import vulnerability."""
     transport_type = type(transport)
     return {
         "transport_type": transport_type,
@@ -1774,18 +1779,26 @@ def execute_transport_and_raw_freeze(
 
     `transport_identity_pin` (optional; from `capture_transport_identity_pin`,
     captured by the caller immediately after constructing `transport` and
-    BEFORE any caller-selected/dynamically-imported code such as
-    `published_archive_date_lookup`/`official_md5_lookup` has run) is
-    re-verified against `transport` TWICE if supplied: immediately on
-    entry (catching tampering that happened between pin capture and this
-    call), and again immediately before the real streamed GET (catching
-    tampering performed by `published_archive_date_lookup`/
-    `official_md5_lookup` themselves, which both run after `transport.head()`
-    but before the GET). Either mismatch returns `TRANSPORT_IDENTITY_TAMPERED`
-    before any network call -- no caller-selected code may silently swap out
-    the hard-wired transport's `head`/`stream_get` behavior. `None` (the
-    default) skips this check entirely, for callers that never claim to be
-    a confirmed-live execution path."""
+    before either lookup port has run) is re-verified against `transport`
+    TWICE if supplied: immediately on entry (catching tampering that
+    happened between pin capture and this call), and again immediately
+    before the real streamed GET (catching tampering performed by
+    `published_archive_date_lookup`/`official_md5_lookup` themselves,
+    which both run after `transport.head()` but before the GET). Either
+    mismatch returns `TRANSPORT_IDENTITY_TAMPERED` before any network
+    call. `None` (the default) skips this check entirely, for callers
+    that never claim to be a confirmed-live execution path. This pin is
+    defense-in-depth: confirmed live `--execute` (see
+    `scripts/run_clinvar_2026_08_prospective_freeze.py` and
+    `raptor.eval.prospective_exact_source_metadata_lookups`) no longer
+    imports any caller-selected Python/plugin code at all before the real
+    GET -- both lookup ports are hard-wired to one production-owned,
+    statically-imported module, closing the underlying vulnerability this
+    pin was originally layered on top of.
+
+    Either lookup port raising any exception is a typed, fail-closed
+    `BLOCKED`/`INVALID` result (`PUBLISHED_ARCHIVE_DATE_LOOKUP_FAILED`/
+    `OFFICIAL_MD5_LOOKUP_FAILED`), never a raw propagated exception."""
     cli_overrides = cli_overrides or {}
     env_overrides = env_overrides or {}
     if cli_overrides or env_overrides:
@@ -1949,13 +1962,34 @@ def execute_transport_and_raw_freeze(
             terminal, reason_code = head_outcome
             return {"stage_status": "BLOCKED", "terminal_outcome": terminal, "reason_code": reason_code}
 
-        published_result = published_archive_date_lookup(exact_url)
+        # Either lookup port may legitimately raise (the hard-wired
+        # production implementation in `prospective_exact_source_metadata_
+        # lookups` always does, until a real NCBI integration lands there --
+        # see that module's docstring). A raised exception must never
+        # propagate out of this function as a raw, untyped traceback: it is
+        # always a typed, fail-closed BLOCKED/INVALID result instead, exactly
+        # like every other acquisition-readiness gap in this function.
+        try:
+            published_result = published_archive_date_lookup(exact_url)
+        except Exception:  # noqa: BLE001 - any lookup-port failure fails closed, typed, never a raw traceback
+            return {
+                "stage_status": "BLOCKED",
+                "terminal_outcome": "INVALID",
+                "reason_code": "PUBLISHED_ARCHIVE_DATE_LOOKUP_FAILED",
+            }
         published_outcome = _verify_published_date(published_result)
         if published_outcome is not None:
             terminal, reason_code = published_outcome
             return {"stage_status": "BLOCKED", "terminal_outcome": terminal, "reason_code": reason_code}
 
-        md5_result = official_md5_lookup(exact_url)
+        try:
+            md5_result = official_md5_lookup(exact_url)
+        except Exception:  # noqa: BLE001 - any lookup-port failure fails closed, typed, never a raw traceback
+            return {
+                "stage_status": "BLOCKED",
+                "terminal_outcome": "INVALID",
+                "reason_code": "OFFICIAL_MD5_LOOKUP_FAILED",
+            }
         md5_outcome = _verify_official_md5_source(md5_result)
         if md5_outcome is not None:
             terminal, reason_code = md5_outcome
