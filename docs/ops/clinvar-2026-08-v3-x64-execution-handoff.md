@@ -19,9 +19,13 @@ checks exactly. It does not authorize changing any registered semantics.
 
 Do not ask the owner to approve this run again.
 
-## Frozen acquisition
+## Prior acquisition reference
 
-The exact August archive has already been acquired and frozen.
+The exact August URL was acquired once on the ARM orchestration host. That
+record proves that acquisition happened before label access, but its host-local
+file is not an input dependency for the x64 run. The x64 worker performs a fresh
+exact-URL acquisition and freezes the bytes it will actually consume before
+decompression or label inspection.
 
 | Item | Value |
 |---|---|
@@ -29,8 +33,8 @@ The exact August archive has already been acquired and frozen.
 | Evidence commit | `34c3c0a2b6ed9b1756d5abd65b4e53450e2c3d34` |
 | Archive | `variant_summary_2026-08.txt.gz` |
 | Byte length | `441792560` |
-| SHA-256 | `230ba6d5ac0869bfb46fecb8d19bd8dbfa9a133bfda2e3f8f5b5b662ae7bf500` |
-| MD5 | `2d6b8fcec81f20c9db443818d3fa4500` |
+| Prior ARM SHA-256 | `230ba6d5ac0869bfb46fecb8d19bd8dbfa9a133bfda2e3f8f5b5b662ae7bf500` |
+| Prior ARM MD5 | `2d6b8fcec81f20c9db443818d3fa4500` |
 | Run scope | `f2d3291b67404153aae1c129a2b973db` |
 | Snapshot ID | `clinvar_2026-08-monthly-amendment-v3` |
 
@@ -41,15 +45,15 @@ Authoritative repository inputs:
 - `data/census/tsc_prospective_validation_2026-08_amendment_v3_transport_freeze.json`
 - `data/census/tsc_prospective_validation_2026-08_amendment_v3_raw_freeze.json`
 
-The original archive is on the acquisition host at:
+The prior digests are comparison evidence, not an accessibility requirement and
+not an acceptance gate for the x64-local acquisition. A cross-host mismatch is
+recorded explicitly; it never causes one host's file to be silently relabelled
+as the other. The x64 run requires two matching local downloads from the exact
+registered URL, with the registered HTTP status, final URL, Last-Modified and
+Content-Length, before its local digest becomes the run's content identity.
 
-`D:\raptor-external\prospective-freeze\clinvar-2026-08-amendment-v3\f2d3291b67404153aae1c129a2b973db\variant_summary_2026-08.txt.gz`
-
-Transfer those exact bytes to the x64 worker. If direct transfer is unavailable,
-the x64 worker may download only the exact registered URL, but it must reject the
-result unless byte length, SHA-256, and MD5 match the frozen values above. Never
-accept an alternate path, mirror, later release, substitute, or redirect to a
-different path.
+Never accept an alternate path, mirror, later release, substitute, or redirect
+to a different path.
 
 ## Recover the existing x64 worker
 
@@ -64,7 +68,7 @@ not reasons to abandon the run:
    is not required on this Windows x64 worker.
 2. The acquisition host's
    `D:\raptor-external\prospective-freeze\...` directory is host-local. The x64
-   worker must copy or independently retrieve the exact frozen bytes into its
+   worker independently retrieves and freezes the exact registered URL into its
    own run root.
 3. The three narrow marker files are a new machine-readable projection of the
    already-provisioned worker identity. Materialize them only after verifying
@@ -150,26 +154,24 @@ Native Windows reports `platform.machine()` as `AMD64`; RAPTOR canonicalizes
 that known x64 spelling to the approval record's `x86_64`. Do not create WSL or
 look for `/home/sdrona/raptor/bin/python` on this worker.
 
-### 3. Materialize the frozen archive on x64
+### 3. Acquire and freeze the archive locally on x64
 
-Prefer copying the already-frozen archive through the same RDP drive bridge used
-by the earlier successful x64 handoffs:
+The x64 worker owns the bytes it will consume. Download the exact registered
+URL twice without following redirects. Require both local copies to have the
+registered transport metadata, exact byte length and identical SHA-256/MD5.
+Freeze those locally observed digests before any decompression or label access.
 
-`\\tsclient\D\raptor-external\prospective-freeze\clinvar-2026-08-amendment-v3\f2d3291b67404153aae1c129a2b973db\variant_summary_2026-08.txt.gz`
-
-If an archive already exists at the x64 destination but its identity does not
-match, preserve it under a timestamped `.mismatch-*` name with its observed
-identity and then replace it from the known-good shared copy. If the drive
-bridge is unavailable, retrieve the exact URL without following redirects.
-Promote a temporary file only after all frozen identity checks pass:
+The prior ARM hash is recorded only as a cross-host comparison. It is not a
+reason to make the ARM filesystem accessible to x64 and it does not replace the
+x64-local content identity.
 
 ```powershell
 $url = "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08.txt.gz"
 $runRoot = "D:\raptor-x64\prospective-freeze\clinvar-2026-08-amendment-v3"
-$runScope = "f2d3291b67404153aae1c129a2b973db"
-$archiveDir = Join-Path $runRoot $runScope
+$archiveDir = Join-Path $runRoot "x64-local-acquisition"
 $archive = Join-Path $archiveDir "variant_summary_2026-08.txt.gz"
-$sharedArchive = "\\tsclient\D\raptor-external\prospective-freeze\clinvar-2026-08-amendment-v3\f2d3291b67404153aae1c129a2b973db\variant_summary_2026-08.txt.gz"
+$repeatArchive = Join-Path $archiveDir "variant_summary_2026-08.repeat.txt.gz"
+$freezeRecord = Join-Path $archiveDir "x64_raw_freeze.json"
 
 New-Item -ItemType Directory -Force -Path $archiveDir | Out-Null
 
@@ -182,68 +184,94 @@ function Get-ArchiveIdentity([string]$Path) {
     }
 }
 
-function Test-FrozenArchiveIdentity([string]$Path) {
-    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
-        return $false
-    }
-    $identity = Get-ArchiveIdentity $Path
-    return (
-        $identity.byte_length -eq 441792560 -and
-        $identity.sha256 -eq "230ba6d5ac0869bfb46fecb8d19bd8dbfa9a133bfda2e3f8f5b5b662ae7bf500" -and
-        $identity.md5 -eq "2d6b8fcec81f20c9db443818d3fa4500"
-    )
-}
-
-if ((Test-Path -LiteralPath $archive -PathType Leaf) -and
-    -not (Test-FrozenArchiveIdentity $archive)) {
-    $identity = Get-ArchiveIdentity $archive
-    $stamp = Get-Date -Format "yyyyMMddTHHmmss"
-    $mismatch = "$archive.mismatch-$stamp"
-    Move-Item -LiteralPath $archive -Destination $mismatch
-    $identity["path"] = $mismatch
-    $identity | ConvertTo-Json |
-      Set-Content -LiteralPath "$mismatch.identity.json" -Encoding utf8
-}
-
-if (-not (Test-Path -LiteralPath $archive -PathType Leaf)) {
-    $partial = "$archive.partial"
-    if (Test-Path -LiteralPath $partial) {
-        throw "Refusing to overwrite stale partial download: $partial"
+function Invoke-ExactArchiveDownload([string]$Destination) {
+    if (Test-Path -LiteralPath $Destination) {
+        throw "Refusing to overwrite existing acquisition file: $Destination"
     }
 
-    if (Test-Path -LiteralPath $sharedArchive -PathType Leaf) {
-        Copy-Item -LiteralPath $sharedArchive -Destination $partial
-    } else {
-        $transport = & curl.exe --fail --silent --show-error `
-          --proto "=https" `
-          --output $partial `
-          --write-out "%{http_code}|%{url_effective}" `
-          $url
-        if ($LASTEXITCODE -ne 0 -or $transport -ne "200|$url") {
-            throw "Exact archive transport failed or redirected: $transport"
-        }
+    $transport = & curl.exe --fail --silent --show-error `
+      --proto "=https" `
+      --output $Destination `
+      --write-out "%{http_code}|%{url_effective}" `
+      $url
+    if ($LASTEXITCODE -ne 0 -or $transport -ne "200|$url") {
+        throw "Exact archive transport failed or redirected: $transport"
     }
-
-    if (-not (Test-FrozenArchiveIdentity $partial)) {
-        $observed = Get-ArchiveIdentity $partial | ConvertTo-Json -Compress
-        throw "Transferred/downloaded archive does not match the frozen bytes: $observed"
-    }
-    Move-Item -LiteralPath $partial -Destination $archive
 }
 
-if (-not (Test-FrozenArchiveIdentity $archive)) {
-    throw "Final x64 archive does not match the frozen bytes"
+if (Test-Path -LiteralPath $freezeRecord) {
+    throw "x64 acquisition is already frozen; reuse it only through its verified record"
 }
 
-Get-ArchiveIdentity $archive | ConvertTo-Json
+$head = (& curl.exe --fail --silent --show-error --head --proto "=https" $url) -join "`n"
+if ($LASTEXITCODE -ne 0) { throw "Exact archive HEAD failed" }
+if ($head -notmatch "(?m)^HTTP/\S+\s+200\s+OK\s*$") {
+    throw "Exact archive HEAD did not return HTTP 200"
+}
+if ($head -notmatch "(?mi)^Last-Modified:\s*Thu, 06 Aug 2026 04:05:02 GMT\s*$") {
+    throw "Exact archive Last-Modified drifted"
+}
+if ($head -notmatch "(?mi)^Content-Length:\s*441792560\s*$") {
+    throw "Exact archive Content-Length drifted"
+}
+
+foreach ($existing in @($archive, $repeatArchive)) {
+    if (Test-Path -LiteralPath $existing) {
+        $stamp = Get-Date -Format "yyyyMMddTHHmmss"
+        Move-Item -LiteralPath $existing -Destination "$existing.prior-$stamp"
+    }
+}
+
+Invoke-ExactArchiveDownload $archive
+Invoke-ExactArchiveDownload $repeatArchive
+
+$first = Get-ArchiveIdentity $archive
+$second = Get-ArchiveIdentity $repeatArchive
+
+if ($first.byte_length -ne 441792560 -or $second.byte_length -ne 441792560) {
+    throw "One or both x64 downloads have the wrong byte length"
+}
+if ($first.sha256 -ne $second.sha256 -or $first.md5 -ne $second.md5) {
+    throw "Independent x64 downloads do not have identical content hashes"
+}
+
+$localFreeze = [ordered]@{
+    schema = "raptor.eval.x64_local_raw_freeze.v1"
+    registration_id = "clinvar-2026-08-amendment-v3"
+    exact_url = $url
+    final_url = $url
+    http_status = 200
+    last_modified_utc = "2026-08-06T04:05:02Z"
+    byte_length = $first.byte_length
+    sha256 = $first.sha256
+    md5 = $first.md5
+    repeat_download_sha256 = $second.sha256
+    repeat_download_md5 = $second.md5
+    frozen_at = (Get-Date).ToUniversalTime().ToString("o")
+    label_or_row_access_before_freeze = $false
+    prior_arm_sha256 = "230ba6d5ac0869bfb46fecb8d19bd8dbfa9a133bfda2e3f8f5b5b662ae7bf500"
+    prior_arm_md5 = "2d6b8fcec81f20c9db443818d3fa4500"
+    cross_host_sha256_match = ($first.sha256 -eq "230ba6d5ac0869bfb46fecb8d19bd8dbfa9a133bfda2e3f8f5b5b662ae7bf500")
+    cross_host_md5_match = ($first.md5 -eq "2d6b8fcec81f20c9db443818d3fa4500")
+}
+
+$freezeTemp = "$freezeRecord.tmp"
+[System.IO.File]::WriteAllText(
+    $freezeTemp,
+    ($localFreeze | ConvertTo-Json),
+    [System.Text.UTF8Encoding]::new($false)
+)
+Move-Item -LiteralPath $freezeTemp -Destination $freezeRecord
+
+$localFreeze | ConvertTo-Json
 ```
 
-The stage 3 operator may consume this x64 path only after comparing its bytes to
-the committed raw-freeze record. The host-local path recorded by stages 1-2 is
-provenance, not a requirement that every worker mount the acquisition host's
-filesystem. A mismatch in a copied or downloaded file must not be reinterpreted
-as a new ClinVar release: preserve its observed identity, restore the frozen
-bytes, and continue only after the exact registered hashes match.
+The stage 3 operator must consume `$archive` and verify it against
+`$freezeRecord` before decompression. It must record the comparison to the
+earlier ARM freeze, but cross-host equality is not required: the x64-local
+freeze is the content identity for the bytes actually scored. The two local
+downloads must agree with each other exactly; otherwise stop with
+`BLOCKED_DATA`.
 
 ### 4. Materialize marker files from the verified installation
 
@@ -327,8 +355,9 @@ prospective-adjudication modules. Do not reimplement their logic.
 
 The additive implementation must:
 
-- verify the archive bytes against both committed freeze records before
-  decompression;
+- verify the archive bytes against the x64-local freeze record before
+  decompression and record, but not gate on, comparison to the earlier
+  host-local acquisition;
 - build the effective eval configuration through the v3 overlay, replacing
   only `labels_snapshot`;
 - derive only GRCh38 TSC1/TSC2 records;
@@ -437,10 +466,12 @@ Execute in this order:
 12. Commit only repository-owned implementation and evidence files.
 
 Do not stop for another generic review or approval. Stop only for a hard
-invariant failure: archive mismatch, immutable-input drift, wrong worker or tool
-identity, corrupt/missing x64 resources, masking leakage, identity mismatch, or
-an implementation defect that cannot be corrected without changing registered
-semantics.
+invariant failure: disagreement between the two x64-local downloads,
+registered transport-metadata drift, immutable-input drift, wrong worker or
+tool identity, corrupt/missing x64 resources, masking leakage, identity
+mismatch, or an implementation defect that cannot be corrected without
+changing registered semantics. A mismatch against the prior ARM hash is
+reported, not blocking.
 
 ## Required report
 
