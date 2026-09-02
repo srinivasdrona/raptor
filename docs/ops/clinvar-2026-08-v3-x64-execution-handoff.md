@@ -152,55 +152,98 @@ look for `/home/sdrona/raptor/bin/python` on this worker.
 
 ### 3. Materialize the frozen archive on x64
 
-Prefer copying the already-frozen archive. If it cannot be transferred, retrieve
-the exact URL without following redirects and promote the temporary file only
-after all frozen identity checks pass:
+Prefer copying the already-frozen archive through the same RDP drive bridge used
+by the earlier successful x64 handoffs:
+
+`\\tsclient\D\raptor-external\prospective-freeze\clinvar-2026-08-amendment-v3\f2d3291b67404153aae1c129a2b973db\variant_summary_2026-08.txt.gz`
+
+If an archive already exists at the x64 destination but its identity does not
+match, preserve it under a timestamped `.mismatch-*` name with its observed
+identity and then replace it from the known-good shared copy. If the drive
+bridge is unavailable, retrieve the exact URL without following redirects.
+Promote a temporary file only after all frozen identity checks pass:
 
 ```powershell
 $url = "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08.txt.gz"
+$runRoot = "D:\raptor-x64\prospective-freeze\clinvar-2026-08-amendment-v3"
 $runScope = "f2d3291b67404153aae1c129a2b973db"
 $archiveDir = Join-Path $runRoot $runScope
 $archive = Join-Path $archiveDir "variant_summary_2026-08.txt.gz"
-$candidate = $archive
+$sharedArchive = "\\tsclient\D\raptor-external\prospective-freeze\clinvar-2026-08-amendment-v3\f2d3291b67404153aae1c129a2b973db\variant_summary_2026-08.txt.gz"
 
 New-Item -ItemType Directory -Force -Path $archiveDir | Out-Null
+
+function Get-ArchiveIdentity([string]$Path) {
+    [ordered]@{
+        path = $Path
+        byte_length = (Get-Item -LiteralPath $Path).Length
+        sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant()
+        md5 = (Get-FileHash -Algorithm MD5 -LiteralPath $Path).Hash.ToLowerInvariant()
+    }
+}
+
+function Test-FrozenArchiveIdentity([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        return $false
+    }
+    $identity = Get-ArchiveIdentity $Path
+    return (
+        $identity.byte_length -eq 441792560 -and
+        $identity.sha256 -eq "230ba6d5ac0869bfb46fecb8d19bd8dbfa9a133bfda2e3f8f5b5b662ae7bf500" -and
+        $identity.md5 -eq "2d6b8fcec81f20c9db443818d3fa4500"
+    )
+}
+
+if ((Test-Path -LiteralPath $archive -PathType Leaf) -and
+    -not (Test-FrozenArchiveIdentity $archive)) {
+    $identity = Get-ArchiveIdentity $archive
+    $stamp = Get-Date -Format "yyyyMMddTHHmmss"
+    $mismatch = "$archive.mismatch-$stamp"
+    Move-Item -LiteralPath $archive -Destination $mismatch
+    $identity["path"] = $mismatch
+    $identity | ConvertTo-Json |
+      Set-Content -LiteralPath "$mismatch.identity.json" -Encoding utf8
+}
 
 if (-not (Test-Path -LiteralPath $archive -PathType Leaf)) {
     $partial = "$archive.partial"
     if (Test-Path -LiteralPath $partial) {
         throw "Refusing to overwrite stale partial download: $partial"
     }
-    $transport = & curl.exe --fail --silent --show-error `
-      --proto "=https" `
-      --output $partial `
-      --write-out "%{http_code}|%{url_effective}" `
-      $url
-    if ($LASTEXITCODE -ne 0 -or $transport -ne "200|$url") {
-        throw "Exact archive transport failed or redirected: $transport"
+
+    if (Test-Path -LiteralPath $sharedArchive -PathType Leaf) {
+        Copy-Item -LiteralPath $sharedArchive -Destination $partial
+    } else {
+        $transport = & curl.exe --fail --silent --show-error `
+          --proto "=https" `
+          --output $partial `
+          --write-out "%{http_code}|%{url_effective}" `
+          $url
+        if ($LASTEXITCODE -ne 0 -or $transport -ne "200|$url") {
+            throw "Exact archive transport failed or redirected: $transport"
+        }
     }
-    $candidate = $partial
+
+    if (-not (Test-FrozenArchiveIdentity $partial)) {
+        $observed = Get-ArchiveIdentity $partial | ConvertTo-Json -Compress
+        throw "Transferred/downloaded archive does not match the frozen bytes: $observed"
+    }
+    Move-Item -LiteralPath $partial -Destination $archive
 }
 
-if ((Get-Item -LiteralPath $candidate).Length -ne 441792560) {
-    throw "Archive byte-length mismatch"
+if (-not (Test-FrozenArchiveIdentity $archive)) {
+    throw "Final x64 archive does not match the frozen bytes"
 }
-if ((Get-FileHash -Algorithm SHA256 -LiteralPath $candidate).Hash.ToLowerInvariant() -ne `
-    "230ba6d5ac0869bfb46fecb8d19bd8dbfa9a133bfda2e3f8f5b5b662ae7bf500") {
-    throw "Archive SHA-256 mismatch"
-}
-if ((Get-FileHash -Algorithm MD5 -LiteralPath $candidate).Hash.ToLowerInvariant() -ne `
-    "2d6b8fcec81f20c9db443818d3fa4500") {
-    throw "Archive MD5 mismatch"
-}
-if ($candidate -ne $archive) {
-    Move-Item -LiteralPath $candidate -Destination $archive
-}
+
+Get-ArchiveIdentity $archive | ConvertTo-Json
 ```
 
 The stage 3 operator may consume this x64 path only after comparing its bytes to
 the committed raw-freeze record. The host-local path recorded by stages 1-2 is
 provenance, not a requirement that every worker mount the acquisition host's
-filesystem.
+filesystem. A mismatch in a copied or downloaded file must not be reinterpreted
+as a new ClinVar release: preserve its observed identity, restore the frozen
+bytes, and continue only after the exact registered hashes match.
 
 ### 4. Materialize marker files from the verified installation
 
