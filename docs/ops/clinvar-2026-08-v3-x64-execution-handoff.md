@@ -143,11 +143,17 @@ if (-not (Test-Path -LiteralPath (Join-Path $venv "Scripts\python.exe"))) {
 }
 
 $python = Join-Path $venv "Scripts\python.exe"
-& $python -m pip install --quiet -e "$repo[dev]"
+& $python -m pip install --upgrade pip setuptools wheel
+if ($LASTEXITCODE -ne 0) { throw "Could not prepare pip in the run-local venv" }
+
+& $python -m pip install -e "${repo}[dev]"
 if ($LASTEXITCODE -ne 0) { throw "Could not install RAPTOR into the run-local venv" }
 
 & $python -c "import platform,sys; print(sys.executable); print(platform.machine()); assert platform.machine().lower() in {'amd64','x86_64'}"
 if ($LASTEXITCODE -ne 0) { throw "Python interpreter is not native x64" }
+
+& $python -c "import bioutils,pysam,scipy,yaml; print('RAPTOR runtime dependencies: OK')"
+if ($LASTEXITCODE -ne 0) { throw "Run-local RAPTOR dependencies are incomplete" }
 ```
 
 Native Windows reports `platform.machine()` as `AMD64`; RAPTOR canonicalizes
@@ -273,7 +279,56 @@ freeze is the content identity for the bytes actually scored. The two local
 downloads must agree with each other exactly; otherwise stop with
 `BLOCKED_DATA`.
 
-### 4. Materialize marker files from the verified installation
+### 4. Re-mask the frozen scorer resources for the new August holdout
+
+The August `variant_summary` is the unseen evaluation label source. It must not
+also update the scorer being evaluated.
+
+The pinned BIAS/Nirvana scorer under test was built from the proven March 9
+ClinVar source. Therefore, the March VCF, its Nirvana annotation and associated
+source files already present under
+`D:\raptor-x64\masked-heldout-2026-07-12` are the correct comparator
+provenance. Using them does not substitute an old evaluation dataset: they are
+part of the frozen model.
+
+Do not download an August VCF or rebuild the model on August labels. That would
+change the scorer during evaluation and introduce temporal leakage.
+
+After stage 3 derives the new August benchmark:
+
+1. Export the new holdout identities without labels.
+2. Verify the existing March source bundle against the hashes and baseline
+   reproduction evidence in
+   `docs\ops\masked-heldout-bias-rerun-handoff.md`.
+3. Apply the **new August holdout identity set** to the proven March 9 ClinVar
+   VCF and its matching Nirvana source.
+4. Regenerate PS1/PM5, PP2 and BP1 through BIAS's pinned generators in a new
+   run-local namespace.
+5. Repeat the PM1 reachability audit for the new holdout; skip PM1 only if both
+   the published and reproduced resources have zero reachable holdout rows.
+6. Require zero new-heldout survivors in every active ClinVar-derived
+   comparator.
+7. Keep PP5, BP6 and PS4 forbidden. Their direct-copy submission streams are
+   not active scoring inputs and do not require an August replacement.
+8. Never reuse the July run's already-masked resources: its 2,577-identity mask
+   is a different holdout set.
+
+The frozen evaluation separation is:
+
+| Role | Source |
+|---|---|
+| Evaluation labels and split | x64-frozen `variant_summary_2026-08.txt.gz` |
+| Scorer/tool versions | pinned BIAS 3.0.0 and Nirvana 3.18.1 |
+| Scorer comparator provenance | proven March 9 ClinVar source bundle |
+| Leakage control | regenerate comparator resources after removing the new August holdout identities |
+
+The stage 3-6 implementation may add a narrow mask adapter for the existing
+March Nirvana artifact if its monolithic compressed JSON shape differs from
+`scripts\mask_clinvar_source.py`'s identity-only JSONL reader. That adapter may
+extract identity fields only and must not expose August labels to the scoring
+path.
+
+### 5. Materialize marker files from the verified installation
 
 The absence of marker files does not mean BIAS or Nirvana is absent. Verify the
 installation that produced
