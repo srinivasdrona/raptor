@@ -121,39 +121,58 @@ unrelated local changes prevent the branch switch.
 ### 2. Use a native Windows x64 Python environment
 
 The earlier formal x64 gate used a native Python 3.12 virtual environment under
-`D:\raptor-x64\masked-heldout-2026-07-12`. Reuse its interpreter as a bootstrap
-when present; otherwise use the installed x64 `py -3.12` launcher. Create a new
-run-local venv so the historical environment remains untouched:
+`D:\raptor-x64\masked-heldout-2026-07-12`. That environment already executed
+RAPTOR with `pysam` successfully. Use it directly with the current checkout's
+`src` directory on `PYTHONPATH`; do not create a clean child venv, because a
+child does not inherit the historical venv's installed binary packages.
+
+This does not modify the historical environment. It selects the current RAPTOR
+source tree at process startup while reusing the proven x64 dependencies.
+Create a new run-local venv only if the historical interpreter is genuinely
+absent or fails the complete dependency import:
 
 ```powershell
 $runRoot = "D:\raptor-x64\prospective-freeze\clinvar-2026-08-amendment-v3"
 $venv = Join-Path $runRoot "validation-venv"
 $priorPython = "D:\raptor-x64\masked-heldout-2026-07-12\gate-venv-2026-07-21\Scripts\python.exe"
+$python = $null
 
 New-Item -ItemType Directory -Force -Path $runRoot | Out-Null
 
-if (-not (Test-Path -LiteralPath (Join-Path $venv "Scripts\python.exe"))) {
-    if (Test-Path -LiteralPath $priorPython) {
-        & $priorPython -m venv $venv
-    } elseif (Get-Command py.exe -ErrorAction SilentlyContinue) {
-        py -3.12 -m venv $venv
-    } else {
-        throw "No existing native x64 Python 3.12 interpreter was found"
+if (Test-Path -LiteralPath $priorPython -PathType Leaf) {
+    $env:PYTHONPATH = Join-Path $repo "src"
+    & $priorPython -c "import bioutils,pysam,scipy,yaml; print('historical x64 dependencies: OK')"
+    if ($LASTEXITCODE -eq 0) {
+        $python = $priorPython
     }
 }
 
-$python = Join-Path $venv "Scripts\python.exe"
-& $python -m pip install --upgrade pip setuptools wheel
-if ($LASTEXITCODE -ne 0) { throw "Could not prepare pip in the run-local venv" }
+if ($null -eq $python) {
+    $runPython = Join-Path $venv "Scripts\python.exe"
+    if (-not (Test-Path -LiteralPath $runPython -PathType Leaf)) {
+        if (-not (Get-Command py.exe -ErrorAction SilentlyContinue)) {
+            throw "Historical x64 environment is unusable and no native Python 3.12 launcher exists"
+        }
+        py -3.12 -m venv $venv
+        if ($LASTEXITCODE -ne 0) { throw "Could not create the run-local venv" }
+    }
 
-& $python -m pip install -e "${repo}[dev]"
-if ($LASTEXITCODE -ne 0) { throw "Could not install RAPTOR into the run-local venv" }
+    & $runPython -m pip install --upgrade pip setuptools wheel
+    if ($LASTEXITCODE -ne 0) { throw "Could not prepare pip in the run-local venv" }
+
+    & $runPython -m pip install -e "${repo}[dev]"
+    if ($LASTEXITCODE -ne 0) { throw "Could not install RAPTOR into the run-local venv" }
+    $python = $runPython
+    $env:PYTHONPATH = Join-Path $repo "src"
+}
 
 & $python -c "import platform,sys; print(sys.executable); print(platform.machine()); assert platform.machine().lower() in {'amd64','x86_64'}"
 if ($LASTEXITCODE -ne 0) { throw "Python interpreter is not native x64" }
 
 & $python -c "import bioutils,pysam,scipy,yaml; print('RAPTOR runtime dependencies: OK')"
-if ($LASTEXITCODE -ne 0) { throw "Run-local RAPTOR dependencies are incomplete" }
+if ($LASTEXITCODE -ne 0) {
+    throw "Neither the historical nor run-local x64 environment has the complete RAPTOR dependencies"
+}
 ```
 
 Native Windows reports `platform.machine()` as `AMD64`; RAPTOR canonicalizes
