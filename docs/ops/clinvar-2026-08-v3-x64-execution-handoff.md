@@ -4,6 +4,16 @@
 >
 > **Mode:** Execute the remaining prospective validation. Do not create another
 > plan, contract, ADR, registration, or owner-approval round.
+>
+> **Current execution requirement:** all RAPTOR and BIAS Python commands run
+> through the WSL x86_64 virtual environment, never a native Windows Python
+> interpreter. On this worker use
+> `/mnt/d/raptor-x64/masked-heldout-2026-07-12/gate-venv-2026-07-21-linux/bin/python`
+> with `PYTHONPATH=src` from `/mnt/d/raptor/repo`. Nirvana's designated
+> `dotnet.exe` invocation remains the non-Python ADR-0008 exception. The
+> native-Windows Python examples below are superseded by this requirement.
+> The stage operator accepts the documented `D:\...` handoff paths and maps
+> them to `/mnt/<drive>/...` before opening files.
 
 ## Owner authorization
 

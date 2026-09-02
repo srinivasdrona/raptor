@@ -248,7 +248,16 @@ _LOCAL_CHECKSUM_VERIFICATION_MODE = "EXACT_URL_HEAD_CONTINUITY_PLUS_LOCAL_SHA256
 #: approval to manifests/markers copied to an arbitrary, non-designated
 #: path.
 DESIGNATED_X64_WORKER_ROOT = r"D:\raptor-x64"
-_DEFAULT_RESOURCE_MANIFEST_CHECKSUMS_DIR = str(Path(DESIGNATED_X64_WORKER_ROOT) / "CHECKSUMS")
+
+
+def _designated_worker_root_path() -> Path:
+    """Resolve the fixed worker root for native Windows and its WSL mount."""
+    if os.name == "posix":
+        return Path("/mnt/d/raptor-x64")
+    return Path(DESIGNATED_X64_WORKER_ROOT)
+
+
+_DEFAULT_RESOURCE_MANIFEST_CHECKSUMS_DIR = str(_designated_worker_root_path() / "CHECKSUMS")
 
 #: The three narrow, machine-readable marker files this module's default
 #: probes read to independently OBSERVE worker designation / BIAS commit /
@@ -313,19 +322,19 @@ def _read_marker_file_or_sentinel(path: Path, *, dimension: str) -> str:
 
 def _default_worker_designation_probe() -> str:
     return _read_marker_file_or_sentinel(
-        Path(DESIGNATED_X64_WORKER_ROOT) / _WORKER_DESIGNATION_MARKER_FILENAME, dimension="worker_designation"
+        _designated_worker_root_path() / _WORKER_DESIGNATION_MARKER_FILENAME, dimension="worker_designation"
     )
 
 
 def _default_bias_commit_probe() -> str:
     return _read_marker_file_or_sentinel(
-        Path(DESIGNATED_X64_WORKER_ROOT) / _BIAS_COMMIT_MARKER_FILENAME, dimension="bias_commit"
+        _designated_worker_root_path() / _BIAS_COMMIT_MARKER_FILENAME, dimension="bias_commit"
     )
 
 
 def _default_nirvana_banner_probe() -> str:
     return _read_marker_file_or_sentinel(
-        Path(DESIGNATED_X64_WORKER_ROOT) / _NIRVANA_BANNER_MARKER_FILENAME, dimension="nirvana_banner"
+        _designated_worker_root_path() / _NIRVANA_BANNER_MARKER_FILENAME, dimension="nirvana_banner"
     )
 
 
