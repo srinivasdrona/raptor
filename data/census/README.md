@@ -88,12 +88,26 @@ Its external manifest is
 `tsc_tiered_readjudication_2026-07-21.sha256`.
 
 `tsc_prospective_validation_2026-08_blocked_data.json` records the locked
-prospective outcome. The exact preregistered August URL returned HTTP 404.
+first prospective attempt. The exact preregistered August URL returned HTTP 404.
 The same filename was visible at a different archive-root URL, but substituting
 that location is prohibited by ADR-0013. No archive GET occurred; no bytes,
 labels, rows or scores were inspected; MD5 and SHA-256 remain unfrozen. The
 terminal status is `BLOCKED_DATA`, and all research/clinical authorization
 remains false.
+
+`tsc_prospective_validation_2026-08_amendment_v3_result.json` records the
+completed, non-identifying August prospective result. The exact archive was
+frozen before labels, 2,608/2,608 holdout identities were removed from the
+frozen scorer's ClinVar-derived resources with zero survivors, and 2,608
+unique BIAS rows were evaluated with zero PP3/BP4 scored calls. Full spectrum
+is `BLOCKED_POLICY` and not authorized. Missense remains unvalidated.
+`truncating:pathogenic` is `VALIDATED_PROSPECTIVE` and
+`AUTHORIZED_RESEARCH_ONLY`: 219/237 correct-call coverage, with conditional
+precision and recall 95% lower bounds of 0.9833 against the registered 0.95
+thresholds. This is not clinical, full-spectrum, public-worklist or
+ClinVar-submission authorization. The complete external evidence artifact is
+pinned by SHA-256
+`145f3ea2146cbc6cf3a1657d7bc30a1aa9698290ed8124acfe9b8b87354c6c10`.
 
 `tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json` (ADR-0012) is the
 packet-free, non-identifying binding census aggregate over the same

@@ -19,33 +19,38 @@ the same frozen R2 counts on independent axes and generates no new evidence.
 Public progress posts:
 [*Before the First Score*](docs/blog/2026-07-10-before-the-first-score.md) ·
 [*After the First Rerun*](docs/blog/2026-07-23-after-the-first-rerun.md) ·
-[*Seven $TSC2$ Variants Reached the Human-Review Boundary*](docs/blog/2026-08-15-seven-variants-human-review-boundary.md)
+[*Seven $TSC2$ Variants Reached the Human-Review Boundary*](docs/blog/2026-08-15-seven-variants-human-review-boundary.md) ·
+[*RAPTOR's First Prospective ClinVar Test*](docs/blog/2026-09-03-first-prospective-clinvar-result.md)
 
 | Milestone | Result |
 |---|---|
 | TSC VUS census (current, disabled_manual) | 6,618 variants; **157** candidate-LP review, **7** candidate-LB review, **6,424** unresolved, **30** annotation/manual — internal, non-authoritative review directions only |
-| Frozen benchmark | 3,681 knowns; 2,577 held out |
+| Historical frozen benchmark | 3,681 knowns; 2,577 held out |
+| August prospective benchmark | 3,725 knowns; 2,608 held out |
 | Mask integrity (R2) | 2,577/2,577 identities removed; zero survivors |
 | R2 masked BIAS score (ADR-0012, `disabled_manual`) | 2,577 canonical rows; zero PP3/BP4 scored calls |
 | v1/v2 frozen interpretation | `FAIL` (coarse missense gate) / `BLOCKED_POLICY`; `vus_authorized=false` (immutable) |
 | v3 tiered re-adjudication (ADR-0013, post-hoc) | missense pathogenic `NO_CALLS`/`NOT_ESTIMABLE`; missense benign `UNDERPOWERED`/`NOT_ESTIMABLE`; truncating pathogenic `ADEQUATE`+`MET`/`SUPPORTED_POSTHOC`; full spectrum `NOT_VALIDATED`/`NOT_AUTHORIZED` |
-| Prospective validation | **`BLOCKED_DATA`** — the exact preregistered August archive URL returned 404; no archive bytes, labels, or scores were accessed, and the live alternate URL was not substituted |
-| VUS / research-scope authorization | **No** — canonical validated research-scope flag remains `false` |
+| August prospective validation | **Completed** — 2,608/2,608 identities masked with zero survivors; full spectrum `BLOCKED_POLICY`; missense unvalidated; truncating pathogenic `VALIDATED_PROSPECTIVE` |
+| VUS / research-scope authorization | `truncating:pathogenic` is `AUTHORIZED_RESEARCH_ONLY`; full spectrum, missense, clinical use, public worklists and ClinVar submission remain unauthorized |
 | Mechanism Atlas source catalog | Five resolver-verified grounding sources plus seven mechanically non-grounding leads; public identifiers, licences and hashes are committed |
 | `$TSC2$` `$p.\mathrm{Arg611Gln}$` deterministic pass | Two exact spans passed Gates 1–7; Gate 8 blocked for missing named review; zero accepted claims |
 | Six-variant gate-smoke cohort | 6/6 technical packages passed Gates 1–7 and blocked only at Gate 8; zero accepted claims; explicitly **not** the formal contrast panel |
 | Formal Atlas contrast panel | **machine result: `INFEASIBLE_PANEL` under v1.0.4** — the reviewed selector exhaustively completed 24 attempts across L0–R7 against universe/map v4 with no budget exhaustion. **post-hoc rubric-v2 interpretation: `EXPERT_ADJUDICATION_REQUIRED`** (ADR-0019, `POST_HOC`, claim ceiling `NONE_NO_PANEL_EXISTS`, `independent_validation: NOT_ESTABLISHED`). **No panel selected or approved**; no candidate was selected and no human adjudication record exists |
 
-v3 is a post-hoc semantic correction of the frozen R2 aggregate: it separates
+Tiered v3 is a post-hoc semantic correction of the frozen R2 aggregate: it separates
 run integrity, data sufficiency, conditional performance, policy parity and
 authorization instead of collapsing them into one coarse pass/fail, but it
-performs no new run, scoring, or evidence generation and authorizes nothing.
+performs no new run, scoring, or evidence generation. The later August
+prospective run is a separate evidence-generating result.
 
 Source of record:
 [`data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json`](data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json)
 (R2, frozen) and
 [`data/census/tsc_tiered_readjudication_2026-07-21.json`](data/census/tsc_tiered_readjudication_2026-07-21.json)
-(v3, post-hoc). The earlier
+(v3, post-hoc), plus the
+[`August prospective result summary`](data/census/tsc_prospective_validation_2026-08_amendment_v3_result.json).
+The earlier
 [`data/census/tsc_masked_holdout_gate_2026-07-13.json`](data/census/tsc_masked_holdout_gate_2026-07-13.json)
 run remains a superseded historical comparator, not the current approved
 policy.
@@ -92,9 +97,9 @@ until named human Gate 8 review. Public run manifests are under
 - PM1 was excluded from the R2 fixed evaluation after a zero-support audit and
   remains unvalidated for production; this exclusion is the reason v3 reports
   missense pathogenic as `NO_CALLS`, not as a passed or failed metric.
-- v3's `truncating_pathogenic` scope evidence is `SUPPORTED_POSTHOC` only;
-  its authorization is `PENDING_PROSPECTIVE` and no scope is authorized until
-  the prospective, unseen-data validation locked by ADR-0013 completes.
+- The August prospective run validates only `truncating:pathogenic` for
+  `AUTHORIZED_RESEARCH_ONLY`. Missense remains unvalidated, and no clinical,
+  full-spectrum, public-worklist or ClinVar-submission authority follows.
 - No external VUS worklist or ClinVar submission is authorized before a
   passed prospective validation and variant-level expert sign-off.
 - Atlas Gates 1–7 verify provenance and deterministic fidelity, not biological

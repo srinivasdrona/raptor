@@ -22,10 +22,12 @@
 > **no new evidence**: missense pathogenic is `NO_CALLS`/`NOT_ESTIMABLE` (PM1-blocked), missense
 > benign is `UNDERPOWERED`/`NOT_ESTIMABLE`, truncating pathogenic is `ADEQUATE`+`MET`/
 > `SUPPORTED_POSTHOC`, and full-spectrum authorization is `NOT_VALIDATED`/`NOT_AUTHORIZED`.
-> Truncating-pathogenic authorization is `PENDING_PROSPECTIVE`, locked to the first NCBI ClinVar
-> GRCh38 monthly archive dated on/after 2026-08-01. The canonical validated research-scope flag
-> remains `false`. No candidate direction is authoritative and no externally usable VUS worklist,
-> clinical classification, or ClinVar submission is authorized.
+> The later August amendment-v3 prospective run is now complete: full spectrum remains
+> `BLOCKED_POLICY`/`NOT_AUTHORIZED`, missense remains unvalidated, and
+> `truncating:pathogenic` is `VALIDATED_PROSPECTIVE`/`AUTHORIZED_RESEARCH_ONLY` with 219/237
+> correct-call coverage and conditional precision/recall 95% lower bounds of 0.9833/0.9833.
+> No candidate direction is authoritative and no clinical classification, public VUS worklist,
+> patient decision or ClinVar submission is authorized.
 
 ## TSC VUS evidence census — COMPLETE (internal · eval-only · non-authoritative)
 
@@ -86,14 +88,17 @@
     `PENDING_PROSPECTIVE`.
   - `full_spectrum_status=NOT_VALIDATED`, `full_spectrum_authorization=NOT_AUTHORIZED`;
     `research_scope_flags.truncating_pathogenic_research_scope_validated=false`.
-- **Prospective validation:** **`BLOCKED_DATA`**. The exact locked August ClinVar URL returned
-  404. The same filename existed at a different archive-root URL, but no outcome-dependent
-  substitute was permitted. No archive bytes, labels, rows, hashes or scores were accessed;
-  research-scope authorization remains `PENDING_PROSPECTIVE` and the validated flag remains false.
-- **What this does and does not authorize:** v3 corrects how the frozen R2 result is *described*
-  (separating insufficient-data from failure from policy-exclusion); it authorizes no clinical
-  classification, VUS worklist, ClinVar submission, or research scope. Only a future prospective run
-  plus a new owner decision can change that.
+- **First prospective attempt (historical):** `BLOCKED_DATA`. Its exact locked URL returned 404,
+  and the same filename at a different path was not substituted. No archive content was read.
+- **Amendment-v3 prospective run (completed 2026-09-02):** 3,725 benchmark variants; 2,608 held
+  out and masked with zero survivors; 2,608 unique BIAS rows; zero PP3/BP4 scored calls. Missense
+  remained unvalidated. `truncating:pathogenic` had 237 actual / 219 called with conditional
+  precision/recall lower bounds 0.9833/0.9833, yielding `VALIDATED_PROSPECTIVE` and
+  `AUTHORIZED_RESEARCH_ONLY`. Full spectrum remains `BLOCKED_POLICY`/`NOT_AUTHORIZED`.
+- **What this does and does not authorize:** the completed run supports only the narrow
+  truncating-pathogenic research-evidence scope. It authorizes no clinical classification, public
+  VUS worklist, patient decision, full-spectrum automation or ClinVar submission. Source:
+  `data/census/tsc_prospective_validation_2026-08_amendment_v3_result.json`.
 
 ## Operating Model — build loop
 
@@ -117,25 +122,25 @@ pending `STRATEGY.md` Part II §10 — ADR-0003.)*
 > *Module built ≠ live run executed.* The Tier-1/2 code path and the validation harness are **built
 > and signed off**; R2 (the leakage-safe held-out set) is **scored and gated** (frozen, v1/v2
 > `FAIL`/`BLOCKED_POLICY`); the **tiered v3 post-hoc re-adjudication (ADR-0013) is complete** and
-> reports the same frozen result on independent axes. No VUS classification is authorized; the only
-> scope with any positive evidence (`truncating:pathogenic`, `SUPPORTED_POSTHOC`) remains
-> `PENDING_PROSPECTIVE`.
+> reports the same frozen result on independent axes. The later August prospective run is also
+> complete: `truncating:pathogenic` is validated for research-evidence use only; full spectrum and
+> missense remain unauthorized. No authoritative VUS classification is authorized.
 
-- Tier 1/2 (Deterministic): 🟡 **MODULE BUILT; R2 GATE FAIL, v3 TIERED RE-ADJUDICATION COMPLETE**
+- Tier 1/2 (Deterministic): 🟡 **MODULE BUILT; PROSPECTIVE RESULT MIXED**
   (PRD-01 scorer `1d2444e`; arm's-length BIAS port) — *2,577-row masked gate completed; missense
-  scopes `NO_CALLS`/`UNDERPOWERED`; truncating-pathogenic `SUPPORTED_POSTHOC`, not authorized*
+  remained unvalidated prospectively; truncating-pathogenic is `VALIDATED_PROSPECTIVE` and
+  `AUTHORIZED_RESEARCH_ONLY`*
 - **Evidence census:** ✅ **COMPLETE** (internal · eval-only · non-authoritative, disabled_manual
   policy, ADR-0012) — 6,618 VUS scored; **157**/**7**/**6,424**/**30** current candidate directions
   (see census section above); candidate directions **not** classifications
 - Tier 3 (LLM Extraction): 🔴 NOT STARTED (Phase 2)
 - Consensus/Adjudication: 🔴 NOT STARTED
-- Validation Framework: 🟡 **EXECUTED — R2 FAIL/BLOCKED_POLICY; v3 PROSPECTIVE BLOCKED_DATA**
+- Validation Framework: 🟡 **EXECUTED — FULL SPECTRUM BLOCKED; NARROW SCOPE VALIDATED**
   (canonical BIAS adapter; ClinVar masker/auditor; exact 95% Clopper-Pearson lower-bound,
   per-direction/per-stratum gate; fail-closed predictor-policy prerequisite; ADR-0013 tiered axes) —
-  *masked resources scored once; v3 separates data sufficiency from failure but authorizes nothing.
-  The August prospective contract resolved to `BLOCKED_DATA` because its exact frozen URL returned
-  404; no archive content, labels or scores were accessed, and the alternate live URL was not
-  substituted.*
+  *the amendment-v3 August run masked and scored 2,608 holdout variants with valid run integrity.
+  Full spectrum is `BLOCKED_POLICY`; missense is not validated; truncating-pathogenic prospectively
+  clears its registered conditional thresholds for research-evidence use only.*
 - **Non-authoritative expert-review packet generation and molecular-geneticist recruitment:** 🟡
   **ACTIVE** — packet generation continues as internal review preparation only; oracle recruitment
   (GP-3) is open (see Active Decisions & Bottlenecks)
@@ -354,32 +359,33 @@ scorer merely because its data is available.
 
 ## Operations (Current Run)
 
-> R2 (the leakage-safe 2,577-variant held-out set) has been scored and gated once; it is frozen and
-> immutable. Metrics below are evaluation-only. v1/v2 interpretation: **FAIL**/`BLOCKED_POLICY`. v3
-> (ADR-0013) re-reports the same numbers as independent axes without rerunning anything.
+> The August amendment-v3 prospective run is the current validation result. R2 remains frozen
+> historical evidence and the tiered v3 record remains its post-hoc interpretation.
 
-- Last Batch Size: **2,577** (frozen; not re-run)
-- `missense:pathogenic` — 51 actual, **0** called; precision/recall not estimable (v3:
-  `NO_CALLS`/`NOT_ESTIMABLE`; `policy_parity=BLOCKED` on PM1)
-- `missense:benign` — 103 actual, 9 called (all correct); precision/recall lower bound **0.6637**
-  vs threshold **0.90/0.85** (v3: `UNDERPOWERED`/`NOT_ESTIMABLE`; coverage `9 < min_count 36`)
-- `truncating:pathogenic` — 210 actual, 189 called; precision/recall lower bound **0.9807** vs
-  threshold **0.95/0.95** (v3: `ADEQUATE`+`MET`/`SUPPORTED_POSTHOC`; authorization
-  `PENDING_PROSPECTIVE`)
+- Last Batch Size: **2,608** held-out variants
+- `missense:pathogenic` — 53 actual, **0** called; `NO_CALLS`/`NOT_ESTIMABLE`;
+  `policy_parity=BLOCKED` on PM1; not authorized
+- `missense:benign` — 110 actual, 10 called (all correct); precision/recall lower bound **0.6915**
+  vs threshold **0.90/0.85**; `UNDERPOWERED`/`UNMET`; not authorized
+- `truncating:pathogenic` — 237 actual, 219 called; conditional precision/recall lower bound
+  **0.9833** vs threshold **0.95/0.95**; `VALIDATED_PROSPECTIVE`/
+  `AUTHORIZED_RESEARCH_ONLY`
+- Full spectrum: `BLOCKED_POLICY` / `NOT_AUTHORIZED`
 - Suspended (Human Review): N/A
 - *(The 2026-07-13 pre-ADR-0012 run's point estimates — precision 0.8421/recall 0.9412 pathogenic,
   0.9688/0.9118 benign — are a superseded historical comparator under a different, since-disabled
   predictor policy; they are not the current binding record.)*
 
-## Priorities (This Week) — prepare expert-review packets; keep prospective validation locked
+## Priorities (This Week) — expand missense evidence and prepare expert review
 
 **Merged:** PR **#12** (Task A — label-free held-out export + pre-results checkpoint) at **`253c9fd`**;
 R2 masked rerun ([ADR-0012](DECISIONS.md#adr-0012--pp3bp4-automated-emission-disabled-for-the-current-masked-rerun))
 and tiered gate v3 ([ADR-0013](DECISIONS.md#adr-0013--tiered-gate-v3-post-hoc-re-adjudication-and-prospective-validation-lock))
 are both merged and frozen. The generic-platform roadmap is retired
 ([ADR-0010](DECISIONS.md#adr-0010--generic-platform-uniqueness-premise-falsified-vertical-tscmtor-research-evidence-strategy));
-the vertical worklist below replaces it. **Census candidate directions and the truncating-pathogenic
-`SUPPORTED_POSTHOC` scope stay non-authoritative until the locked prospective validation PASSes.**
+the vertical worklist below replaces it. **The prospective run validates only a narrow
+truncating-pathogenic research-evidence scope; census candidate directions remain
+non-authoritative and missense remains unvalidated.**
 
 1. **BIAS criterion lineage — COMPLETE.** The pinned source-derived **28-slot / 19-can-fire / 9-internal-stub** policy, exact-set registry gate, total audit + fail-closed enforcement, and portable source-oracle fixture are implemented. Real 6,618-VUS and 2,577-held-out audits both block on **PS1/PM5**; zero firing does not clear the statically mask-required **PM1/PP2/BP1**. See `data/census/tsc_bias_lineage_audit_2026-07-10.json`.
 2. **Held-out-masked BIAS validation bundle (R2) — COMPLETE; v1/v2 GATE FAIL/BLOCKED_POLICY; v3
@@ -389,7 +395,9 @@ the vertical worklist below replaces it. **Census candidate directions and the t
    resources, was explicitly skipped for this evaluation, and remains production-unvalidated. The
    frozen R2 aggregate is unchanged; [ADR-0013](DECISIONS.md#adr-0013--tiered-gate-v3-post-hoc-re-adjudication-and-prospective-validation-lock)
    re-reports it as missense `NO_CALLS`/`UNDERPOWERED` and truncating-pathogenic
-   `SUPPORTED_POSTHOC`/`PENDING_PROSPECTIVE` — see the R2/v3 section above.
+   `SUPPORTED_POSTHOC`/`PENDING_PROSPECTIVE`. The later August prospective run upgrades only the
+   truncating-pathogenic research-evidence scope to `VALIDATED_PROSPECTIVE`/
+   `AUTHORIZED_RESEARCH_ONLY` — see the R2/v3 section above.
 3. **ClinVar audit — COMPLETE.** Direct-copy PS4/PP5/BP6 were suppressed; effective lineage blockers
    after the verified mask were zero. The terminal gate nevertheless failed the binding missense metrics.
 4. **Canonical adapter — COMPLETE.** Arm's-length `BiasEvidenceSource` joins by canonical SPDI, enforces
@@ -420,13 +428,13 @@ the vertical worklist below replaces it. **Census candidate directions and the t
 12. **Tiered gate v3 post-hoc re-adjudication — COMPLETE.** [ADR-0013](DECISIONS.md#adr-0013--tiered-gate-v3-post-hoc-re-adjudication-and-prospective-validation-lock)
     re-reports the frozen R2 aggregate on independent axes (run integrity, data sufficiency,
     conditional performance, policy parity, correct-call coverage, scope evidence, authorization)
-    without any new run, scoring, or evidence generation. Prospective validation is locked to the
-    first NCBI ClinVar GRCh38 monthly archive dated on/after 2026-08-01 (frozen before labels/scoring)
-    and is `PENDING`.
+    without any new run, scoring, or evidence generation. **The separate amendment-v3 prospective
+    validation is now COMPLETE:** full spectrum remains blocked, missense remains unvalidated and
+    truncating-pathogenic is authorized for research-evidence use only.
 13. **Non-authoritative expert-review packet generation — ACTIVE.** Provisional candidate packets
     (PRD-04 output, item 9) are being prepared for internal expert review as non-authoritative review
-    preparation only; this may proceed in parallel with the pending prospective validation but cannot
-    itself authorize any scope. **Mechanism Atlas Phase 1 is implemented and merged** (`9709ec6`;
+    preparation only; the prospective result does not turn them into classifications or a public
+    worklist. **Mechanism Atlas Phase 1 is implemented and merged** (`9709ec6`;
     tracker `1134c2e`), GPT-5.4-clean: generic condition-agnostic core, exactly one versioned
     `tsc2` pack, pack-bound hashes, static import/classification-leakage guards, a synthetic-only
     promotion flow, and out-of-process Discovery templates, backed by the 35-test `tests/atlas/`
@@ -444,11 +452,10 @@ the vertical worklist below replaces it. **Census candidate directions and the t
 
 > **Provisional packets now vs externally usable worklist after PASS:** items 1–8 and the PRD-04 output
 > contract (item 9) proceed now, and provisional representative/all-VUS candidate packets may be built
-> for internal review before expert sign-off; **releasing the full *externally usable* worklist waits
-> for the locked prospective validation (ADR-0013) to PASS** on unseen data, the ADR-0009 policy
-> correction, and leakage-safe expert sign-off. The frozen R2/v1/v2 result and the v3 post-hoc
-> re-adjudication do **not** by themselves satisfy this — v3 generates no new evidence and
-> `truncating:pathogenic` remains `PENDING_PROSPECTIVE`.
+> for internal review before expert sign-off. **The August run does not authorize a full externally
+> usable worklist:** only the truncating-pathogenic research-evidence scope passed. Missense/full
+> spectrum, production policy approval and leakage-safe per-variant expert sign-off remain required
+> for any broader release.
 >
 > **Frozen (out of scope — ADR-0010):** **PRD-05** pipeline/generic orchestration and any **generic
 > Tier-3 platform** work; generic ACMG-engine / literature-agent / NGS-platform expansion. *(TSC-specific,
@@ -465,27 +472,27 @@ index file until ≥3 exist).
 | PRD-01 | Tier-1/2 Deterministic ACMG Scorer | 1 | **Signed off · module built ✓** (`1d2444e`, 149 tests; arm's-length BIAS) |
 | PRD-02 | Variant Ingestion & Normalization | 0 | **Signed off · module built ✓** (`a889710`, 125 tests) |
 | PRD-03 | KB Schema & Provenance Ledger | 0 | **Signed off · module built ✓** (`b627073`) |
-| PRD-04 | **Candidate Evidence Packet / Output Contract** (immutable evidence core; nullable candidate direction; deterministic first-pass render/queue; populated-atom calibration selector; variant-scoped review log; reveal-only comparator) | 1/2 | **Built ✓ — provisional/internal only** (42 packet tests; external worklist release gated on the locked prospective validation (ADR-0013) + policy approval + per-variant sign-off) |
+| PRD-04 | **Candidate Evidence Packet / Output Contract** (immutable evidence core; nullable candidate direction; deterministic first-pass render/queue; populated-atom calibration selector; variant-scoped review log; reveal-only comparator) | 1/2 | **Built ✓ — provisional/internal only** (42 packet tests; the narrow prospective result does not authorize a full external worklist; policy approval + per-variant sign-off remain required) |
 | PRD-05 | Pipeline & Orchestration skeleton | 0 | **frozen** — generic orchestration out of scope (ADR-0010) |
 | PRD-06 | **Benchmark & Evaluation Harness** (build known-variant benchmark + train/dev/held-out split + P/R/concordance, class-stratified; **gates any VUS run**) | 1 | **Signed off · module built ✓** (`e026422`, PR #1, 222 tests; 7-round cross-family checker sign-off) |
 | PRD-07 | **ClinVar Knowns → Benchmark Labels Loader** (Track A1: label-side `variant_summary` → `LabeledVariant` for PRD-06; reuses PRD-02 contract+normalizer; keeps scorer label-blind, H1) | 1 | **Signed off · module built ✓** (`499f479`, PR #3, 274 tests; 7-round checker sign-off) |
 | PRD-09 | **ClinVar/VCEP Submission Preparation** (field/lifecycle mapping, source register, deny-list, no-submission controls; no network client/SCV) | external prep | **Prepared ✓ — no submission authorized** |
 
-> **Validation gate (binding):** no classification is run on the ~6,700 TSC VUS until the locked
-> prospective validation (ADR-0013) PASSes on unseen data. PRD-06's held-out framework and
-> Tier-1/2's frozen R2 run against pre-registered thresholds are complete and gated **FAIL**/
-> `BLOCKED_POLICY`; the tiered v3 post-hoc re-adjudication (ADR-0013) reports that same result more
-> precisely (per-scope, not pooled) but generates no new evidence and authorizes nothing — see
+> **Validation gate (binding):** the amendment-v3 prospective run has completed. It authorizes only
+> the `truncating:pathogenic` research-evidence scope; no clinical classification, full-spectrum
+> automation, missense VUS run or public worklist is authorized. PRD-06's held-out framework, R2,
+> tiered v3 post-hoc interpretation and the separate prospective result must be read together — see
 > See [EVALUATION.md Part I §1.1](EVALUATION.md#evaluation-validation-gate), [Part I §1.3](EVALUATION.md#evaluation-v3-posthoc-prospective), and [Part II §7](EVALUATION.md#evaluation-rubric-v3).
 
 ## Path to first VUS run
 
 The three parallel tracks (A benchmark · B x64 scoring infra · C oracle thresholds) are **done**, the
 **terminal join** (R2) is **done** (frozen, immutable), and the tiered v3 post-hoc re-adjudication
-(ADR-0013) is **done**. What remains before any VUS run is the **locked prospective validation** —
-the first eligible NCBI ClinVar GRCh38 monthly archive dated on/after 2026-08-01, frozen before
-labels/scoring — plus a new owner decision. Canonical adapter, exact statistical gate, static lineage
-gate, and full-output derivation audit are complete (ADR-0009).
+(ADR-0013) is **done**. The amendment-v3 prospective run is also **done**. Its narrow
+truncating-pathogenic result may support research-evidence work; missense/full-spectrum execution
+remains blocked pending better evidence coverage, production policy and expert review. Canonical
+adapter, exact statistical gate, static lineage gate, and full-output derivation audit are complete
+(ADR-0009).
 
 | # | Track | Type | Status |
 |---|---|---|---|
@@ -493,18 +500,20 @@ gate, and full-output derivation audit are complete (ADR-0009).
 | B | **x64 live-scoring infra** — BIAS-2015 (arm's-length, ADR-0007) + Nirvana (x64-only, ADR-0008) | infra | **Smoke-tested ✓ (operator-confirmed)** — BIAS-2015 v3.0.0 + Nirvana 3.18.1 produced an 8-record TSV that passed `BiasTsvSource`'s 18-column contract with identity preserved. Large external artifacts intentionally out of repo; versions/hashes live in the operator's external reports (handoff bundle PR #8 `3556548`) |
 | C | **Oracle thresholds (GP-3)** — pre-register precision/recall targets into `configs/eval/tsc2.yaml` | governance | **DONE ✓** — nested 95% lower-bound thresholds: missense 0.90/0.85 both directions; truncating 0.95 pathogenic; `min_count_per_class: 36`, `split.holdout_fraction: 0.7` |
 | J | **Terminal join (R2)** — label-free held-out VCF masked, rescored, canonically joined, corrected and gated | code + eval | **DONE — FAIL/BLOCKED_POLICY (frozen)** (`vus_authorized=false`; binding missense scopes not estimable/underpowered; PM1 excluded/production-unvalidated; truncating-pathogenic met but unauthorized) |
-| K | **Tiered v3 post-hoc re-adjudication (ADR-0013)** — re-report the frozen R2 aggregate on independent axes; lock prospective validation | eval + governance | **DONE** — `NO_CALLS`/`UNDERPOWERED`/`SUPPORTED_POSTHOC` per scope; prospective validation `PENDING` |
+| K | **Tiered v3 post-hoc re-adjudication (ADR-0013)** — re-report the frozen R2 aggregate on independent axes; lock prospective validation | eval + governance | **DONE** — `NO_CALLS`/`UNDERPOWERED`/`SUPPORTED_POSTHOC` per scope |
+| L | **August amendment-v3 prospective validation** — freeze unseen data, remask the frozen scorer and evaluate unchanged thresholds | eval | **DONE** — full spectrum `BLOCKED_POLICY`; missense unvalidated; truncating-pathogenic `VALIDATED_PROSPECTIVE`/`AUTHORIZED_RESEARCH_ONLY` |
 
 > A/B/C are complete and had **no code dependency on each other**. Thresholds are now pre-registered
 > (C done), so the gate no longer reads `UNVERIFIED` for a missing target — the **raw** held-out score
 > now exists. The leakage-safe masked rerun (R2/J) also exists, is frozen, and returned
 > `FAIL`/`BLOCKED_POLICY`; the tiered v3 re-adjudication (K) reports that result more precisely without
-> rerunning anything. The next step is the **locked prospective validation** on unseen data (ADR-0013)
-> plus continued non-authoritative expert-review packet preparation — not threshold relaxation or
-> VUS release.
+> rerunning anything. The prospective run (L) has now measured the unchanged system on unseen data.
+> The next step is missense evidence expansion and continued non-authoritative expert-review packet
+> preparation — not threshold relaxation or a broad VUS release.
 
 ## Active Decisions & Bottlenecks
-- (Resolved 2026-07-10) **Strategy premise falsified → vertical TSC/mTOR reset** — generic-platform *uniqueness* premise withdrawn; horizontal/platform expansion **frozen**; RAPTOR repositioned as a vertical TSC/mTOR research-evidence product (candidate packets · atlas · gated mTOR hypotheses) — **ADR-0010**. Census (PR #12 `253c9fd`, `5a307df`) complete but **non-authoritative**; the frozen R2 gate and locked prospective validation still govern.
+- (Resolved 2026-07-10) **Strategy premise falsified → vertical TSC/mTOR reset** — generic-platform *uniqueness* premise withdrawn; horizontal/platform expansion **frozen**; RAPTOR repositioned as a vertical TSC/mTOR research-evidence product (candidate packets · atlas · gated mTOR hypotheses) — **ADR-0010**. Census (PR #12 `253c9fd`, `5a307df`) complete but **non-authoritative**; R2 and the later prospective result define the current evidence boundary.
+- (Resolved 2026-09-02) **August amendment-v3 prospective validation completed** — 3,725 benchmark variants; 2,608 held out and remasked with zero survivors; 2,608 unique BIAS rows; full spectrum `BLOCKED_POLICY`; missense unvalidated; truncating-pathogenic `VALIDATED_PROSPECTIVE`/`AUTHORIZED_RESEARCH_ONLY` with 219/237 correct-call coverage and conditional precision/recall lower bounds 0.9833/0.9833. No clinical, public-worklist or ClinVar-submission authority.
 - (Resolved 2026-07-10) **AAVC prior-art boundary** — AAVC's September-2024 release contains 4,532 TSC VUS and 808 machine P/LP/B/LB calls. It is now a pinned **external disagreement comparator**, never a truth label or criterion source; all eight directional conflicts in the representation-matched overlap enter the expert calibration batch, with first-pass reviewers blinded to both machine directions until a logged reconciliation reveal. See [`reference/aavc-prior-art-audit-2026-07.md`](reference/aavc-prior-art-audit-2026-07.md).
 - (Resolved 2026-07-08) Loop-engineering operating model → planner/test-author/doer/checker,
   see ADR-0003 + ADR-0005.
@@ -533,7 +542,8 @@ gate, and full-output derivation audit are complete (ADR-0009).
   missense `NO_CALLS`/`UNDERPOWERED` (both `NOT_ESTIMABLE`), truncating-pathogenic `ADEQUATE`+`MET`
   (`SUPPORTED_POSTHOC`), and full-spectrum `NOT_VALIDATED`/`NOT_AUTHORIZED`, with prospective
   validation locked to the first NCBI ClinVar GRCh38 monthly archive on/after 2026-08-01 (`PENDING`).
-  No new evidence was generated; no scope is authorized.
+  No new evidence was generated and that post-hoc record authorized no scope; the later
+  amendment-v3 prospective run is recorded separately above.
 - (Resolved 2026-07-12) **Policy blockers** — BP4/PP3 correction is fully decidable on both corpora;
   BS2 remains explicitly deferred; TSC1/TSC2 scope reconciles only with canonical proof; production
   point map is populated but unapproved/null.
@@ -565,7 +575,7 @@ gate, and full-output derivation audit are complete (ADR-0009).
   on the x64 devbox (operator-confirmed, ADR-0008), (C) Oracle thresholds pre-registered (`8662499`).
   The **terminal join** (R2), the tiered v3 post-hoc re-adjudication (ADR-0013), and the current
   disabled_manual census are all now **done** and frozen (see *Path to first VUS run* / *Priorities*).
-  Next: non-authoritative expert-review packet preparation, molecular-geneticist recruitment (GP-3),
-  and the **locked prospective validation** (first NCBI ClinVar GRCh38 monthly archive on/after
-  2026-08-01). Deferred: conformance-kit
+  The amendment-v3 prospective validation is also complete. Next: missense evidence/source
+  expansion, non-authoritative expert-review packet preparation and molecular-geneticist
+  recruitment (GP-3). Deferred: conformance-kit
   *governance* (kit-mypy/strict-first/C3 provenance/gate-0); PRD-05 (frozen, ADR-0010); cross-machine fleet.

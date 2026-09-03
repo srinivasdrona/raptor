@@ -184,6 +184,24 @@ todos:
   depends_on:
   - revise-tiered-gate-semantics
   created: '2026-07-22'
+- id: clinvar-2026-08-amendment-v3-prospective-run
+  title: Running the amended August ClinVar prospective validation
+  description: 'Completed 2026-09-02 on the designated x64 worker. The exact
+    August archive was frozen before label access; the deterministic benchmark
+    contained 3,725 variants with 2,608 held out; all holdout identities were
+    remasked from the frozen scorer resources with zero survivors; and 2,608
+    unique BIAS rows were evaluated with zero PP3/BP4 scored calls. Full
+    spectrum remains BLOCKED_POLICY/NOT_AUTHORIZED and missense remains
+    unvalidated. The truncating:pathogenic scope is VALIDATED_PROSPECTIVE and
+    AUTHORIZED_RESEARCH_ONLY with 219/237 correct-call coverage and conditional
+    precision/recall 95% lower bounds 0.9833/0.9833. Compact result:
+    data/census/tsc_prospective_validation_2026-08_amendment_v3_result.json;
+    external evidence SHA-256:
+    145f3ea2146cbc6cf3a1657d7bc30a1aa9698290ed8124acfe9b8b87354c6c10.'
+  status: done
+  depends_on:
+  - validate-tiered-gate-prospectively
+  created: '2026-09-02'
 - id: reconcile-strength-policy
   title: Reconciling criterion strength policy
   description: For BP4, PM2, PM4, PS1, BP3, and PM5, trace BIAS behavior, current ClinGen

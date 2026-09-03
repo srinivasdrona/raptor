@@ -1,0 +1,101 @@
+{
+  "schema": "raptor.eval.clinvar_prospective_result_summary.v1",
+  "registration_id": "clinvar-2026-08-amendment-v3",
+  "status": "COMPLETED",
+  "completed_at": "2026-09-02T16:16:24.029411Z",
+  "implementation": {
+    "branch": "validation/clinvar-2026-08-v3-x64-run",
+    "commit": "6329f406fa01e5e4f70d491b252e5d7689f33c33",
+    "operator": "scripts/run_clinvar_2026_08_prospective_stages.py"
+  },
+  "dataset": {
+    "snapshot_id": "clinvar_2026-08-monthly-amendment-v3",
+    "exact_url": "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08.txt.gz",
+    "byte_length": 441792560,
+    "sha256": "230ba6d5ac0869bfb46fecb8d19bd8dbfa9a133bfda2e3f8f5b5b662ae7bf500",
+    "md5": "2d6b8fcec81f20c9db443818d3fa4500",
+    "independent_x64_downloads_matched": true,
+    "cross_host_sha256_matched": true
+  },
+  "benchmark": {
+    "raw_rows_scanned": 9035842,
+    "grch38_tsc_rows": 18223,
+    "labels_emitted": 18119,
+    "rows_skipped_unnormalizable": 104,
+    "benchmark_size": 3725,
+    "train_dev_size": 1117,
+    "holdout_size": 2608,
+    "benchmark_sha256": "958cf976d7795121e05aadb49a80dfd81ddca9985cea496c7e27454abb4a4478",
+    "holdout_sha256": "e3991bc20ba17f97f28f468a07a29cce23951001233b7fc4ee7d37719785a8b2",
+    "holdout_vcf_sha256": "ea0f97bdd896e96f7f64c1f5f6ceda4e2e43156485bf635a6d11f7369dc4e77b"
+  },
+  "integrity": {
+    "run_integrity": "PASS",
+    "heldout_identities_masked": 2608,
+    "mask_survivors": 0,
+    "bias_rows": 2608,
+    "duplicate_bias_keys": 0,
+    "pp3_bp4_scored_calls": 0,
+    "pm1_disposition": "SKIPPED_ZERO_REACHABLE_HOLDOUT_ROWS"
+  },
+  "scopes": {
+    "missense:pathogenic": {
+      "actual_count": 53,
+      "called_count": 0,
+      "correct_call_coverage": "0/53",
+      "data_sufficiency": "NO_CALLS",
+      "conditional_performance": "NOT_ESTIMABLE",
+      "policy_parity": "BLOCKED",
+      "authorization": "NOT_AUTHORIZED"
+    },
+    "missense:benign": {
+      "actual_count": 110,
+      "called_count": 10,
+      "correct_call_coverage": "10/110",
+      "conditional_precision": 1.0,
+      "conditional_recall": 1.0,
+      "precision_lower_bound_95": 0.6915028921812392,
+      "recall_lower_bound_95": 0.6915028921812392,
+      "data_sufficiency": "UNDERPOWERED",
+      "conditional_performance": "UNMET",
+      "authorization": "NOT_AUTHORIZED"
+    },
+    "truncating:pathogenic": {
+      "actual_count": 237,
+      "called_count": 219,
+      "correct_call_coverage": "219/237",
+      "conditional_precision": 1.0,
+      "conditional_recall": 1.0,
+      "precision_lower_bound_95": 0.9832968719068411,
+      "recall_lower_bound_95": 0.9832968719068411,
+      "data_sufficiency": "ADEQUATE",
+      "conditional_performance": "MET",
+      "policy_parity": "CLEAR",
+      "evidence_status": "VALIDATED_PROSPECTIVE",
+      "authorization": "AUTHORIZED_RESEARCH_ONLY"
+    }
+  },
+  "outcomes": {
+    "full_spectrum_terminal_outcome": "BLOCKED_POLICY",
+    "full_spectrum_authorization": "NOT_AUTHORIZED",
+    "narrow_scope": "truncating:pathogenic",
+    "narrow_scope_terminal_outcome": "PASS",
+    "narrow_scope_authorization": "AUTHORIZED_RESEARCH_ONLY"
+  },
+  "external_evidence": {
+    "location_convention": "raptor-data/handoffs/clinvar-2026-08-v3-prospective-run",
+    "committed_to_repository": false,
+    "prospective_evidence_sha256": "145f3ea2146cbc6cf3a1657d7bc30a1aa9698290ed8124acfe9b8b87354c6c10",
+    "terminal_eval_sha256": "540ed4f362c70c5f92febfb26d6b06886088d7980403455d867454dff88983db",
+    "return_manifest_sha256": "441fbc349bf97346aa70d302ca69c9107fd434b796f741566634da84c6e718eb",
+    "bias_tsv_sha256": "32908ce3d0d152903a094dbb70042a60e4d3a64df696ff74a2352f684188b1f0"
+  },
+  "authority_note": "The top-level prospective adjudication is authoritative. The embedded legacy masked-holdout scope-gate snapshot was computed before prospective adjudication and is retained only as input context.",
+  "limitations": [
+    "This authorizes research-evidence use only for the truncating:pathogenic scope.",
+    "It authorizes no clinical classification, patient decision, full-spectrum VUS automation, public VUS worklist or ClinVar submission.",
+    "Missense pathogenic produced no calls.",
+    "Missense benign produced only 10 calls and did not meet the registered lower-bound thresholds or minimum called-count floor.",
+    "PM1 remains production-unvalidated and was skipped only after both published and reproduced resources had zero reachable holdout rows."
+  ]
+}

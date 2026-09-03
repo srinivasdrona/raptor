@@ -11,7 +11,6 @@ from tests.eval._clinvar_2026_08_prospective_red_helpers import (
     build_approval_record,
     execute_transport_and_raw_freeze,
     make_head_payload,
-    md5_hex,
     prospective_sandbox,
     require_module,
 )
@@ -28,12 +27,15 @@ def _published_date_lookup_ok(url: str) -> InjectedLookup:
     )
 
 
-def _official_md5_lookup_ok(url: str, archive_bytes: bytes) -> InjectedLookup:
+def _official_md5_lookup_ok(url: str, _archive_bytes: bytes) -> InjectedLookup:
     return InjectedLookup(
         {
             url: {
-                "official_md5": md5_hex(archive_bytes),
-                "source_identity": "ncbi-official-md5-manifest-2026-08",
+                "official_md5": None,
+                "upstream_checksum_available": False,
+                "source_identity": "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/",
+                "unavailable_reason": "NCBI publishes no checksum for monthly tab-delimited archive copies.",
+                "verification_mode": "EXACT_URL_HEAD_CONTINUITY_PLUS_LOCAL_SHA256_MD5",
             }
         }
     )
