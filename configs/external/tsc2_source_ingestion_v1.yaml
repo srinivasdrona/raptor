@@ -1,0 +1,115 @@
+# RAPTOR v2 TSC2 source-ingestion pilot configuration
+# (docs/project/specs/raptor-v2-missense-source-ingestion-v1.yaml).
+#
+# Loaded ONLY by scripts/fetch_tsc2_source_bundle.py (the sole network-I/O
+# entry point for this slice); raptor.external.tsc2_sources itself performs
+# no network I/O and never reads this file. Every endpoint/expected value
+# below is copied from the spec's `sources` section -- this file pins the
+# CURRENT (2026-09-09) MaveDB CC0 licence and IGVF `released`/public-access
+# state; it is NOT ACMG evidence, a classification input, or SourceOps
+# declaration/registry configuration.
+
+schema: raptor.external.tsc2_source_ingestion_config.v1
+config_version: 1.0.0
+gene: TSC2
+bundle_id: tsc2-source-pilot-2026-09-09
+run_name: tsc2-source-pilot-2026-09-09
+
+output:
+  # Mirrors configs/external/mave_sources.yaml's external-root convention:
+  # raw bytes never live inside the repository.
+  environment_variable: RAPTOR_TSC2_SOURCE_ROOT
+  default_relative_run: tsc2-source-pilot-2026-09-09
+
+rate_limits:
+  # NCBI E-utilities/LitVar2: at least this many seconds between requests to
+  # eutils.ncbi.nlm.nih.gov / www.ncbi.nlm.nih.gov without an API key.
+  ncbi_without_api_key_min_interval_seconds: 0.34
+
+sources:
+  pubmed:
+    source_id: pubmed
+    source_kind: pubmed
+    database: pubmed
+    query: 'TSC2[Title/Abstract]'
+    publication_date_start: '2026/01/01'
+    publication_date_end: '2026/09/09'
+    retmax: 100
+    required_pmid: '42425971'
+
+  litvar2:
+    source_id: litvar2
+    source_kind: litvar2
+    gene: TSC2
+
+  pmc:
+    source_id: pmc
+    source_kind: pmc
+    # Pilot-only fixed known-public JATS XML endpoint (spec `sources.pmc.
+    # pilot_full_text_endpoint`); general PMC acquisition never calls the
+    # retired OA Web Service and never infers open reuse from PMCID alone.
+    fulltext_endpoint: https://www.ebi.ac.uk/europepmc/webservices/rest/PMC12871146/fullTextXML
+    expected_pmcid: PMC12871146
+
+  mavedb_clipe:
+    source_id: mavedb_clipe
+    source_kind: mavedb
+    urn: 'urn:mavedb:00001201-a-1'
+    metadata_endpoint: https://api.mavedb.org/api/v1/score-sets/urn:mavedb:00001201-a-1
+    scores_endpoint: https://api.mavedb.org/api/v1/score-sets/urn:mavedb:00001201-a-1/scores
+    expected_gene: TSC2
+    expected_transcript: NM_000548.5
+    expected_variant_count: 208
+    # Current MaveDB CC0-1.0 pin (matches configs/external/mave_sources.yaml,
+    # not modified by this slice).
+    expected_license: CC0-1.0
+    expected_sha256: '74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717'
+
+  igvf_vamp_seq:
+    source_id: igvf_vamp_seq
+    source_kind: igvf
+    analysis_set: IGVFDS5595BTYJ
+    file_accession: IGVFFI9747KART
+    analysis_endpoint: https://api.data.igvf.org/analysis-sets/IGVFDS5595BTYJ/
+    file_endpoint: https://api.data.igvf.org/tabular-files/IGVFFI9747KART/
+    download_endpoint: https://api.data.igvf.org/tabular-files/IGVFFI9747KART/@@download/IGVFFI9747KART.tsv.gz
+    # Current (2026-09-09) observed status -- corrects the stale
+    # access-not-held assumption in configs/external/mave_sources.yaml
+    # (not modified by this slice); licence permission remains separately
+    # unresolved (licence_state below).
+    required_status: released
+    required_controlled_access: false
+    expected_assembly: GRCh38
+    expected_file_size: 439700
+    expected_md5: 1a397944b7a5158b3d63999dfcf926db
+    licence_state: REVIEW_REQUIRED
+    redistribution: FORBIDDEN_UNTIL_REVIEW
+
+  igvf_sge:
+    source_id: igvf_sge
+    source_kind: igvf
+    analysis_set: IGVFDS1782FCXW
+    file_accession: IGVFFI3097DFGF
+    analysis_endpoint: https://api.data.igvf.org/analysis-sets/IGVFDS1782FCXW/
+    file_endpoint: https://api.data.igvf.org/tabular-files/IGVFFI3097DFGF/
+    download_endpoint: https://api.data.igvf.org/tabular-files/IGVFFI3097DFGF/@@download/IGVFFI3097DFGF.tsv.gz
+    required_status: released
+    required_controlled_access: false
+    expected_assembly: GRCh38
+    expected_file_size: 35101
+    expected_md5: c188e0a9dd4c67dfac13381d3879aedf
+    licence_state: REVIEW_REQUIRED
+    redistribution: FORBIDDEN_UNTIL_REVIEW
+
+# Circularity guard (mirrors configs/external/mave_sources.yaml): every
+# source above is an untrusted discovery lead or a non-gating functional
+# dataset, never ACMG criteria, never raptor.scorer/BiasEvidenceSource
+# input, and never ClinVar-derived.
+circularity_guard:
+  forbidden_consumers:
+    - raptor.scorer
+    - raptor.eval.benchmark
+    - raptor.eval.gate
+    - raptor.eval.harness
+    - raptor.eval.knowns
+  forbidden_criteria: [PS3, BS3]
