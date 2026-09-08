@@ -5,7 +5,7 @@
 # use, or automatic source activation.
 
 schema: raptor.v2.missense_source_ingestion_spec.v1
-spec_version: 1.0.0
+spec_version: 1.0.1
 task_id: v2-missense-source-ingestion-v1
 status: APPROVED_TO_BUILD
 owner: '@dronasrinivas'
@@ -73,6 +73,20 @@ architecture:
       Only scripts/fetch_tsc2_source_bundle.py performs network I/O. The
       raptor.external.tsc2_sources package is deterministic parsing,
       validation, hashing and manifest construction over injected bytes.
+    transport_result: >-
+      Every response must be a typed mapping with HTTPS requested/final URLs,
+      integer HTTP 200 status, nonblank media type and bytes body. Network,
+      timeout, TLS, DNS, malformed-response and non-200 failures are converted
+      to a source-specific error with sanitized URLs.
+    source_identity: >-
+      Final URL validation binds every source-defining path and canonical query
+      parameter, not only the host. PubMed term/date/retmax and EFetch PMID set,
+      MaveDB URN, IGVF accession/path and IGVF S3 object identity may not change
+      across redirects. Only explicitly nonsemantic signed query parameters may
+      differ.
+    secret_handling: >-
+      API keys, contact values and signed-object credentials are redacted before
+      entering any exception, stderr output, manifest, artifact record or log.
     sourceops_boundary: >-
       raptor.sourceops remains offline and imports no network or domain
       package. The external bundle and committed declaration config become
@@ -91,6 +105,11 @@ architecture:
     - write each artifact to a unique temporary sibling
     - hash and validate before atomic publication
     - refuse every pre-existing final run directory
+    - require run_name to be exactly one safe relative path component
+    - resolve the final path beneath the approved external root
+    - reject symlink/reparse ancestry, not only a symlink leaf
+    - reserve or publish the final directory without replacing a concurrent writer
+    - clean the staging directory on publication failure
     - write the bundle manifest last
   deterministic_manifest:
     schema: raptor.external.tsc2_source_bundle.v1
@@ -111,6 +130,7 @@ sources:
     retmax: 100
     retmode_search: json
     retmode_fetch: xml
+    date_type: pdat
     required_known_pmid: '42425971'
     rate_limit:
       without_api_key_requests_per_second: 3
@@ -118,6 +138,11 @@ sources:
     interpretation: >-
       Search results and PubMed metadata are discovery records, not proof that
       a paper contains variant-level evidence.
+    date_rule: >-
+      Preserve valid PubMed date precision without invention: YYYY, YYYY-MM or
+      YYYY-MM-DD are accepted, and a MedlineDate string is retained explicitly
+      when structured fields are unavailable. Missing day/month is not a parse
+      failure and is never filled with synthetic values.
 
   litvar2:
     role: variant_publication_leads
@@ -126,10 +151,16 @@ sources:
     gene_endpoint: https://www.ncbi.nlm.nih.gov/research/litvar2-api/variant/search/gene/TSC2
     response_shape: line_delimited_mapping_records
     required_fields: [_id, rsid, pmids_count]
+    optional_fields: [clingen_id]
+    projection_fields: [_id, rsid, pmids_count]
     interpretation: >-
       Every returned mapping is an untrusted lead. A LitVar association never
       becomes an Atlas span, ACMG criterion or accepted evidence without source
       retrieval and deterministic verification.
+    field_rule: >-
+      Required fields must exist, the optional clingen_id field may be present,
+      all other fields are rejected, and accepted records are projected to the
+      three projection fields before bundling.
 
   pmc:
     role: lawful_full_text_when_explicitly_permitted
@@ -149,6 +180,7 @@ sources:
     metadata_endpoint: https://api.mavedb.org/api/v1/score-sets/urn:mavedb:00001201-a-1
     scores_endpoint: https://api.mavedb.org/api/v1/score-sets/urn:mavedb:00001201-a-1/scores
     expected_gene: TSC2
+    expected_urn: urn:mavedb:00001201-a-1
     expected_transcript: NM_000548.5
     expected_variant_count: 208
     expected_license: CC0-1.0
@@ -236,27 +268,47 @@ schemas:
 
 acceptance_criteria:
   - id: AC-01
-    rule: URL builders encode query values and accept no arbitrary scheme or host.
+    rule: >-
+      URL builders encode query values, bind PubMed datetype=pdat, and accept no
+      arbitrary scheme, host, path or source-defining query substitution.
   - id: AC-02
     rule: All network operations are injected into pure package functions; tests make zero network calls.
   - id: AC-03
-    rule: PubMed search count, returned PMIDs and truncation are parsed and preserved; PMID 42425971 is present in the real pilot.
+    rule: >-
+      PubMed search count, returned PMIDs and truncation are parsed and
+      preserved; date bounds and retmax are bound to the final URL; EFetch
+      metadata PMIDs equal the requested ESearch PMID set; PMID 42425971 is
+      present in the real pilot.
   - id: AC-04
-    rule: PubMed XML parser emits PMID, DOI, title, publication date and abstract text without inferring evidence.
+    rule: >-
+      PubMed XML parser emits PMID, DOI, title, publication date with explicit
+      precision, and abstract text without inferring evidence; valid partial
+      dates and MedlineDate do not abort ingestion.
   - id: AC-05
-    rule: LitVar2 line records are parsed without eval or code execution, require exact fields, deduplicate RSIDs and preserve pmids_count.
+    rule: >-
+      LitVar2 line records are parsed without eval or code execution, require
+      the required fields, allow only optional clingen_id, project to three
+      committed fields, deduplicate RSIDs and preserve pmids_count.
   - id: AC-06
     rule: PMC JATS acquisition preserves raw XML and its explicit licence text; missing licence becomes LICENCE_REVIEW_REQUIRED.
   - id: AC-07
-    rule: MaveDB metadata and CSV match the existing registered transcript, licence, row count and SHA-256.
+    rule: >-
+      MaveDB metadata/final paths and CSV match the exact registered URN, gene,
+      transcript, licence, row count and SHA-256.
   - id: AC-08
-    rule: Each IGVF metadata response matches its analysis/file accession, released status, public access, assembly, file size and published MD5.
+    rule: >-
+      Each IGVF metadata/final path matches its exact analysis/file accession,
+      released status, public access, assembly, file size and published MD5.
   - id: AC-09
     rule: Each downloaded IGVF file is verified against metadata MD5 and file size before publication.
   - id: AC-10
     rule: IGVF remains STAGED_LICENCE_REVIEW_REQUIRED and cannot be marked classification-ready.
   - id: AC-11
-    rule: Output paths are external, create-only, atomic and symlink-safe; partial failures publish no bundle manifest.
+    rule: >-
+      Output paths are external, create-only, race-safe, atomically published,
+      ancestry-symlink-safe and confined to one safe run-name child; partial or
+      publication failures leave no manifest or staging directory and never
+      replace a competing writer.
   - id: AC-12
     rule: Reordering source dictionaries cannot change semantic output; changing any artifact byte changes the bundle content hash.
   - id: AC-13
@@ -266,7 +318,11 @@ acceptance_criteria:
   - id: AC-15
     rule: No output uses classification, pathogenic, benign, PS3, BS3, validated mechanism or accepted claim as an inferred status.
   - id: AC-16
-    rule: Real pilot failure reports the exact source and observed invariant; it never substitutes another endpoint or silently drops a source.
+    rule: >-
+      Real pilot failure reports the exact source and observed invariant with
+      sanitized URLs; it validates HTTP 200 and response types, wraps all
+      transport failures, never leaks credentials, substitutes another
+      endpoint or silently drops a source.
 
 test_requirements:
   author: GPT-5.3-Codex
@@ -274,15 +330,25 @@ test_requirements:
   required_failure_cases:
     - wrong PubMed database or malformed count
     - missing required PMID
+    - valid partial PubMed date and MedlineDate
+    - PubMed final query/date/PMID-set substitution
     - duplicate or malformed LitVar RSID
+    - LitVar optional clingen_id and unknown extra field
     - unsafe LitVar line payload
     - PMC XML without explicit licence
     - MaveDB transcript, licence, row-count or hash drift
+    - MaveDB URN/final-path drift
     - IGVF accession, status, access, assembly, size or MD5 drift
+    - IGVF metadata path or S3 object substitution
     - redirected final host outside the allowlist
     - pre-existing output directory
     - symlinked output path
     - interrupted download
+    - non-200 or malformed transport result
+    - credential-bearing failure URL
+    - absolute/nested run name and symlinked output ancestry
+    - concurrent final-path publication
+    - failed atomic publication cleanup
     - manifest hash mismatch
     - attempted clinical or ACMG status
   command: python -m pytest tests/external/test_tsc2_source_ingestion.py -q
