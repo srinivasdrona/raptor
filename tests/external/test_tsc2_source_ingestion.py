@@ -8,7 +8,7 @@ import socket
 from importlib import import_module
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, parse_qsl, urlencode, urlsplit, urlunsplit
 
 import pytest
 
@@ -387,6 +387,152 @@ def _module_imports(path: Path) -> list[tuple[str, int]]:
             if node.module:
                 imports.append((node.module, node.lineno))
     return imports
+
+
+def _pubmed_efetch_partial_dates_xml() -> str:
+    return """<?xml version="1.0" encoding="UTF-8"?>
+<PubmedArticleSet>
+  <PubmedArticle>
+    <MedlineCitation>
+      <PMID>50000001</PMID>
+      <Article>
+        <ArticleTitle>Year-only TSC2 note</ArticleTitle>
+        <Abstract>
+          <AbstractText>Year precision is preserved.</AbstractText>
+        </Abstract>
+        <Journal>
+          <JournalIssue>
+            <PubDate>
+              <Year>2026</Year>
+            </PubDate>
+          </JournalIssue>
+        </Journal>
+      </Article>
+    </MedlineCitation>
+  </PubmedArticle>
+  <PubmedArticle>
+    <MedlineCitation>
+      <PMID>50000002</PMID>
+      <Article>
+        <ArticleTitle>Structured <i>TSC2</i> month-level date</ArticleTitle>
+        <Abstract>
+          <AbstractText>Nested <i>text</i> remains preserved.</AbstractText>
+        </Abstract>
+        <Journal>
+          <JournalIssue>
+            <PubDate>
+              <Year>2026</Year>
+              <Month>09</Month>
+            </PubDate>
+          </JournalIssue>
+        </Journal>
+      </Article>
+    </MedlineCitation>
+  </PubmedArticle>
+  <PubmedArticle>
+    <MedlineCitation>
+      <PMID>50000003</PMID>
+      <Article>
+        <ArticleTitle>MedlineDate fallback sample</ArticleTitle>
+        <Abstract>
+          <AbstractText>Structured fields are absent.</AbstractText>
+        </Abstract>
+        <Journal>
+          <JournalIssue>
+            <PubDate>
+              <MedlineDate>2026 Winter</MedlineDate>
+            </PubDate>
+          </JournalIssue>
+        </Journal>
+      </Article>
+    </MedlineCitation>
+  </PubmedArticle>
+</PubmedArticleSet>
+"""
+
+
+def _replace_query_params(url: str, updates: dict[str, str]) -> str:
+    parts = urlsplit(url)
+    params = dict(parse_qsl(parts.query, keep_blank_values=True))
+    params.update(updates)
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(params), parts.fragment))
+
+
+def _sensitive_query_url() -> str:
+    return (
+        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+        "?db=pubmed"
+        "&retmode=json"
+        "&term=TSC2%5BTitle%2FAbstract%5D"
+        "&mindate=2026%2F01%2F01"
+        "&maxdate=2026%2F09%2F09"
+        "&retmax=100"
+        "&datetype=pdat"
+        "&api_key=SENTINEL_API_KEY_VALUE"
+        "&email=sentinel.user%40example.org"
+        "&AWSAccessKeyId=SENTINEL_AWS_ACCESS_KEY_ID"
+        "&Signature=SENTINEL_SIGNATURE_VALUE"
+        "&x-amz-security-token=SENTINEL_SECURITY_TOKEN"
+        "&x-amz-credential=SENTINEL_AMZ_CREDENTIAL"
+    )
+
+
+def _assert_no_secret_values(text: str) -> None:
+    lowered = text.lower()
+    secret_values = (
+        "SENTINEL_API_KEY_VALUE",
+        "sentinel.user@example.org",
+        "SENTINEL_AWS_ACCESS_KEY_ID",
+        "SENTINEL_SIGNATURE_VALUE",
+        "SENTINEL_SECURITY_TOKEN",
+        "SENTINEL_AMZ_CREDENTIAL",
+    )
+    for value in secret_values:
+        assert value.lower() not in lowered
+
+
+def _minimal_bundle_manifest_and_payload(
+    *,
+    source_id: str = "pubmed",
+    source_kind: str = "pubmed",
+    run_tag: str = "default",
+) -> tuple[dict[str, Any], dict[str, bytes]]:
+    api = _bundle_api()
+    body = f"artifact-{source_id}-{run_tag}".encode("utf-8")
+    artifact_id = f"{source_id}-artifact-{run_tag}"
+    relative_path = f"{source_id}/{run_tag}.bin"
+    artifact = _artifact_record(
+        artifact_id=artifact_id,
+        source_id=source_id,
+        relative_path=relative_path,
+        body=body,
+        verification="HASHED",
+    )
+    source = _source_record(
+        source_id=source_id,
+        source_kind=source_kind,
+        artifact_ids=[artifact_id],
+    )
+    manifest = api["build_bundle_manifest"](
+        bundle_id=f"bundle-{run_tag}",
+        created_at="2026-09-09T00:00:00Z",
+        query={"gene": "TSC2"},
+        artifacts=[artifact],
+        sources=[source],
+        truncation={},
+        boundaries={"network": "injected", "external_output_only": True},
+    )
+    return manifest, {relative_path: body}
+
+
+def _extract_yaml_entry_block(yaml_text: str, *, urn: str) -> str:
+    marker = f'- urn: "{urn}"'
+    start = yaml_text.find(marker)
+    if start == -1:
+        pytest.fail(f"source register entry for {urn!r} was not found")
+    remainder = yaml_text[start:]
+    next_entry = remainder.find("\n  - urn:", len(marker))
+    return remainder if next_entry == -1 else remainder[:next_entry]
 
 
 def test_ac01_url_builders_encode_query_and_enforce_allowlists() -> None:
@@ -1203,3 +1349,594 @@ def test_ac16_source_specific_failure_and_no_endpoint_substitution(
     assert "count" in message or "pmid" in message
     assert pubmed_url in str(err)
     assert seen_urls == [pubmed_url]
+
+
+def test_ac04_pubmed_valid_partial_dates_and_medline_date_preserve_precision_without_invention() -> None:
+    api = _pubmed_api()
+    rows = api["parse_efetch_xml"](_pubmed_efetch_partial_dates_xml())
+    by_pmid = {row["pmid"]: row for row in rows}
+    assert set(by_pmid) == {"50000001", "50000002", "50000003"}
+
+    expected_fields = {
+        "pmid",
+        "doi",
+        "title",
+        "publication_date",
+        "publication_date_precision",
+        "publication_date_raw",
+        "abstract",
+    }
+    for row in rows:
+        assert set(row) == expected_fields
+
+    year_only = by_pmid["50000001"]
+    assert year_only["publication_date"] == "2026"
+    assert str(year_only["publication_date_precision"]).lower() in {"year", "yyyy"}
+    assert year_only["publication_date_raw"] == "2026"
+
+    year_month = by_pmid["50000002"]
+    assert year_month["publication_date"] == "2026-09"
+    assert year_month["publication_date"] != "2026-09-01"
+    assert str(year_month["publication_date_precision"]).lower() in {
+        "month",
+        "year-month",
+        "yyyy-mm",
+    }
+    assert year_month["publication_date_raw"] == "2026-09"
+    assert year_month["title"] == "Structured TSC2 month-level date"
+    assert year_month["abstract"] == "Nested text remains preserved."
+
+    medline_fallback = by_pmid["50000003"]
+    assert medline_fallback["publication_date"] == "2026 Winter"
+    assert str(medline_fallback["publication_date_precision"]).lower() in {
+        "medline",
+        "medline-date",
+        "medlinedate",
+        "text",
+    }
+    assert medline_fallback["publication_date_raw"] == "2026 Winter"
+
+
+def test_ac05_litvar_optional_clingen_id_is_accepted_and_projected() -> None:
+    api = _litvar_api()
+    payload = _litvar_lines(
+        [
+            {
+                "_id": "litvar@rs121907954##",
+                "rsid": "rs121907954",
+                "pmids_count": 3,
+                "clingen_id": "CA123456",
+            },
+            {
+                "_id": "litvar@rs587782356##",
+                "rsid": "rs587782356",
+                "pmids_count": 1,
+                "clingen_id": "CA654321",
+            },
+        ]
+    )
+    assert api["parse_gene_mappings"](payload) == [
+        {"_id": "litvar@rs121907954##", "rsid": "rs121907954", "pmids_count": 3},
+        {"_id": "litvar@rs587782356##", "rsid": "rs587782356", "pmids_count": 1},
+    ]
+
+
+def test_ac05_litvar_unknown_extra_field_is_rejected_even_when_clingen_id_is_present() -> None:
+    api = _litvar_api()
+    payload = _litvar_lines(
+        [
+            {
+                "_id": "litvar@rs121907954##",
+                "rsid": "rs121907954",
+                "pmids_count": 3,
+                "clingen_id": "CA123456",
+                "unexpected_field": "must-fail",
+            },
+        ]
+    )
+    with pytest.raises(api["LitVarParseError"], match="required fields|exact"):
+        api["parse_gene_mappings"](payload)
+
+
+def test_ac01_ac03_pubmed_esearch_builder_includes_datetype_pdat() -> None:
+    api = _endpoint_api()
+    esearch_url = api["build_pubmed_esearch_url"](
+        query="TSC2[Title/Abstract]",
+        date_start="2026/01/01",
+        date_end="2026/09/09",
+        retmax=100,
+    )
+    params = parse_qs(urlsplit(esearch_url).query, strict_parsing=True)
+    assert params["datetype"] == ["pdat"]
+
+
+@pytest.mark.parametrize(
+    ("updated_key", "updated_value"),
+    [
+        ("term", "TSC1[Title/Abstract]"),
+        ("mindate", "2025/01/01"),
+        ("maxdate", "2026/12/31"),
+        ("datetype", "edat"),
+        ("retmax", "250"),
+    ],
+    ids=[
+        "term-substitution",
+        "mindate-substitution",
+        "maxdate-substitution",
+        "datetype-substitution",
+        "retmax-substitution",
+    ],
+)
+def test_ac03_pubmed_esearch_final_url_rejects_source_defining_query_substitution(
+    updated_key: str,
+    updated_value: str,
+) -> None:
+    api = _endpoint_api()
+    requested_url = (
+        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+        "?db=pubmed"
+        "&retmode=json"
+        "&term=TSC2%5BTitle%2FAbstract%5D"
+        "&mindate=2026%2F01%2F01"
+        "&maxdate=2026%2F09%2F09"
+        "&datetype=pdat"
+        "&retmax=100"
+    )
+    final_url = _replace_query_params(requested_url, {updated_key: updated_value})
+    with pytest.raises(api["EndpointSecurityError"]):
+        api["assert_allowed_final_url"](requested_url=requested_url, final_url=final_url)
+
+
+def test_ac03_pubmed_efetch_final_url_rejects_changed_pmid_set() -> None:
+    api = _endpoint_api()
+    requested_url = api["build_pubmed_efetch_url"](pmids=["42425971", "40000001"])
+    final_url = api["build_pubmed_efetch_url"](pmids=["42425971", "40000002"])
+    with pytest.raises(api["EndpointSecurityError"]):
+        api["assert_allowed_final_url"](requested_url=requested_url, final_url=final_url)
+
+
+@pytest.mark.parametrize(
+    ("requested_url", "final_url"),
+    [
+        (
+            "https://api.mavedb.org/api/v1/score-sets/urn:mavedb:00001201-a-1",
+            "https://api.mavedb.org/api/v1/score-sets/urn:mavedb:99990000-z-9",
+        ),
+        (
+            "https://api.mavedb.org/api/v1/score-sets/urn:mavedb:00001201-a-1/scores",
+            "https://api.mavedb.org/api/v1/score-sets/urn:mavedb:99990000-z-9/scores",
+        ),
+    ],
+    ids=["metadata-urn-substitution", "scores-path-substitution"],
+)
+def test_ac07_mavedb_final_url_rejects_scoreset_identity_substitution(
+    requested_url: str,
+    final_url: str,
+) -> None:
+    api = _mavedb_api()
+    with pytest.raises(api["MaveSourceVerificationError"]):
+        api["assert_allowed_mavedb_final_url"](requested_url=requested_url, final_url=final_url)
+
+
+def test_ac08_igvf_metadata_final_url_rejects_accession_path_substitution() -> None:
+    api = _igvf_api()
+    requested_url = "https://api.data.igvf.org/analysis-sets/IGVFDS5595BTYJ/"
+    final_url = "https://api.data.igvf.org/analysis-sets/IGVFDS1782FCXW/"
+    with pytest.raises(api["IgvfVerificationError"]):
+        api["assert_allowed_igvf_metadata_final_url"](requested_url=requested_url, final_url=final_url)
+
+
+def test_ac08_igvf_download_final_url_rejects_s3_object_substitution() -> None:
+    api = _igvf_api()
+    requested_url = (
+        "https://api.data.igvf.org/tabular-files/IGVFFI9747KART/"
+        "@@download/IGVFFI9747KART.tsv.gz"
+    )
+    final_url = (
+        "https://igvf-public.s3.amazonaws.com/tabular-files/IGVFFI3097DFGF/"
+        "@@download/IGVFFI3097DFGF.tsv.gz?X-Amz-Signature=opaque"
+    )
+    with pytest.raises(api["IgvfVerificationError"]):
+        api["assert_allowed_igvf_download_final_url"](requested_url=requested_url, final_url=final_url)
+
+
+def test_ac16_source_ingestion_error_and_cli_rendering_redact_sensitive_values() -> None:
+    api = _ingest_api()
+    err = api["SourceIngestionError"](
+        source_id="pubmed",
+        invariant="TransportTimeout",
+        message="simulated transport timeout",
+        request_url=_sensitive_query_url(),
+    )
+    rendered_error = str(err)
+    rendered_cli = (
+        f"ERROR: source ingestion failed for source_id={err.source_id!r} "
+        f"invariant={err.invariant!r}: {err}"
+    )
+
+    _assert_no_secret_values(rendered_error)
+    _assert_no_secret_values(rendered_cli)
+
+    lowered = rendered_error.lower()
+    for redacted_key in (
+        "api_key=redacted",
+        "email=redacted",
+        "awsaccesskeyid=redacted",
+        "signature=redacted",
+        "x-amz-security-token=redacted",
+        "x-amz-credential=redacted",
+    ):
+        assert redacted_key in lowered
+    assert "eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi" in rendered_error
+
+
+@pytest.mark.parametrize(
+    ("case_name", "transport"),
+    [
+        (
+            "non-200-status",
+            lambda url: {
+                "final_url": url,
+                "http_status": 503,
+                "media_type": "application/json",
+                "body": b"{}",
+            },
+        ),
+        (
+            "missing-required-field",
+            lambda url: {
+                "final_url": url,
+                "http_status": 200,
+                "body": b"{}",
+            },
+        ),
+        (
+            "wrong-field-type",
+            lambda _url: {
+                "final_url": 123,
+                "http_status": "200",
+                "media_type": "application/json",
+                "body": b"{}",
+            },
+        ),
+        (
+            "non-bytes-body",
+            lambda url: {
+                "final_url": url,
+                "http_status": 200,
+                "media_type": "application/json",
+                "body": "{}",
+            },
+        ),
+        (
+            "blank-media-type",
+            lambda url: {
+                "final_url": url,
+                "http_status": 200,
+                "media_type": "   ",
+                "body": b"{}",
+            },
+        ),
+        (
+            "transport-exception",
+            lambda _url: (_ for _ in ()).throw(TimeoutError("simulated timeout")),
+        ),
+    ],
+    ids=[
+        "non-200-status",
+        "missing-required-field",
+        "wrong-field-type",
+        "non-bytes-body",
+        "blank-media-type",
+        "transport-exception",
+    ],
+)
+def test_ac16_request_with_transport_rejects_invalid_results_with_typed_errors(
+    case_name: str,
+    transport,
+) -> None:
+    api = _endpoint_api()
+    requested_url = (
+        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+        "?db=pubmed&retmode=json"
+    )
+    with pytest.raises(Exception) as exc:
+        api["request_with_transport"](requested_url=requested_url, transport=transport)
+    assert (
+        type(exc.value).__module__ != "builtins"
+    ), f"{case_name} must raise a typed domain error, not {type(exc.value).__name__}"
+    assert type(exc.value).__name__.endswith("Error")
+
+
+def test_ac16_run_ingestion_wraps_transport_exception_with_sanitized_url(
+    tmp_path: Path,
+) -> None:
+    api = _ingest_api()
+    plan = {
+        "bundle_id": "transport-failure-bundle",
+        "created_at": "2026-09-09T00:00:00Z",
+        "query": {"gene": "TSC2"},
+        "sources": [
+            {
+                "source_id": "pubmed",
+                "source_kind": "pubmed",
+                "request_url": _sensitive_query_url(),
+                "required_pmid": "42425971",
+            }
+        ],
+    }
+
+    def failing_transport(_url: str) -> dict[str, Any]:
+        raise TimeoutError("simulated timeout with SENTINEL_SIGNATURE_VALUE")
+
+    with pytest.raises(api["SourceIngestionError"]) as exc:
+        api["run_ingestion"](
+            plan=plan,
+            transport=failing_transport,
+            repo_root=tmp_path / "repo",
+            output_root=tmp_path / "external",
+            run_name="transport-failure-run",
+        )
+
+    err = exc.value
+    assert getattr(err, "source_id", None) == "pubmed"
+    assert getattr(err, "invariant", None)
+    rendered = str(err)
+    _assert_no_secret_values(rendered)
+    assert "redacted" in rendered.lower()
+    assert "eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi" in rendered
+
+
+def test_ac11_write_bundle_run_rejects_nested_run_name(tmp_path: Path) -> None:
+    api = _bundle_api()
+    manifest, payloads = _minimal_bundle_manifest_and_payload(run_tag="nested-run-name")
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    output_root = tmp_path / "external-root"
+    output_root.mkdir()
+
+    with pytest.raises(api["BundleBoundaryError"]):
+        api["write_bundle_run"](
+            repo_root=repo_root,
+            output_root=output_root,
+            run_name="nested/run-name",
+            manifest=manifest,
+            artifact_payloads=payloads,
+        )
+
+
+def test_ac11_write_bundle_run_rejects_absolute_run_name(tmp_path: Path) -> None:
+    api = _bundle_api()
+    manifest, payloads = _minimal_bundle_manifest_and_payload(run_tag="absolute-run-name")
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    output_root = tmp_path / "external-root"
+    output_root.mkdir()
+    absolute_run_name = str((tmp_path / "escaped-final-run").resolve())
+
+    with pytest.raises(api["BundleBoundaryError"]):
+        api["write_bundle_run"](
+            repo_root=repo_root,
+            output_root=output_root,
+            run_name=absolute_run_name,
+            manifest=manifest,
+            artifact_payloads=payloads,
+        )
+
+
+def test_ac11_write_bundle_run_rejects_output_root_symlink(tmp_path: Path) -> None:
+    api = _bundle_api()
+    manifest, payloads = _minimal_bundle_manifest_and_payload(run_tag="symlink-root")
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    real_output_root = tmp_path / "real-output-root"
+    real_output_root.mkdir()
+    symlink_output_root = tmp_path / "linked-output-root"
+    symlink_output_root.symlink_to(real_output_root, target_is_directory=True)
+
+    with pytest.raises(api["BundleBoundaryError"]):
+        api["write_bundle_run"](
+            repo_root=repo_root,
+            output_root=symlink_output_root,
+            run_name="safe-run",
+            manifest=manifest,
+            artifact_payloads=payloads,
+        )
+
+
+def test_ac11_write_bundle_run_rejects_symlinked_output_ancestry(tmp_path: Path) -> None:
+    api = _bundle_api()
+    manifest, payloads = _minimal_bundle_manifest_and_payload(run_tag="symlink-ancestor")
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    real_ancestor = tmp_path / "real-ancestor"
+    real_ancestor.mkdir()
+    symlink_ancestor = tmp_path / "symlink-ancestor"
+    symlink_ancestor.symlink_to(real_ancestor, target_is_directory=True)
+    output_root = symlink_ancestor / "child-output-root"
+
+    with pytest.raises(api["BundleBoundaryError"]):
+        api["write_bundle_run"](
+            repo_root=repo_root,
+            output_root=output_root,
+            run_name="safe-run",
+            manifest=manifest,
+            artifact_payloads=payloads,
+        )
+
+
+def test_ac11_concurrent_final_path_creation_preserves_competing_sentinel(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = _bundle_api()
+    bundle_module = _load_module("raptor.external.tsc2_sources.bundle")
+    manifest, payloads = _minimal_bundle_manifest_and_payload(run_tag="concurrent-writer")
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    output_root = tmp_path / "external-root"
+    output_root.mkdir()
+    run_name = "concurrent-run"
+    final_run_dir = output_root / run_name
+    competing_sentinel = final_run_dir / "COMPETING_WRITER_SENTINEL.txt"
+    sentinel_value = "keep-existing-writer-output"
+
+    def fake_replace(_src: str | Path, dst: str | Path) -> None:
+        destination = Path(dst)
+        destination.mkdir(parents=True, exist_ok=True)
+        competing_sentinel.write_text(sentinel_value, encoding="utf-8")
+        raise FileExistsError("simulated concurrent final-path creation")
+
+    monkeypatch.setattr(bundle_module.os, "replace", fake_replace)
+
+    with pytest.raises(Exception) as exc:
+        api["write_bundle_run"](
+            repo_root=repo_root,
+            output_root=output_root,
+            run_name=run_name,
+            manifest=manifest,
+            artifact_payloads=payloads,
+        )
+
+    assert competing_sentinel.read_text(encoding="utf-8") == sentinel_value
+    assert not (final_run_dir / MANIFEST_FILENAME).exists()
+    assert isinstance(exc.value, api["BundleBoundaryError"])
+
+
+def test_ac11_os_replace_failure_cleans_staging_dir_and_publishes_no_manifest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = _bundle_api()
+    bundle_module = _load_module("raptor.external.tsc2_sources.bundle")
+    manifest, payloads = _minimal_bundle_manifest_and_payload(run_tag="replace-failure")
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    output_root = tmp_path / "external-root"
+    output_root.mkdir()
+    run_name = "replace-failure-run"
+    final_run_dir = output_root / run_name
+
+    def fake_replace(_src: str | Path, _dst: str | Path) -> None:
+        raise OSError("simulated os.replace publication failure")
+
+    monkeypatch.setattr(bundle_module.os, "replace", fake_replace)
+
+    with pytest.raises(Exception):
+        api["write_bundle_run"](
+            repo_root=repo_root,
+            output_root=output_root,
+            run_name=run_name,
+            manifest=manifest,
+            artifact_payloads=payloads,
+        )
+
+    assert not final_run_dir.exists()
+    assert not list(output_root.glob(f".{run_name}.staging-*"))
+    assert not (final_run_dir / MANIFEST_FILENAME).exists()
+
+
+def test_ac13_package_init_does_not_claim_implemented_modules_are_absent() -> None:
+    init_path = PACKAGE_ROOT / "__init__.py"
+    if not init_path.is_file():
+        pytest.fail(f"TSC2 source package __init__ is missing: {init_path}")
+
+    for module_name in ("mavedb.py", "igvf.py", "bundle.py", "ingest.py"):
+        module_path = PACKAGE_ROOT / module_name
+        assert module_path.is_file(), f"expected implemented module is missing: {module_path}"
+
+    text = init_path.read_text(encoding="utf-8").lower()
+    normalized = " ".join(text.split())
+    assert "not present yet" not in normalized
+
+
+@pytest.mark.parametrize(
+    "urn",
+    [
+        "IGVF:analysis-set:IGVFDS5595BTYJ",
+        "IGVF:analysis-set:IGVFDS1782FCXW",
+    ],
+    ids=["igvf-vamp-seq", "igvf-sge"],
+)
+def test_ac10_mave_sources_yaml_no_longer_marks_released_igvf_accessions_pending(
+    urn: str,
+) -> None:
+    config_path = REPO_ROOT / "configs" / "external" / "mave_sources.yaml"
+    text = config_path.read_text(encoding="utf-8")
+    block = _extract_yaml_entry_block(text, urn=urn).lower()
+    assert "verification: confirm_pending" not in block
+    assert "access-not-held" not in block
+
+
+def test_ac14_aggregate_summary_schema_and_required_source_ids_are_validated_in_memory() -> None:
+    api = _bundle_api()
+    required_source_ids = [
+        "pubmed",
+        "litvar2",
+        "pmc",
+        "mavedb_clipe",
+        "igvf_vamp_seq",
+        "igvf_sge",
+    ]
+    source_kind = {
+        "pubmed": "pubmed",
+        "litvar2": "litvar2",
+        "pmc": "pmc",
+        "mavedb_clipe": "mavedb",
+        "igvf_vamp_seq": "igvf",
+        "igvf_sge": "igvf",
+    }
+
+    artifacts: list[dict[str, Any]] = []
+    sources: list[dict[str, Any]] = []
+    for index, source_id in enumerate(required_source_ids, start=1):
+        body = f"summary-{source_id}".encode("utf-8")
+        artifact_id = f"{source_id}-artifact"
+        relative_path = f"{source_id}/artifact-{index}.bin"
+        artifacts.append(
+            _artifact_record(
+                artifact_id=artifact_id,
+                source_id=source_id,
+                relative_path=relative_path,
+                body=body,
+            )
+        )
+        if source_id.startswith("igvf_"):
+            lifecycle_state = "STAGED_LICENCE_REVIEW_REQUIRED"
+            licence_state = "REVIEW_REQUIRED"
+        else:
+            lifecycle_state = "STAGED_VERIFIED"
+            licence_state = "EXPLICIT_LICENSE_DECLARED"
+        sources.append(
+            _source_record(
+                source_id=source_id,
+                source_kind=source_kind[source_id],
+                artifact_ids=[artifact_id],
+                lifecycle_state=lifecycle_state,
+                licence_state=licence_state,
+            )
+        )
+
+    manifest = api["build_bundle_manifest"](
+        bundle_id="tsc2-source-pilot-2026-09-09",
+        created_at="2026-09-09T00:00:00Z",
+        query={"gene": "TSC2"},
+        artifacts=artifacts,
+        sources=sources,
+        truncation={"pubmed": {"count": 3, "returned_count": 2, "is_truncated": True}},
+        boundaries={"network": "injected", "external_output_only": True},
+    )
+    summary = api["build_pilot_summary"](manifest)
+
+    assert summary["schema"] == "raptor.external.tsc2_source_pilot_summary.v1"
+    assert set(summary) == {
+        "schema",
+        "bundle_id",
+        "counts",
+        "truncation",
+        "source_states",
+        "artifact_hashes",
+        "normalization_gaps",
+    }
+    assert summary["counts"] == {"sources": 6, "artifacts": 6}
+    assert set(summary["source_states"]) == set(required_source_ids)
