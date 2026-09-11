@@ -3,8 +3,10 @@ from __future__ import annotations
 import ast
 import hashlib
 import importlib.util
+import inspect
 import json
 import os
+import re
 from copy import deepcopy
 from importlib import import_module
 from pathlib import Path
@@ -115,6 +117,7 @@ def _endpoint_api() -> dict[str, Any]:
         ),
         "build_step3_spdi_hgvs_url": _symbol(module, "build_step3_spdi_hgvs_url"),
         "assert_allowed_projector_final_url": _symbol(module, "assert_allowed_projector_final_url"),
+        "fetch_raw_with_transport": _symbol(module, "fetch_raw_with_transport"),
         "fetch_with_transport": _symbol(module, "fetch_with_transport"),
     }
 
@@ -468,12 +471,12 @@ def _valid_projector_manifest_and_payloads(bundle_api: dict[str, Any]) -> tuple[
     return manifest, mapping_payload, request_payload, raw_payloads
 
 
-def test_cp00_binding_spec_exists_and_is_v1_0_3() -> None:
+def test_cp00_binding_spec_exists_and_is_v1_0_4() -> None:
     if not SPEC_PATH.is_file():
         pytest.fail(f"binding spec is missing: {SPEC_PATH}")
     spec = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))
     assert spec["spec_id"] == "raptor-v2-clipe-cdna-spdi-projector-acquisition-v1"
-    assert spec["spec_version"] == "1.0.3"
+    assert spec["spec_version"] == "1.0.4"
 
 
 def test_cp01_endpoint_url_builders_percent_encode_whole_path_segment_no_query_and_pin_resource() -> None:
@@ -576,6 +579,46 @@ def test_cp04_fetch_with_transport_requires_typed_200_bytes_media_and_sanitizes_
     with pytest.raises(err) as raised:
         api["fetch_with_transport"](requested_url=requested, transport=bad_transport)
     assert "SECRET" not in str(raised.value)
+
+
+def test_cp04b_transport_response_headers_are_optional_mapping_and_typed_if_present() -> None:
+    api = _endpoint_api()
+    requested = f"{BASE_URL}/hgvs/{quote('NM_000548.5:c.1600G>A', safe='')}/contextuals"
+    body = _step1_payload()
+
+    result = api["fetch_raw_with_transport"](
+        requested_url=requested,
+        transport=lambda _url: {
+            "final_url": requested,
+            "http_status": 429,
+            "media_type": "application/json",
+            "body": body,
+            "response_headers": {"Retry-After": "3", "X-Trace": "abc"},
+        },
+    )
+    assert result["http_status"] == 429
+    assert result.get("response_headers") == {"Retry-After": "3", "X-Trace": "abc"}
+
+    err = api["ProjectorTransportValidationError"]
+    malformed_headers = (
+        ["Retry-After: 3"],
+        "Retry-After: 3",
+        {"Retry-After": 3},
+        {1: "3"},
+        {"Retry-After": None},
+    )
+    for headers in malformed_headers:
+        with pytest.raises(err):
+            api["fetch_raw_with_transport"](
+                requested_url=requested,
+                transport=lambda _url, h=headers: {
+                    "final_url": requested,
+                    "http_status": 429,
+                    "media_type": "application/json",
+                    "body": body,
+                    "response_headers": h,
+                },
+            )
 
 
 def test_cp05_step1_parser_requires_valid_single_transcript_spdi_and_acgt_alleles() -> None:
@@ -1184,6 +1227,292 @@ def test_cp08f_transport_exception_retrying_requires_allowed_category_not_nonemp
     assert result["mapping_rows"][0]["status"] == expected_status
 
 
+@pytest.mark.parametrize(("status", "retry_after_seconds"), [(429, 7), (503, 4)])
+def test_cp08g_retryable_http_honors_numeric_retry_after_before_next_attempt(
+    status: int, retry_after_seconds: int
+) -> None:
+    ingest = _load_module("raptor.external.tsc2_cdna_projector.ingest")
+    perform = getattr(ingest, "_perform_step_request", None)
+    if perform is None:
+        pytest.fail("ingest module must expose private seam _perform_step_request for retry validation")
+
+    sleeps: list[float] = []
+    attempts = {"count": 0}
+    retry_body = b'{"error":"retry-me"}'
+    success_body = _step1_payload()
+    request_url = f"{BASE_URL}/hgvs/{quote(f'{TRANSCRIPT}:c.1600G>A', safe='')}/contextuals"
+
+    def transport(_url: str) -> dict[str, Any]:
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            return {
+                "final_url": request_url,
+                "http_status": status,
+                "media_type": "application/json",
+                "body": retry_body,
+                "response_headers": {"Retry-After": str(retry_after_seconds)},
+            }
+        return {
+            "final_url": request_url,
+            "http_status": 200,
+            "media_type": "application/json",
+            "body": success_body,
+            "response_headers": {},
+        }
+
+    result = perform(
+        url=request_url,
+        transport=transport,
+        retry_policy={
+            "retryable_http": sorted(RETRYABLE_HTTP),
+            "retryable_transport": ["timeout", "connection_error", "tls_error"],
+            "non_retryable_http": sorted(NON_RETRYABLE_HTTP),
+            "max_attempts_per_request": 3,
+            "backoff_base_seconds": 2.0,
+            "backoff_cap_seconds": 60.0,
+            "honor_retry_after_header": True,
+        },
+        sleep=sleeps.append,
+        min_interval_seconds=MIN_INTERVAL_SECONDS,
+    )
+    assert result["outcome"] == "success"
+    assert attempts["count"] == 2
+    assert sleeps and sleeps[0] == MIN_INTERVAL_SECONDS
+    assert any(value >= retry_after_seconds for value in sleeps[1:])
+
+
+def test_cp08h_retry_backoff_requires_injected_uniform_jitter_seam() -> None:
+    ingest = _load_module("raptor.external.tsc2_cdna_projector.ingest")
+    perform = getattr(ingest, "_perform_step_request", None)
+    if perform is None:
+        pytest.fail("ingest module must expose private seam _perform_step_request for jitter validation")
+    signature = inspect.signature(perform)
+    uniform_param = next((name for name in ("random_uniform", "uniform", "jitter_uniform") if name in signature.parameters), None)
+    if uniform_param is None:
+        pytest.fail(
+            "_perform_step_request must accept an injected uniform-random seam "
+            "(e.g. random_uniform(low, high)) so retry jitter is testable deterministically"
+        )
+
+    sleeps: list[float] = []
+    responses = iter(
+        [
+            {
+                "final_url": f"{BASE_URL}/hgvs/{quote(f'{TRANSCRIPT}:c.1600G>A', safe='')}/contextuals",
+                "http_status": 500,
+                "media_type": "application/json",
+                "body": b'{"error":"transient"}',
+            },
+            {
+                "final_url": f"{BASE_URL}/hgvs/{quote(f'{TRANSCRIPT}:c.1600G>A', safe='')}/contextuals",
+                "http_status": 200,
+                "media_type": "application/json",
+                "body": _step1_payload(),
+            },
+        ]
+    )
+
+    kwargs = {
+        "url": f"{BASE_URL}/hgvs/{quote(f'{TRANSCRIPT}:c.1600G>A', safe='')}/contextuals",
+        "transport": lambda _url: next(responses),
+        "retry_policy": {
+            "retryable_http": [500],
+            "retryable_transport": [],
+            "max_attempts_per_request": 2,
+            "backoff_base_seconds": 2.0,
+            "backoff_cap_seconds": 60.0,
+        },
+        "sleep": sleeps.append,
+        "min_interval_seconds": MIN_INTERVAL_SECONDS,
+        uniform_param: (lambda low, high: low + ((high - low) * 0.25)),
+    }
+    result = perform(**kwargs)
+    assert result["outcome"] == "success"
+    assert len(sleeps) >= 3
+    exp_cap = min(2.0, 60.0)
+    jitter_values = [value for value in sleeps if value not in (MIN_INTERVAL_SECONDS,)]
+    assert jitter_values
+    assert all(0.0 <= value <= exp_cap for value in jitter_values)
+    assert any(value < exp_cap for value in jitter_values)
+
+
+def test_cp08i_retry_exhaustion_aggregate_distinguishes_nonretryable_vs_exhausted_rows(tmp_path: Path) -> None:
+    api = _ingest_api()
+    scores_csv_text = _scores_csv([["urn:mavedb:00001201-a-1#1", "c.1600G>A", "", "p.Gly534Arg", "0.21"]])
+    scores_payload = scores_csv_text.encode("utf-8")
+    reference_path = tmp_path / REFERENCE_FASTA_FILENAME
+    reference_bytes = b">NC_000016.10\nACGTACGTACGTACGT\n"
+    reference_path.write_bytes(reference_bytes)
+
+    nonretryable = api["project_clipe_rows"](
+        source_id=SOURCE_ID,
+        scores_csv_bytes=scores_payload,
+        expected_header=SCORES_HEADER,
+        expected_rows=1,
+        expected_scores_sha256=_sha256(scores_payload),
+        expected_scores_byte_length=len(scores_payload),
+        transcript=TRANSCRIPT,
+        genomic_accession=GENOMIC_ACCESSION,
+        assembly=ASSEMBLY,
+        reference_fasta_path=reference_path,
+        expected_reference_sha256=_sha256(reference_bytes),
+        transport=lambda url: {
+            "final_url": url,
+            "http_status": 400,
+            "media_type": "application/json",
+            "body": b'{"error":"bad-request"}',
+        },
+        min_interval_seconds=MIN_INTERVAL_SECONDS,
+        retry_policy={
+            "retryable_http": sorted(RETRYABLE_HTTP),
+            "retryable_transport": ["timeout", "connection_error", "tls_error"],
+            "non_retryable_http": sorted(NON_RETRYABLE_HTTP),
+            "max_attempts_per_request": MAX_ATTEMPTS,
+        },
+        sleep=lambda _seconds: None,
+        fasta_deleted_allele_checker=lambda **kwargs: str(kwargs.get("deleted_sequence", "")),
+    )
+    assert "retry_exhausted_count" in nonretryable
+    assert "retry_exhausted_rows" in nonretryable
+    assert nonretryable["retry_exhausted_count"] == 0
+    assert nonretryable["retry_exhausted_rows"] == []
+
+    attempts = {"count": 0}
+
+    def retryable_then_exhausted(url: str) -> dict[str, Any]:
+        attempts["count"] += 1
+        return {
+            "final_url": url,
+            "http_status": 503,
+            "media_type": "application/json",
+            "body": b'{"error":"temporary"}',
+        }
+
+    exhausted = api["project_clipe_rows"](
+        source_id=SOURCE_ID,
+        scores_csv_bytes=scores_payload,
+        expected_header=SCORES_HEADER,
+        expected_rows=1,
+        expected_scores_sha256=_sha256(scores_payload),
+        expected_scores_byte_length=len(scores_payload),
+        transcript=TRANSCRIPT,
+        genomic_accession=GENOMIC_ACCESSION,
+        assembly=ASSEMBLY,
+        reference_fasta_path=reference_path,
+        expected_reference_sha256=_sha256(reference_bytes),
+        transport=retryable_then_exhausted,
+        min_interval_seconds=MIN_INTERVAL_SECONDS,
+        retry_policy={
+            "retryable_http": sorted(RETRYABLE_HTTP),
+            "retryable_transport": ["timeout", "connection_error", "tls_error"],
+            "non_retryable_http": sorted(NON_RETRYABLE_HTTP),
+            "max_attempts_per_request": 2,
+        },
+        sleep=lambda _seconds: None,
+        fasta_deleted_allele_checker=lambda **kwargs: str(kwargs.get("deleted_sequence", "")),
+    )
+    assert attempts["count"] == 2
+    assert exhausted["retry_exhausted_count"] == 1
+    assert exhausted["retry_exhausted_rows"] == [1]
+
+
+def test_cp08j_request_index_is_attempt_level_and_raw_attempts_preserve_all_typed_bodies(tmp_path: Path) -> None:
+    api = _ingest_api()
+    scores_csv_text = _scores_csv([["urn:mavedb:00001201-a-1#1", "c.1600G>A", "", "p.Gly534Arg", "0.21"]])
+    scores_payload = scores_csv_text.encode("utf-8")
+    reference_path = tmp_path / REFERENCE_FASTA_FILENAME
+    reference_bytes = b">NC_000016.10\nACGTACGTACGTACGT\n"
+    reference_path.write_bytes(reference_bytes)
+
+    step1_retry = b'{"error":"retryable-500"}'
+    step1_terminal = _step1_payload()
+    step2_terminal = _step2_payload()
+    responses = iter(
+        [
+            {
+                "final_url": f"{BASE_URL}/hgvs/{quote(f'{TRANSCRIPT}:c.1600G>A', safe='')}/contextuals",
+                "http_status": 500,
+                "media_type": "application/json",
+                "body": step1_retry,
+            },
+            {
+                "final_url": f"{BASE_URL}/hgvs/{quote(f'{TRANSCRIPT}:c.1600G>A', safe='')}/contextuals",
+                "http_status": 200,
+                "media_type": "application/json",
+                "body": step1_terminal,
+            },
+            {
+                "final_url": f"{BASE_URL}/spdi/{quote('NM_000548.5:1709:G:A', safe='')}/canonical_representative",
+                "http_status": 200,
+                "media_type": "application/json",
+                "body": step2_terminal,
+            },
+        ]
+    )
+
+    result = api["project_clipe_rows"](
+        source_id=SOURCE_ID,
+        scores_csv_bytes=scores_payload,
+        expected_header=SCORES_HEADER,
+        expected_rows=1,
+        expected_scores_sha256=_sha256(scores_payload),
+        expected_scores_byte_length=len(scores_payload),
+        transcript=TRANSCRIPT,
+        genomic_accession=GENOMIC_ACCESSION,
+        assembly=ASSEMBLY,
+        reference_fasta_path=reference_path,
+        expected_reference_sha256=_sha256(reference_bytes),
+        transport=lambda _url: next(responses),
+        min_interval_seconds=MIN_INTERVAL_SECONDS,
+        retry_policy={
+            "retryable_http": sorted(RETRYABLE_HTTP),
+            "retryable_transport": ["timeout", "connection_error", "tls_error"],
+            "non_retryable_http": sorted(NON_RETRYABLE_HTTP),
+            "max_attempts_per_request": 3,
+        },
+        sleep=lambda _seconds: None,
+        fasta_deleted_allele_checker=lambda **kwargs: str(kwargs["deleted_sequence"]),
+    )
+
+    assert "request_index" in result and isinstance(result["request_index"], list)
+    assert len(result["request_index"]) == 3
+    expected_keys = {
+        "source_row",
+        "step",
+        "attempt",
+        "requested_url",
+        "final_url",
+        "http_status",
+        "body_sha256",
+        "elapsed_ms",
+        "retry_category",
+        "terminal",
+        "retry_exhausted",
+    }
+    for entry in result["request_index"]:
+        assert set(entry) == expected_keys
+
+    raw_attempts = None
+    for field in ("raw_attempt_envelopes", "attempt_envelopes", "http_attempts"):
+        if field in result:
+            raw_attempts = result[field]
+            break
+    assert raw_attempts is not None
+    assert isinstance(raw_attempts, list)
+    assert len(raw_attempts) == 3
+    assert [item["attempt"] for item in raw_attempts] == [1, 2, 1]
+    assert [item["http_status"] for item in raw_attempts] == [500, 200, 200]
+    assert [item["body_sha256"] for item in raw_attempts] == [
+        _sha256(step1_retry),
+        _sha256(step1_terminal),
+        _sha256(step2_terminal),
+    ]
+    row = result["mapping_rows"][0]
+    assert row["step1_body_sha256"] == _sha256(step1_terminal)
+    assert row["step2_body_sha256"] == _sha256(step2_terminal)
+    assert row["step1_body_sha256"] != _sha256(step1_retry)
+
+
 def test_cp09_frozen_scores_header_rowcount_duplicate_and_shape_validation_fail_closed() -> None:
     api = _ingest_api()
     rows = [
@@ -1740,6 +2069,82 @@ def test_cp16b_operator_reads_pinned_source_manifest_and_validates_it_before_sco
     assert "bundle_manifest.json" in source or "source_bundle_manifest" in source
 
 
+def test_cp16c_operator_https_transport_sets_connect_and_read_timeouts(monkeypatch: pytest.MonkeyPatch) -> None:
+    operator = _load_operator_module()
+    transport_cls = getattr(operator, "_RateLimitedHttpsTransport", None)
+    if transport_cls is None:
+        pytest.fail("operator must define _RateLimitedHttpsTransport for timeout behavior")
+
+    events: list[tuple[str, Any]] = []
+    observed: dict[str, Any] = {}
+
+    class _FakeSocket:
+        def settimeout(self, timeout: float) -> None:
+            observed["socket_timeout"] = timeout
+            events.append(("settimeout", timeout))
+
+    class _FakeResponse:
+        status = 200
+
+        def read(self) -> bytes:
+            events.append(("read", None))
+            return b"{}"
+
+        def getheader(self, _name: str) -> str:
+            return "application/json"
+
+    class _FakeHTTPSConnection:
+        def __init__(self, host: str, timeout: float | None = None, context: Any = None) -> None:
+            observed["host"] = host
+            observed["constructor_timeout"] = timeout
+            observed["context"] = context
+            self.sock = _FakeSocket()
+            events.append(("init", timeout))
+
+        def connect(self) -> None:
+            events.append(("connect", None))
+
+        def request(self, method: str, path: str, headers: dict[str, str]) -> None:
+            events.append(("request", (method, path, headers)))
+
+        def getresponse(self) -> _FakeResponse:
+            events.append(("getresponse", None))
+            return _FakeResponse()
+
+        def close(self) -> None:
+            events.append(("close", None))
+
+    monkeypatch.setattr(operator.http.client, "HTTPSConnection", _FakeHTTPSConnection)
+
+    transport = transport_cls(connect_timeout=9.0, read_timeout=27.0)
+    response = transport(f"{BASE_URL}/hgvs/{quote(f'{TRANSCRIPT}:c.1600G>A', safe='')}/contextuals")
+    assert response["http_status"] == 200
+    assert observed.get("constructor_timeout") == 9.0
+    event_names = [name for name, _ in events]
+    assert "connect" in event_names
+    assert "settimeout" in event_names
+    assert event_names.index("connect") < event_names.index("request")
+    assert observed.get("socket_timeout") == 27.0
+
+
+def test_cp16d_operator_run_abort_threshold_uses_retry_exhaustion_aggregate_not_status_rollup() -> None:
+    if not OPERATOR_SCRIPT.is_file():
+        pytest.fail(f"TSC2 cliPE projector operator script is not implemented: {OPERATOR_SCRIPT}")
+    source = OPERATOR_SCRIPT.read_text(encoding="utf-8")
+    assert "retry_exhausted_count" in source or "retry_exhausted_rows" in source
+    assert "STEP1_HTTP_ERROR" not in re.sub(r"\s+", " ", source.split("run_abort", 1)[-1])
+
+
+def test_cp16e_operator_raw_publication_uses_attempt_records_not_transport_capture_replay() -> None:
+    if not OPERATOR_SCRIPT.is_file():
+        pytest.fail(f"TSC2 cliPE projector operator script is not implemented: {OPERATOR_SCRIPT}")
+    source = OPERATOR_SCRIPT.read_text(encoding="utf-8")
+    assert "transport.captured" not in source
+    assert "reversed(transport.captured)" not in source
+    assert "raw_attempt" in source
+    assert re.search(r"raw/.+attempt", source) is not None
+
+
 def test_cp17_operator_cli_requires_explicit_roots_and_does_not_fall_back_to_cwd(monkeypatch: pytest.MonkeyPatch) -> None:
     operator = _load_operator_module()
     for env_name in (
@@ -1759,7 +2164,7 @@ def test_cp18_config_pins_exact_input_hashes_endpoints_run_name_and_shape_totals
         pytest.fail(f"TSC2 cliPE projector config is not implemented: {CONFIG_PATH}")
     config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
     assert config["spec_id"] == "raptor-v2-clipe-cdna-spdi-projector-acquisition-v1"
-    assert config["spec_version"] == "1.0.3"
+    assert config["spec_version"] == "1.0.4"
 
     source_bundle = config["inputs"]["source_bundle"]
     assert source_bundle["bundle_id"] == SOURCE_BUNDLE_ID
