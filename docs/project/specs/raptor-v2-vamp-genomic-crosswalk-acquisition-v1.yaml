@@ -1,6 +1,6 @@
 schema: raptor.project.spec.v1
 spec_id: raptor-v2-vamp-genomic-crosswalk-acquisition-v1
-spec_version: 1.0.2
+spec_version: 1.0.3
 status: APPROVED_BUILD
 created_at: '2026-09-12'
 owner: human-terminal-authority
@@ -67,6 +67,8 @@ inputs:
     license: MIT
     filename: FowlerLab/TSC2_analysis-V1.zip
     download_url: https://zenodo.org/api/records/20837254/files/FowlerLab/TSC2_analysis-V1.zip/content
+    request_accept: '*/*'
+    observed_content_type: application/octet-stream
     byte_length: 5746881
     md5: 8c35d120b65dbd93bc38d07c11b9538b
     sha256: f9ceaec5d4608d3d2f804b4f919d42030aceb7d72170efb7e1c49ec0c725f403
