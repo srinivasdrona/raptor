@@ -212,7 +212,7 @@ def _validate_transport_result(response: Any, *, requested_url: str) -> dict[str
             f"transport response body is not bytes: {type(body).__name__}"
         )
 
-    return {
+    result = {
         "requested_url": requested_url,
         "final_url": final_url,
         "http_status": http_status,
@@ -221,6 +221,18 @@ def _validate_transport_result(response: Any, *, requested_url: str) -> dict[str
         "byte_length": len(body),
         "sha256": hashlib.sha256(body).hexdigest(),
     }
+
+    if "response_headers" in response:
+        headers = response["response_headers"]
+        if not isinstance(headers, dict) or not all(
+            isinstance(key, str) and isinstance(value, str) for key, value in headers.items()
+        ):
+            raise ProjectorTransportValidationError(
+                f"transport response response_headers is not a str->str mapping: {type(headers).__name__}"
+            )
+        result["response_headers"] = headers
+
+    return result
 
 
 def fetch_raw_with_transport(

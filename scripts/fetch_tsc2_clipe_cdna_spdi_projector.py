@@ -204,9 +204,15 @@ class _RateLimitedHttpsTransport:
         if parts.scheme != "https":
             raise ProjectorOperatorError(f"refusing to fetch a non-https URL: {url}")
         connection = http.client.HTTPSConnection(
-            parts.netloc, timeout=self._read_timeout, context=self._ssl_context
+            parts.netloc, timeout=self._connect_timeout, context=self._ssl_context
         )
         try:
+            # Establish the connection explicitly (rather than letting the
+            # first .request() call do it implicitly) so the READ timeout
+            # can be applied to the connected socket separately from the
+            # CONNECT timeout passed to the constructor above.
+            connection.connect()
+            connection.sock.settimeout(self._read_timeout)
             path = parts.path + (f"?{parts.query}" if parts.query else "")
             connection.request(
                 "GET", path, headers={"Accept": "application/json", "User-Agent": _USER_AGENT}
@@ -215,33 +221,24 @@ class _RateLimitedHttpsTransport:
             body = response.read()
             status = response.status
             media_type = response.getheader("Content-Type") or "application/octet-stream"
+            response_headers: dict[str, str] | None = None
+            getheaders = getattr(response, "getheaders", None)
+            if callable(getheaders):
+                try:
+                    response_headers = {str(key): str(value) for key, value in getheaders()}
+                except Exception:  # noqa: BLE001 - header extraction is best-effort only
+                    response_headers = None
         finally:
             connection.close()
         # NCBI Variation Services' fixed-resource GET endpoints used by this
         # slice are not expected to redirect; final_url is always the
         # requested_url itself (endpoint.assert_allowed_projector_final_url
         # still independently re-verifies this on every call).
-        return {"final_url": url, "http_status": status, "media_type": media_type, "body": body}
+        result: dict[str, Any] = {"final_url": url, "http_status": status, "media_type": media_type, "body": body}
+        if response_headers is not None:
+            result["response_headers"] = response_headers
+        return result
 
-
-class _CapturingTransport:
-    """Wraps a real transport callable, recording every WELL-TYPED
-    ``(requested_url, response)`` pair it returns (in call order,
-    including every retry attempt) so the operator can reconstruct the
-    exact raw response bytes for its offline replay cache -- without
-    ``project_clipe_rows``/``ingest`` themselves ever needing to hand raw
-    bodies back across their pure, hash-only return contract. A raised
-    transport exception is never captured (it propagates unchanged)."""
-
-    def __init__(self, inner: Any) -> None:
-        self._inner = inner
-        self.captured: list[dict[str, Any]] = []
-
-    def __call__(self, url: str) -> dict[str, Any]:
-        response = self._inner(url)
-        if isinstance(response, dict) and isinstance(response.get("body"), bytes):
-            self.captured.append({"requested_url": url, **response})
-        return response
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -356,11 +353,10 @@ def main(argv: list[str] | None = None) -> int:
 
         min_interval_seconds = float(rate_limits_retries["min_interval_seconds"])
         timeout_seconds = rate_limits_retries.get("timeout_seconds", {})
-        raw_transport = _RateLimitedHttpsTransport(
+        transport = _RateLimitedHttpsTransport(
             connect_timeout=float(timeout_seconds.get("connect", 10)),
             read_timeout=float(timeout_seconds.get("read", 45)),
         )
-        transport = _CapturingTransport(raw_transport)
 
         started_at = time.monotonic()
         result = project_clipe_rows(
@@ -388,20 +384,20 @@ def main(argv: list[str] | None = None) -> int:
         # max_attempts_per_request) on more than this fraction of all rows
         # means the run is unreliable and must be reported as a failure
         # rather than silently published as a partial/degraded bundle (spec
-        # rate_limits_retries.row_failure_vs_run_abort.run_abort).
+        # rate_limits_retries.row_failure_vs_run_abort.run_abort). This
+        # threshold uses ONLY project_clipe_rows's own retry_exhausted_count
+        # aggregate -- never a status-vocabulary rollup -- since a row can
+        # fail permanently on a non-retryable status without ever having
+        # exhausted a retry budget at all.
         max_retry_exhaustion_rate = float(
             rate_limits_retries.get("run_abort", {}).get("max_retry_exhaustion_rate", 0.05)
         )
-        transport_failure_rows = sum(
-            count
-            for status, count in result["status_counts"].items()
-            if status in ("STEP1_HTTP_ERROR", "STEP2_HTTP_ERROR", "TRANSPORT_OR_BINDING_ERROR")
-        )
-        if total_rows > 0 and (transport_failure_rows / total_rows) > max_retry_exhaustion_rate:
+        retry_exhausted_count = int(result["retry_exhausted_count"])
+        if total_rows > 0 and (retry_exhausted_count / total_rows) > max_retry_exhaustion_rate:
             raise ProjectorAcquisitionError(
-                f"{transport_failure_rows}/{total_rows} rows failed on retryable HTTP/transport "
-                f"errors ({transport_failure_rows / total_rows:.1%}), exceeding the "
-                f"{max_retry_exhaustion_rate:.0%} run-abort threshold; refusing to publish an "
+                f"{retry_exhausted_count}/{total_rows} rows exhausted their retry budget on a "
+                f"retryable status/category ({retry_exhausted_count / total_rows:.1%}), exceeding "
+                f"the {max_retry_exhaustion_rate:.0%} run-abort threshold; refusing to publish an "
                 "unreliable partial bundle"
             )
 
@@ -414,35 +410,28 @@ def main(argv: list[str] | None = None) -> int:
         artifact_cfg = output_cfg["artifacts"]
         created_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+        # Every raw response file is built directly from project_clipe_rows's
+        # own attempt-level envelopes (never reconstructed by replaying a
+        # transport-capturing wrapper) -- one deterministic file per
+        # attempt actually made, including every retried-then-abandoned one.
         raw_payloads: dict[str, bytes] = {}
         raw_artifacts: list[dict[str, Any]] = []
         _step_suffix = {"step1": "contextuals", "step2": "canonical_representative", "step3": "hgvs"}
-        for entry in request_index:
-            step = entry["step"]
-            source_row = entry["source_row"]
-            body_sha256 = entry.get("body_sha256")
-            final_url = entry.get("final_url")
-            if body_sha256 is None or final_url is None:
-                continue
-            # Reconstruct the raw response bytes from the capturing
-            # transport's recorded attempts -- the LAST captured attempt for
-            # this (final_url, body_sha256) pair is the one project_clipe_rows
-            # actually accepted/recorded for this request_index entry.
-            body = None
-            for captured in reversed(transport.captured):
-                if captured.get("final_url") == final_url and hashlib.sha256(captured["body"]).hexdigest() == body_sha256:
-                    body = captured["body"]
-                    break
+        for raw_attempt in result["raw_attempt_envelopes"]:
+            step = raw_attempt["step"]
+            source_row = raw_attempt["source_row"]
+            attempt = raw_attempt["attempt"]
+            body = raw_attempt.get("body")
             if body is None:
                 continue
-            relative_path = f"raw/{step}/{source_row:04d}-{_step_suffix.get(step, step)}.json"
+            relative_path = f"raw/{step}/{source_row:04d}-attempt-{attempt:02d}-{_step_suffix.get(step, step)}.json"
             raw_payloads[relative_path] = body
             raw_artifacts.append(
                 {
-                    "artifact_id": f"raw-{step}-{source_row:04d}",
+                    "artifact_id": f"raw-{step}-{source_row:04d}-attempt-{attempt:02d}",
                     "relative_path": relative_path,
                     "byte_length": len(body),
-                    "sha256": body_sha256,
+                    "sha256": raw_attempt["body_sha256"],
                     "row_count": 1,
                 }
             )

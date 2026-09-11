@@ -40,6 +40,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
+import random
 import ssl
 import time
 from pathlib import Path
@@ -392,27 +393,57 @@ def _perform_step_request(
     retry_policy: dict[str, Any],
     sleep: Callable[[float], None],
     min_interval_seconds: float,
+    random_uniform: Callable[[float, float], float] = random.uniform,
 ) -> dict[str, Any]:
     """Perform one projector HTTP GET (step1 or step2) with rate-limiting
     and retry, ALWAYS via the injected ``transport``/``sleep`` callables
-    (never a real socket call or a real ``time.sleep``). Returns
-    ``{"outcome": "success", ...typed transport fields..., "elapsed_ms"}``
-    on an HTTP 200, or ``{"outcome": "failure", "error_detail": str,
-    "final_url": str | None, "http_status": int | None, "body_sha256":
-    str | None, "elapsed_ms": int}`` on a permanent (non-retryable, or
-    retry-budget-exhausted) row-scoped failure. ``endpoint.
-    ProjectorEndpointSecurityError`` (an allowlist/binding violation) is
-    NEVER caught here -- it always propagates and aborts the whole run."""
+    (never a real socket call or a real ``time.sleep``), and ALWAYS via the
+    injected ``random_uniform(low, high)`` seam for full-jitter backoff
+    (never the real ``random`` module's nondeterministic state in a test).
+    Returns ``{"outcome": "success"|"failure", ...typed transport fields
+    for the terminal attempt..., "elapsed_ms", "retry_exhausted": bool,
+    "attempts": list[dict]}`` where ``attempts`` carries ONE record per
+    HTTP round-trip actually made (``attempt`` 1-based, ``requested_url``,
+    ``final_url``, ``http_status``, ``media_type``, ``body``,
+    ``byte_length``, ``sha256``, ``elapsed_ms``, ``retry_category``,
+    ``terminal``, ``retry_exhausted``) -- every attempt is preserved, not
+    only the terminal one, so a retried-then-succeeded request's full
+    history remains auditable. ``endpoint.ProjectorEndpointSecurityError``
+    (an allowlist/binding violation) is NEVER caught here -- it always
+    propagates and aborts the whole run, on ANY attempt.
+
+    Full-jitter backoff: ``random_uniform(0, min(backoff_base * 2**(attempt-1),
+    backoff_cap))``. When ``retry_policy["honor_retry_after_header"]`` is
+    true and a retryable HTTP response carries a numeric ``Retry-After``
+    response header, the actual sleep before the next attempt is
+    ``max(jitter_backoff, retry_after_seconds)`` -- the server's requested
+    wait is always honored, never shortened by jitter."""
     max_attempts = max(1, int(retry_policy.get("max_attempts_per_request", 1)))
     retryable_http = set(retry_policy.get("retryable_http", []))
     retryable_transport_categories = set(retry_policy.get("retryable_transport", []))
     backoff_base = float(retry_policy.get("backoff_base_seconds", 2.0))
     backoff_cap = float(retry_policy.get("backoff_cap_seconds", 60.0))
+    honor_retry_after = bool(retry_policy.get("honor_retry_after_header", False))
 
-    last_error_detail = "no attempt made"
-    last_final_url: str | None = None
-    last_http_status: int | None = None
-    last_body_sha256: str | None = None
+    attempts: list[dict[str, Any]] = []
+
+    def _backoff_sleep(*, attempt: int, retry_after_seconds: float | None) -> None:
+        jitter_ceiling = min(backoff_base * (2 ** (attempt - 1)), backoff_cap)
+        backoff_seconds = random_uniform(0.0, jitter_ceiling)
+        if honor_retry_after and retry_after_seconds is not None:
+            backoff_seconds = max(backoff_seconds, retry_after_seconds)
+        sleep(backoff_seconds)
+
+    def _extract_retry_after(response_headers: dict[str, str] | None) -> float | None:
+        if not response_headers:
+            return None
+        raw_value = response_headers.get("Retry-After", response_headers.get("retry-after"))
+        if raw_value is None:
+            return None
+        try:
+            return float(raw_value)
+        except (TypeError, ValueError):
+            return None
 
     for attempt in range(1, max_attempts + 1):
         sleep(min_interval_seconds)
@@ -421,22 +452,38 @@ def _perform_step_request(
             validated = fetch_raw_with_transport(requested_url=url, transport=transport)
         except ProjectorTransportValidationError as exc:
             elapsed_ms = int((time.perf_counter() - start) * 1000)
-            # Classify the UNDERLYING transport exception (never a
-            # malformed-shape validation failure, which has no meaningful
-            # "category" and is never retried) via its type only -- never
-            # its message, which may carry a secret/signed value.
             category = _classify_transport_exception(exc.__cause__) if exc.__cause__ is not None else "other"
-            last_error_detail = f"transport failure: {type(exc).__name__} (category={category})"
-            if category in retryable_transport_categories and attempt < max_attempts:
-                sleep(min(backoff_base * (2 ** (attempt - 1)), backoff_cap))
+            is_retryable = category in retryable_transport_categories
+            is_last_attempt = attempt >= max_attempts
+            terminal = (not is_retryable) or is_last_attempt
+            attempts.append(
+                {
+                    "attempt": attempt,
+                    "requested_url": url,
+                    "final_url": None,
+                    "http_status": None,
+                    "media_type": None,
+                    "body": None,
+                    "byte_length": None,
+                    "sha256": None,
+                    "elapsed_ms": elapsed_ms,
+                    "retry_category": category,
+                    "terminal": terminal,
+                    "retry_exhausted": terminal and is_retryable,
+                }
+            )
+            if is_retryable and not is_last_attempt:
+                _backoff_sleep(attempt=attempt, retry_after_seconds=None)
                 continue
             return {
                 "outcome": "failure",
-                "error_detail": last_error_detail,
-                "final_url": last_final_url,
-                "http_status": last_http_status,
-                "body_sha256": last_body_sha256,
+                "error_detail": f"transport failure: {type(exc).__name__} (category={category})",
+                "final_url": None,
+                "http_status": None,
+                "body_sha256": None,
                 "elapsed_ms": elapsed_ms,
+                "retry_exhausted": terminal and is_retryable,
+                "attempts": attempts,
             }
 
         elapsed_ms = int((time.perf_counter() - start) * 1000)
@@ -446,37 +493,77 @@ def _perform_step_request(
         # never retried.
         assert_allowed_projector_final_url(requested_url=url, final_url=validated["final_url"])
 
-        last_final_url = validated["final_url"]
-        last_http_status = validated["http_status"]
-        last_body_sha256 = validated["sha256"]
-
-        if validated["http_status"] == 200:
+        http_status = validated["http_status"]
+        if http_status == 200:
+            attempts.append(
+                {
+                    "attempt": attempt,
+                    "requested_url": url,
+                    "final_url": validated["final_url"],
+                    "http_status": http_status,
+                    "media_type": validated["media_type"],
+                    "body": validated["body"],
+                    "byte_length": validated["byte_length"],
+                    "sha256": validated["sha256"],
+                    "elapsed_ms": elapsed_ms,
+                    "retry_category": "success",
+                    "terminal": True,
+                    "retry_exhausted": False,
+                }
+            )
             return {
                 "outcome": "success",
                 **validated,
                 "elapsed_ms": elapsed_ms,
+                "retry_exhausted": False,
+                "attempts": attempts,
             }
 
-        last_error_detail = f"http_status={validated['http_status']}"
-        if validated["http_status"] in retryable_http and attempt < max_attempts:
-            sleep(min(backoff_base * (2 ** (attempt - 1)), backoff_cap))
+        is_retryable = http_status in retryable_http
+        is_last_attempt = attempt >= max_attempts
+        terminal = (not is_retryable) or is_last_attempt
+        attempts.append(
+            {
+                "attempt": attempt,
+                "requested_url": url,
+                "final_url": validated["final_url"],
+                "http_status": http_status,
+                "media_type": validated["media_type"],
+                "body": validated["body"],
+                "byte_length": validated["byte_length"],
+                "sha256": validated["sha256"],
+                "elapsed_ms": elapsed_ms,
+                "retry_category": "retryable_http" if is_retryable else "non_retryable_http",
+                "terminal": terminal,
+                "retry_exhausted": terminal and is_retryable,
+            }
+        )
+        if is_retryable and not is_last_attempt:
+            retry_after_seconds = _extract_retry_after(validated.get("response_headers"))
+            _backoff_sleep(attempt=attempt, retry_after_seconds=retry_after_seconds)
             continue
         return {
             "outcome": "failure",
-            "error_detail": last_error_detail,
-            "final_url": last_final_url,
-            "http_status": last_http_status,
-            "body_sha256": last_body_sha256,
+            "error_detail": f"http_status={http_status}",
+            "final_url": validated["final_url"],
+            "http_status": http_status,
+            "body_sha256": validated["sha256"],
             "elapsed_ms": elapsed_ms,
+            "retry_exhausted": terminal and is_retryable,
+            "attempts": attempts,
         }
 
+    # Unreachable in practice (the loop always returns), but keeps a safe
+    # fallback shape if max_attempts somehow permitted zero iterations.
     return {
         "outcome": "failure",
-        "error_detail": last_error_detail,
-        "final_url": last_final_url,
-        "http_status": last_http_status,
-        "body_sha256": last_body_sha256,
+        "error_detail": "no attempt made",
+        "final_url": None,
+        "http_status": None,
+        "body_sha256": None,
         "elapsed_ms": 0,
+        "retry_exhausted": False,
+        "attempts": attempts,
     }
 
 
@@ -498,6 +585,7 @@ def project_clipe_rows(
     retry_policy: dict[str, Any],
     sleep: Callable[[float], None],
     fasta_deleted_allele_checker: Callable[..., str] | None = None,
+    random_uniform: Callable[[float, float], float] = random.uniform,
 ) -> dict[str, Any]:
     """Project every row of the frozen cliPE scores CSV from
     ``transcript`` c.HGVS to a canonical ``genomic_accession`` SPDI via the
@@ -506,9 +594,22 @@ def project_clipe_rows(
     pinned reference FASTA checksum is verified FIRST -- before the scores
     CSV is even parsed, and before any request is issued (spec
     ``fasta_validation.precondition``). Returns ``{"mapping_rows":
-    list[dict], "request_index": list[dict], "status_counts": dict[str,
-    int], "shape_counts": dict[str, int]}``. Raises ``ReferenceIntegrityError``
-    or ``FrozenInputError`` before any transport call on an input-integrity
+    list[dict], "request_index": list[dict], "raw_attempt_envelopes":
+    list[dict], "status_counts": dict[str, int], "shape_counts": dict[str,
+    int], "retry_exhausted_rows": list[int], "retry_exhausted_count":
+    int}``. ``request_index``/``raw_attempt_envelopes`` are ATTEMPT-level
+    (one entry per HTTP round-trip actually made, including every retried-
+    then-abandoned attempt) -- ``raw_attempt_envelopes`` additionally
+    preserves the actual response ``body`` bytes for every attempt so the
+    operator can publish a raw file per attempt without needing to replay/
+    re-derive them from the transport. A row's ``mapping_rows`` entry's
+    ``step1_body_sha256``/``step2_body_sha256`` always reflect the
+    TERMINAL (successful) body for that step, never an earlier failed
+    retry's body. ``retry_exhausted_rows`` lists the ``source_row`` of
+    every row where some step's retry budget was genuinely exhausted on a
+    retryable status/category (never a row that failed immediately on a
+    non-retryable status). Raises ``ReferenceIntegrityError`` or
+    ``FrozenInputError`` before any transport call on an input-integrity
     failure; raises ``endpoint.ProjectorEndpointSecurityError`` (never
     caught) the instant any binding/allowlist violation is observed,
     aborting the whole run immediately."""
@@ -533,21 +634,52 @@ def project_clipe_rows(
 
     mapping_rows: list[dict[str, Any]] = []
     request_index: list[dict[str, Any]] = []
+    raw_attempt_envelopes: list[dict[str, Any]] = []
     status_counts: dict[str, int] = {}
     shape_counts: dict[str, int] = {}
+    retry_exhausted_rows: list[int] = []
 
-    def _record_request(*, source_row: int, step: str, outcome: dict[str, Any], requested_url: str) -> None:
-        request_index.append(
-            {
-                "source_row": source_row,
-                "step": step,
-                "requested_url": requested_url,
-                "final_url": outcome.get("final_url"),
-                "http_status": outcome.get("http_status"),
-                "body_sha256": outcome.get("sha256") or outcome.get("body_sha256"),
-                "elapsed_ms": outcome.get("elapsed_ms", 0),
-            }
+    def _perform(*, url: str) -> dict[str, Any]:
+        return _perform_step_request(
+            url=url,
+            transport=transport,
+            retry_policy=retry_policy,
+            sleep=sleep,
+            min_interval_seconds=min_interval_seconds,
+            random_uniform=random_uniform,
         )
+
+    def _record_attempts(*, source_row: int, step: str, outcome: dict[str, Any]) -> None:
+        for attempt in outcome.get("attempts", []):
+            request_index.append(
+                {
+                    "source_row": source_row,
+                    "step": step,
+                    "attempt": attempt["attempt"],
+                    "requested_url": attempt["requested_url"],
+                    "final_url": attempt["final_url"],
+                    "http_status": attempt["http_status"],
+                    "body_sha256": attempt["sha256"],
+                    "elapsed_ms": attempt["elapsed_ms"],
+                    "retry_category": attempt["retry_category"],
+                    "terminal": attempt["terminal"],
+                    "retry_exhausted": attempt["retry_exhausted"],
+                }
+            )
+            raw_attempt_envelopes.append(
+                {
+                    "source_row": source_row,
+                    "step": step,
+                    "attempt": attempt["attempt"],
+                    "requested_url": attempt["requested_url"],
+                    "final_url": attempt["final_url"],
+                    "http_status": attempt["http_status"],
+                    "media_type": attempt["media_type"],
+                    "body": attempt["body"],
+                    "body_sha256": attempt["sha256"],
+                    "elapsed_ms": attempt["elapsed_ms"],
+                }
+            )
 
     def _finalize_row(row_fields: dict[str, Any]) -> None:
         built = ClipeCdnaSpdiMappingRow(**row_fields).to_dict()
@@ -575,16 +707,13 @@ def project_clipe_rows(
 
         # --- step1: hgvs contextuals -------------------------------------------------
         step1_url = build_step1_hgvs_contextuals_url(hgvs_c=hgvs_c)
-        step1_outcome = _perform_step_request(
-            url=step1_url,
-            transport=transport,
-            retry_policy=retry_policy,
-            sleep=sleep,
-            min_interval_seconds=min_interval_seconds,
-        )
-        _record_request(source_row=source_row, step="step1", outcome=step1_outcome, requested_url=step1_url)
+        step1_outcome = _perform(url=step1_url)
+        _record_attempts(source_row=source_row, step="step1", outcome=step1_outcome)
+        row_retry_exhausted = bool(step1_outcome.get("retry_exhausted"))
 
         if step1_outcome["outcome"] != "success":
+            if row_retry_exhausted:
+                retry_exhausted_rows.append(source_row)
             _finalize_row(
                 {
                     **base_row_fields,
@@ -630,16 +759,14 @@ def project_clipe_rows(
 
         # --- step2: spdi canonical_representative -------------------------------------
         step2_url = build_step2_spdi_canonical_representative_url(spdi=tx_spdi)
-        step2_outcome = _perform_step_request(
-            url=step2_url,
-            transport=transport,
-            retry_policy=retry_policy,
-            sleep=sleep,
-            min_interval_seconds=min_interval_seconds,
-        )
-        _record_request(source_row=source_row, step="step2", outcome=step2_outcome, requested_url=step2_url)
+        step2_outcome = _perform(url=step2_url)
+        _record_attempts(source_row=source_row, step="step2", outcome=step2_outcome)
+        if step2_outcome.get("retry_exhausted"):
+            row_retry_exhausted = True
 
         if step2_outcome["outcome"] != "success":
+            if row_retry_exhausted:
+                retry_exhausted_rows.append(source_row)
             _finalize_row(
                 {
                     **base_row_fields,
@@ -765,8 +892,11 @@ def project_clipe_rows(
     return {
         "mapping_rows": mapping_rows,
         "request_index": request_index,
+        "raw_attempt_envelopes": raw_attempt_envelopes,
         "status_counts": status_counts,
         "shape_counts": shape_counts,
+        "retry_exhausted_rows": retry_exhausted_rows,
+        "retry_exhausted_count": len(retry_exhausted_rows),
     }
 
 
