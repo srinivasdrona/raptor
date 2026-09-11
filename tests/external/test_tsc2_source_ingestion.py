@@ -11,6 +11,7 @@ from typing import Any
 from urllib.parse import parse_qs, parse_qsl, urlencode, urlsplit, urlunsplit
 
 import pytest
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src" / "raptor"
@@ -98,6 +99,10 @@ def _mavedb_api() -> dict[str, Any]:
     module = _load_module("raptor.external.tsc2_sources.mavedb")
     return {
         "MaveSourceVerificationError": _symbol(module, "MaveSourceVerificationError"),
+        "assert_allowed_mavedb_final_url": _symbol(
+            module,
+            "assert_allowed_mavedb_final_url",
+        ),
         "verify_scoreset": _symbol(module, "verify_scoreset"),
     }
 
@@ -106,6 +111,14 @@ def _igvf_api() -> dict[str, Any]:
     module = _load_module("raptor.external.tsc2_sources.igvf")
     return {
         "IgvfVerificationError": _symbol(module, "IgvfVerificationError"),
+        "assert_allowed_igvf_metadata_final_url": _symbol(
+            module,
+            "assert_allowed_igvf_metadata_final_url",
+        ),
+        "assert_allowed_igvf_download_final_url": _symbol(
+            module,
+            "assert_allowed_igvf_download_final_url",
+        ),
         "verify_analysis_and_file": _symbol(module, "verify_analysis_and_file"),
     }
 
@@ -1862,10 +1875,22 @@ def test_ac10_mave_sources_yaml_no_longer_marks_released_igvf_accessions_pending
     urn: str,
 ) -> None:
     config_path = REPO_ROOT / "configs" / "external" / "mave_sources.yaml"
-    text = config_path.read_text(encoding="utf-8")
-    block = _extract_yaml_entry_block(text, urn=urn).lower()
-    assert "verification: confirm_pending" not in block
-    assert "access-not-held" not in block
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    sources = payload.get("sources")
+    assert isinstance(sources, list)
+
+    selected = next(
+        (
+            source
+            for source in sources
+            if isinstance(source, dict) and source.get("urn") == urn
+        ),
+        None,
+    )
+    assert isinstance(selected, dict), f"expected source entry for {urn}"
+    assert selected.get("verification") != "confirm_pending"
+    notes = selected.get("notes")
+    assert "access-not-held" not in (notes or "").lower()
 
 
 def test_ac14_aggregate_summary_schema_and_required_source_ids_are_validated_in_memory() -> None:

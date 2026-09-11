@@ -89,6 +89,19 @@ def test_register_verifies_public_cc0_transcript_and_hash_fail_closed() -> None:
             observed_variant_count=208,
         )
 
+    metadata_verified_entry = _make_entry(
+        "a" * 64, verification="released_metadata_verified"
+    )
+    assert metadata_verified_entry.verification == "released_metadata_verified"
+    with pytest.raises(api["ConfirmationPendingError"]):
+        api["verify_registered_source"](
+            metadata_verified_entry,
+            observed_transcript="NM_000548.5",
+            observed_license="CC0-1.0",
+            observed_sha256="a" * 64,
+            observed_variant_count=208,
+        )
+
     with pytest.raises(api["SourceVerificationError"], match="pinned|unpinned|sha"):
         api["verify_registered_source"](
             _make_entry(""),
