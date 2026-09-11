@@ -40,6 +40,14 @@ FORBIDDEN_STATUS_TOKENS = (
 )
 
 RETIRED_PMC_OA_ENDPOINT_PATH = "pmc/utils/oa/oa.fcgi"
+REQUIRED_PILOT_SOURCE_IDS = [
+    "pubmed",
+    "litvar2",
+    "pmc",
+    "mavedb_clipe",
+    "igvf_vamp_seq",
+    "igvf_sge",
+]
 
 
 def _load_module(module_name: str):
@@ -541,6 +549,29 @@ def _minimal_bundle_manifest_and_payload(
         boundaries={"network": "injected", "external_output_only": True},
     )
     return manifest, {relative_path: body}
+
+
+def _expected_missing_source_ids(source_ids: list[str]) -> list[str]:
+    source_id_set = set(source_ids)
+    return [source_id for source_id in REQUIRED_PILOT_SOURCE_IDS if source_id not in source_id_set]
+
+
+def _artifact_integrity_map(artifacts: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return {
+        artifact["artifact_id"]: {
+            "sha256": artifact["sha256"],
+            "md5": artifact["md5"],
+            "byte_length": artifact["byte_length"],
+            "verification": artifact["verification"],
+        }
+        for artifact in artifacts
+    }
+
+
+def _assert_hex_digest(value: str, *, length: int) -> None:
+    assert isinstance(value, str)
+    assert len(value) == length
+    int(value, 16)
 
 
 def _extract_yaml_entry_block(yaml_text: str, *, urn: str) -> str:
@@ -1307,29 +1338,57 @@ def test_ac14_committed_pilot_summary_is_aggregate_only() -> None:
         boundaries={"network": "injected", "external_output_only": True},
     )
     summary = api["build_pilot_summary"](manifest)
+    source_ids = [source["source_id"] for source in sources]
+    expected_source_states = {
+        source["source_id"]: {
+            "source_kind": source["source_kind"],
+            "lifecycle_state": source["lifecycle_state"],
+            "access_state": source["access_state"],
+            "licence_state": source["licence_state"],
+        }
+        for source in sources
+    }
+    expected_source_observations = {
+        source["source_id"]: source["observations"] for source in sources
+    }
+
+    assert summary["schema"] == "raptor.external.tsc2_source_pilot_summary.v1"
     assert set(summary) == {
         "schema",
         "bundle_id",
+        "manifest_content_hash",
         "counts",
+        "source_ids",
+        "missing_source_ids",
         "truncation",
         "source_states",
-        "artifact_hashes",
+        "source_observations",
+        "artifact_integrity",
         "normalization_gaps",
     }
-    assert summary["counts"]["sources"] == 2
-    assert summary["counts"]["artifacts"] == 2
-    assert summary["artifact_hashes"] == {
-        "pubmed-search": artifacts[0]["sha256"],
-        "litvar-gene": artifacts[1]["sha256"],
-    }
+    assert "artifact_hashes" not in summary
+    assert summary["bundle_id"] == manifest["bundle_id"]
+    assert summary["manifest_content_hash"] == manifest["content_hash"]
+    assert summary["counts"] == {"sources": 2, "artifacts": 2}
+    assert summary["source_ids"] == source_ids
+    assert summary["missing_source_ids"] == _expected_missing_source_ids(source_ids)
+    assert summary["truncation"] == manifest["truncation"]
+    assert summary["source_states"] == expected_source_states
+    assert summary["source_observations"] == expected_source_observations
+    assert summary["artifact_integrity"] == _artifact_integrity_map(artifacts)
 
     blob = json.dumps(summary, sort_keys=True).lower()
     forbidden_payload_tokens = (
+        "requested_url",
+        "final_url",
         "variant_id",
         "hgvs",
         "full_text",
         "abstract_text",
         "patient",
+        "api_key",
+        "awsaccesskeyid",
+        "x-amz-signature",
         "classification",
         "pathogenic",
         "benign",
@@ -2254,14 +2313,6 @@ def test_ac10_staged_igvf_release_state_does_not_promote_legacy_mave_registry() 
 
 def test_ac14_aggregate_summary_schema_and_required_source_ids_are_validated_in_memory() -> None:
     api = _bundle_api()
-    required_source_ids = [
-        "pubmed",
-        "litvar2",
-        "pmc",
-        "mavedb_clipe",
-        "igvf_vamp_seq",
-        "igvf_sge",
-    ]
     source_kind = {
         "pubmed": "pubmed",
         "litvar2": "litvar2",
@@ -2273,7 +2324,7 @@ def test_ac14_aggregate_summary_schema_and_required_source_ids_are_validated_in_
 
     artifacts: list[dict[str, Any]] = []
     sources: list[dict[str, Any]] = []
-    for index, source_id in enumerate(required_source_ids, start=1):
+    for index, source_id in enumerate(REQUIRED_PILOT_SOURCE_IDS, start=1):
         body = f"summary-{source_id}".encode("utf-8")
         artifact_id = f"{source_id}-artifact"
         relative_path = f"{source_id}/artifact-{index}.bin"
@@ -2300,6 +2351,7 @@ def test_ac14_aggregate_summary_schema_and_required_source_ids_are_validated_in_
                 licence_state=licence_state,
             )
         )
+        sources[-1]["observations"] = {"source_count": index}
 
     manifest = api["build_bundle_manifest"](
         bundle_id="tsc2-source-pilot-2026-09-09",
@@ -2311,16 +2363,137 @@ def test_ac14_aggregate_summary_schema_and_required_source_ids_are_validated_in_
         boundaries={"network": "injected", "external_output_only": True},
     )
     summary = api["build_pilot_summary"](manifest)
+    source_ids = [source["source_id"] for source in sources]
 
     assert summary["schema"] == "raptor.external.tsc2_source_pilot_summary.v1"
     assert set(summary) == {
         "schema",
         "bundle_id",
+        "manifest_content_hash",
         "counts",
+        "source_ids",
+        "missing_source_ids",
         "truncation",
         "source_states",
-        "artifact_hashes",
+        "source_observations",
+        "artifact_integrity",
         "normalization_gaps",
     }
+    assert "artifact_hashes" not in summary
+    assert summary["bundle_id"] == manifest["bundle_id"]
+    assert summary["manifest_content_hash"] == manifest["content_hash"]
     assert summary["counts"] == {"sources": 6, "artifacts": 6}
-    assert set(summary["source_states"]) == set(required_source_ids)
+    assert summary["source_ids"] == source_ids
+    assert summary["missing_source_ids"] == []
+    assert summary["truncation"] == manifest["truncation"]
+    assert summary["source_states"] == {
+        source["source_id"]: {
+            "source_kind": source["source_kind"],
+            "lifecycle_state": source["lifecycle_state"],
+            "access_state": source["access_state"],
+            "licence_state": source["licence_state"],
+        }
+        for source in sources
+    }
+    assert summary["source_observations"] == {
+        source["source_id"]: source["observations"] for source in sources
+    }
+    assert summary["artifact_integrity"] == _artifact_integrity_map(artifacts)
+
+
+def test_ac14_generated_pilot_summary_file_matches_v1_0_5_contract_if_present() -> None:
+    summary_path = (
+        REPO_ROOT / "data" / "census" / "tsc2_source_ingestion_pilot_2026-09-09.json"
+    )
+    if not summary_path.is_file():
+        pytest.skip(f"pilot summary file is absent: {summary_path}")
+
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+
+    assert set(summary) == {
+        "schema",
+        "bundle_id",
+        "manifest_content_hash",
+        "counts",
+        "source_ids",
+        "missing_source_ids",
+        "truncation",
+        "source_states",
+        "source_observations",
+        "artifact_integrity",
+        "normalization_gaps",
+    }
+    assert "artifact_hashes" not in summary
+    assert summary["schema"] == "raptor.external.tsc2_source_pilot_summary.v1"
+    assert summary["bundle_id"] == "tsc2-source-pilot-2026-09-09"
+    assert (
+        summary["manifest_content_hash"]
+        == "63bd6eb4e7182b7f2d345cd78b3a110a59c361c72d521b88990c475919865808"
+    )
+    assert summary["source_ids"] == REQUIRED_PILOT_SOURCE_IDS
+    assert summary["missing_source_ids"] == []
+    assert summary["counts"] == {"sources": 6, "artifacts": 12}
+    assert summary["truncation"] == {
+        "pubmed": {"count": 189, "returned_count": 100, "is_truncated": True}
+    }
+
+    source_states = summary["source_states"]
+    assert isinstance(source_states, dict)
+    assert set(source_states) == set(REQUIRED_PILOT_SOURCE_IDS)
+
+    source_observations = summary["source_observations"]
+    assert isinstance(source_observations, dict)
+    assert set(source_observations) == set(REQUIRED_PILOT_SOURCE_IDS)
+    assert source_observations["pubmed"]["count"] == 189
+    assert source_observations["pubmed"]["returned_count"] == 100
+    assert source_observations["litvar2"]["mapping_count"] == 3946
+    assert source_observations["litvar2"]["rsid_mapping_count"] == 2902
+    assert source_observations["litvar2"]["rsidless_mapping_count"] == 1044
+    assert source_observations["mavedb_clipe"]["variant_count"] == 208
+    assert source_observations["igvf_vamp_seq"]["status"] == "released"
+    assert source_observations["igvf_vamp_seq"]["assembly"] == "GRCh38"
+    assert source_observations["igvf_vamp_seq"]["byte_length"] == 439700
+    assert source_observations["igvf_sge"]["status"] == "released"
+    assert source_observations["igvf_sge"]["assembly"] == "GRCh38"
+    assert source_observations["igvf_sge"]["byte_length"] == 35101
+
+    artifact_integrity = summary["artifact_integrity"]
+    assert isinstance(artifact_integrity, dict)
+    assert len(artifact_integrity) == 12
+    assert len(set(artifact_integrity)) == 12
+    assert artifact_integrity["igvf_vamp_seq-download-tsv-gz"]["md5"] == "1a397944b7a5158b3d63999dfcf926db"
+    assert artifact_integrity["igvf_vamp_seq-download-tsv-gz"]["byte_length"] == 439700
+    assert artifact_integrity["igvf_sge-download-tsv-gz"]["md5"] == "c188e0a9dd4c67dfac13381d3879aedf"
+    assert artifact_integrity["igvf_sge-download-tsv-gz"]["byte_length"] == 35101
+    assert (
+        artifact_integrity["mavedb_clipe-scores-csv"]["sha256"]
+        == "74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717"
+    )
+    for entry in artifact_integrity.values():
+        assert set(entry) == {"sha256", "md5", "byte_length", "verification"}
+        _assert_hex_digest(entry["sha256"], length=64)
+        _assert_hex_digest(entry["md5"], length=32)
+        assert isinstance(entry["byte_length"], int)
+        assert entry["byte_length"] > 0
+        assert isinstance(entry["verification"], str)
+        assert entry["verification"]
+
+    blob = json.dumps(summary, sort_keys=True).lower()
+    forbidden_payload_tokens = (
+        "requested_url",
+        "final_url",
+        "full_text",
+        "abstract_text",
+        "variant_id",
+        "hgvs",
+        "patient",
+        "api_key",
+        "awsaccesskeyid",
+        "x-amz-signature",
+        "classification",
+        "pathogenic",
+        "benign",
+        "ps3",
+        "bs3",
+    )
+    assert not any(token in blob for token in forbidden_payload_tokens)
