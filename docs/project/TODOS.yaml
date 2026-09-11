@@ -1785,3 +1785,39 @@ todos:
   - v2-functional-source-build
   - v2-literature-source-build
   created: '2026-09-09'
+- id: v2-functional-normalization-spec
+  title: Specifying functional identity normalization
+  description: Versioned the offline $TSC2$ functional identity contract through
+    v1.0.1, including exact frozen-input pins, conservative resolution states,
+    reference-backed SPDI and create-only output.
+  status: done
+  depends_on:
+  - v2-source-pilot
+  created: '2026-09-11'
+- id: v2-functional-normalization-tests
+  title: Writing functional normalization RED tests
+  description: Added independent acceptance and checker-regression coverage for
+    frozen inputs, real CRLF source formats, exact artifact selection, row
+    invariants, conservation, publication safety and aggregate summaries.
+  status: done
+  depends_on:
+  - v2-functional-normalization-spec
+  created: '2026-09-11'
+- id: v2-functional-normalization-build
+  title: Building functional identity normalization
+  description: Implemented offline cliPE, VAMP-seq and SGE row normalization,
+    using the pinned $\text{NC\_000016.10}$ reference and explicit unresolved
+    states without score interpretation.
+  status: done
+  depends_on:
+  - v2-functional-normalization-tests
+  created: '2026-09-11'
+- id: v2-functional-normalization-pilot
+  title: Running functional normalization pilot
+  description: Conserved 9,914 rows into three external normalized JSONL artifacts;
+    resolved 423 SGE SPDI rows, blocked 27 reference mismatches and pinned manifest
+    SHA-256 74f15f22cfb6e876a8fab3a16c841e6f33317eadd58ef04547e4c060162afb48.
+  status: done
+  depends_on:
+  - v2-functional-normalization-build
+  created: '2026-09-11'
