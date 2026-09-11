@@ -273,10 +273,21 @@ class _RateLimitedHttpsTransport:
         parts = urlsplit(url)
         if parts.scheme != "https":
             raise VampCrosswalkOperatorError(f"refusing to fetch a non-https URL: {url}")
-        connection = http.client.HTTPSConnection(parts.netloc, timeout=self._read_timeout, context=self._ssl_context)
+        connection = http.client.HTTPSConnection(
+            parts.netloc, timeout=self._connect_timeout, context=self._ssl_context
+        )
         try:
+            # Establish the connection explicitly (rather than letting the
+            # first .request() call do it implicitly) so the READ timeout
+            # can be applied to the connected socket separately from the
+            # CONNECT timeout passed to the constructor above.
+            connection.connect()
+            connection.sock.settimeout(self._read_timeout)
             path = parts.path + (f"?{parts.query}" if parts.query else "")
-            connection.request("GET", path, headers={"Accept": "application/zip", "User-Agent": _USER_AGENT})
+            # Zenodo's file-download endpoint 406s on a narrow media-type
+            # Accept header (e.g. "application/zip") -- only the universal
+            # wildcard is guaranteed to succeed for this archive.
+            connection.request("GET", path, headers={"Accept": "*/*", "User-Agent": _USER_AGENT})
             response = connection.getresponse()
             body = response.read()
             status = response.status
