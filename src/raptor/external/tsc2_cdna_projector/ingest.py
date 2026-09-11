@@ -43,6 +43,8 @@ import io
 import random
 import ssl
 import time
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any, Callable
 
@@ -394,6 +396,7 @@ def _perform_step_request(
     sleep: Callable[[float], None],
     min_interval_seconds: float,
     random_uniform: Callable[[float, float], float] = random.uniform,
+    current_time: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
 ) -> dict[str, Any]:
     """Perform one projector HTTP GET (step1 or step2) with rate-limiting
     and retry, ALWAYS via the injected ``transport``/``sleep`` callables
@@ -414,10 +417,17 @@ def _perform_step_request(
 
     Full-jitter backoff: ``random_uniform(0, min(backoff_base * 2**(attempt-1),
     backoff_cap))``. When ``retry_policy["honor_retry_after_header"]`` is
-    true and a retryable HTTP response carries a numeric ``Retry-After``
-    response header, the actual sleep before the next attempt is
-    ``max(jitter_backoff, retry_after_seconds)`` -- the server's requested
-    wait is always honored, never shortened by jitter."""
+    true and a retryable HTTP response carries a ``Retry-After`` response
+    header (looked up CASE-INSENSITIVELY, e.g. ``retry-after``/
+    ``rEtRy-AfTeR``), its value is parsed as EITHER a delay-seconds
+    integer/float OR an RFC 7231 HTTP-date (via the injected
+    ``current_time()`` seam -- never the real wall clock in a test -- as
+    ``max(0, parsed_date - current_time())``); the actual sleep before the
+    next attempt is then ``max(jitter_backoff, retry_after_seconds)`` --
+    the server's requested wait is always honored, never shortened by
+    jitter. A malformed or already-past ``Retry-After`` value NEVER raises
+    -- it simply contributes nothing (``None``/``0``), falling back to
+    plain jitter backoff."""
     max_attempts = max(1, int(retry_policy.get("max_attempts_per_request", 1)))
     retryable_http = set(retry_policy.get("retryable_http", []))
     retryable_transport_categories = set(retry_policy.get("retryable_transport", []))
@@ -434,16 +444,41 @@ def _perform_step_request(
             backoff_seconds = max(backoff_seconds, retry_after_seconds)
         sleep(backoff_seconds)
 
-    def _extract_retry_after(response_headers: dict[str, str] | None) -> float | None:
+    def _find_header_value(response_headers: dict[str, str] | None, name: str) -> str | None:
         if not response_headers:
             return None
-        raw_value = response_headers.get("Retry-After", response_headers.get("retry-after"))
+        lowered_name = name.lower()
+        for key, value in response_headers.items():
+            if isinstance(key, str) and key.lower() == lowered_name:
+                return value
+        return None
+
+    def _extract_retry_after(response_headers: dict[str, str] | None) -> float | None:
+        raw_value = _find_header_value(response_headers, "Retry-After")
         if raw_value is None:
             return None
         try:
             return float(raw_value)
         except (TypeError, ValueError):
+            pass
+        # Not a delay-seconds value -- try RFC 7231 HTTP-date. Any parse
+        # failure (malformed date) falls back to "no Retry-After signal"
+        # rather than raising -- this is best-effort compliance, never a
+        # crash-worthy condition.
+        try:
+            parsed = parsedate_to_datetime(raw_value)
+        except (TypeError, ValueError, IndexError, OverflowError):
             return None
+        if parsed is None:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        now = current_time()
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        # A date already in the past contributes 0 -- never a negative
+        # sleep -- which simply lets the plain jitter backoff stand.
+        return max(0.0, (parsed - now).total_seconds())
 
     for attempt in range(1, max_attempts + 1):
         sleep(min_interval_seconds)
@@ -586,6 +621,7 @@ def project_clipe_rows(
     sleep: Callable[[float], None],
     fasta_deleted_allele_checker: Callable[..., str] | None = None,
     random_uniform: Callable[[float, float], float] = random.uniform,
+    current_time: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
 ) -> dict[str, Any]:
     """Project every row of the frozen cliPE scores CSV from
     ``transcript`` c.HGVS to a canonical ``genomic_accession`` SPDI via the
@@ -647,6 +683,7 @@ def project_clipe_rows(
             sleep=sleep,
             min_interval_seconds=min_interval_seconds,
             random_uniform=random_uniform,
+            current_time=current_time,
         )
 
     def _record_attempts(*, source_row: int, step: str, outcome: dict[str, Any]) -> None:

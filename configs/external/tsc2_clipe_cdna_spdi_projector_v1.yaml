@@ -2,7 +2,7 @@ schema: raptor.external.tsc2_clipe_cdna_spdi_projector_config.v1
 config_id: tsc2-clipe-cdna-spdi-projector-v1
 spec: docs/project/specs/raptor-v2-clipe-cdna-spdi-projector-acquisition-v1.yaml
 spec_id: raptor-v2-clipe-cdna-spdi-projector-acquisition-v1
-spec_version: "1.0.4"
+spec_version: "1.0.5"
 
 inputs:
   source_bundle:

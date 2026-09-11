@@ -298,6 +298,64 @@ class _RateLimitedHttpsTransport:
         return last_result
 
 
+def _validate_expected_pilot_result(*, manifest: dict[str, Any], expected_pilot: dict[str, Any]) -> None:
+    """Fail-closed gate: the crosswalk manifest's actual totals must match
+    the frozen ``expected_pilot`` pins EXACTLY before publication. Every
+    axis is derived from the manifest itself (never from any other,
+    possibly stale, source): ``total_score_rows`` from
+    ``input_scores.row_count``, ``archive_crosswalk_rows`` from
+    ``status_counts`` (every status EXCEPT ``ARCHIVE_CROSSWALK_ABSENT``),
+    ``status_counts``/``verified_unique_spdi`` directly, and
+    ``conservation`` from ``input_scores.row_count``/``counts.rows`` (a
+    duplicate source_row is structurally impossible given this package's
+    one-row-per-score-row contract, so ``duplicate_source_rows`` is always
+    compared against the derived constant ``0``). Raises
+    ``VampCrosswalkOperatorError`` naming the specific mismatched axis
+    (``total_score_rows``, ``archive_crosswalk_rows``, ``status_counts``,
+    ``verified_unique_spdi`` or ``conservation``)."""
+    actual_total_score_rows = manifest["input_scores"]["row_count"]
+    if actual_total_score_rows != expected_pilot["total_score_rows"]:
+        raise VampCrosswalkOperatorError(
+            f"expected_pilot gate failed on total_score_rows: manifest input_scores.row_count "
+            f"{actual_total_score_rows!r} != expected {expected_pilot['total_score_rows']!r}"
+        )
+
+    status_counts = manifest["status_counts"]
+    actual_archive_crosswalk_rows = sum(status_counts.values()) - status_counts.get("ARCHIVE_CROSSWALK_ABSENT", 0)
+    if actual_archive_crosswalk_rows != expected_pilot["archive_crosswalk_rows"]:
+        raise VampCrosswalkOperatorError(
+            f"expected_pilot gate failed on archive_crosswalk_rows: derived "
+            f"{actual_archive_crosswalk_rows!r} (status_counts sum minus ARCHIVE_CROSSWALK_ABSENT) != "
+            f"expected {expected_pilot['archive_crosswalk_rows']!r}"
+        )
+
+    if status_counts != expected_pilot["status_counts"]:
+        raise VampCrosswalkOperatorError(
+            f"expected_pilot gate failed on status_counts: manifest {status_counts!r} != expected "
+            f"{expected_pilot['status_counts']!r}"
+        )
+
+    actual_verified_unique_spdi = manifest["verified_unique_spdi"]
+    if actual_verified_unique_spdi != expected_pilot["verified_unique_spdi"]:
+        raise VampCrosswalkOperatorError(
+            f"expected_pilot gate failed on verified_unique_spdi: manifest "
+            f"{actual_verified_unique_spdi!r} != expected {expected_pilot['verified_unique_spdi']!r}"
+        )
+
+    actual_output_crosswalk_rows = manifest["counts"]["rows"]
+    actual_conservation = {
+        "input_score_rows": actual_total_score_rows,
+        "output_crosswalk_rows": actual_output_crosswalk_rows,
+        "dropped_rows": actual_total_score_rows - actual_output_crosswalk_rows,
+        "duplicate_source_rows": 0,
+    }
+    if actual_conservation != expected_pilot["conservation"]:
+        raise VampCrosswalkOperatorError(
+            f"expected_pilot gate failed on conservation: derived {actual_conservation!r} != expected "
+            f"{expected_pilot['conservation']!r}"
+        )
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG, help=f"config YAML (default: {DEFAULT_CONFIG})")
@@ -500,6 +558,8 @@ def main(argv: list[str] | None = None) -> int:
             follow_on_unresolved=follow_on_unresolved,
             pacbio_download_decision="NO_GO",
         )
+
+        _validate_expected_pilot_result(manifest=manifest, expected_pilot=config["expected_pilot"])
 
         publish_result = publish_vamp_crosswalk_bundle(
             repo_root=REPO_ROOT,
