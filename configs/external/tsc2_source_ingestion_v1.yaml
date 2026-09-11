@@ -45,11 +45,10 @@ sources:
   pmc:
     source_id: pmc
     source_kind: pmc
-    # Pilot-only fixed known-public JATS XML endpoint (spec `sources.pmc.
-    # pilot_full_text_endpoint`); general PMC acquisition never calls the
-    # retired OA Web Service and never infers open reuse from PMCID alone.
-    fulltext_endpoint: https://www.ebi.ac.uk/europepmc/webservices/rest/PMC12871146/fullTextXML
-    expected_pmcid: PMC12871146
+    # Final Nature Communications article. General PMC acquisition never calls
+    # the retired OA Web Service and never infers open reuse from PMCID alone.
+    fulltext_endpoint: https://www.ebi.ac.uk/europepmc/webservices/rest/PMC13478581/fullTextXML
+    expected_pmcid: PMC13478581
 
   mavedb_clipe:
     source_id: mavedb_clipe

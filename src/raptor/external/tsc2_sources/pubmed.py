@@ -12,6 +12,20 @@ required PMID is a hard failure, never a soft `False` a caller could ignore.
 from the EFetch XML metadata response *verbatim* -- it performs no evidence
 inference (e.g. it never inspects title/abstract wording for terms like
 "pathogenic"/"benign"; those words are preserved as opaque source text).
+
+A PubMed `PubDate` is never assumed to carry a full Year/Month/Day: a
+`Year`-only or `Year`+`Month`-only `PubDate`, or a `MedlineDate` fallback
+string (used when NLM cannot structure the date at all, e.g. `"2026
+Winter"`), are all valid and are never rejected nor filled in with an
+invented day/month. `publication_date` always preserves the highest
+precision actually present -- `YYYY`, `YYYY-MM`, `YYYY-MM-DD`, or the raw
+`MedlineDate` text -- and a row whose precision is anything other than a
+full day (`YYYY-MM-DD`) additionally carries `publication_date_precision`
+and `publication_date_raw` so a caller can tell a partial/MedlineDate
+result apart from a fully-dated one without any additional parsing. A row
+with full day precision carries only the original five fields
+(`pmid`/`doi`/`title`/`publication_date`/`abstract`) for backward
+compatibility with the exact-day case.
 """
 from __future__ import annotations
 
@@ -110,23 +124,57 @@ def _element_text(element: ET.Element | None) -> str | None:
     return text or None
 
 
-def _format_publication_date(pub_date: ET.Element | None, *, pmid: str) -> str:
+def _format_publication_date(pub_date: ET.Element | None, *, pmid: str) -> tuple[str, str, str]:
+    """Return `(publication_date, precision, raw)` for one PubMed `PubDate`
+    element, preserving whatever precision is actually present:
+
+    - `Year` + `Month` + `Day` -> `("YYYY-MM-DD", "day", "YYYY-MM-DD")`
+    - `Year` + `Month` (no `Day`) -> `("YYYY-MM", "month", "YYYY-MM")`
+    - `Year` only -> `("YYYY", "year", "YYYY")`
+    - `MedlineDate` only (no structured `Year`) -> the raw MedlineDate text
+      for all three, e.g. `("2026 Winter", "medline", "2026 Winter")`
+
+    Never invents a missing day/month, and never rejects a partial date or
+    a `MedlineDate` fallback as a parse failure."""
     if pub_date is None:
         raise PubMedParseError(f"PMID {pmid} is missing a Journal/JournalIssue/PubDate")
+
     year = _element_text(pub_date.find("Year"))
     month = _element_text(pub_date.find("Month"))
     day = _element_text(pub_date.find("Day"))
-    if not year or not month or not day:
-        raise PubMedParseError(f"PMID {pmid} has an incomplete PubDate (Year/Month/Day)")
-    if month.isdigit():
-        month_number = int(month)
-    else:
-        month_number = _MONTH_NAME_TO_NUMBER.get(month.strip().lower()[:3])
-        if month_number is None:
-            raise PubMedParseError(f"PMID {pmid} has an unrecognized PubDate Month: {month!r}")
-    if not day.isdigit():
-        raise PubMedParseError(f"PMID {pmid} has a non-numeric PubDate Day: {day!r}")
-    return f"{year}-{month_number:02d}-{int(day):02d}"
+
+    if year and month and day:
+        if month.isdigit():
+            month_number = int(month)
+        else:
+            month_number = _MONTH_NAME_TO_NUMBER.get(month.strip().lower()[:3])
+            if month_number is None:
+                raise PubMedParseError(f"PMID {pmid} has an unrecognized PubDate Month: {month!r}")
+        if not day.isdigit():
+            raise PubMedParseError(f"PMID {pmid} has a non-numeric PubDate Day: {day!r}")
+        formatted = f"{year}-{month_number:02d}-{int(day):02d}"
+        return formatted, "day", formatted
+
+    if year and month:
+        if month.isdigit():
+            month_number = int(month)
+        else:
+            month_number = _MONTH_NAME_TO_NUMBER.get(month.strip().lower()[:3])
+            if month_number is None:
+                raise PubMedParseError(f"PMID {pmid} has an unrecognized PubDate Month: {month!r}")
+        formatted = f"{year}-{month_number:02d}"
+        return formatted, "month", formatted
+
+    if year:
+        return year, "year", year
+
+    medline_date = _element_text(pub_date.find("MedlineDate"))
+    if medline_date:
+        return medline_date, "medline", medline_date
+
+    raise PubMedParseError(
+        f"PMID {pmid} has a PubDate with no Year and no MedlineDate fallback"
+    )
 
 
 def _extract_doi(article: ET.Element) -> str | None:
@@ -145,11 +193,21 @@ def _extract_abstract(article: ET.Element) -> str | None:
     return " ".join(paragraphs) if paragraphs else None
 
 
-def parse_efetch_xml(xml_text: str) -> list[dict[str, Any]]:
+def parse_efetch_xml(
+    xml_text: str,
+    *,
+    expected_pmids: list[str] | None = None,
+) -> list[dict[str, Any]]:
     """Parse an NCBI Entrez EFetch `PubmedArticleSet` XML document into one
     record per `PubmedArticle`: `{"pmid", "doi", "title", "publication_date",
-    "abstract"}`. Title and abstract text are copied verbatim -- no
-    filtering, summarization or evidence inference is performed here."""
+    "abstract"}` (partial-date rows additionally carry
+    `publication_date_precision`/`publication_date_raw`; see the module
+    docstring). Title and abstract text are copied verbatim -- no
+    filtering, summarization or evidence inference is performed here. When
+    `expected_pmids` is given (the caller's own ESearch PMID set), the
+    returned PMIDs must equal it EXACTLY -- no missing and no extra
+    records -- and any drift is a hard `PubMedParseError`, never a silently
+    accepted partial/superset result."""
     try:
         root = ET.fromstring(xml_text)
     except ET.ParseError as exc:
@@ -172,20 +230,34 @@ def parse_efetch_xml(xml_text: str) -> list[dict[str, Any]]:
 
         title = _element_text(article.find("ArticleTitle"))
         doi = _extract_doi(article)
-        publication_date = _format_publication_date(
+        publication_date, precision, raw = _format_publication_date(
             article.find("Journal/JournalIssue/PubDate"), pmid=pmid
         )
         abstract = _extract_abstract(article)
 
-        rows.append(
-            {
-                "pmid": pmid,
-                "doi": doi,
-                "title": title,
-                "publication_date": publication_date,
-                "abstract": abstract,
-            }
-        )
+        row: dict[str, Any] = {
+            "pmid": pmid,
+            "doi": doi,
+            "title": title,
+            "publication_date": publication_date,
+            "abstract": abstract,
+        }
+        if precision != "day":
+            row["publication_date_precision"] = precision
+            row["publication_date_raw"] = raw
+        rows.append(row)
+
+    if expected_pmids is not None:
+        observed_pmid_set = {row["pmid"] for row in rows}
+        expected_pmid_set = set(expected_pmids)
+        if observed_pmid_set != expected_pmid_set:
+            missing = sorted(expected_pmid_set - observed_pmid_set)
+            extra = sorted(observed_pmid_set - expected_pmid_set)
+            raise PubMedParseError(
+                "efetch PMID identity does not equal the requested esearch PMID set "
+                f"(no silent missing/extra records allowed): missing={missing!r} "
+                f"extra={extra!r}"
+            )
 
     return rows
 

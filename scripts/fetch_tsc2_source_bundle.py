@@ -51,7 +51,12 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from raptor.external.tsc2_sources.bundle import build_pilot_summary  # noqa: E402
+from raptor.external.tsc2_sources.bundle import (  # noqa: E402
+    BundleBoundaryError,
+    BundleHashMismatchError,
+    StatusVocabularyError,
+    build_pilot_summary,
+)
 from raptor.external.tsc2_sources.endpoint import (  # noqa: E402
     build_litvar2_gene_url,
     build_pubmed_esearch_url,
@@ -192,6 +197,7 @@ def _build_plan(
             "expected_variant_count": int(mave_cfg["expected_variant_count"]),
             "expected_license": mave_cfg["expected_license"],
             "expected_sha256": mave_cfg["expected_sha256"],
+            "expected_urn": mave_cfg["urn"],
             "urn": mave_cfg["urn"],
         }
 
@@ -312,6 +318,14 @@ def main(argv: list[str] | None = None) -> int:
             f"invariant={exc.invariant!r}: {exc}",
             file=sys.stderr,
         )
+        return 1
+    except (BundleBoundaryError, BundleHashMismatchError, StatusVocabularyError) as exc:
+        # Bundle-manifest/publication-boundary domain errors (e.g. a
+        # create-only/symlink-safety violation, an artifact hash mismatch,
+        # or forbidden status vocabulary) never carry a URL/secret -- print
+        # a concise, single-line ERROR (never a raw traceback) and fail
+        # closed. This never falls through to a success-shaped return.
+        print(f"ERROR: bundle publication failed ({type(exc).__name__}): {exc}", file=sys.stderr)
         return 1
 
     manifest = result["manifest"]

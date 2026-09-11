@@ -4,10 +4,11 @@ functional-dataset source (``urn:mavedb:00001201-a-1``).
 ``verify_scoreset`` is the single entry point: given an already-fetched
 score-set metadata JSON document and an already-fetched raw scores CSV
 (``accession,hgvs_nt,hgvs_splice,hgvs_pro,score``), it independently
-observes the target gene (``targetGenes[].name``), the target RefSeq
-transcript (``methodText``, reusing
-``raptor.external.mave.metadata.extract_observed_transcript``'s regex), the
-license (the structured ``license`` object, reusing
+observes the metadata's own ``urn`` (verified against an OPTIONAL
+caller-supplied ``expected_urn`` pin, when given), the target gene
+(``targetGenes[].name``), the target RefSeq transcript (``methodText``,
+reusing ``raptor.external.mave.metadata.extract_observed_transcript``'s
+regex), the license (the structured ``license`` object, reusing
 ``raptor.external.mave.metadata.extract_observed_license``), the declared
 variant count (``numVariants``) and the CSV's own data-row count, and the
 scores CSV's sha256 -- then fails loud on ANY drift against the
@@ -18,9 +19,13 @@ documents are injected as already-fetched bytes/text.
 ``raptor.external.tsc2_sources.endpoint.assert_allowed_final_url`` (which is
 scoped to literature sources only, per its own module docstring): it
 restricts both the requested and the (possibly redirected) final URL to
-HTTPS ``api.mavedb.org`` score-set endpoints, so the real operator can
-validate a transport's reported ``final_url`` before this module ever
-parses its body.
+HTTPS ``api.mavedb.org``, and binds ``final_url`` to the EXACT score-set/
+endpoint path that was requested (e.g.
+``/api/v1/score-sets/urn:mavedb:00001201-a-1`` or its ``/scores`` sibling)
+-- not merely any path under the ``/api/v1/score-sets/`` host prefix, so a
+redirect can never silently substitute a different score-set's URN -- so
+the real operator can validate a transport's reported ``final_url`` before
+this module ever parses its body.
 """
 from __future__ import annotations
 
@@ -99,11 +104,15 @@ def verify_scoreset(
     expected_variant_count: int,
     expected_license: str,
     expected_sha256: str,
+    expected_urn: str | None = None,
 ) -> dict[str, Any]:
     """Independently verify a MaveDB score-set metadata document and its raw
-    scores CSV against caller-supplied expected pins. Returns
-    ``{"gene", "transcript", "license", "variant_count", "sha256",
-    "lifecycle_state": "STAGED_VERIFIED"}`` on success. Raises
+    scores CSV against caller-supplied expected pins. When ``expected_urn``
+    is given, the metadata's own ``urn`` field must equal it exactly (this
+    pin is OPTIONAL for backward compatibility with callers that do not yet
+    supply it; when omitted, the metadata ``urn`` is observed but not
+    checked). Returns ``{"gene", "transcript", "license", "variant_count",
+    "sha256", "lifecycle_state": "STAGED_VERIFIED"}`` on success. Raises
     ``MaveSourceVerificationError`` on ANY parse failure or drift -- never
     silently accepts a mismatch."""
     try:
@@ -112,6 +121,14 @@ def verify_scoreset(
         raise MaveSourceVerificationError(
             f"mavedb score-set metadata could not be parsed: {exc}"
         ) from exc
+
+    if expected_urn is not None:
+        observed_urn = metadata.get("urn")
+        if observed_urn != expected_urn:
+            raise MaveSourceVerificationError(
+                f"mavedb score-set metadata urn mismatch: expected {expected_urn!r}, "
+                f"observed {observed_urn!r}"
+            )
 
     gene = _extract_gene_name(metadata)
     if gene != expected_gene:
@@ -174,7 +191,12 @@ def verify_scoreset(
 
 def assert_allowed_mavedb_final_url(*, requested_url: str, final_url: str) -> None:
     """Validate both the requested and the (possibly redirected) final URL
-    against the fixed HTTPS ``api.mavedb.org`` score-set endpoint allowlist.
+    against the fixed HTTPS ``api.mavedb.org`` allowlist, AND bind
+    ``final_url`` to the EXACT score-set/endpoint path that was requested --
+    not merely any path under the ``/api/v1/score-sets/`` host prefix. A
+    redirect from one score-set URN's metadata/scores endpoint to a
+    *different* score-set URN (even one that is itself under the allowed
+    prefix) is endpoint/identity substitution and is never acceptable.
     Mirrors ``endpoint.assert_allowed_final_url``'s intent for the
     literature sources, scoped to MaveDB instead."""
     for label, url in (("requested_url", requested_url), ("final_url", final_url)):
@@ -192,6 +214,16 @@ def assert_allowed_mavedb_final_url(*, requested_url: str, final_url: str) -> No
                 f"mavedb {label} path is not under the allowed {MAVEDB_ALLOWED_PATH_PREFIX!r} "
                 f"prefix: {url!r}"
             )
+
+    requested_path = urlsplit(requested_url).path
+    final_path = urlsplit(final_url).path
+    if requested_path != final_path:
+        raise MaveSourceVerificationError(
+            f"mavedb final_url path {final_path!r} does not match the exact requested "
+            f"score-set/endpoint path {requested_path!r} (possible score-set identity "
+            "substitution -- a different URN's path is never an acceptable redirect "
+            "target, even under the same host prefix)"
+        )
 
 
 __all__ = [

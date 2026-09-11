@@ -35,7 +35,7 @@ import json
 import os
 import shutil
 import uuid
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 BUNDLE_MANIFEST_SCHEMA = "raptor.external.tsc2_source_bundle.v1"
@@ -281,6 +281,78 @@ def _safe_join(base: Path, relative_path: str) -> Path:
     return candidate
 
 
+def _validate_run_name(run_name: str) -> None:
+    """Raise ``BundleBoundaryError`` unless ``run_name`` is exactly one
+    safe, relative path component: not blank, not absolute (POSIX or
+    Windows-style), not containing a path separator, and not a traversal
+    component (``.``/``..``)."""
+    if not isinstance(run_name, str) or not run_name.strip():
+        raise BundleBoundaryError("run_name must be a non-blank string")
+    if "\x00" in run_name:
+        raise BundleBoundaryError(f"run_name must not contain a NUL byte: {run_name!r}")
+    if "/" in run_name or "\\" in run_name:
+        raise BundleBoundaryError(
+            f"run_name must be exactly one safe path component (no separators): {run_name!r}"
+        )
+    if PureWindowsPath(run_name).drive or PurePosixPath(run_name).is_absolute():
+        raise BundleBoundaryError(f"run_name must not be an absolute path: {run_name!r}")
+    if run_name in (".", ".."):
+        raise BundleBoundaryError(f"run_name must not be a traversal component: {run_name!r}")
+
+
+def _assert_no_symlink_ancestry(path: Path, *, role: str) -> None:
+    """Raise ``BundleBoundaryError`` if ``path`` itself, or any of its
+    ancestor directories, is a symlink/reparse point. Only EXISTING
+    ancestors are checked (a not-yet-created leaf is never itself a
+    symlink); this walks all the way to the filesystem root, not merely
+    ``path``'s immediate parent."""
+    current = path
+    while True:
+        if current.is_symlink():
+            raise BundleBoundaryError(
+                f"{role} path {path} has a symlink/reparse ancestor at {current}; refusing "
+                "for safety"
+            )
+        parent = current.parent
+        if parent == current:
+            return
+        current = parent
+
+
+def _reserve_run_name(output_root: Path, run_name: str) -> Path:
+    """Create-EXCLUSIVELY (``O_CREAT | O_EXCL``, mode ``0o600``) reserve
+    ``run_name`` within ``output_root`` via a sibling publication-
+    reservation lock file -- BEFORE any staging directory is created and
+    BEFORE any artifact bytes are written. Only ONE compliant concurrent
+    writer can ever win this reservation for a given ``run_name``; every
+    other compliant writer fails FAST here (raising ``BundleBoundaryError``,
+    doing no staging work at all) instead of only colliding later at the
+    final atomic ``os.replace``. Returns the reservation lock file's own
+    path; the caller MUST remove exactly that path (and never any other
+    writer's reservation) in every success and failure path."""
+    lock_path = output_root / f".{run_name}.publish.lock"
+    try:
+        fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError as exc:
+        raise BundleBoundaryError(
+            f"run_name {run_name!r} is already reserved by a concurrent writer under "
+            f"{output_root}; refusing to race a compliant concurrent publication"
+        ) from exc
+    os.close(fd)
+    return lock_path
+
+
+def _release_reservation(lock_path: Path) -> None:
+    """Remove ONLY this process's own reservation lock file (never a
+    different writer's reservation -- each reservation is a distinct,
+    exclusively-created path keyed by its own ``run_name``). Tolerates the
+    lock file already being gone (e.g. a prior partial cleanup attempt)."""
+    try:
+        lock_path.unlink()
+    except FileNotFoundError:
+        pass
+
+
 def write_bundle_run(
     *,
     repo_root: Path,
@@ -291,18 +363,33 @@ def write_bundle_run(
 ) -> dict[str, Any]:
     """Publish ``manifest`` and ``artifact_payloads`` to
     ``output_root/run_name`` -- external, create-only, atomic and
-    symlink-safe. Raises ``BundleBoundaryError`` if ``output_root`` resolves
-    inside ``repo_root``, if the final run path already exists, or if the
-    final run path is a symlink/reparse point. Raises
-    ``BundleHashMismatchError`` if any artifact payload's bytes do not match
-    its manifest-declared ``byte_length``/``sha256``, or if the manifest's
-    own ``content_hash`` does not match its recomputed value. On ANY
-    failure the staging directory is removed and NO manifest is ever
-    published to the final run path."""
+    symlink-safe. Raises ``BundleBoundaryError`` if ``run_name`` is not
+    exactly one safe relative path component (rejecting absolute, nested
+    and traversal names), if ``output_root`` (or any of its ancestors) is a
+    symlink/reparse point (checked both before AND after ``output_root`` is
+    created), if ``output_root`` resolves inside ``repo_root``, if the
+    final run path already exists (checked both before AND after acquiring
+    the publication reservation below), if the final run path is a
+    symlink/reparse point, or if ``run_name`` is already reserved by a
+    concurrent compliant writer (a ``.{run_name}.publish.lock`` sibling
+    file created ``O_CREAT|O_EXCL`` -- a losing writer fails here, before
+    any staging work). Raises ``BundleHashMismatchError`` if any artifact
+    payload's bytes do not match its manifest-declared
+    ``byte_length``/``sha256``, or if the manifest's own ``content_hash``
+    does not match its recomputed value. On ANY failure -- including a
+    concurrent writer winning the final atomic publication, or the
+    publication step itself raising -- the staging directory is removed and
+    NO manifest is ever published to the final run path; a competing
+    writer's already-published final directory is never
+    deleted/replaced/touched. This process's own reservation lock is always
+    removed (success or failure) before returning/raising."""
     validate_manifest_hash(manifest)
+    _validate_run_name(run_name)
 
     repo_root = Path(repo_root)
     output_root = Path(output_root)
+
+    _assert_no_symlink_ancestry(output_root, role="output_root")
 
     resolved_repo_root = repo_root.resolve()
     resolved_output_root = output_root.resolve()
@@ -329,43 +416,90 @@ def write_bundle_run(
         )
 
     output_root.mkdir(parents=True, exist_ok=True)
-    staging_dir = output_root / f".{run_name}.staging-{uuid.uuid4().hex}"
-    staging_dir.mkdir(parents=False, exist_ok=False)
+    # Re-check ancestry AFTER creating output_root: `mkdir` may have just
+    # created one or more of its ancestor directories, and a TOCTOU window
+    # exists between the pre-creation check above and this point.
+    _assert_no_symlink_ancestry(output_root, role="output_root")
 
+    reservation_path = _reserve_run_name(output_root, run_name)
     try:
-        for artifact in manifest["artifacts"]:
-            relative_path = artifact["relative_path"]
-            payload = artifact_payloads.get(relative_path)
-            if payload is None:
-                raise BundleHashMismatchError(
-                    f"missing artifact payload bytes for relative_path {relative_path!r} "
-                    f"(artifact_id={artifact.get('artifact_id')!r})"
-                )
-            if len(payload) != artifact["byte_length"]:
-                raise BundleHashMismatchError(
-                    f"artifact {artifact['artifact_id']!r} byte_length mismatch: expected "
-                    f"{artifact['byte_length']!r}, observed {len(payload)!r} bytes"
-                )
-            observed_sha256 = hashlib.sha256(payload).hexdigest()
-            if observed_sha256.lower() != artifact["sha256"].lower():
-                raise BundleHashMismatchError(
-                    f"artifact {artifact['artifact_id']!r} sha256 hash mismatch: expected "
-                    f"{artifact['sha256']!r}, observed {observed_sha256!r}"
-                )
-            destination = _safe_join(staging_dir, relative_path)
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_bytes(payload)
+        # Re-check the final run path is still absent now that WE hold the
+        # publication reservation: a non-compliant writer (one bypassing
+        # this reservation protocol entirely) could have published directly
+        # into the TOCTOU window between the pre-reservation check above and
+        # winning this lock. Never delete/replace whatever is there -- just
+        # fail loud, exactly like the pre-reservation existence check does.
+        if final_run_dir.is_symlink():
+            raise BundleBoundaryError(
+                f"output run path {final_run_dir} is a symlink/reparse point; refusing for "
+                "safety"
+            )
+        if final_run_dir.exists():
+            raise BundleBoundaryError(
+                f"output run path {final_run_dir} already exists; runs are create-only and "
+                "are never overwritten or silently resumed"
+            )
 
-        manifest_path = staging_dir / MANIFEST_FILENAME
-        manifest_path.write_text(
-            json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False),
-            encoding="utf-8",
-        )
-    except Exception:
-        shutil.rmtree(staging_dir, ignore_errors=True)
-        raise
+        staging_dir = output_root / f".{run_name}.staging-{uuid.uuid4().hex}"
+        staging_dir.mkdir(parents=False, exist_ok=False)
 
-    os.replace(staging_dir, final_run_dir)
+        try:
+            for artifact in manifest["artifacts"]:
+                relative_path = artifact["relative_path"]
+                payload = artifact_payloads.get(relative_path)
+                if payload is None:
+                    raise BundleHashMismatchError(
+                        f"missing artifact payload bytes for relative_path {relative_path!r} "
+                        f"(artifact_id={artifact.get('artifact_id')!r})"
+                    )
+                if len(payload) != artifact["byte_length"]:
+                    raise BundleHashMismatchError(
+                        f"artifact {artifact['artifact_id']!r} byte_length mismatch: expected "
+                        f"{artifact['byte_length']!r}, observed {len(payload)!r} bytes"
+                    )
+                observed_sha256 = hashlib.sha256(payload).hexdigest()
+                if observed_sha256.lower() != artifact["sha256"].lower():
+                    raise BundleHashMismatchError(
+                        f"artifact {artifact['artifact_id']!r} sha256 hash mismatch: expected "
+                        f"{artifact['sha256']!r}, observed {observed_sha256!r}"
+                    )
+                destination = _safe_join(staging_dir, relative_path)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(payload)
+
+            manifest_path = staging_dir / MANIFEST_FILENAME
+            manifest_path.write_text(
+                json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False),
+                encoding="utf-8",
+            )
+        except Exception:
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            raise
+
+        try:
+            os.replace(staging_dir, final_run_dir)
+        except FileExistsError as exc:
+            # A concurrent writer won the race and already published (or is
+            # publishing) the final run path between our earlier existence
+            # check and this atomic rename: never replace it, never touch it
+            # -- only remove OUR OWN staging directory and fail loud.
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            raise BundleBoundaryError(
+                f"output run path {final_run_dir} was concurrently created by another writer "
+                "during publication; refusing to replace a competing publication"
+            ) from exc
+        except OSError as exc:
+            # Any other publication failure (permissions, a non-empty
+            # destination on platforms that reject that, etc.): clean up
+            # staging and fail loud -- the final path must never be left
+            # partially published.
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            raise BundleBoundaryError(
+                f"failed to atomically publish run directory {final_run_dir}: {exc}"
+            ) from exc
+    finally:
+        _release_reservation(reservation_path)
+
     return {
         "run_dir": str(final_run_dir),
         "manifest_path": str(final_run_dir / MANIFEST_FILENAME),

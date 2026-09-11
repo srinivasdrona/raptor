@@ -15,16 +15,28 @@ requires. On success across every planned source, the artifacts/sources are
 assembled into a bundle manifest (``bundle.build_bundle_manifest``) and
 published (``bundle.write_bundle_run``).
 
-Any failure -- an endpoint-security violation, a parser/verifier error, or
-an unknown ``source_kind`` -- is reported as a ``SourceIngestionError``
-carrying the failing ``source_id``, a short ``invariant`` code (the
-underlying exception's class name) and the EXACT ``request_url`` that
-failed: this module never substitutes a different endpoint for a failing
-source and never silently drops a source from the plan.
+Any failure -- a transport exception, an endpoint-security violation, a
+parser/verifier error, or an unknown ``source_kind`` -- is reported as a
+``SourceIngestionError`` carrying the failing ``source_id``, a short
+``invariant`` code (the underlying exception's class name) and the EXACT
+``request_url`` that failed (always sanitized -- see ``_sanitize_url`` --
+before it is ever stored or rendered): this module never substitutes a
+different endpoint for a failing source and never silently drops a source
+from the plan. Every per-source handler wraps its own known transport/
+parser/verifier exceptions with a precisely-attributed ``request_url``, and
+``run_ingestion`` itself additionally wraps ANY exception a handler might
+still let escape (e.g. a malformed plan) as a last-resort safety net --
+`SourceIngestionError` is always what a caller of ``run_ingestion`` sees,
+never a raw/untyped exception. ``message`` -- not only ``request_url`` --
+is ALSO scrubbed (``_redact_sensitive_text``) before it is ever stored or
+rendered: a nested verifier's own message can itself embed a raw URL (e.g.
+an IGVF endpoint verifier's rejection message quoting a signed final URL),
+and that embedded value must never leak any sensitive query value either.
 """
 from __future__ import annotations
 
 import hashlib
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -35,7 +47,9 @@ from raptor.atlas.citation import AtlasCitationResolutionError, normalize_identi
 from .bundle import build_bundle_manifest, write_bundle_run
 from .endpoint import (
     EndpointSecurityError,
+    TransportValidationError,
     build_pubmed_efetch_url,
+    fetch_with_transport,
     request_with_transport,
 )
 from .igvf import (
@@ -68,13 +82,44 @@ _SENSITIVE_QUERY_KEYS = frozenset(
     }
 )
 
+#: Matches a sensitive `key=value` occurrence ANYWHERE in arbitrary free
+#: text -- not only a well-formed URL's own query string -- e.g. a raw URL
+#: quoted/`repr`'d inside a nested verifier's own exception message (an
+#: IGVF endpoint check rejecting a redirect embeds the full, still-signed
+#: `final_url` in its message text). Longest keys are tried first so e.g.
+#: `x-amz-signature` is matched as a whole instead of leaving a stray
+#: `x-amz-` prefix in front of a `signature`-only redaction. Case-
+#: insensitive on the key; only the value is ever replaced.
+_SENSITIVE_TEXT_PATTERN = re.compile(
+    r"(?i)\b(" + "|".join(re.escape(key) for key in sorted(_SENSITIVE_QUERY_KEYS, key=len, reverse=True))
+    + r")=([^&\s'\")\]]*)"
+)
+
+
+def _redact_sensitive_text(text: str) -> str:
+    """Redact every sensitive `key=value` occurrence found anywhere in
+    ``text`` (see ``_SENSITIVE_TEXT_PATTERN``), preserving the key's own
+    original casing and replacing only the value with ``REDACTED``. Unlike
+    ``_sanitize_url``, this makes no assumption that ``text`` is itself a
+    well-formed URL -- it also catches a URL (with its own query string)
+    embedded inside another exception's free-form message text."""
+    return _SENSITIVE_TEXT_PATTERN.sub(lambda match: f"{match.group(1)}=REDACTED", text)
+
 
 class SourceIngestionError(RuntimeError):
     """Raised when one planned source fails to ingest. Carries the failing
     ``source_id``, a short ``invariant`` code (the underlying exception's
     class name -- never ``None``), and the exact ``request_url`` that was
     being fetched/parsed when the failure occurred (never a substituted
-    endpoint)."""
+    endpoint). ``request_url`` -- both the stored attribute and the value
+    embedded in this exception's rendered message -- is ALWAYS sanitized
+    (``_sanitize_url``) before it is ever stored or rendered, and ``message``
+    is ALSO scrubbed (``_redact_sensitive_text``) before rendering: a secret
+    query value (``api_key``/``email``/an AWS SigV4 signed-download
+    credential) must never reach an exception object, CLI stderr, a
+    manifest, an artifact record or a log, here or anywhere downstream --
+    including when a NESTED verifier's own message text already embeds a
+    raw, still-signed URL."""
 
     def __init__(
         self,
@@ -84,12 +129,14 @@ class SourceIngestionError(RuntimeError):
         message: str,
         request_url: str | None = None,
     ) -> None:
+        sanitized_request_url = _sanitize_url(request_url) if request_url else None
+        sanitized_message = _redact_sensitive_text(message)
         self.source_id = source_id
         self.invariant = invariant
-        self.request_url = request_url
-        rendered = f"{source_id}: {message}"
-        if request_url:
-            rendered = f"{rendered} (request_url={request_url})"
+        self.request_url = sanitized_request_url
+        rendered = f"{source_id}: {sanitized_message}"
+        if sanitized_request_url:
+            rendered = f"{rendered} (request_url={sanitized_request_url})"
         super().__init__(rendered)
 
 
@@ -143,17 +190,15 @@ def _artifact_from_fetch(
 
 
 def _fetch_raw(url: str, transport: Callable[[str], dict[str, Any]]) -> dict[str, Any]:
-    """Call the injected ``transport`` directly (no allowlist baked in --
-    the caller applies its own source-specific final-URL allowlist right
-    after this returns)."""
-    response = transport(url)
-    return {
-        "requested_url": url,
-        "final_url": response["final_url"],
-        "http_status": response["http_status"],
-        "media_type": response["media_type"],
-        "body": response["body"],
-    }
+    """Call the injected ``transport`` through the shared, VALIDATED
+    transport boundary (``endpoint.fetch_with_transport``) -- catching a
+    raised transport exception and validating the response mapping's
+    shape/types -- WITHOUT the literature-source host/path/query allowlist
+    (no allowlist baked in here: the caller applies its own source-specific
+    final-URL allowlist right after this returns). Raises
+    ``TransportValidationError`` on ANY transport exception or malformed
+    response."""
+    return fetch_with_transport(requested_url=url, transport=transport)
 
 
 def _normalize_identifier_safe(source_id: str, raw: str, *, request_url: str | None) -> str:
@@ -175,7 +220,7 @@ def _handle_pubmed(source_plan: dict[str, Any], transport: Callable[[str], dict[
 
     try:
         esearch_fetch = request_with_transport(requested_url=esearch_url, transport=transport)
-    except EndpointSecurityError as exc:
+    except (EndpointSecurityError, TransportValidationError) as exc:
         raise SourceIngestionError(
             source_id=source_id, invariant=type(exc).__name__, message=str(exc),
             request_url=esearch_url,
@@ -196,14 +241,16 @@ def _handle_pubmed(source_plan: dict[str, Any], transport: Callable[[str], dict[
     efetch_url = build_pubmed_efetch_url(pmids=parsed["pmids"])
     try:
         efetch_fetch = request_with_transport(requested_url=efetch_url, transport=transport)
-    except EndpointSecurityError as exc:
+    except (EndpointSecurityError, TransportValidationError) as exc:
         raise SourceIngestionError(
             source_id=source_id, invariant=type(exc).__name__, message=str(exc),
             request_url=efetch_url,
         ) from exc
 
     try:
-        rows = parse_efetch_xml(efetch_fetch["body"].decode("utf-8"))
+        rows = parse_efetch_xml(
+            efetch_fetch["body"].decode("utf-8"), expected_pmids=parsed["pmids"]
+        )
     except PubMedParseError as exc:
         raise SourceIngestionError(
             source_id=source_id, invariant=type(exc).__name__, message=str(exc),
@@ -270,7 +317,7 @@ def _handle_litvar2(source_plan: dict[str, Any], transport: Callable[[str], dict
 
     try:
         fetch = request_with_transport(requested_url=request_url, transport=transport)
-    except EndpointSecurityError as exc:
+    except (EndpointSecurityError, TransportValidationError) as exc:
         raise SourceIngestionError(
             source_id=source_id, invariant=type(exc).__name__, message=str(exc),
             request_url=request_url,
@@ -318,7 +365,7 @@ def _handle_pmc(source_plan: dict[str, Any], transport: Callable[[str], dict[str
 
     try:
         fetch = request_with_transport(requested_url=request_url, transport=transport)
-    except EndpointSecurityError as exc:
+    except (EndpointSecurityError, TransportValidationError) as exc:
         raise SourceIngestionError(
             source_id=source_id, invariant=type(exc).__name__, message=str(exc),
             request_url=request_url,
@@ -376,7 +423,7 @@ def _handle_mavedb(source_plan: dict[str, Any], transport: Callable[[str], dict[
         assert_allowed_mavedb_final_url(
             requested_url=metadata_url, final_url=metadata_fetch["final_url"],
         )
-    except MaveSourceVerificationError as exc:
+    except (MaveSourceVerificationError, TransportValidationError) as exc:
         raise SourceIngestionError(
             source_id=source_id, invariant=type(exc).__name__, message=str(exc),
             request_url=metadata_url,
@@ -385,7 +432,7 @@ def _handle_mavedb(source_plan: dict[str, Any], transport: Callable[[str], dict[
     try:
         scores_fetch = _fetch_raw(scores_url, transport)
         assert_allowed_mavedb_final_url(requested_url=scores_url, final_url=scores_fetch["final_url"])
-    except MaveSourceVerificationError as exc:
+    except (MaveSourceVerificationError, TransportValidationError) as exc:
         raise SourceIngestionError(
             source_id=source_id, invariant=type(exc).__name__, message=str(exc),
             request_url=scores_url,
@@ -400,6 +447,7 @@ def _handle_mavedb(source_plan: dict[str, Any], transport: Callable[[str], dict[
             expected_variant_count=source_plan["expected_variant_count"],
             expected_license=source_plan["expected_license"],
             expected_sha256=source_plan["expected_sha256"],
+            expected_urn=source_plan.get("expected_urn"),
         )
     except MaveSourceVerificationError as exc:
         raise SourceIngestionError(
@@ -461,7 +509,7 @@ def _handle_igvf(source_plan: dict[str, Any], transport: Callable[[str], dict[st
         assert_allowed_igvf_metadata_final_url(
             requested_url=analysis_url, final_url=analysis_fetch["final_url"],
         )
-    except IgvfVerificationError as exc:
+    except (IgvfVerificationError, TransportValidationError) as exc:
         raise SourceIngestionError(
             source_id=source_id, invariant=type(exc).__name__, message=str(exc),
             request_url=analysis_url,
@@ -470,7 +518,7 @@ def _handle_igvf(source_plan: dict[str, Any], transport: Callable[[str], dict[st
     try:
         file_fetch = _fetch_raw(file_url, transport)
         assert_allowed_igvf_metadata_final_url(requested_url=file_url, final_url=file_fetch["final_url"])
-    except IgvfVerificationError as exc:
+    except (IgvfVerificationError, TransportValidationError) as exc:
         raise SourceIngestionError(
             source_id=source_id, invariant=type(exc).__name__, message=str(exc),
             request_url=file_url,
@@ -481,7 +529,7 @@ def _handle_igvf(source_plan: dict[str, Any], transport: Callable[[str], dict[st
         assert_allowed_igvf_download_final_url(
             requested_url=download_url, final_url=download_fetch["final_url"],
         )
-    except IgvfVerificationError as exc:
+    except (IgvfVerificationError, TransportValidationError) as exc:
         raise SourceIngestionError(
             source_id=source_id, invariant=type(exc).__name__, message=str(exc),
             request_url=download_url,
@@ -598,7 +646,28 @@ def run_ingestion(
                 message=f"no handler registered for source_kind {source_kind!r}",
                 request_url=source_plan.get("request_url"),
             )
-        result = handler(source_plan, transport)
+        try:
+            result = handler(source_plan, transport)
+        except SourceIngestionError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - last-resort safety net: every handler
+            # already wraps its own known transport/parser/verifier exceptions with a
+            # precisely-attributed request_url, but this guarantees run_ingestion NEVER
+            # lets a raw/unexpected exception (e.g. a malformed plan) escape unsanitized.
+            fallback_request_url = (
+                source_plan.get("request_url")
+                or source_plan.get("metadata_request_url")
+                or source_plan.get("analysis_request_url")
+            )
+            raise SourceIngestionError(
+                source_id=source_id or "__unknown__",
+                invariant=type(exc).__name__,
+                message=(
+                    f"unhandled {type(exc).__name__} while ingesting source (the underlying "
+                    "exception message is withheld to avoid leaking transport-layer secrets)"
+                ),
+                request_url=fallback_request_url,
+            ) from exc
         all_artifacts.extend(result["artifacts"])
         all_sources.append(result["source"])
         all_bodies.update(result["bodies"])

@@ -9,8 +9,12 @@ literal strings/numbers/containers, so an arbitrary-code-execution payload
 (e.g. a `__import__(...)` call expression) raises instead of running.
 
 Every record is required to carry exactly `{"_id", "rsid", "pmids_count"}`
-with the right types; `rsid` must match `rs\\d+`. Records are deduplicated
-by `rsid`, keeping the first occurrence, PROVIDED every duplicate agrees on
+plus, OPTIONALLY, `clingen_id`; any other field is an unknown extra and is a
+hard parse failure -- even when `clingen_id` itself is present and valid.
+`rsid` must match `rs\\d+`. A record's OUTPUT is always projected down to
+exactly the three required fields (`clingen_id`, when present on input, is
+never propagated to the returned record). Records are deduplicated by
+`rsid`, keeping the first occurrence, PROVIDED every duplicate agrees on
 `pmids_count`; a duplicate `rsid` with a conflicting `pmids_count` is a hard
 parse failure, never silently resolved by picking one side.
 """
@@ -22,11 +26,14 @@ from typing import Any
 
 _RSID_PATTERN = re.compile(r"^rs\d+$")
 _REQUIRED_FIELDS = frozenset({"_id", "rsid", "pmids_count"})
+_OPTIONAL_FIELDS = frozenset({"clingen_id"})
+_ALLOWED_FIELDS = _REQUIRED_FIELDS | _OPTIONAL_FIELDS
 
 
 class LitVarParseError(ValueError):
     """Raised when a LitVar2 line-delimited mapping record cannot be safely
-    parsed, is missing/has extra fields, has a malformed value, or conflicts
+    parsed, is missing a required field or carries an unknown extra field
+    (beyond the optional `clingen_id`), has a malformed value, or conflicts
     with an already-seen record for the same `rsid`."""
 
 
@@ -43,10 +50,15 @@ def _parse_line(line: str, *, line_number: int) -> dict[str, Any]:
             f"line {line_number} does not decode to a mapping record; got "
             f"{type(record).__name__}"
         )
-    if set(record) != _REQUIRED_FIELDS:
+
+    record_keys = set(record)
+    missing = _REQUIRED_FIELDS - record_keys
+    extra = record_keys - _ALLOWED_FIELDS
+    if missing or extra:
         raise LitVarParseError(
             f"line {line_number} does not have the exact required fields "
-            f"{sorted(_REQUIRED_FIELDS)!r}: got {sorted(record)!r}"
+            f"{sorted(_REQUIRED_FIELDS)!r} (optional: {sorted(_OPTIONAL_FIELDS)!r}): "
+            f"missing={sorted(missing)!r} extra={sorted(extra)!r} got={sorted(record_keys)!r}"
         )
 
     record_id = record["_id"]
@@ -61,7 +73,15 @@ def _parse_line(line: str, *, line_number: int) -> dict[str, Any]:
         raise LitVarParseError(
             f"line {line_number} has a malformed pmids_count value: {pmids_count!r}"
         )
+    if "clingen_id" in record and (
+        not isinstance(record["clingen_id"], str) or not record["clingen_id"]
+    ):
+        raise LitVarParseError(
+            f"line {line_number} has a malformed clingen_id value: {record['clingen_id']!r}"
+        )
 
+    # Project the parsed record down to exactly the three committed fields --
+    # an accepted optional clingen_id is validated above but never bundled.
     return {"_id": record_id, "rsid": rsid, "pmids_count": pmids_count}
 
 

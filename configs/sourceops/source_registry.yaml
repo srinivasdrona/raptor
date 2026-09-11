@@ -2,7 +2,7 @@ schema: raptor.source_registry.v1
 registry_id: raptor-sourceops-registry-v1
 registry_version: 1.0.0
 created_at: '2026-08-16T09:30:50Z'
-registry_content_hash: ef6995a8822c53a1bef228545b0a01c23963b79212967d3f3c15b66d54b02e90
+registry_content_hash: e5fdbd5786f8ec47332ffc705df10267266938d0c20eb24e159195418c630559
 hash_basis: raptor.source_registry_content_hash.v1
 source_records:
 - source_id: tsc-ingest-and-reference-declarations
@@ -570,7 +570,7 @@ source_records:
   declaration_refs:
   - path: configs/external/mave_sources.yaml
     role: authoritative_root
-    canonical_lf_sha256: 34bdaff3c9d3ecff31942dfc73b47f34b0ab808419a1fa945141082a8d3fa9d1
+    canonical_lf_sha256: e6605857aaa3500517f6322d6a80554551f972822b59337af876a0992ce2945d
     authority_scope: repository
   licence:
     status: mixed_verified_and_pending
@@ -579,20 +579,20 @@ source_records:
     permitted_use: orthogonal_validation_only
     redistribution: forbidden_until_access_and_licensing_are_confirmed
     cloud_egress: forbidden
-    verification_basis: one_verified_primary_source_and_three_unverified_candidates
+    verification_basis: one_content_verified_source_two_released_metadata_verified_sources_and_one_unverified_candidate
   release:
-    version_or_snapshot: phase-0-1
+    version_or_snapshot: phase-0-1-plus-released-igvf-metadata
     release_date: '2026-07-13'
-    retrieved_at: '2026-08-16T00:00:00Z'
+    retrieved_at: '2026-09-09T00:00:00Z'
     content_pin_status: mixed_verification_state
   acquisition:
-    method: registered_external_reference_catalog
-    operator_contract: no_network_fetching
-    writes_outside_repository: false
+    method: versioned_external_source_bundle_operator
+    operator_contract: scripts/fetch_tsc2_source_bundle.py
+    writes_outside_repository: true
   refresh:
     cadence: manual
     freshness_sla: P365D
-    last_checked_at: '2026-08-16T00:00:00Z'
+    last_checked_at: '2026-09-09T00:00:00Z'
     next_check_rule: manual operator review
   consumers: []
   components:
@@ -605,17 +605,17 @@ source_records:
     declaration_locator: configs/external/mave_sources.yaml#sources[0]
   - component_id: mave-igvf-vamp
     display_name: IGVF VAMP-seq TSC2 assay
-    lifecycle_state: CONFIRM_PENDING
+    lifecycle_state: METADATA_ONLY
     source_role: provenance_only
     version_or_snapshot: IGVF:analysis-set:IGVFDS5595BTYJ
-    licence_status: unconfirmed
+    licence_status: review_required
     declaration_locator: configs/external/mave_sources.yaml#sources[1]
   - component_id: mave-igvf-sge
     display_name: IGVF SGE TSC2 assay
-    lifecycle_state: CONFIRM_PENDING
+    lifecycle_state: METADATA_ONLY
     source_role: provenance_only
     version_or_snapshot: IGVF:analysis-set:IGVFDS1782FCXW
-    licence_status: unconfirmed
+    licence_status: review_required
     declaration_locator: configs/external/mave_sources.yaml#sources[2]
   - component_id: mave-cagi7
     display_name: CAGI7 TSC2 stability challenge
@@ -644,13 +644,14 @@ source_records:
     origin_reason: external validation register remains repository-bound and non-authoritative
       until access review completes
   blocked_reasons:
-  - external access and licensing review still pending
+  - IGVF permitted-use and redistribution review still pending
+  - CAGI7 access and licensing review still pending
   missing_inputs:
-  - verified MAVE access path
-  - permitted-use confirmation
-  unblock_condition: external review complete and access verified for MAVE register
+  - IGVF permitted-use confirmation
+  - CAGI7 access and permitted-use confirmation
+  unblock_condition: IGVF permitted-use review and CAGI7 access review complete
   reviewed_by: raptor.external
-  reviewed_at: '2026-08-16T00:00:00Z'
+  reviewed_at: '2026-09-09T00:00:00Z'
 - source_id: atlas-tsc2-pack-source-pins
   display_name: Atlas TSC2 pack source pins
   record_kind: POLICY_SOURCE_REGISTER

@@ -31,47 +31,62 @@ sources:
     publication_pmcid: "PMC11185720"
     external_path: "external/mavedb/TSC2-clipe-00001201-a-1/scores.csv"
 
-  # 2026 IGVF VAMP-seq TSC2 protein-abundance functional data (referenced by
-  # PMC12871146). Registered so the source register documents its existence
-  # and pins -- NOT fetched, NOT downloaded, NOT claimed as verified.
-  # RAPTOR does not hold access to the underlying IGVF files; any attempt to
-  # verify this entry raises `ConfirmationPendingError` fail-closed.
+  # 2026 IGVF VAMP-seq TSC2 protein-abundance functional data. Official
+  # analysis/file metadata and public download access are verified. Content
+  # SHA-256 and permitted-use review remain separate pilot outputs.
   - urn: "IGVF:analysis-set:IGVFDS5595BTYJ"
     gene: TSC2
     transcript: NM_000548.5
-    license: "unconfirmed"
+    license: "review_required"
     variant_count: 0
-    verification: confirm_pending
+    verification: released_metadata_verified
     sha256: ""
     api:
-      portal: "https://www.igvf.org"
+      portal: "https://data.igvf.org"
       analysis_set: "IGVFDS5595BTYJ"
       score_file: "IGVFFI9747KART"
+      analysis_metadata: "https://api.data.igvf.org/analysis-sets/IGVFDS5595BTYJ/"
+      file_metadata: "https://api.data.igvf.org/tabular-files/IGVFFI9747KART/"
+      scores_tsv_gz: "https://api.data.igvf.org/tabular-files/IGVFFI9747KART/@@download/IGVFFI9747KART.tsv.gz"
+    observed:
+      status: released
+      controlled_access: false
+      assembly: GRCh38
+      file_size: 439700
+      md5: "1a397944b7a5158b3d63999dfcf926db"
     publication_pmcid: "PMC12871146"
     notes: >
-      access-not-held; VAMP-seq protein-abundance assay accession candidates
-      identified from public reporting only. Do not fetch/claim until IGVF
-      portal access and a licensing/terms review are completed.
+      Official metadata and public download access verified 2026-09-09.
+      Redistribution, classification use and raw-score cloud egress remain
+      forbidden until a separate licensing/terms review and content freeze.
 
-  # 2026 IGVF Saturation Genome Editing (SGE) TSC2 functional data
-  # (referenced by PMC12871146). Same confirm-pending, access-not-held
-  # posture as the VAMP-seq entry above.
+  # 2026 IGVF immune-SGE TSC2 functional data. Same released-metadata /
+  # licence-review-required posture as the VAMP-seq entry above.
   - urn: "IGVF:analysis-set:IGVFDS1782FCXW"
     gene: TSC2
     transcript: NM_000548.5
-    license: "unconfirmed"
+    license: "review_required"
     variant_count: 0
-    verification: confirm_pending
+    verification: released_metadata_verified
     sha256: ""
     api:
-      portal: "https://www.igvf.org"
+      portal: "https://data.igvf.org"
       analysis_set: "IGVFDS1782FCXW"
       score_file: "IGVFFI3097DFGF"
+      analysis_metadata: "https://api.data.igvf.org/analysis-sets/IGVFDS1782FCXW/"
+      file_metadata: "https://api.data.igvf.org/tabular-files/IGVFFI3097DFGF/"
+      scores_tsv_gz: "https://api.data.igvf.org/tabular-files/IGVFFI3097DFGF/@@download/IGVFFI3097DFGF.tsv.gz"
+    observed:
+      status: released
+      controlled_access: false
+      assembly: GRCh38
+      file_size: 35101
+      md5: "c188e0a9dd4c67dfac13381d3879aedf"
     publication_pmcid: "PMC12871146"
     notes: >
-      access-not-held; SGE functional assay accession candidates identified
-      from public reporting only. Do not fetch/claim until IGVF portal
-      access and a licensing/terms review are completed.
+      Official metadata and public download access verified 2026-09-09.
+      Redistribution, classification use and raw-score cloud egress remain
+      forbidden until a separate licensing/terms review and content freeze.
 
   # CAGI7 TSC2 protein-stability challenge (genomeinterpretation.org).
   # Registered for provenance/citation purposes only -- confirm-pending,

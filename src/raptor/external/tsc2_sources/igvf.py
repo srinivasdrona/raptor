@@ -20,9 +20,17 @@ I/O; all three inputs are injected as already-fetched bytes/text.
 final_url`` are the IGVF-specific counterparts of
 ``raptor.external.tsc2_sources.endpoint.assert_allowed_final_url`` (which is
 scoped to literature sources only): analysis-set/tabular-file metadata
-requests must stay on ``api.data.igvf.org``, while a tabular-file DOWNLOAD
-request may be redirected to the official public object-storage host
-(``igvf-public.s3.amazonaws.com``) and nowhere else.
+requests must stay on ``api.data.igvf.org`` AND on the exact requested
+accession path, while a tabular-file DOWNLOAD request's (possibly
+redirected) final URL may land on EITHER ``api.data.igvf.org`` (exact
+requested portal path) OR the official public object-storage host
+(``igvf-public.s3.amazonaws.com``) -- no other host is ever added. The
+real observed S3 redirect shape is an OPAQUE ``<date>/<uuid>/`` path
+prefix, not the portal's ``/tabular-files/.../@@download/`` shape, so only
+the S3 final path's BASENAME is bound and must be EXACTLY
+``{requested_accession}.tsv.gz`` -- only explicitly nonsemantic signed
+query values (e.g. ``X-Amz-Signature``) may differ, and the path prefix
+ahead of the basename is unconstrained.
 """
 from __future__ import annotations
 
@@ -182,7 +190,11 @@ def assert_allowed_igvf_metadata_final_url(*, requested_url: str, final_url: str
     """Validate both the requested and the (possibly redirected) final URL
     for an IGVF analysis-set/tabular-file METADATA request against the
     fixed HTTPS ``api.data.igvf.org`` allowlist (metadata is never expected
-    to redirect off-portal)."""
+    to redirect off-portal), AND bind ``final_url`` to the EXACT requested
+    analysis-set/tabular-file accession path -- a redirect from one
+    accession's metadata path to a *different* accession's metadata path
+    (even on the same allowed host) is endpoint/identity substitution and
+    is never acceptable."""
     for label, url in (("requested_url", requested_url), ("final_url", final_url)):
         parts = urlsplit(url)
         if parts.scheme != "https":
@@ -194,30 +206,85 @@ def assert_allowed_igvf_metadata_final_url(*, requested_url: str, final_url: str
                 f"igvf {label} host is not the allowed {IGVF_METADATA_HOST!r} host: {url!r}"
             )
 
+    requested_path = urlsplit(requested_url).path
+    final_path = urlsplit(final_url).path
+    if requested_path != final_path:
+        raise IgvfVerificationError(
+            f"igvf metadata final_url path {final_path!r} does not match the exact "
+            f"requested analysis/file accession path {requested_path!r} (possible "
+            "accession substitution)"
+        )
+
 
 def assert_allowed_igvf_download_final_url(*, requested_url: str, final_url: str) -> None:
     """Validate an IGVF tabular-file DOWNLOAD request: the requested URL
-    must stay on the ``api.data.igvf.org`` portal, but the (possibly
-    redirected) final URL may ALSO land on the official public
-    object-storage host (``igvf-public.s3.amazonaws.com``) -- and no other
-    host -- since IGVF serves public tabular-file bytes from S3."""
+    must stay on the ``api.data.igvf.org`` portal and match the exact
+    ``/tabular-files/{accession}/@@download/{accession}.tsv.gz`` pattern.
+    The (possibly redirected) final URL may land on EITHER of exactly two
+    hosts -- no new host is ever added:
+
+    - ``api.data.igvf.org`` (no redirect happened): the final path must be
+      the EXACT requested portal path.
+    - ``igvf-public.s3.amazonaws.com`` (the observed real download
+      redirect, e.g. ``https://igvf-public.s3.amazonaws.com/<date>/<uuid>/
+      {accession}.tsv.gz?...`` -- an opaque date/uuid PREFIX, not the
+      portal's ``/tabular-files/.../@@download/`` shape): only the final
+      path's BASENAME is bound, and it must be EXACTLY
+      ``{requested_accession}.tsv.gz`` -- a redirect may never substitute a
+      different file's bytes. Signed query values (e.g.
+      ``X-Amz-Signature``) are explicitly nonsemantic and are never
+      compared, and nothing about the prefix ahead of the basename is
+      constrained.
+
+    Any other final host is rejected."""
     requested_parts = urlsplit(requested_url)
     if requested_parts.scheme != "https" or requested_parts.netloc != IGVF_METADATA_HOST:
         raise IgvfVerificationError(
             f"igvf download requested_url is not in the HTTPS {IGVF_METADATA_HOST!r} "
             f"allowlist: {requested_url!r}"
         )
+    requested_match = _HREF_PATTERN.match(requested_parts.path)
+    if requested_match is None or (
+        requested_match.group("path_accession") != requested_match.group("filename_accession")
+    ):
+        raise IgvfVerificationError(
+            "igvf download requested_url path does not match the required "
+            f"/tabular-files/{{accession}}/@@download/{{accession}}.tsv.gz pattern: "
+            f"{requested_url!r}"
+        )
+    requested_accession = requested_match.group("filename_accession")
+
     final_parts = urlsplit(final_url)
     if final_parts.scheme != "https":
         raise IgvfVerificationError(
             f"igvf download final_url scheme is not in the HTTPS allowlist: "
             f"{final_parts.scheme!r} ({final_url!r})"
         )
-    if final_parts.netloc not in (IGVF_METADATA_HOST, IGVF_DOWNLOAD_REDIRECT_HOST):
-        raise IgvfVerificationError(
-            f"igvf download final_url host {final_parts.netloc!r} is outside the allowed "
-            f"{IGVF_METADATA_HOST!r}/{IGVF_DOWNLOAD_REDIRECT_HOST!r} allowlist: {final_url!r}"
-        )
+
+    if final_parts.netloc == IGVF_METADATA_HOST:
+        if final_parts.path != requested_parts.path:
+            raise IgvfVerificationError(
+                f"igvf download final_url path {final_parts.path!r} does not match the "
+                f"exact requested portal path {requested_parts.path!r} (possible "
+                "endpoint substitution)"
+            )
+        return
+
+    if final_parts.netloc == IGVF_DOWNLOAD_REDIRECT_HOST:
+        final_basename = final_parts.path.rsplit("/", 1)[-1]
+        expected_basename = f"{requested_accession}.tsv.gz"
+        if final_basename != expected_basename:
+            raise IgvfVerificationError(
+                f"igvf download final_url S3 object basename {final_basename!r} does not "
+                f"match the requested file accession's expected basename "
+                f"{expected_basename!r} (possible S3 object substitution)"
+            )
+        return
+
+    raise IgvfVerificationError(
+        f"igvf download final_url host {final_parts.netloc!r} is outside the allowed "
+        f"{IGVF_METADATA_HOST!r}/{IGVF_DOWNLOAD_REDIRECT_HOST!r} allowlist: {final_url!r}"
+    )
 
 
 __all__ = [
