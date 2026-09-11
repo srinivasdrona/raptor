@@ -5,7 +5,7 @@
 # use, or automatic source activation.
 
 schema: raptor.v2.missense_source_ingestion_spec.v1
-spec_version: 1.0.2
+spec_version: 1.0.3
 task_id: v2-missense-source-ingestion-v1
 status: APPROVED_TO_BUILD
 owner: '@dronasrinivas'
@@ -36,8 +36,11 @@ why_now:
   stale_assumption_corrected: >-
     IGVF analysis sets IGVFDS5595BTYJ and IGVFDS1782FCXW and their principal
     score files are released and public as of this specification. The current
-    source register's access-not-held text is stale and must be updated from
-    observed metadata, while licence permission remains separately unresolved.
+    legacy MAVE register remains the protected pre-pilot declaration and is not
+    edited by this slice. The released observations are staged in
+    configs/external/tsc2_source_ingestion_v1.yaml and the external bundle;
+    SourceOps promotion may update the authoritative legacy register only after
+    the pilot and licence review. Licence permission remains unresolved.
 
 delivery:
   implementation:
@@ -305,7 +308,10 @@ acceptance_criteria:
   - id: AC-09
     rule: Each downloaded IGVF file is verified against metadata MD5 and file size before publication.
   - id: AC-10
-    rule: IGVF remains STAGED_LICENCE_REVIEW_REQUIRED and cannot be marked classification-ready.
+    rule: >-
+      IGVF remains STAGED_LICENCE_REVIEW_REQUIRED and cannot be marked
+      classification-ready. The staged config records released/public metadata
+      while the legacy MAVE register remains confirm_pending until promotion.
   - id: AC-11
     rule: >-
       Output paths are external, create-only, race-safe, atomically published,
@@ -372,6 +378,7 @@ build_requirements:
     - per-variant committed data
     - blanket PMC licence assumption
     - use of the retired PMC OA Web Service
+    - in-place promotion of configs/external/mave_sources.yaml
 
 real_pilot:
   required: true

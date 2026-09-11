@@ -3,18 +3,15 @@
 A `SourceRegisterEntry` is a PINNED claim about one external scoreset (e.g.
 MaveDB `urn:mavedb:00001201-a-1`): its gene, transcript, license, sha256 and
 variant count. `verify_registered_source` re-checks an observed fetch against
-that pin and fails loud (never silently accepts drift) on any mismatch. It
-refuses to treat either an unconfirmed entry or a released source whose
-metadata is verified but whose content/licence review is incomplete as a
-content-verified source.
+that pin and fails loud (never silently accepts drift) on any mismatch, and
+refuses to treat a `confirm_pending` entry (e.g. an IGVF/CAGI7 accession we
+do not yet hold access to) as verified.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-_VALID_VERIFICATIONS = frozenset(
-    {"verified", "confirm_pending", "released_metadata_verified"}
-)
+_VALID_VERIFICATIONS = frozenset({"verified", "confirm_pending"})
 
 
 class SourceVerificationError(ValueError):
@@ -22,12 +19,12 @@ class SourceVerificationError(ValueError):
 
 
 class ConfirmationPendingError(RuntimeError):
-    """Raised when a source is not yet eligible for content verification.
+    """Raised when a source is registered but not yet confirmed/accessible.
 
-    This includes an unconfirmed source and a released/public source whose
-    metadata has been verified but whose raw content hash and permitted-use
-    review are not yet pinned. Neither state is silently treated as a verified
-    score source.
+    E.g. 2026 IGVF VAMP-seq/SGE accessions and CAGI7 challenge data that are
+    registered (so the source register documents their existence and pins)
+    but for which RAPTOR does not hold verified access -- never claimed as
+    fetched/verified, never silently treated as available.
     """
 
 
@@ -63,10 +60,10 @@ def verify_registered_source(
     """Fail-closed verification: raises on ANY drift between the pinned
     register entry and what was actually observed/fetched. Returns `None`
     (no value) on success -- callers only care whether this raised."""
-    if entry.verification in {"confirm_pending", "released_metadata_verified"}:
+    if entry.verification == "confirm_pending":
         raise ConfirmationPendingError(
-            f"{entry.urn} is {entry.verification} -- content and permitted-use "
-            "verification are incomplete; refusing to treat it as a verified source"
+            f"{entry.urn} is confirm_pending -- RAPTOR does not hold verified access; "
+            "refusing to treat it as a validated source"
         )
 
     if not entry.sha256 or len(entry.sha256) != 64:
