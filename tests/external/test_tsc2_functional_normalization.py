@@ -67,6 +67,12 @@ EXPECTED_VARIANT_KIND_COUNTS = {
     "OTHER": 12,
     "REFERENCE_CONTROL": 3,
 }
+EXPECTED_UNRESOLVED_REASON_COUNTS = {
+    "CDNA_PROJECTOR_REQUIRED": 208,
+    "NUCLEOTIDE_CROSSWALK_REQUIRED": 9253,
+    "REFERENCE_ALLELE_MISMATCH": 27,
+    "NOT_A_VARIANT": 3,
+}
 EXPECTED_SGE_VARIANT_KIND_COUNTS = {
     "MISSENSE": 318,
     "SYNONYMOUS": 104,
@@ -2090,3 +2096,67 @@ def test_fn16_config_pins_exact_input_hashes_accessions_run_names_and_expected_t
     assert config["expected_pilot"]["identity_state_counts"] == EXPECTED_IDENTITY_STATE_COUNTS
     assert config["expected_pilot"]["variant_kind_counts"] == EXPECTED_VARIANT_KIND_COUNTS
     assert config["source_rules"]["igvf_sge"]["expected_variant_kinds"] == EXPECTED_SGE_VARIANT_KIND_COUNTS
+
+
+def test_fn17_committed_pilot_summary_file_matches_published_v1_0_1_contract_and_excludes_sensitive_content() -> None:
+    summary_path = REPO_ROOT / "data" / "census" / "tsc2_functional_identity_normalization_pilot_2026-09-11.json"
+    if not summary_path.is_file():
+        pytest.fail(f"committed pilot summary is missing: {summary_path}")
+
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert set(summary) == {
+        "schema",
+        "bundle_id",
+        "manifest_content_hash",
+        "input_bundle_content_hash",
+        "reference_sha256",
+        "counts",
+        "identity_state_counts",
+        "variant_kind_counts",
+        "source_row_counts",
+        "artifact_integrity",
+        "unresolved_reason_counts",
+        "normalization_gaps",
+    }
+    assert summary["schema"] == SUMMARY_SCHEMA
+    assert summary["bundle_id"] == NORMALIZATION_BUNDLE_ID
+    assert summary["manifest_content_hash"] == "74f15f22cfb6e876a8fab3a16c841e6f33317eadd58ef04547e4c060162afb48"
+    assert summary["input_bundle_content_hash"] == INPUT_MANIFEST_CONTENT_HASH
+    assert summary["reference_sha256"] == REFERENCE_FASTA_SHA256
+    assert summary["counts"] == {"sources": 3, "artifacts": 3, "rows": EXPECTED_TOTAL_ROWS}
+    assert summary["identity_state_counts"] == EXPECTED_IDENTITY_STATE_COUNTS
+    assert summary["variant_kind_counts"] == EXPECTED_VARIANT_KIND_COUNTS
+    assert summary["source_row_counts"] == EXPECTED_SOURCE_ROWS
+    assert summary["unresolved_reason_counts"] == EXPECTED_UNRESOLVED_REASON_COUNTS
+    assert summary["artifact_integrity"] == {
+        "mavedb_clipe-normalized-jsonl": {
+            "source_id": "mavedb_clipe",
+            "sha256": "2328f46bf5a2ae087eddeaa2ad0fb6f44de2b60a2e9e3ad0c034c73907f5031e",
+            "byte_length": 102100,
+            "row_count": 208,
+        },
+        "igvf_vamp_seq-normalized-jsonl": {
+            "source_id": "igvf_vamp_seq",
+            "sha256": "26f34a7a8d52d01ffbdef50427ac1ab0b268a523a29a55ce77452fc56bb83adb",
+            "byte_length": 4522418,
+            "row_count": 9253,
+        },
+        "igvf_sge-normalized-jsonl": {
+            "source_id": "igvf_sge",
+            "sha256": "2292e5770911e13fcd2536287fd04fc7f23354c9bc81ebf01533aa441114ea52",
+            "byte_length": 227381,
+            "row_count": 453,
+        },
+    }
+
+    serialized = json.dumps(summary, sort_keys=True)
+    lowered = serialized.lower()
+    assert '"score_raw"' not in serialized
+    assert '"functional_class"' not in serialized
+    assert '"requested_url"' not in serialized
+    assert '"final_url"' not in serialized
+    assert "http://" not in lowered and "https://" not in lowered
+    assert "patient" not in lowered
+    assert "hgvs_" not in lowered
+    assert SPDI_VALUE_PATTERN.search(serialized) is None
+    assert not any(token in lowered for token in FORBIDDEN_CLINICAL_TOKENS)
