@@ -1821,3 +1821,38 @@ todos:
   depends_on:
   - v2-functional-normalization-build
   created: '2026-09-11'
+- id: v2-identity-crosswalk-spec
+  title: Specifying identity crosswalk acquisition
+  description: Versioned separate cliPE NCBI projector and VAMP Zenodo
+    crosswalk contracts, including retry replay, cross-exon blocking and exact
+    prepublication gates.
+  status: done
+  depends_on:
+  - v2-functional-normalization-pilot
+  created: '2026-09-12'
+- id: v2-identity-crosswalk-tests
+  title: Writing identity crosswalk RED tests
+  description: Added independent acceptance and checker-regression suites for
+    two-step cliPE projection and immutable VAMP archive crosswalking.
+  status: done
+  depends_on:
+  - v2-identity-crosswalk-spec
+  created: '2026-09-12'
+- id: v2-identity-crosswalk-build
+  title: Building identity crosswalk acquisition
+  description: Implemented operator-only NCBI acquisition and Zenodo archive
+    crosswalking with reference-backed identity validation and create-only
+    external bundles.
+  status: done
+  depends_on:
+  - v2-identity-crosswalk-tests
+  created: '2026-09-12'
+- id: v2-identity-crosswalk-pilot
+  title: Running identity crosswalk pilot
+  description: Projected 208/208 cliPE rows and resolved 9,050/9,253 VAMP
+    rows; retained 57 coordinate-length conflicts and 146 archive-absent rows
+    without silent drops.
+  status: done
+  depends_on:
+  - v2-identity-crosswalk-build
+  created: '2026-09-12'

@@ -132,6 +132,25 @@ The external normalized-row bundle is pinned by manifest SHA-256
 No per-row identity or raw score is committed, and no functional score is
 promoted to classification or assay-specific evidence.
 
+`tsc2_clipe_cdna_spdi_projector_pilot_2026-09-12.json` records the
+aggregate-only cliPE cDNA projector pilot. All 208 frozen
+$NM\_000548.5$ rows—161 SNVs and 47 equal-length delins—were projected
+through the two-step NCBI Variation Services path and independently
+reference-verified on $\text{NC\_000016.10}$. The external mapping and 416
+raw response bodies are pinned by manifest SHA-256
+`247665b9758860124b196d037b913626b7699b87ba1bb1c32b0e461bb4473529`.
+No mapping row or raw response is committed.
+
+`tsc2_vamp_genomic_crosswalk_2026-09-12.json` records the aggregate-only
+VAMP-seq genomic crosswalk from the immutable Zenodo V1 analysis archive.
+Of 9,253 frozen VAMP score rows, 9,050 resolved to unique reference-backed
+$\text{GRCh38}$ SPDI, 57 were blocked because the archive genomic interval
+was not equivalent in length to the cDNA replacement, and 146 were absent
+from the archived GMM identity tables. The external archive and crosswalk
+are pinned by manifest SHA-256
+`f80759aa43874d201efb69c52b611d9ebd8c40712159bf1f291c86195dd33ba0`.
+The approximately 2.45 GB PacBio raw-read download was not required.
+
 `tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json` (ADR-0012) is the
 packet-free, non-identifying binding census aggregate over the same
 6,618-VUS TSC1/TSC2 run under the PP3/BP4-disabled-automated-emission /
