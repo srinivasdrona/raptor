@@ -1,6 +1,6 @@
 schema: raptor.project.spec.v1
 spec_id: raptor-v2-vamp-genomic-crosswalk-acquisition-v1
-spec_version: 1.0.3
+spec_version: 1.0.4
 status: APPROVED_BUILD
 created_at: '2026-09-12'
 owner: human-terminal-authority
@@ -246,6 +246,10 @@ expected_pilot:
     SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH: 57
     SOURCE_COORDINATE_REFERENCE_MISMATCH: 0
     ARCHIVE_CROSSWALK_ABSENT: 146
+  status_histogram_rule: >-
+    Emit every expected status key explicitly, including zero-valued
+    SOURCE_COORDINATE_REFERENCE_MISMATCH, before manifest construction and
+    expected-pilot validation.
   verified_unique_spdi: 9050
   conservation:
     input_score_rows: 9253
