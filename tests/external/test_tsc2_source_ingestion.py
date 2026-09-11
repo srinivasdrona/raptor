@@ -132,6 +132,7 @@ def _bundle_api() -> dict[str, Any]:
         "build_bundle_manifest": _symbol(module, "build_bundle_manifest"),
         "compute_bundle_content_hash": _symbol(module, "compute_bundle_content_hash"),
         "validate_manifest_hash": _symbol(module, "validate_manifest_hash"),
+        "_publish_directory_no_replace": _symbol(module, "_publish_directory_no_replace"),
         "write_bundle_run": _symbol(module, "write_bundle_run"),
         "build_pilot_summary": _symbol(module, "build_pilot_summary"),
         "assert_no_forbidden_status_vocabulary": _symbol(
@@ -1793,14 +1794,21 @@ def test_ac11_concurrent_final_path_creation_preserves_competing_sentinel(
     final_run_dir = output_root / run_name
     competing_sentinel = final_run_dir / "COMPETING_WRITER_SENTINEL.txt"
     sentinel_value = "keep-existing-writer-output"
+    real_publish_directory_no_replace = api["_publish_directory_no_replace"]
 
-    def fake_replace(_src: str | Path, dst: str | Path) -> None:
-        destination = Path(dst)
+    def fake_publish_directory_no_replace(
+        staging_dir: str | Path, destination_dir: str | Path
+    ) -> None:
+        destination = Path(destination_dir)
         destination.mkdir(parents=True, exist_ok=True)
         competing_sentinel.write_text(sentinel_value, encoding="utf-8")
-        raise FileExistsError("simulated concurrent final-path creation")
+        real_publish_directory_no_replace(staging_dir, destination_dir)
 
-    monkeypatch.setattr(bundle_module.os, "replace", fake_replace)
+    monkeypatch.setattr(
+        bundle_module,
+        "_publish_directory_no_replace",
+        fake_publish_directory_no_replace,
+    )
 
     with pytest.raises(Exception) as exc:
         api["write_bundle_run"](
@@ -1816,7 +1824,51 @@ def test_ac11_concurrent_final_path_creation_preserves_competing_sentinel(
     assert isinstance(exc.value, api["BundleBoundaryError"])
 
 
-def test_ac11_os_replace_failure_cleans_staging_dir_and_publishes_no_manifest(
+def test_ac11_empty_competing_final_dir_before_publish_is_not_clobbered(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = _bundle_api()
+    bundle_module = _load_module("raptor.external.tsc2_sources.bundle")
+    manifest, payloads = _minimal_bundle_manifest_and_payload(run_tag="empty-competing-dir")
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    output_root = tmp_path / "external-root"
+    output_root.mkdir()
+    run_name = "empty-competing-dir-run"
+    final_run_dir = output_root / run_name
+
+    real_publish_directory_no_replace = api["_publish_directory_no_replace"]
+
+    def fake_publish_directory_no_replace(
+        staging_dir: str | Path, destination_dir: str | Path
+    ) -> None:
+        destination = Path(destination_dir)
+        destination.mkdir(parents=True, exist_ok=False)
+        real_publish_directory_no_replace(staging_dir, destination_dir)
+
+    monkeypatch.setattr(
+        bundle_module,
+        "_publish_directory_no_replace",
+        fake_publish_directory_no_replace,
+    )
+
+    with pytest.raises(api["BundleBoundaryError"]):
+        api["write_bundle_run"](
+            repo_root=repo_root,
+            output_root=output_root,
+            run_name=run_name,
+            manifest=manifest,
+            artifact_payloads=payloads,
+        )
+
+    assert final_run_dir.exists()
+    assert list(final_run_dir.iterdir()) == []
+    assert not (final_run_dir / MANIFEST_FILENAME).exists()
+    assert not list(output_root.glob(f".{run_name}.staging-*"))
+
+
+def test_ac11_atomic_publication_failure_cleans_staging_dir_and_publishes_no_manifest(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1830,10 +1882,16 @@ def test_ac11_os_replace_failure_cleans_staging_dir_and_publishes_no_manifest(
     run_name = "replace-failure-run"
     final_run_dir = output_root / run_name
 
-    def fake_replace(_src: str | Path, _dst: str | Path) -> None:
-        raise OSError("simulated os.replace publication failure")
+    def fake_publish_directory_no_replace(
+        _staging_dir: str | Path, _destination_dir: str | Path
+    ) -> None:
+        raise OSError("simulated atomic publication failure")
 
-    monkeypatch.setattr(bundle_module.os, "replace", fake_replace)
+    monkeypatch.setattr(
+        bundle_module,
+        "_publish_directory_no_replace",
+        fake_publish_directory_no_replace,
+    )
 
     with pytest.raises(Exception):
         api["write_bundle_run"](
