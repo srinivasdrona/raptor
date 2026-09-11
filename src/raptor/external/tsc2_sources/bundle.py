@@ -61,6 +61,18 @@ BUNDLE_MANIFEST_SCHEMA = "raptor.external.tsc2_source_bundle.v1"
 PILOT_SUMMARY_SCHEMA = "raptor.external.tsc2_source_pilot_summary.v1"
 MANIFEST_FILENAME = "bundle_manifest.json"
 
+# The six sources the real pilot must cover (spec `real_pilot.required_sources`,
+# in the spec's fixed order). `build_pilot_summary` uses this ONLY to compute
+# `missing_source_ids` -- it never fabricates or reorders `source_ids` itself.
+_REQUIRED_PILOT_SOURCE_IDS = (
+    "pubmed",
+    "litvar2",
+    "pmc",
+    "mavedb_clipe",
+    "igvf_vamp_seq",
+    "igvf_sge",
+)
+
 _REQUIRED_ARTIFACT_FIELDS = frozenset(
     {
         "artifact_id",
@@ -878,12 +890,23 @@ def write_bundle_run(
 
 def build_pilot_summary(manifest: dict[str, Any]) -> dict[str, Any]:
     """Build the compact, aggregate-only committed pilot summary from an
-    already-built bundle manifest: counts, truncation, per-source
-    lifecycle/access/licence state, per-artifact sha256 hashes, and a fixed
-    list of known follow-on normalization gaps. NEVER includes full text,
-    per-variant rows, patient information, or any classification/evidence-
-    strength claim (enforced structurally: this function reads no field
-    beyond the aggregate ones listed below)."""
+    already-built bundle manifest: the manifest's own content hash, counts,
+    exact/missing source-ID coverage, truncation, per-source
+    lifecycle/access/licence state, per-source aggregate ``observations``,
+    per-artifact integrity metadata (sha256/md5/byte_length/verification --
+    NOT a bare hash mapping), and a fixed list of known follow-on
+    normalization gaps. NEVER includes a requested/final URL, identifiers,
+    full text, per-variant rows, patient information, credentials, or any
+    classification/evidence-strength claim (enforced structurally: this
+    function is a strict field-whitelist projection and reads/copies no
+    field beyond the aggregate ones listed below)."""
+    source_ids = [source["source_id"] for source in manifest["sources"]]
+    source_id_set = set(source_ids)
+    missing_source_ids = [
+        source_id
+        for source_id in _REQUIRED_PILOT_SOURCE_IDS
+        if source_id not in source_id_set
+    ]
     source_states = {
         source["source_id"]: {
             "source_kind": source["source_kind"],
@@ -893,8 +916,17 @@ def build_pilot_summary(manifest: dict[str, Any]) -> dict[str, Any]:
         }
         for source in manifest["sources"]
     }
-    artifact_hashes = {
-        artifact["artifact_id"]: artifact["sha256"] for artifact in manifest["artifacts"]
+    source_observations = {
+        source["source_id"]: dict(source["observations"]) for source in manifest["sources"]
+    }
+    artifact_integrity = {
+        artifact["artifact_id"]: {
+            "sha256": artifact["sha256"],
+            "md5": artifact["md5"],
+            "byte_length": artifact["byte_length"],
+            "verification": artifact["verification"],
+        }
+        for artifact in manifest["artifacts"]
     }
     normalization_gaps = [
         "functional-dataset rows are not yet normalized to a canonical transcript/assembly identity",
@@ -905,10 +937,14 @@ def build_pilot_summary(manifest: dict[str, Any]) -> dict[str, Any]:
     return {
         "schema": PILOT_SUMMARY_SCHEMA,
         "bundle_id": manifest["bundle_id"],
+        "manifest_content_hash": manifest["content_hash"],
         "counts": manifest["counts"],
+        "source_ids": source_ids,
+        "missing_source_ids": missing_source_ids,
         "truncation": manifest["truncation"],
         "source_states": source_states,
-        "artifact_hashes": artifact_hashes,
+        "source_observations": source_observations,
+        "artifact_integrity": artifact_integrity,
         "normalization_gaps": normalization_gaps,
     }
 
