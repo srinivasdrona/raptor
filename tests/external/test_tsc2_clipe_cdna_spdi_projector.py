@@ -5,6 +5,7 @@ import hashlib
 import importlib.util
 import inspect
 import json
+import math
 import os
 import re
 from datetime import datetime, timedelta, timezone
@@ -473,12 +474,12 @@ def _valid_projector_manifest_and_payloads(bundle_api: dict[str, Any]) -> tuple[
     return manifest, mapping_payload, request_payload, raw_payloads
 
 
-def test_cp00_binding_spec_exists_and_is_v1_0_5() -> None:
+def test_cp00_binding_spec_exists_and_is_v1_0_6() -> None:
     if not SPEC_PATH.is_file():
         pytest.fail(f"binding spec is missing: {SPEC_PATH}")
     spec = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))
     assert spec["spec_id"] == "raptor-v2-clipe-cdna-spdi-projector-acquisition-v1"
-    assert spec["spec_version"] == "1.0.5"
+    assert spec["spec_version"] == "1.0.6"
 
 
 def test_cp01_endpoint_url_builders_percent_encode_whole_path_segment_no_query_and_pin_resource() -> None:
@@ -1357,7 +1358,17 @@ def test_cp08ga_retryable_http_honors_http_date_retry_after_with_time_seam() -> 
     assert any(value >= retry_after_delay for value in sleeps[1:])
 
 
-@pytest.mark.parametrize("retry_after_header", ["not-a-date", "Wed, 01 Jan 2020 00:00:00 GMT"])
+@pytest.mark.parametrize(
+    "retry_after_header",
+    [
+        "not-a-date",
+        "Wed, 01 Jan 2020 00:00:00 GMT",
+        "inf",
+        "-inf",
+        "nan",
+        "1e309",
+    ],
+)
 def test_cp08gb_retry_after_http_date_malformed_or_past_falls_back_without_crashing(
     retry_after_header: str,
 ) -> None:
@@ -1406,7 +1417,7 @@ def test_cp08gb_retry_after_http_date_malformed_or_past_falls_back_without_crash
     )
     assert result["outcome"] == "success"
     assert attempts["count"] == 2
-    assert all(value >= 0.0 for value in sleeps)
+    assert all(math.isfinite(value) and value >= 0.0 for value in sleeps)
     assert any(abs(value - 1.25) < 1e-9 for value in sleeps[1:])
 
 
@@ -2293,7 +2304,7 @@ def test_cp18_config_pins_exact_input_hashes_endpoints_run_name_and_shape_totals
         pytest.fail(f"TSC2 cliPE projector config is not implemented: {CONFIG_PATH}")
     config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
     assert config["spec_id"] == "raptor-v2-clipe-cdna-spdi-projector-acquisition-v1"
-    assert config["spec_version"] == "1.0.5"
+    assert config["spec_version"] == "1.0.6"
 
     source_bundle = config["inputs"]["source_bundle"]
     assert source_bundle["bundle_id"] == SOURCE_BUNDLE_ID
