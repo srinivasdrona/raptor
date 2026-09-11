@@ -5,7 +5,7 @@
 # use, or automatic source activation.
 
 schema: raptor.v2.missense_source_ingestion_spec.v1
-spec_version: 1.0.3
+spec_version: 1.0.4
 task_id: v2-missense-source-ingestion-v1
 status: APPROVED_TO_BUILD
 owner: '@dronasrinivas'
@@ -153,17 +153,35 @@ sources:
     documentation: https://www.ncbi.nlm.nih.gov/research/litvar2/doc/api
     gene_endpoint: https://www.ncbi.nlm.nih.gov/research/litvar2-api/variant/search/gene/TSC2
     response_shape: line_delimited_mapping_records
-    required_fields: [_id, rsid, pmids_count]
-    optional_fields: [clingen_id]
+    required_fields: [_id, pmids_count]
+    optional_fields: [rsid, clingen_id]
     projection_fields: [_id, rsid, pmids_count]
+    projection_nullable_fields: [rsid]
     interpretation: >-
       Every returned mapping is an untrusted lead. A LitVar association never
       becomes an Atlas span, ACMG criterion or accepted evidence without source
       retrieval and deterministic verification.
     field_rule: >-
-      Required fields must exist, the optional clingen_id field may be present,
-      all other fields are rejected, and accepted records are projected to the
-      three projection fields before bundling.
+      Required fields must exist, optional rsid and clingen_id fields may be
+      present, all other fields are rejected, and accepted records are
+      projected to the three projection fields with rsid=null when absent.
+    identity_rule: >-
+      Records without an rsid are retained by their unique _id. Records sharing
+      an rsid are one alias group: prefer the unique canonical aggregate record
+      whose _id is litvar@{rsid}## and has no clingen_id; if no canonical record
+      exists, retain the sole group member, but fail closed if multiple
+      non-canonical records compete. Every narrower alias pmids_count must be
+      less than or equal to the canonical aggregate pmids_count. Preserve the
+      first-seen order of resulting identity groups.
+    live_shape_observed_2026_09_09:
+      total_records: 4785
+      records_with_rsid: 3741
+      records_without_rsid: 1044
+      unique_rsid_groups: 2902
+      note: >-
+        Counts describe the failed-closed pilot observation and are diagnostic,
+        not immutable acceptance pins; exact acquired bytes are hash-bound by
+        the successful bundle.
 
   pmc:
     role: lawful_full_text_when_explicitly_permitted
@@ -293,8 +311,10 @@ acceptance_criteria:
   - id: AC-05
     rule: >-
       LitVar2 line records are parsed without eval or code execution, require
-      the required fields, allow only optional clingen_id, project to three
-      committed fields, deduplicate RSIDs and preserve pmids_count.
+      _id and pmids_count, allow only optional rsid and clingen_id, retain
+      rsid-less protein mappings, project to three fields with nullable rsid,
+      and collapse RSID aliases only by the deterministic canonical-aggregate
+      identity rule while preserving pmids_count.
   - id: AC-06
     rule: PMC JATS acquisition preserves raw XML and its explicit licence text; missing licence becomes LICENCE_REVIEW_REQUIRED.
   - id: AC-07
