@@ -1863,34 +1863,66 @@ def test_ac13_package_init_does_not_claim_implemented_modules_are_absent() -> No
     assert "not present yet" not in normalized
 
 
-@pytest.mark.parametrize(
-    "urn",
-    [
-        "IGVF:analysis-set:IGVFDS5595BTYJ",
-        "IGVF:analysis-set:IGVFDS1782FCXW",
-    ],
-    ids=["igvf-vamp-seq", "igvf-sge"],
-)
-def test_ac10_mave_sources_yaml_no_longer_marks_released_igvf_accessions_pending(
-    urn: str,
-) -> None:
-    config_path = REPO_ROOT / "configs" / "external" / "mave_sources.yaml"
-    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    sources = payload.get("sources")
-    assert isinstance(sources, list)
+def test_ac10_staged_igvf_release_state_does_not_promote_legacy_mave_registry() -> None:
+    staged_config_path = REPO_ROOT / "configs" / "external" / "tsc2_source_ingestion_v1.yaml"
+    staged_payload = yaml.safe_load(staged_config_path.read_text(encoding="utf-8"))
+    staged_sources = staged_payload.get("sources")
+    assert isinstance(staged_sources, dict)
 
-    selected = next(
-        (
-            source
-            for source in sources
-            if isinstance(source, dict) and source.get("urn") == urn
-        ),
-        None,
-    )
-    assert isinstance(selected, dict), f"expected source entry for {urn}"
-    assert selected.get("verification") != "confirm_pending"
-    notes = selected.get("notes")
-    assert "access-not-held" not in (notes or "").lower()
+    expected_staged = {
+        "igvf_vamp_seq": {
+            "analysis_set": "IGVFDS5595BTYJ",
+            "file_accession": "IGVFFI9747KART",
+            "required_status": "released",
+            "required_controlled_access": False,
+            "expected_assembly": "GRCh38",
+            "expected_file_size": 439700,
+            "expected_md5": "1a397944b7a5158b3d63999dfcf926db",
+            "licence_state": "REVIEW_REQUIRED",
+            "redistribution": "FORBIDDEN_UNTIL_REVIEW",
+            "legacy_urn": "IGVF:analysis-set:IGVFDS5595BTYJ",
+        },
+        "igvf_sge": {
+            "analysis_set": "IGVFDS1782FCXW",
+            "file_accession": "IGVFFI3097DFGF",
+            "required_status": "released",
+            "required_controlled_access": False,
+            "expected_assembly": "GRCh38",
+            "expected_file_size": 35101,
+            "expected_md5": "c188e0a9dd4c67dfac13381d3879aedf",
+            "licence_state": "REVIEW_REQUIRED",
+            "redistribution": "FORBIDDEN_UNTIL_REVIEW",
+            "legacy_urn": "IGVF:analysis-set:IGVFDS1782FCXW",
+        },
+    }
+    for source_id, expected in expected_staged.items():
+        staged_source = staged_sources.get(source_id)
+        assert isinstance(staged_source, dict), f"missing staged source: {source_id}"
+        assert staged_source.get("analysis_set") == expected["analysis_set"]
+        assert staged_source.get("file_accession") == expected["file_accession"]
+        assert staged_source.get("required_status") == expected["required_status"]
+        assert staged_source.get("required_controlled_access") is expected[
+            "required_controlled_access"
+        ]
+        assert staged_source.get("expected_assembly") == expected["expected_assembly"]
+        assert staged_source.get("expected_file_size") == expected["expected_file_size"]
+        assert staged_source.get("expected_md5") == expected["expected_md5"]
+        assert staged_source.get("licence_state") == expected["licence_state"]
+        assert staged_source.get("redistribution") == expected["redistribution"]
+
+    legacy_config_path = REPO_ROOT / "configs" / "external" / "mave_sources.yaml"
+    legacy_payload = yaml.safe_load(legacy_config_path.read_text(encoding="utf-8"))
+    legacy_sources = legacy_payload.get("sources")
+    assert isinstance(legacy_sources, list)
+    legacy_by_urn = {
+        source.get("urn"): source
+        for source in legacy_sources
+        if isinstance(source, dict) and source.get("urn")
+    }
+    for expected in expected_staged.values():
+        legacy_entry = legacy_by_urn.get(expected["legacy_urn"])
+        assert isinstance(legacy_entry, dict), f"missing legacy source: {expected['legacy_urn']}"
+        assert legacy_entry.get("verification") == "confirm_pending"
 
 
 def test_ac14_aggregate_summary_schema_and_required_source_ids_are_validated_in_memory() -> None:
