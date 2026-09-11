@@ -1,6 +1,6 @@
 schema: raptor.project.spec.v1
 spec_id: raptor-v2-functional-identity-normalization-v1
-spec_version: 1.0.0
+spec_version: 1.0.1
 status: APPROVED_BUILD
 created_at: '2026-09-11'
 owner: human-terminal-authority
@@ -153,11 +153,14 @@ normalized_row:
     - NUCLEOTIDE_CROSSWALK_REQUIRED
     - NOT_A_VARIANT
   invariants:
+    - schema equals raptor.external.normalized_functional_row.v1
+    - gene equals TSC2
     - source_row is one-based and unique within source_id
     - source_record_id is non-empty
     - score_raw is a finite numeric string copied without numeric transformation
     - spdi is present only for GENOMIC_SPDI_VERIFIED
     - GENOMIC_SPDI_VERIFIED requires assembly GRCh38 and transcript NM_000548.5
+    - verified SPDI must be a canonical NC_000016.10 SNV matching the normalized source hgvs_g
     - every non-verified state has spdi null and an explicit unresolved_reason
     - no source functional_class value is copied into the normalized row
 
@@ -245,12 +248,13 @@ source_rules:
       GENOMIC_REFERENCE_MISMATCH: 27
       REFERENCE_CONTROL: 3
     expected_variant_kinds:
-      MISSENSE: 334
+      MISSENSE: 318
       SYNONYMOUS: 104
+      STOP_GAINED: 16
       OTHER: 12
       REFERENCE_CONTROL: 3
-    verified_missense_rows: 322
-    blocked_missense_rows: 12
+    verified_missense_rows: 308
+    blocked_missense_rows: 10
 
 bundle_manifest:
   required_exact:
@@ -297,9 +301,9 @@ expected_pilot:
     PROTEIN_ONLY_CROSSWALK_REQUIRED: 9253
     REFERENCE_CONTROL: 3
   variant_kind_counts:
-    MISSENSE: 9356
+    MISSENSE: 9340
     SYNONYMOUS: 496
-    STOP_GAINED: 47
+    STOP_GAINED: 63
     OTHER: 12
     REFERENCE_CONTROL: 3
   conservation:
@@ -313,6 +317,9 @@ acceptance_criteria:
     rule: >-
       The operator rejects any source manifest, artifact SHA-256/MD5/byte
       length or bundle content hash that differs from the frozen input pins.
+      Required payloads are selected by exact artifact_id and read from the
+      pinned relative paths only after manifest validation; first-artifact
+      selection and unvalidated manifest paths are forbidden.
   - id: FN-02
     rule: >-
       The operator performs no network I/O and imports no scorer, eval, packet,
@@ -324,7 +331,8 @@ acceptance_criteria:
   - id: FN-04
     rule: >-
       All three input files require their exact headers, exact row counts,
-      finite score strings and one output row per input row.
+      finite score strings, non-empty source identities, source-valid HGVS
+      shapes and one output row per input row.
   - id: FN-05
     rule: >-
       cliPE rows are normalized to $NM\_000548.5$ c.HGVS but never receive
@@ -341,6 +349,8 @@ acceptance_criteria:
     rule: >-
       SGE SPDI is emitted only by SeqRepoGenomicNormalizer against the pinned
       GRCh38 FASTA; direct arithmetic without reference validation is forbidden.
+      The returned SPDI must be a canonical NC_000016.10 SNV matching the
+      source genomic position/ref/alt exactly.
   - id: FN-09
     rule: >-
       The frozen SGE file yields exactly 423 verified SPDI rows, 27 explicit
@@ -380,6 +390,8 @@ acceptance_criteria:
 failure_cases:
   - source bundle hash drift
   - missing or altered source artifact
+  - wrong artifact selected because a source has multiple artifacts
+  - source artifact path escaping the pinned source run directory
   - compressed-file decode failure
   - unexpected header or row count
   - blank, non-numeric, NaN or infinite score
@@ -393,6 +405,7 @@ failure_cases:
   - pre-existing or concurrently-created run directory
   - output artifact or manifest hash mismatch
   - forbidden clinical/evidence vocabulary
+  - missing source/reference root argument or environment variable
 
 pilot_command: >-
   PYTHONPATH=src python scripts/normalize_tsc2_functional_bundle.py
