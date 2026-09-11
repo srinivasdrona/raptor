@@ -109,6 +109,17 @@ ClinVar-submission authorization. The complete external evidence artifact is
 pinned by SHA-256
 `145f3ea2146cbc6cf3a1657d7bc30a1aa9698290ed8124acfe9b8b87354c6c10`.
 
+`tsc2_source_ingestion_pilot_2026-09-09.json` records the aggregate-only
+$TSC2$ missense source-expansion pilot. Six staged sources produced 12
+hash-bound external artifacts: 189 PubMed results (100 returned under the
+registered cap), 3,946 retained LitVar2 mappings, the final Europe PMC article,
+the 208-row MaveDB cliPE scoreset, and the released IGVF VAMP-seq and SGE
+files. The external bundle is pinned by manifest SHA-256
+`63bd6eb4e7182b7f2d345cd78b3a110a59c361c72d521b88990c475919865808`.
+Raw publication and functional-dataset bytes remain outside Git. IGVF licence
+review remains required, and no source is activated for classification or
+assay-specific evidence.
+
 `tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json` (ADR-0012) is the
 packet-free, non-identifying binding census aggregate over the same
 6,618-VUS TSC1/TSC2 run under the PP3/BP4-disabled-automated-emission /

@@ -1749,3 +1749,39 @@ todos:
   depends_on:
   - approve-clinvar-2026-08-amendment-v2-pre-data
   created: '2026-08-29'
+- id: v2-missense-source-spec
+  title: Specifying v2 missense source ingestion
+  description: Versioned the bounded six-source ingestion contract through v1.0.5,
+    including live LitVar2 identity shapes, create-only publication and aggregate
+    pilot-summary integrity.
+  status: done
+  depends_on: []
+  created: '2026-09-09'
+- id: v2-literature-source-build
+  title: Building literature source ingestion
+  description: Implemented deterministic PubMed, Europe PMC and LitVar2 ingestion;
+    the pilot retained 100 PubMed metadata rows and 3,946 LitVar2 mappings without
+    promoting discovery leads to evidence.
+  status: done
+  depends_on:
+  - v2-missense-source-spec
+  created: '2026-09-09'
+- id: v2-functional-source-build
+  title: Building functional source ingestion
+  description: Implemented MaveDB cliPE and released IGVF VAMP-seq/SGE staging with
+    exact content verification while retaining licence-review and non-classification
+    boundaries.
+  status: done
+  depends_on:
+  - v2-missense-source-spec
+  created: '2026-09-09'
+- id: v2-source-pilot
+  title: Running v2 source pilot
+  description: Completed the six-source external pilot with 12 artifacts and manifest
+    SHA-256 63bd6eb4e7182b7f2d345cd78b3a110a59c361c72d521b88990c475919865808;
+    committed only the aggregate summary.
+  status: done
+  depends_on:
+  - v2-functional-source-build
+  - v2-literature-source-build
+  created: '2026-09-09'
