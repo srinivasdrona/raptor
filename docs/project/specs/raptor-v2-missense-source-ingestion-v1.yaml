@@ -5,7 +5,7 @@
 # use, or automatic source activation.
 
 schema: raptor.v2.missense_source_ingestion_spec.v1
-spec_version: 1.0.4
+spec_version: 1.0.5
 task_id: v2-missense-source-ingestion-v1
 status: APPROVED_TO_BUILD
 owner: '@dronasrinivas'
@@ -58,10 +58,12 @@ delivery:
   committed_summary:
     path: data/census/tsc2_source_ingestion_pilot_2026-09-09.json
     contains:
+      - external bundle manifest content hash
       - source and artifact counts
+      - exact staged source IDs and explicit missing-source IDs
       - observed access and licence states
-      - raw artifact SHA-256 and byte lengths
-      - source-specific MD5 verification where published
+      - aggregate source observations
+      - per-artifact SHA-256, MD5, byte length and verification state
       - query result counts and explicit truncation
       - missing-source and follow-on normalization gaps
     excludes:
@@ -343,7 +345,11 @@ acceptance_criteria:
   - id: AC-13
     rule: The package and pilot import no scorer, eval, packet, census, KB or RescueScreen module.
   - id: AC-14
-    rule: The committed pilot summary contains aggregate counts and hashes only, with no per-variant rows or full text.
+    rule: >-
+      The committed pilot summary binds to the external manifest content hash,
+      records exact/missing source IDs, aggregate source observations and
+      per-artifact SHA-256/MD5/byte-length/verification values, with no
+      per-variant rows or full text.
   - id: AC-15
     rule: No output uses classification, pathogenic, benign, PS3, BS3, validated mechanism or accepted claim as an inferred status.
   - id: AC-16
