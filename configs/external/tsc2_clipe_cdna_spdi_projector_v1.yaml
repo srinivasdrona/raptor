@@ -1,0 +1,104 @@
+schema: raptor.external.tsc2_clipe_cdna_spdi_projector_config.v1
+config_id: tsc2-clipe-cdna-spdi-projector-v1
+spec: docs/project/specs/raptor-v2-clipe-cdna-spdi-projector-acquisition-v1.yaml
+spec_id: raptor-v2-clipe-cdna-spdi-projector-acquisition-v1
+spec_version: "1.0.3"
+
+inputs:
+  source_bundle:
+    bundle_id: tsc2-source-pilot-2026-09-09
+    environment_variable: RAPTOR_TSC2_SOURCE_ROOT
+    run_name: tsc2-source-pilot-2026-09-09
+    manifest_filename: bundle_manifest.json
+    manifest_content_hash: 63bd6eb4e7182b7f2d345cd78b3a110a59c361c72d521b88990c475919865808
+    scores_artifact:
+      artifact_id: mavedb_clipe-scores-csv
+      relative_path: mavedb/mavedb_clipe-scores.csv
+      sha256: 74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717
+      byte_length: 14277
+      expected_rows: 208
+      exact_header: [accession, hgvs_nt, hgvs_splice, hgvs_pro, score]
+  optional_normalized_seed:
+    bundle_id: tsc2-functional-identity-normalization-pilot-2026-09-11
+    relative_path: normalized/mavedb_clipe.jsonl
+    row_count: 208
+  genomic_reference:
+    environment_variable: RAPTOR_TSC2_REFERENCE_ROOT
+    accession: NC_000016.10
+    assembly: GRCh38
+    fasta_filename: NC_000016.10.fasta
+    sha256: 22dc1bb93de407e0653791c36e4097fbaf64c9efa2510c83b7777f607a61e4d0
+  identity_pins:
+    gene: TSC2
+    transcript: NM_000548.5
+    genomic_accession: NC_000016.10
+    assembly: GRCh38
+    service_host: api.ncbi.nlm.nih.gov
+    service_base_path: /variation/v0
+
+api:
+  base_url: https://api.ncbi.nlm.nih.gov/variation/v0
+  step_sequence: [contextuals, canonical_representative]
+  optional_step3_path: hgvs
+  accept: application/json
+
+rate_limits_retries:
+  min_interval_seconds: 1.0
+  max_concurrent_requests: 1
+  timeout_seconds:
+    connect: 10
+    read: 45
+  retry_policy:
+    retryable_http: [408, 429, 500, 502, 503, 504]
+    retryable_transport: [timeout, connection_error, tls_error]
+    non_retryable_http: [400, 401, 403, 404, 422]
+    max_attempts_per_request: 4
+    backoff: exponential_with_full_jitter
+    backoff_base_seconds: 2.0
+    backoff_cap_seconds: 60.0
+    honor_retry_after_header: true
+  run_abort:
+    # Repeated retryable failures exhausting the retry budget on more than
+    # 5% (0.05) of all rows aborts the whole run (spec
+    # rate_limits_retries.row_failure_vs_run_abort.run_abort).
+    max_retry_exhaustion_rate: 0.05
+
+outputs:
+  external_bundle:
+    environment_variable: RAPTOR_TSC2_CDNA_PROJECTOR_ROOT
+    default_root: ~/raptor-data/external/tsc2-cdna-projector
+    run_name: tsc2-clipe-cdna-spdi-projector-2026-09-12
+    bundle_id: tsc2-clipe-cdna-spdi-projector-2026-09-12
+    manifest_filename: bundle_manifest.json
+    artifacts:
+      mapping_jsonl:
+        artifact_id: mapping-jsonl
+        relative_path: mapping/mavedb_clipe_nm000548_5_to_nc000016_10.jsonl
+        schema: raptor.external.clipe_cdna_spdi_mapping_row.v1
+        row_count: 208
+      request_log:
+        artifact_id: request-index-jsonl
+        relative_path: logs/request_index.jsonl
+      raw_responses:
+        relative_dir: raw/
+  committed_summary:
+    path: data/census/tsc2_clipe_cdna_spdi_projector_pilot_2026-09-12.json
+    schema: raptor.external.clipe_cdna_spdi_projector_summary.v1
+    boundaries:
+      clinical_use: forbidden
+      evidence_strength_use: forbidden
+
+expected_pilot_outputs:
+  supportable_now:
+    total_mapping_rows: 208
+    shape_counts: {SNV: 161, DELINS: 47}
+    endpoint_sequence: two_step_only
+    reference_sha256: 22dc1bb93de407e0653791c36e4097fbaf64c9efa2510c83b7777f607a61e4d0
+    scores_sha256: 74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717
+
+boundaries:
+  clinical_use: forbidden
+  evidence_strength_use: forbidden
+  network_in_library: forbidden
+  git_raw_responses: forbidden
+  git_full_mapping_jsonl: forbidden
