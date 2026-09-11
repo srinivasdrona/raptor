@@ -226,8 +226,8 @@ def _csv_payload(header: list[str], rows: list[list[str]]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _gzip_tsv_payload(header: list[str], rows: list[list[str]]) -> bytes:
-    text = "\n".join(["\t".join(header), *["\t".join(str(cell) for cell in row) for row in rows]]) + "\n"
+def _gzip_tsv_payload(header: list[str], rows: list[list[str]], *, line_ending: str = "\n") -> bytes:
+    text = line_ending.join(["\t".join(header), *["\t".join(str(cell) for cell in row) for row in rows]]) + line_ending
     return gzip.compress(text.encode("utf-8"))
 
 
@@ -1319,6 +1319,109 @@ def test_fn06_vamp_exact_header_real_variant_token_and_wrong_accession_rejected(
             expected_rows=1,
             required_protein_accession=VAMP_PROTEIN_ACCESSION,
         )
+
+
+def test_fn06c_crlf_gzip_tsv_line_endings_parse_identically_to_lf_for_vamp_and_sge() -> None:
+    normalize_api = _normalize_api()
+    ingest_model_api = _ingest_model_api()
+
+    vamp_rows_lf = normalize_api["normalize_vamp_seq"](
+        source_id="igvf_vamp_seq",
+        tsv_gz_bytes=_gzip_tsv_payload(
+            VAMP_HEADER,
+            [
+                ["ENSP00000219476.3:p.Arg174Cys", "0.62", "0.03", "0.60", "0.63", "0.63", "damaging"],
+                ["ENSP00000219476.3:p.Lys40=", "0.05", "0.02", "0.06", "0.05", "0.04", "wt-like"],
+            ],
+            line_ending="\n",
+        ),
+        expected_header=VAMP_HEADER,
+        expected_rows=2,
+        required_protein_accession=VAMP_PROTEIN_ACCESSION,
+    )
+    vamp_rows_crlf = normalize_api["normalize_vamp_seq"](
+        source_id="igvf_vamp_seq",
+        tsv_gz_bytes=_gzip_tsv_payload(
+            VAMP_HEADER,
+            [
+                ["ENSP00000219476.3:p.Arg174Cys", "0.62", "0.03", "0.60", "0.63", "0.63", "damaging"],
+                ["ENSP00000219476.3:p.Lys40=", "0.05", "0.02", "0.06", "0.05", "0.04", "wt-like"],
+            ],
+            line_ending="\r\n",
+        ),
+        expected_header=VAMP_HEADER,
+        expected_rows=2,
+        required_protein_accession=VAMP_PROTEIN_ACCESSION,
+    )
+    assert vamp_rows_crlf == vamp_rows_lf
+    assert all("\r" not in row["hgvs_p"] for row in vamp_rows_crlf)
+    assert all("\r" not in row["score_raw"] for row in vamp_rows_crlf)
+
+    class StubNormalizer:
+        def normalize(self, raw: Any, _config: object) -> Any:
+            return _mk_normalized_variant(
+                ingest_model_api,
+                raw,
+                variant_id=f"{raw.chromosome}:{int(raw.position) - 1}:{raw.ref}:{raw.alt}",
+            )
+
+    sge_rows_lf = normalize_api["normalize_sge"](
+        source_id="igvf_sge",
+        tsv_gz_bytes=_gzip_tsv_payload(
+            SGE_HEADER,
+            [
+                _sge_row(hgvs_nt="NM_000548_5:c.=", hgvs_p="p.=", hgvs_g="NC_000016_10:g.=", score="0.00"),
+                _sge_row(
+                    hgvs_nt="NM_000548_5:c.100A>G",
+                    hgvs_p="p.Lys34Arg",
+                    hgvs_g="NC_000016_10:g.2044829C>T",
+                    score="0.71",
+                ),
+            ],
+            line_ending="\n",
+        ),
+        expected_header=SGE_HEADER,
+        expected_rows=2,
+        expected_source_transcript=SGE_SOURCE_TRANSCRIPT,
+        expected_source_genomic_accession=SGE_SOURCE_GDNA_ACCESSION,
+        normalized_transcript=SOURCE_TRANSCRIPT,
+        normalized_genomic_accession=SOURCE_GDNA_ACCESSION,
+        assembly=REFERENCE_ASSEMBLY,
+        gene="TSC2",
+        normalizer=StubNormalizer(),
+        normalizer_config={"run_id": "fn06c"},
+    )
+    sge_rows_crlf = normalize_api["normalize_sge"](
+        source_id="igvf_sge",
+        tsv_gz_bytes=_gzip_tsv_payload(
+            SGE_HEADER,
+            [
+                _sge_row(hgvs_nt="NM_000548_5:c.=", hgvs_p="p.=", hgvs_g="NC_000016_10:g.=", score="0.00"),
+                _sge_row(
+                    hgvs_nt="NM_000548_5:c.100A>G",
+                    hgvs_p="p.Lys34Arg",
+                    hgvs_g="NC_000016_10:g.2044829C>T",
+                    score="0.71",
+                ),
+            ],
+            line_ending="\r\n",
+        ),
+        expected_header=SGE_HEADER,
+        expected_rows=2,
+        expected_source_transcript=SGE_SOURCE_TRANSCRIPT,
+        expected_source_genomic_accession=SGE_SOURCE_GDNA_ACCESSION,
+        normalized_transcript=SOURCE_TRANSCRIPT,
+        normalized_genomic_accession=SOURCE_GDNA_ACCESSION,
+        assembly=REFERENCE_ASSEMBLY,
+        gene="TSC2",
+        normalizer=StubNormalizer(),
+        normalizer_config={"run_id": "fn06c"},
+    )
+    assert sge_rows_crlf == sge_rows_lf
+    for row in sge_rows_crlf:
+        for value in row.values():
+            if isinstance(value, str):
+                assert "\r" not in value
 
 
 def test_fn07_sge_accession_prefix_rules_reference_controls_snv_parsing_and_rawvariant_provenance() -> None:
