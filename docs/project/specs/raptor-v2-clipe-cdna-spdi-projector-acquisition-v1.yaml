@@ -12,7 +12,7 @@
 
 schema: raptor.project.spec.v1
 spec_id: raptor-v2-clipe-cdna-spdi-projector-acquisition-v1
-spec_version: 1.0.2
+spec_version: 1.0.3
 status: APPROVED_BUILD
 created_at: '2026-09-12'
 owner: human-terminal-authority
@@ -209,8 +209,9 @@ api:
         - data.input_hgvs_validity == 'valid'
         - len(data.spdis) == 1
         - data.spdis[0].seq_id == 'NM_000548.5'
-        - deleted_sequence and inserted_sequence are uppercase ACGT (normalize if needed; reject non-ACGT)
+        - deleted_sequence and inserted_sequence are non-empty uppercase ACGT
         - position is an integer >= 0
+        - warnings are absent at envelope, data and SPDI-item levels
       spdi_string_construction: >-
         tx_spdi = f"{seq_id}:{position}:{deleted_sequence}:{inserted_sequence}"
         using the exact field values from the JSON object (not the obsolete
@@ -260,9 +261,10 @@ api:
       acceptance_invariants_step2:
         - data.seq_id == 'NC_000016.10'
         - position is integer >= 0
-        - deleted_sequence / inserted_sequence uppercase ACGT only
+        - deleted_sequence / inserted_sequence non-empty uppercase ACGT only
         - for cliPE shapes, len(deleted_sequence) >= 1 and len(inserted_sequence) >= 1
           (no pure empty-del or empty-ins expected in this score-set)
+        - warnings are absent at envelope and data levels
       genomic_spdi_string: >-
         genomic_spdi = f"{seq_id}:{position}:{deleted_sequence}:{inserted_sequence}"
       canonical_representative_semantics: >-
@@ -437,7 +439,9 @@ deterministic_ordering:
 row_pipeline:
   build_hgvs_c:
     rule: 'hgvs_c = "NM_000548.5:" + hgvs_nt.strip()'
-    reject_if: hgvs_nt does not match snv or delins patterns above
+    reject_if: >-
+      hgvs_nt does not match the SNV pattern, or its DELINS interval is
+      reversed/unequal-length relative to the inserted sequence
   step1: GET contextuals(hgvs_c)
   parse_tx_spdi: enforce acceptance_invariants_step1
   step2: GET canonical_representative(tx_spdi)
@@ -779,7 +783,9 @@ acceptance_criteria:
   - id: CP-01
     rule: Operator is the only network I/O entry point; library tests run offline on fixtures.
   - id: CP-02
-    rule: Input scores CSV sha256/bytes/rows and FASTA sha256 match pins before fetch.
+    rule: >-
+      Source bundle manifest content hash/bundle id/scores artifact identity,
+      input scores CSV sha256/bytes/rows and FASTA sha256 match pins before fetch.
   - id: CP-03
     rule: Endpoint sequence is exactly step1 contextuals → step2 canonical_representative.
   - id: CP-04
@@ -803,6 +809,12 @@ acceptance_criteria:
     rule: Replaying frozen raw responses reproduces mapping bytes and manifest content_hash.
   - id: CP-12
     rule: Full pilot records residual pilot_uncertainties outcomes in the committed summary.
+  - id: CP-13
+    rule: Mapping JSONL revalidates exact row schema/invariants and rejects duplicate source_row keys.
+  - id: CP-14
+    rule: >-
+      Bundle manifests enforce exact field sets, safe unique artifact paths and
+      full row/status/shape/success/failure conservation before publication.
 
 failure_cases:
   - input scores hash drift or row-count != 208
