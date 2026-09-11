@@ -350,7 +350,11 @@ def _handle_litvar2(source_plan: dict[str, Any], transport: Callable[[str], dict
         "permitted_use": "NON_CLINICAL_DISCOVERY",
         "identifiers": {"gene": source_plan.get("gene", source_id)},
         "artifact_ids": [artifact_id],
-        "observations": {"rsid_count": len(rows)},
+        "observations": {
+            "mapping_count": len(rows),
+            "rsid_mapping_count": sum(1 for row in rows if row["rsid"] is not None),
+            "rsidless_mapping_count": sum(1 for row in rows if row["rsid"] is None),
+        },
         "limitations": [
             "every mapping is an untrusted lead, never a verified variant-publication association",
         ],
