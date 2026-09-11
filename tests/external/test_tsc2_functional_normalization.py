@@ -1779,7 +1779,7 @@ def test_fn14_summary_aggregate_contract_and_unresolved_reason_derivation_from_i
                 "relative_path": "normalized/mavedb_clipe.jsonl",
                 "byte_length": len(payload_a),
                 "sha256": _sha256_bytes(payload_a),
-                "row_count": 1,
+                "row_count": 17,
             },
             {
                 "artifact_id": "igvf_vamp_seq-normalized-jsonl",
@@ -1787,7 +1787,7 @@ def test_fn14_summary_aggregate_contract_and_unresolved_reason_derivation_from_i
                 "relative_path": "normalized/igvf_vamp_seq.jsonl",
                 "byte_length": len(payload_b),
                 "sha256": _sha256_bytes(payload_b),
-                "row_count": 1,
+                "row_count": 11,
             },
         ],
         counts={"sources": 2, "artifacts": 2, "rows": sum(identity_counts.values())},
