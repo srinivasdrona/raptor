@@ -498,12 +498,12 @@ def _mk_manual_queue_item(model_api: dict[str, Any], raw: Any, *, error_code: st
     )
 
 
-def test_vx00_binding_spec_exists_and_is_v1_0_1() -> None:
+def test_vx00_binding_spec_exists_and_is_v1_0_2() -> None:
     if not SPEC_PATH.is_file():
         pytest.fail(f"binding spec is missing: {SPEC_PATH}")
     spec = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))
     assert spec["spec_id"] == "raptor-v2-vamp-genomic-crosswalk-acquisition-v1"
-    assert spec["spec_version"] == "1.0.1"
+    assert spec["spec_version"] == "1.0.2"
 
 
 def test_vx01_zenodo_url_builder_and_allowlist_binding_contract() -> None:
@@ -1711,6 +1711,98 @@ def test_vx15_operator_enforces_sequential_pipeline_rate_retry_and_no_fastq_down
     assert "max_attempts_per_request" in source
 
 
+def test_vx15b_operator_expected_pilot_validator_compares_all_axes_and_names_mismatch_axis() -> None:
+    operator = _load_operator_module()
+    helper = getattr(operator, "_validate_expected_pilot_result", None)
+    if helper is None:
+        pytest.fail(
+            "operator must define _validate_expected_pilot_result(manifest, expected_pilot) "
+            "and call it before publish_vamp_crosswalk_bundle"
+        )
+    domain_error = getattr(operator, "VampCrosswalkOperatorError", RuntimeError)
+
+    manifest = {
+        "input_scores": {"row_count": 3},
+        "counts": {"rows": 3},
+        "status_counts": {
+            "CROSSWALK_SPDI_VERIFIED": 2,
+            "SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH": 1,
+            "SOURCE_COORDINATE_REFERENCE_MISMATCH": 0,
+            "ARCHIVE_CROSSWALK_ABSENT": 0,
+        },
+        "verified_unique_spdi": 2,
+    }
+    expected_pilot = {
+        "total_score_rows": 3,
+        "archive_crosswalk_rows": 3,
+        "status_counts": {
+            "CROSSWALK_SPDI_VERIFIED": 2,
+            "SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH": 1,
+            "SOURCE_COORDINATE_REFERENCE_MISMATCH": 0,
+            "ARCHIVE_CROSSWALK_ABSENT": 0,
+        },
+        "verified_unique_spdi": 2,
+        "conservation": {
+            "input_score_rows": 3,
+            "output_crosswalk_rows": 3,
+            "dropped_rows": 0,
+            "duplicate_source_rows": 0,
+        },
+    }
+    helper(manifest=deepcopy(manifest), expected_pilot=deepcopy(expected_pilot))
+
+    drifts: list[tuple[str, dict[str, Any]]] = [
+        ("total_score_rows", {**expected_pilot, "total_score_rows": 4}),
+        ("archive_crosswalk_rows", {**expected_pilot, "archive_crosswalk_rows": 2}),
+        (
+            "status_counts",
+            {
+                **expected_pilot,
+                "status_counts": {
+                    **expected_pilot["status_counts"],
+                    "SOURCE_COORDINATE_REFERENCE_MISMATCH": 1,
+                },
+            },
+        ),
+        ("verified_unique_spdi", {**expected_pilot, "verified_unique_spdi": 1}),
+        (
+            "conservation",
+            {
+                **expected_pilot,
+                "conservation": {
+                    **expected_pilot["conservation"],
+                    "output_crosswalk_rows": 2,
+                },
+            },
+        ),
+    ]
+    for axis, drifted_expected in drifts:
+        with pytest.raises(domain_error) as raised:
+            helper(manifest=deepcopy(manifest), expected_pilot=drifted_expected)
+        assert axis in str(raised.value)
+
+
+def test_vx15c_operator_calls_expected_pilot_validator_before_publication() -> None:
+    if not OPERATOR_SCRIPT.is_file():
+        pytest.fail(f"TSC2 VAMP crosswalk operator script is not implemented: {OPERATOR_SCRIPT}")
+    tree = ast.parse(OPERATOR_SCRIPT.read_text(encoding="utf-8"), filename=str(OPERATOR_SCRIPT))
+    main_node = next((node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "main"), None)
+    if main_node is None:
+        pytest.fail("operator script is missing main(argv=...)")
+
+    first_lines: dict[str, int] = {}
+    for node in ast.walk(main_node):
+        if isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name):
+                first_lines.setdefault(node.func.id, node.lineno)
+            elif isinstance(node.func, ast.Attribute):
+                first_lines.setdefault(node.func.attr, node.lineno)
+
+    assert "_validate_expected_pilot_result" in first_lines
+    assert "publish_vamp_crosswalk_bundle" in first_lines
+    assert first_lines["_validate_expected_pilot_result"] < first_lines["publish_vamp_crosswalk_bundle"]
+
+
 def test_vx16_operator_cli_requires_explicit_roots_without_cwd_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     operator = _load_operator_module()
     for env_name in (
@@ -1731,7 +1823,7 @@ def test_vx17_config_pins_exact_source_archive_reference_and_expected_status_tot
         pytest.fail(f"TSC2 VAMP crosswalk config is not implemented: {CONFIG_PATH}")
     config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
     assert config["spec_id"] == "raptor-v2-vamp-genomic-crosswalk-acquisition-v1"
-    assert config["spec_version"] == "1.0.1"
+    assert config["spec_version"] == "1.0.2"
 
     source = config["inputs"]["frozen_vamp_scores"]
     assert source["source_bundle_id"] == SOURCE_BUNDLE_ID

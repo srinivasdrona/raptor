@@ -7,6 +7,8 @@ import inspect
 import json
 import os
 import re
+from datetime import datetime, timedelta, timezone
+from email.utils import format_datetime
 from copy import deepcopy
 from importlib import import_module
 from pathlib import Path
@@ -471,12 +473,12 @@ def _valid_projector_manifest_and_payloads(bundle_api: dict[str, Any]) -> tuple[
     return manifest, mapping_payload, request_payload, raw_payloads
 
 
-def test_cp00_binding_spec_exists_and_is_v1_0_4() -> None:
+def test_cp00_binding_spec_exists_and_is_v1_0_5() -> None:
     if not SPEC_PATH.is_file():
         pytest.fail(f"binding spec is missing: {SPEC_PATH}")
     spec = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))
     assert spec["spec_id"] == "raptor-v2-clipe-cdna-spdi-projector-acquisition-v1"
-    assert spec["spec_version"] == "1.0.4"
+    assert spec["spec_version"] == "1.0.5"
 
 
 def test_cp01_endpoint_url_builders_percent_encode_whole_path_segment_no_query_and_pin_resource() -> None:
@@ -1232,9 +1234,16 @@ def test_cp08f_transport_exception_retrying_requires_allowed_category_not_nonemp
     assert result["mapping_rows"][0]["status"] == expected_status
 
 
-@pytest.mark.parametrize(("status", "retry_after_seconds"), [(429, 7), (503, 4)])
-def test_cp08g_retryable_http_honors_numeric_retry_after_before_next_attempt(
-    status: int, retry_after_seconds: int
+@pytest.mark.parametrize(
+    ("status", "retry_after_seconds", "header_name"),
+    [
+        (429, 7, "Retry-After"),
+        (503, 4, "retry-after"),
+        (429, 6, "rEtRy-AfTeR"),
+    ],
+)
+def test_cp08g_retryable_http_honors_numeric_retry_after_before_next_attempt_case_insensitive(
+    status: int, retry_after_seconds: int, header_name: str
 ) -> None:
     ingest = _load_module("raptor.external.tsc2_cdna_projector.ingest")
     perform = getattr(ingest, "_perform_step_request", None)
@@ -1255,7 +1264,7 @@ def test_cp08g_retryable_http_honors_numeric_retry_after_before_next_attempt(
                 "http_status": status,
                 "media_type": "application/json",
                 "body": retry_body,
-                "response_headers": {"Retry-After": str(retry_after_seconds)},
+                "response_headers": {header_name: str(retry_after_seconds)},
             }
         return {
             "final_url": request_url,
@@ -1284,6 +1293,121 @@ def test_cp08g_retryable_http_honors_numeric_retry_after_before_next_attempt(
     assert attempts["count"] == 2
     assert sleeps and sleeps[0] == MIN_INTERVAL_SECONDS
     assert any(value >= retry_after_seconds for value in sleeps[1:])
+
+
+def test_cp08ga_retryable_http_honors_http_date_retry_after_with_time_seam() -> None:
+    ingest = _load_module("raptor.external.tsc2_cdna_projector.ingest")
+    perform = getattr(ingest, "_perform_step_request", None)
+    if perform is None:
+        pytest.fail("ingest module must expose private seam _perform_step_request for retry validation")
+
+    sleeps: list[float] = []
+    attempts = {"count": 0}
+    base_now = datetime(2026, 9, 12, 0, 0, 0, tzinfo=timezone.utc)
+    retry_after_delay = 12.0
+    retry_after_value = format_datetime(base_now + timedelta(seconds=retry_after_delay), usegmt=True)
+    request_url = f"{BASE_URL}/hgvs/{quote(f'{TRANSCRIPT}:c.1600G>A', safe='')}/contextuals"
+
+    def transport(_url: str) -> dict[str, Any]:
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            return {
+                "final_url": request_url,
+                "http_status": 503,
+                "media_type": "application/json",
+                "body": b'{"error":"retry-me"}',
+                "response_headers": {"Retry-After": retry_after_value},
+            }
+        return {
+            "final_url": request_url,
+            "http_status": 200,
+            "media_type": "application/json",
+            "body": _step1_payload(),
+            "response_headers": {},
+        }
+
+    kwargs: dict[str, Any] = {
+        "url": request_url,
+        "transport": transport,
+        "retry_policy": {
+            "retryable_http": sorted(RETRYABLE_HTTP),
+            "retryable_transport": ["timeout", "connection_error", "tls_error"],
+            "non_retryable_http": sorted(NON_RETRYABLE_HTTP),
+            "max_attempts_per_request": 3,
+            "backoff_base_seconds": 2.0,
+            "backoff_cap_seconds": 60.0,
+            "honor_retry_after_header": True,
+        },
+        "sleep": sleeps.append,
+        "min_interval_seconds": MIN_INTERVAL_SECONDS,
+        "random_uniform": lambda _low, high: high,
+    }
+    signature = inspect.signature(perform)
+    if "current_time" in signature.parameters:
+        kwargs["current_time"] = lambda: base_now
+    elif "now_utc" in signature.parameters:
+        kwargs["now_utc"] = lambda: base_now
+    elif "current_timestamp" in signature.parameters:
+        kwargs["current_timestamp"] = lambda: base_now.timestamp()
+
+    result = perform(**kwargs)
+    assert result["outcome"] == "success"
+    assert attempts["count"] == 2
+    assert sleeps and sleeps[0] == MIN_INTERVAL_SECONDS
+    assert any(value >= retry_after_delay for value in sleeps[1:])
+
+
+@pytest.mark.parametrize("retry_after_header", ["not-a-date", "Wed, 01 Jan 2020 00:00:00 GMT"])
+def test_cp08gb_retry_after_http_date_malformed_or_past_falls_back_without_crashing(
+    retry_after_header: str,
+) -> None:
+    ingest = _load_module("raptor.external.tsc2_cdna_projector.ingest")
+    perform = getattr(ingest, "_perform_step_request", None)
+    if perform is None:
+        pytest.fail("ingest module must expose private seam _perform_step_request for retry validation")
+
+    sleeps: list[float] = []
+    attempts = {"count": 0}
+    request_url = f"{BASE_URL}/hgvs/{quote(f'{TRANSCRIPT}:c.1600G>A', safe='')}/contextuals"
+
+    def transport(_url: str) -> dict[str, Any]:
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            return {
+                "final_url": request_url,
+                "http_status": 429,
+                "media_type": "application/json",
+                "body": b'{"error":"retry-me"}',
+                "response_headers": {"rEtRy-AfTeR": retry_after_header},
+            }
+        return {
+            "final_url": request_url,
+            "http_status": 200,
+            "media_type": "application/json",
+            "body": _step1_payload(),
+            "response_headers": {},
+        }
+
+    result = perform(
+        url=request_url,
+        transport=transport,
+        retry_policy={
+            "retryable_http": sorted(RETRYABLE_HTTP),
+            "retryable_transport": ["timeout", "connection_error", "tls_error"],
+            "non_retryable_http": sorted(NON_RETRYABLE_HTTP),
+            "max_attempts_per_request": 3,
+            "backoff_base_seconds": 2.0,
+            "backoff_cap_seconds": 60.0,
+            "honor_retry_after_header": True,
+        },
+        sleep=sleeps.append,
+        min_interval_seconds=MIN_INTERVAL_SECONDS,
+        random_uniform=lambda _low, _high: 1.25,
+    )
+    assert result["outcome"] == "success"
+    assert attempts["count"] == 2
+    assert all(value >= 0.0 for value in sleeps)
+    assert any(abs(value - 1.25) < 1e-9 for value in sleeps[1:])
 
 
 def test_cp08h_retry_backoff_requires_injected_uniform_jitter_seam() -> None:
@@ -2169,7 +2293,7 @@ def test_cp18_config_pins_exact_input_hashes_endpoints_run_name_and_shape_totals
         pytest.fail(f"TSC2 cliPE projector config is not implemented: {CONFIG_PATH}")
     config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
     assert config["spec_id"] == "raptor-v2-clipe-cdna-spdi-projector-acquisition-v1"
-    assert config["spec_version"] == "1.0.4"
+    assert config["spec_version"] == "1.0.5"
 
     source_bundle = config["inputs"]["source_bundle"]
     assert source_bundle["bundle_id"] == SOURCE_BUNDLE_ID
