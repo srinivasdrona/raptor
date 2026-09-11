@@ -1,0 +1,1260 @@
+from __future__ import annotations
+
+import ast
+import hashlib
+import importlib.util
+import json
+import os
+from copy import deepcopy
+from importlib import import_module
+from pathlib import Path
+from typing import Any
+from urllib.parse import quote, unquote, urlsplit
+
+import pytest
+import yaml
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PACKAGE_ROOT = REPO_ROOT / "src" / "raptor" / "external" / "tsc2_cdna_projector"
+OPERATOR_SCRIPT = REPO_ROOT / "scripts" / "fetch_tsc2_clipe_cdna_spdi_projector.py"
+CONFIG_PATH = REPO_ROOT / "configs" / "external" / "tsc2_clipe_cdna_spdi_projector_v1.yaml"
+SPEC_PATH = (
+    REPO_ROOT / "docs" / "project" / "specs" / "raptor-v2-clipe-cdna-spdi-projector-acquisition-v1.yaml"
+)
+
+MAPPING_ROW_SCHEMA = "raptor.external.clipe_cdna_spdi_mapping_row.v1"
+BUNDLE_SCHEMA = "raptor.external.clipe_cdna_spdi_projector_bundle.v1"
+SUMMARY_SCHEMA = "raptor.external.clipe_cdna_spdi_projector_summary.v1"
+
+SOURCE_ID = "mavedb_clipe"
+SOURCE_BUNDLE_ID = "tsc2-source-pilot-2026-09-09"
+SOURCE_MANIFEST_CONTENT_HASH = "63bd6eb4e7182b7f2d345cd78b3a110a59c361c72d521b88990c475919865808"
+SCORES_ARTIFACT_ID = "mavedb_clipe-scores-csv"
+SCORES_RELATIVE_PATH = "mavedb/mavedb_clipe-scores.csv"
+SCORES_SHA256 = "74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717"
+SCORES_BYTE_LENGTH = 14277
+TOTAL_ROWS = 208
+SNV_ROWS = 161
+DELINS_ROWS = 47
+
+GENE = "TSC2"
+TRANSCRIPT = "NM_000548.5"
+GENOMIC_ACCESSION = "NC_000016.10"
+ASSEMBLY = "GRCh38"
+REFERENCE_FASTA_FILENAME = "NC_000016.10.fasta"
+REFERENCE_FASTA_SHA256 = "22dc1bb93de407e0653791c36e4097fbaf64c9efa2510c83b7777f607a61e4d0"
+
+BASE_URL = "https://api.ncbi.nlm.nih.gov/variation/v0"
+EXPECTED_HOST = "api.ncbi.nlm.nih.gov"
+EXPECTED_BASE_PATH = "/variation/v0"
+
+RUN_NAME = "tsc2-clipe-cdna-spdi-projector-2026-09-12"
+BUNDLE_ID = "tsc2-clipe-cdna-spdi-projector-2026-09-12"
+SUMMARY_PATH = REPO_ROOT / "data" / "census" / "tsc2_clipe_cdna_spdi_projector_pilot_2026-09-12.json"
+
+SCORES_HEADER = ["accession", "hgvs_nt", "hgvs_splice", "hgvs_pro", "score"]
+
+STATUS_VOCABULARY = {
+    "PROJECTED_FASTA_VERIFIED",
+    "STEP1_HTTP_ERROR",
+    "STEP1_INVALID_HGVS",
+    "STEP1_SCHEMA_VIOLATION",
+    "STEP1_AMBIGUOUS_SPDIS",
+    "STEP1_UNEXPECTED_SEQ_ID",
+    "STEP2_HTTP_ERROR",
+    "STEP2_SCHEMA_VIOLATION",
+    "STEP2_NON_PINNED_GENOME",
+    "FASTA_REF_MISMATCH",
+    "FASTA_OUT_OF_RANGE",
+    "NON_ACGT_ALLELE",
+    "TRANSPORT_OR_BINDING_ERROR",
+    "OPERATOR_SKIPPED",
+}
+SHAPE_VOCABULARY = {"SNV", "DELINS"}
+RETRYABLE_HTTP = {408, 429, 500, 502, 503, 504}
+NON_RETRYABLE_HTTP = {400, 401, 403, 404, 422}
+MIN_INTERVAL_SECONDS = 1.0
+MAX_ATTEMPTS = 4
+
+FORBIDDEN_IMPORT_PREFIXES = (
+    "raptor.scorer",
+    "raptor.eval",
+    "raptor.packet",
+    "raptor.census",
+    "raptor.kb",
+    "raptor.atlas",
+    "raptor.rescuescreen",
+)
+FORBIDDEN_NETWORK_IMPORTS = ("urllib.request", "requests", "httpx", "aiohttp")
+FORBIDDEN_TEXT_TOKENS = ("classification", "pathogenic", "benign", "ps3", "bs3", "patient")
+
+
+def _load_module(module_name: str):
+    try:
+        return import_module(module_name)
+    except ImportError as exc:
+        pytest.fail(f"TSC2 cliPE projector module {module_name!r} is not implemented: {exc}")
+
+
+def _symbol(module: Any, symbol_name: str):
+    if not hasattr(module, symbol_name):
+        pytest.fail(
+            f"TSC2 cliPE projector module {module.__name__!r} is missing public symbol {symbol_name!r}"
+        )
+    return getattr(module, symbol_name)
+
+
+def _endpoint_api() -> dict[str, Any]:
+    module = _load_module("raptor.external.tsc2_cdna_projector.endpoint")
+    return {
+        "ProjectorEndpointSecurityError": _symbol(module, "ProjectorEndpointSecurityError"),
+        "ProjectorTransportValidationError": _symbol(module, "ProjectorTransportValidationError"),
+        "build_step1_hgvs_contextuals_url": _symbol(module, "build_step1_hgvs_contextuals_url"),
+        "build_step2_spdi_canonical_representative_url": _symbol(
+            module, "build_step2_spdi_canonical_representative_url"
+        ),
+        "build_step3_spdi_hgvs_url": _symbol(module, "build_step3_spdi_hgvs_url"),
+        "assert_allowed_projector_final_url": _symbol(module, "assert_allowed_projector_final_url"),
+        "fetch_with_transport": _symbol(module, "fetch_with_transport"),
+    }
+
+
+def _parse_api() -> dict[str, Any]:
+    module = _load_module("raptor.external.tsc2_cdna_projector.parse")
+    return {
+        "Step1SchemaError": _symbol(module, "Step1SchemaError"),
+        "Step2SchemaError": _symbol(module, "Step2SchemaError"),
+        "parse_step1_contextuals_response": _symbol(module, "parse_step1_contextuals_response"),
+        "parse_step2_canonical_representative_response": _symbol(
+            module, "parse_step2_canonical_representative_response"
+        ),
+    }
+
+
+def _model_api() -> dict[str, Any]:
+    module = _load_module("raptor.external.tsc2_cdna_projector.model")
+    return {
+        "CLIPE_CDNA_SPDI_MAPPING_ROW_SCHEMA": _symbol(module, "CLIPE_CDNA_SPDI_MAPPING_ROW_SCHEMA"),
+        "ALLOWED_MAPPING_STATUSES": _symbol(module, "ALLOWED_MAPPING_STATUSES"),
+        "ALLOWED_VARIANT_SHAPES": _symbol(module, "ALLOWED_VARIANT_SHAPES"),
+        "ProjectionContractError": _symbol(module, "ProjectionContractError"),
+        "ClipeCdnaSpdiMappingRow": _symbol(module, "ClipeCdnaSpdiMappingRow"),
+    }
+
+
+def _ingest_api() -> dict[str, Any]:
+    module = _load_module("raptor.external.tsc2_cdna_projector.ingest")
+    return {
+        "ProjectorAcquisitionError": _symbol(module, "ProjectorAcquisitionError"),
+        "FrozenInputError": _symbol(module, "FrozenInputError"),
+        "ReferenceIntegrityError": _symbol(module, "ReferenceIntegrityError"),
+        "validate_frozen_scores_input": _symbol(module, "validate_frozen_scores_input"),
+        "validate_reference_fasta_checksum": _symbol(module, "validate_reference_fasta_checksum"),
+        "project_clipe_rows": _symbol(module, "project_clipe_rows"),
+    }
+
+
+def _bundle_api() -> dict[str, Any]:
+    module = _load_module("raptor.external.tsc2_cdna_projector.bundle")
+    return {
+        "ProjectorBundleBoundaryError": _symbol(module, "ProjectorBundleBoundaryError"),
+        "ProjectorManifestError": _symbol(module, "ProjectorManifestError"),
+        "canonical_mapping_jsonl_bytes": _symbol(module, "canonical_mapping_jsonl_bytes"),
+        "canonical_request_index_jsonl_bytes": _symbol(module, "canonical_request_index_jsonl_bytes"),
+        "compute_manifest_content_hash": _symbol(module, "compute_manifest_content_hash"),
+        "validate_manifest_content_hash": _symbol(module, "validate_manifest_content_hash"),
+        "build_projector_bundle_manifest": _symbol(module, "build_projector_bundle_manifest"),
+        "publish_projector_bundle": _symbol(module, "publish_projector_bundle"),
+        "build_committed_summary": _symbol(module, "build_committed_summary"),
+        "_publish_directory_no_replace": _symbol(module, "_publish_directory_no_replace"),
+    }
+
+
+def _load_operator_module():
+    if not OPERATOR_SCRIPT.is_file():
+        pytest.fail(f"TSC2 cliPE projector operator script is not implemented: {OPERATOR_SCRIPT}")
+    spec = importlib.util.spec_from_file_location("raptor_tsc2_cdna_projector_operator_module", OPERATOR_SCRIPT)
+    if spec is None or spec.loader is None:
+        pytest.fail(f"could not load operator module spec from {OPERATOR_SCRIPT}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _module_imports(path: Path) -> list[tuple[str, int]]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    imports: list[tuple[str, int]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                imports.append((alias.name, node.lineno))
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imports.append((node.module, node.lineno))
+    return imports
+
+
+def _sha256(blob: bytes) -> str:
+    return hashlib.sha256(blob).hexdigest()
+
+
+def _scores_csv(rows: list[list[str]]) -> str:
+    lines = [",".join(SCORES_HEADER)]
+    lines.extend(",".join(str(value) for value in row) for row in rows)
+    return "\n".join(lines) + "\n"
+
+
+def _minimal_mapping_row(*, source_row: int, shape: str = "SNV", status: str = "PROJECTED_FASTA_VERIFIED") -> dict[str, Any]:
+    if shape == "SNV":
+        hgvs_nt = "c.1600G>A"
+        tx_spdi = "NM_000548.5:1709:G:A"
+        genomic_spdi = "NC_000016.10:2065518:G:A"
+        hgvs_g = "NC_000016.10:g.2065519G>A"
+        observed = "G"
+    else:
+        hgvs_nt = "c.1627_1629delinsTGA"
+        tx_spdi = "NM_000548.5:1736:CCG:TGA"
+        genomic_spdi = "NC_000016.10:2065545:CCG:TGA"
+        hgvs_g = "NC_000016.10:g.2065546_2065548delinsTGA"
+        observed = "CCG"
+    return {
+        "schema": MAPPING_ROW_SCHEMA,
+        "source_id": SOURCE_ID,
+        "source_row": source_row,
+        "source_record_id": f"urn:mavedb:00001201-a-1#{source_row}",
+        "gene": GENE,
+        "transcript": TRANSCRIPT,
+        "hgvs_c": f"{TRANSCRIPT}:{hgvs_nt}",
+        "hgvs_nt_source": hgvs_nt,
+        "tx_spdi": tx_spdi if status == "PROJECTED_FASTA_VERIFIED" else None,
+        "genomic_spdi": genomic_spdi if status == "PROJECTED_FASTA_VERIFIED" else None,
+        "hgvs_g": hgvs_g if status == "PROJECTED_FASTA_VERIFIED" else None,
+        "assembly": ASSEMBLY if status == "PROJECTED_FASTA_VERIFIED" else None,
+        "genomic_accession": GENOMIC_ACCESSION if status == "PROJECTED_FASTA_VERIFIED" else None,
+        "status": status,
+        "fasta_deleted_observed": observed if status == "PROJECTED_FASTA_VERIFIED" else None,
+        "error_detail": None if status == "PROJECTED_FASTA_VERIFIED" else "sanitized",
+        "step1_body_sha256": "a" * 64,
+        "step2_body_sha256": "b" * 64,
+        "variant_shape": shape,
+    }
+
+
+def _minimal_request_index_row(*, source_row: int, step: str, requested_url: str, final_url: str) -> dict[str, Any]:
+    body = json.dumps({"ok": True, "step": step, "source_row": source_row}, separators=(",", ":")).encode("utf-8")
+    return {
+        "source_row": source_row,
+        "step": step,
+        "requested_url": requested_url,
+        "final_url": final_url,
+        "http_status": 200,
+        "body_sha256": _sha256(body),
+        "elapsed_ms": 123,
+    }
+
+
+def _step1_payload(*, seq_id: str = TRANSCRIPT, position: int = 1709, deleted: str = "G", inserted: str = "A") -> bytes:
+    payload = {
+        "data": {
+            "input_hgvs_validity": "valid",
+            "spdis": [
+                {
+                    "seq_id": seq_id,
+                    "position": position,
+                    "deleted_sequence": deleted,
+                    "inserted_sequence": inserted,
+                }
+            ],
+        }
+    }
+    return json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+
+
+def _step2_payload(
+    *, seq_id: str = GENOMIC_ACCESSION, position: int = 2065518, deleted: str = "G", inserted: str = "A"
+) -> bytes:
+    payload = {
+        "data": {
+            "seq_id": seq_id,
+            "position": position,
+            "deleted_sequence": deleted,
+            "inserted_sequence": inserted,
+        }
+    }
+    return json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+
+
+def _valid_projector_manifest_and_payloads(bundle_api: dict[str, Any]) -> tuple[dict[str, Any], bytes, bytes, dict[str, bytes]]:
+    mapping_rows = [_minimal_mapping_row(source_row=1, shape="SNV"), _minimal_mapping_row(source_row=2, shape="DELINS")]
+    mapping_payload = bundle_api["canonical_mapping_jsonl_bytes"](mapping_rows)
+    request_rows = [
+        _minimal_request_index_row(
+            source_row=1,
+            step="step1",
+            requested_url=f"{BASE_URL}/hgvs/{quote('NM_000548.5:c.1600G>A', safe='')}/contextuals",
+            final_url=f"{BASE_URL}/hgvs/{quote('NM_000548.5:c.1600G>A', safe='')}/contextuals",
+        ),
+        _minimal_request_index_row(
+            source_row=1,
+            step="step2",
+            requested_url=f"{BASE_URL}/spdi/{quote('NM_000548.5:1709:G:A', safe='')}/canonical_representative",
+            final_url=f"{BASE_URL}/spdi/{quote('NM_000548.5:1709:G:A', safe='')}/canonical_representative",
+        ),
+        _minimal_request_index_row(
+            source_row=2,
+            step="step1",
+            requested_url=f"{BASE_URL}/hgvs/{quote('NM_000548.5:c.1627_1629delinsTGA', safe='')}/contextuals",
+            final_url=f"{BASE_URL}/hgvs/{quote('NM_000548.5:c.1627_1629delinsTGA', safe='')}/contextuals",
+        ),
+        _minimal_request_index_row(
+            source_row=2,
+            step="step2",
+            requested_url=f"{BASE_URL}/spdi/{quote('NM_000548.5:1736:CCG:TGA', safe='')}/canonical_representative",
+            final_url=f"{BASE_URL}/spdi/{quote('NM_000548.5:1736:CCG:TGA', safe='')}/canonical_representative",
+        ),
+    ]
+    request_payload = bundle_api["canonical_request_index_jsonl_bytes"](request_rows)
+
+    raw_payloads = {
+        "raw/step1/0001-contextuals.json": _step1_payload(),
+        "raw/step2/0001-canonical_representative.json": _step2_payload(),
+        "raw/step1/0002-contextuals.json": _step1_payload(position=1736, deleted="CCG", inserted="TGA"),
+        "raw/step2/0002-canonical_representative.json": _step2_payload(position=2065545, deleted="CCG", inserted="TGA"),
+    }
+    artifacts = [
+        {
+            "artifact_id": "mapping-jsonl",
+            "relative_path": "mapping/mavedb_clipe_nm000548_5_to_nc000016_10.jsonl",
+            "byte_length": len(mapping_payload),
+            "sha256": _sha256(mapping_payload),
+            "row_count": 2,
+        },
+        {
+            "artifact_id": "request-index-jsonl",
+            "relative_path": "logs/request_index.jsonl",
+            "byte_length": len(request_payload),
+            "sha256": _sha256(request_payload),
+            "row_count": 4,
+        },
+        {
+            "artifact_id": "raw-step1-0001",
+            "relative_path": "raw/step1/0001-contextuals.json",
+            "byte_length": len(raw_payloads["raw/step1/0001-contextuals.json"]),
+            "sha256": _sha256(raw_payloads["raw/step1/0001-contextuals.json"]),
+            "row_count": 1,
+        },
+        {
+            "artifact_id": "raw-step2-0001",
+            "relative_path": "raw/step2/0001-canonical_representative.json",
+            "byte_length": len(raw_payloads["raw/step2/0001-canonical_representative.json"]),
+            "sha256": _sha256(raw_payloads["raw/step2/0001-canonical_representative.json"]),
+            "row_count": 1,
+        },
+        {
+            "artifact_id": "raw-step1-0002",
+            "relative_path": "raw/step1/0002-contextuals.json",
+            "byte_length": len(raw_payloads["raw/step1/0002-contextuals.json"]),
+            "sha256": _sha256(raw_payloads["raw/step1/0002-contextuals.json"]),
+            "row_count": 1,
+        },
+        {
+            "artifact_id": "raw-step2-0002",
+            "relative_path": "raw/step2/0002-canonical_representative.json",
+            "byte_length": len(raw_payloads["raw/step2/0002-canonical_representative.json"]),
+            "sha256": _sha256(raw_payloads["raw/step2/0002-canonical_representative.json"]),
+            "row_count": 1,
+        },
+    ]
+
+    manifest = bundle_api["build_projector_bundle_manifest"](
+        bundle_id=BUNDLE_ID,
+        created_at="2026-09-12T00:00:00Z",
+        input_scores={
+            "artifact_id": SCORES_ARTIFACT_ID,
+            "sha256": SCORES_SHA256,
+            "byte_length": SCORES_BYTE_LENGTH,
+            "row_count": TOTAL_ROWS,
+        },
+        reference={"accession": GENOMIC_ACCESSION, "sha256": REFERENCE_FASTA_SHA256},
+        endpoint_pins={
+            "base_url": BASE_URL,
+            "step_sequence": ["contextuals", "canonical_representative"],
+            "min_interval_seconds": MIN_INTERVAL_SECONDS,
+        },
+        artifacts=artifacts,
+        status_counts={"PROJECTED_FASTA_VERIFIED": 2},
+        shape_counts={"SNV": 1, "DELINS": 1},
+        success_count=2,
+        failure_count=0,
+        boundaries={
+            "network": "operator_only",
+            "clinical_use": "forbidden",
+            "evidence_strength_use": "forbidden",
+        },
+    )
+    return manifest, mapping_payload, request_payload, raw_payloads
+
+
+def test_cp00_binding_spec_exists_and_is_v1_0_2() -> None:
+    if not SPEC_PATH.is_file():
+        pytest.fail(f"binding spec is missing: {SPEC_PATH}")
+    spec = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))
+    assert spec["spec_id"] == "raptor-v2-clipe-cdna-spdi-projector-acquisition-v1"
+    assert spec["spec_version"] == "1.0.2"
+
+
+def test_cp01_endpoint_url_builders_percent_encode_whole_path_segment_no_query_and_pin_resource() -> None:
+    api = _endpoint_api()
+    hgvs_c = "NM_000548.5:c.1600G>A"
+    tx_spdi = "NM_000548.5:1709:G:A"
+    genomic_spdi = "NC_000016.10:2065518:G:A"
+
+    step1 = api["build_step1_hgvs_contextuals_url"](hgvs_c=hgvs_c)
+    step2 = api["build_step2_spdi_canonical_representative_url"](spdi=tx_spdi)
+    step3 = api["build_step3_spdi_hgvs_url"](spdi=genomic_spdi)
+
+    assert step1 == f"{BASE_URL}/hgvs/{quote(hgvs_c, safe='')}/contextuals"
+    assert step2 == f"{BASE_URL}/spdi/{quote(tx_spdi, safe='')}/canonical_representative"
+    assert step3 == f"{BASE_URL}/spdi/{quote(genomic_spdi, safe='')}/hgvs"
+
+    for url, expected_resource in ((step1, hgvs_c), (step2, tx_spdi), (step3, genomic_spdi)):
+        parts = urlsplit(url)
+        assert parts.scheme == "https"
+        assert parts.netloc == EXPECTED_HOST
+        assert parts.path.startswith(EXPECTED_BASE_PATH + "/")
+        assert parts.query == ""
+        encoded_resource = parts.path.split("/")[4]
+        assert unquote(encoded_resource) == expected_resource
+
+
+def test_cp02_final_url_allowlist_and_resource_binding_enforced_across_redirects() -> None:
+    api = _endpoint_api()
+    requested = f"{BASE_URL}/hgvs/{quote('NM_000548.5:c.1600G>A', safe='')}/contextuals"
+    api["assert_allowed_projector_final_url"](requested_url=requested, final_url=requested)
+
+    err = api["ProjectorEndpointSecurityError"]
+    with pytest.raises(err):
+        api["assert_allowed_projector_final_url"](
+            requested_url=requested,
+            final_url=requested.replace("https://api.ncbi.nlm.nih.gov", "https://evil.example.org"),
+        )
+    with pytest.raises(err):
+        api["assert_allowed_projector_final_url"](
+            requested_url=requested, final_url=requested.replace("/contextuals", "/canonical_representative")
+        )
+    with pytest.raises(err):
+        api["assert_allowed_projector_final_url"](
+            requested_url=requested, final_url=requested.replace("1600G%3EA", "1600A%3EG")
+        )
+    with pytest.raises(err):
+        api["assert_allowed_projector_final_url"](
+            requested_url=requested, final_url=requested + "?api_key=SECRET"
+        )
+
+
+def test_cp03_reject_direct_hgvs_canonical_and_batch_contextuals_endpoints() -> None:
+    api = _endpoint_api()
+    err = api["ProjectorEndpointSecurityError"]
+    direct = f"{BASE_URL}/hgvs/{quote('NM_000548.5:c.1600G>A', safe='')}/canonical_representative"
+    batch = f"{BASE_URL}/hgvs/batch/contextuals"
+    with pytest.raises(err):
+        api["assert_allowed_projector_final_url"](requested_url=direct, final_url=direct)
+    with pytest.raises(err):
+        api["assert_allowed_projector_final_url"](requested_url=batch, final_url=batch)
+
+
+def test_cp04_fetch_with_transport_requires_typed_200_bytes_media_and_sanitizes_transport_errors() -> None:
+    api = _endpoint_api()
+    requested = f"{BASE_URL}/hgvs/{quote('NM_000548.5:c.1600G>A', safe='')}/contextuals"
+    body = _step1_payload()
+
+    def ok_transport(_url: str) -> dict[str, Any]:
+        return {
+            "final_url": requested,
+            "http_status": 200,
+            "media_type": "application/json; charset=utf-8",
+            "body": body,
+        }
+
+    result = api["fetch_with_transport"](requested_url=requested, transport=ok_transport)
+    assert result["requested_url"] == requested
+    assert result["final_url"] == requested
+    assert result["http_status"] == 200
+    assert result["media_type"].startswith("application/json")
+    assert result["byte_length"] == len(body)
+    assert result["sha256"] == _sha256(body)
+
+    err = api["ProjectorTransportValidationError"]
+    for malformed in (
+        {"http_status": 200, "media_type": "application/json", "body": body},
+        {"final_url": requested, "http_status": 500, "media_type": "application/json", "body": body},
+        {"final_url": requested, "http_status": 200, "media_type": "", "body": body},
+        {"final_url": requested, "http_status": 200, "media_type": "application/json", "body": "not-bytes"},
+    ):
+        with pytest.raises(err):
+            api["fetch_with_transport"](requested_url=requested, transport=lambda _url, m=malformed: m)
+
+    class SecretTransportError(RuntimeError):
+        pass
+
+    def bad_transport(_url: str) -> dict[str, Any]:
+        raise SecretTransportError("api_key=SECRET should not leak")
+
+    with pytest.raises(err) as raised:
+        api["fetch_with_transport"](requested_url=requested, transport=bad_transport)
+    assert "SECRET" not in str(raised.value)
+
+
+def test_cp05_step1_parser_requires_valid_single_transcript_spdi_and_acgt_alleles() -> None:
+    api = _parse_api()
+    parsed = api["parse_step1_contextuals_response"](
+        body=_step1_payload(), media_type="application/json", expected_seq_id=TRANSCRIPT
+    )
+    assert parsed["seq_id"] == TRANSCRIPT
+    assert parsed["position"] == 1709
+    assert parsed["deleted_sequence"] == "G"
+    assert parsed["inserted_sequence"] == "A"
+    assert parsed["spdi"] == "NM_000548.5:1709:G:A"
+
+    err = api["Step1SchemaError"]
+    with pytest.raises(err):
+        api["parse_step1_contextuals_response"](
+            body=json.dumps({"data": {"input_hgvs_validity": "invalid", "spdis": []}}).encode("utf-8"),
+            media_type="application/json",
+            expected_seq_id=TRANSCRIPT,
+        )
+    with pytest.raises(err):
+        api["parse_step1_contextuals_response"](
+            body=json.dumps(
+                {
+                    "data": {
+                        "input_hgvs_validity": "valid",
+                        "spdis": [
+                            {"seq_id": TRANSCRIPT, "position": 1, "deleted_sequence": "A", "inserted_sequence": "G"},
+                            {"seq_id": TRANSCRIPT, "position": 2, "deleted_sequence": "C", "inserted_sequence": "T"},
+                        ],
+                    }
+                }
+            ).encode("utf-8"),
+            media_type="application/json",
+            expected_seq_id=TRANSCRIPT,
+        )
+    with pytest.raises(err):
+        api["parse_step1_contextuals_response"](
+            body=_step1_payload(seq_id="NM_000548.4"), media_type="application/json", expected_seq_id=TRANSCRIPT
+        )
+    with pytest.raises(err):
+        api["parse_step1_contextuals_response"](
+            body=_step1_payload(position=-1), media_type="application/json", expected_seq_id=TRANSCRIPT
+        )
+    with pytest.raises(err):
+        api["parse_step1_contextuals_response"](
+            body=_step1_payload(deleted="n", inserted="A"), media_type="application/json", expected_seq_id=TRANSCRIPT
+        )
+
+
+def test_cp06_step2_parser_requires_pinned_genome_and_rejects_transcript_or_warning_payloads() -> None:
+    api = _parse_api()
+    parsed = api["parse_step2_canonical_representative_response"](
+        body=_step2_payload(), media_type="application/json", expected_seq_id=GENOMIC_ACCESSION
+    )
+    assert parsed["seq_id"] == GENOMIC_ACCESSION
+    assert parsed["position"] == 2065518
+    assert parsed["deleted_sequence"] == "G"
+    assert parsed["inserted_sequence"] == "A"
+    assert parsed["spdi"] == "NC_000016.10:2065518:G:A"
+
+    err = api["Step2SchemaError"]
+    with pytest.raises(err):
+        api["parse_step2_canonical_representative_response"](
+            body=_step2_payload(seq_id=TRANSCRIPT), media_type="application/json", expected_seq_id=GENOMIC_ACCESSION
+        )
+    with pytest.raises(err):
+        api["parse_step2_canonical_representative_response"](
+            body=json.dumps({"data": {"seq_id": GENOMIC_ACCESSION, "position": 1, "deleted_sequence": "A"}}).encode(
+                "utf-8"
+            ),
+            media_type="application/json",
+            expected_seq_id=GENOMIC_ACCESSION,
+        )
+    with pytest.raises(err):
+        api["parse_step2_canonical_representative_response"](
+            body=json.dumps(
+                {
+                    "warnings": [{"message": "alignment drift"}],
+                    "data": {"seq_id": GENOMIC_ACCESSION, "position": 1, "deleted_sequence": "A", "inserted_sequence": "G"},
+                }
+            ).encode("utf-8"),
+            media_type="application/json",
+            expected_seq_id=GENOMIC_ACCESSION,
+        )
+
+
+def test_cp07_mapping_row_contract_supports_snv_and_delins_and_retains_failure_rows() -> None:
+    api = _model_api()
+    assert api["CLIPE_CDNA_SPDI_MAPPING_ROW_SCHEMA"] == MAPPING_ROW_SCHEMA
+    assert set(api["ALLOWED_MAPPING_STATUSES"]) == STATUS_VOCABULARY
+    assert set(api["ALLOWED_VARIANT_SHAPES"]) == SHAPE_VOCABULARY
+
+    snv = _minimal_mapping_row(source_row=1, shape="SNV")
+    delins = _minimal_mapping_row(source_row=2, shape="DELINS")
+    failure = _minimal_mapping_row(source_row=3, shape="SNV", status="STEP1_INVALID_HGVS")
+    assert [snv["source_row"], delins["source_row"], failure["source_row"]] == [1, 2, 3]
+    assert failure["tx_spdi"] is None and failure["genomic_spdi"] is None
+
+    constructed = [
+        api["ClipeCdnaSpdiMappingRow"](**snv).to_dict(),
+        api["ClipeCdnaSpdiMappingRow"](**delins).to_dict(),
+        api["ClipeCdnaSpdiMappingRow"](**failure).to_dict(),
+    ]
+    assert [row["source_row"] for row in constructed] == [1, 2, 3]
+    assert [row["source_record_id"] for row in constructed] == [
+        "urn:mavedb:00001201-a-1#1",
+        "urn:mavedb:00001201-a-1#2",
+        "urn:mavedb:00001201-a-1#3",
+    ]
+
+
+def test_cp08_reference_checksum_is_verified_before_any_request_attempt() -> None:
+    api = _ingest_api()
+    scores_rows = [
+        ["urn:mavedb:00001201-a-1#1", "c.1600G>A", "", "p.Gly534Arg", "0.21"],
+        ["urn:mavedb:00001201-a-1#2", "c.1627_1629delinsTGA", "", "p.Pro543Ter", "-0.30"],
+    ]
+    scores_csv = _scores_csv(scores_rows).encode("utf-8")
+
+    calls: list[str] = []
+
+    def transport(_url: str) -> dict[str, Any]:
+        calls.append("transport")
+        return {
+            "final_url": "https://api.ncbi.nlm.nih.gov/variation/v0/hgvs/NM_000548.5%3Ac.1600G%3EA/contextuals",
+            "http_status": 200,
+            "media_type": "application/json",
+            "body": _step1_payload(),
+        }
+
+    with pytest.raises(api["ReferenceIntegrityError"]):
+        api["project_clipe_rows"](
+            source_id=SOURCE_ID,
+            scores_csv_bytes=scores_csv,
+            expected_header=SCORES_HEADER,
+            expected_rows=2,
+            expected_scores_sha256=_sha256(scores_csv),
+            expected_scores_byte_length=len(scores_csv),
+            transcript=TRANSCRIPT,
+            genomic_accession=GENOMIC_ACCESSION,
+            assembly=ASSEMBLY,
+            reference_fasta_path=Path("missing.fasta"),
+            expected_reference_sha256="0" * 64,
+            transport=transport,
+            min_interval_seconds=MIN_INTERVAL_SECONDS,
+            retry_policy={
+                "retryable_http": sorted(RETRYABLE_HTTP),
+                "non_retryable_http": sorted(NON_RETRYABLE_HTTP),
+                "max_attempts_per_request": MAX_ATTEMPTS,
+            },
+            sleep=lambda _seconds: None,
+        )
+    assert calls == []
+
+
+def test_cp08b_project_clipe_rows_successful_snv_and_delins_flow_is_ordered_and_conservative(tmp_path: Path) -> None:
+    api = _ingest_api()
+    scores_rows = [
+        ["urn:mavedb:00001201-a-1#1", "c.1600G>A", "", "p.Gly534Arg", "0.21"],
+        ["urn:mavedb:00001201-a-1#2", "c.1627_1629delinsTGA", "", "p.Pro543Ter", "-0.30"],
+    ]
+    scores_csv_text = _scores_csv(scores_rows)
+    scores_payload = scores_csv_text.encode("utf-8")
+    reference_path = tmp_path / REFERENCE_FASTA_FILENAME
+    reference_bytes = b">NC_000016.10\nACGTACGTACGTACGT\n"
+    reference_path.write_bytes(reference_bytes)
+
+    step1_snv = _step1_payload()
+    step2_snv = _step2_payload()
+    step1_delins = _step1_payload(position=1736, deleted="CCG", inserted="TGA")
+    step2_delins = _step2_payload(position=2065545, deleted="CCG", inserted="TGA")
+    responses = [
+        {
+            "final_url": f"{BASE_URL}/hgvs/{quote(f'{TRANSCRIPT}:c.1600G>A', safe='')}/contextuals",
+            "http_status": 200,
+            "media_type": "application/json; charset=utf-8",
+            "body": step1_snv,
+        },
+        {
+            "final_url": f"{BASE_URL}/spdi/{quote('NM_000548.5:1709:G:A', safe='')}/canonical_representative",
+            "http_status": 200,
+            "media_type": "application/json; charset=utf-8",
+            "body": step2_snv,
+        },
+        {
+            "final_url": f"{BASE_URL}/hgvs/{quote(f'{TRANSCRIPT}:c.1627_1629delinsTGA', safe='')}/contextuals",
+            "http_status": 200,
+            "media_type": "application/json; charset=utf-8",
+            "body": step1_delins,
+        },
+        {
+            "final_url": f"{BASE_URL}/spdi/{quote('NM_000548.5:1736:CCG:TGA', safe='')}/canonical_representative",
+            "http_status": 200,
+            "media_type": "application/json; charset=utf-8",
+            "body": step2_delins,
+        },
+    ]
+    requested_urls: list[str] = []
+
+    def transport(url: str) -> dict[str, Any]:
+        requested_urls.append(url)
+        return deepcopy(responses[len(requested_urls) - 1])
+
+    fasta_checks: list[tuple[str, int, str]] = []
+
+    def fasta_deleted_allele_checker(*, accession: str, position: int, deleted_sequence: str) -> str:
+        fasta_checks.append((accession, position, deleted_sequence))
+        return deleted_sequence
+
+    result = api["project_clipe_rows"](
+        source_id=SOURCE_ID,
+        scores_csv_bytes=scores_payload,
+        expected_header=SCORES_HEADER,
+        expected_rows=2,
+        expected_scores_sha256=_sha256(scores_payload),
+        expected_scores_byte_length=len(scores_payload),
+        transcript=TRANSCRIPT,
+        genomic_accession=GENOMIC_ACCESSION,
+        assembly=ASSEMBLY,
+        reference_fasta_path=reference_path,
+        expected_reference_sha256=_sha256(reference_bytes),
+        transport=transport,
+        min_interval_seconds=MIN_INTERVAL_SECONDS,
+        retry_policy={
+            "retryable_http": sorted(RETRYABLE_HTTP),
+            "retryable_transport": ["timeout", "connection_error", "tls_error"],
+            "non_retryable_http": sorted(NON_RETRYABLE_HTTP),
+            "max_attempts_per_request": MAX_ATTEMPTS,
+        },
+        sleep=lambda _seconds: None,
+        fasta_deleted_allele_checker=fasta_deleted_allele_checker,
+    )
+    assert requested_urls == [
+        f"{BASE_URL}/hgvs/{quote(f'{TRANSCRIPT}:c.1600G>A', safe='')}/contextuals",
+        f"{BASE_URL}/spdi/{quote('NM_000548.5:1709:G:A', safe='')}/canonical_representative",
+        f"{BASE_URL}/hgvs/{quote(f'{TRANSCRIPT}:c.1627_1629delinsTGA', safe='')}/contextuals",
+        f"{BASE_URL}/spdi/{quote('NM_000548.5:1736:CCG:TGA', safe='')}/canonical_representative",
+    ]
+    assert fasta_checks == [
+        (GENOMIC_ACCESSION, 2065518, "G"),
+        (GENOMIC_ACCESSION, 2065545, "CCG"),
+    ]
+
+    rows = result["mapping_rows"]
+    assert [row["source_row"] for row in rows] == [1, 2]
+    assert [row["status"] for row in rows] == ["PROJECTED_FASTA_VERIFIED", "PROJECTED_FASTA_VERIFIED"]
+    assert [row["tx_spdi"] for row in rows] == ["NM_000548.5:1709:G:A", "NM_000548.5:1736:CCG:TGA"]
+    assert [row["genomic_spdi"] for row in rows] == ["NC_000016.10:2065518:G:A", "NC_000016.10:2065545:CCG:TGA"]
+    assert [row["step1_body_sha256"] for row in rows] == [_sha256(step1_snv), _sha256(step1_delins)]
+    assert [row["step2_body_sha256"] for row in rows] == [_sha256(step2_snv), _sha256(step2_delins)]
+    assert len({row["source_row"] for row in rows}) == 2
+
+    request_index = result["request_index"]
+    assert len(request_index) == 4
+    assert [(entry["source_row"], entry["step"]) for entry in request_index] == [
+        (1, "step1"),
+        (1, "step2"),
+        (2, "step1"),
+        (2, "step2"),
+    ]
+    assert result["status_counts"] == {"PROJECTED_FASTA_VERIFIED": 2}
+    assert result["shape_counts"] == {"SNV": 1, "DELINS": 1}
+
+
+def test_cp08c_project_clipe_rows_retains_permanent_step1_failure_and_continues_to_later_success(
+    tmp_path: Path,
+) -> None:
+    api = _ingest_api()
+    scores_rows = [
+        ["urn:mavedb:00001201-a-1#1", "c.1600A>G", "", "p.Gly534Arg", "0.21"],
+        ["urn:mavedb:00001201-a-1#2", "c.1600G>A", "", "p.Gly534Arg", "0.20"],
+    ]
+    scores_csv_text = _scores_csv(scores_rows)
+    scores_payload = scores_csv_text.encode("utf-8")
+    reference_path = tmp_path / REFERENCE_FASTA_FILENAME
+    reference_bytes = b">NC_000016.10\nACGTACGTACGTACGT\n"
+    reference_path.write_bytes(reference_bytes)
+
+    invalid_step1 = json.dumps({"data": {"input_hgvs_validity": "invalid", "spdis": []}}, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    valid_step1 = _step1_payload()
+    valid_step2 = _step2_payload()
+    responses = [
+        {
+            "final_url": f"{BASE_URL}/hgvs/{quote(f'{TRANSCRIPT}:c.1600A>G', safe='')}/contextuals",
+            "http_status": 200,
+            "media_type": "application/json; charset=utf-8",
+            "body": invalid_step1,
+        },
+        {
+            "final_url": f"{BASE_URL}/hgvs/{quote(f'{TRANSCRIPT}:c.1600G>A', safe='')}/contextuals",
+            "http_status": 200,
+            "media_type": "application/json; charset=utf-8",
+            "body": valid_step1,
+        },
+        {
+            "final_url": f"{BASE_URL}/spdi/{quote('NM_000548.5:1709:G:A', safe='')}/canonical_representative",
+            "http_status": 200,
+            "media_type": "application/json; charset=utf-8",
+            "body": valid_step2,
+        },
+    ]
+    requested_urls: list[str] = []
+
+    def transport(url: str) -> dict[str, Any]:
+        requested_urls.append(url)
+        return deepcopy(responses[len(requested_urls) - 1])
+
+    fasta_checks: list[tuple[str, int, str]] = []
+
+    def fasta_deleted_allele_checker(*, accession: str, position: int, deleted_sequence: str) -> str:
+        fasta_checks.append((accession, position, deleted_sequence))
+        return deleted_sequence
+
+    result = api["project_clipe_rows"](
+        source_id=SOURCE_ID,
+        scores_csv_bytes=scores_payload,
+        expected_header=SCORES_HEADER,
+        expected_rows=2,
+        expected_scores_sha256=_sha256(scores_payload),
+        expected_scores_byte_length=len(scores_payload),
+        transcript=TRANSCRIPT,
+        genomic_accession=GENOMIC_ACCESSION,
+        assembly=ASSEMBLY,
+        reference_fasta_path=reference_path,
+        expected_reference_sha256=_sha256(reference_bytes),
+        transport=transport,
+        min_interval_seconds=MIN_INTERVAL_SECONDS,
+        retry_policy={
+            "retryable_http": sorted(RETRYABLE_HTTP),
+            "retryable_transport": ["timeout", "connection_error", "tls_error"],
+            "non_retryable_http": sorted(NON_RETRYABLE_HTTP),
+            "max_attempts_per_request": MAX_ATTEMPTS,
+        },
+        sleep=lambda _seconds: None,
+        fasta_deleted_allele_checker=fasta_deleted_allele_checker,
+    )
+    assert requested_urls == [
+        f"{BASE_URL}/hgvs/{quote(f'{TRANSCRIPT}:c.1600A>G', safe='')}/contextuals",
+        f"{BASE_URL}/hgvs/{quote(f'{TRANSCRIPT}:c.1600G>A', safe='')}/contextuals",
+        f"{BASE_URL}/spdi/{quote('NM_000548.5:1709:G:A', safe='')}/canonical_representative",
+    ]
+    assert fasta_checks == [(GENOMIC_ACCESSION, 2065518, "G")]
+
+    rows = result["mapping_rows"]
+    assert [row["source_row"] for row in rows] == [1, 2]
+    assert [row["status"] for row in rows] == ["STEP1_INVALID_HGVS", "PROJECTED_FASTA_VERIFIED"]
+    assert rows[0]["tx_spdi"] is None and rows[0]["genomic_spdi"] is None
+    assert rows[1]["genomic_spdi"] == "NC_000016.10:2065518:G:A"
+    assert result["status_counts"] == {"STEP1_INVALID_HGVS": 1, "PROJECTED_FASTA_VERIFIED": 1}
+    assert result["shape_counts"] == {"SNV": 2}
+    assert len(result["request_index"]) == 3
+    assert [(entry["source_row"], entry["step"]) for entry in result["request_index"]] == [
+        (1, "step1"),
+        (2, "step1"),
+        (2, "step2"),
+    ]
+
+
+def test_cp09_frozen_scores_header_rowcount_duplicate_and_shape_validation_fail_closed() -> None:
+    api = _ingest_api()
+    rows = [
+        ["urn:mavedb:00001201-a-1#1", "c.1600G>A", "", "p.Gly534Arg", "0.21"],
+        ["urn:mavedb:00001201-a-1#2", "c.1627_1629delinsTGA", "", "p.Pro543Ter", "-0.30"],
+    ]
+    csv_text = _scores_csv(rows)
+    payload = csv_text.encode("utf-8")
+    parsed = api["validate_frozen_scores_input"](
+        csv_text=csv_text,
+        expected_header=SCORES_HEADER,
+        expected_rows=2,
+        expected_sha256=_sha256(payload),
+        expected_byte_length=len(payload),
+        transcript=TRANSCRIPT,
+    )
+    assert len(parsed) == 2
+    assert parsed[0]["source_row"] == 1 and parsed[1]["source_row"] == 2
+
+    err = api["FrozenInputError"]
+    with pytest.raises(err):
+        api["validate_frozen_scores_input"](
+            csv_text=csv_text.replace("hgvs_nt", "HGVS"),
+            expected_header=SCORES_HEADER,
+            expected_rows=2,
+            expected_sha256=_sha256(payload),
+            expected_byte_length=len(payload),
+            transcript=TRANSCRIPT,
+        )
+    with pytest.raises(err):
+        api["validate_frozen_scores_input"](
+            csv_text=csv_text,
+            expected_header=SCORES_HEADER,
+            expected_rows=208,
+            expected_sha256=_sha256(payload),
+            expected_byte_length=len(payload),
+            transcript=TRANSCRIPT,
+        )
+    with pytest.raises(err):
+        api["validate_frozen_scores_input"](
+            csv_text=_scores_csv([rows[0], rows[0]]),
+            expected_header=SCORES_HEADER,
+            expected_rows=2,
+            expected_sha256=_sha256(_scores_csv([rows[0], rows[0]]).encode("utf-8")),
+            expected_byte_length=len(_scores_csv([rows[0], rows[0]]).encode("utf-8")),
+            transcript=TRANSCRIPT,
+        )
+    with pytest.raises(err):
+        api["validate_frozen_scores_input"](
+            csv_text=_scores_csv([["urn:mavedb:00001201-a-1#1", "c.1600_1601insA", "", "p.X", "0.21"]]),
+            expected_header=SCORES_HEADER,
+            expected_rows=1,
+            expected_sha256=_sha256(
+                _scores_csv([["urn:mavedb:00001201-a-1#1", "c.1600_1601insA", "", "p.X", "0.21"]]).encode("utf-8")
+            ),
+            expected_byte_length=len(
+                _scores_csv([["urn:mavedb:00001201-a-1#1", "c.1600_1601insA", "", "p.X", "0.21"]]).encode("utf-8")
+            ),
+            transcript=TRANSCRIPT,
+        )
+
+
+def test_cp10_canonical_mapping_jsonl_and_request_index_are_deterministic_and_lf_terminated() -> None:
+    api = _bundle_api()
+    rows_a = [_minimal_mapping_row(source_row=1, shape="SNV"), _minimal_mapping_row(source_row=2, shape="DELINS")]
+    rows_b = [dict(reversed(list(row.items()))) for row in rows_a]
+
+    blob_a = api["canonical_mapping_jsonl_bytes"](rows_a)
+    blob_b = api["canonical_mapping_jsonl_bytes"](rows_b)
+    assert blob_a == blob_b
+    assert blob_a.endswith(b"\n")
+    assert b"\r\n" not in blob_a
+
+    request_rows = [
+        _minimal_request_index_row(
+            source_row=1,
+            step="step1",
+            requested_url=f"{BASE_URL}/hgvs/{quote('NM_000548.5:c.1600G>A', safe='')}/contextuals",
+            final_url=f"{BASE_URL}/hgvs/{quote('NM_000548.5:c.1600G>A', safe='')}/contextuals",
+        ),
+        _minimal_request_index_row(
+            source_row=1,
+            step="step2",
+            requested_url=f"{BASE_URL}/spdi/{quote('NM_000548.5:1709:G:A', safe='')}/canonical_representative",
+            final_url=f"{BASE_URL}/spdi/{quote('NM_000548.5:1709:G:A', safe='')}/canonical_representative",
+        ),
+    ]
+    request_blob = api["canonical_request_index_jsonl_bytes"](request_rows)
+    assert request_blob.endswith(b"\n")
+    assert b"\r\n" not in request_blob
+
+
+def test_cp11_request_index_redacts_secret_query_values_and_preserves_raw_body_hashes() -> None:
+    api = _bundle_api()
+    rows = [
+        {
+            **_minimal_request_index_row(
+                source_row=1,
+                step="step1",
+                requested_url=(
+                    f"{BASE_URL}/hgvs/{quote('NM_000548.5:c.1600G>A', safe='')}/contextuals?api_key=SECRET&tool=xyz"
+                ),
+                final_url=f"{BASE_URL}/hgvs/{quote('NM_000548.5:c.1600G>A', safe='')}/contextuals?api_key=SECRET",
+            )
+        }
+    ]
+    blob = api["canonical_request_index_jsonl_bytes"](rows)
+    text = blob.decode("utf-8")
+    assert "SECRET" not in text
+    assert "api_key=" not in text or "REDACTED" in text
+    assert rows[0]["body_sha256"] in text
+
+
+def test_cp12_bundle_manifest_hash_schema_crossrefs_and_counts_are_exact() -> None:
+    api = _bundle_api()
+    mapping_blob = api["canonical_mapping_jsonl_bytes"](
+        [_minimal_mapping_row(source_row=1, shape="SNV"), _minimal_mapping_row(source_row=2, shape="DELINS")]
+    )
+    request_blob = api["canonical_request_index_jsonl_bytes"](
+        [
+            _minimal_request_index_row(
+                source_row=1,
+                step="step1",
+                requested_url=f"{BASE_URL}/hgvs/{quote('NM_000548.5:c.1600G>A', safe='')}/contextuals",
+                final_url=f"{BASE_URL}/hgvs/{quote('NM_000548.5:c.1600G>A', safe='')}/contextuals",
+            )
+        ]
+    )
+    args = {
+        "bundle_id": BUNDLE_ID,
+        "created_at": "2026-09-12T00:00:00Z",
+        "input_scores": {
+            "artifact_id": SCORES_ARTIFACT_ID,
+            "sha256": SCORES_SHA256,
+            "byte_length": SCORES_BYTE_LENGTH,
+            "row_count": TOTAL_ROWS,
+        },
+        "reference": {"accession": GENOMIC_ACCESSION, "sha256": REFERENCE_FASTA_SHA256},
+        "endpoint_pins": {
+            "base_url": BASE_URL,
+            "step_sequence": ["contextuals", "canonical_representative"],
+            "min_interval_seconds": MIN_INTERVAL_SECONDS,
+        },
+        "artifacts": [
+            {
+                "artifact_id": "mapping-jsonl",
+                "relative_path": "mapping/mavedb_clipe_nm000548_5_to_nc000016_10.jsonl",
+                "byte_length": len(mapping_blob),
+                "sha256": _sha256(mapping_blob),
+                "row_count": 2,
+            },
+            {
+                "artifact_id": "request-index-jsonl",
+                "relative_path": "logs/request_index.jsonl",
+                "byte_length": len(request_blob),
+                "sha256": _sha256(request_blob),
+                "row_count": 1,
+            },
+        ],
+        "status_counts": {"PROJECTED_FASTA_VERIFIED": 2},
+        "shape_counts": {"SNV": 1, "DELINS": 1},
+        "success_count": 2,
+        "failure_count": 0,
+        "boundaries": {"network": "operator_only", "clinical_use": "forbidden"},
+    }
+    manifest = api["build_projector_bundle_manifest"](**args)
+    assert manifest["schema"] == BUNDLE_SCHEMA
+    assert manifest["bundle_id"] == BUNDLE_ID
+    assert manifest["shape_counts"] == {"SNV": 1, "DELINS": 1}
+    assert manifest["status_counts"] == {"PROJECTED_FASTA_VERIFIED": 2}
+    assert manifest["content_hash"] == api["compute_manifest_content_hash"](manifest)
+    api["validate_manifest_content_hash"](manifest)
+
+    drifted = deepcopy(manifest)
+    drifted["artifacts"][0]["sha256"] = "0" * 64
+    with pytest.raises(api["ProjectorManifestError"]):
+        api["validate_manifest_content_hash"](drifted)
+
+
+def test_cp13_summary_is_aggregate_only_with_boundaries_and_no_row_level_or_clinical_content() -> None:
+    api = _bundle_api()
+    manifest = {
+        "schema": BUNDLE_SCHEMA,
+        "bundle_id": BUNDLE_ID,
+        "content_hash": "1" * 64,
+        "input_scores": {"sha256": SCORES_SHA256, "row_count": TOTAL_ROWS},
+        "reference": {"sha256": REFERENCE_FASTA_SHA256},
+        "endpoint_pins": {"sequence": ["contextuals", "canonical_representative"]},
+        "counts": {"rows": TOTAL_ROWS},
+        "status_counts": {"PROJECTED_FASTA_VERIFIED": TOTAL_ROWS},
+        "shape_counts": {"SNV": SNV_ROWS, "DELINS": DELINS_ROWS},
+        "request_budget_observed": {"step1": TOTAL_ROWS, "step2": TOTAL_ROWS},
+        "pilot_uncertainties": ["U1"],
+        "boundaries": {"clinical_use": "forbidden", "evidence_strength_use": "forbidden"},
+    }
+    summary = api["build_committed_summary"](manifest)
+    assert set(summary) == {
+        "schema",
+        "bundle_id",
+        "manifest_content_hash",
+        "input_scores_sha256",
+        "reference_sha256",
+        "endpoint_sequence",
+        "total_rows",
+        "success_count",
+        "failure_count",
+        "status_counts",
+        "shape_counts",
+        "request_budget_observed",
+        "pilot_uncertainties",
+        "boundaries",
+    }
+    assert summary["boundaries"] == {"clinical_use": "forbidden", "evidence_strength_use": "forbidden"}
+    merged = json.dumps(summary, sort_keys=True).lower()
+    assert "hgvs_c" not in merged
+    assert "hgvs_g" not in merged
+    assert "genomic_spdi" not in merged
+    assert "score_raw" not in merged
+    assert "functional_class" not in merged
+    assert "http://" not in merged and "https://" not in merged
+    assert not any(token in merged for token in FORBIDDEN_TEXT_TOKENS)
+
+
+def test_cp14_publication_reuses_hardened_no_clobber_helper_and_refuses_unsafe_targets(tmp_path: Path) -> None:
+    api = _bundle_api()
+    source_bundle_module = _load_module("raptor.external.tsc2_sources.bundle")
+    assert api["_publish_directory_no_replace"] is _symbol(source_bundle_module, "_publish_directory_no_replace")
+
+    manifest, mapping_payload, request_index_payload, raw_payloads = _valid_projector_manifest_and_payloads(api)
+    output_root = tmp_path / "external"
+    output_root.mkdir()
+    repo_root_for_preexisting = tmp_path / "repo-preexisting"
+    repo_root_for_preexisting.mkdir()
+    preexisting = output_root / RUN_NAME
+    preexisting.mkdir()
+    with pytest.raises(api["ProjectorBundleBoundaryError"]):
+        api["publish_projector_bundle"](
+            repo_root=repo_root_for_preexisting,
+            output_root=output_root,
+            run_name=RUN_NAME,
+            manifest=manifest,
+            mapping_payload=mapping_payload,
+            request_index_payload=request_index_payload,
+            raw_payloads=raw_payloads,
+        )
+    assert preexisting.exists()
+    assert list(preexisting.iterdir()) == []
+
+    repo_root = tmp_path / "repo-root"
+    repo_root.mkdir()
+    with pytest.raises(api["ProjectorBundleBoundaryError"]):
+        api["publish_projector_bundle"](
+            repo_root=repo_root,
+            output_root=repo_root / "inside-repo-not-allowed",
+            run_name=RUN_NAME,
+            manifest=manifest,
+            mapping_payload=mapping_payload,
+            request_index_payload=request_index_payload,
+            raw_payloads=raw_payloads,
+        )
+
+
+def test_cp15_package_and_operator_remain_offline_and_disallow_forbidden_imports() -> None:
+    missing: list[Path] = []
+    targets: list[Path] = []
+
+    if not PACKAGE_ROOT.is_dir():
+        missing.append(PACKAGE_ROOT)
+    else:
+        targets.extend(sorted(path for path in PACKAGE_ROOT.rglob("*.py") if path.is_file()))
+
+    if not OPERATOR_SCRIPT.is_file():
+        missing.append(OPERATOR_SCRIPT)
+    else:
+        targets.append(OPERATOR_SCRIPT)
+
+    if missing:
+        pytest.fail("TSC2 cliPE projector implementation targets are missing: " + ", ".join(str(p) for p in missing))
+
+    offenders: list[str] = []
+    for path in targets:
+        for imported, lineno in _module_imports(path):
+            lowered = imported.lower()
+            if any(lowered == token or lowered.startswith(token + ".") for token in FORBIDDEN_NETWORK_IMPORTS):
+                offenders.append(f"{path.relative_to(REPO_ROOT)}:{lineno}:{imported}")
+            if any(imported == token or imported.startswith(token + ".") for token in FORBIDDEN_IMPORT_PREFIXES):
+                offenders.append(f"{path.relative_to(REPO_ROOT)}:{lineno}:{imported}")
+    assert not offenders, "forbidden imports detected:\n" + "\n".join(offenders)
+
+
+def test_cp16_operator_enforces_sequential_two_step_flow_rate_limit_and_abort_policy() -> None:
+    if not OPERATOR_SCRIPT.is_file():
+        pytest.fail(f"TSC2 cliPE projector operator script is not implemented: {OPERATOR_SCRIPT}")
+    tree = ast.parse(OPERATOR_SCRIPT.read_text(encoding="utf-8"), filename=str(OPERATOR_SCRIPT))
+    main_node = next((node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "main"), None)
+    if main_node is None:
+        pytest.fail("operator script is missing main(argv=...)")
+
+    called_names: list[tuple[str, int]] = []
+    for node in ast.walk(main_node):
+        if isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name):
+                called_names.append((node.func.id, node.lineno))
+            elif isinstance(node.func, ast.Attribute):
+                called_names.append((node.func.attr, node.lineno))
+
+    names = [name for name, _ in called_names]
+    assert "validate_reference_fasta_checksum" in names
+    assert "validate_frozen_scores_input" in names
+    assert "project_clipe_rows" in names
+    assert "publish_projector_bundle" in names
+    assert names.index("validate_reference_fasta_checksum") < names.index("project_clipe_rows")
+    assert names.index("validate_frozen_scores_input") < names.index("project_clipe_rows")
+    assert names.index("project_clipe_rows") < names.index("publish_projector_bundle")
+
+    source = OPERATOR_SCRIPT.read_text(encoding="utf-8")
+    assert "/hgvs/batch/contextuals" not in source
+    assert "/hgvs/" not in source or "canonical_representative" not in source.split("/hgvs/")[-1]
+    assert "min_interval_seconds" in source or "sleep(" in source
+    assert "max_attempts_per_request" in source
+    assert "retryable_http" in source
+    assert "retryable_transport" in source
+    assert "0.05" in source or "5%" in source
+
+
+def test_cp17_operator_cli_requires_explicit_roots_and_does_not_fall_back_to_cwd(monkeypatch: pytest.MonkeyPatch) -> None:
+    operator = _load_operator_module()
+    for env_name in (
+        "RAPTOR_TSC2_SOURCE_ROOT",
+        "RAPTOR_TSC2_REFERENCE_ROOT",
+        "RAPTOR_TSC2_CDNA_PROJECTOR_ROOT",
+    ):
+        monkeypatch.delenv(env_name, raising=False)
+    cwd_before = os.getcwd()
+    exit_code = operator.main(["--config", str(CONFIG_PATH)])
+    assert os.getcwd() == cwd_before
+    assert exit_code == 1
+
+
+def test_cp18_config_pins_exact_input_hashes_endpoints_run_name_and_shape_totals() -> None:
+    if not CONFIG_PATH.is_file():
+        pytest.fail(f"TSC2 cliPE projector config is not implemented: {CONFIG_PATH}")
+    config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+    assert config["spec_id"] == "raptor-v2-clipe-cdna-spdi-projector-acquisition-v1"
+    assert config["spec_version"] == "1.0.2"
+
+    source_bundle = config["inputs"]["source_bundle"]
+    assert source_bundle["bundle_id"] == SOURCE_BUNDLE_ID
+    assert source_bundle["manifest_content_hash"] == SOURCE_MANIFEST_CONTENT_HASH
+    scores = source_bundle["scores_artifact"]
+    assert scores["artifact_id"] == SCORES_ARTIFACT_ID
+    assert scores["relative_path"] == SCORES_RELATIVE_PATH
+    assert scores["sha256"] == SCORES_SHA256
+    assert scores["byte_length"] == SCORES_BYTE_LENGTH
+    assert scores["expected_rows"] == TOTAL_ROWS
+    assert scores["exact_header"] == SCORES_HEADER
+
+    ref = config["inputs"]["genomic_reference"]
+    assert ref["accession"] == GENOMIC_ACCESSION
+    assert ref["assembly"] == ASSEMBLY
+    assert ref["fasta_filename"] == REFERENCE_FASTA_FILENAME
+    assert ref["sha256"] == REFERENCE_FASTA_SHA256
+
+    pins = config["inputs"]["identity_pins"]
+    assert pins["gene"] == GENE
+    assert pins["transcript"] == TRANSCRIPT
+    assert pins["genomic_accession"] == GENOMIC_ACCESSION
+    assert pins["service_host"] == EXPECTED_HOST
+    assert pins["service_base_path"] == EXPECTED_BASE_PATH
+
+    assert config["rate_limits_retries"]["min_interval_seconds"] == MIN_INTERVAL_SECONDS
+    retry_policy = config["rate_limits_retries"]["retry_policy"]
+    assert set(retry_policy["retryable_http"]) == RETRYABLE_HTTP
+    assert set(retry_policy["non_retryable_http"]) == NON_RETRYABLE_HTTP
+    assert retry_policy["max_attempts_per_request"] == MAX_ATTEMPTS
+
+    output = config["outputs"]["external_bundle"]
+    assert output["run_name"] == RUN_NAME
+    assert output["bundle_id"] == BUNDLE_ID
+    assert output["artifacts"]["mapping_jsonl"]["schema"] == MAPPING_ROW_SCHEMA
+    assert output["artifacts"]["mapping_jsonl"]["row_count"] == TOTAL_ROWS
+    summary_output = config["outputs"]["committed_summary"]
+    assert summary_output["path"] == str(SUMMARY_PATH.relative_to(REPO_ROOT)).replace("\\", "/")
+    assert summary_output["schema"] == SUMMARY_SCHEMA
+    if "boundaries" in summary_output:
+        assert summary_output["boundaries"] == {
+            "clinical_use": "forbidden",
+            "evidence_strength_use": "forbidden",
+        }
+
+    expected = config["expected_pilot_outputs"]["supportable_now"]
+    assert expected["total_mapping_rows"] == TOTAL_ROWS
+    assert expected["shape_counts"] == {"SNV": SNV_ROWS, "DELINS": DELINS_ROWS}
+    assert expected["reference_sha256"] == REFERENCE_FASTA_SHA256
+    assert expected["scores_sha256"] == SCORES_SHA256
