@@ -12,7 +12,7 @@
 
 schema: raptor.project.spec.v1
 spec_id: raptor-v2-clipe-cdna-spdi-projector-acquisition-v1
-spec_version: 1.0.1
+spec_version: 1.0.2
 status: APPROVED_BUILD
 created_at: '2026-09-12'
 owner: human-terminal-authority
@@ -628,7 +628,7 @@ outputs:
       - status_counts, shape_counts (SNV/DELINS)
       - request_budget_observed (approx counts, wall clock)
       - pilot_uncertainties residual after run
-      - explicit non_goals restatement (no PS3/BS3/clinical)
+      - boundary flags for clinical_use and evidence_strength_use
     excludes:
       - per-row genomic_spdi / hgvs_c / hgvs_g strings
       - raw NCBI JSON bodies
@@ -795,7 +795,10 @@ acceptance_criteria:
   - id: CP-09
     rule: Raw responses + mapping + manifest live outside Git; committed summary is aggregates only.
   - id: CP-10
-    rule: No PS3/BS3/classification/evidence-strength vocabulary in any artifact.
+    rule: >-
+      No $PS3$/$BS3$/classification vocabulary appears in any artifact;
+      boundary flags use only clinical_use=forbidden and
+      evidence_strength_use=forbidden.
   - id: CP-11
     rule: Replaying frozen raw responses reproduces mapping bytes and manifest content_hash.
   - id: CP-12
