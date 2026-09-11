@@ -4,6 +4,7 @@ import ast
 import gzip
 import hashlib
 import importlib.util
+import inspect
 import io
 import json
 import os
@@ -74,8 +75,9 @@ SUMMARY_PATH = REPO_ROOT / "data" / "census" / "tsc2_vamp_genomic_crosswalk_2026
 TOTAL_SCORE_ROWS = 9253
 ARCHIVE_CROSSWALK_ROWS = 9107
 STATUS_COUNTS = {
-    "CROSSWALK_SPDI_VERIFIED": 9058,
-    "SOURCE_COORDINATE_REFERENCE_MISMATCH": 49,
+    "CROSSWALK_SPDI_VERIFIED": 9050,
+    "SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH": 57,
+    "SOURCE_COORDINATE_REFERENCE_MISMATCH": 0,
     "ARCHIVE_CROSSWALK_ABSENT": 146,
 }
 EXPECTED_COUNTS = {
@@ -86,11 +88,13 @@ EXPECTED_COUNTS = {
 
 STATUS_VOCABULARY = {
     "CROSSWALK_SPDI_VERIFIED",
+    "SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH",
     "SOURCE_COORDINATE_REFERENCE_MISMATCH",
     "ARCHIVE_CROSSWALK_ABSENT",
 }
 UNRESOLVED_REASON_VOCABULARY = {
     None,
+    "SOURCE_GENOMIC_INTERVAL_NOT_EQUIVALENT_TO_CDNA_REPLACEMENT",
     "SOURCE_REF_DOES_NOT_MATCH_PINNED_FASTA",
     "PROTEIN_VARIANT_NOT_IN_ARCHIVE",
 }
@@ -370,11 +374,73 @@ def _synthetic_scores_fixture() -> dict[str, Any]:
     }
 
 
+def _synthetic_scores_fixture_from_tokens(tokens: list[str]) -> dict[str, Any]:
+    rows: list[list[str]] = []
+    for token in tokens:
+        rows.append([token, "0.10", "0.01", "0.10", "0.10", "0.10", "neutral"])
+    payload = _gzip_tsv(VAMP_SCORE_HEADER, rows)
+    return {
+        "rows": rows,
+        "payload": payload,
+        "pins": {
+            "sha256": _sha256(payload),
+            "md5": _md5(payload),
+            "byte_length": len(payload),
+            "row_count": len(rows),
+            "protein_accession": PROTEIN_ACCESSION,
+        },
+    }
+
+
+def _synthetic_archive_fixture_from_rows(
+    *,
+    lib1_rows: list[list[str]],
+    lib2_rows: list[list[str]],
+) -> dict[str, Any]:
+    header = [*GMM_REQUIRED_COLUMNS, *GMM_IGNORED_COLUMNS]
+    lib1_payload = _tsv_text(header, lib1_rows).encode("utf-8")
+    lib2_payload = _tsv_text(header, lib2_rows).encode("utf-8")
+    archive_bytes = _build_zip(
+        [
+            (LIB1_MEMBER_PATH, lib1_payload, False),
+            (LIB2_MEMBER_PATH, lib2_payload, False),
+        ]
+    )
+    return {
+        "archive_bytes": archive_bytes,
+        "archive_pins": {
+            "record_id": ZENODO_RECORD_ID,
+            "filename": ZENODO_FILENAME,
+            "download_url": ZENODO_DOWNLOAD_URL,
+            "byte_length": len(archive_bytes),
+            "md5": _md5(archive_bytes),
+            "sha256": _sha256(archive_bytes),
+        },
+        "required_members": {
+            "library1": {
+                "path": LIB1_MEMBER_PATH,
+                "byte_length": len(lib1_payload),
+                "md5": _md5(lib1_payload),
+                "sha256": _sha256(lib1_payload),
+                "row_count": len(lib1_rows),
+            },
+            "library2": {
+                "path": LIB2_MEMBER_PATH,
+                "byte_length": len(lib2_payload),
+                "md5": _md5(lib2_payload),
+                "sha256": _sha256(lib2_payload),
+                "row_count": len(lib2_rows),
+            },
+        },
+    }
+
+
 def _minimal_crosswalk_row(*, source_row: int, status: str, protein_variant: str) -> dict[str, Any]:
     verified = status == "CROSSWALK_SPDI_VERIFIED"
+    cdna_length_mismatch = status == "SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH"
     mismatch = status == "SOURCE_COORDINATE_REFERENCE_MISMATCH"
     absent = status == "ARCHIVE_CROSSWALK_ABSENT"
-    assert verified or mismatch or absent
+    assert verified or cdna_length_mismatch or mismatch or absent
     return {
         "schema": CROSSWALK_SCHEMA,
         "source_id": SOURCE_ID,
@@ -390,6 +456,8 @@ def _minimal_crosswalk_row(*, source_row: int, status: str, protein_variant: str
         "unresolved_reason": (
             None
             if verified
+            else "SOURCE_GENOMIC_INTERVAL_NOT_EQUIVALENT_TO_CDNA_REPLACEMENT"
+            if cdna_length_mismatch
             else "SOURCE_REF_DOES_NOT_MATCH_PINNED_FASTA"
             if mismatch
             else "PROTEIN_VARIANT_NOT_IN_ARCHIVE"
@@ -430,12 +498,12 @@ def _mk_manual_queue_item(model_api: dict[str, Any], raw: Any, *, error_code: st
     )
 
 
-def test_vx00_binding_spec_exists_and_is_v1_0_0() -> None:
+def test_vx00_binding_spec_exists_and_is_v1_0_1() -> None:
     if not SPEC_PATH.is_file():
         pytest.fail(f"binding spec is missing: {SPEC_PATH}")
     spec = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))
     assert spec["spec_id"] == "raptor-v2-vamp-genomic-crosswalk-acquisition-v1"
-    assert spec["spec_version"] == "1.0.0"
+    assert spec["spec_version"] == "1.0.1"
 
 
 def test_vx01_zenodo_url_builder_and_allowlist_binding_contract() -> None:
@@ -1053,6 +1121,303 @@ def test_vx08_mismatch_and_absent_rows_are_retained_with_null_spdi_and_exact_rea
     assert len(rows) == 3
 
 
+def test_vx08b_cross_exon_interval_length_mismatch_is_blocked_before_normalizer(tmp_path: Path) -> None:
+    ingest_api = _ingest_api()
+    ingest_model_api = _ingest_model_api()
+    score_fixture = _synthetic_scores_fixture_from_tokens([f"{PROTEIN_ACCESSION}:p.Pro543Ter"])
+    long_ref = "A" * 301
+    archive_fixture = _synthetic_archive_fixture_from_rows(
+        lib1_rows=[
+            [
+                "lib1-cross-exon",
+                GENE,
+                CHROM,
+                "+",
+                "2065000",
+                "2065300",
+                long_ref,
+                "TGA",
+                "c.1627_1629delinsTGA",
+                "p.Pro543Ter",
+                TRANSCRIPT,
+                ENSEMBL_TRANSCRIPT,
+                "-0.10",
+                "lof",
+                "none",
+                "none",
+            ]
+        ],
+        lib2_rows=[],
+    )
+    reference_path = tmp_path / REFERENCE_FASTA_FILENAME
+    reference_bytes = b">NC_000016.10\nA\n"
+    reference_path.write_bytes(reference_bytes)
+
+    class GuardNormalizer:
+        def __init__(self) -> None:
+            self.calls: list[Any] = []
+
+        def normalize(self, raw: Any, cfg: Any) -> Any:
+            self.calls.append((raw, cfg))
+            return _mk_normalized_variant(
+                ingest_model_api,
+                raw,
+                variant_id=f"{raw.chromosome}:{int(raw.position) - 1}:{raw.ref}:{raw.alt}",
+            )
+
+    normalizer = GuardNormalizer()
+
+    result = ingest_api["build_vamp_genomic_crosswalk"](
+        source_id=SOURCE_ID,
+        score_tsv_gz_bytes=score_fixture["payload"],
+        archive_zip_bytes=archive_fixture["archive_bytes"],
+        score_pins={
+            "sha256": score_fixture["pins"]["sha256"],
+            "md5": score_fixture["pins"]["md5"],
+            "byte_length": score_fixture["pins"]["byte_length"],
+            "row_count": score_fixture["pins"]["row_count"],
+            "protein_accession": PROTEIN_ACCESSION,
+        },
+        archive_pins={
+            **archive_fixture["archive_pins"],
+            "required_members": archive_fixture["required_members"],
+        },
+        reference_fasta_path=reference_path,
+        expected_reference_sha256=_sha256(reference_bytes),
+        required_columns=GMM_REQUIRED_COLUMNS,
+        required_values={
+            "Gene": GENE,
+            "Chrom": CHROM,
+            "Ref_seq_transcript_ID": TRANSCRIPT,
+            "Ensembl_transcript_ID": ENSEMBL_TRANSCRIPT,
+        },
+        transcript=TRANSCRIPT,
+        genomic_accession=REFERENCE_ACCESSION,
+        assembly=REFERENCE_ASSEMBLY,
+        normalizer=normalizer,
+        normalizer_config={"run_id": "vx08b"},
+        fasta_deleted_allele_checker=lambda **kwargs: kwargs["expected_ref"],
+    )
+    assert normalizer.calls == []
+    row = result["crosswalk_rows"][0]
+    assert row["status"] == "SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH"
+    assert row["unresolved_reason"] == "SOURCE_GENOMIC_INTERVAL_NOT_EQUIVALENT_TO_CDNA_REPLACEMENT"
+    assert row["genomic_spdi"] is None
+    assert result["status_counts"] == {"SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH": 1}
+
+
+def test_vx08c_accepted_snv_and_delins_require_cdna_genomic_ref_alt_length_equivalence(tmp_path: Path) -> None:
+    ingest_api = _ingest_api()
+    ingest_model_api = _ingest_model_api()
+    score_fixture = _synthetic_scores_fixture_from_tokens(
+        [f"{PROTEIN_ACCESSION}:p.Gly534Arg", f"{PROTEIN_ACCESSION}:p.Pro543Ter"]
+    )
+    archive_fixture = _synthetic_archive_fixture_from_rows(
+        lib1_rows=[
+            [
+                "lib1-snv",
+                GENE,
+                CHROM,
+                "+",
+                "2065519",
+                "2065519",
+                "G",
+                "A",
+                "c.1600G>A",
+                "p.Gly534Arg",
+                TRANSCRIPT,
+                ENSEMBL_TRANSCRIPT,
+                "0.10",
+                "neutral",
+                "none",
+                "none",
+            ]
+        ],
+        lib2_rows=[
+            [
+                "lib2-delins",
+                GENE,
+                CHROM,
+                "+",
+                "2065546",
+                "2065548",
+                "CCG",
+                "TGA",
+                "c.1627_1629delinsTGA",
+                "p.Pro543Ter",
+                TRANSCRIPT,
+                ENSEMBL_TRANSCRIPT,
+                "-0.10",
+                "lof",
+                "none",
+                "none",
+            ]
+        ],
+    )
+    reference_path = tmp_path / REFERENCE_FASTA_FILENAME
+    reference_bytes = b">NC_000016.10\nGCCG\n"
+    reference_path.write_bytes(reference_bytes)
+
+    class RecordingNormalizer:
+        def __init__(self) -> None:
+            self.calls: list[Any] = []
+
+        def normalize(self, raw: Any, cfg: Any) -> Any:
+            self.calls.append((raw, cfg))
+            return _mk_normalized_variant(
+                ingest_model_api,
+                raw,
+                variant_id=f"{raw.chromosome}:{int(raw.position) - 1}:{raw.ref}:{raw.alt}",
+            )
+
+    normalizer = RecordingNormalizer()
+    fasta_lengths: list[tuple[int, int, int]] = []
+
+    def fasta_checker(*, accession: str, start_1based: int, end_1based: int, expected_ref: str) -> str:
+        assert accession == REFERENCE_ACCESSION
+        fasta_lengths.append((end_1based - start_1based + 1, len(expected_ref), len(expected_ref)))
+        return expected_ref
+
+    result = ingest_api["build_vamp_genomic_crosswalk"](
+        source_id=SOURCE_ID,
+        score_tsv_gz_bytes=score_fixture["payload"],
+        archive_zip_bytes=archive_fixture["archive_bytes"],
+        score_pins={
+            "sha256": score_fixture["pins"]["sha256"],
+            "md5": score_fixture["pins"]["md5"],
+            "byte_length": score_fixture["pins"]["byte_length"],
+            "row_count": score_fixture["pins"]["row_count"],
+            "protein_accession": PROTEIN_ACCESSION,
+        },
+        archive_pins={
+            **archive_fixture["archive_pins"],
+            "required_members": archive_fixture["required_members"],
+        },
+        reference_fasta_path=reference_path,
+        expected_reference_sha256=_sha256(reference_bytes),
+        required_columns=GMM_REQUIRED_COLUMNS,
+        required_values={
+            "Gene": GENE,
+            "Chrom": CHROM,
+            "Ref_seq_transcript_ID": TRANSCRIPT,
+            "Ensembl_transcript_ID": ENSEMBL_TRANSCRIPT,
+        },
+        transcript=TRANSCRIPT,
+        genomic_accession=REFERENCE_ACCESSION,
+        assembly=REFERENCE_ASSEMBLY,
+        normalizer=normalizer,
+        normalizer_config={"run_id": "vx08c"},
+        fasta_deleted_allele_checker=fasta_checker,
+    )
+    rows = result["crosswalk_rows"]
+    assert [row["status"] for row in rows] == ["CROSSWALK_SPDI_VERIFIED", "CROSSWALK_SPDI_VERIFIED"]
+    assert len(normalizer.calls) == 2
+    raw_snv, _ = normalizer.calls[0]
+    raw_delins, _ = normalizer.calls[1]
+    assert [row["hgvs_c"] for row in rows] == ["c.1600G>A", "c.1627_1629delinsTGA"]
+    cdna_lengths = [1, 3]
+    for cdna_length, (interval_length, ref_length, _), raw in zip(
+        cdna_lengths, fasta_lengths, (raw_snv, raw_delins), strict=True
+    ):
+        assert cdna_length == interval_length == ref_length == len(raw.ref) == len(raw.alt)
+
+
+def test_vx08d_accepted_inv_length_equivalence_is_enforced_when_supported(tmp_path: Path) -> None:
+    ingest_api = _ingest_api()
+    ingest_module = _load_module("raptor.external.tsc2_vamp_crosswalk.ingest")
+    source_text = inspect.getsource(ingest_module).lower()
+    if "inv" not in source_text:
+        pytest.skip("ingest hgvs_c length parser does not yet advertise inv support")
+
+    ingest_model_api = _ingest_model_api()
+    score_fixture = _synthetic_scores_fixture_from_tokens([f"{PROTEIN_ACCESSION}:p.Gly560Val"])
+    archive_fixture = _synthetic_archive_fixture_from_rows(
+        lib1_rows=[
+            [
+                "lib1-inv",
+                GENE,
+                CHROM,
+                "+",
+                "2065600",
+                "2065602",
+                "ATG",
+                "GTA",
+                "c.1681_1683inv",
+                "p.Gly560Val",
+                TRANSCRIPT,
+                ENSEMBL_TRANSCRIPT,
+                "0.02",
+                "neutral",
+                "none",
+                "none",
+            ]
+        ],
+        lib2_rows=[],
+    )
+    reference_path = tmp_path / REFERENCE_FASTA_FILENAME
+    reference_bytes = b">NC_000016.10\nATG\n"
+    reference_path.write_bytes(reference_bytes)
+
+    class RecordingNormalizer:
+        def __init__(self) -> None:
+            self.calls: list[Any] = []
+
+        def normalize(self, raw: Any, _cfg: Any) -> Any:
+            self.calls.append(raw)
+            return _mk_normalized_variant(
+                ingest_model_api,
+                raw,
+                variant_id=f"{raw.chromosome}:{int(raw.position) - 1}:{raw.ref}:{raw.alt}",
+            )
+
+    normalizer = RecordingNormalizer()
+    fasta_lengths: list[int] = []
+
+    def fasta_checker(*, accession: str, start_1based: int, end_1based: int, expected_ref: str) -> str:
+        assert accession == REFERENCE_ACCESSION
+        fasta_lengths.append(end_1based - start_1based + 1)
+        return expected_ref
+
+    result = ingest_api["build_vamp_genomic_crosswalk"](
+        source_id=SOURCE_ID,
+        score_tsv_gz_bytes=score_fixture["payload"],
+        archive_zip_bytes=archive_fixture["archive_bytes"],
+        score_pins={
+            "sha256": score_fixture["pins"]["sha256"],
+            "md5": score_fixture["pins"]["md5"],
+            "byte_length": score_fixture["pins"]["byte_length"],
+            "row_count": score_fixture["pins"]["row_count"],
+            "protein_accession": PROTEIN_ACCESSION,
+        },
+        archive_pins={
+            **archive_fixture["archive_pins"],
+            "required_members": archive_fixture["required_members"],
+        },
+        reference_fasta_path=reference_path,
+        expected_reference_sha256=_sha256(reference_bytes),
+        required_columns=GMM_REQUIRED_COLUMNS,
+        required_values={
+            "Gene": GENE,
+            "Chrom": CHROM,
+            "Ref_seq_transcript_ID": TRANSCRIPT,
+            "Ensembl_transcript_ID": ENSEMBL_TRANSCRIPT,
+        },
+        transcript=TRANSCRIPT,
+        genomic_accession=REFERENCE_ACCESSION,
+        assembly=REFERENCE_ASSEMBLY,
+        normalizer=normalizer,
+        normalizer_config={"run_id": "vx08d"},
+        fasta_deleted_allele_checker=fasta_checker,
+    )
+    assert result["status_counts"] == {"CROSSWALK_SPDI_VERIFIED": 1}
+    row = result["crosswalk_rows"][0]
+    assert row["genomic_spdi"] is not None
+    assert row["hgvs_c"] == "c.1681_1683inv"
+    assert len(normalizer.calls) == 1
+    raw = normalizer.calls[0]
+    assert 3 == len(raw.ref) == len(raw.alt) == fasta_lengths[0]
+
+
 def test_vx09_crosswalk_row_status_vocabulary_and_invariants() -> None:
     model_api = _model_api()
     assert model_api["VAMP_GENOMIC_CROSSWALK_ROW_SCHEMA"] == CROSSWALK_SCHEMA
@@ -1060,14 +1425,19 @@ def test_vx09_crosswalk_row_status_vocabulary_and_invariants() -> None:
     assert set(model_api["ALLOWED_UNRESOLVED_REASONS"]) == UNRESOLVED_REASON_VOCABULARY
 
     verified = _minimal_crosswalk_row(source_row=1, status="CROSSWALK_SPDI_VERIFIED", protein_variant=f"{PROTEIN_ACCESSION}:p.Gly534Arg")
+    cdna_length_mismatch = _minimal_crosswalk_row(
+        source_row=2,
+        status="SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH",
+        protein_variant=f"{PROTEIN_ACCESSION}:p.Pro543Ter",
+    )
     mismatch = _minimal_crosswalk_row(
-        source_row=2, status="SOURCE_COORDINATE_REFERENCE_MISMATCH", protein_variant=f"{PROTEIN_ACCESSION}:p.Pro543Ter"
+        source_row=3, status="SOURCE_COORDINATE_REFERENCE_MISMATCH", protein_variant=f"{PROTEIN_ACCESSION}:p.Gly560Val"
     )
     absent = _minimal_crosswalk_row(
-        source_row=3, status="ARCHIVE_CROSSWALK_ABSENT", protein_variant=f"{PROTEIN_ACCESSION}:p.Met600Val"
+        source_row=4, status="ARCHIVE_CROSSWALK_ABSENT", protein_variant=f"{PROTEIN_ACCESSION}:p.Met600Val"
     )
 
-    for row in (verified, mismatch, absent):
+    for row in (verified, cdna_length_mismatch, mismatch, absent):
         built = model_api["VampGenomicCrosswalkRow"](**row).to_dict()
         assert built["source_id"] == SOURCE_ID
         assert built["source_row"] >= 1
@@ -1102,7 +1472,11 @@ def test_vx11_manifest_hash_and_count_conservation_are_enforced() -> None:
     bundle_api = _bundle_api()
     rows = [
         _minimal_crosswalk_row(source_row=1, status="CROSSWALK_SPDI_VERIFIED", protein_variant=f"{PROTEIN_ACCESSION}:p.Gly534Arg"),
-        _minimal_crosswalk_row(source_row=2, status="SOURCE_COORDINATE_REFERENCE_MISMATCH", protein_variant=f"{PROTEIN_ACCESSION}:p.Pro543Ter"),
+        _minimal_crosswalk_row(
+            source_row=2,
+            status="SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH",
+            protein_variant=f"{PROTEIN_ACCESSION}:p.Pro543Ter",
+        ),
         _minimal_crosswalk_row(source_row=3, status="ARCHIVE_CROSSWALK_ABSENT", protein_variant=f"{PROTEIN_ACCESSION}:p.Met600Val"),
     ]
     crosswalk_payload = bundle_api["canonical_crosswalk_jsonl_bytes"](rows)
@@ -1137,7 +1511,8 @@ def test_vx11_manifest_hash_and_count_conservation_are_enforced() -> None:
         "counts": {"rows": 3, "status_rows": 3},
         "status_counts": {
             "CROSSWALK_SPDI_VERIFIED": 1,
-            "SOURCE_COORDINATE_REFERENCE_MISMATCH": 1,
+            "SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH": 1,
+            "SOURCE_COORDINATE_REFERENCE_MISMATCH": 0,
             "ARCHIVE_CROSSWALK_ABSENT": 1,
         },
         "boundaries": {"network": "operator_only", "clinical_use": "forbidden", "evidence_strength_use": "forbidden"},
@@ -1164,8 +1539,12 @@ def test_vx12_committed_summary_is_aggregate_only_and_omits_sensitive_fields() -
         "reference": {"sha256": REFERENCE_FASTA_SHA256},
         "counts": {"rows": TOTAL_SCORE_ROWS},
         "status_counts": STATUS_COUNTS,
-        "verified_unique_spdi": 9058,
-        "follow_on_unresolved": {"SOURCE_COORDINATE_REFERENCE_MISMATCH": 49, "ARCHIVE_CROSSWALK_ABSENT": 146},
+        "verified_unique_spdi": 9050,
+        "follow_on_unresolved": {
+            "SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH": 57,
+            "SOURCE_COORDINATE_REFERENCE_MISMATCH": 0,
+            "ARCHIVE_CROSSWALK_ABSENT": 146,
+        },
         "boundaries": {"clinical_use": "forbidden", "evidence_strength_use": "forbidden"},
         "pacbio_fastq_download": "NO_GO",
     }
@@ -1352,7 +1731,7 @@ def test_vx17_config_pins_exact_source_archive_reference_and_expected_status_tot
         pytest.fail(f"TSC2 VAMP crosswalk config is not implemented: {CONFIG_PATH}")
     config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
     assert config["spec_id"] == "raptor-v2-vamp-genomic-crosswalk-acquisition-v1"
-    assert config["spec_version"] == "1.0.0"
+    assert config["spec_version"] == "1.0.1"
 
     source = config["inputs"]["frozen_vamp_scores"]
     assert source["source_bundle_id"] == SOURCE_BUNDLE_ID
@@ -1400,6 +1779,7 @@ def test_vx17_config_pins_exact_source_archive_reference_and_expected_status_tot
     assert expected["total_score_rows"] == TOTAL_SCORE_ROWS
     assert expected["archive_crosswalk_rows"] == ARCHIVE_CROSSWALK_ROWS
     assert expected["status_counts"] == STATUS_COUNTS
+    assert expected["verified_unique_spdi"] == STATUS_COUNTS["CROSSWALK_SPDI_VERIFIED"]
     assert expected["conservation"]["input_score_rows"] == TOTAL_SCORE_ROWS
     assert expected["conservation"]["output_crosswalk_rows"] == TOTAL_SCORE_ROWS
     assert expected["conservation"]["dropped_rows"] == 0
