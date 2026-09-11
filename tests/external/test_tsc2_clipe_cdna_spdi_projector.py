@@ -1116,7 +1116,11 @@ def test_cp08d_retryable_http_500_is_retried_then_succeeds(tmp_path: Path) -> No
     assert requested_urls[2].endswith("/canonical_representative")
     assert result["status_counts"] == {"PROJECTED_FASTA_VERIFIED": 1}
     assert result["mapping_rows"][0]["status"] == "PROJECTED_FASTA_VERIFIED"
-    assert len(result["request_index"]) == 2
+    request_index = result["request_index"]
+    assert len(request_index) == 3
+    assert [entry["attempt"] for entry in request_index] == [1, 2, 1]
+    assert [entry["http_status"] for entry in request_index] == [500, 200, 200]
+    assert [entry["terminal"] for entry in request_index] == [False, True, True]
     assert sleep_calls.count(MIN_INTERVAL_SECONDS) >= 3
     assert any(value > MIN_INTERVAL_SECONDS for value in sleep_calls)
 
