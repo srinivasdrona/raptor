@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import gzip
 import hashlib
+import importlib.util
 import json
 import math
 import re
@@ -60,9 +61,16 @@ EXPECTED_IDENTITY_STATE_COUNTS = {
     "REFERENCE_CONTROL": 3,
 }
 EXPECTED_VARIANT_KIND_COUNTS = {
-    "MISSENSE": 9356,
+    "MISSENSE": 9340,
     "SYNONYMOUS": 496,
-    "STOP_GAINED": 47,
+    "STOP_GAINED": 63,
+    "OTHER": 12,
+    "REFERENCE_CONTROL": 3,
+}
+EXPECTED_SGE_VARIANT_KIND_COUNTS = {
+    "MISSENSE": 318,
+    "SYNONYMOUS": 104,
+    "STOP_GAINED": 16,
     "OTHER": 12,
     "REFERENCE_CONTROL": 3,
 }
@@ -130,6 +138,17 @@ def _source_bundle_api() -> dict[str, Any]:
     return {
         "build_bundle_manifest": _symbol(module, "build_bundle_manifest"),
     }
+
+
+def _load_operator_module():
+    if not OPERATOR_SCRIPT.is_file():
+        pytest.fail(f"TSC2 functional normalization operator script is not implemented: {OPERATOR_SCRIPT}")
+    spec = importlib.util.spec_from_file_location("raptor_tsc2_functional_operator_test_module", OPERATOR_SCRIPT)
+    if spec is None or spec.loader is None:
+        pytest.fail(f"could not load operator module spec from {OPERATOR_SCRIPT}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _model_api() -> dict[str, Any]:
@@ -383,6 +402,171 @@ def _build_synthetic_source_bundle_fixture() -> dict[str, Any]:
     }
 
 
+def _build_synthetic_source_bundle_fixture_with_preceding_decoys() -> dict[str, Any]:
+    source_bundle_api = _source_bundle_api()
+
+    mavedb_metadata_payload = b'{"urn":"urn:mavedb:00001201-a-1"}'
+    mavedb_scores_payload = _csv_payload(
+        MAVEDB_HEADER,
+        [
+            ["m1", "c.100A>G", "", "p.Lys34Arg", "0.200"],
+            ["m2", "c.120A>T", "", "p.Lys40Ter", "-0.600"],
+        ],
+    ).encode("utf-8")
+    vamp_analysis_payload = b'{"analysis_set":"IGVFDS5595BTYJ"}'
+    vamp_file_payload = b'{"file_accession":"IGVFFI9747KART"}'
+    vamp_download_payload = _gzip_tsv_payload(
+        VAMP_HEADER,
+        [
+            ["ENSP00000219476.3:p.Arg174Cys", "0.620", "0.030", "0.600", "0.630", "0.630", "damaging"],
+            ["ENSP00000219476.3:p.Lys40=", "0.050", "0.020", "0.060", "0.050", "0.040", "wt-like"],
+        ],
+    )
+    sge_analysis_payload = b'{"analysis_set":"IGVFDS1782FCXW"}'
+    sge_file_payload = b'{"file_accession":"IGVFFI3097DFGF"}'
+    sge_download_payload = _gzip_tsv_payload(
+        SGE_HEADER,
+        [
+            _sge_row(hgvs_nt="NM_000548_5:c.=", hgvs_p="p.=", hgvs_g="NC_000016_10:g.=", score="0.0"),
+            _sge_row(
+                hgvs_nt="NM_000548_5:c.100A>G",
+                hgvs_p="p.Lys34Arg",
+                hgvs_g="NC_000016_10:g.2044829C>T",
+                score="0.7",
+            ),
+        ],
+    )
+
+    artifacts = [
+        _source_artifact_record(
+            artifact_id="mavedb_clipe-metadata-json",
+            source_id="mavedb_clipe",
+            relative_path="mavedb/mavedb_clipe-metadata.json",
+            payload=mavedb_metadata_payload,
+        ),
+        _source_artifact_record(
+            artifact_id="mavedb_clipe-scores-csv",
+            source_id="mavedb_clipe",
+            relative_path="mavedb/mavedb_clipe-scores.csv",
+            payload=mavedb_scores_payload,
+        ),
+        _source_artifact_record(
+            artifact_id="igvf_vamp_seq-analysis-json",
+            source_id="igvf_vamp_seq",
+            relative_path="igvf/igvf_vamp_seq-analysis.json",
+            payload=vamp_analysis_payload,
+        ),
+        _source_artifact_record(
+            artifact_id="igvf_vamp_seq-file-json",
+            source_id="igvf_vamp_seq",
+            relative_path="igvf/igvf_vamp_seq-file.json",
+            payload=vamp_file_payload,
+        ),
+        _source_artifact_record(
+            artifact_id="igvf_vamp_seq-download-tsv-gz",
+            source_id="igvf_vamp_seq",
+            relative_path="igvf/igvf_vamp_seq-IGVFFI9747KART.tsv.gz",
+            payload=vamp_download_payload,
+        ),
+        _source_artifact_record(
+            artifact_id="igvf_sge-analysis-json",
+            source_id="igvf_sge",
+            relative_path="igvf/igvf_sge-analysis.json",
+            payload=sge_analysis_payload,
+        ),
+        _source_artifact_record(
+            artifact_id="igvf_sge-file-json",
+            source_id="igvf_sge",
+            relative_path="igvf/igvf_sge-file.json",
+            payload=sge_file_payload,
+        ),
+        _source_artifact_record(
+            artifact_id="igvf_sge-download-tsv-gz",
+            source_id="igvf_sge",
+            relative_path="igvf/igvf_sge-IGVFFI3097DFGF.tsv.gz",
+            payload=sge_download_payload,
+        ),
+    ]
+    sources = [
+        _source_record(
+            source_id="mavedb_clipe",
+            source_kind="mavedb",
+            artifact_ids=["mavedb_clipe-metadata-json", "mavedb_clipe-scores-csv"],
+        ),
+        _source_record(
+            source_id="igvf_vamp_seq",
+            source_kind="igvf",
+            artifact_ids=[
+                "igvf_vamp_seq-analysis-json",
+                "igvf_vamp_seq-file-json",
+                "igvf_vamp_seq-download-tsv-gz",
+            ],
+        ),
+        _source_record(
+            source_id="igvf_sge",
+            source_kind="igvf",
+            artifact_ids=[
+                "igvf_sge-analysis-json",
+                "igvf_sge-file-json",
+                "igvf_sge-download-tsv-gz",
+            ],
+        ),
+    ]
+    manifest = source_bundle_api["build_bundle_manifest"](
+        bundle_id="synthetic-source-bundle-with-decoys",
+        created_at="2026-09-11T00:00:00Z",
+        query={"gene": "TSC2"},
+        artifacts=artifacts,
+        sources=sources,
+        truncation={},
+        boundaries={"network": "injected", "external_output_only": True},
+    )
+
+    required_artifact_ids = {
+        "mavedb_clipe-scores-csv",
+        "igvf_vamp_seq-download-tsv-gz",
+        "igvf_sge-download-tsv-gz",
+    }
+    required_artifact_pins = [
+        {
+            "artifact_id": artifact["artifact_id"],
+            "source_id": artifact["source_id"],
+            "relative_path": artifact["relative_path"],
+            "sha256": artifact["sha256"],
+            "md5": artifact["md5"],
+            "byte_length": artifact["byte_length"],
+        }
+        for artifact in artifacts
+        if artifact["artifact_id"] in required_artifact_ids
+    ]
+    pinned_payloads = {
+        artifact["artifact_id"]: payload
+        for artifact, payload in zip(
+            artifacts,
+            [
+                mavedb_metadata_payload,
+                mavedb_scores_payload,
+                vamp_analysis_payload,
+                vamp_file_payload,
+                vamp_download_payload,
+                sge_analysis_payload,
+                sge_file_payload,
+                sge_download_payload,
+            ],
+            strict=True,
+        )
+        if artifact["artifact_id"] in required_artifact_ids
+    }
+
+    return {
+        "source_manifest": manifest,
+        "artifact_payloads": pinned_payloads,
+        "expected_bundle_id": manifest["bundle_id"],
+        "expected_manifest_content_hash": manifest["content_hash"],
+        "expected_artifacts": required_artifact_pins,
+    }
+
+
 def _minimal_normalized_row(*, source_id: str, source_row: int) -> dict[str, Any]:
     return {
         "schema": NORMALIZATION_SCHEMA,
@@ -482,6 +666,68 @@ def _mk_manual_queue_item(model_api: dict[str, Any], raw: Any, *, error_code: st
     )
 
 
+def _tiny_plan(*, manifest: dict[str, Any], reference_sha256: str) -> dict[str, Any]:
+    required_by_source = {
+        item["source_id"]: item
+        for item in manifest["artifacts"]
+        if item["artifact_id"]
+        in {"mavedb_clipe-scores-csv", "igvf_vamp_seq-download-tsv-gz", "igvf_sge-download-tsv-gz"}
+    }
+    return {
+        "bundle_id": NORMALIZATION_BUNDLE_ID,
+        "created_at": "2026-09-11T00:00:00Z",
+        "reference": {
+            "accession": REFERENCE_ACCESSION,
+            "assembly": REFERENCE_ASSEMBLY,
+            "sha256": reference_sha256,
+        },
+        "expected_source_rows": {"mavedb_clipe": 2, "igvf_vamp_seq": 2, "igvf_sge": 2},
+        "identity_pins": {
+            "gene": "TSC2",
+            "transcript": SOURCE_TRANSCRIPT,
+            "genomic_accession": SOURCE_GDNA_ACCESSION,
+            "sge_source_transcript": SGE_SOURCE_TRANSCRIPT,
+            "sge_source_genomic_accession": SGE_SOURCE_GDNA_ACCESSION,
+            "vamp_source_protein": VAMP_PROTEIN_ACCESSION,
+        },
+        "header_pins": {
+            "mavedb_clipe": list(MAVEDB_HEADER),
+            "igvf_vamp_seq": list(VAMP_HEADER),
+            "igvf_sge": list(SGE_HEADER),
+        },
+        "input_bundle": {
+            "bundle_id": manifest["bundle_id"],
+            "manifest_content_hash": manifest["content_hash"],
+            "artifacts": [
+                {
+                    "artifact_id": required_by_source["mavedb_clipe"]["artifact_id"],
+                    "source_id": "mavedb_clipe",
+                    "relative_path": required_by_source["mavedb_clipe"]["relative_path"],
+                    "sha256": required_by_source["mavedb_clipe"]["sha256"],
+                    "md5": required_by_source["mavedb_clipe"]["md5"],
+                    "byte_length": required_by_source["mavedb_clipe"]["byte_length"],
+                },
+                {
+                    "artifact_id": required_by_source["igvf_vamp_seq"]["artifact_id"],
+                    "source_id": "igvf_vamp_seq",
+                    "relative_path": required_by_source["igvf_vamp_seq"]["relative_path"],
+                    "sha256": required_by_source["igvf_vamp_seq"]["sha256"],
+                    "md5": required_by_source["igvf_vamp_seq"]["md5"],
+                    "byte_length": required_by_source["igvf_vamp_seq"]["byte_length"],
+                },
+                {
+                    "artifact_id": required_by_source["igvf_sge"]["artifact_id"],
+                    "source_id": "igvf_sge",
+                    "relative_path": required_by_source["igvf_sge"]["relative_path"],
+                    "sha256": required_by_source["igvf_sge"]["sha256"],
+                    "md5": required_by_source["igvf_sge"]["md5"],
+                    "byte_length": required_by_source["igvf_sge"]["byte_length"],
+                },
+            ],
+        },
+    }
+
+
 def test_fn01_source_bundle_and_artifact_pins_fail_closed_on_any_drift() -> None:
     ingest_api = _ingest_api()
     fixture = _build_synthetic_source_bundle_fixture()
@@ -567,6 +813,122 @@ def test_fn02_operator_and_package_modules_remain_offline_and_boundary_safe() ->
     )
 
 
+def test_fn02b_operator_main_without_source_root_arg_or_env_fails_before_cwd_probe(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    operator = _load_operator_module()
+    monkeypatch.delenv(operator.DEFAULT_SOURCE_ROOT_ENV, raising=False)
+    monkeypatch.delenv(operator.DEFAULT_REFERENCE_ROOT_ENV, raising=False)
+    monkeypatch.delenv(operator.DEFAULT_OUTPUT_ROOT_ENV, raising=False)
+
+    exit_code = operator.main(["--config", str(CONFIG_PATH)])
+    captured = capsys.readouterr()
+    stderr = captured.err
+
+    assert exit_code == 1
+    assert "--source-root" in stderr or operator.DEFAULT_SOURCE_ROOT_ENV in stderr
+    assert "source bundle manifest not found" not in stderr.lower()
+
+
+def test_fn02c_read_artifact_payloads_uses_config_pinned_relative_path_not_manifest_override(
+    tmp_path: Path,
+) -> None:
+    operator = _load_operator_module()
+    source_root = tmp_path / "source-root"
+    run_dir = source_root / "run-001"
+    pinned_relpath = "mavedb/mavedb_clipe-scores.csv"
+    pinned_path = run_dir / pinned_relpath
+    pinned_path.parent.mkdir(parents=True, exist_ok=True)
+    safe_bytes = b"SAFE_PINNED_BYTES"
+    pinned_path.write_bytes(safe_bytes)
+
+    escaped_path = source_root / "escaped.csv"
+    escaped_bytes = b"ESCAPED_BYTES"
+    escaped_path.write_bytes(escaped_bytes)
+
+    config = {
+        "inputs": {
+            "source_bundle": {
+                "run_name": "run-001",
+                "required_artifacts": {
+                    "mavedb_clipe": {
+                        "artifact_id": "mavedb_clipe-scores-csv",
+                        "relative_path": pinned_relpath,
+                    }
+                },
+            }
+        }
+    }
+    source_manifest = {
+        "artifacts": [
+            {
+                "artifact_id": "mavedb_clipe-scores-csv",
+                "source_id": "mavedb_clipe",
+                "relative_path": "../escaped.csv",
+            }
+        ]
+    }
+
+    payloads = operator._read_artifact_payloads(source_root, config, source_manifest)
+    assert payloads["mavedb_clipe-scores-csv"] == safe_bytes
+    assert payloads["mavedb_clipe-scores-csv"] != escaped_bytes
+
+
+@pytest.mark.parametrize(
+    ("pinned_relpath", "manifest_relpath", "make_symlink"),
+    [
+        ("../escaped.csv", "../escaped.csv", False),
+        ("mavedb/mavedb_clipe-scores.csv", "mavedb/mavedb_clipe-scores.csv", True),
+    ],
+    ids=["path-escapes-run-dir", "symlinked-pinned-artifact-path"],
+)
+def test_fn02d_read_artifact_payloads_rejects_escaped_or_symlinked_pinned_path(
+    tmp_path: Path,
+    pinned_relpath: str,
+    manifest_relpath: str,
+    make_symlink: bool,
+) -> None:
+    operator = _load_operator_module()
+    source_root = tmp_path / "source-root"
+    run_dir = source_root / "run-001"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    config = {
+        "inputs": {
+            "source_bundle": {
+                "run_name": "run-001",
+                "required_artifacts": {
+                    "mavedb_clipe": {
+                        "artifact_id": "mavedb_clipe-scores-csv",
+                        "relative_path": pinned_relpath,
+                    }
+                },
+            }
+        }
+    }
+    source_manifest = {
+        "artifacts": [
+            {
+                "artifact_id": "mavedb_clipe-scores-csv",
+                "source_id": "mavedb_clipe",
+                "relative_path": manifest_relpath,
+            }
+        ]
+    }
+
+    if make_symlink:
+        outside = source_root / "outside.csv"
+        outside.write_bytes(b"outside")
+        pinned_path = run_dir / pinned_relpath
+        pinned_path.parent.mkdir(parents=True, exist_ok=True)
+        pinned_path.symlink_to(outside)
+    else:
+        (source_root / "escaped.csv").write_bytes(b"escaped")
+
+    with pytest.raises(operator.Tsc2FunctionalOperatorError):
+        operator._read_artifact_payloads(source_root, config, source_manifest)
+
+
 def test_fn03_reference_checksum_mismatch_fails_before_normalizer_call(tmp_path: Path) -> None:
     ingest_api = _ingest_api()
     fixture = _build_synthetic_source_bundle_fixture()
@@ -614,6 +976,44 @@ def test_fn03_reference_checksum_mismatch_fails_before_normalizer_call(tmp_path:
     assert normalizer.calls == []
 
 
+def test_fn03b_normalize_functional_bundle_uses_plan_pinned_artifact_ids_not_first_artifact_by_source(
+    tmp_path: Path,
+) -> None:
+    ingest_api = _ingest_api()
+    ingest_model_api = _ingest_model_api()
+    fixture = _build_synthetic_source_bundle_fixture_with_preceding_decoys()
+    reference_path = tmp_path / REFERENCE_FASTA_FILENAME
+    reference_bytes = b">NC_000016.10\nACGTACGTACGT\n"
+    reference_path.write_bytes(reference_bytes)
+    plan = _tiny_plan(
+        manifest=fixture["source_manifest"],
+        reference_sha256=_sha256_bytes(reference_bytes),
+    )
+
+    class StubNormalizer:
+        def normalize(self, raw: Any, _config: object) -> Any:
+            return _mk_normalized_variant(
+                ingest_model_api,
+                raw,
+                variant_id=f"{raw.chromosome}:{int(raw.position) - 1}:{raw.ref}:{raw.alt}",
+            )
+
+    result = ingest_api["normalize_functional_bundle"](
+        plan=plan,
+        source_manifest=fixture["source_manifest"],
+        artifact_payloads=fixture["artifact_payloads"],
+        reference_fasta_path=reference_path,
+        normalizer=StubNormalizer(),
+        normalizer_config={"run_id": "fn03b"},
+    )
+
+    rows_by_source = result["rows_by_source"]
+    assert set(rows_by_source) == {"mavedb_clipe", "igvf_vamp_seq", "igvf_sge"}
+    assert len(rows_by_source["mavedb_clipe"]) == 2
+    assert len(rows_by_source["igvf_vamp_seq"]) == 2
+    assert len(rows_by_source["igvf_sge"]) == 2
+
+
 def test_fn04_exact_row_schema_allowed_states_and_one_based_source_row_conservation() -> None:
     model_api = _model_api()
     normalize_api = _normalize_api()
@@ -651,6 +1051,68 @@ def test_fn04_exact_row_schema_allowed_states_and_one_based_source_row_conservat
     assert len({(row["source_id"], row["source_row"]) for row in all_rows}) == len(all_rows)
     for row in all_rows:
         _assert_exact_row_schema(row, model_api)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("schema", "raptor.external.normalized_functional_row.v0"),
+        ("gene", "TSC1"),
+        ("source_id", ""),
+        ("score_name", ""),
+        ("score_raw", "NaN"),
+        ("spdi", "not-an-spdi"),
+        ("spdi", "NC_000017.11:2044828:C:T"),
+        ("spdi", "NC_000016.10:2044827:C:T"),
+        ("spdi", "NC_000016.10:2044828:G:T"),
+        ("spdi", "NC_000016.10:2044828:C:A"),
+    ],
+    ids=[
+        "wrong-schema",
+        "wrong-gene",
+        "blank-source-id",
+        "blank-score-name",
+        "non-finite-score",
+        "malformed-spdi",
+        "wrong-spdi-accession",
+        "wrong-spdi-position",
+        "wrong-spdi-ref",
+        "wrong-spdi-alt",
+    ],
+)
+def test_fn04b_row_model_rejects_invalid_schema_identity_and_spdi_binding(field: str, value: Any) -> None:
+    model_api = _model_api()
+    base = {
+        "source_id": "igvf_sge",
+        "source_row": 1,
+        "source_record_id": "NC_000016.10:g.2044829C>T",
+        "gene": "TSC2",
+        "assembly": "GRCh38",
+        "transcript": "NM_000548.5",
+        "protein_accession": None,
+        "hgvs_c": "NM_000548.5:c.100A>G",
+        "hgvs_p": "p.Lys34Arg",
+        "hgvs_g": "NC_000016.10:g.2044829C>T",
+        "spdi": "NC_000016.10:2044828:C:T",
+        "variant_kind": "MISSENSE",
+        "identity_state": "GENOMIC_SPDI_VERIFIED",
+        "unresolved_reason": None,
+        "score_name": "pS6_score",
+        "score_raw": "0.71",
+        "schema": NORMALIZATION_SCHEMA,
+    }
+    base[field] = value
+    with pytest.raises(model_api["NormalizationContractError"]):
+        model_api["NormalizedFunctionalRow"](**base)
+
+
+def test_fn04c_canonical_jsonl_revalidates_full_row_invariants_not_only_keys() -> None:
+    bundle_api = _bundle_api()
+    model_api = _model_api()
+    invalid_row = _minimal_normalized_row(source_id="mavedb_clipe", source_row=1)
+    invalid_row["source_id"] = ""
+    with pytest.raises(model_api["NormalizationContractError"]):
+        bundle_api["canonical_jsonl_bytes"]([invalid_row])
 
 
 def test_fn05_mavedb_exact_header_count_pin_hgvs_prefix_variant_kind_and_no_spdi() -> None:
@@ -692,6 +1154,33 @@ def test_fn05_mavedb_exact_header_count_pin_hgvs_prefix_variant_kind_and_no_spdi
             transcript=SOURCE_TRANSCRIPT,
         )
 
+    with pytest.raises(model_api["NormalizationContractError"]):
+        normalize_api["normalize_mavedb"](
+            source_id="mavedb_clipe",
+            csv_text=_csv_payload(MAVEDB_HEADER, [["", "c.100A>G", "", "p.Lys34Arg", "0.10"]]),
+            expected_header=MAVEDB_HEADER,
+            expected_rows=1,
+            transcript=SOURCE_TRANSCRIPT,
+        )
+    with pytest.raises(model_api["NormalizationContractError"]):
+        normalize_api["normalize_mavedb"](
+            source_id="mavedb_clipe",
+            csv_text=_csv_payload(
+                MAVEDB_HEADER, [["m1", "NM_000548_5:c.100A>G", "", "p.Lys34Arg", "0.10"]]
+            ),
+            expected_header=MAVEDB_HEADER,
+            expected_rows=1,
+            transcript=SOURCE_TRANSCRIPT,
+        )
+    with pytest.raises(model_api["NormalizationContractError"]):
+        normalize_api["normalize_mavedb"](
+            source_id="mavedb_clipe",
+            csv_text=_csv_payload(MAVEDB_HEADER, [["m1", "c.100A>G", "", "", "0.10"]]),
+            expected_header=MAVEDB_HEADER,
+            expected_rows=1,
+            transcript=SOURCE_TRANSCRIPT,
+        )
+
 
 def test_fn06_vamp_exact_header_real_variant_token_and_wrong_accession_rejected() -> None:
     model_api = _model_api()
@@ -721,6 +1210,17 @@ def test_fn06_vamp_exact_header_real_variant_token_and_wrong_accession_rejected(
             tsv_gz_bytes=_gzip_tsv_payload(
                 VAMP_HEADER,
                 [["ENSP00000399999.1:p.Arg174Cys", "0.62", "0.03", "0.60", "0.63", "0.63", "damaging"]],
+            ),
+            expected_header=VAMP_HEADER,
+            expected_rows=1,
+            required_protein_accession=VAMP_PROTEIN_ACCESSION,
+        )
+    with pytest.raises(model_api["NormalizationContractError"]):
+        normalize_api["normalize_vamp_seq"](
+            source_id="igvf_vamp_seq",
+            tsv_gz_bytes=_gzip_tsv_payload(
+                VAMP_HEADER,
+                [["ENSP00000219476.3:p.?", "0.62", "0.03", "0.60", "0.63", "0.63", "damaging"]],
             ),
             expected_header=VAMP_HEADER,
             expected_rows=1,
@@ -794,6 +1294,31 @@ def test_fn07_sge_accession_prefix_rules_reference_controls_snv_parsing_and_rawv
                         hgvs_nt="XM_000548_5:c.100A>G",
                         hgvs_p="p.Lys34Arg",
                         hgvs_g="NC_000016_10:g.2044829C>T",
+                        score="0.71",
+                    )
+                ],
+            ),
+            expected_header=SGE_HEADER,
+            expected_rows=1,
+            expected_source_transcript=SGE_SOURCE_TRANSCRIPT,
+            expected_source_genomic_accession=SGE_SOURCE_GDNA_ACCESSION,
+            normalized_transcript=SOURCE_TRANSCRIPT,
+            normalized_genomic_accession=SOURCE_GDNA_ACCESSION,
+            assembly=REFERENCE_ASSEMBLY,
+            gene="TSC2",
+            normalizer=normalizer,
+            normalizer_config={"run_id": "fn07"},
+        )
+    with pytest.raises(model_api["NormalizationContractError"]):
+        normalize_api["normalize_sge"](
+            source_id="igvf_sge",
+            tsv_gz_bytes=_gzip_tsv_payload(
+                SGE_HEADER,
+                [
+                    _sge_row(
+                        hgvs_nt="NM_000548_5:c.100A>G",
+                        hgvs_p="p.Lys34Arg",
+                        hgvs_g="NC_000016_10:g.2044829C>Tjunk",
                         score="0.71",
                     )
                 ],
@@ -971,6 +1496,52 @@ def test_fn10_reference_mismatch_row_retains_source_hgvs_and_score_with_explicit
     assert row["unresolved_reason"] == "REFERENCE_ALLELE_MISMATCH"
 
 
+@pytest.mark.parametrize(
+    "variant_id",
+    [
+        "NC_000017.11:2044828:C:T",
+        "NC_000016.10:2044827:C:T",
+        "NC_000016.10:2044828:G:T",
+        "NC_000016.10:2044828:C:A",
+    ],
+    ids=["wrong-accession", "wrong-position", "wrong-ref", "wrong-alt"],
+)
+def test_fn10b_sge_normalizer_success_result_must_bind_to_exact_source_snv_spdi(variant_id: str) -> None:
+    model_api = _model_api()
+    normalize_api = _normalize_api()
+    ingest_model_api = _ingest_model_api()
+
+    class VariantIdNormalizer:
+        def normalize(self, raw: Any, _config: object) -> Any:
+            return _mk_normalized_variant(ingest_model_api, raw, variant_id=variant_id)
+
+    with pytest.raises(model_api["NormalizationOutcomeError"]):
+        normalize_api["normalize_sge"](
+            source_id="igvf_sge",
+            tsv_gz_bytes=_gzip_tsv_payload(
+                SGE_HEADER,
+                [
+                    _sge_row(
+                        hgvs_nt="NM_000548_5:c.100A>G",
+                        hgvs_p="p.Lys34Arg",
+                        hgvs_g="NC_000016_10:g.2044829C>T",
+                        score="0.77",
+                    )
+                ],
+            ),
+            expected_header=SGE_HEADER,
+            expected_rows=1,
+            expected_source_transcript=SGE_SOURCE_TRANSCRIPT,
+            expected_source_genomic_accession=SGE_SOURCE_GDNA_ACCESSION,
+            normalized_transcript=SOURCE_TRANSCRIPT,
+            normalized_genomic_accession=SOURCE_GDNA_ACCESSION,
+            assembly=REFERENCE_ASSEMBLY,
+            gene="TSC2",
+            normalizer=VariantIdNormalizer(),
+            normalizer_config={"run_id": "fn10b"},
+        )
+
+
 def test_fn11_output_manifest_shape_count_conservation_and_hash_determinism() -> None:
     bundle_api = _bundle_api()
     row = _minimal_normalized_row(source_id="mavedb_clipe", source_row=1)
@@ -1027,6 +1598,70 @@ def test_fn11_output_manifest_shape_count_conservation_and_hash_determinism() ->
     mutated = deepcopy(manifest_a)
     mutated["artifacts"][0]["sha256"] = "0" * 64
     assert bundle_api["compute_manifest_content_hash"](mutated) != manifest_a["content_hash"]
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda args: args.update({"counts": {"sources": 2, "artifacts": 2, "rows": 999}}),
+        lambda args: args.update(
+            {"identity_state_counts": {"TRANSCRIPT_ONLY_PROJECTOR_REQUIRED": 1, "PROTEIN_ONLY_CROSSWALK_REQUIRED": 9}}
+        ),
+        lambda args: args.update({"variant_kind_counts": {"MISSENSE": 1}}),
+        lambda args: args["artifacts"].append(deepcopy(args["artifacts"][0])),
+        lambda args: args["artifacts"][1].update({"artifact_id": args["artifacts"][0]["artifact_id"]}),
+        lambda args: args["artifacts"][1].update({"source_id": args["artifacts"][0]["source_id"]}),
+        lambda args: args["artifacts"][1].update({"relative_path": args["artifacts"][0]["relative_path"]}),
+        lambda args: args["artifacts"][0].update({"unexpected": "extra-field"}),
+    ],
+    ids=[
+        "counts-rows-mismatch",
+        "identity-sum-mismatch",
+        "variant-sum-mismatch",
+        "duplicate-artifact-record",
+        "duplicate-artifact-id",
+        "duplicate-artifact-source-id",
+        "duplicate-artifact-relative-path",
+        "unexpected-artifact-field",
+    ],
+)
+def test_fn11b_manifest_builder_rejects_conservation_and_artifact_integrity_violations(mutate) -> None:
+    bundle_api = _bundle_api()
+    row_a = _minimal_normalized_row(source_id="mavedb_clipe", source_row=1)
+    row_b = _minimal_normalized_row(source_id="igvf_vamp_seq", source_row=1)
+    payload_a = bundle_api["canonical_jsonl_bytes"]([row_a])
+    payload_b = bundle_api["canonical_jsonl_bytes"]([row_b])
+    args = {
+        "bundle_id": NORMALIZATION_BUNDLE_ID,
+        "created_at": "2026-09-11T00:00:00Z",
+        "input_bundle": {"bundle_id": INPUT_BUNDLE_ID, "content_hash": INPUT_MANIFEST_CONTENT_HASH},
+        "reference": {"accession": REFERENCE_ACCESSION, "sha256": REFERENCE_FASTA_SHA256},
+        "artifacts": [
+            {
+                "artifact_id": "mavedb_clipe-normalized-jsonl",
+                "source_id": "mavedb_clipe",
+                "relative_path": "normalized/mavedb_clipe.jsonl",
+                "byte_length": len(payload_a),
+                "sha256": _sha256_bytes(payload_a),
+                "row_count": 1,
+            },
+            {
+                "artifact_id": "igvf_vamp_seq-normalized-jsonl",
+                "source_id": "igvf_vamp_seq",
+                "relative_path": "normalized/igvf_vamp_seq.jsonl",
+                "byte_length": len(payload_b),
+                "sha256": _sha256_bytes(payload_b),
+                "row_count": 1,
+            },
+        ],
+        "counts": {"sources": 2, "artifacts": 2, "rows": 2},
+        "identity_state_counts": {"TRANSCRIPT_ONLY_PROJECTOR_REQUIRED": 1, "PROTEIN_ONLY_CROSSWALK_REQUIRED": 1},
+        "variant_kind_counts": {"MISSENSE": 2},
+        "boundaries": {"network": "forbidden", "external_output_only": True},
+    }
+    mutate(args)
+    with pytest.raises(bundle_api["NormalizationManifestError"]):
+        bundle_api["build_normalization_manifest"](**args)
 
 
 def test_fn12_canonical_jsonl_is_deterministic_lf_final_newline_and_rejects_duplicate_source_row() -> None:
@@ -1222,6 +1857,7 @@ def test_fn16_config_pins_exact_input_hashes_accessions_run_names_and_expected_t
         pytest.fail(f"TSC2 functional normalization config is not implemented: {CONFIG_PATH}")
 
     config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+    assert config["spec_version"] == "1.0.1"
     assert config["inputs"]["source_bundle"]["bundle_id"] == INPUT_BUNDLE_ID
     assert config["inputs"]["source_bundle"]["run_name"] == INPUT_BUNDLE_RUN_NAME
     assert config["inputs"]["source_bundle"]["manifest_filename"] == INPUT_MANIFEST_FILENAME
@@ -1255,3 +1891,4 @@ def test_fn16_config_pins_exact_input_hashes_accessions_run_names_and_expected_t
     assert config["expected_pilot"]["source_rows"] == EXPECTED_SOURCE_ROWS
     assert config["expected_pilot"]["identity_state_counts"] == EXPECTED_IDENTITY_STATE_COUNTS
     assert config["expected_pilot"]["variant_kind_counts"] == EXPECTED_VARIANT_KIND_COUNTS
+    assert config["source_rules"]["igvf_sge"]["expected_variant_kinds"] == EXPECTED_SGE_VARIANT_KIND_COUNTS
