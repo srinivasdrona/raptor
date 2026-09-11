@@ -1109,6 +1109,7 @@ def test_cp08d_retryable_http_500_is_retried_then_succeeds(tmp_path: Path) -> No
             "max_attempts_per_request": MAX_ATTEMPTS,
         },
         sleep=sleep_calls.append,
+        random_uniform=lambda _low, high: high,
         fasta_deleted_allele_checker=lambda **kwargs: str(kwargs["deleted_sequence"]),
     )
     assert len(requested_urls) == 3
