@@ -40,6 +40,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
+import math
 import random
 import ssl
 import time
@@ -458,9 +459,18 @@ def _perform_step_request(
         if raw_value is None:
             return None
         try:
-            return float(raw_value)
+            delay_seconds = float(raw_value)
         except (TypeError, ValueError):
-            pass
+            delay_seconds = None
+        if delay_seconds is not None:
+            # A delay-seconds value must be finite and non-negative --
+            # negative, +/-inf, nan, or an overflowed literal (e.g.
+            # "1e309", which Python's float() silently rounds to inf) are
+            # all malformed and fall back to plain jitter, never raising
+            # and never propagating a non-finite/negative sleep duration.
+            if math.isfinite(delay_seconds) and delay_seconds >= 0.0:
+                return delay_seconds
+            return None
         # Not a delay-seconds value -- try RFC 7231 HTTP-date. Any parse
         # failure (malformed date) falls back to "no Retry-After signal"
         # rather than raising -- this is best-effort compliance, never a
