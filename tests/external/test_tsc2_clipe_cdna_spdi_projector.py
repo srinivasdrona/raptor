@@ -8,7 +8,7 @@ import os
 from copy import deepcopy
 from importlib import import_module
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import quote, unquote, urlsplit
 
 import pytest
@@ -154,6 +154,14 @@ def _ingest_api() -> dict[str, Any]:
     }
 
 
+def _source_bundle_api() -> dict[str, Any]:
+    module = _load_module("raptor.external.tsc2_sources.bundle")
+    return {
+        "build_bundle_manifest": _symbol(module, "build_bundle_manifest"),
+        "compute_bundle_content_hash": _symbol(module, "compute_bundle_content_hash"),
+    }
+
+
 def _bundle_api() -> dict[str, Any]:
     module = _load_module("raptor.external.tsc2_cdna_projector.bundle")
     return {
@@ -195,6 +203,10 @@ def _module_imports(path: Path) -> list[tuple[str, int]]:
 
 def _sha256(blob: bytes) -> str:
     return hashlib.sha256(blob).hexdigest()
+
+
+def _md5(blob: bytes) -> str:
+    return hashlib.md5(blob).hexdigest()  # nosec B303 - pinned upstream md5 compatibility
 
 
 def _scores_csv(rows: list[list[str]]) -> str:
@@ -281,6 +293,68 @@ def _step2_payload(
         }
     }
     return json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+
+
+def _source_artifact_record(*, artifact_id: str, source_id: str, relative_path: str, payload: bytes) -> dict[str, Any]:
+    return {
+        "artifact_id": artifact_id,
+        "source_id": source_id,
+        "role": "TEST_ARTIFACT",
+        "requested_url": f"https://example.invalid/{artifact_id}",
+        "final_url": f"https://example.invalid/{artifact_id}",
+        "http_status": 200,
+        "media_type": "text/csv",
+        "relative_path": relative_path,
+        "byte_length": len(payload),
+        "sha256": _sha256(payload),
+        "md5": _md5(payload),
+        "fetched_at": "2026-09-12T00:00:00Z",
+        "verification": "HASHED",
+    }
+
+
+def _source_record(*, source_id: str, artifact_ids: list[str]) -> dict[str, Any]:
+    return {
+        "source_id": source_id,
+        "source_kind": "functional",
+        "lifecycle_state": "STAGED_VERIFIED",
+        "access_state": "PUBLIC",
+        "licence_state": "PUBLIC_METADATA",
+        "permitted_use": "NON_CLINICAL_DISCOVERY",
+        "identifiers": {"primary": source_id},
+        "artifact_ids": artifact_ids,
+        "observations": {},
+        "limitations": [],
+    }
+
+
+def _build_synthetic_source_bundle_manifest(
+    *,
+    scores_payload: bytes,
+    artifacts: list[dict[str, Any]] | None = None,
+    bundle_id: str = SOURCE_BUNDLE_ID,
+) -> dict[str, Any]:
+    source_bundle_api = _source_bundle_api()
+    if artifacts is None:
+        artifacts = [
+            _source_artifact_record(
+                artifact_id=SCORES_ARTIFACT_ID,
+                source_id=SOURCE_ID,
+                relative_path=SCORES_RELATIVE_PATH,
+                payload=scores_payload,
+            )
+        ]
+    sources = [_source_record(source_id=SOURCE_ID, artifact_ids=[item["artifact_id"] for item in artifacts])]
+    manifest = source_bundle_api["build_bundle_manifest"](
+        bundle_id=bundle_id,
+        created_at="2026-09-12T00:00:00Z",
+        query={"q": "synthetic"},
+        artifacts=artifacts,
+        sources=sources,
+        truncation={},
+        boundaries={"network": "injected", "external_output_only": True},
+    )
+    return manifest
 
 
 def _valid_projector_manifest_and_payloads(bundle_api: dict[str, Any]) -> tuple[dict[str, Any], bytes, bytes, dict[str, bytes]]:
@@ -372,7 +446,7 @@ def _valid_projector_manifest_and_payloads(bundle_api: dict[str, Any]) -> tuple[
             "artifact_id": SCORES_ARTIFACT_ID,
             "sha256": SCORES_SHA256,
             "byte_length": SCORES_BYTE_LENGTH,
-            "row_count": TOTAL_ROWS,
+            "row_count": 2,
         },
         reference={"accession": GENOMIC_ACCESSION, "sha256": REFERENCE_FASTA_SHA256},
         endpoint_pins={
@@ -394,12 +468,12 @@ def _valid_projector_manifest_and_payloads(bundle_api: dict[str, Any]) -> tuple[
     return manifest, mapping_payload, request_payload, raw_payloads
 
 
-def test_cp00_binding_spec_exists_and_is_v1_0_2() -> None:
+def test_cp00_binding_spec_exists_and_is_v1_0_3() -> None:
     if not SPEC_PATH.is_file():
         pytest.fail(f"binding spec is missing: {SPEC_PATH}")
     spec = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))
     assert spec["spec_id"] == "raptor-v2-clipe-cdna-spdi-projector-acquisition-v1"
-    assert spec["spec_version"] == "1.0.2"
+    assert spec["spec_version"] == "1.0.3"
 
 
 def test_cp01_endpoint_url_builders_percent_encode_whole_path_segment_no_query_and_pin_resource() -> None:
@@ -552,6 +626,60 @@ def test_cp05_step1_parser_requires_valid_single_transcript_spdi_and_acgt_allele
         )
 
 
+def test_cp05b_step1_parser_rejects_nested_warnings_and_empty_alleles() -> None:
+    api = _parse_api()
+    err = api["Step1SchemaError"]
+    with pytest.raises(err):
+        api["parse_step1_contextuals_response"](
+            body=json.dumps(
+                {
+                    "data": {
+                        "input_hgvs_validity": "valid",
+                        "warnings": [{"message": "cross-exon projection warning"}],
+                        "spdis": [
+                            {
+                                "seq_id": TRANSCRIPT,
+                                "position": 1709,
+                                "deleted_sequence": "G",
+                                "inserted_sequence": "A",
+                            }
+                        ],
+                    }
+                }
+            ).encode("utf-8"),
+            media_type="application/json",
+            expected_seq_id=TRANSCRIPT,
+        )
+    with pytest.raises(err):
+        api["parse_step1_contextuals_response"](
+            body=json.dumps(
+                {
+                    "data": {
+                        "input_hgvs_validity": "valid",
+                        "spdis": [
+                            {
+                                "seq_id": TRANSCRIPT,
+                                "position": 1709,
+                                "deleted_sequence": "G",
+                                "inserted_sequence": "A",
+                                "warnings": [{"message": "cross-exon projection warning"}],
+                            }
+                        ],
+                    }
+                }
+            ).encode("utf-8"),
+            media_type="application/json",
+            expected_seq_id=TRANSCRIPT,
+        )
+    for deleted, inserted in (("", "A"), ("G", "")):
+        with pytest.raises(err):
+            api["parse_step1_contextuals_response"](
+                body=_step1_payload(deleted=deleted, inserted=inserted),
+                media_type="application/json",
+                expected_seq_id=TRANSCRIPT,
+            )
+
+
 def test_cp06_step2_parser_requires_pinned_genome_and_rejects_transcript_or_warning_payloads() -> None:
     api = _parse_api()
     parsed = api["parse_step2_canonical_representative_response"](
@@ -587,6 +715,34 @@ def test_cp06_step2_parser_requires_pinned_genome_and_rejects_transcript_or_warn
             media_type="application/json",
             expected_seq_id=GENOMIC_ACCESSION,
         )
+
+
+def test_cp06b_step2_parser_rejects_nested_warnings_and_empty_alleles() -> None:
+    api = _parse_api()
+    err = api["Step2SchemaError"]
+    with pytest.raises(err):
+        api["parse_step2_canonical_representative_response"](
+            body=json.dumps(
+                {
+                    "data": {
+                        "warnings": [{"message": "cross-exon projection warning"}],
+                        "seq_id": GENOMIC_ACCESSION,
+                        "position": 2065518,
+                        "deleted_sequence": "G",
+                        "inserted_sequence": "A",
+                    }
+                }
+            ).encode("utf-8"),
+            media_type="application/json",
+            expected_seq_id=GENOMIC_ACCESSION,
+        )
+    for deleted, inserted in (("", "A"), ("G", "")):
+        with pytest.raises(err):
+            api["parse_step2_canonical_representative_response"](
+                body=_step2_payload(deleted=deleted, inserted=inserted),
+                media_type="application/json",
+                expected_seq_id=GENOMIC_ACCESSION,
+            )
 
 
 def test_cp07_mapping_row_contract_supports_snv_and_delins_and_retains_failure_rows() -> None:
@@ -863,6 +1019,171 @@ def test_cp08c_project_clipe_rows_retains_permanent_step1_failure_and_continues_
     ]
 
 
+def test_cp08d_retryable_http_500_is_retried_then_succeeds(tmp_path: Path) -> None:
+    api = _ingest_api()
+    scores_csv_text = _scores_csv([["urn:mavedb:00001201-a-1#1", "c.1600G>A", "", "p.Gly534Arg", "0.21"]])
+    scores_payload = scores_csv_text.encode("utf-8")
+    reference_path = tmp_path / REFERENCE_FASTA_FILENAME
+    reference_bytes = b">NC_000016.10\nACGTACGTACGTACGT\n"
+    reference_path.write_bytes(reference_bytes)
+
+    requested_urls: list[str] = []
+    sleep_calls: list[float] = []
+    attempts = {"count": 0}
+
+    def transport(url: str) -> dict[str, Any]:
+        requested_urls.append(url)
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            return {
+                "final_url": url,
+                "http_status": 500,
+                "media_type": "application/json",
+                "body": b'{"error":"temporary"}',
+            }
+        if attempts["count"] == 2:
+            return {"final_url": url, "http_status": 200, "media_type": "application/json", "body": _step1_payload()}
+        return {"final_url": url, "http_status": 200, "media_type": "application/json", "body": _step2_payload()}
+
+    result = api["project_clipe_rows"](
+        source_id=SOURCE_ID,
+        scores_csv_bytes=scores_payload,
+        expected_header=SCORES_HEADER,
+        expected_rows=1,
+        expected_scores_sha256=_sha256(scores_payload),
+        expected_scores_byte_length=len(scores_payload),
+        transcript=TRANSCRIPT,
+        genomic_accession=GENOMIC_ACCESSION,
+        assembly=ASSEMBLY,
+        reference_fasta_path=reference_path,
+        expected_reference_sha256=_sha256(reference_bytes),
+        transport=transport,
+        min_interval_seconds=MIN_INTERVAL_SECONDS,
+        retry_policy={
+            "retryable_http": sorted(RETRYABLE_HTTP),
+            "retryable_transport": ["timeout", "connection_error", "tls_error"],
+            "non_retryable_http": sorted(NON_RETRYABLE_HTTP),
+            "max_attempts_per_request": MAX_ATTEMPTS,
+        },
+        sleep=sleep_calls.append,
+        fasta_deleted_allele_checker=lambda **kwargs: str(kwargs["deleted_sequence"]),
+    )
+    assert len(requested_urls) == 3
+    assert requested_urls[0] == requested_urls[1]
+    assert requested_urls[2].endswith("/canonical_representative")
+    assert result["status_counts"] == {"PROJECTED_FASTA_VERIFIED": 1}
+    assert result["mapping_rows"][0]["status"] == "PROJECTED_FASTA_VERIFIED"
+    assert len(result["request_index"]) == 2
+    assert sleep_calls.count(MIN_INTERVAL_SECONDS) >= 3
+    assert any(value > MIN_INTERVAL_SECONDS for value in sleep_calls)
+
+
+def test_cp08e_non_retryable_http_400_emits_row_failure_without_retry(tmp_path: Path) -> None:
+    api = _ingest_api()
+    scores_csv_text = _scores_csv([["urn:mavedb:00001201-a-1#1", "c.1600G>A", "", "p.Gly534Arg", "0.21"]])
+    scores_payload = scores_csv_text.encode("utf-8")
+    reference_path = tmp_path / REFERENCE_FASTA_FILENAME
+    reference_bytes = b">NC_000016.10\nACGTACGTACGTACGT\n"
+    reference_path.write_bytes(reference_bytes)
+
+    requested_urls: list[str] = []
+
+    def transport(url: str) -> dict[str, Any]:
+        requested_urls.append(url)
+        return {
+            "final_url": url,
+            "http_status": 400,
+            "media_type": "application/json",
+            "body": b'{"error":"invalid hgvs"}',
+        }
+
+    result = api["project_clipe_rows"](
+        source_id=SOURCE_ID,
+        scores_csv_bytes=scores_payload,
+        expected_header=SCORES_HEADER,
+        expected_rows=1,
+        expected_scores_sha256=_sha256(scores_payload),
+        expected_scores_byte_length=len(scores_payload),
+        transcript=TRANSCRIPT,
+        genomic_accession=GENOMIC_ACCESSION,
+        assembly=ASSEMBLY,
+        reference_fasta_path=reference_path,
+        expected_reference_sha256=_sha256(reference_bytes),
+        transport=transport,
+        min_interval_seconds=MIN_INTERVAL_SECONDS,
+        retry_policy={
+            "retryable_http": sorted(RETRYABLE_HTTP),
+            "retryable_transport": ["timeout", "connection_error", "tls_error"],
+            "non_retryable_http": sorted(NON_RETRYABLE_HTTP),
+            "max_attempts_per_request": MAX_ATTEMPTS,
+        },
+        sleep=lambda _seconds: None,
+        fasta_deleted_allele_checker=lambda **kwargs: str(kwargs.get("deleted_sequence", "")),
+    )
+    assert requested_urls == [f"{BASE_URL}/hgvs/{quote(f'{TRANSCRIPT}:c.1600G>A', safe='')}/contextuals"]
+    assert result["status_counts"] == {"STEP1_HTTP_ERROR": 1}
+    assert result["mapping_rows"][0]["status"] == "STEP1_HTTP_ERROR"
+    assert len(result["request_index"]) == 1
+
+
+@pytest.mark.parametrize(
+    ("exc_factory", "retryable_transport", "expected_calls", "expected_status"),
+    [
+        (lambda: TimeoutError("timeout"), ["timeout"], 3, "PROJECTED_FASTA_VERIFIED"),
+        (lambda: ConnectionError("connection reset"), ["timeout"], 1, "STEP1_HTTP_ERROR"),
+    ],
+)
+def test_cp08f_transport_exception_retrying_requires_allowed_category_not_nonempty_list(
+    tmp_path: Path,
+    exc_factory: Callable[[], BaseException],
+    retryable_transport: list[str],
+    expected_calls: int,
+    expected_status: str,
+) -> None:
+    api = _ingest_api()
+    scores_csv_text = _scores_csv([["urn:mavedb:00001201-a-1#1", "c.1600G>A", "", "p.Gly534Arg", "0.21"]])
+    scores_payload = scores_csv_text.encode("utf-8")
+    reference_path = tmp_path / REFERENCE_FASTA_FILENAME
+    reference_bytes = b">NC_000016.10\nACGTACGTACGTACGT\n"
+    reference_path.write_bytes(reference_bytes)
+
+    calls = {"count": 0}
+
+    def transport(url: str) -> dict[str, Any]:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise exc_factory()
+        if calls["count"] == 2:
+            return {"final_url": url, "http_status": 200, "media_type": "application/json", "body": _step1_payload()}
+        return {"final_url": url, "http_status": 200, "media_type": "application/json", "body": _step2_payload()}
+
+    result = api["project_clipe_rows"](
+        source_id=SOURCE_ID,
+        scores_csv_bytes=scores_payload,
+        expected_header=SCORES_HEADER,
+        expected_rows=1,
+        expected_scores_sha256=_sha256(scores_payload),
+        expected_scores_byte_length=len(scores_payload),
+        transcript=TRANSCRIPT,
+        genomic_accession=GENOMIC_ACCESSION,
+        assembly=ASSEMBLY,
+        reference_fasta_path=reference_path,
+        expected_reference_sha256=_sha256(reference_bytes),
+        transport=transport,
+        min_interval_seconds=MIN_INTERVAL_SECONDS,
+        retry_policy={
+            "retryable_http": sorted(RETRYABLE_HTTP),
+            "retryable_transport": retryable_transport,
+            "non_retryable_http": sorted(NON_RETRYABLE_HTTP),
+            "max_attempts_per_request": MAX_ATTEMPTS,
+        },
+        sleep=lambda _seconds: None,
+        fasta_deleted_allele_checker=lambda **kwargs: str(kwargs["deleted_sequence"]),
+    )
+    assert calls["count"] == expected_calls
+    assert result["mapping_rows"][0]["status"] == expected_status
+
+
 def test_cp09_frozen_scores_header_rowcount_duplicate_and_shape_validation_fail_closed() -> None:
     api = _ingest_api()
     rows = [
@@ -923,6 +1244,98 @@ def test_cp09_frozen_scores_header_rowcount_duplicate_and_shape_validation_fail_
             ),
             transcript=TRANSCRIPT,
         )
+    for bad_hgvs in ("c.1629_1627delinsTGA", "c.1627_1629delinsTG"):
+        bad_csv_text = _scores_csv([["urn:mavedb:00001201-a-1#1", bad_hgvs, "", "p.X", "0.21"]])
+        bad_payload = bad_csv_text.encode("utf-8")
+        with pytest.raises(err):
+            api["validate_frozen_scores_input"](
+                csv_text=bad_csv_text,
+                expected_header=SCORES_HEADER,
+                expected_rows=1,
+                expected_sha256=_sha256(bad_payload),
+                expected_byte_length=len(bad_payload),
+                transcript=TRANSCRIPT,
+            )
+
+
+def test_cp09b_validate_frozen_source_bundle_manifest_recomputes_hash_and_rejects_hash_or_artifact_drift() -> None:
+    ingest = _load_module("raptor.external.tsc2_cdna_projector.ingest")
+    helper = getattr(ingest, "validate_frozen_source_bundle_manifest", None)
+    if helper is None:
+        pytest.fail(
+            "ingest API must expose validate_frozen_source_bundle_manifest("
+            "source_manifest, expected_bundle_id, expected_manifest_content_hash, expected_scores_artifact)"
+        )
+    api = _ingest_api()
+    err = api["FrozenInputError"]
+    source_bundle_api = _source_bundle_api()
+
+    scores_payload = _scores_csv([["urn:mavedb:00001201-a-1#1", "c.1600G>A", "", "p.Gly534Arg", "0.21"]]).encode("utf-8")
+    manifest = _build_synthetic_source_bundle_manifest(scores_payload=scores_payload)
+    expected_artifact = {
+        "artifact_id": SCORES_ARTIFACT_ID,
+        "source_id": SOURCE_ID,
+        "relative_path": SCORES_RELATIVE_PATH,
+        "sha256": _sha256(scores_payload),
+        "byte_length": len(scores_payload),
+    }
+    helper(
+        source_manifest=manifest,
+        expected_bundle_id=SOURCE_BUNDLE_ID,
+        expected_manifest_content_hash=manifest["content_hash"],
+        expected_scores_artifact=expected_artifact,
+    )
+
+    altered_hash = deepcopy(manifest)
+    altered_hash["content_hash"] = "0" * 64
+    with pytest.raises(err):
+        helper(
+            source_manifest=altered_hash,
+            expected_bundle_id=SOURCE_BUNDLE_ID,
+            expected_manifest_content_hash=manifest["content_hash"],
+            expected_scores_artifact=expected_artifact,
+        )
+
+    real_artifact = _source_artifact_record(
+        artifact_id=SCORES_ARTIFACT_ID,
+        source_id=SOURCE_ID,
+        relative_path=SCORES_RELATIVE_PATH,
+        payload=scores_payload,
+    )
+    decoy_artifact = _source_artifact_record(
+        artifact_id="mavedb_clipe-scores-csv-decoy",
+        source_id=SOURCE_ID,
+        relative_path="mavedb/decoy-scores.csv",
+        payload=b"accession,hgvs_nt,hgvs_splice,hgvs_pro,score\nx,c.1A>G,,p.X,0.0\n",
+    )
+    manifest_with_decoy = _build_synthetic_source_bundle_manifest(
+        scores_payload=scores_payload,
+        artifacts=[decoy_artifact, real_artifact],
+    )
+    manifest_with_decoy["content_hash"] = source_bundle_api["compute_bundle_content_hash"](manifest_with_decoy)
+    with pytest.raises(err):
+        helper(
+            source_manifest=manifest_with_decoy,
+            expected_bundle_id=SOURCE_BUNDLE_ID,
+            expected_manifest_content_hash=manifest_with_decoy["content_hash"],
+            expected_scores_artifact=expected_artifact,
+        )
+
+    duplicate_artifact = deepcopy(real_artifact)
+    duplicate_artifact["artifact_id"] = f"{SCORES_ARTIFACT_ID}-duplicate"
+    duplicate_artifact["relative_path"] = SCORES_RELATIVE_PATH
+    manifest_with_duplicate = _build_synthetic_source_bundle_manifest(
+        scores_payload=scores_payload,
+        artifacts=[real_artifact, duplicate_artifact],
+    )
+    manifest_with_duplicate["content_hash"] = source_bundle_api["compute_bundle_content_hash"](manifest_with_duplicate)
+    with pytest.raises(err):
+        helper(
+            source_manifest=manifest_with_duplicate,
+            expected_bundle_id=SOURCE_BUNDLE_ID,
+            expected_manifest_content_hash=manifest_with_duplicate["content_hash"],
+            expected_scores_artifact=expected_artifact,
+        )
 
 
 def test_cp10_canonical_mapping_jsonl_and_request_index_are_deterministic_and_lf_terminated() -> None:
@@ -953,6 +1366,29 @@ def test_cp10_canonical_mapping_jsonl_and_request_index_are_deterministic_and_lf
     request_blob = api["canonical_request_index_jsonl_bytes"](request_rows)
     assert request_blob.endswith(b"\n")
     assert b"\r\n" not in request_blob
+
+
+def test_cp10b_canonical_mapping_jsonl_revalidates_rows_and_rejects_duplicate_source_pairs() -> None:
+    bundle_api = _bundle_api()
+    model_api = _model_api()
+    err = model_api["ProjectionContractError"]
+
+    malformed = _minimal_mapping_row(source_row=1, shape="SNV")
+    malformed["status"] = "NOT_A_REAL_STATUS"
+    with pytest.raises(err):
+        bundle_api["canonical_mapping_jsonl_bytes"]([malformed])
+
+    malformed_spdi = _minimal_mapping_row(source_row=1, shape="SNV")
+    malformed_spdi["genomic_spdi"] = "NC_000016.10:bad:G:A"
+    with pytest.raises(err):
+        bundle_api["canonical_mapping_jsonl_bytes"]([malformed_spdi])
+
+    duplicate_pair = [
+        _minimal_mapping_row(source_row=1, shape="SNV"),
+        _minimal_mapping_row(source_row=1, shape="SNV"),
+    ]
+    with pytest.raises(err):
+        bundle_api["canonical_mapping_jsonl_bytes"](duplicate_pair)
 
 
 def test_cp11_request_index_redacts_secret_query_values_and_preserves_raw_body_hashes() -> None:
@@ -998,7 +1434,7 @@ def test_cp12_bundle_manifest_hash_schema_crossrefs_and_counts_are_exact() -> No
             "artifact_id": SCORES_ARTIFACT_ID,
             "sha256": SCORES_SHA256,
             "byte_length": SCORES_BYTE_LENGTH,
-            "row_count": TOTAL_ROWS,
+            "row_count": 2,
         },
         "reference": {"accession": GENOMIC_ACCESSION, "sha256": REFERENCE_FASTA_SHA256},
         "endpoint_pins": {
@@ -1040,6 +1476,98 @@ def test_cp12_bundle_manifest_hash_schema_crossrefs_and_counts_are_exact() -> No
     drifted["artifacts"][0]["sha256"] = "0" * 64
     with pytest.raises(api["ProjectorManifestError"]):
         api["validate_manifest_content_hash"](drifted)
+
+
+def test_cp12b_manifest_builder_and_hash_validator_enforce_fields_uniqueness_and_count_conservation() -> None:
+    api = _bundle_api()
+    mapping_blob = api["canonical_mapping_jsonl_bytes"](
+        [_minimal_mapping_row(source_row=1, shape="SNV"), _minimal_mapping_row(source_row=2, shape="DELINS")]
+    )
+    request_blob = api["canonical_request_index_jsonl_bytes"](
+        [
+            _minimal_request_index_row(
+                source_row=1,
+                step="step1",
+                requested_url=f"{BASE_URL}/hgvs/{quote('NM_000548.5:c.1600G>A', safe='')}/contextuals",
+                final_url=f"{BASE_URL}/hgvs/{quote('NM_000548.5:c.1600G>A', safe='')}/contextuals",
+            ),
+            _minimal_request_index_row(
+                source_row=1,
+                step="step2",
+                requested_url=f"{BASE_URL}/spdi/{quote('NM_000548.5:1709:G:A', safe='')}/canonical_representative",
+                final_url=f"{BASE_URL}/spdi/{quote('NM_000548.5:1709:G:A', safe='')}/canonical_representative",
+            ),
+        ]
+    )
+    base_manifest = api["build_projector_bundle_manifest"](
+        bundle_id=BUNDLE_ID,
+        created_at="2026-09-12T00:00:00Z",
+        input_scores={
+            "artifact_id": SCORES_ARTIFACT_ID,
+            "sha256": SCORES_SHA256,
+            "byte_length": SCORES_BYTE_LENGTH,
+            "row_count": 2,
+        },
+        reference={"accession": GENOMIC_ACCESSION, "sha256": REFERENCE_FASTA_SHA256},
+        endpoint_pins={
+            "base_url": BASE_URL,
+            "step_sequence": ["contextuals", "canonical_representative"],
+            "min_interval_seconds": MIN_INTERVAL_SECONDS,
+        },
+        artifacts=[
+            {
+                "artifact_id": "mapping-jsonl",
+                "relative_path": "mapping/mavedb_clipe_nm000548_5_to_nc000016_10.jsonl",
+                "byte_length": len(mapping_blob),
+                "sha256": _sha256(mapping_blob),
+                "row_count": 2,
+            },
+            {
+                "artifact_id": "request-index-jsonl",
+                "relative_path": "logs/request_index.jsonl",
+                "byte_length": len(request_blob),
+                "sha256": _sha256(request_blob),
+                "row_count": 2,
+            },
+        ],
+        status_counts={"PROJECTED_FASTA_VERIFIED": 1, "STEP1_INVALID_HGVS": 1},
+        shape_counts={"SNV": 1, "DELINS": 1},
+        success_count=1,
+        failure_count=1,
+        boundaries={
+            "network": "operator_only",
+            "clinical_use": "forbidden",
+            "evidence_strength_use": "forbidden",
+        },
+    )
+    api["validate_manifest_content_hash"](base_manifest)
+
+    def _mutated(mutate: Callable[[dict[str, Any]], None]) -> dict[str, Any]:
+        candidate = deepcopy(base_manifest)
+        mutate(candidate)
+        candidate["content_hash"] = api["compute_manifest_content_hash"](candidate)
+        return candidate
+
+    invalid_manifests = [
+        _mutated(lambda m: m.__setitem__("unexpected_top_level", True)),
+        _mutated(lambda m: m["artifacts"][0].__setitem__("extra", "forbidden")),
+        _mutated(lambda m: m["artifacts"].append(deepcopy(m["artifacts"][0]))),
+        _mutated(lambda m: m["artifacts"][1].__setitem__("relative_path", m["artifacts"][0]["relative_path"])),
+        _mutated(lambda m: m["artifacts"][0].__setitem__("relative_path", "../escape.jsonl")),
+        _mutated(lambda m: m.__setitem__("success_count", 2)),
+        _mutated(
+            lambda m: (
+                m["status_counts"].__setitem__("PROJECTED_FASTA_VERIFIED", 2),
+                m["status_counts"].__setitem__("STEP1_INVALID_HGVS", 0),
+            )
+        ),
+        _mutated(lambda m: m["shape_counts"].__setitem__("SNV", 2)),
+        _mutated(lambda m: m["artifacts"][0].__setitem__("row_count", 1)),
+    ]
+
+    for candidate in invalid_manifests:
+        with pytest.raises(api["ProjectorManifestError"]):
+            api["validate_manifest_content_hash"](candidate)
 
 
 def test_cp13_summary_is_aggregate_only_with_boundaries_and_no_row_level_or_clinical_content() -> None:
@@ -1188,6 +1716,30 @@ def test_cp16_operator_enforces_sequential_two_step_flow_rate_limit_and_abort_po
     assert "0.05" in source or "5%" in source
 
 
+def test_cp16b_operator_reads_pinned_source_manifest_and_validates_it_before_scores_use() -> None:
+    if not OPERATOR_SCRIPT.is_file():
+        pytest.fail(f"TSC2 cliPE projector operator script is not implemented: {OPERATOR_SCRIPT}")
+    tree = ast.parse(OPERATOR_SCRIPT.read_text(encoding="utf-8"), filename=str(OPERATOR_SCRIPT))
+    main_node = next((node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "main"), None)
+    if main_node is None:
+        pytest.fail("operator script is missing main(argv=...)")
+
+    called_lines: dict[str, int] = {}
+    for node in ast.walk(main_node):
+        if isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name):
+                called_lines.setdefault(node.func.id, node.lineno)
+            elif isinstance(node.func, ast.Attribute):
+                called_lines.setdefault(node.func.attr, node.lineno)
+    assert "validate_frozen_source_bundle_manifest" in called_lines
+    assert "validate_frozen_scores_input" in called_lines
+    assert called_lines["validate_frozen_source_bundle_manifest"] < called_lines["validate_frozen_scores_input"]
+
+    source = OPERATOR_SCRIPT.read_text(encoding="utf-8")
+    assert "manifest_filename" in source
+    assert "bundle_manifest.json" in source or "source_bundle_manifest" in source
+
+
 def test_cp17_operator_cli_requires_explicit_roots_and_does_not_fall_back_to_cwd(monkeypatch: pytest.MonkeyPatch) -> None:
     operator = _load_operator_module()
     for env_name in (
@@ -1207,7 +1759,7 @@ def test_cp18_config_pins_exact_input_hashes_endpoints_run_name_and_shape_totals
         pytest.fail(f"TSC2 cliPE projector config is not implemented: {CONFIG_PATH}")
     config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
     assert config["spec_id"] == "raptor-v2-clipe-cdna-spdi-projector-acquisition-v1"
-    assert config["spec_version"] == "1.0.2"
+    assert config["spec_version"] == "1.0.3"
 
     source_bundle = config["inputs"]["source_bundle"]
     assert source_bundle["bundle_id"] == SOURCE_BUNDLE_ID
