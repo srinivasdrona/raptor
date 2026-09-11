@@ -12,7 +12,7 @@
 
 schema: raptor.project.spec.v1
 spec_id: raptor-v2-clipe-cdna-spdi-projector-acquisition-v1
-spec_version: 1.0.4
+spec_version: 1.0.5
 status: APPROVED_BUILD
 created_at: '2026-09-12'
 owner: human-terminal-authority
@@ -396,6 +396,11 @@ rate_limits_retries:
     backoff_base_seconds: 2.0
     backoff_cap_seconds: 60.0
     honor_retry_after_header: true
+    retry_after_rule: >-
+      Header names are case-insensitive. Accept either delay-seconds or an
+      RFC 7231 HTTP-date and compute the non-negative delay against the
+      operator clock. Malformed or past values fall back to jitter without
+      aborting the row.
   row_failure_vs_run_abort:
     permanent_row_failure: >-
       HTTP 400 with input_hgvs_validity=invalid, empty/ambiguous spdis,
