@@ -5,7 +5,7 @@
 # use, or automatic source activation.
 
 schema: raptor.v2.missense_source_ingestion_spec.v1
-spec_version: 1.0.1
+spec_version: 1.0.2
 task_id: v2-missense-source-ingestion-v1
 status: APPROVED_TO_BUILD
 owner: '@dronasrinivas'
@@ -166,13 +166,16 @@ sources:
     role: lawful_full_text_when_explicitly_permitted
     legacy_oa_service_status: RETIRED_2026_08_25
     current_bulk_documentation: https://pmc.ncbi.nlm.nih.gov/tools/textmining/
-    pilot_full_text_endpoint: https://www.ebi.ac.uk/europepmc/webservices/rest/PMC12871146/fullTextXML
-    pilot_pmcid: PMC12871146
+    pilot_full_text_endpoint: https://www.ebi.ac.uk/europepmc/webservices/rest/PMC13478581/fullTextXML
+    pilot_pmcid: PMC13478581
+    pilot_pmid: '42425971'
+    pilot_doi: 10.1038/s41467-026-75442-6
     rule: >-
-      The pilot may acquire this known public JATS XML and must parse and
-      preserve its own licence declaration. General PMC acquisition may not
-      call the retired OA Web Service and may not infer open reuse from the
-      existence of a PMC record.
+      The pilot acquires the final Nature Communications JATS XML, not the
+      earlier preprint representation, and must parse and preserve its own
+      licence declaration. General PMC acquisition may not call the retired OA
+      Web Service and may not infer open reuse from the existence of a PMC
+      record.
 
   mavedb_clipe:
     role: functional_dataset
