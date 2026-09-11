@@ -2355,3 +2355,66 @@ def test_cp18_config_pins_exact_input_hashes_endpoints_run_name_and_shape_totals
     assert expected["shape_counts"] == {"SNV": SNV_ROWS, "DELINS": DELINS_ROWS}
     assert expected["reference_sha256"] == REFERENCE_FASTA_SHA256
     assert expected["scores_sha256"] == SCORES_SHA256
+
+
+def test_cp19_committed_summary_exists_and_matches_final_pilot_contract_without_row_level_content() -> None:
+    if not SUMMARY_PATH.is_file():
+        pytest.fail(f"committed summary is missing: {SUMMARY_PATH}")
+
+    summary = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))
+    assert set(summary) == {
+        "schema",
+        "bundle_id",
+        "manifest_content_hash",
+        "input_scores_sha256",
+        "reference_sha256",
+        "total_rows",
+        "success_count",
+        "failure_count",
+        "status_counts",
+        "shape_counts",
+        "request_budget_observed",
+        "endpoint_sequence",
+        "boundaries",
+        "pilot_uncertainties",
+    }
+    assert summary["schema"] == SUMMARY_SCHEMA
+    assert summary["bundle_id"] == BUNDLE_ID
+    assert summary["manifest_content_hash"] == "247665b9758860124b196d037b913626b7699b87ba1bb1c32b0e461bb4473529"
+    assert summary["input_scores_sha256"] == SCORES_SHA256
+    assert summary["reference_sha256"] == REFERENCE_FASTA_SHA256
+    assert summary["total_rows"] == TOTAL_ROWS
+    assert summary["success_count"] == TOTAL_ROWS
+    assert summary["failure_count"] == 0
+    assert summary["status_counts"] == {"PROJECTED_FASTA_VERIFIED": TOTAL_ROWS}
+    assert summary["shape_counts"] == {"SNV": SNV_ROWS, "DELINS": DELINS_ROWS}
+    assert summary["request_budget_observed"]["step1"] == TOTAL_ROWS
+    assert summary["request_budget_observed"]["step2"] == TOTAL_ROWS
+    assert summary["boundaries"] == {
+        "clinical_use": "forbidden",
+        "evidence_strength_use": "forbidden",
+        "network": "operator_only",
+    }
+    assert summary["endpoint_sequence"] == ["contextuals", "canonical_representative"]
+    assert summary["pilot_uncertainties"] == []
+
+    serialized = json.dumps(summary, sort_keys=True).lower()
+    forbidden_row_tokens = (
+        "hgvs_nt_source",
+        "hgvs_c",
+        "hgvs_g",
+        "tx_spdi",
+        "genomic_spdi",
+        "requested_url",
+        "final_url",
+        "raw_body",
+        "raw_attempt",
+        "score_raw",
+        "functional_class",
+        "classification",
+        "pathogenic",
+        "benign",
+        "ps3",
+        "bs3",
+    )
+    assert not any(token in serialized for token in forbidden_row_tokens)

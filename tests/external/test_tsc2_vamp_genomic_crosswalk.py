@@ -2200,3 +2200,69 @@ def test_vx17_config_pins_exact_source_archive_reference_and_expected_status_tot
     assert expected["conservation"]["output_crosswalk_rows"] == TOTAL_SCORE_ROWS
     assert expected["conservation"]["dropped_rows"] == 0
     assert expected["conservation"]["duplicate_source_rows"] == 0
+
+
+def test_vx18_committed_summary_exists_and_matches_final_pilot_contract_without_row_level_content() -> None:
+    if not SUMMARY_PATH.is_file():
+        pytest.fail(f"committed summary is missing: {SUMMARY_PATH}")
+
+    summary = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))
+    assert set(summary) == {
+        "schema",
+        "bundle_id",
+        "manifest_content_hash",
+        "archive",
+        "input_scores_sha256",
+        "reference_sha256",
+        "counts",
+        "status_counts",
+        "verified_unique_spdi",
+        "follow_on_unresolved",
+        "boundaries",
+        "pacbio_fastq_download",
+    }
+    assert summary["schema"] == SUMMARY_SCHEMA
+    assert summary["bundle_id"] == BUNDLE_ID
+    assert summary["manifest_content_hash"] == "f80759aa43874d201efb69c52b611d9ebd8c40712159bf1f291c86195dd33ba0"
+    assert summary["archive"] == {
+        "record_id": ZENODO_RECORD_ID,
+        "doi": ZENODO_DOI,
+        "filename": "FowlerLab/TSC2_analysis-V1.zip",
+        "sha256": ZENODO_SHA256,
+        "md5": ZENODO_MD5,
+        "byte_length": ZENODO_BYTE_LENGTH,
+    }
+    assert summary["input_scores_sha256"] == SCORES_SHA256
+    assert summary["reference_sha256"] == REFERENCE_FASTA_SHA256
+    assert summary["counts"] == {"rows": TOTAL_SCORE_ROWS, "status_rows": TOTAL_SCORE_ROWS}
+    assert summary["status_counts"] == STATUS_COUNTS
+    assert summary["verified_unique_spdi"] == STATUS_COUNTS["CROSSWALK_SPDI_VERIFIED"]
+    assert summary["follow_on_unresolved"] == {
+        "SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH": STATUS_COUNTS["SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH"],
+        "SOURCE_COORDINATE_REFERENCE_MISMATCH": STATUS_COUNTS["SOURCE_COORDINATE_REFERENCE_MISMATCH"],
+        "ARCHIVE_CROSSWALK_ABSENT": STATUS_COUNTS["ARCHIVE_CROSSWALK_ABSENT"],
+    }
+    assert summary["pacbio_fastq_download"] == "NO_GO"
+    assert summary["boundaries"] == {
+        "clinical_use": "forbidden",
+        "evidence_strength_use": "forbidden",
+        "network": "operator_only",
+    }
+
+    serialized = json.dumps(summary, sort_keys=True).lower()
+    forbidden_row_tokens = (
+        "protein_variant",
+        "hgvs_c",
+        "hgvs_p",
+        "tx_spdi",
+        "genomic_spdi",
+        "score_raw",
+        "functional_class",
+        "auth_reported_score",
+        "classification",
+        "pathogenic",
+        "benign",
+        "ps3",
+        "bs3",
+    )
+    assert not any(token in serialized for token in forbidden_row_tokens)
