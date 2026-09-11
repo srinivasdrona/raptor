@@ -309,6 +309,29 @@ class _RateLimitedHttpsTransport:
         return last_result
 
 
+def _expand_observed_status_counts(
+    *, observed_status_counts: dict[str, int], expected_status_counts: dict[str, int]
+) -> dict[str, int]:
+    """Expand a possibly SPARSE observed ``status_counts`` (a status the
+    crosswalk builder never actually emitted for this run is simply absent
+    from its dict, rather than recorded as an explicit ``0``) into the
+    FULL, exact key set pinned by ``expected_pilot.status_counts`` --
+    every expected status key is present with its observed count, or ``0``
+    if the builder never emitted it at all. Raises
+    ``VampCrosswalkOperatorError`` if the observed dict contains ANY status
+    key that is not in the expected set -- an unrecognized status is a
+    contract violation, never silently carried forward into the manifest."""
+    observed_keys = set(observed_status_counts)
+    expected_keys = set(expected_status_counts)
+    unknown_keys = observed_keys - expected_keys
+    if unknown_keys:
+        raise VampCrosswalkOperatorError(
+            "observed crosswalk status_counts contains status value(s) not present in "
+            f"expected_pilot.status_counts: {sorted(unknown_keys)!r}"
+        )
+    return {status: observed_status_counts.get(status, 0) for status in expected_status_counts}
+
+
 def _validate_expected_pilot_result(*, manifest: dict[str, Any], expected_pilot: dict[str, Any]) -> None:
     """Fail-closed gate: the crosswalk manifest's actual totals must match
     the frozen ``expected_pilot`` pins EXACTLY before publication. Every
@@ -509,7 +532,15 @@ def main(argv: list[str] | None = None) -> int:
         )
 
         crosswalk_rows = result["crosswalk_rows"]
-        status_counts = result["status_counts"]
+        # Expand a possibly sparse observed status_counts to the FULL
+        # expected key set (with an explicit 0 for any status the builder
+        # never emitted this run) BEFORE the manifest is built -- the
+        # manifest, follow_on_unresolved and the expected-pilot validator
+        # all consume this SAME expanded dict, never the raw sparse one.
+        status_counts = _expand_observed_status_counts(
+            observed_status_counts=result["status_counts"],
+            expected_status_counts=config["expected_pilot"]["status_counts"],
+        )
         crosswalk_payload = canonical_crosswalk_jsonl_bytes(crosswalk_rows)
 
         output_cfg = config["outputs"]["external_bundle"]
