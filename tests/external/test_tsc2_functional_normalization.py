@@ -1613,6 +1613,7 @@ def test_fn11_output_manifest_shape_count_conservation_and_hash_determinism() ->
         lambda args: args["artifacts"][1].update({"source_id": args["artifacts"][0]["source_id"]}),
         lambda args: args["artifacts"][1].update({"relative_path": args["artifacts"][0]["relative_path"]}),
         lambda args: args["artifacts"][0].update({"unexpected": "extra-field"}),
+        lambda args: args["artifacts"][0].update({"row_count": args["artifacts"][0]["row_count"] + 1}),
     ],
     ids=[
         "counts-rows-mismatch",
@@ -1623,6 +1624,7 @@ def test_fn11_output_manifest_shape_count_conservation_and_hash_determinism() ->
         "duplicate-artifact-source-id",
         "duplicate-artifact-relative-path",
         "unexpected-artifact-field",
+        "artifact-row-sum-mismatch",
     ],
 )
 def test_fn11b_manifest_builder_rejects_conservation_and_artifact_integrity_violations(mutate) -> None:
@@ -1643,7 +1645,7 @@ def test_fn11b_manifest_builder_rejects_conservation_and_artifact_integrity_viol
                 "relative_path": "normalized/mavedb_clipe.jsonl",
                 "byte_length": len(payload_a),
                 "sha256": _sha256_bytes(payload_a),
-                "row_count": 1,
+                "row_count": 17,
             },
             {
                 "artifact_id": "igvf_vamp_seq-normalized-jsonl",
@@ -1651,7 +1653,7 @@ def test_fn11b_manifest_builder_rejects_conservation_and_artifact_integrity_viol
                 "relative_path": "normalized/igvf_vamp_seq.jsonl",
                 "byte_length": len(payload_b),
                 "sha256": _sha256_bytes(payload_b),
-                "row_count": 1,
+                "row_count": 11,
             },
         ],
         "counts": {"sources": 2, "artifacts": 2, "rows": 2},
