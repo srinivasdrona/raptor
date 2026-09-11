@@ -133,6 +133,10 @@ def _bundle_api() -> dict[str, Any]:
         "compute_bundle_content_hash": _symbol(module, "compute_bundle_content_hash"),
         "validate_manifest_hash": _symbol(module, "validate_manifest_hash"),
         "_publish_directory_no_replace": _symbol(module, "_publish_directory_no_replace"),
+        "_publish_directory_no_replace_via_claim_then_populate": _symbol(
+            module,
+            "_publish_directory_no_replace_via_claim_then_populate",
+        ),
         "write_bundle_run": _symbol(module, "write_bundle_run"),
         "build_pilot_summary": _symbol(module, "build_pilot_summary"),
         "assert_no_forbidden_status_vocabulary": _symbol(
@@ -1905,6 +1909,165 @@ def test_ac11_atomic_publication_failure_cleans_staging_dir_and_publishes_no_man
     assert not final_run_dir.exists()
     assert not list(output_root.glob(f".{run_name}.staging-*"))
     assert not (final_run_dir / MANIFEST_FILENAME).exists()
+
+
+def test_ac11_fallback_claim_then_populate_successfully_publishes_and_cleans_staging(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = _bundle_api()
+    bundle_module = _load_module("raptor.external.tsc2_sources.bundle")
+    staging_dir = tmp_path / "staging"
+    destination_dir = tmp_path / "final-run"
+    nested_relpath = Path("artifacts") / "nested" / "payload.bin"
+    nested_payload = b"nested-payload-bytes"
+    nested_path = staging_dir / nested_relpath
+    nested_path.parent.mkdir(parents=True, exist_ok=True)
+    nested_path.write_bytes(nested_payload)
+    manifest_bytes = b'{"bundle":"fallback-test","version":1}'
+    (staging_dir / MANIFEST_FILENAME).write_bytes(manifest_bytes)
+
+    events: list[str] = []
+    real_rmtree = bundle_module.shutil.rmtree
+    real_write_bytes_exclusive = bundle_module._write_bytes_exclusive
+
+    def record_rmtree(path: str | Path, *args: Any, **kwargs: Any) -> None:
+        if Path(path) == staging_dir:
+            events.append("staging-removed")
+            assert not (destination_dir / MANIFEST_FILENAME).exists()
+        real_rmtree(path, *args, **kwargs)
+
+    def record_write_manifest(
+        destination_path: Path, payload: bytes, created_files: list[Path]
+    ) -> None:
+        if destination_path.name == MANIFEST_FILENAME:
+            events.append("manifest-written")
+            assert not staging_dir.exists()
+        real_write_bytes_exclusive(destination_path, payload, created_files)
+
+    monkeypatch.setattr(bundle_module.shutil, "rmtree", record_rmtree)
+    monkeypatch.setattr(bundle_module, "_write_bytes_exclusive", record_write_manifest)
+
+    api["_publish_directory_no_replace_via_claim_then_populate"](staging_dir, destination_dir)
+
+    assert events == ["staging-removed", "manifest-written"]
+    assert (destination_dir / nested_relpath).read_bytes() == nested_payload
+    assert (destination_dir / MANIFEST_FILENAME).read_bytes() == manifest_bytes
+    assert not staging_dir.exists()
+
+
+def test_ac11_fallback_claim_then_populate_refuses_preexisting_empty_destination(
+    tmp_path: Path,
+) -> None:
+    api = _bundle_api()
+    staging_dir = tmp_path / "staging"
+    destination_dir = tmp_path / "final-run"
+    staging_dir.mkdir()
+    (staging_dir / "artifact.bin").write_bytes(b"payload")
+    (staging_dir / MANIFEST_FILENAME).write_bytes(b'{"bundle":"fallback-test"}')
+    destination_dir.mkdir()
+
+    with pytest.raises(FileExistsError):
+        api["_publish_directory_no_replace_via_claim_then_populate"](staging_dir, destination_dir)
+
+    assert destination_dir.exists()
+    assert list(destination_dir.iterdir()) == []
+    assert (staging_dir / MANIFEST_FILENAME).is_file()
+
+
+def test_ac11_fallback_staging_cleanup_failure_rolls_back_and_write_bundle_run_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = _bundle_api()
+    bundle_module = _load_module("raptor.external.tsc2_sources.bundle")
+    manifest, payloads = _minimal_bundle_manifest_and_payload(run_tag="fallback-staging-cleanup")
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    output_root = tmp_path / "external-root"
+    output_root.mkdir()
+    run_name = "fallback-staging-cleanup-run"
+    final_run_dir = output_root / run_name
+    real_fallback_publish = api["_publish_directory_no_replace_via_claim_then_populate"]
+    real_rmtree = bundle_module.shutil.rmtree
+    injected_failure = {"triggered": False}
+
+    def force_fallback_publish(staging_dir: str | Path, destination_dir: str | Path) -> None:
+        real_fallback_publish(Path(staging_dir), Path(destination_dir))
+
+    def fail_once_precommit_staging_cleanup(path: str | Path, *args: Any, **kwargs: Any) -> None:
+        path_obj = Path(path)
+        ignore_errors = bool(kwargs.get("ignore_errors"))
+        if (
+            not injected_failure["triggered"]
+            and not ignore_errors
+            and path_obj.name.startswith(f".{run_name}.staging-")
+        ):
+            injected_failure["triggered"] = True
+            raise OSError("simulated fallback pre-commit staging cleanup failure")
+        real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(bundle_module, "_publish_directory_no_replace", force_fallback_publish)
+    monkeypatch.setattr(bundle_module.shutil, "rmtree", fail_once_precommit_staging_cleanup)
+
+    with pytest.raises(api["BundleBoundaryError"]):
+        api["write_bundle_run"](
+            repo_root=repo_root,
+            output_root=output_root,
+            run_name=run_name,
+            manifest=manifest,
+            artifact_payloads=payloads,
+        )
+
+    assert injected_failure["triggered"]
+    assert not final_run_dir.exists()
+    assert not (final_run_dir / MANIFEST_FILENAME).exists()
+    assert not list(output_root.glob(f".{run_name}.staging-*"))
+
+
+def test_ac11_fallback_cleanup_failure_never_reports_failure_with_committed_manifest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = _bundle_api()
+    bundle_module = _load_module("raptor.external.tsc2_sources.bundle")
+    manifest, payloads = _minimal_bundle_manifest_and_payload(run_tag="fallback-rollback-cleanup")
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    output_root = tmp_path / "external-root"
+    output_root.mkdir()
+    run_name = "fallback-rollback-cleanup-run"
+    final_run_dir = output_root / run_name
+    real_fallback_publish = api["_publish_directory_no_replace_via_claim_then_populate"]
+
+    def force_fallback_publish(staging_dir: str | Path, destination_dir: str | Path) -> None:
+        real_fallback_publish(Path(staging_dir), Path(destination_dir))
+
+    def fail_non_manifest_copy(_src: Path, _dst: Path, _created_files: list[Path]) -> None:
+        raise OSError("simulated non-manifest copy failure")
+
+    def fail_rollback_cleanup(
+        _destination_dir: Path,
+        _created_dirs: list[Path],
+        _created_files: list[Path],
+    ) -> None:
+        raise OSError("simulated rollback cleanup failure")
+
+    monkeypatch.setattr(bundle_module, "_publish_directory_no_replace", force_fallback_publish)
+    monkeypatch.setattr(bundle_module, "_copy_file_exclusive", fail_non_manifest_copy)
+    monkeypatch.setattr(bundle_module, "_rollback_claimed_publication", fail_rollback_cleanup)
+
+    with pytest.raises(api["BundleBoundaryError"]):
+        api["write_bundle_run"](
+            repo_root=repo_root,
+            output_root=output_root,
+            run_name=run_name,
+            manifest=manifest,
+            artifact_payloads=payloads,
+        )
+
+    assert not (final_run_dir / MANIFEST_FILENAME).exists()
+    assert not list(output_root.glob(f".{run_name}.staging-*"))
 
 
 def test_ac13_package_init_does_not_claim_implemented_modules_are_absent() -> None:

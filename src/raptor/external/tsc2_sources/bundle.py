@@ -19,10 +19,26 @@ EXTERNAL (never-inside-the-repo), create-only, symlink-safe run directory:
 every artifact is hashed/length-verified against its manifest record, all
 bytes are written to a unique staging sibling directory first, the manifest
 is written into that staging directory LAST, and only then is the whole
-staging directory atomically renamed onto the (never pre-existing) final
-run path. Any failure during staging removes the staging directory and
-raises -- the final run path is never created and no manifest is ever
-published for a partial/failed run.
+staging directory published onto the (never pre-existing) final run path
+via ``_publish_directory_no_replace``. That helper's FAST PATH is a
+genuinely atomic, no-clobber whole-directory rename (``renameat2`` with
+``RENAME_NOREPLACE`` on Linux; ``os.rename`` on Windows) that fails instead
+of replacing ANY pre-existing destination, including an EMPTY destination
+directory (see that helper's docstring for why plain
+``os.rename``/``os.replace`` can silently replace an empty directory on
+POSIX and must never be used here). On filesystems that reject
+``RENAME_NOREPLACE`` itself (observed on DrvFS -- WSL2's passthrough for
+Windows drives such as ``/mnt/d/...``), it falls back to a manifest-last
+claim-then-populate protocol built from ``os.mkdir``/``O_CREAT|O_EXCL``
+alone: as a result, a published run directory's ``bundle_manifest.json``
+is ALWAYS the last thing written, and every consumer of these run
+directories MUST treat a run directory that exists but does not (yet, or
+ever) contain ``bundle_manifest.json`` as UNPUBLISHED/INVALID. Any failure
+during staging, or during that publish step, removes the staging directory
+(and, for the fallback protocol, only whatever this process itself had
+already created under the final path) and raises -- the final run path is
+never left containing this process's own partial content, and a competing
+writer's pre-existing content there is never touched.
 
 This module performs no network I/O and never imports ``raptor.sourceops``,
 ``raptor.scorer``, ``raptor.eval``, ``raptor.packet``, ``raptor.census``,
@@ -30,9 +46,12 @@ This module performs no network I/O and never imports ``raptor.sourceops``,
 """
 from __future__ import annotations
 
+import ctypes
+import errno
 import hashlib
 import json
 import os
+import platform
 import shutil
 import uuid
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -327,9 +346,10 @@ def _reserve_run_name(output_root: Path, run_name: str) -> Path:
     writer can ever win this reservation for a given ``run_name``; every
     other compliant writer fails FAST here (raising ``BundleBoundaryError``,
     doing no staging work at all) instead of only colliding later at the
-    final atomic ``os.replace``. Returns the reservation lock file's own
-    path; the caller MUST remove exactly that path (and never any other
-    writer's reservation) in every success and failure path."""
+    final atomic ``_publish_directory_no_replace`` publish step. Returns
+    the reservation lock file's own path; the caller MUST remove exactly
+    that path (and never any other writer's reservation) in every success
+    and failure path."""
     lock_path = output_root / f".{run_name}.publish.lock"
     try:
         fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
@@ -351,6 +371,353 @@ def _release_reservation(lock_path: Path) -> None:
         lock_path.unlink()
     except FileNotFoundError:
         pass
+
+
+#: ``renameat2(2)`` flag requesting an atomic no-clobber rename: the call
+#: fails with ``EEXIST`` instead of replacing an existing ``newpath`` (this
+#: is the fast-path way on Linux to get a genuinely atomic no-clobber
+#: directory rename -- plain POSIX ``rename(2)``/``os.replace`` silently
+#: replaces an existing EMPTY destination directory, by design). NOT every
+#: Linux-mounted filesystem implements this flag: see
+#: ``_RenameAt2FlagUnsupportedError`` below.
+_RENAME_NOREPLACE = 0x1
+#: Special ``AT_FDCWD`` dirfd value: resolve the paired path argument
+#: relative to the current working directory, exactly like plain
+#: ``rename(2)`` would.
+_AT_FDCWD = -100
+
+
+class _RenameAt2FlagUnsupportedError(OSError):
+    """Internal signal (never escapes ``_publish_directory_no_replace``):
+    the kernel rejected ``RENAME_NOREPLACE`` itself with ``EINVAL`` or
+    ``EOPNOTSUPP``/``ENOTSUP``, meaning the underlying filesystem driver
+    does not implement the flag -- observed on DrvFS (WSL2's passthrough
+    for Windows drives, e.g. ``/mnt/d/...``) -- rather than any real
+    existence conflict (``EEXIST``/``ENOTEMPTY``) or other genuine
+    failure. Raising this (instead of a generic ``OSError``) lets
+    ``_publish_directory_no_replace`` fall back to the claim-then-populate
+    publish protocol on exactly this filesystem-capability condition, and
+    nothing else."""
+
+
+#: ``errno`` values that specifically mean "this filesystem rejects the
+#: ``RENAME_NOREPLACE`` flag" rather than a real existence conflict or
+#: other genuine failure: ``EINVAL`` (the flag itself is rejected --
+#: observed on DrvFS) and ``EOPNOTSUPP``/``ENOTSUP`` (an explicit
+#: "operation not supported" some filesystem drivers may return instead).
+#: On Linux, ``EOPNOTSUPP`` and ``ENOTSUP`` share the same numeric value,
+#: but both names are included defensively since that is not guaranteed by
+#: the ``errno`` module across all C libraries.
+_RENAME_NOREPLACE_UNSUPPORTED_ERRNOS = frozenset(
+    value
+    for value in (
+        errno.EINVAL,
+        getattr(errno, "EOPNOTSUPP", None),
+        getattr(errno, "ENOTSUP", None),
+    )
+    if value is not None
+)
+
+
+def _renameat2_no_replace_linux(old_path: str, new_path: str) -> None:
+    """Invoke the Linux-only ``renameat2(2)`` syscall with
+    ``RENAME_NOREPLACE`` via ``ctypes`` (the standard library exposes no
+    wrapper for this syscall). Atomically renames ``old_path`` onto
+    ``new_path`` -- kernel-enforced, no check-then-rename TOCTOU window --
+    and NEVER replaces an existing ``new_path``, in ANY form (empty
+    directory, non-empty directory, file, or symlink): the kernel rejects
+    the rename with ``EEXIST``/``ENOTEMPTY`` instead. Raises
+    ``FileExistsError`` for exactly that case, ``_RenameAt2FlagUnsupportedError``
+    if the underlying filesystem rejects the ``RENAME_NOREPLACE`` flag
+    itself (``EINVAL``/``EOPNOTSUPP``/``ENOTSUP`` -- e.g. DrvFS), and
+    ``OSError`` for any other syscall failure. If ``libc.so.6`` does not
+    even export the ``renameat2`` symbol at all (e.g. a glibc predating
+    the wrapper), this raises a clear ``OSError`` -- fail closed -- rather
+    than letting a raw ``AttributeError`` escape; that is a genuine
+    environment limitation, distinct from (and NOT treated the same as) a
+    specific filesystem rejecting the flag, so it is never silently routed
+    to the claim-then-populate fallback."""
+    libc = ctypes.CDLL("libc.so.6", use_errno=True)
+    renameat2 = getattr(libc, "renameat2", None)
+    if renameat2 is None:
+        raise OSError(
+            "libc.so.6 does not export renameat2(2) on this system; no atomic no-clobber "
+            "directory rename primitive is available -- refusing to fall back to "
+            "clobber-capable rename/replace semantics"
+        )
+    old_bytes = os.fsencode(old_path)
+    new_bytes = os.fsencode(new_path)
+    ctypes.set_errno(0)
+    result = renameat2(
+        ctypes.c_int(_AT_FDCWD),
+        ctypes.c_char_p(old_bytes),
+        ctypes.c_int(_AT_FDCWD),
+        ctypes.c_char_p(new_bytes),
+        ctypes.c_uint(_RENAME_NOREPLACE),
+    )
+    if result == 0:
+        return
+    errno_value = ctypes.get_errno()
+    message = f"renameat2(RENAME_NOREPLACE) {old_path!r} -> {new_path!r} failed: " + os.strerror(
+        errno_value
+    )
+    if errno_value in (errno.EEXIST, errno.ENOTEMPTY):
+        raise FileExistsError(errno_value, message)
+    if errno_value in _RENAME_NOREPLACE_UNSUPPORTED_ERRNOS:
+        raise _RenameAt2FlagUnsupportedError(errno_value, message)
+    raise OSError(errno_value, message)
+
+
+def _claim_subdirectory_chain(
+    destination_dir: Path, relative_parent: Path, created_dirs: list[Path]
+) -> None:
+    """Create every ancestor directory of ``relative_parent`` under
+    ``destination_dir`` that this process has not already created earlier
+    in the SAME publish call (tracked via ``created_dirs``, appended to in
+    place). Each still-missing level is created with plain ``os.mkdir``
+    (never ``exist_ok=True``): since ``destination_dir`` itself was just
+    exclusively claimed by this process, ANY level that already exists and
+    was not created by us this call is an unexpected occupant, and
+    ``os.mkdir`` raising ``FileExistsError`` for it is the correct,
+    fail-loud outcome -- never silently reused or replaced."""
+    if relative_parent == Path("."):
+        return
+    current = destination_dir
+    for part in relative_parent.parts:
+        current = current / part
+        if current in created_dirs:
+            continue
+        os.mkdir(str(current))
+        created_dirs.append(current)
+
+
+def _copy_file_exclusive(
+    source_path: Path, destination_path: Path, created_files: list[Path]
+) -> None:
+    """Copy ``source_path``'s bytes onto ``destination_path`` via a
+    context-managed exclusive create (``open(..., "xb")``, the
+    ``open()``-level equivalent of ``O_CREAT | O_EXCL``): raises
+    ``FileExistsError`` immediately -- before any byte is written -- if
+    ``destination_path`` already exists, never overwriting it, and the
+    context manager guarantees the destination file descriptor is closed
+    even if the copy itself fails partway through. ``destination_path`` is
+    appended to ``created_files`` the moment the exclusive create
+    succeeds (before any bytes are copied), so a failure partway through
+    still leaves the (partial) file tracked for rollback."""
+    with open(str(destination_path), "xb") as destination_handle:
+        created_files.append(destination_path)
+        with open(str(source_path), "rb") as source_handle:
+            shutil.copyfileobj(source_handle, destination_handle)
+
+
+def _write_bytes_exclusive(
+    destination_path: Path, payload: bytes, created_files: list[Path]
+) -> None:
+    """Write ``payload`` onto ``destination_path`` via a context-managed
+    exclusive create (``open(..., "xb")``): raises ``FileExistsError``
+    immediately if ``destination_path`` already exists, never overwriting
+    it, and guarantees the file descriptor is closed even if the write
+    itself fails partway through. ``destination_path`` is appended to
+    ``created_files`` the moment the exclusive create succeeds (before any
+    bytes are written), so a failure partway through the write still
+    leaves the (partial) file tracked for rollback."""
+    with open(str(destination_path), "xb") as destination_handle:
+        created_files.append(destination_path)
+        destination_handle.write(payload)
+
+
+def _rollback_claimed_publication(
+    destination_dir: Path, created_dirs: list[Path], created_files: list[Path]
+) -> None:
+    """Undo a failed claim-then-populate publish: remove ONLY the files
+    and directories THIS process itself created while populating
+    ``destination_dir`` (tracked precisely in ``created_files``/
+    ``created_dirs``, removed in reverse creation order), then remove
+    ``destination_dir`` itself if it is now empty. Content this process
+    did not create is NEVER force-deleted: if a tracked directory is not
+    empty after removing our own tracked files (an unexpected occupant is
+    present), or if ``destination_dir`` itself is not empty afterwards,
+    ``os.rmdir``'s ``ENOTEMPTY`` is deliberately swallowed and that
+    directory is left exactly as found -- any other removal failure (a
+    real, unexpected error) is left to propagate."""
+    for file_path in reversed(created_files):
+        try:
+            os.remove(str(file_path))
+        except FileNotFoundError:
+            pass
+    for dir_path in reversed(created_dirs):
+        try:
+            os.rmdir(str(dir_path))
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            if exc.errno != errno.ENOTEMPTY:
+                raise
+    try:
+        os.rmdir(str(destination_dir))
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        if exc.errno != errno.ENOTEMPTY:
+            raise
+
+
+def _publish_directory_no_replace_via_claim_then_populate(
+    staging_dir: Path, destination_dir: Path
+) -> None:
+    """Fallback publish protocol for filesystems that reject
+    ``renameat2``'s ``RENAME_NOREPLACE`` flag (``EINVAL``/``EOPNOTSUPP``/
+    ``ENOTSUP`` -- observed on DrvFS, WSL2's passthrough for Windows
+    drives such as ``/mnt/d/AIProjects/raptor-data/...``), where NO
+    whole-directory atomic-rename primitive can be relied on at all. This
+    is a manifest-last claim-then-populate protocol, never a
+    check-then-rename, and it is carefully ordered so that NO fallible
+    step remains after the manifest -- the commit marker -- has been
+    written:
+
+    1. Read ``bundle_manifest.json``'s bytes from ``staging_dir`` into
+       memory FIRST, before touching the destination at all.
+    2. Atomically CLAIM ``destination_dir`` with plain ``os.mkdir``: this
+       raises ``FileExistsError`` if ``destination_dir`` already exists in
+       ANY form (empty directory, non-empty directory, file, or symlink)
+       instead of ever replacing it. Unlike ``rename(2)``, POSIX
+       ``mkdir(2)`` (and Windows ``CreateDirectoryW``) NEVER special-cases
+       an empty destination -- it is a genuinely portable no-clobber
+       primitive on every filesystem this module targets, which is why it
+       is used here instead of another rename attempt.
+    3. Copy every staged file EXCEPT the manifest into the newly claimed
+       directory with a context-managed exclusive create
+       (``_copy_file_exclusive``), recreating only the subdirectory levels
+       needed (again via plain, non-``exist_ok`` ``os.mkdir``) and
+       tracking every path this process itself creates.
+    4. Remove ``staging_dir`` completely (it is no longer needed -- its
+       manifest bytes are already held in memory from step 1).
+    5. Write the in-memory manifest bytes onto
+       ``destination_dir/bundle_manifest.json`` via a context-managed
+       exclusive create, as the TRUE LAST operation. This is the commit
+       marker: a ``destination_dir`` that exists but does not (yet, or
+       ever) contain ``bundle_manifest.json`` is, by contract,
+       UNPUBLISHED/INVALID, and every consumer of these run directories
+       MUST treat it that way.
+
+    If step 3, the staging removal in step 4, or the manifest write in
+    step 5 fails, ``_rollback_claimed_publication`` removes exactly what
+    THIS process created under ``destination_dir`` (files, then
+    directories, then -- if left empty -- ``destination_dir`` itself) and
+    the original exception is re-raised; a pre-existing competing writer's
+    content is never touched, because we only ever reach step 3 after
+    winning the exclusive claim in step 2. Once the manifest write in step
+    5 succeeds, this function returns immediately with NO further fallible
+    operation -- a fully published bundle (manifest included) is never
+    reported as a failure because of a later, unrelated cleanup error."""
+    manifest_path = staging_dir / MANIFEST_FILENAME
+    if not manifest_path.is_file():
+        raise OSError(
+            f"staging directory {staging_dir} is missing its manifest file "
+            f"{MANIFEST_FILENAME!r}; refusing to publish"
+        )
+    manifest_bytes = manifest_path.read_bytes()
+    non_manifest_relpaths = sorted(
+        p.relative_to(staging_dir)
+        for p in staging_dir.rglob("*")
+        if p.is_file() and p != manifest_path
+    )
+
+    # Step 2: exclusively claim destination_dir. A FileExistsError here
+    # propagates unchanged -- nothing has been created yet, so no rollback
+    # is needed.
+    os.mkdir(str(destination_dir))
+
+    created_dirs: list[Path] = []
+    created_files: list[Path] = []
+    try:
+        # Step 3: populate every non-manifest file.
+        for relpath in non_manifest_relpaths:
+            _claim_subdirectory_chain(destination_dir, relpath.parent, created_dirs)
+            _copy_file_exclusive(staging_dir / relpath, destination_dir / relpath, created_files)
+        # Step 4: staging is no longer needed -- its manifest bytes are
+        # already held in memory. This is still pre-commit: a failure
+        # here still rolls back destination_dir below.
+        shutil.rmtree(staging_dir)
+        # Step 5: the manifest write is the TRUE LAST fallible operation
+        # and the commit marker.
+        _write_bytes_exclusive(
+            destination_dir / MANIFEST_FILENAME, manifest_bytes, created_files
+        )
+    except Exception:
+        _rollback_claimed_publication(destination_dir, created_dirs, created_files)
+        raise
+
+
+def _publish_directory_no_replace(staging_dir: Path | str, destination_dir: Path | str) -> None:
+    """Atomically publish ``staging_dir`` onto ``destination_dir`` using a
+    genuinely atomic, no-clobber directory rename primitive -- NEVER a
+    check-then-rename (``exists()`` then ``os.rename``/``os.replace``)
+    sequence, which always leaves a TOCTOU window a concurrent writer can
+    win.
+
+    Plain POSIX ``rename(2)`` (what ``os.replace`` uses on Linux/WSL) has a
+    standard, documented behavior that is a trap here: if ``newpath``
+    already exists and is an EMPTY directory, the kernel silently replaces
+    it. That means a non-compliant concurrent writer that creates (but has
+    not yet populated) the destination directory after this module's
+    existence checks can have its empty directory silently destroyed by
+    our own publish step -- an ``os.replace``-based implementation can
+    never protect against this. This function instead uses:
+
+    - On Linux: the ``renameat2(2)`` syscall (via ``ctypes``, since the
+      standard library exposes no wrapper) with ``RENAME_NOREPLACE`` as the
+      FAST PATH, which is kernel-enforced-atomic and fails with
+      ``EEXIST``/``ENOTEMPTY`` if ``destination_dir`` exists in ANY form --
+      empty directory, non-empty directory, file, or symlink -- rather
+      than ever replacing it. NOT every Linux-mounted filesystem
+      implements this flag: DrvFS (WSL2's passthrough for Windows drives,
+      e.g. ``/mnt/d/...``) rejects it with ``EINVAL``. When that happens,
+      this falls back to ``_publish_directory_no_replace_via_claim_then_populate``
+      -- a manifest-last claim-then-populate protocol built entirely from
+      primitives (``os.mkdir``, ``O_CREAT|O_EXCL``) that behave
+      consistently as no-clobber on EVERY filesystem this module targets,
+      including DrvFS.
+    - On Windows: plain ``os.rename`` (backed by ``MoveFileExW`` with no
+      flags). Windows directory renames already refuse to replace an
+      existing destination directory -- even an empty one -- without
+      ``MOVEFILE_REPLACE_EXISTING``, and that flag itself only ever
+      replaces FILES, never directories; so plain ``os.rename`` is already
+      an atomic no-clobber directory rename on Windows and needs no extra
+      flag/wrapper.
+
+    Any other platform -- one without a verified atomic no-clobber
+    directory rename primitive -- fails closed by raising ``OSError``
+    rather than silently falling back to clobber-capable
+    ``os.rename``/``os.replace`` semantics.
+
+    Raises ``FileExistsError`` if ``destination_dir`` already exists (in
+    any form). Raises ``OSError`` for any other publication failure
+    (including an unsupported platform). NOTE: when the claim-then-populate
+    fallback is used, a ``destination_dir`` that exists without
+    ``bundle_manifest.json`` inside it is UNPUBLISHED/INVALID -- see
+    ``_publish_directory_no_replace_via_claim_then_populate``'s docstring."""
+    staging_dir = Path(staging_dir)
+    destination_dir = Path(destination_dir)
+    system = platform.system()
+    if system == "Linux":
+        try:
+            _renameat2_no_replace_linux(str(staging_dir), str(destination_dir))
+        except _RenameAt2FlagUnsupportedError:
+            _publish_directory_no_replace_via_claim_then_populate(staging_dir, destination_dir)
+    elif system == "Windows":
+        # Windows MoveFileExW-backed os.rename already refuses to replace
+        # an existing directory destination (even an empty one) without
+        # MOVEFILE_REPLACE_EXISTING, which itself can only ever replace
+        # files, never directories -- so no extra no-clobber wrapper is
+        # needed here.
+        os.rename(str(staging_dir), str(destination_dir))
+    else:
+        raise OSError(
+            f"no verified atomic no-clobber directory rename primitive is available for "
+            f"platform {system!r}; refusing to fall back to clobber-capable rename/replace "
+            "semantics"
+        )
 
 
 def write_bundle_run(
@@ -477,22 +844,25 @@ def write_bundle_run(
             raise
 
         try:
-            os.replace(staging_dir, final_run_dir)
+            _publish_directory_no_replace(staging_dir, final_run_dir)
         except FileExistsError as exc:
-            # A concurrent writer won the race and already published (or is
-            # publishing) the final run path between our earlier existence
-            # check and this atomic rename: never replace it, never touch it
-            # -- only remove OUR OWN staging directory and fail loud.
+            # A concurrent writer won the race and already created (or is
+            # publishing into) the final run path between our earlier
+            # existence check and this atomic no-clobber rename -- in ANY
+            # form, including an EMPTY directory (which plain
+            # os.replace/os.rename would silently replace on POSIX; see
+            # _publish_directory_no_replace's docstring): never replace it,
+            # never touch it -- only remove OUR OWN staging directory and
+            # fail loud.
             shutil.rmtree(staging_dir, ignore_errors=True)
             raise BundleBoundaryError(
                 f"output run path {final_run_dir} was concurrently created by another writer "
                 "during publication; refusing to replace a competing publication"
             ) from exc
         except OSError as exc:
-            # Any other publication failure (permissions, a non-empty
-            # destination on platforms that reject that, etc.): clean up
-            # staging and fail loud -- the final path must never be left
-            # partially published.
+            # Any other publication failure (permissions, an unsupported
+            # platform, etc.): clean up staging and fail loud -- the final
+            # path must never be left partially published.
             shutil.rmtree(staging_dir, ignore_errors=True)
             raise BundleBoundaryError(
                 f"failed to atomically publish run directory {final_run_dir}: {exc}"
