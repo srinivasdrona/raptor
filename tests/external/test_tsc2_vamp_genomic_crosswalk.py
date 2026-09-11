@@ -498,12 +498,12 @@ def _mk_manual_queue_item(model_api: dict[str, Any], raw: Any, *, error_code: st
     )
 
 
-def test_vx00_binding_spec_exists_and_is_v1_0_2() -> None:
+def test_vx00_binding_spec_exists_and_is_v1_0_3() -> None:
     if not SPEC_PATH.is_file():
         pytest.fail(f"binding spec is missing: {SPEC_PATH}")
     spec = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))
     assert spec["spec_id"] == "raptor-v2-vamp-genomic-crosswalk-acquisition-v1"
-    assert spec["spec_version"] == "1.0.2"
+    assert spec["spec_version"] == "1.0.3"
 
 
 def test_vx01_zenodo_url_builder_and_allowlist_binding_contract() -> None:
@@ -1711,6 +1711,95 @@ def test_vx15_operator_enforces_sequential_pipeline_rate_retry_and_no_fastq_down
     assert "max_attempts_per_request" in source
 
 
+def test_vx15d_operator_zenodo_transport_uses_pinned_accept_star_and_observes_octet_stream(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    operator = _load_operator_module()
+    config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+    expected_accept = "*/*"
+
+    transport_cls = getattr(operator, "_RateLimitedHttpsTransport", None)
+    if transport_cls is None:
+        pytest.fail("operator script is missing _RateLimitedHttpsTransport")
+
+    observed: dict[str, Any] = {}
+    events: list[str] = []
+
+    class _FakeSocket:
+        def settimeout(self, timeout: float) -> None:
+            observed["socket_timeout"] = timeout
+            events.append("settimeout")
+
+    class _FakeResponse:
+        def __init__(self, status: int, media_type: str, body: bytes) -> None:
+            self.status = status
+            self._media_type = media_type
+            self._body = body
+
+        def read(self) -> bytes:
+            events.append("read")
+            return self._body
+
+        def getheader(self, name: str) -> str:
+            if name.lower() == "content-type":
+                return self._media_type
+            return ""
+
+    class _FakeHTTPSConnection:
+        def __init__(self, host: str, timeout: float | None = None, context: Any = None) -> None:
+            observed["host"] = host
+            observed["constructor_timeout"] = timeout
+            observed["context"] = context
+            self.sock = _FakeSocket()
+            events.append("init")
+
+        def connect(self) -> None:
+            observed["connect_called"] = True
+            events.append("connect")
+
+        def request(self, method: str, path: str, headers: dict[str, str]) -> None:
+            observed["method"] = method
+            observed["path"] = path
+            observed["accept"] = headers.get("Accept")
+            events.append("request")
+            assert headers.get("Accept") == expected_accept
+
+        def getresponse(self) -> _FakeResponse:
+            events.append("getresponse")
+            media = "application/octet-stream"
+            if observed.get("accept") != expected_accept:
+                return _FakeResponse(406, media, b"not acceptable")
+            return _FakeResponse(200, media, b"PK\x03\x04zip-bytes")
+
+        def close(self) -> None:
+            events.append("close")
+
+    monkeypatch.setattr(operator.http.client, "HTTPSConnection", _FakeHTTPSConnection)
+    monkeypatch.setattr(operator.time, "sleep", lambda _seconds: None)
+
+    timeout_cfg = config["rate_limits_retries"]["timeout_seconds"]
+    connect_timeout = float(timeout_cfg["connect"])
+    read_timeout = float(timeout_cfg["read"])
+    transport = transport_cls(
+        connect_timeout=connect_timeout,
+        read_timeout=read_timeout,
+        min_interval_seconds=0.0,
+        retryable_http=set(config["rate_limits_retries"]["retry_policy"]["retryable_http"]),
+        max_attempts_per_request=1,
+        backoff_base_seconds=0.0,
+        backoff_cap_seconds=0.0,
+    )
+    response = transport(ZENODO_DOWNLOAD_URL)
+    assert response["media_type"] == "application/octet-stream"
+    assert observed.get("accept") == expected_accept
+
+    # If the operator implementation explicitly uses separate connect/read
+    # socket semantics, verify configured values are honored per role.
+    if observed.get("connect_called") and "socket_timeout" in observed:
+        assert observed["constructor_timeout"] == connect_timeout
+        assert observed["socket_timeout"] == read_timeout
+
+
 def test_vx15b_operator_expected_pilot_validator_compares_all_axes_and_names_mismatch_axis() -> None:
     operator = _load_operator_module()
     helper = getattr(operator, "_validate_expected_pilot_result", None)
@@ -1823,7 +1912,7 @@ def test_vx17_config_pins_exact_source_archive_reference_and_expected_status_tot
         pytest.fail(f"TSC2 VAMP crosswalk config is not implemented: {CONFIG_PATH}")
     config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
     assert config["spec_id"] == "raptor-v2-vamp-genomic-crosswalk-acquisition-v1"
-    assert config["spec_version"] == "1.0.2"
+    assert config["spec_version"] == "1.0.3"
 
     source = config["inputs"]["frozen_vamp_scores"]
     assert source["source_bundle_id"] == SOURCE_BUNDLE_ID
@@ -1841,6 +1930,7 @@ def test_vx17_config_pins_exact_source_archive_reference_and_expected_status_tot
     assert archive["doi"] == ZENODO_DOI
     assert archive["filename"] == ZENODO_FILENAME
     assert archive["download_url"] == ZENODO_DOWNLOAD_URL
+    assert archive["request_accept"] == "*/*"
     assert archive["sha256"] == ZENODO_SHA256
     assert archive["md5"] == ZENODO_MD5
     assert archive["byte_length"] == ZENODO_BYTE_LENGTH
