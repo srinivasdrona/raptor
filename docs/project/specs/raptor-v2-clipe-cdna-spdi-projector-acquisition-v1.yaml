@@ -1,0 +1,843 @@
+# RAPTOR v2 — bounded acquisition contract for projecting MaveDB TSC2 cliPE
+# c.HGVS (NM_000548.5) to canonical GRCh38 genomic SPDI (NC_000016.10) via the
+# NCBI Variation Services API.
+#
+# Status: APPROVED_BUILD / binding design authority for this bounded slice.
+# This file does NOT authorize library network I/O, ACMG evidence, classification,
+# PS3/BS3, packet promotion, or clinical use.
+#
+# Empirical grounding (operator probes, 2026-09-11T18:44Z–18:47Z UTC window):
+# live GETs against api.ncbi.nlm.nih.gov/variation/v0 for SNV and delins shapes
+# drawn from the frozen cliPE scores set. See `empirical_grounding` below.
+
+schema: raptor.project.spec.v1
+spec_id: raptor-v2-clipe-cdna-spdi-projector-acquisition-v1
+spec_version: 1.0.1
+status: APPROVED_BUILD
+created_at: '2026-09-12'
+owner: human-terminal-authority
+branch: feature/raptor-v2-identity-crosswalk-v1
+stacked_on:
+  - spec_id: raptor-v2-missense-source-ingestion-v1
+    role: supplies frozen mavedb_clipe scores + metadata pins
+  - spec_id: raptor-v2-functional-identity-normalization-v1
+    role: defines TRANSCRIPT_ONLY_PROJECTOR_REQUIRED gap this acquisition closes
+
+objective: >-
+  Define a safe, bounded, operator-only acquisition contract that projects every
+  row of the frozen MaveDB TSC2 cliPE score-set (urn:mavedb:00001201-a-1; 208
+  rows) from NM_000548.5 c.HGVS to a single canonical GRCh38 genomic SPDI on
+  NC_000016.10 using NCBI Variation Services, then independently validates each
+  returned deleted allele against the pinned NC_000016.10 FASTA. Emit a create-only
+  external response cache + mapping JSONL + manifest outside Git, and a compact
+  aggregate committed summary inside Git. Library code performs zero network I/O.
+
+workflow:
+  planner: GPT-5.6-Sol
+  red_tests: GPT-5.3-Codex
+  builder: Claude-Sonnet-5
+  checker: GPT-5.6-Terra-xhigh
+  integrator: GPT-5.6-Sol
+  terminal_authority: human-owner
+
+non_goals:
+  - ACMG / VCEP evidence assignment (no PS3, BS3, PP3, BP4, or strength claims)
+  - clinical classification, pathogenicity, or benignity inference
+  - abundance / activity / cliPE score transformation or calibration
+  - ClinVar, VUS, prospective-holdout, or Atlas overlap computation
+  - VAMP-seq protein→nucleotide crosswalk (separate gap)
+  - SGE reference-mismatch adjudication (separate gap)
+  - live network calls from any raptor.* library module
+  - use of the unstable /hgvs/batch/contextuals endpoint
+  - guessing genomic coordinates by arithmetic without NCBI + FASTA validation
+  - treating transcript SPDI or GRCh37 NC_000016.9 as the join key
+
+why_now: >-
+  Functional-identity normalization pilot 2026-09-11 left all 208 cliPE rows in
+  identity_state=TRANSCRIPT_ONLY_PROJECTOR_REQUIRED / unresolved_reason=
+  CDNA_PROJECTOR_REQUIRED with spdi=null. The explicit follow-on is to inject a
+  real NM_000548.5 cDNA-to-genome projector. This spec freezes the acquisition
+  boundary for that projector.
+
+# ---------------------------------------------------------------------------
+# Input pins (must match already-frozen source + reference artifacts)
+# ---------------------------------------------------------------------------
+inputs:
+  source_bundle:
+    bundle_id: tsc2-source-pilot-2026-09-09
+    environment_variable: RAPTOR_TSC2_SOURCE_ROOT
+    manifest_content_hash: 63bd6eb4e7182b7f2d345cd78b3a110a59c361c72d521b88990c475919865808
+    scores_artifact:
+      artifact_id: mavedb_clipe-scores-csv
+      relative_path: mavedb/mavedb_clipe-scores.csv
+      sha256: 74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717
+      byte_length: 14277
+      expected_rows: 208
+      exact_header: [accession, hgvs_nt, hgvs_splice, hgvs_pro, score]
+    metadata_pins:
+      urn: 'urn:mavedb:00001201-a-1'
+      gene: TSC2
+      transcript: NM_000548.5
+      license: CC0-1.0
+      numVariants: 208
+  optional_normalized_seed:
+    # May be used as a convenience row index, but scores CSV + pins remain authoritative.
+    bundle_id: tsc2-functional-identity-normalization-pilot-2026-09-11
+    relative_path: normalized/mavedb_clipe.jsonl
+    row_count: 208
+    identity_state_all: TRANSCRIPT_ONLY_PROJECTOR_REQUIRED
+  genomic_reference:
+    environment_variable: RAPTOR_TSC2_REFERENCE_ROOT  # or RAPTOR_SEQREPO_ROOT
+    accession: NC_000016.10
+    assembly: GRCh38
+    fasta_filename: NC_000016.10.fasta
+    sha256: 22dc1bb93de407e0653791c36e4097fbaf64c9efa2510c83b7777f607a61e4d0
+    # Independently re-verified 2026-09-11 against
+    # D:\AIProjects\raptor-data\handoffs\masked-heldout-2026-07-12\references\NC_000016.10.fasta
+    fai:
+      sequence_length: 90338345
+      offset: 70
+      linebases: 70
+      linewidth: 71
+  identity_pins:
+    gene: TSC2
+    transcript: NM_000548.5
+    genomic_accession: NC_000016.10
+    assembly: GRCh38
+    service_host: api.ncbi.nlm.nih.gov
+    service_base_path: /variation/v0
+
+# ---------------------------------------------------------------------------
+# Observed input composition (from frozen scores CSV; no network)
+# ---------------------------------------------------------------------------
+input_composition:
+  total_rows: 208
+  unique_hgvs_nt: 208
+  duplicate_hgvs_nt_groups: 0
+  shapes:
+    snv:
+      pattern: 'c.<pos><ACGT>><ACGT>'
+      count: 161
+      notes: missense + synonymous single-nucleotide substitutions
+    delins:
+      pattern: 'c.<start>_<end>delins<ACGT+>'
+      count: 47
+      length_pairs:
+        - deleted_len: 3
+          inserted_len: 3
+          count: 40
+        - deleted_len: 2
+          inserted_len: 2
+          count: 7
+      notes: >-
+        All 47 are equal-length delins (MNVs / codon-scale substitutions),
+        matching STOP_GAINED protein annotations in the normalization pilot
+        (47 stop-gained). No pure del, dup, or ins shapes are present.
+  c_position_span:
+    min: 1600
+    max: 5390
+  protein_kind_rough_counts_from_hgvs_pro:
+    stopish_Ter_or_star: 47
+    synonymous_equals: 30
+    remainder_mostly_missense: 131
+  should_all_208_project: >-
+    YES under this contract's success criteria, contingent on a full live pilot
+    confirming every row yields exactly one NM_000548.5 contextual SPDI, a
+    canonical representative on NC_000016.10, and a FASTA deleted-allele match.
+    Composition contains only projectable SNV/equal-length-delins shapes; there
+    are no SV/CNV/imprecise alleles. This is an expectation, not a pre-pilot
+    guarantee — see pilot_uncertainties.
+
+# ---------------------------------------------------------------------------
+# NCBI Variation Services — exact endpoint sequence
+# ---------------------------------------------------------------------------
+api:
+  base_url: https://api.ncbi.nlm.nih.gov/variation/v0
+  auth: none required for public GETs
+  accept: application/json
+  content_type_observed: 'application/json; charset=utf-8'
+
+  # REQUIRED sequence. There is no single-request HGVS→canonical path.
+  endpoint_sequence:
+    step1_hgvs_contextuals:
+      method: GET
+      path_template: /hgvs/{hgvs}/contextuals
+      purpose: >-
+        Convert a fully qualified HGVS c. expression into one or more
+        contextual SPDI alleles on the stated sequence (for cliPE inputs,
+        the transcript NM_000548.5).
+      hgvs_input_rule: >-
+        Always send the FULL expression `NM_000548.5:` + bare `c.…` from the
+        scores CSV (after stripping any accidental whitespace). Never send bare
+        `c.` alone; never substitute another transcript version.
+      path_binding:
+        # Live probes: both fully percent-encoded and curl-auto-encoded forms
+        # returned 200, but the contract REQUIRES explicit encoding so builders
+        # cannot depend on client-specific auto-encoding.
+        encoding: >-
+          Percent-encode the entire {hgvs} path segment with no safe characters
+          (urllib.parse.quote(hgvs, safe='')). At minimum ':' -> '%3A' and
+          '>' -> '%3E'. Do not use '+' for spaces; HGVS inputs must not contain
+          spaces.
+        example_snv_url: >-
+          https://api.ncbi.nlm.nih.gov/variation/v0/hgvs/NM_000548.5%3Ac.1600G%3EA/contextuals
+        example_delins_url: >-
+          https://api.ncbi.nlm.nih.gov/variation/v0/hgvs/NM_000548.5%3Ac.1627_1629delinsTGA/contextuals
+      success_http: 200
+      success_schema:
+        type: object
+        required: [data]
+        properties:
+          data:
+            type: object
+            required: [spdis, input_hgvs_validity]
+            properties:
+              input_hgvs_validity:
+                const: valid
+              spdis:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  required: [seq_id, position, deleted_sequence, inserted_sequence]
+                  properties:
+                    seq_id: {type: string}
+                    position: {type: integer, minimum: 0, description: '0-based SPDI position'}
+                    deleted_sequence: {type: string, pattern: '^[ACGT]*$'}
+                    inserted_sequence: {type: string, pattern: '^[ACGT]*$'}
+      acceptance_invariants_step1:
+        - data.input_hgvs_validity == 'valid'
+        - len(data.spdis) == 1
+        - data.spdis[0].seq_id == 'NM_000548.5'
+        - deleted_sequence and inserted_sequence are uppercase ACGT (normalize if needed; reject non-ACGT)
+        - position is an integer >= 0
+      spdi_string_construction: >-
+        tx_spdi = f"{seq_id}:{position}:{deleted_sequence}:{inserted_sequence}"
+        using the exact field values from the JSON object (not the obsolete
+        documentation spellings deletion-sequence / insertion-sequence).
+      observed_examples:
+        - hgvs: NM_000548.5:c.1600G>A
+          response_spdi: {seq_id: NM_000548.5, position: 1709, deleted_sequence: G, inserted_sequence: A}
+        - hgvs: NM_000548.5:c.1627_1629delinsTGA
+          response_spdi: {seq_id: NM_000548.5, position: 1736, deleted_sequence: CCG, inserted_sequence: TGA}
+        - hgvs: NM_000548.5:c.1613_1614delinsGA
+          response_spdi: {seq_id: NM_000548.5, position: 1722, deleted_sequence: CC, inserted_sequence: GA}
+
+    step2_spdi_canonical_representative:
+      method: GET
+      path_template: /spdi/{spdi}/canonical_representative
+      purpose: >-
+        Remap a contextual allele to the service's canonical representative
+        using the latest NCBI alignment set (same family of alignments used by
+        ClinVar/dbSNP). For TSC2 NM_000548.5 alleles in the pilot set this is
+        NC_000016.10 on GRCh38.
+      spdi_input_rule: >-
+        Use the exact tx_spdi string from step 1. Length-form SPDI
+        (SEQ:POS:DEL_LEN:INS) is accepted by the service for some inputs, but
+        this contract FORBIDS length-form outputs and FORBIDS feeding length-form
+        as the frozen tx_spdi — always freeze explicit deleted_sequence bases.
+      path_binding:
+        encoding: >-
+          Percent-encode the entire {spdi} path segment with quote(spdi, safe='').
+          ':' -> '%3A'.
+        example_snv_url: >-
+          https://api.ncbi.nlm.nih.gov/variation/v0/spdi/NM_000548.5%3A1709%3AG%3AA/canonical_representative
+        example_delins_url: >-
+          https://api.ncbi.nlm.nih.gov/variation/v0/spdi/NM_000548.5%3A1736%3ACCG%3ATGA/canonical_representative
+      success_http: 200
+      success_schema:
+        type: object
+        required: [data]
+        properties:
+          data:
+            type: object
+            required: [seq_id, position, deleted_sequence, inserted_sequence]
+            properties:
+              seq_id: {type: string}
+              position: {type: integer, minimum: 0}
+              deleted_sequence: {type: string, pattern: '^[ACGT]*$'}
+              inserted_sequence: {type: string, pattern: '^[ACGT]*$'}
+      acceptance_invariants_step2:
+        - data.seq_id == 'NC_000016.10'
+        - position is integer >= 0
+        - deleted_sequence / inserted_sequence uppercase ACGT only
+        - for cliPE shapes, len(deleted_sequence) >= 1 and len(inserted_sequence) >= 1
+          (no pure empty-del or empty-ins expected in this score-set)
+      genomic_spdi_string: >-
+        genomic_spdi = f"{seq_id}:{position}:{deleted_sequence}:{inserted_sequence}"
+      canonical_representative_semantics: >-
+        Per NCBI Variation Services documentation, the canonical representative
+        is a single-location representative of a contextual allele under the
+        latest alignment model, chosen so that identical variants share one
+        representative when remapped to the same model. It is NOT "any GRCh38
+        alias" and NOT "the full set of equivalents". This contract treats
+        canonical_representative as the sole machine-selected genomic identity
+        candidate, then HARD-FILTERS it to NC_000016.10. If the service ever
+        returns a different primary contig (including NC_000016.9 / GRCh37),
+        the row fails closed — it is not rewritten by the operator.
+      observed_examples:
+        - tx_spdi: 'NM_000548.5:1709:G:A'
+          genomic_spdi: 'NC_000016.10:2065518:G:A'
+        - tx_spdi: 'NM_000548.5:1736:CCG:TGA'
+          genomic_spdi: 'NC_000016.10:2065545:CCG:TGA'
+        - tx_spdi: 'NM_000548.5:1722:CC:GA'
+          genomic_spdi: 'NC_000016.10:2065531:CC:GA'
+
+    step3_optional_genomic_hgvs:
+      method: GET
+      path_template: /spdi/{spdi}/hgvs
+      purpose: >-
+        Optional annotation only. Derive right-shifted genomic HGVS from the
+        accepted genomic SPDI for human review and for future identity-row
+        hgvs_g population. NOT required to accept a mapping row.
+      when: >-
+        May be fetched in the same operator run after step2 acceptance, or in a
+        follow-on annotation pass over the frozen mapping. Must use the accepted
+        NC_000016.10 genomic_spdi as input (never the transcript SPDI) when the
+        desired output is genomic HGVS.
+      observed_examples:
+        - genomic_spdi: 'NC_000016.10:2065518:G:A'
+          hgvs_g: 'NC_000016.10:g.2065519G>A'
+        - genomic_spdi: 'NC_000016.10:2065545:CCG:TGA'
+          hgvs_g: 'NC_000016.10:g.2065546_2065548delinsTGA'
+        - genomic_spdi: 'NC_000016.10:2065531:CC:GA'
+          hgvs_g: 'NC_000016.10:g.2065532_2065533delinsGA'
+      coordinate_note: >-
+        SPDI position is 0-based; HGVS g. position is 1-based. For SNVs,
+        hgvs_g_pos == spdi_pos + 1. For multi-base delins,
+        hgvs interval start == spdi_pos + 1 and end == spdi_pos + len(deleted).
+
+  rejected_endpoints:
+    - path: /hgvs/{hgvs}/canonical_representative
+      live_result: >-
+        HTTP 422 Unprocessable Entity —
+        'Expected one of "/hgvs/{hgvs}/contextuals" "/hgvs/batch/contextuals"'.
+      rule: FORBIDDEN — no direct HGVS→canonical path exists on this API.
+    - path: /hgvs/batch/contextuals
+      live_result: >-
+        GET without body → 500 missing post_body; POST with a JSON array of two
+        valid cliPE HGVS strings → 500 internal substr error (2026-09-11 probe).
+      rule: FORBIDDEN until a future spec re-probes and freezes a stable schema.
+    - path: /spdi/{spdi}/all_equivalent_contextual
+      role: diagnostic only
+      live_observation: >-
+        Returns many aligned sequences including NM_* isoforms, NG_005895.1,
+        NC_000016.10 AND NC_000016.9. The NC_000016.10 entry matched
+        canonical_representative in the SNV pilot, but selecting among
+        equivalents in library code would re-implement canonicalization.
+      rule: >-
+        Not part of the acquisition hot path. May be stored as an optional
+        diagnostic artifact; must never be the sole selector of genomic SPDI.
+    - path: /vcf/{chrom}/{pos}/{ref}/{alt}/contextuals
+      rule: >-
+        Out of scope for cDNA projection (no genomic VCF inputs in cliPE).
+        Existing tests/ingest/fetch_spdi.py uses this for unrelated AC3 work.
+
+# ---------------------------------------------------------------------------
+# URL / resource binding rules (network boundary)
+# ---------------------------------------------------------------------------
+network_boundary:
+  rule: >-
+    Only a dedicated operator script performs network I/O. The library package
+    is pure parsing, schema validation, FASTA checks, hashing, deterministic
+    ordering, and manifest construction over injected transport results / files.
+  transport_result_shape:
+    required_fields: [final_url, http_status, media_type, body]
+    http_status_success: 200
+    body_type: bytes
+  allowlist:
+    scheme: https
+    host: api.ncbi.nlm.nih.gov
+    path_prefix: /variation/v0/
+    allowed_exact_path_patterns:
+      - /variation/v0/hgvs/{hgvs}/contextuals
+      - /variation/v0/spdi/{spdi}/canonical_representative
+      - /variation/v0/spdi/{spdi}/hgvs   # optional step3
+  final_url_binding: >-
+    final_url must retain the same scheme, host, and path pattern as
+    requested_url. The decoded {hgvs} or {spdi} path resource MUST equal the
+    requested resource exactly (no transcript / allele substitution via
+    redirect). Query string must be empty on both requested and final URLs for
+    these endpoints. Any redirect that changes host, path template, or path
+    resource identity is endpoint substitution and fails the row/run.
+  secret_handling: >-
+    No API key is required for the baseline contract. If an NCBI API key or
+    tool/email contact is later added as a query parameter, it must be redacted
+    from exceptions, logs, manifests, and committed summaries (store presence
+    boolean only, never the secret value).
+  library_import_ban:
+    - urllib.request used for real fetches inside src/raptor/**
+    - requests/httpx/aiohttp inside src/raptor/**
+    - any call that opens a network socket from library code
+
+# ---------------------------------------------------------------------------
+# Rate limits, retries, timeouts
+# ---------------------------------------------------------------------------
+rate_limits_retries:
+  service_note: >-
+    NCBI Variation Services have historically been documented as beta with a
+    conservative ~1 request/second guidance. Successful 2026-09-11 probes did
+    not return Retry-After or RateLimit headers. E-utilities' 3 rps default
+    MUST NOT be assumed for this host.
+  min_interval_seconds: 1.0
+  max_concurrent_requests: 1
+  timeout_seconds:
+    connect: 10
+    read: 45
+  retry_policy:
+    retryable_http: [408, 429, 500, 502, 503, 504]
+    retryable_transport: [timeout, connection_error, tls_error]
+    non_retryable_http: [400, 401, 403, 404, 422]
+    max_attempts_per_request: 4
+    backoff: exponential_with_full_jitter
+    backoff_base_seconds: 2.0
+    backoff_cap_seconds: 60.0
+    honor_retry_after_header: true
+  row_failure_vs_run_abort:
+    permanent_row_failure: >-
+      HTTP 400 with input_hgvs_validity=invalid, empty/ambiguous spdis,
+      canonical seq_id != NC_000016.10, non-ACGT alleles, FASTA mismatch —
+      record structured row error; continue to next row.
+    run_abort: >-
+      Allowlist/binding violation, HTTP 422 on a supposedly valid path template
+      (programming error), repeated retryable failures exhausting budget on
+      >5% of rows, reference FASTA missing/checksum mismatch before any row,
+      input scores hash drift, or operator cancellation.
+  expected_request_budget_full_pilot:
+    step1: 208
+    step2: 208
+    step3_optional: 208
+    minimum_wall_clock_at_1rps_seconds: 416  # without step3; 624 with step3
+    note: >-
+      Plus retries. Operator should plan ~10–20 minutes wall clock with margin.
+
+# ---------------------------------------------------------------------------
+# Deterministic ordering
+# ---------------------------------------------------------------------------
+deterministic_ordering:
+  input_order: >-
+    Read the frozen scores CSV in file order. Assign source_row = 1-based
+    data-row index (header excluded), matching functional-normalization.
+  request_order: ascending source_row (1..208)
+  output_order: >-
+    mapping JSONL and per-row raw response index emit in ascending source_row.
+    Never sort by genomic position or by success/failure before write.
+  tie_breakers: >-
+    source_row is unique. accession suffix (#N) must equal source_row for this
+    score-set; if a future freeze breaks that equality, source_row remains the
+    authority and the mismatch is recorded as a verification warning.
+  hash_stability: >-
+    Canonical JSON objects use sorted keys, UTF-8, LF newlines, final trailing
+    newline on JSONL. Re-running over identical frozen raw responses must byte-
+    reproduce mapping JSONL and manifest content_hash.
+
+# ---------------------------------------------------------------------------
+# Per-row processing contract
+# ---------------------------------------------------------------------------
+row_pipeline:
+  build_hgvs_c:
+    rule: 'hgvs_c = "NM_000548.5:" + hgvs_nt.strip()'
+    reject_if: hgvs_nt does not match snv or delins patterns above
+  step1: GET contextuals(hgvs_c)
+  parse_tx_spdi: enforce acceptance_invariants_step1
+  step2: GET canonical_representative(tx_spdi)
+  parse_genomic_spdi: enforce acceptance_invariants_step2
+  fasta_validate: see fasta_validation
+  optional_step3: GET hgvs(genomic_spdi)
+  emit_mapping_row: always emit exactly one mapping row per source_row
+
+# ---------------------------------------------------------------------------
+# FASTA validation (independent of NCBI)
+# ---------------------------------------------------------------------------
+fasta_validation:
+  precondition: >-
+    Before any row is accepted, compute sha256 of NC_000016.10.fasta and require
+    exact match to inputs.genomic_reference.sha256. Mismatch aborts the run.
+  algorithm: >-
+    Let pos0 = genomic_spdi.position (0-based). Let del = deleted_sequence.
+    Read len(del) bases from the pinned FASTA starting at pos0 (using .fai random
+    access or equivalent). Uppercase observed bases. Require observed == del.
+  rejects:
+    - observed != deleted_sequence → status FASTA_REF_MISMATCH (row failure)
+    - pos0 + len(del) > sequence_length → status FASTA_OUT_OF_RANGE (row failure)
+    - any non-ACGT in observed or in SPDI alleles → status NON_ACGT_ALLELE
+  does_not_validate: >-
+    Inserted sequence cannot be checked against the reference (by definition).
+    Transcript-level deleted alleles are NOT re-checked against a local NM
+    FASTA in this slice (NCBI step1 is the transcript authority); only the
+    genomic deleted allele is locally grounded.
+  pilot_results_2026_09_11:
+    all_checked: 7
+    all_matched: true
+    examples:
+      - genomic_spdi: 'NC_000016.10:2065518:G:A'
+        observed_del: G
+      - genomic_spdi: 'NC_000016.10:2065545:CCG:TGA'
+        observed_del: CCG
+      - genomic_spdi: 'NC_000016.10:2088575:T:C'
+        observed_del: T
+      - genomic_spdi: 'NC_000016.10:2088553:GTG:TGA'
+        observed_del: GTG
+
+# ---------------------------------------------------------------------------
+# Error states (structured; no silent drops)
+# ---------------------------------------------------------------------------
+error_states:
+  conservation_rule: >-
+    |input_rows| == |mapping_rows|. Every source_row appears exactly once with
+    an explicit status. Success and failure both produce a mapping row.
+  status_vocabulary:
+    - PROJECTED_FASTA_VERIFIED
+    - STEP1_HTTP_ERROR
+    - STEP1_INVALID_HGVS
+    - STEP1_SCHEMA_VIOLATION
+    - STEP1_AMBIGUOUS_SPDIS
+    - STEP1_UNEXPECTED_SEQ_ID
+    - STEP2_HTTP_ERROR
+    - STEP2_SCHEMA_VIOLATION
+    - STEP2_NON_PINNED_GENOME  # seq_id != NC_000016.10
+    - FASTA_REF_MISMATCH
+    - FASTA_OUT_OF_RANGE
+    - NON_ACGT_ALLELE
+    - TRANSPORT_OR_BINDING_ERROR
+    - OPERATOR_SKIPPED  # only if run aborted mid-way; remaining rows marked
+  http_error_examples_live:
+    - hgvs: NM_000548.5:c.999999G>A
+      http: 400
+      body: >-
+        position off the end of the sequence (NM_000548.5 length 6415bp);
+        input_hgvs_validity=invalid
+    - hgvs: NM_000548.5:c.1600A>G
+      http: 400
+      body: >-
+        submitted reference allele (A) does not agree with actual reference (G);
+        input_hgvs_validity=invalid
+  ambiguous_spdis_rule: >-
+    If step1 returns spdis length != 1, fail the row as STEP1_AMBIGUOUS_SPDIS
+    even if one entry looks right. Do not pick.
+  duplicate_source_hgvs: >-
+    Not observed (0 duplicate hgvs_nt). If a future freeze introduces duplicate
+    c.HGVS strings, still emit one mapping row per source_row; identical
+    genomic_spdi across rows is allowed and expected (many rows → one variant_id).
+    One source_row mapping to multiple distinct genomic SPDI is impossible under
+    this pipeline by construction (single canonical_representative object).
+
+# ---------------------------------------------------------------------------
+# Duplicates and equivalent representations
+# ---------------------------------------------------------------------------
+duplicates_and_equivalents:
+  input_duplicates: none in frozen 208
+  many_rows_one_spdi: >-
+    Allowed. Downstream join key remains genomic SPDI; provenance retains each
+    source_record_id / accession.
+  equivalent_representations: >-
+    all_equivalent_contextual may list GRCh37 NC_000016.9 and alternate
+    transcripts. These are NOT accepted identities. Only NC_000016.10
+    canonical_representative + FASTA verification yields PROJECTED_FASTA_VERIFIED.
+  left_right_shift: >-
+    Step1 returns contextual (precision-corrected) alleles. Step2 canonicalizes
+    location. Operators must not further left-align with a second local algorithm
+    before freeze; local SeqRepoGenomicNormalizer may be used in a LATER
+    identity-normalization slice as an independent cross-check, not to rewrite
+    the frozen NCBI mapping without a new acquisition version.
+
+# ---------------------------------------------------------------------------
+# Output artifacts — outside Git vs inside Git
+# ---------------------------------------------------------------------------
+outputs:
+  external_bundle:
+    environment_variable: RAPTOR_TSC2_CDNA_PROJECTOR_ROOT
+    default_root_hint: ~/raptor-data/external/tsc2-cdna-projector
+    run_name: tsc2-clipe-cdna-spdi-projector-2026-09-12
+    bundle_id: tsc2-clipe-cdna-spdi-projector-2026-09-12
+    create_only: true
+    symlink_safe: true
+    manifest_last: true
+    outside_git: true
+    artifacts:
+      raw_responses:
+        relative_dir: raw/
+        per_row_files:
+          - 'raw/step1/{source_row:04d}-contextuals.json'
+          - 'raw/step2/{source_row:04d}-canonical_representative.json'
+          - 'raw/step3/{source_row:04d}-hgvs.json'  # optional
+        also_allowed: >-
+          A single JSONL of raw envelopes is acceptable if it preserves exact
+          response body bytes (base64 or utf-8 with explicit media_type) plus
+          requested_url, final_url, http_status, fetched_at, sha256.
+        purpose: offline replay cache (PRD-02 R-A11 external-API rule)
+      mapping_jsonl:
+        relative_path: mapping/mavedb_clipe_nm000548_5_to_nc000016_10.jsonl
+        schema: raptor.external.clipe_cdna_spdi_mapping_row.v1
+        row_count: 208
+        fields_required:
+          - schema
+          - source_id          # mavedb_clipe
+          - source_row
+          - source_record_id   # urn:mavedb:00001201-a-1#N
+          - gene               # TSC2
+          - transcript         # NM_000548.5
+          - hgvs_c
+          - hgvs_nt_source     # bare c. from CSV
+          - tx_spdi            # nullable on failure
+          - genomic_spdi       # nullable on failure
+          - hgvs_g             # nullable
+          - assembly           # GRCh38 when verified else null
+          - genomic_accession  # NC_000016.10 when verified else null
+          - status             # status_vocabulary
+          - fasta_deleted_observed  # nullable
+          - error_detail       # sanitized; no secrets
+          - step1_body_sha256
+          - step2_body_sha256
+          - variant_shape      # SNV | DELINS
+        success_requires:
+          - status == PROJECTED_FASTA_VERIFIED
+          - genomic_spdi matches ^NC_000016\.10:\d+:[ACGT]+:[ACGT]+$
+          - fasta_deleted_observed == deleted_sequence
+      request_log:
+        relative_path: logs/request_index.jsonl
+        fields: [source_row, step, requested_url, final_url, http_status, body_sha256, elapsed_ms]
+        redaction: strip any api_key/tool/email query values
+      bundle_manifest:
+        relative_path: bundle_manifest.json
+        schema: raptor.external.clipe_cdna_spdi_projector_bundle.v1
+        written_last: true
+        content_hash_basis: >-
+          SHA-256 of UTF-8 canonical JSON with sorted keys; omit top-level
+          content_hash field when hashing.
+        must_include:
+          - input scores sha256 + byte_length + row_count
+          - reference fasta sha256
+          - endpoint pins + min_interval_seconds
+          - per-artifact sha256/byte_length
+          - status_counts
+          - shape_counts
+          - success_count / failure_count
+          - boundaries.network = operator_only
+          - boundaries.clinical_use = forbidden
+
+  committed_summary:
+    path: data/census/tsc2_clipe_cdna_spdi_projector_pilot_2026-09-12.json
+    schema: raptor.external.clipe_cdna_spdi_projector_summary.v1
+    inside_git: true
+    contains:
+      - external bundle_id + manifest content_hash
+      - input scores sha256 + reference sha256
+      - endpoint sequence pin
+      - total_rows, success_count, failure_count
+      - status_counts, shape_counts (SNV/DELINS)
+      - request_budget_observed (approx counts, wall clock)
+      - pilot_uncertainties residual after run
+      - explicit non_goals restatement (no PS3/BS3/clinical)
+    excludes:
+      - per-row genomic_spdi / hgvs_c / hgvs_g strings
+      - raw NCBI JSON bodies
+      - scores
+      - patient information
+      - clinical labels or evidence strengths
+
+  optional_committed_canary_fixture:
+    path: tests/fixtures/clipe_cdna_spdi_canary.yaml
+    inside_git: true
+    max_rows: 8
+    purpose: >-
+      Tiny independently reviewed expected mappings for offline unit tests of
+      the parser/validator (AC3-style). MUST be hand-curated from the frozen
+      external mapping after pilot, not generated by code under test at assert
+      time. Must include ≥1 SNV and ≥1 delins.
+    excludes_full_208: true
+
+# ---------------------------------------------------------------------------
+# Relationship to functional-identity normalization
+# ---------------------------------------------------------------------------
+downstream_identity_normalization:
+  current_blocker: >-
+    raptor.external.normalized_functional_row.v1 GENOMIC_SPDI_VERIFIED currently
+    cross-checks spdi only against an SNV-shaped hgvs_g
+    (NC_000016.10:g.<pos><base>><base>). The 47 delins require a contract
+    extension (MNV/delins hgvs_g + multi-base SPDI) before those rows can flip
+    from TRANSCRIPT_ONLY_PROJECTOR_REQUIRED to GENOMIC_SPDI_VERIFIED inside the
+    normalized functional bundle.
+  acquisition_vs_identity_split: >-
+    This acquisition slice freezes NCBI mappings for ALL 208 rows (SNV+delins).
+    A separate identity-normalization amendment consumes the frozen mapping
+    JSONL offline (no network), attaches genomic_spdi to cliPE rows, and
+    extends the SNV-only invariant as needed. Acquisition success is not gated
+    on that amendment landing in the same PR.
+  forbidden: >-
+    Do not mutate the 2026-09-11 functional-normalization bundle in place.
+    Publish a new normalization run/bundle when identity is upgraded.
+
+# ---------------------------------------------------------------------------
+# Binding implementation surfaces
+# ---------------------------------------------------------------------------
+implementation:
+  package: src/raptor/external/tsc2_cdna_projector/
+  responsibilities:
+    - build percent-encoded URLs (no I/O)
+    - assert_allowed_final_url for variation/v0 patterns
+    - parse step1/step2/step3 JSON against schemas
+    - construct SPDI strings
+    - FASTA deleted-allele check via injected reference handle
+    - deterministic mapping JSONL + manifest builders
+    - fetch_with_transport(injected) only — same pattern as tsc2_sources.endpoint
+  operator: scripts/fetch_tsc2_clipe_cdna_spdi_projector.py
+  config: configs/external/tsc2_clipe_cdna_spdi_projector_v1.yaml
+  tests: tests/external/test_tsc2_clipe_cdna_spdi_projector.py
+  test_strategy: >-
+    Offline only: replay frozen raw JSON fixtures through the library; never
+    hit the network in CI. Include negative fixtures for 400 invalid HGVS,
+    non-NC genome, FASTA mismatch, ambiguous spdis, and binding violations.
+
+# ---------------------------------------------------------------------------
+# Empirical grounding summary
+# ---------------------------------------------------------------------------
+empirical_grounding:
+  probed_at_utc_window: '2026-09-11T18:44:00Z/2026-09-11T18:47:40Z'
+  host: api.ncbi.nlm.nih.gov
+  results:
+    snv_two_step: pass
+    delins3_two_step: pass
+    delins2_two_step: pass
+    direct_hgvs_canonical: 'http 422 — path not offered'
+    batch_contextuals: 'http 500 — unstable; forbidden'
+    fasta_match_rate_pilot: '7/7'
+  pilot_sample_table:
+    - hgvs_c: NM_000548.5:c.1600G>A
+      tx_spdi: 'NM_000548.5:1709:G:A'
+      genomic_spdi: 'NC_000016.10:2065518:G:A'
+      hgvs_g: 'NC_000016.10:g.2065519G>A'
+      fasta_del_match: true
+    - hgvs_c: NM_000548.5:c.3723C>T
+      tx_spdi: 'NM_000548.5:3832:C:T'
+      genomic_spdi: 'NC_000016.10:2081706:C:T'
+      hgvs_g: 'NC_000016.10:g.2081707C>T'
+      fasta_del_match: true
+    - hgvs_c: NM_000548.5:c.5390T>C
+      tx_spdi: 'NM_000548.5:5499:T:C'
+      genomic_spdi: 'NC_000016.10:2088575:T:C'
+      hgvs_g: 'NC_000016.10:g.2088576T>C'
+      fasta_del_match: true
+    - hgvs_c: NM_000548.5:c.1627_1629delinsTGA
+      tx_spdi: 'NM_000548.5:1736:CCG:TGA'
+      genomic_spdi: 'NC_000016.10:2065545:CCG:TGA'
+      hgvs_g: 'NC_000016.10:g.2065546_2065548delinsTGA'
+      fasta_del_match: true
+    - hgvs_c: NM_000548.5:c.3706_3708delinsTGA
+      tx_spdi: 'NM_000548.5:3815:ATG:TGA'
+      genomic_spdi: 'NC_000016.10:2081689:ATG:TGA'
+      hgvs_g: 'NC_000016.10:g.2081690_2081692delinsTGA'
+      fasta_del_match: true
+    - hgvs_c: NM_000548.5:c.5368_5370delinsTGA
+      tx_spdi: 'NM_000548.5:5477:GTG:TGA'
+      genomic_spdi: 'NC_000016.10:2088553:GTG:TGA'
+      hgvs_g: 'NC_000016.10:g.2088554_2088556delinsTGA'
+      fasta_del_match: true
+    - hgvs_c: NM_000548.5:c.1613_1614delinsGA
+      tx_spdi: 'NM_000548.5:1722:CC:GA'
+      genomic_spdi: 'NC_000016.10:2065531:CC:GA'
+      hgvs_g: 'NC_000016.10:g.2065532_2065533delinsGA'
+      fasta_del_match: true
+
+# ---------------------------------------------------------------------------
+# Uncertainties requiring a full live pilot (not block-able by more design)
+# ---------------------------------------------------------------------------
+pilot_uncertainties:
+  - id: U1
+    question: Do all 208 rows return len(spdis)==1 on NM_000548.5?
+    support_now: 7/7 pilot; composition is only SNV/delins
+    resolution: full operator run; any !=1 → STEP1_AMBIGUOUS_SPDIS
+  - id: U2
+    question: Does canonical_representative always return NC_000016.10 for this set?
+    support_now: 7/7 pilot returned NC_000016.10; all_equivalent also lists NC_000016.9
+    resolution: hard-fail non-pinned genome; count STEP2_NON_PINNED_GENOME
+  - id: U3
+    question: Do any delins undergo unexpected contextual reshaping vs source HGVS span?
+    support_now: pilot delins preserved equal-length del/ins with plausible coords
+    resolution: freeze tx_spdi+genomic_spdi; optional local SeqRepo cross-check later
+  - id: U4
+    question: Can the service sustain ~416 sequential GETs without elevated error rates?
+    support_now: short probe series OK at ≥1s interval; no rate headers observed
+    resolution: enforce 1 rps + retries; abort if retryable failures exceed 5%
+  - id: U5
+    question: Will step3 hgvs for all delins be uniformly parseable for identity upgrade?
+    support_now: 3 delins hgvs_g forms observed as g.START_ENDdelinsSEQ
+    resolution: optional; acquisition success does not require step3
+  - id: U6
+    question: >-
+      Does NCBI alignment version drift over time change canonical positions for
+      the same input HGVS?
+    support_now: unknown long-term; SPDI services use "latest alignment"
+    resolution: >-
+      Raw response cache + mapping freeze make a pilot reproducible offline.
+      Re-acquisition requires a new run_id/bundle; never silently overwrite.
+
+# ---------------------------------------------------------------------------
+# Acceptance criteria for a future build+pilot
+# ---------------------------------------------------------------------------
+acceptance_criteria:
+  - id: CP-01
+    rule: Operator is the only network I/O entry point; library tests run offline on fixtures.
+  - id: CP-02
+    rule: Input scores CSV sha256/bytes/rows and FASTA sha256 match pins before fetch.
+  - id: CP-03
+    rule: Endpoint sequence is exactly step1 contextuals → step2 canonical_representative.
+  - id: CP-04
+    rule: Batch contextuals and direct hgvs canonical paths are not called.
+  - id: CP-05
+    rule: Every final_url passes host/path/resource binding to api.ncbi.nlm.nih.gov/variation/v0.
+  - id: CP-06
+    rule: Mapping JSONL has exactly 208 rows, source_row 1..208 contiguous, no drops.
+  - id: CP-07
+    rule: PROJECTED_FASTA_VERIFIED requires genomic_spdi on NC_000016.10 and FASTA del match.
+  - id: CP-08
+    rule: Failures use the status vocabulary; error_detail never contains secrets.
+  - id: CP-09
+    rule: Raw responses + mapping + manifest live outside Git; committed summary is aggregates only.
+  - id: CP-10
+    rule: No PS3/BS3/classification/evidence-strength vocabulary in any artifact.
+  - id: CP-11
+    rule: Replaying frozen raw responses reproduces mapping bytes and manifest content_hash.
+  - id: CP-12
+    rule: Full pilot records residual pilot_uncertainties outcomes in the committed summary.
+
+failure_cases:
+  - input scores hash drift or row-count != 208
+  - reference FASTA missing or checksum mismatch
+  - URL allowlist or resource-binding violation
+  - use of batch or direct-canonical endpoints
+  - step1 invalid HGVS / ambiguous spdis / wrong seq_id
+  - step2 non-NC_000016.10 canonical representative
+  - FASTA deleted-allele mismatch
+  - silent drop or duplicate source_row in mapping
+  - library network I/O
+  - overwrite of an existing external run directory
+  - clinical or evidence-strength claims in outputs
+
+# ---------------------------------------------------------------------------
+# Expected pilot outputs (where empirically supportable)
+# ---------------------------------------------------------------------------
+expected_pilot_outputs:
+  supportable_now:
+    total_mapping_rows: 208
+    shape_counts: {SNV: 161, DELINS: 47}
+    endpoint_sequence: two_step_only
+    reference_sha256: 22dc1bb93de407e0653791c36e4097fbaf64c9efa2510c83b7777f607a61e4d0
+    scores_sha256: 74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717
+    sample_success_genomic_spdis:
+      - 'NC_000016.10:2065518:G:A'      # c.1600G>A
+      - 'NC_000016.10:2065545:CCG:TGA'  # c.1627_1629delinsTGA
+      - 'NC_000016.10:2065531:CC:GA'    # c.1613_1614delinsGA
+      - 'NC_000016.10:2088575:T:C'      # c.5390T>C
+  not_supportable_until_full_pilot:
+    - exact success_count out of 208
+    - exact status_counts histogram
+    - full mapping JSONL bytes / sha256
+    - wall-clock and retry statistics
+
+boundaries:
+  clinical_use: forbidden
+  evidence_strength_use: forbidden
+  network_in_library: forbidden
+  git_raw_responses: forbidden
+  git_full_mapping_jsonl: forbidden
