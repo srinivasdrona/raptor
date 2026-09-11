@@ -703,48 +703,102 @@ def test_ac04_pubmed_efetch_parses_metadata_without_evidence_inference() -> None
         assert set(row) == {"pmid", "doi", "title", "publication_date", "abstract"}
 
 
-def test_ac05_litvar_parser_requires_exact_fields_and_deduplicates_rsid() -> None:
+def test_ac05_litvar_rsidless_record_with_id_and_pmids_count_is_accepted_and_projected() -> None:
+    api = _litvar_api()
+    payload = _litvar_lines(
+        [
+            {"_id": "litvar@#7249#p.Y893H", "pmids_count": 17, "rsid": None},
+        ]
+    )
+    rows = api["parse_gene_mappings"](payload)
+    assert rows == [{"_id": "litvar@#7249#p.Y893H", "rsid": None, "pmids_count": 17}]
+    assert all(set(row) == {"_id", "rsid", "pmids_count"} for row in rows)
+
+
+def test_ac05_litvar_canonical_aggregate_supersedes_narrower_clingen_alias() -> None:
+    api = _litvar_api()
+    payload = _litvar_lines(
+        [
+            {"_id": "litvar@rs121907954##", "pmids_count": 11, "rsid": "rs121907954"},
+            {
+                "_id": "litvar@CA321685#rs121907954##",
+                "rsid": "rs121907954",
+                "pmids_count": 4,
+                "clingen_id": "CA321685",
+            },
+            {"_id": "litvar@rs587782356##", "pmids_count": 3, "rsid": "rs587782356"},
+        ]
+    )
+    assert api["parse_gene_mappings"](payload) == [
+        {"_id": "litvar@rs121907954##", "rsid": "rs121907954", "pmids_count": 11},
+        {"_id": "litvar@rs587782356##", "rsid": "rs587782356", "pmids_count": 3},
+    ]
+
+
+def test_ac05_litvar_sole_noncanonical_rsid_record_is_retained() -> None:
+    api = _litvar_api()
+    payload = _litvar_lines(
+        [
+            {
+                "_id": "litvar@CA987654#rs987654321##",
+                "pmids_count": 2,
+                "rsid": "rs987654321",
+                "clingen_id": "CA987654",
+            }
+        ]
+    )
+    assert api["parse_gene_mappings"](payload) == [
+        {"_id": "litvar@CA987654#rs987654321##", "rsid": "rs987654321", "pmids_count": 2}
+    ]
+
+
+def test_ac05_litvar_malformed_rsid_fails() -> None:
+    api = _litvar_api()
+    payload = _litvar_lines(
+        [
+            {"_id": "litvar@121907954##", "pmids_count": 3, "rsid": "121907954"},
+        ]
+    )
+    with pytest.raises(api["LitVarParseError"], match="rsid"):
+        api["parse_gene_mappings"](payload)
+
+
+def test_ac05_litvar_alias_pmids_count_greater_than_canonical_fails_closed() -> None:
     api = _litvar_api()
     payload = _litvar_lines(
         [
             {"_id": "litvar@rs121907954##", "pmids_count": 3, "rsid": "rs121907954"},
-            {"_id": "litvar@rs121907954-duplicate##", "pmids_count": 3, "rsid": "rs121907954"},
-            {"_id": "litvar@rs587782356##", "pmids_count": 1, "rsid": "rs587782356"},
+            {
+                "_id": "litvar@CA321685#rs121907954##",
+                "pmids_count": 4,
+                "rsid": "rs121907954",
+                "clingen_id": "CA321685",
+            },
         ]
     )
-    rows = api["parse_gene_mappings"](payload)
-    assert [row["rsid"] for row in rows] == ["rs121907954", "rs587782356"]
-    assert rows[0]["pmids_count"] == 3
-    assert rows[1]["pmids_count"] == 1
-    assert all(set(row) == {"_id", "rsid", "pmids_count"} for row in rows)
+    with pytest.raises(api["LitVarParseError"], match="pmids_count|canonical|alias|duplicate|rsid"):
+        api["parse_gene_mappings"](payload)
 
 
-@pytest.mark.parametrize(
-    ("payload", "message"),
-    [
-        (
-            _litvar_lines(
-                [
-                    {"_id": "litvar@121907954##", "pmids_count": 3, "rsid": "121907954"},
-                ]
-            ),
-            "rsid",
-        ),
-        (
-            _litvar_lines(
-                [
-                    {"_id": "litvar@rs121907954##", "pmids_count": 3, "rsid": "rs121907954"},
-                    {"_id": "litvar@rs121907954-alt##", "pmids_count": 4, "rsid": "rs121907954"},
-                ]
-            ),
-            "duplicate|rsid",
-        ),
-    ],
-    ids=["malformed-rsid", "duplicate-rsid-conflict"],
-)
-def test_ac05_litvar_duplicate_or_malformed_rsid_fails(payload: str, message: str) -> None:
+def test_ac05_litvar_multiple_noncanonical_records_without_canonical_are_ambiguous() -> None:
     api = _litvar_api()
-    with pytest.raises(api["LitVarParseError"], match=message):
+    payload = _litvar_lines(
+        [
+            {
+                "_id": "litvar@CA111111#rs121907954##",
+                "pmids_count": 3,
+                "rsid": "rs121907954",
+                "clingen_id": "CA111111",
+            },
+            {
+                "_id": "litvar@CA222222#rs121907954##",
+                "pmids_count": 3,
+                "rsid": "rs121907954",
+                "clingen_id": "CA222222",
+            },
+        ]
+    )
+    with pytest.raises(api["LitVarParseError"], match="ambiguous|canonical|duplicate|rsid"):
         api["parse_gene_mappings"](payload)
 
 
@@ -1454,6 +1508,58 @@ def test_ac05_litvar_unknown_extra_field_is_rejected_even_when_clingen_id_is_pre
     )
     with pytest.raises(api["LitVarParseError"], match="required fields|exact"):
         api["parse_gene_mappings"](payload)
+
+
+def test_ac05_litvar_ingestion_observations_report_mapping_and_rsid_split_counts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ingest_api = _ingest_api()
+    endpoint_api = _endpoint_api()
+    ingest_module = _load_module("raptor.external.tsc2_sources.ingest")
+    request_url = endpoint_api["build_litvar2_gene_url"](gene="TSC2")
+    plan = {
+        "bundle_id": "litvar-observation-counts-v104",
+        "created_at": "2026-09-11T00:00:00Z",
+        "query": {"gene": "TSC2"},
+        "sources": [
+            {
+                "source_id": "litvar2",
+                "source_kind": "litvar2",
+                "request_url": request_url,
+                "gene": "TSC2",
+            }
+        ],
+    }
+    parsed_rows = [
+        {"_id": "litvar@rs121907954##", "rsid": "rs121907954", "pmids_count": 4},
+        {"_id": "litvar@#7249#p.Y893H", "rsid": None, "pmids_count": 1},
+    ]
+
+    monkeypatch.setattr(ingest_module, "parse_gene_mappings", lambda _payload: parsed_rows)
+
+    def fake_transport(url: str) -> dict[str, Any]:
+        assert url == request_url
+        return {
+            "final_url": request_url,
+            "http_status": 200,
+            "media_type": "application/json",
+            "body": b"{}",
+        }
+
+    result = ingest_api["run_ingestion"](
+        plan=plan,
+        transport=fake_transport,
+        repo_root=tmp_path / "repo",
+        output_root=tmp_path / "external",
+        run_name="litvar-observation-counts-v104",
+    )
+
+    observations = result["manifest"]["sources"][0]["observations"]
+    assert observations["mapping_count"] == 2
+    assert observations["rsid_mapping_count"] == 1
+    assert observations["rsidless_mapping_count"] == 1
+    assert "rsid_count" not in observations
 
 
 def test_ac01_ac03_pubmed_esearch_builder_includes_datetype_pdat() -> None:
