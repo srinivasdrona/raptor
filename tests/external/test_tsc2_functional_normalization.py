@@ -728,6 +728,28 @@ def _tiny_plan(*, manifest: dict[str, Any], reference_sha256: str) -> dict[str, 
     }
 
 
+def _expected_pilot_contract() -> dict[str, Any]:
+    return {
+        "total_rows": EXPECTED_TOTAL_ROWS,
+        "source_rows": dict(EXPECTED_SOURCE_ROWS),
+        "identity_state_counts": dict(EXPECTED_IDENTITY_STATE_COUNTS),
+        "variant_kind_counts": dict(EXPECTED_VARIANT_KIND_COUNTS),
+    }
+
+
+def _manifest_for_expected_pilot_gate() -> dict[str, Any]:
+    return {
+        "counts": {"sources": 3, "artifacts": 3, "rows": EXPECTED_TOTAL_ROWS},
+        "artifacts": [
+            {"artifact_id": "mavedb_clipe-normalized-jsonl", "source_id": "mavedb_clipe", "row_count": 208},
+            {"artifact_id": "igvf_vamp_seq-normalized-jsonl", "source_id": "igvf_vamp_seq", "row_count": 9253},
+            {"artifact_id": "igvf_sge-normalized-jsonl", "source_id": "igvf_sge", "row_count": 453},
+        ],
+        "identity_state_counts": dict(EXPECTED_IDENTITY_STATE_COUNTS),
+        "variant_kind_counts": dict(EXPECTED_VARIANT_KIND_COUNTS),
+    }
+
+
 def test_fn01_source_bundle_and_artifact_pins_fail_closed_on_any_drift() -> None:
     ingest_api = _ingest_api()
     fixture = _build_synthetic_source_bundle_fixture()
@@ -927,6 +949,77 @@ def test_fn02d_read_artifact_payloads_rejects_escaped_or_symlinked_pinned_path(
 
     with pytest.raises(operator.Tsc2FunctionalOperatorError):
         operator._read_artifact_payloads(source_root, config, source_manifest)
+
+
+def test_fn02e_validate_expected_pilot_counts_checks_all_axes_and_derives_source_rows_from_artifacts() -> None:
+    operator = _load_operator_module()
+    if not hasattr(operator, "_validate_expected_pilot_counts"):
+        pytest.fail(
+            "TSC2 functional normalization operator is missing helper "
+            "'_validate_expected_pilot_counts'"
+        )
+    validate = operator._validate_expected_pilot_counts
+
+    expected_pilot = _expected_pilot_contract()
+    manifest = _manifest_for_expected_pilot_gate()
+    manifest["source_rows"] = {"mavedb_clipe": 1, "igvf_vamp_seq": 1, "igvf_sge": 1}
+    manifest["source_row_counts"] = {"mavedb_clipe": 2, "igvf_vamp_seq": 2, "igvf_sge": 2}
+
+    validate(manifest, expected_pilot)
+
+    drifted_total = deepcopy(manifest)
+    drifted_total["counts"]["rows"] += 1
+    with pytest.raises(operator.Tsc2FunctionalOperatorError, match="total_rows"):
+        validate(drifted_total, expected_pilot)
+
+    drifted_source_rows = deepcopy(manifest)
+    drifted_source_rows["artifacts"][0]["row_count"] += 1
+    with pytest.raises(operator.Tsc2FunctionalOperatorError, match="source_rows"):
+        validate(drifted_source_rows, expected_pilot)
+
+    drifted_identity = deepcopy(manifest)
+    drifted_identity["identity_state_counts"]["GENOMIC_SPDI_VERIFIED"] -= 1
+    drifted_identity["identity_state_counts"]["TRANSCRIPT_ONLY_PROJECTOR_REQUIRED"] += 1
+    with pytest.raises(operator.Tsc2FunctionalOperatorError, match="identity_state_counts"):
+        validate(drifted_identity, expected_pilot)
+
+    drifted_variant_kinds = deepcopy(manifest)
+    drifted_variant_kinds["variant_kind_counts"]["MISSENSE"] -= 1
+    drifted_variant_kinds["variant_kind_counts"]["OTHER"] += 1
+    with pytest.raises(operator.Tsc2FunctionalOperatorError, match="variant_kind_counts"):
+        validate(drifted_variant_kinds, expected_pilot)
+
+
+def test_fn02f_operator_main_calls_expected_pilot_validator_before_publication() -> None:
+    if not OPERATOR_SCRIPT.is_file():
+        pytest.fail(f"TSC2 functional normalization operator script is not implemented: {OPERATOR_SCRIPT}")
+
+    tree = ast.parse(OPERATOR_SCRIPT.read_text(encoding="utf-8"), filename=str(OPERATOR_SCRIPT))
+    main_node = next(
+        (
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "main"
+        ),
+        None,
+    )
+    if main_node is None:
+        pytest.fail("operator script is missing main(argv=...)")
+
+    calls: list[tuple[str, int]] = []
+    for node in ast.walk(main_node):
+        if not isinstance(node, ast.Call):
+            continue
+        if isinstance(node.func, ast.Name):
+            calls.append((node.func.id, node.lineno))
+        elif isinstance(node.func, ast.Attribute):
+            calls.append((node.func.attr, node.lineno))
+
+    validator_lines = [line for name, line in calls if name == "_validate_expected_pilot_counts"]
+    publish_lines = [line for name, line in calls if name == "publish_normalized_bundle"]
+    assert validator_lines, "main must call _validate_expected_pilot_counts before publication"
+    assert publish_lines, "main must publish with publish_normalized_bundle"
+    assert min(validator_lines) < min(publish_lines)
 
 
 def test_fn03_reference_checksum_mismatch_fails_before_normalizer_call(tmp_path: Path) -> None:
@@ -1645,7 +1738,7 @@ def test_fn11b_manifest_builder_rejects_conservation_and_artifact_integrity_viol
                 "relative_path": "normalized/mavedb_clipe.jsonl",
                 "byte_length": len(payload_a),
                 "sha256": _sha256_bytes(payload_a),
-                "row_count": 17,
+                "row_count": 1,
             },
             {
                 "artifact_id": "igvf_vamp_seq-normalized-jsonl",
@@ -1653,7 +1746,7 @@ def test_fn11b_manifest_builder_rejects_conservation_and_artifact_integrity_viol
                 "relative_path": "normalized/igvf_vamp_seq.jsonl",
                 "byte_length": len(payload_b),
                 "sha256": _sha256_bytes(payload_b),
-                "row_count": 11,
+                "row_count": 1,
             },
         ],
         "counts": {"sources": 2, "artifacts": 2, "rows": 2},
