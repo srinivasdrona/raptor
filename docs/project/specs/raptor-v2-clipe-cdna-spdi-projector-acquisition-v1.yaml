@@ -12,7 +12,7 @@
 
 schema: raptor.project.spec.v1
 spec_id: raptor-v2-clipe-cdna-spdi-projector-acquisition-v1
-spec_version: 1.0.3
+spec_version: 1.0.4
 status: APPROVED_BUILD
 created_at: '2026-09-12'
 owner: human-terminal-authority
@@ -345,6 +345,7 @@ network_boundary:
     ordering, and manifest construction over injected transport results / files.
   transport_result_shape:
     required_fields: [final_url, http_status, media_type, body]
+    optional_fields: [response_headers]
     http_status_success: 200
     body_type: bytes
   allowlist:
@@ -562,9 +563,9 @@ outputs:
       raw_responses:
         relative_dir: raw/
         per_row_files:
-          - 'raw/step1/{source_row:04d}-contextuals.json'
-          - 'raw/step2/{source_row:04d}-canonical_representative.json'
-          - 'raw/step3/{source_row:04d}-hgvs.json'  # optional
+          - 'raw/step1/{source_row:04d}-attempt-{attempt:02d}-contextuals.json'
+          - 'raw/step2/{source_row:04d}-attempt-{attempt:02d}-canonical_representative.json'
+          - 'raw/step3/{source_row:04d}-attempt-{attempt:02d}-hgvs.json'  # optional
         also_allowed: >-
           A single JSONL of raw envelopes is acceptable if it preserves exact
           response body bytes (base64 or utf-8 with explicit media_type) plus
@@ -600,7 +601,18 @@ outputs:
           - fasta_deleted_observed == deleted_sequence
       request_log:
         relative_path: logs/request_index.jsonl
-        fields: [source_row, step, requested_url, final_url, http_status, body_sha256, elapsed_ms]
+        fields:
+          - source_row
+          - step
+          - attempt
+          - requested_url
+          - final_url
+          - http_status
+          - body_sha256
+          - elapsed_ms
+          - retry_category
+          - terminal
+          - retry_exhausted
         redaction: strip any api_key/tool/email query values
       bundle_manifest:
         relative_path: bundle_manifest.json
@@ -815,6 +827,15 @@ acceptance_criteria:
     rule: >-
       Bundle manifests enforce exact field sets, safe unique artifact paths and
       full row/status/shape/success/failure conservation before publication.
+  - id: CP-15
+    rule: >-
+      Every well-typed HTTP attempt body, including failed retry attempts, is
+      frozen and indexed; permanent 4xx failures are never counted as retry
+      exhaustion.
+  - id: CP-16
+    rule: >-
+      Retry backoff uses full jitter, honors Retry-After when present, and the
+      operator applies distinct connect and read timeouts.
 
 failure_cases:
   - input scores hash drift or row-count != 208
