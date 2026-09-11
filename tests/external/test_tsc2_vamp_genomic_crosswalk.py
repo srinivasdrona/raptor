@@ -498,12 +498,12 @@ def _mk_manual_queue_item(model_api: dict[str, Any], raw: Any, *, error_code: st
     )
 
 
-def test_vx00_binding_spec_exists_and_is_v1_0_3() -> None:
+def test_vx00_binding_spec_exists_and_is_v1_0_4() -> None:
     if not SPEC_PATH.is_file():
         pytest.fail(f"binding spec is missing: {SPEC_PATH}")
     spec = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))
     assert spec["spec_id"] == "raptor-v2-vamp-genomic-crosswalk-acquisition-v1"
-    assert spec["spec_version"] == "1.0.3"
+    assert spec["spec_version"] == "1.0.4"
 
 
 def test_vx01_zenodo_url_builder_and_allowlist_binding_contract() -> None:
@@ -1892,6 +1892,240 @@ def test_vx15c_operator_calls_expected_pilot_validator_before_publication() -> N
     assert first_lines["_validate_expected_pilot_result"] < first_lines["publish_vamp_crosswalk_bundle"]
 
 
+def test_vx15e_operator_expands_sparse_status_counts_with_expected_zeroes_before_manifest_and_validation(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    operator = _load_operator_module()
+
+    source_root = tmp_path / "source-root"
+    reference_root = tmp_path / "reference-root"
+    output_root = tmp_path / "output-root"
+    source_root.mkdir(parents=True, exist_ok=True)
+    reference_root.mkdir(parents=True, exist_ok=True)
+    output_root.mkdir(parents=True, exist_ok=True)
+
+    source_run_name = "source-run"
+    source_relative_path = "igvf/igvf_vamp_seq.tsv.gz"
+    source_score_path = source_root / source_run_name / source_relative_path
+    source_score_path.parent.mkdir(parents=True, exist_ok=True)
+    source_score_path.write_bytes(b"synthetic-vamp-score-bytes")
+    (reference_root / REFERENCE_FASTA_FILENAME).write_text(">NC_000016.10\nACGT\n", encoding="utf-8")
+
+    expected_status_counts = {
+        "CROSSWALK_SPDI_VERIFIED": 9050,
+        "SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH": 57,
+        "SOURCE_COORDINATE_REFERENCE_MISMATCH": 0,
+        "ARCHIVE_CROSSWALK_ABSENT": 146,
+    }
+    observed_sparse_status_counts = {
+        "CROSSWALK_SPDI_VERIFIED": 9050,
+        "SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH": 57,
+        "ARCHIVE_CROSSWALK_ABSENT": 146,
+    }
+    config = {
+        "inputs": {
+            "frozen_vamp_scores": {
+                "run_name": source_run_name,
+                "manifest_filename": "bundle_manifest.json",
+                "source_bundle_id": SOURCE_BUNDLE_ID,
+                "source_manifest_content_hash": SOURCE_MANIFEST_CONTENT_HASH,
+                "artifact_id": SCORES_ARTIFACT_ID,
+                "relative_path": source_relative_path,
+                "sha256": SCORES_SHA256,
+                "md5": SCORES_MD5,
+                "byte_length": SCORES_BYTE_LENGTH,
+                "row_count": SCORES_ROW_COUNT,
+                "protein_accession": PROTEIN_ACCESSION,
+            },
+            "zenodo_archive": {
+                "record_id": ZENODO_RECORD_ID,
+                "doi": ZENODO_DOI,
+                "filename": ZENODO_FILENAME,
+                "download_url": ZENODO_DOWNLOAD_URL,
+                "sha256": ZENODO_SHA256,
+                "md5": ZENODO_MD5,
+                "byte_length": ZENODO_BYTE_LENGTH,
+                "required_members": {},
+            },
+            "genomic_reference": {
+                "accession": REFERENCE_ACCESSION,
+                "assembly": REFERENCE_ASSEMBLY,
+                "fasta_filename": REFERENCE_FASTA_FILENAME,
+                "sha256": REFERENCE_FASTA_SHA256,
+            },
+            "identity_pins": {
+                "transcript": TRANSCRIPT,
+                "genomic_accession": REFERENCE_ACCESSION,
+                "assembly": REFERENCE_ASSEMBLY,
+            },
+        },
+        "archive_table_contract": {"required_columns": list(GMM_REQUIRED_COLUMNS), "required_values": {}},
+        "rate_limits_retries": {
+            "min_interval_seconds": 0.0,
+            "timeout_seconds": {"connect": 1.0, "read": 1.0},
+            "retry_policy": {
+                "retryable_http": [500],
+                "non_retryable_http": [400],
+                "max_attempts_per_request": 1,
+                "backoff_base_seconds": 0.0,
+                "backoff_cap_seconds": 0.0,
+            },
+        },
+        "outputs": {
+            "external_bundle": {
+                "run_name": RUN_NAME,
+                "bundle_id": BUNDLE_ID,
+                "artifacts": {
+                    "raw_archive": {"relative_path": "raw/FowlerLab-TSC2_analysis-V1.zip"},
+                    "crosswalk_jsonl": {"relative_path": "crosswalk/igvf_vamp_seq_genomic_crosswalk.jsonl"},
+                },
+            }
+        },
+        "expected_pilot": {
+            "total_score_rows": TOTAL_SCORE_ROWS,
+            "archive_crosswalk_rows": ARCHIVE_CROSSWALK_ROWS,
+            "status_counts": expected_status_counts,
+            "verified_unique_spdi": 9050,
+            "conservation": {
+                "input_score_rows": TOTAL_SCORE_ROWS,
+                "output_crosswalk_rows": TOTAL_SCORE_ROWS,
+                "dropped_rows": 0,
+                "duplicate_source_rows": 0,
+            },
+        },
+    }
+
+    call_order: list[str] = []
+    captured: dict[str, Any] = {}
+
+    monkeypatch.setattr(operator, "_load_config", lambda _path: deepcopy(config))
+    monkeypatch.setattr(operator, "_read_source_bundle_manifest", lambda _source_root, _config: {})
+    monkeypatch.setattr(operator, "_validate_source_bundle_manifest_pin", lambda _manifest, _config: None)
+    monkeypatch.setattr(operator, "_resolve_safe_path_in_run_dir", lambda _run_dir, _rel, context: source_score_path)
+    monkeypatch.setattr(operator, "validate_reference_fasta_checksum", lambda **_kwargs: None)
+    monkeypatch.setattr(operator, "build_zenodo_archive_download_url", lambda **_kwargs: ZENODO_DOWNLOAD_URL)
+    monkeypatch.setattr(
+        operator,
+        "fetch_with_transport",
+        lambda **_kwargs: {
+            "final_url": ZENODO_DOWNLOAD_URL,
+            "http_status": 200,
+            "media_type": "application/octet-stream",
+            "body": b"PK\x03\x04zip",
+        },
+    )
+    monkeypatch.setattr(operator, "assert_allowed_zenodo_final_url", lambda **_kwargs: None)
+    monkeypatch.setattr(operator, "validate_zenodo_archive_and_extract_members", lambda **_kwargs: None)
+    monkeypatch.setattr(operator, "SeqRepoGenomicNormalizer", lambda **_kwargs: object())
+    monkeypatch.setattr(
+        operator,
+        "build_vamp_genomic_crosswalk",
+        lambda **_kwargs: {
+            "crosswalk_rows": [
+                _minimal_crosswalk_row(
+                    source_row=1,
+                    status="CROSSWALK_SPDI_VERIFIED",
+                    protein_variant=f"{PROTEIN_ACCESSION}:p.Gly534Arg",
+                ),
+                _minimal_crosswalk_row(
+                    source_row=2,
+                    status="ARCHIVE_CROSSWALK_ABSENT",
+                    protein_variant=f"{PROTEIN_ACCESSION}:p.Met600Val",
+                ),
+            ],
+            "status_counts": deepcopy(observed_sparse_status_counts),
+        },
+    )
+    monkeypatch.setattr(operator, "canonical_crosswalk_jsonl_bytes", lambda rows: b"".join(b"{}\n" for _ in rows))
+
+    def _capture_manifest_build(**kwargs: Any) -> dict[str, Any]:
+        call_order.append("build")
+        captured["manifest_input_status_counts"] = deepcopy(kwargs["status_counts"])
+        return {
+            "schema": BUNDLE_SCHEMA,
+            "bundle_id": kwargs["bundle_id"],
+            "content_hash": "0" * 64,
+            "input_scores": {"row_count": kwargs["input_scores"]["row_count"]},
+            "counts": {"rows": kwargs["counts"]["rows"]},
+            "status_counts": deepcopy(kwargs["status_counts"]),
+            "verified_unique_spdi": kwargs["verified_unique_spdi"],
+        }
+
+    def _capture_expected_validation(*, manifest: dict[str, Any], expected_pilot: dict[str, Any]) -> None:
+        call_order.append("validate")
+        captured["validated_manifest_status_counts"] = deepcopy(manifest["status_counts"])
+        captured["expected_status_count_keys"] = tuple(expected_pilot["status_counts"].keys())
+
+    monkeypatch.setattr(operator, "build_crosswalk_bundle_manifest", _capture_manifest_build)
+    monkeypatch.setattr(operator, "_validate_expected_pilot_result", _capture_expected_validation)
+    monkeypatch.setattr(
+        operator,
+        "publish_vamp_crosswalk_bundle",
+        lambda **_kwargs: call_order.append("publish") or {"run_dir": str(output_root / RUN_NAME)},
+    )
+
+    exit_code = operator.main(
+        [
+            "--config",
+            str(tmp_path / "config.yaml"),
+            "--source-root",
+            str(source_root),
+            "--reference-root",
+            str(reference_root),
+            "--output-root",
+            str(output_root),
+        ]
+    )
+    assert exit_code == 0
+    assert captured["manifest_input_status_counts"] == expected_status_counts
+    assert captured["validated_manifest_status_counts"] == expected_status_counts
+    assert set(captured["expected_status_count_keys"]) == set(expected_status_counts)
+    assert call_order[:3] == ["build", "validate", "publish"]
+
+
+def test_vx15f_operator_expected_pilot_rejects_unknown_statuses() -> None:
+    operator = _load_operator_module()
+    helper = getattr(operator, "_validate_expected_pilot_result", None)
+    if helper is None:
+        pytest.fail("operator must define _validate_expected_pilot_result(manifest, expected_pilot)")
+    domain_error = getattr(operator, "VampCrosswalkOperatorError", RuntimeError)
+
+    manifest = {
+        "input_scores": {"row_count": 3},
+        "counts": {"rows": 3},
+        "status_counts": {
+            "CROSSWALK_SPDI_VERIFIED": 2,
+            "SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH": 1,
+            "SOURCE_COORDINATE_REFERENCE_MISMATCH": 0,
+            "ARCHIVE_CROSSWALK_ABSENT": 0,
+            "UNEXPECTED_STATUS": 1,
+        },
+        "verified_unique_spdi": 2,
+    }
+    expected_pilot = {
+        "total_score_rows": 3,
+        "archive_crosswalk_rows": 3,
+        "status_counts": {
+            "CROSSWALK_SPDI_VERIFIED": 2,
+            "SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH": 1,
+            "SOURCE_COORDINATE_REFERENCE_MISMATCH": 0,
+            "ARCHIVE_CROSSWALK_ABSENT": 0,
+        },
+        "verified_unique_spdi": 2,
+        "conservation": {
+            "input_score_rows": 3,
+            "output_crosswalk_rows": 3,
+            "dropped_rows": 0,
+            "duplicate_source_rows": 0,
+        },
+    }
+
+    with pytest.raises(domain_error) as raised:
+        helper(manifest=manifest, expected_pilot=expected_pilot)
+    assert "status_counts" in str(raised.value)
+
+
 def test_vx16_operator_cli_requires_explicit_roots_without_cwd_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     operator = _load_operator_module()
     for env_name in (
@@ -1912,7 +2146,7 @@ def test_vx17_config_pins_exact_source_archive_reference_and_expected_status_tot
         pytest.fail(f"TSC2 VAMP crosswalk config is not implemented: {CONFIG_PATH}")
     config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
     assert config["spec_id"] == "raptor-v2-vamp-genomic-crosswalk-acquisition-v1"
-    assert config["spec_version"] == "1.0.3"
+    assert config["spec_version"] == "1.0.4"
 
     source = config["inputs"]["frozen_vamp_scores"]
     assert source["source_bundle_id"] == SOURCE_BUNDLE_ID
