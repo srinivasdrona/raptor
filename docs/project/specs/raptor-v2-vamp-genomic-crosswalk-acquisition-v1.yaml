@@ -1,6 +1,6 @@
 schema: raptor.project.spec.v1
 spec_id: raptor-v2-vamp-genomic-crosswalk-acquisition-v1
-spec_version: 1.0.0
+spec_version: 1.0.1
 status: APPROVED_BUILD
 created_at: '2026-09-12'
 owner: human-terminal-authority
@@ -140,8 +140,10 @@ join_contract:
 
 coordinate_contract:
   accepted_source_coordinates: >-
-    Treat hg38_start/hg38_end as 1-based inclusive only when
-    len(ref_allele) == hg38_end - hg38_start + 1 and the pinned FASTA slice
+    First derive the affected cDNA length from hgvs_c. Accept a genomic
+    coordinate only when cDNA affected length, len(ref_allele),
+    len(alt_allele), and hg38_end-hg38_start+1 are all identical. Then treat
+    hg38_start/hg38_end as 1-based inclusive only when the pinned FASTA slice
     [hg38_start-1:hg38_end] equals ref_allele exactly.
   normalized_spdi: >-
     For accepted rows, construct RawVariant(NC_000016.10, position=hg38_start,
@@ -149,13 +151,15 @@ coordinate_contract:
     SeqRepoGenomicNormalizer to return NormalizedVariant. The returned
     variant_id is the only accepted genomic SPDI.
   rejected_coordinates: >-
-    Do not reinterpret failed rows as zero-based/half-open and do not search
-    nearby offsets. Such rows remain SOURCE_COORDINATE_REFERENCE_MISMATCH even
-    if an alternate convention can make the source ref match.
+    A cDNA/genomic/ref/alt length mismatch is
+    SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH. After that gate, a FASTA mismatch
+    is SOURCE_COORDINATE_REFERENCE_MISMATCH. Do not reinterpret failed rows as
+    zero-based/half-open and do not search nearby offsets.
   observed:
-    genomic_spdi_verified: 9058
-    source_coordinate_reference_mismatch: 49
-    unique_verified_spdi: 9058
+    genomic_spdi_verified: 9050
+    source_coordinate_cdna_length_mismatch: 57
+    source_coordinate_reference_mismatch: 0
+    unique_verified_spdi: 9050
     normalizer_manual_or_error_outcomes: 0
 
 crosswalk_row:
@@ -175,10 +179,12 @@ crosswalk_row:
     - unresolved_reason
   status_values:
     - CROSSWALK_SPDI_VERIFIED
+    - SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH
     - SOURCE_COORDINATE_REFERENCE_MISMATCH
     - ARCHIVE_CROSSWALK_ABSENT
   unresolved_reason_values:
     - null
+    - SOURCE_GENOMIC_INTERVAL_NOT_EQUIVALENT_TO_CDNA_REPLACEMENT
     - SOURCE_REF_DOES_NOT_MATCH_PINNED_FASTA
     - PROTEIN_VARIANT_NOT_IN_ARCHIVE
   invariants:
@@ -234,10 +240,11 @@ expected_pilot:
   total_score_rows: 9253
   archive_crosswalk_rows: 9107
   status_counts:
-    CROSSWALK_SPDI_VERIFIED: 9058
-    SOURCE_COORDINATE_REFERENCE_MISMATCH: 49
+    CROSSWALK_SPDI_VERIFIED: 9050
+    SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH: 57
+    SOURCE_COORDINATE_REFERENCE_MISMATCH: 0
     ARCHIVE_CROSSWALK_ABSENT: 146
-  verified_unique_spdi: 9058
+  verified_unique_spdi: 9050
   conservation:
     input_score_rows: 9253
     output_crosswalk_rows: 9253
@@ -258,11 +265,13 @@ acceptance_criteria:
   - id: VX-06
     rule: Archive-absent score rows remain explicit unresolved rows with no inferred allele.
   - id: VX-07
-    rule: Source coordinates are accepted only under the pinned 1-based-inclusive reference rule.
+    rule: >-
+      Source coordinates are accepted only when cDNA/genomic/ref/alt lengths
+      agree, followed by the pinned 1-based-inclusive reference rule.
   - id: VX-08
     rule: Reference-consistent rows are normalized only through SeqRepoGenomicNormalizer.
   - id: VX-09
-    rule: The observed 9,058/49/146 status split is required by the real pilot gate.
+    rule: The observed 9,050/57/0/146 status split is required by the real pilot gate.
   - id: VX-10
     rule: The two PacBio FASTQs are not downloaded or required by this slice.
   - id: VX-11
@@ -288,7 +297,7 @@ failure_cases:
   - output conservation or manifest hash mismatch
 
 follow_on:
-  - adjudicate 49 cross-exon coordinate rows using a separately frozen alignment authority
+  - adjudicate 57 cross-exon/coordinate-inconsistent rows using a separately frozen alignment authority
   - investigate 146 archive-absent score rows without inferring codons
   - consume the frozen crosswalk in a new functional-normalization bundle
   - perform VUS, prospective-holdout and Atlas overlap only after identity promotion
