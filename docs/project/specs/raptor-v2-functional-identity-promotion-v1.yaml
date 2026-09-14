@@ -1,6 +1,6 @@
 schema: raptor.project.spec.v1
 spec_id: raptor-v2-functional-identity-promotion-v1
-spec_version: 1.0.1
+spec_version: 1.0.2
 status: APPROVED_BUILD
 created_at: '2026-09-14'
 owner: human-terminal-authority
@@ -310,8 +310,9 @@ acceptance_criteria:
   - id: FP-16
     rule: >-
       Every unresolved artifact-path component is checked for symlink/reparse
-      status before resolution, including links whose target remains inside the
-      run directory.
+      status before resolution, starting at the supplied root and including
+      Windows junctions/reparse points and links whose target remains inside
+      the run directory.
   - id: FP-17
     rule: >-
       Manifest artifacts are exactly the three pinned output IDs/paths and
@@ -321,7 +322,8 @@ acceptance_criteria:
     rule: >-
       Count dictionaries contain non-negative integers and source-overlap
       values satisfy pairwise/triple bounds plus inclusion-exclusion equality
-      for verified_unique_spdi.
+      for verified_unique_spdi. Every source-only and pair-only Venn region
+      implied by those values must also be non-negative.
 
 failure_cases:
   - any input manifest/artifact hash drift

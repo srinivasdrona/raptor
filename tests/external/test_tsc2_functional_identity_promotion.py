@@ -1050,12 +1050,12 @@ def _tiny_promotion_manifest_fixture(api: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def test_fp00_binding_spec_exists_and_is_v1_0_1() -> None:
+def test_fp00_binding_spec_exists_and_is_v1_0_2() -> None:
     if not SPEC_PATH.is_file():
         pytest.fail(f"binding spec is missing: {SPEC_PATH}")
     spec = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))
     assert spec["spec_id"] == "raptor-v2-functional-identity-promotion-v1"
-    assert spec["spec_version"] == "1.0.1"
+    assert spec["spec_version"] == "1.0.2"
 
 
 def test_fp01_existing_row_schema_stays_exact_17_fields_and_adds_new_state_reason_bindings() -> None:
@@ -1262,7 +1262,9 @@ def test_fp04_input_manifest_and_artifact_pins_are_exact_fail_closed_and_unambig
     )
 
 
-def test_fp05_pinned_artifact_reads_use_trusted_paths_and_reject_escape_or_symlink(tmp_path: Path) -> None:
+def test_fp05_pinned_artifact_reads_use_trusted_paths_and_reject_escape_or_symlink(
+    tmp_path: Path,
+) -> None:
     api = _promotion_ingest_api()
     fixture = _source_manifests_fixture()
     validated = api["validate_input_bundle_manifests"](
@@ -1405,6 +1407,112 @@ def test_fp05_pinned_artifact_reads_use_trusted_paths_and_reject_escape_or_symli
             vamp_crosswalk_root=vx_root,
             validated_inputs=component_symlink_validated,
         )
+
+    # Root itself must not be a symlink/junction-like alias.
+    fn_root_symlink = tmp_path / "functional-root-symlink"
+    if fn_root_symlink.exists() or fn_root_symlink.is_symlink():
+        fn_root_symlink.unlink()
+    fn_root_symlink.symlink_to(fn_root, target_is_directory=True)
+    with pytest.raises(err):
+        api["read_pinned_artifact_payloads"](
+            functional_normalization_root=fn_root_symlink,
+            clipe_projector_root=cp_root,
+            vamp_crosswalk_root=vx_root,
+            validated_inputs=validated,
+        )
+
+
+def test_fp05a_pinned_artifact_reads_reject_windows_reparse_like_component_before_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = _promotion_ingest_api()
+    fixture = _source_manifests_fixture()
+    validated = api["validate_input_bundle_manifests"](
+        functional_normalization_manifest=deepcopy(fixture["functional_normalization_manifest"]),
+        clipe_projector_manifest=deepcopy(fixture["clipe_manifest"]),
+        vamp_crosswalk_manifest=deepcopy(fixture["vamp_manifest"]),
+        expected_pins=deepcopy(fixture["expected_pins"]),
+    )
+    err = api["InputPinMismatchError"]
+    expected_payloads = fixture["artifact_payloads"]
+    run_names = fixture["run_names"]
+
+    fn_root = tmp_path / "functional"
+    cp_root = tmp_path / "clipe"
+    vx_root = tmp_path / "vamp"
+    for root, run_name in (
+        (fn_root, run_names["functional_normalization"]),
+        (cp_root, run_names["clipe_projector"]),
+        (vx_root, run_names["vamp_crosswalk"]),
+    ):
+        (root / run_name).mkdir(parents=True, exist_ok=True)
+
+    fn_artifacts = validated["functional_normalization_bundle"]["artifacts"]
+    cp_mapping = validated["clipe_projector_bundle"]["mapping"]
+    vx_crosswalk = validated["vamp_crosswalk_bundle"]["crosswalk"]
+    (fn_root / run_names["functional_normalization"] / fn_artifacts["mavedb_clipe"]["relative_path"]).parent.mkdir(
+        parents=True, exist_ok=True
+    )
+    (fn_root / run_names["functional_normalization"] / fn_artifacts["mavedb_clipe"]["relative_path"]).write_bytes(
+        expected_payloads["functional_normalization"]["mavedb_clipe"]
+    )
+    (fn_root / run_names["functional_normalization"] / fn_artifacts["igvf_vamp_seq"]["relative_path"]).parent.mkdir(
+        parents=True, exist_ok=True
+    )
+    (fn_root / run_names["functional_normalization"] / fn_artifacts["igvf_vamp_seq"]["relative_path"]).write_bytes(
+        expected_payloads["functional_normalization"]["igvf_vamp_seq"]
+    )
+    (fn_root / run_names["functional_normalization"] / fn_artifacts["igvf_sge"]["relative_path"]).parent.mkdir(
+        parents=True, exist_ok=True
+    )
+    (fn_root / run_names["functional_normalization"] / fn_artifacts["igvf_sge"]["relative_path"]).write_bytes(
+        expected_payloads["functional_normalization"]["igvf_sge"]
+    )
+    (cp_root / run_names["clipe_projector"] / cp_mapping["relative_path"]).parent.mkdir(parents=True, exist_ok=True)
+    (cp_root / run_names["clipe_projector"] / cp_mapping["relative_path"]).write_bytes(
+        expected_payloads["clipe_projector_mapping"]
+    )
+    (vx_root / run_names["vamp_crosswalk"] / vx_crosswalk["relative_path"]).parent.mkdir(parents=True, exist_ok=True)
+    (vx_root / run_names["vamp_crosswalk"] / vx_crosswalk["relative_path"]).write_bytes(
+        expected_payloads["vamp_crosswalk"]
+    )
+
+    ingest_module = _load_module("raptor.external.tsc2_identity_promotion.ingest")
+    reparse_predicate_name = "_is_symlink_or_reparse_point"
+    if getattr(ingest_module, reparse_predicate_name, None) is None:
+        pytest.fail(
+            "ingest must expose _is_symlink_or_reparse_point(path) and use it before resolve/open"
+        )
+    probed_components: list[str] = []
+
+    def _fake_reparse_predicate(path: Path) -> bool:
+        path_text = str(path).replace("\\", "/")
+        probed_components.append(path_text)
+        return "simulated-reparse-component" in path_text
+
+    monkeypatch.setattr(ingest_module, reparse_predicate_name, _fake_reparse_predicate)
+    simulated_reparse_path = (
+        fn_root
+        / run_names["functional_normalization"]
+        / "normalized"
+        / "simulated-reparse-component"
+        / "mavedb.jsonl"
+    )
+    simulated_reparse_path.parent.mkdir(parents=True, exist_ok=True)
+    simulated_reparse_path.write_bytes(expected_payloads["functional_normalization"]["mavedb_clipe"])
+    reparse_validated = deepcopy(validated)
+    reparse_validated["functional_normalization_bundle"]["artifacts"]["mavedb_clipe"]["relative_path"] = (
+        "normalized/simulated-reparse-component/mavedb.jsonl"
+    )
+    with pytest.raises(err):
+        api["read_pinned_artifact_payloads"](
+            functional_normalization_root=fn_root,
+            clipe_projector_root=cp_root,
+            vamp_crosswalk_root=vx_root,
+            validated_inputs=reparse_validated,
+        )
+    assert any("simulated-reparse-component" in component for component in probed_components)
 
 
 def test_fp06_source_row_revalidation_rejects_duplicate_or_noncontiguous_keys_and_schema_drift() -> None:
@@ -1900,6 +2008,33 @@ def test_fp13c_variant_kind_counts_require_nonnegative_ints_and_no_bool() -> Non
             api["validate_manifest_content_hash"](drifted)
 
 
+def test_fp13c2_manifest_counts_and_unresolved_reason_counts_require_nonbool_nonnegative_ints() -> None:
+    api = _promotion_bundle_api()
+    fixture = _tiny_promotion_manifest_fixture(api)
+    manifest = fixture["manifest"]
+    err = api["PromotionManifestError"]
+
+    for invalid_rows in (6.0, True, -1, "7"):
+        drifted = deepcopy(manifest)
+        drifted["counts"]["rows"] = invalid_rows
+        drifted["content_hash"] = api["compute_manifest_content_hash"](drifted)
+        with pytest.raises(err):
+            api["validate_manifest_content_hash"](drifted)
+
+    unresolved_mutations = (
+        ("REFERENCE_ALLELE_MISMATCH", 6.0),
+        ("SOURCE_GENOMIC_INTERVAL_NOT_EQUIVALENT_TO_CDNA_REPLACEMENT", -1),
+        ("PROTEIN_VARIANT_NOT_IN_ARCHIVE", "1"),
+        ("NOT_A_VARIANT", True),
+    )
+    for reason, invalid_value in unresolved_mutations:
+        drifted = deepcopy(manifest)
+        drifted["unresolved_reason_counts"][reason] = invalid_value
+        drifted["content_hash"] = api["compute_manifest_content_hash"](drifted)
+        with pytest.raises(err):
+            api["validate_manifest_content_hash"](drifted)
+
+
 def test_fp13d_overlap_arithmetic_invariants_reject_impossible_self_hashed_manifests() -> None:
     api = _promotion_bundle_api()
     fixture = _tiny_promotion_manifest_fixture(api)
@@ -1940,6 +2075,59 @@ def test_fp13d_overlap_arithmetic_invariants_reject_impossible_self_hashed_manif
     wrong_duplicate["content_hash"] = api["compute_manifest_content_hash"](wrong_duplicate)
     with pytest.raises(err):
         api["validate_manifest_content_hash"](wrong_duplicate)
+
+
+def test_fp13d2_venn_region_nonnegativity_rejects_impossible_overlap_shapes() -> None:
+    api = _promotion_bundle_api()
+    fixture = _tiny_promotion_manifest_fixture(api)
+    manifest = fixture["manifest"]
+    err = api["PromotionManifestError"]
+
+    impossible = deepcopy(manifest)
+    impossible["counts"]["rows"] = 6
+    impossible["source_row_counts"] = {"mavedb_clipe": 2, "igvf_vamp_seq": 2, "igvf_sge": 2}
+    impossible["identity_state_counts"] = {
+        key: (6 if key == "GENOMIC_SPDI_VERIFIED" else 0)
+        for key in impossible["identity_state_counts"]
+    }
+    impossible["unresolved_reason_counts"] = {key: 0 for key in impossible["unresolved_reason_counts"]}
+    impossible["variant_kind_counts"] = {
+        key: (6 if key == "MISSENSE" else 0)
+        for key in impossible["variant_kind_counts"]
+    }
+    impossible["verified_observations_by_source"] = {"mavedb_clipe": 2, "igvf_vamp_seq": 2, "igvf_sge": 2}
+    impossible["verified_observations"] = 6
+    impossible["verified_unique_spdi"] = 2
+    impossible["duplicate_verified_observations"] = 4
+    impossible["source_overlap"] = {
+        "pairwise": {
+            "mavedb_clipe__igvf_vamp_seq": 2,
+            "mavedb_clipe__igvf_sge": 2,
+            "igvf_vamp_seq__igvf_sge": 0,
+        },
+        "triple": 0,
+    }
+    impossible["conservation"] = {"input_rows": 6, "output_rows": 6, "dropped_rows": 0, "duplicate_source_rows": 0}
+    for artifact in impossible["artifacts"]:
+        artifact["row_count"] = 2
+    impossible["content_hash"] = api["compute_manifest_content_hash"](impossible)
+    with pytest.raises(err):
+        api["validate_manifest_content_hash"](impossible)
+
+    triple_exceeds_pair = deepcopy(impossible)
+    triple_exceeds_pair["source_overlap"] = {
+        "pairwise": {
+            "mavedb_clipe__igvf_vamp_seq": 0,
+            "mavedb_clipe__igvf_sge": 1,
+            "igvf_vamp_seq__igvf_sge": 1,
+        },
+        "triple": 1,
+    }
+    triple_exceeds_pair["verified_unique_spdi"] = 5
+    triple_exceeds_pair["duplicate_verified_observations"] = 1
+    triple_exceeds_pair["content_hash"] = api["compute_manifest_content_hash"](triple_exceeds_pair)
+    with pytest.raises(err):
+        api["validate_manifest_content_hash"](triple_exceeds_pair)
 
 
 def test_fp13e_summary_rejects_artifact_and_boundary_drift_even_with_self_hash() -> None:
@@ -2041,7 +2229,7 @@ def test_fp16_config_pins_all_input_hashes_and_output_names_from_spec() -> None:
         pytest.fail(f"functional identity promotion config is not implemented: {CONFIG_PATH}")
     config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
     assert config["spec_id"] == "raptor-v2-functional-identity-promotion-v1"
-    assert config["spec_version"] == "1.0.1"
+    assert config["spec_version"] == "1.0.2"
 
     functional = config["inputs"]["functional_normalization_bundle"]
     assert functional["run_name"] == FUNCTIONAL_RUN_NAME
