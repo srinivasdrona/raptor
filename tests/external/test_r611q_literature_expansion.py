@@ -417,7 +417,7 @@ def _europe_pmc_core_payload_dict(
                     "firstPublicationDate": "2026-09-15",
                     "abstractText": "First abstract sentence.",
                     "isOpenAccess": bad_open_access or "Y",
-                    "license": bad_licence or "CC BY",
+                    "license": bad_licence or "cc by",
                 },
                 {
                     "id": "9102",
@@ -429,7 +429,7 @@ def _europe_pmc_core_payload_dict(
                     "firstPublicationDate": "2026-09-01",
                     "abstractText": None,
                     "isOpenAccess": "N",
-                    "license": "CC BY-NC-ND",
+                    "license": "  cC bY-nC-nD  ",
                 },
                 {
                     "id": "9104",
@@ -860,7 +860,7 @@ def test_ac05_parse_litvar_clinvar_and_union_subtraction_is_deterministic_and_pr
     api = _parse_api()
     litvar_payload = json.dumps(
         {
-            "pmids": ["9101", "9102", "9102", "99999999"],
+            "pmids": [9101, "9102", 9102, 99999999],
             "pmcids": ["PMC9101", "PMC9102", "PMC9102"],
             "pmids_count": 3,
         },
@@ -915,14 +915,19 @@ def test_ac05_parse_litvar_clinvar_and_union_subtraction_is_deterministic_and_pr
 def test_ac05_parse_litvar_rejects_malformed_ids() -> None:
     api = _parse_api()
     bad_payloads = [
-        {"pmids": ["9101"], "pmcids": ["PMC9101"]},  # missing pmids_count
-        {"pmids": ["9101"], "pmcids": ["PMC9101"], "pmids_count": 1, "extra": True},  # extra key
-        {"pmids": ["9101"], "pmcids": ["PMC9101"], "pmids_count": True},  # bool invalid
-        {"pmids": ["9101"], "pmcids": ["PMC9101"], "pmids_count": "1"},  # string invalid
+        {"pmids": [9101], "pmcids": ["PMC9101"]},  # missing pmids_count
+        {"pmids": [9101], "pmcids": ["PMC9101"], "pmids_count": 1, "extra": True},  # extra key
+        {"pmids": [9101], "pmcids": ["PMC9101"], "pmids_count": True},  # bool invalid
+        {"pmids": [9101], "pmcids": ["PMC9101"], "pmids_count": "1"},  # string invalid
         {"pmids": ["9101"], "pmcids": ["PMC9101"], "pmids_count": -1},  # negative invalid
-        {"pmids": ["9101", "9101"], "pmcids": ["PMC9101"], "pmids_count": 2},  # count drift from unique PMID set
-        {"pmids": ["9101", "bad"], "pmcids": ["PMC9101"], "pmids_count": 2},  # malformed PMID
-        {"pmids": ["9101"], "pmcids": ["PMC9101", "bad-pmcid"], "pmids_count": 1},  # malformed PMCID
+        {"pmids": [9101, "9101"], "pmcids": ["PMC9101"], "pmids_count": 2},  # count drift from unique normalized PMID set
+        {"pmids": [True], "pmcids": ["PMC9101"], "pmids_count": 1},  # bool PMID invalid
+        {"pmids": [0], "pmcids": ["PMC9101"], "pmids_count": 1},  # non-positive PMID invalid
+        {"pmids": [-5], "pmcids": ["PMC9101"], "pmids_count": 1},  # non-positive PMID invalid
+        {"pmids": [9101.0], "pmcids": ["PMC9101"], "pmids_count": 1},  # float PMID invalid
+        {"pmids": ["91O1"], "pmcids": ["PMC9101"], "pmids_count": 1},  # non-decimal string PMID invalid
+        {"pmids": [9101, "bad"], "pmcids": ["PMC9101"], "pmids_count": 2},  # malformed PMID
+        {"pmids": [9101], "pmcids": ["PMC9101", "bad-pmcid"], "pmids_count": 1},  # malformed PMCID
     ]
     for payload_obj in bad_payloads:
         payload = json.dumps(payload_obj, sort_keys=True, separators=(",", ":"))
@@ -998,6 +1003,22 @@ def test_ac07_europe_pmc_core_parser_tracks_requested_subset_and_normalizes_know
     assert all(row["pmid"].isdigit() for row in rows)
     assert all(row["is_open_access"] in {"Y", "N"} for row in rows)
     assert all(row["licence"] in KNOWN_LICENCE_VALUES for row in rows)
+    by_pmid = {row["pmid"]: row for row in rows}
+    assert by_pmid["9101"]["licence"] == "CC BY"
+    assert by_pmid["9102"]["licence"] == "CC BY-NC-ND"
+    assert by_pmid["9104"]["licence"] is None
+
+    mixed_case = _europe_pmc_core_payload_dict()
+    mixed_case["resultList"]["result"][0]["license"] = " cC bY-Nc-sA "
+    mixed_case["resultList"]["result"][2]["license"] = " cc by "
+    normalized = api["parse_europe_pmc_core"](
+        json.dumps(mixed_case, sort_keys=True, separators=(",", ":")),
+        requested_pmids=["9101", "9102", "9103", "9104"],
+    )
+    normalized_by_pmid = {row["pmid"]: row for row in normalized["records"]}
+    assert normalized_by_pmid["9101"]["licence"] == "CC BY-NC-SA"
+    assert normalized_by_pmid["9102"]["licence"] == "CC BY-NC-ND"
+    assert normalized_by_pmid["9104"]["licence"] == "CC BY"
     assert parsed["counts"]["records_returned"] == 3
     assert parsed["counts"]["pmcid_count"] == 2
     assert parsed["counts"]["abstract_count"] == 2
@@ -1006,13 +1027,21 @@ def test_ac07_europe_pmc_core_parser_tracks_requested_subset_and_normalizes_know
 def test_ac07_europe_pmc_core_parser_rejects_invalid_open_access_or_licence(
 ) -> None:
     api = _parse_api()
-    bad_cases = [("YES", None), (None, "CC BY-SA")]
+    bad_cases = [("YES", None), (None, "CC BY-SA"), (None, "ccby"), (None, "cc by 4.0"), (None, "cc by nd")]
     for bad_open_access, bad_licence in bad_cases:
         with pytest.raises(api["R611QLiteratureParseError"], match="open|access|licen"):
             api["parse_europe_pmc_core"](
                 _europe_pmc_core_payload(bad_open_access=bad_open_access, bad_licence=bad_licence),
                 requested_pmids=["9101", "9102", "9103", "9104"],
             )
+
+    non_string_case = _europe_pmc_core_payload_dict()
+    non_string_case["resultList"]["result"][0]["license"] = 123
+    with pytest.raises(api["R611QLiteratureParseError"], match="licen|type|string"):
+        api["parse_europe_pmc_core"](
+            json.dumps(non_string_case, sort_keys=True, separators=(",", ":")),
+            requested_pmids=["9101", "9102", "9103", "9104"],
+        )
 
 
 def test_ac07_europe_pmc_core_parser_rejects_hitcount_source_identity_and_field_drift() -> None:
@@ -1063,6 +1092,14 @@ def test_ac07_europe_pmc_core_parser_rejects_hitcount_source_identity_and_field_
 
 def test_ac08_cc_by_candidate_selection_and_jats_parser_enforce_exact_cc_by_only() -> None:
     api = _parse_api()
+    parsed_core = api["parse_europe_pmc_core"](
+        _europe_pmc_core_payload(),
+        requested_pmids=["9101", "9102", "9103", "9104"],
+    )
+    canonical_records = parsed_core["records"]
+    canonical_candidates = api["select_cc_by_fulltext_candidates"](canonical_records)
+    assert canonical_candidates == ["PMC9101"]
+
     records = [
         {"pmid": "9101", "pmcid": "PMC9101", "licence": "CC BY", "is_open_access": "Y"},
         {"pmid": "9102", "pmcid": "PMC9102", "licence": "CC BY", "is_open_access": "N"},
