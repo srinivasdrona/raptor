@@ -29,8 +29,8 @@ BUNDLE_PATH = PACKAGE_ROOT / "bundle.py"
 INIT_PATH = PACKAGE_ROOT / "__init__.py"
 
 SPEC_ID = "raptor-v2-functional-coverage-map-v1"
-SPEC_VERSION = "1.0.1"
-CONFIG_CANONICAL_LF_SHA256 = "e5082dcbe75338949f386c6b193016befc0f9f7e56b6371267ba07584576ad05"
+SPEC_VERSION = "1.0.2"
+CONFIG_CANONICAL_LF_SHA256 = "b70d0fbf5d3117c4d0057f5df0846315809097d41c9d8c582e0c424a3dcc58de"
 COVERAGE_ROW_SCHEMA = "raptor.external.tsc2_functional_coverage_row.v1"
 BUNDLE_SCHEMA = "raptor.external.tsc2_functional_coverage_bundle.v1"
 SUMMARY_SCHEMA = "raptor.external.tsc2_functional_coverage_summary.v1"
@@ -2731,6 +2731,89 @@ def test_fc12d_manifest_rejects_cross_cohort_arithmetic_self_hash_mutations() ->
     )
 
 
+def test_fc12e_manifest_rejects_priority_arithmetic_self_hash_mutations() -> None:
+    bundle_api = _bundle_api()
+    manifest_err = bundle_api["CoverageManifestError"]
+    validate = bundle_api["validate_manifest_content_hash"]
+    recompute = bundle_api["compute_manifest_content_hash"]
+    manifest, _ = _minimal_manifest_and_payload(bundle_api)
+
+    def _reject(mutator: Any) -> None:
+        candidate = deepcopy(manifest)
+        priority = candidate["coverage_statistics"]["cohorts"]["priority"]
+        mutator(priority)
+        candidate["content_hash"] = recompute(candidate)
+        with pytest.raises(manifest_err):
+            _invoke_validate_manifest_content_hash(validate, candidate)
+
+    def _lp_exceeds_identities(priority: dict[str, Any]) -> None:
+        priority["candidate_LP_review"] = priority["identities"] + 1
+
+    def _lb_exceeds_identities(priority: dict[str, Any]) -> None:
+        priority["candidate_LB_review"] = priority["identities"] + 1
+
+    def _strata_sum_not_equal_identities(priority: dict[str, Any]) -> None:
+        priority.update({"identities": 2, "TSC1": 0, "TSC2": 2, "candidate_LP_review": 1, "candidate_LB_review": 0})
+
+    def _overlap_sum_not_equal_functional_overlap(priority: dict[str, Any]) -> None:
+        priority.pop("source_membership_patterns", None)
+        priority.update(
+            {
+                "identities": 2,
+                "TSC1": 0,
+                "TSC2": 2,
+                "candidate_LP_review": 1,
+                "candidate_LB_review": 1,
+                "functional_overlap_unique": 1,
+                "candidate_LP_review_overlap": 0,
+                "candidate_LB_review_overlap": 0,
+                "source_overlap_unique": {"mavedb_clipe": 0, "igvf_vamp_seq": 0, "igvf_sge": 0},
+            }
+        )
+
+    def _overlap_exceeds_stratum_count(priority: dict[str, Any]) -> None:
+        priority.pop("source_membership_patterns", None)
+        priority.update(
+            {
+                "identities": 1,
+                "TSC1": 0,
+                "TSC2": 1,
+                "candidate_LP_review": 0,
+                "candidate_LB_review": 1,
+                "functional_overlap_unique": 1,
+                "candidate_LP_review_overlap": 1,
+                "candidate_LB_review_overlap": 0,
+                "source_overlap_unique": {"mavedb_clipe": 0, "igvf_vamp_seq": 0, "igvf_sge": 0},
+            }
+        )
+
+    def _source_overlap_exceeds_functional_overlap(priority: dict[str, Any]) -> None:
+        priority.pop("source_membership_patterns", None)
+        priority.update(
+            {
+                "identities": 1,
+                "TSC1": 0,
+                "TSC2": 1,
+                "candidate_LP_review": 1,
+                "candidate_LB_review": 0,
+                "functional_overlap_unique": 0,
+                "candidate_LP_review_overlap": 0,
+                "candidate_LB_review_overlap": 0,
+                "source_overlap_unique": {"mavedb_clipe": 1, "igvf_vamp_seq": 0, "igvf_sge": 0},
+            }
+        )
+
+    for mutator in (
+        _lp_exceeds_identities,
+        _lb_exceeds_identities,
+        _strata_sum_not_equal_identities,
+        _overlap_sum_not_equal_functional_overlap,
+        _overlap_exceeds_stratum_count,
+        _source_overlap_exceeds_functional_overlap,
+    ):
+        _reject(mutator)
+
+
 def test_fc13_manifest_uses_coverage_statistics_field_and_expected_pilot_comparison_uses_it() -> None:
     bundle_api = _bundle_api()
     operator = _load_operator_module()
@@ -2903,6 +2986,258 @@ def test_fc14_input_reader_and_publication_probe_monkeypatchable_reparse_predica
             artifact_payloads=payloads,
         )
     assert any(sentinel in path for path in bundle_probed)
+
+
+def test_fc14b_real_reproduce_census_strata_rejects_reparse_scorer_eval_paths_before_read_or_parse(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ingest_api = _ingest_api()
+    ingest_module = _load_module("raptor.external.tsc2_functional_coverage.ingest")
+    err = ingest_api["CoverageInputError"]
+    real_fn = getattr(ingest_module, "_real_reproduce_census_strata", None)
+    if real_fn is None:
+        pytest.fail("ingest must expose _real_reproduce_census_strata")
+    if not hasattr(ingest_module, "_is_symlink_or_reparse_point"):
+        pytest.fail("ingest must expose _is_symlink_or_reparse_point for monkeypatchable path safety checks")
+
+    scorer_config_module = import_module("raptor.scorer.config")
+    eval_config_module = import_module("raptor.eval.config")
+    bias_source_module = import_module("raptor.scorer.bias_source")
+    census_strata_module = import_module("raptor.census.strata")
+
+    downstream_calls = {"scorer_load": 0, "eval_load": 0, "bias_records": 0, "reproduce": 0}
+
+    def _fake_scorer_load(_path: str) -> dict[str, Any]:
+        downstream_calls["scorer_load"] += 1
+        return {}
+
+    def _fake_eval_load(_path: str) -> dict[str, Any]:
+        downstream_calls["eval_load"] += 1
+        return {}
+
+    class _FakeBiasSource:
+        def __init__(self, _path: Path) -> None:
+            pass
+
+        def records(self):  # noqa: ANN202 - test seam
+            downstream_calls["bias_records"] += 1
+            return []
+
+    def _fake_reproduce(_bias_rows: Any, _manifest_by_vcf_key: Any, _scorer: Any, _eval: Any) -> list[Any]:
+        downstream_calls["reproduce"] += 1
+        return []
+
+    monkeypatch.setattr(scorer_config_module, "load_config", _fake_scorer_load)
+    monkeypatch.setattr(eval_config_module, "load_config", _fake_eval_load)
+    monkeypatch.setattr(bias_source_module, "BiasTsvSource", _FakeBiasSource)
+    monkeypatch.setattr(census_strata_module, "reproduce_census_strata", _fake_reproduce)
+
+    sentinel = "sentinel-reparse-ancestor"
+    scorer_path = (tmp_path / sentinel / "configs" / "scorer.yaml").resolve()
+    eval_path = (tmp_path / sentinel / "configs" / "eval.yaml").resolve()
+    scorer_path.parent.mkdir(parents=True, exist_ok=True)
+    eval_path.parent.mkdir(parents=True, exist_ok=True)
+    scorer_payload = b"schema: synthetic.scorer\n"
+    eval_payload = b"schema: synthetic.eval\n"
+    scorer_path.write_bytes(scorer_payload)
+    eval_path.write_bytes(eval_payload)
+
+    probed: list[str] = []
+
+    def _fake_reparse(path: Path) -> bool:
+        text = str(path).replace("\\", "/")
+        probed.append(text)
+        return sentinel in text
+
+    monkeypatch.setattr(ingest_module, "_is_symlink_or_reparse_point", _fake_reparse)
+
+    with pytest.raises(err):
+        real_fn(
+            manifest_rows=[],
+            bias_payload=_tsv_bytes(["variant_id", "acmgClassification"], []),
+            scorer_config_pin={"path": str(scorer_path), "raw_sha256": _sha256(scorer_payload)},
+            eval_config_pin={"path": str(eval_path), "raw_sha256": _sha256(eval_payload)},
+        )
+    assert downstream_calls == {"scorer_load": 0, "eval_load": 0, "bias_records": 0, "reproduce": 0}
+    assert any(sentinel in path for path in probed)
+
+
+def test_fc14c_reproduce_priority_subset_rejects_reparse_lineage_packet_paths_before_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = _ingest_api()
+    ingest_module = _load_module("raptor.external.tsc2_functional_coverage.ingest")
+    err = api["CoverageInputError"]
+    if not hasattr(ingest_module, "_is_symlink_or_reparse_point"):
+        pytest.fail("ingest must expose _is_symlink_or_reparse_point for monkeypatchable path safety checks")
+
+    manifest_rows = _manifest_rows(tsc1=0, tsc2=1, pos0_start_tsc1=1000, pos0_start_tsc2=700000)
+    spdi = manifest_rows[0]["variant_id"]
+    queue_rows = _priority_queue_rows([(spdi, "candidate_LP_review")])
+    queue_payload = _jsonl_bytes(queue_rows)
+    queue_pin = _pin_from_payload(payload=queue_payload, relative_path="priority_queue.jsonl", row_count=1)
+    queue_pin["exact_fields"] = list(REAL_PRIORITY_QUEUE_PIN["exact_fields"])
+    queue_pin["required_review_state"] = "POLICY_BLOCKED"
+    queue_pin["required_gate_status"] = "UNVERIFIED"
+
+    aggregate = {
+        "universe_size": 1,
+        "conservation": {
+            "manifest_identities": 1,
+            "bias_rows": 1,
+            "candidate_LP_review": 1,
+            "candidate_LB_review": 0,
+            "no_deterministic_resolution": 0,
+            "manual_review": 0,
+        },
+        "source_hashes": {
+            "manifest_sha256": "synthetic-manifest-sha",
+            "bias_tsv_sha256": "synthetic-bias-sha",
+            "input_vcf_sha256": "synthetic-vcf-sha",
+        },
+        "run_pins": {"code_commit": "synthetic", "source_snapshot": "clinvar_2026-07-07"},
+    }
+    aggregate_payload = _json_bytes(aggregate)
+    aggregate_pin = _pin_from_payload(payload=aggregate_payload, relative_path="aggregate_manifest.json", row_count=1)
+    aggregate_pin["required_values"] = aggregate
+
+    sentinel = "sentinel-reparse-ancestor"
+    lineage_path = (tmp_path / sentinel / "policy" / "lineage.yaml").resolve()
+    packet_path = (tmp_path / sentinel / "policy" / "packet.yaml").resolve()
+    lineage_path.parent.mkdir(parents=True, exist_ok=True)
+    packet_path.parent.mkdir(parents=True, exist_ok=True)
+    lineage_payload = b"schema: synthetic.lineage\n"
+    packet_payload = b"schema: synthetic.packet\n"
+    lineage_path.write_bytes(lineage_payload)
+    packet_path.write_bytes(packet_payload)
+
+    real_reproduce_calls = {"count": 0}
+
+    def _fake_real_reproduce(**_kwargs: Any) -> list[dict[str, Any]]:
+        real_reproduce_calls["count"] += 1
+        return [{"variant_id": spdi, "stratum": "candidate_LP_review"}]
+
+    monkeypatch.setattr(ingest_module, "_real_reproduce_census_strata", _fake_real_reproduce)
+
+    probed: list[str] = []
+
+    def _fake_reparse(path: Path) -> bool:
+        text = str(path).replace("\\", "/")
+        probed.append(text)
+        return sentinel in text
+
+    monkeypatch.setattr(ingest_module, "_is_symlink_or_reparse_point", _fake_reparse)
+
+    with pytest.raises(err):
+        api["reproduce_priority_subset"](
+            vus_manifest_payload=_jsonl_bytes(manifest_rows),
+            bias_payload=_tsv_bytes(["variant_id", "acmgClassification"], [[spdi, "unused"]]),
+            aggregate_manifest_payload=aggregate_payload,
+            queue_payload=queue_payload,
+            expected={"candidate_LP_review": 1, "candidate_LB_review": 0, "total": 1, "gene_counts": {"TSC1": 0, "TSC2": 1}},
+            queue_pin=queue_pin,
+            aggregate_manifest_pin=aggregate_pin,
+            predictor_policy={"schema": "bp4pp3-predictor-policy/2", "status": "approved", "mode": "disabled_manual"},
+            scorer_config_pin={"path": str(lineage_path), "raw_sha256": _sha256(lineage_payload)},
+            eval_config_pin={"path": str(packet_path), "raw_sha256": _sha256(packet_payload)},
+            lineage_policy_pin={"path": str(lineage_path), "raw_sha256": _sha256(lineage_payload)},
+            packet_policy_pin={"path": str(packet_path), "raw_sha256": _sha256(packet_payload)},
+        )
+    assert real_reproduce_calls["count"] == 0
+    assert any(sentinel in path for path in probed)
+
+
+def test_fc14d_load_atlas_rejects_reparse_disease_pack_path_before_loader_call(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = _ingest_api()
+    ingest_module = _load_module("raptor.external.tsc2_functional_coverage.ingest")
+    err = api["CoverageInputError"]
+    if not hasattr(ingest_module, "_is_symlink_or_reparse_point"):
+        pytest.fail("ingest must expose _is_symlink_or_reparse_point for monkeypatchable path safety checks")
+
+    raw_inventory_rows = [
+        {"raw_record_id": f"raw-{i}", "raw_identity_string": f"p.Synthetic{i}", "source_reported_consequence_hint": "missense_substitution"}
+        for i in range(1, 36)
+    ]
+    map_payload = yaml.safe_dump(
+        {"schema": "atlas.raw_identity_map.v2", "map_record_count": 35, "records": [{"raw_record_id": row["raw_record_id"]} for row in raw_inventory_rows]},
+        sort_keys=False,
+    ).encode("utf-8")
+    lock_payload_body = {"schema": "atlas.raw_identity_map_lock.v2", "map_content_hash": "synthetic-map-content-hash"}
+    lock_payload = _yaml_bytes(lock_payload_body, sort_keys=True)
+    lock_payload_body["lock_content_hash"] = _identity_map_lock_content_hash(lock_payload)
+    lock_payload = _yaml_bytes(lock_payload_body, sort_keys=True)
+    raw_inventory_payload = yaml.safe_dump(
+        {"schema": "atlas.discovery_inventory.raw.v1", "row_count": 35, "records": raw_inventory_rows},
+        sort_keys=False,
+    ).encode("utf-8")
+    response_bundle_observed = _response_bundle_observed({"official_responses/x.json": b'{"id":"x"}\n'})
+
+    expected_map_pin = {
+        "schema": "atlas.raw_identity_map.v2",
+        "sha256": _sha256(map_payload),
+        "byte_length": len(map_payload),
+        "map_record_count": 35,
+    }
+    expected_lock_pin = {"schema": "atlas.raw_identity_map_lock.v2", "lock_content_hash": lock_payload_body["lock_content_hash"]}
+    expected_raw_inventory_pin = {"sha256": _sha256(raw_inventory_payload), "byte_length": len(raw_inventory_payload), "row_count": 35}
+    expected_response_bundle_pin = dict(response_bundle_observed)
+
+    class _FakeMapper:
+        def replay(self, raw_record_id: str, _raw_identity_string: str, _hint: str) -> dict[str, Any]:
+            idx = int(raw_record_id.split("-")[1])
+            if idx <= 25:
+                return {"identity_state": "resolved", "spdi_canonical": f"NC_000016.10:{910000 + idx}:G:A"}
+            return {"identity_state": "unresolved", "spdi_canonical": None}
+
+    load_calls = {"pack": 0, "map": 0}
+
+    def _fake_load_pack(_path: Path) -> object:
+        load_calls["pack"] += 1
+        return object()
+
+    def _fake_load_map(**_kwargs: Any) -> _FakeMapper:
+        load_calls["map"] += 1
+        return _FakeMapper()
+
+    sentinel = "sentinel-reparse-ancestor"
+    disease_pack_path = (tmp_path / sentinel / "pack.yaml").resolve()
+    probed: list[str] = []
+
+    def _fake_reparse(path: Path) -> bool:
+        text = str(path).replace("\\", "/")
+        probed.append(text)
+        return sentinel in text
+
+    monkeypatch.setattr(ingest_module, "_is_symlink_or_reparse_point", _fake_reparse)
+
+    with pytest.raises(err):
+        api["load_atlas_contrast_replays"](
+            map_path=Path("synthetic/raw_identity_map.yaml"),
+            response_root=Path("synthetic/official_responses"),
+            lock_path=Path("synthetic/lock.yaml"),
+            disease_pack_path=disease_pack_path,
+            raw_inventory_path=Path("synthetic/discovery_inventory.raw.yaml"),
+            map_payload=map_payload,
+            lock_payload=lock_payload,
+            raw_inventory_payload=raw_inventory_payload,
+            response_bundle_observed=response_bundle_observed,
+            raw_inventory_rows=raw_inventory_rows,
+            expected_map_pin=expected_map_pin,
+            expected_lock_pin=expected_lock_pin,
+            expected_raw_inventory_pin=expected_raw_inventory_pin,
+            expected_response_bundle_pin=expected_response_bundle_pin,
+            expected_counts={"raw_records": 35, "resolved_unique_spdi": 25, "unresolved_records": 10},
+            load_disease_pack_fn=_fake_load_pack,
+            load_identity_map_fn=_fake_load_map,
+        )
+    assert load_calls["pack"] == 0
+    assert load_calls["map"] == 0
+    assert any(sentinel in path for path in probed)
 
 
 def test_fc15_publication_create_only_outside_repo_and_no_clobber_manifest_last(
