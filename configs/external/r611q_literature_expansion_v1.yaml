@@ -10,7 +10,7 @@
 # SourceOps declaration/registry configuration.
 
 schema: raptor.external.r611q_literature_expansion_config.v1
-config_version: 1.0.0
+config_version: 1.0.1
 
 variant:
   gene: TSC2

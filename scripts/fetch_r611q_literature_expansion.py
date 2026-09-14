@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 import time
@@ -196,6 +197,55 @@ def _load_baseline_bytes(baseline_manifest_path: Path) -> bytes:
     return baseline_manifest_path.read_bytes()
 
 
+def _validate_rate_limit_override(value: Any, config: dict[str, Any]) -> float:
+    """Validate a caller-supplied ``--min-ncbi-interval-seconds`` override
+    BEFORE any transport is ever constructed: it must be a genuine,
+    non-bool, finite number (never NaN/inf, never a string) that is
+    strictly positive, and it must be at least the configured rate-limit
+    floor -- the maximum of ``rate_limits.ncbi_without_api_key_min_
+    interval_seconds`` and ``rate_limits.europe_pmc_min_interval_seconds``
+    (falling back to ``DEFAULT_MIN_NCBI_INTERVAL_SECONDS`` for either when
+    the config carries no ``rate_limits`` section at all). A caller may
+    only ever REQUEST a slower (higher) request spacing than the
+    configured floor, never a faster one."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise R611QOperatorError(
+            f"--min-ncbi-interval-seconds must be a genuine number (never a bool): {value!r}"
+        )
+    numeric = float(value)
+    if not math.isfinite(numeric):
+        raise R611QOperatorError(
+            f"--min-ncbi-interval-seconds must be finite (NaN/inf are rejected): {value!r}"
+        )
+    if numeric <= 0:
+        raise R611QOperatorError(
+            f"--min-ncbi-interval-seconds must be strictly positive: {value!r}"
+        )
+
+    rate_limits_cfg = config.get("rate_limits")
+    if not isinstance(rate_limits_cfg, dict):
+        rate_limits_cfg = {}
+    floor = max(
+        float(
+            rate_limits_cfg.get(
+                "ncbi_without_api_key_min_interval_seconds", DEFAULT_MIN_NCBI_INTERVAL_SECONDS
+            )
+        ),
+        float(
+            rate_limits_cfg.get(
+                "europe_pmc_min_interval_seconds", DEFAULT_MIN_NCBI_INTERVAL_SECONDS
+            )
+        ),
+    )
+    if numeric < floor:
+        raise R611QOperatorError(
+            f"--min-ncbi-interval-seconds {numeric!r} is below the configured minimum "
+            f"rate-limit floor {floor!r}; only a value at or above the configured floor is "
+            f"ever accepted (a caller may only request slower spacing, never faster)"
+        )
+    return numeric
+
+
 def _validate_expected_counts(*, observed: dict[str, Any], expected: dict[str, Any]) -> None:
     """Gate every probe axis derived from this run's actually-parsed data
     (``observed``) against the config's frozen ``probe_expected_counts``
@@ -251,14 +301,15 @@ def run_ingestion(
     never writes the committed summary."""
     plan = _validate_plan(config)
     baseline_cfg = _require(config, "baseline")
+    baseline_expected = baseline_cfg.get("expected") or {}
     baseline_bytes = _load_baseline_bytes(baseline_manifest_path)
     baseline = parse_mod.parse_baseline_manifest(
         payload_bytes=baseline_bytes,
         expected_schema=baseline_cfg["schema"],
         expected_sha256=baseline_cfg["sha256"],
         expected_byte_length=baseline_cfg["byte_length"],
-        expected_pmid_publications=baseline_cfg["expected"]["pmid_publications"],
-        expected_doi_only_publications=baseline_cfg["expected"]["doi_only_publications"],
+        expected_pmid_publications=baseline_expected.get("pmid_publications"),
+        expected_doi_only_publications=baseline_expected.get("doi_only_publications"),
     )
 
     artifacts: list[dict[str, Any]] = []
@@ -331,35 +382,43 @@ def run_ingestion(
 
     pubmed_articles: list[dict[str, Any]] = []
     pubmed_missing: list[str] = []
+    pubmed_fetch: dict[str, Any] | None = None
     if new_pmids:
         pubmed_cfg = _require(config, "sources", "pubmed")
-        batch_size = int(pubmed_cfg.get("batch_size", 200))
-        artifact_payload_parts: list[bytes] = []
-        for start in range(0, len(new_pmids), batch_size):
-            batch = new_pmids[start : start + batch_size]
-            efetch_url = endpoint_mod.build_pubmed_efetch_url(pmids=batch, tool=plan["tool"])
-            fetched = endpoint_mod.request_with_transport(requested_url=efetch_url, transport=transport)
-            artifact_payload_parts.append(fetched["body"])
-            parsed = parse_mod.parse_pubmed_articles_xml(
-                fetched["body"].decode("utf-8"), expected_pmids=batch
+        batch_size = pubmed_cfg.get("batch_size")
+        if not isinstance(batch_size, int) or isinstance(batch_size, bool) or batch_size <= 0:
+            raise R611QOperatorError(
+                f"pubmed batch_size must be a positive integer: {batch_size!r}"
             )
-            pubmed_articles.extend(parsed["articles"])
-            pubmed_missing.extend(parsed["requested_but_missing_pmids"])
+        if len(new_pmids) > batch_size:
+            raise R611QOperatorError(
+                f"the derived new-PMID set ({len(new_pmids)}) exceeds the configured pubmed "
+                f"batch_size ({batch_size}); this slice requires every new-PMID lead to fit "
+                f"in a single bounded EFetch batch and fails rather than silently broadening "
+                f"to multiple batches"
+            )
 
-        combined_pubmed_body = b"\n".join(artifact_payload_parts)
+        efetch_url = endpoint_mod.build_pubmed_efetch_url(pmids=new_pmids, tool=plan["tool"])
+        pubmed_fetch = endpoint_mod.request_with_transport(requested_url=efetch_url, transport=transport)
+        parsed = parse_mod.parse_pubmed_articles_xml(
+            pubmed_fetch["body"].decode("utf-8"), expected_pmids=new_pmids
+        )
+        pubmed_articles = parsed["articles"]
+        pubmed_missing = parsed["requested_but_missing_pmids"]
+
         artifacts.append(
             {
                 "artifact_id": "raw-pubmed",
                 "source_id": "pubmed",
                 "role": "RAW_RESPONSE",
-                "requested_url": "batched",
-                "final_url": "batched",
-                "http_status": 200,
-                "media_type": "application/xml",
+                "requested_url": pubmed_fetch["requested_url"],
+                "final_url": pubmed_fetch["final_url"],
+                "http_status": pubmed_fetch["http_status"],
+                "media_type": pubmed_fetch["media_type"],
                 "relative_path": "raw/pubmed-efetch.xml",
-                "byte_length": len(combined_pubmed_body),
-                "sha256": __import__("hashlib").sha256(combined_pubmed_body).hexdigest(),
-                "md5": __import__("hashlib").md5(combined_pubmed_body).hexdigest(),  # nosec B303
+                "byte_length": pubmed_fetch["byte_length"],
+                "sha256": pubmed_fetch["sha256"],
+                "md5": __import__("hashlib").md5(pubmed_fetch["body"]).hexdigest(),  # nosec B303
                 "fetched_at": created_at,
                 "verification": "HASHED",
             }
@@ -562,7 +621,7 @@ def run_ingestion(
     artifact_payloads["raw/clinvar-esearch.json"] = esearch_fetch["body"]
     artifact_payloads["raw/clinvar-pubmed-links.json"] = elink_fetch["body"]
     if new_pmids:
-        artifact_payloads["raw/pubmed-efetch.xml"] = combined_pubmed_body
+        artifact_payloads["raw/pubmed-efetch.xml"] = pubmed_fetch["body"]
         artifact_payloads["raw/europepmc-core.json"] = core_fetch["body"]
     for pmcid in fulltext_acquired_pmcids:
         artifact_payloads[f"fulltext/{pmcid}.xml"] = fulltext_bytes_by_pmcid[pmcid]
@@ -649,8 +708,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  output_root={output_root} run_name={run_name}")
         return 0
 
+    try:
+        validated_min_interval = _validate_rate_limit_override(args.min_ncbi_interval_seconds, config)
+    except R611QOperatorError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
     rate_limiter = _RateLimiter(
-        {host: float(args.min_ncbi_interval_seconds) for host in _RATE_LIMITED_HOSTS}
+        {host: validated_min_interval for host in _RATE_LIMITED_HOSTS}
     )
     transport = _make_transport(rate_limiter)
 

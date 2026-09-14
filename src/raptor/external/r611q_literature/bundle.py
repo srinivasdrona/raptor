@@ -173,6 +173,17 @@ def _validate_extended_manifest_schema(manifest: dict[str, Any]) -> None:
         raise BundleBoundaryError("manifest 'source_response_hashes' must be a non-empty mapping")
     for key, value in source_response_hashes.items():
         _assert_hex64(value, label=f"source_response_hashes[{key!r}]")
+    derived_source_response_hashes = {
+        artifact["source_id"]: artifact["sha256"]
+        for artifact in artifacts
+        if artifact.get("role") == _RAW_RESPONSE_ROLE
+    }
+    if derived_source_response_hashes and source_response_hashes != derived_source_response_hashes:
+        raise BundleBoundaryError(
+            "manifest 'source_response_hashes' does not exactly equal the derived mapping "
+            f"from RAW_RESPONSE artifacts: recorded={source_response_hashes!r} "
+            f"derived={derived_source_response_hashes!r}"
+        )
 
     licence_counts = manifest["licence_counts"]
     if not isinstance(licence_counts, dict):
@@ -200,6 +211,20 @@ def _validate_extended_manifest_schema(manifest: dict[str, Any]) -> None:
         raise BundleBoundaryError(
             "manifest 'fulltext_artifact_hashes' is invalid: entries must be unique, valid "
             f"sha256 hex and sorted ascending; got {fulltext_artifact_hashes!r}"
+        )
+    derived_fulltext_artifact_hashes = sorted(
+        artifact["sha256"] for artifact in artifacts if artifact.get("role") == _FULLTEXT_ROLE
+    )
+    # Cross-checked against the real FULLTEXT_XML artifacts ONLY when this
+    # manifest actually has real RAW_RESPONSE artifacts to derive `source_
+    # response_hashes` from (i.e. it looks like a genuinely-built
+    # acquisition manifest, not a synthetic/placeholder one whose
+    # extension fields were hand-populated independently of `artifacts`).
+    if derived_source_response_hashes and fulltext_artifact_hashes != derived_fulltext_artifact_hashes:
+        raise BundleBoundaryError(
+            "manifest 'fulltext_artifact_hashes' does not exactly equal the derived sorted "
+            f"sha256 list of FULLTEXT_XML artifacts: recorded={fulltext_artifact_hashes!r} "
+            f"derived={derived_fulltext_artifact_hashes!r}"
         )
 
     counts = manifest["counts"]
@@ -403,19 +428,25 @@ def build_bundle_manifest(
     ``raptor.external.r611q_literature_bundle.v1`` manifest from
     already-verified artifact/source records (validated via the shared
     ``tsc2_sources.bundle`` schema/cross-reference checks). ``source_
-    response_hashes`` defaults to one entry per artifact whose ``role`` is
-    ``RAW_RESPONSE`` (keyed by ``source_id``); ``baseline_hashes``
-    defaults to a hash of ``query`` when the caller supplies none
-    (guaranteeing the field is never empty even for a minimal manifest
-    with no explicit baseline artifact). ``unresolved`` defaults to
-    ``{"pubmed_missing_pmids": [], "europe_pmc_unresolved_pmids": []}``
-    when the caller supplies none/an empty mapping -- the KEY set is never
-    empty, even when every PMID resolved. ``fulltext_artifact_hashes`` is
-    always DERIVED -- never caller-supplied -- as the sorted SHA-256 list
-    of every artifact whose ``role`` is ``FULLTEXT_XML``. Raises
-    ``BundleBoundaryError`` on a malformed record or a broken artifact/
-    source cross-reference, and ``StatusVocabularyError`` if any source
-    contains forbidden clinical/ACMG/classification vocabulary."""
+    response_hashes`` is ALWAYS the exact derived mapping of one entry
+    per artifact whose ``role`` is ``RAW_RESPONSE`` (keyed by
+    ``source_id``) whenever at least one such artifact exists -- the
+    optional ``source_response_hashes`` kwarg is NEVER merged/overridden
+    into that derived mapping in that case (it is only ever consulted as
+    a fallback when there is no RAW_RESPONSE artifact at all, alongside
+    the final ``query``-hash fallback, so the field is never left empty).
+    ``baseline_hashes`` defaults to a hash of ``query`` when the caller
+    supplies none (guaranteeing the field is never empty even for a
+    minimal manifest with no explicit baseline artifact). ``unresolved``
+    defaults to ``{"pubmed_missing_pmids": [], "europe_pmc_unresolved_
+    pmids": []}`` when the caller supplies none/an empty mapping -- the
+    KEY set is never empty, even when every PMID resolved.
+    ``fulltext_artifact_hashes`` is always DERIVED -- never caller-
+    supplied -- as the sorted SHA-256 list of every artifact whose
+    ``role`` is ``FULLTEXT_XML``. Raises ``BundleBoundaryError`` on a
+    malformed record or a broken artifact/source cross-reference, and
+    ``StatusVocabularyError`` if any source contains forbidden clinical/
+    ACMG/classification vocabulary."""
     artifacts = list(artifacts)
     sources = list(sources)
 
@@ -432,10 +463,14 @@ def build_bundle_manifest(
         for artifact in artifacts
         if artifact["role"] == _RAW_RESPONSE_ROLE
     }
-    if source_response_hashes:
-        derived_source_response_hashes.update(source_response_hashes)
     if not derived_source_response_hashes:
-        derived_source_response_hashes = {"query": _sha256_of(query)}
+        # No RAW_RESPONSE artifact exists to derive from -- fall back to
+        # the caller's optional mapping (never merged/updated once real
+        # artifacts exist; see below), or a query hash as a last resort so
+        # the field is never left empty.
+        derived_source_response_hashes = dict(source_response_hashes) if source_response_hashes else {
+            "query": _sha256_of(query)
+        }
 
     derived_baseline_hashes = dict(baseline_hashes) if baseline_hashes else {}
     if not derived_baseline_hashes:
