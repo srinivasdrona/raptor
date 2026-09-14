@@ -29,7 +29,8 @@ BUNDLE_PATH = PACKAGE_ROOT / "bundle.py"
 INIT_PATH = PACKAGE_ROOT / "__init__.py"
 
 SPEC_ID = "raptor-v2-functional-coverage-map-v1"
-SPEC_VERSION = "1.0.0"
+SPEC_VERSION = "1.0.1"
+CONFIG_CANONICAL_LF_SHA256 = "e5082dcbe75338949f386c6b193016befc0f9f7e56b6371267ba07584576ad05"
 COVERAGE_ROW_SCHEMA = "raptor.external.tsc2_functional_coverage_row.v1"
 BUNDLE_SCHEMA = "raptor.external.tsc2_functional_coverage_bundle.v1"
 SUMMARY_SCHEMA = "raptor.external.tsc2_functional_coverage_summary.v1"
@@ -540,6 +541,10 @@ def _jsonl_bytes(rows: list[dict[str, Any]]) -> bytes:
 
 def _json_bytes(payload: dict[str, Any]) -> bytes:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def _canonical_lf(payload: bytes) -> bytes:
+    return payload.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
 
 
 def _yaml_bytes(payload: dict[str, Any], *, sort_keys: bool = True) -> bytes:
@@ -2267,6 +2272,50 @@ def test_fc09_atlas_contrast_loader_must_call_public_load_identity_map_seam_and_
         )
 
 
+def test_fc09b_operator_rejects_reparse_response_root_before_tree_hash_call(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    operator = _load_operator_module()
+    op_error = getattr(operator, "Tsc2FunctionalCoverageMapOperatorError", RuntimeError)
+    helper = (
+        getattr(operator, "_compute_response_bundle_observed", None)
+        or getattr(operator, "_hash_response_bundle", None)
+        or getattr(operator, "_compute_official_response_bundle_observed", None)
+    )
+    if helper is None:
+        pytest.fail(
+            "operator must expose a monkeypatchable response-root hashing helper "
+            "(for reparse rejection before response-tree hashing)"
+        )
+
+    sentinel = "sentinel-reparse-ancestor"
+    response_root = tmp_path / sentinel / "official_responses"
+    response_root.mkdir(parents=True, exist_ok=True)
+    hash_calls = {"count": 0}
+
+    def _fake_hash_fn(_root: Path) -> tuple[str, int, int]:
+        hash_calls["count"] += 1
+        return ("0" * 64, 0, 0)
+
+    def _fake_reparse_predicate(path: Path) -> bool:
+        return sentinel in str(path).replace("\\", "/")
+
+    monkeypatch.setattr(operator, "_is_symlink_or_reparse_point", _fake_reparse_predicate)
+
+    kwargs = {"response_root": response_root}
+    sig = inspect.signature(helper)
+    if "compute_bundle_hash_fn" in sig.parameters:
+        kwargs["compute_bundle_hash_fn"] = _fake_hash_fn
+    else:
+        atlas_identity_map = import_module("raptor.atlas.identity_map")
+        monkeypatch.setattr(atlas_identity_map, "_compute_bundle_hash", _fake_hash_fn)
+
+    with pytest.raises(op_error):
+        helper(**kwargs)
+    assert hash_calls["count"] == 0
+
+
 def test_fc10_anchor_validation_uses_nested_variant_spdi_and_raw_byte_pin() -> None:
     api = _ingest_api()
     err = api["CoverageInputError"]
@@ -2535,6 +2584,139 @@ def test_fc12b_manifest_coverage_statistics_nested_whitelist_arithmetic_and_hash
     mutated["coverage_statistics"]["functional"]["source_membership_patterns"]["spdi"] = 1
     with pytest.raises((manifest_err, boundary_err)):
         _invoke_validate_manifest_content_hash(bundle_api["validate_manifest_content_hash"], mutated)
+
+
+def test_fc12c_statistics_reject_row_membership_flags_disagreeing_with_full_inputs() -> None:
+    api = _coverage_api()
+    err = api["CoverageBuildError"]
+    compute = api["compute_coverage_statistics"]
+
+    row_priority_vus = _coverage_row(
+        spdi="NC_000016.10:100:A:G",
+        source_ids=["mavedb_clipe"],
+        vus=True,
+        priority="candidate_LP_review",
+        holdout=False,
+        atlas_contrast=True,
+        atlas_anchor=False,
+    )
+    row_holdout_anchor = _coverage_row(
+        spdi="NC_000016.10:200:C:T",
+        source_ids=["igvf_sge"],
+        vus=False,
+        priority=None,
+        holdout=True,
+        atlas_contrast=False,
+        atlas_anchor=True,
+    )
+    base_rows = [row_priority_vus, row_holdout_anchor]
+    context = {
+        "vus_spdis": {"NC_000016.10:100:A:G"},
+        "priority_spdis": {"NC_000016.10:100:A:G"},
+        "priority_by_spdi": {"NC_000016.10:100:A:G": "candidate_LP_review"},
+        "prospective_holdout_spdis": {"NC_000016.10:200:C:T"},
+        "atlas_contrast_spdis": {"NC_000016.10:100:A:G"},
+        "atlas_anchor_spdi": "NC_000016.10:200:C:T",
+        "vus_gene_counts": {"TSC1": 0, "TSC2": 1},
+        "priority_gene_counts": {"TSC1": 0, "TSC2": 1},
+        "prospective_holdout_gene_counts": {"TSC1": 0, "TSC2": 1},
+        "atlas_raw_records": 2,
+        "atlas_resolved_count": 2,
+        "atlas_unresolved_count": 0,
+    }
+
+    _compute_statistics(compute, coverage_rows=deepcopy(base_rows), full_context=deepcopy(context))
+
+    mutated_sets: list[list[dict[str, Any]]] = [
+        [
+            _coverage_row(
+                spdi="NC_000016.10:100:A:G",
+                source_ids=["mavedb_clipe"],
+                vus=False,
+                priority=None,
+                holdout=False,
+                atlas_contrast=True,
+                atlas_anchor=False,
+            ),
+            deepcopy(row_holdout_anchor),
+        ],
+        [
+            _coverage_row(
+                spdi="NC_000016.10:100:A:G",
+                source_ids=["mavedb_clipe"],
+                vus=True,
+                priority="candidate_LB_review",
+                holdout=False,
+                atlas_contrast=True,
+                atlas_anchor=False,
+            ),
+            deepcopy(row_holdout_anchor),
+        ],
+        [
+            deepcopy(row_priority_vus),
+            _coverage_row(
+                spdi="NC_000016.10:200:C:T",
+                source_ids=["igvf_sge"],
+                vus=False,
+                priority=None,
+                holdout=False,
+                atlas_contrast=False,
+                atlas_anchor=True,
+            ),
+        ],
+        [
+            _coverage_row(
+                spdi="NC_000016.10:100:A:G",
+                source_ids=["mavedb_clipe"],
+                vus=True,
+                priority="candidate_LP_review",
+                holdout=False,
+                atlas_contrast=False,
+                atlas_anchor=False,
+            ),
+            deepcopy(row_holdout_anchor),
+        ],
+        [
+            deepcopy(row_priority_vus),
+            _coverage_row(
+                spdi="NC_000016.10:200:C:T",
+                source_ids=["igvf_sge"],
+                vus=False,
+                priority=None,
+                holdout=True,
+                atlas_contrast=False,
+                atlas_anchor=False,
+            ),
+        ],
+    ]
+
+    for mutated_rows in mutated_sets:
+        with pytest.raises(err):
+            _compute_statistics(compute, coverage_rows=mutated_rows, full_context=deepcopy(context))
+
+
+def test_fc12d_manifest_rejects_cross_cohort_arithmetic_self_hash_mutations() -> None:
+    bundle_api = _bundle_api()
+    manifest_err = bundle_api["CoverageManifestError"]
+    validate = bundle_api["validate_manifest_content_hash"]
+    recompute = bundle_api["compute_manifest_content_hash"]
+    manifest, _ = _minimal_manifest_and_payload(bundle_api)
+
+    def _reject(mutator: Any) -> None:
+        candidate = deepcopy(manifest)
+        mutator(candidate)
+        candidate["content_hash"] = recompute(candidate)
+        with pytest.raises(manifest_err):
+            _invoke_validate_manifest_content_hash(validate, candidate)
+
+    _reject(lambda m: m["coverage_statistics"]["cross_cohort"].__setitem__("vus__prospective_holdout", 1))
+    _reject(lambda m: m["coverage_statistics"]["cross_cohort"].__setitem__("priority__atlas_contrast", 1))
+    _reject(lambda m: m["coverage_statistics"]["cross_cohort"].__setitem__("functional__vus__atlas_contrast", 2))
+    _reject(
+        lambda m: m["coverage_statistics"]["cross_cohort"].__setitem__(
+            "functional__atlas_contrast_outside_vus_holdout", 1
+        )
+    )
 
 
 def test_fc13_manifest_uses_coverage_statistics_field_and_expected_pilot_comparison_uses_it() -> None:
@@ -2806,6 +2988,48 @@ def test_fc15_publication_create_only_outside_repo_and_no_clobber_manifest_last(
         )
 
 
+def test_fc15b_publication_cleanup_raises_typed_boundary_error_when_staging_cleanup_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bundle_api = _bundle_api()
+    bundle_module = _load_module("raptor.external.tsc2_functional_coverage.bundle")
+    boundary_err = bundle_api["CoverageBundleBoundaryError"]
+
+    repo_root = (tmp_path / "repo").resolve()
+    repo_root.mkdir(parents=True, exist_ok=True)
+    output_root = (tmp_path / "external").resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    manifest, payloads = _minimal_manifest_and_payload(bundle_api)
+    bad_payloads = deepcopy(payloads)
+    bad_payloads[OUTPUT_ARTIFACT_PATH] = bad_payloads[OUTPUT_ARTIFACT_PATH] + b"drift"
+
+    def _failing_rmtree(_path: Path, ignore_errors: bool = False) -> None:
+        raise OSError("cleanup failed for staging directory")
+
+    monkeypatch.setattr(bundle_module.shutil, "rmtree", _failing_rmtree)
+    with pytest.raises(boundary_err, match="cleanup"):
+        bundle_api["publish_coverage_bundle"](
+            repo_root=repo_root,
+            output_root=output_root,
+            run_name="cleanup-failure-run",
+            manifest=manifest,
+            artifact_payloads=bad_payloads,
+        )
+
+    tree = ast.parse(BUNDLE_PATH.read_text(encoding="utf-8"), filename=str(BUNDLE_PATH))
+    broad_handlers = [
+        handler.lineno
+        for handler in ast.walk(tree)
+        if isinstance(handler, ast.ExceptHandler)
+        and (
+            handler.type is None
+            or (isinstance(handler.type, ast.Name) and handler.type.id in {"Exception", "BaseException"})
+        )
+    ]
+    assert not broad_handlers, f"bundle.py must not use broad exception handlers: lines={broad_handlers}"
+
+
 def test_fc16_static_import_boundaries_allow_only_named_seams_and_forbid_network_packet_kb_rescuescreen() -> None:
     targets = [MODEL_PATH, INGEST_PATH, COVERAGE_PATH, BUNDLE_PATH, OPERATOR_SCRIPT]
     missing = [path for path in targets if not path.is_file()]
@@ -2868,6 +3092,88 @@ def test_fc17_production_overlap_literals_are_forbidden_outside_operator_expecte
                 f"forbidden expected-pilot literal {pattern!r} must appear only in _validate_expected_pilot_result; "
                 f"found at line {line_no}"
             )
+
+
+def test_fc17b_operator_config_trust_gate_uses_exact_default_absolute_path_and_pinned_hash(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    operator = _load_operator_module()
+    op_error = getattr(operator, "Tsc2FunctionalCoverageMapOperatorError", RuntimeError)
+    load_config = getattr(operator, "_load_config", None)
+    if load_config is None:
+        pytest.fail("operator must define _load_config(config_path)")
+
+    source = OPERATOR_SCRIPT.read_text(encoding="utf-8")
+    assert CONFIG_CANONICAL_LF_SHA256 in source, "operator must embed pinned canonical-LF config hash"
+
+    pinned_names = [
+        name for name, value in vars(operator).items() if isinstance(value, str) and value == CONFIG_CANONICAL_LF_SHA256
+    ]
+    assert pinned_names, "operator module must expose pinned canonical-LF config hash constant"
+
+    default_config = getattr(operator, "DEFAULT_CONFIG", None)
+    assert isinstance(default_config, Path), "operator.DEFAULT_CONFIG must be a Path"
+    assert default_config.is_absolute(), "operator.DEFAULT_CONFIG must be absolute"
+    assert default_config == CONFIG_PATH, "operator.DEFAULT_CONFIG must target the canonical config path"
+
+    safe_load_calls = {"count": 0}
+    real_safe_load = operator.yaml.safe_load
+
+    def _spy_safe_load(payload: Any) -> Any:
+        safe_load_calls["count"] += 1
+        return real_safe_load(payload)
+
+    monkeypatch.setattr(operator.yaml, "safe_load", _spy_safe_load)
+
+    with pytest.raises(op_error):
+        load_config(Path("configs/external/tsc2_functional_coverage_map_v1.yaml"))
+    assert safe_load_calls["count"] == 0
+
+    config_copy = (tmp_path / "copy.yaml").resolve()
+    config_copy.write_bytes(default_config.read_bytes())
+    with pytest.raises(op_error):
+        load_config(config_copy)
+    assert safe_load_calls["count"] == 0
+
+    alias_path = (tmp_path / "config-alias.yaml").resolve()
+    alias_path.symlink_to(default_config)
+    with pytest.raises(op_error):
+        load_config(alias_path)
+    assert safe_load_calls["count"] == 0
+
+    drifted = (tmp_path / "drifted-default.yaml").resolve()
+    drifted.write_bytes(_canonical_lf(default_config.read_bytes()) + b"\n# drifted\n")
+    monkeypatch.setattr(operator, "DEFAULT_CONFIG", drifted)
+    with pytest.raises(op_error):
+        load_config(drifted)
+    assert safe_load_calls["count"] == 0
+
+
+def test_fc17c_main_loads_and_verifies_config_before_any_root_resolution_or_reader_calls() -> None:
+    if not OPERATOR_SCRIPT.is_file():
+        pytest.fail(f"TSC2 functional coverage operator script is missing: {OPERATOR_SCRIPT}")
+    tree = ast.parse(OPERATOR_SCRIPT.read_text(encoding="utf-8"), filename=str(OPERATOR_SCRIPT))
+    main_node = next((n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "main"), None)
+    if main_node is None:
+        pytest.fail("operator script must define main(argv=...)")
+
+    first_seen: dict[str, int] = {}
+    for node in ast.walk(main_node):
+        if not isinstance(node, ast.Call):
+            continue
+        if isinstance(node.func, ast.Name):
+            name = node.func.id
+        elif isinstance(node.func, ast.Attribute):
+            name = node.func.attr
+        else:
+            continue
+        first_seen.setdefault(name, node.lineno)
+
+    assert "_load_config" in first_seen
+    assert "_resolve_root" in first_seen
+    assert "read_input_payload" in first_seen
+    assert first_seen["_load_config"] < first_seen["_resolve_root"] < first_seen["read_input_payload"]
 
 
 def test_fc18_config_pins_binding_spec_exactly_and_uses_real_frozen_values() -> None:
