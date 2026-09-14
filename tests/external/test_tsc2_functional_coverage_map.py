@@ -36,6 +36,24 @@ SUMMARY_SCHEMA = "raptor.external.tsc2_functional_coverage_summary.v1"
 
 SOURCE_ORDER = ["mavedb_clipe", "igvf_vamp_seq", "igvf_sge"]
 LEAKAGE_MARKER_ORDER = ["PROSPECTIVE_HOLDOUT", "ATLAS_CONTEXT"]
+SOURCE_MEMBERSHIP_PATTERN_KEYS = [
+    "mavedb_clipe",
+    "igvf_vamp_seq",
+    "igvf_sge",
+    "mavedb_clipe+igvf_vamp_seq",
+    "mavedb_clipe+igvf_sge",
+    "igvf_vamp_seq+igvf_sge",
+    "mavedb_clipe+igvf_vamp_seq+igvf_sge",
+]
+FUNCTIONAL_COHORT_MEMBERSHIP_PATTERN_KEYS = [
+    "NONE",
+    "VUS",
+    "VUS+ATLAS_CONTRAST",
+    "PROSPECTIVE_HOLDOUT",
+    "PROSPECTIVE_HOLDOUT+ATLAS_CONTRAST",
+    "PROSPECTIVE_HOLDOUT+ATLAS_ANCHOR",
+    "ATLAS_CONTRAST",
+]
 REQUIRED_COVERAGE_ROW_FIELDS = [
     "schema",
     "spdi",
@@ -361,7 +379,7 @@ FORBIDDEN_QUOTED_ROW_KEYS = (
     '"bs3"',
     '"clinical_status"',
 )
-SUMMARY_TOP_LEVEL_WHITELIST = {
+SUMMARY_TOP_LEVEL_KEYS = {
     "schema",
     "bundle_id",
     "manifest_content_hash",
@@ -376,6 +394,15 @@ SUMMARY_TOP_LEVEL_WHITELIST = {
 }
 
 ALLOWED_DOMAIN_SEAMS = {
+    "raptor.census.strata",
+    "raptor.scorer.bias_source",
+    "raptor.scorer.config",
+    "raptor.eval.config",
+    "raptor.atlas.identity_map",
+    "raptor.atlas.model",
+    "raptor.atlas.pack",
+}
+REQUIRED_DOMAIN_SEAMS = {
     "raptor.census.strata",
     "raptor.scorer.bias_source",
     "raptor.scorer.config",
@@ -513,6 +540,35 @@ def _jsonl_bytes(rows: list[dict[str, Any]]) -> bytes:
 
 def _json_bytes(payload: dict[str, Any]) -> bytes:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def _yaml_bytes(payload: dict[str, Any], *, sort_keys: bool = True) -> bytes:
+    return yaml.safe_dump(payload, sort_keys=sort_keys).encode("utf-8")
+
+
+def _identity_map_lock_content_hash(lock_payload: bytes) -> str:
+    parsed = yaml.safe_load(lock_payload.decode("utf-8"))
+    if not isinstance(parsed, dict):
+        raise ValueError("lock payload must decode to a mapping")
+    stripped = dict(parsed)
+    stripped.pop("lock_content_hash", None)
+    return _sha256(_yaml_bytes(stripped, sort_keys=True))
+
+
+def _response_bundle_observed(file_payloads: dict[str, bytes]) -> dict[str, Any]:
+    files = []
+    total_bytes = 0
+    for relative_path, payload in sorted(file_payloads.items()):
+        total_bytes += len(payload)
+        files.append(
+            {
+                "relative_path": str(relative_path).replace("\\", "/"),
+                "sha256": _sha256(payload),
+                "byte_length": len(payload),
+            }
+        )
+    commitment = _sha256(_json_bytes({"files": files}))
+    return {"sha256": commitment, "file_count": len(files), "byte_count": total_bytes}
 
 
 def _tsv_bytes(header: list[str], rows: list[list[str]]) -> bytes:
@@ -743,7 +799,6 @@ def _synthetic_functional_promotion_manifest_fixture() -> dict[str, Any]:
     artifacts = [
         {
             "artifact_id": "mavedb_clipe-promoted-jsonl",
-            "source_id": "mavedb_clipe",
             "relative_path": "normalized/mavedb_clipe.jsonl",
             "sha256": _sha256(payloads["mavedb_clipe"]),
             "byte_length": len(payloads["mavedb_clipe"]),
@@ -751,7 +806,6 @@ def _synthetic_functional_promotion_manifest_fixture() -> dict[str, Any]:
         },
         {
             "artifact_id": "igvf_vamp_seq-promoted-jsonl",
-            "source_id": "igvf_vamp_seq",
             "relative_path": "normalized/igvf_vamp_seq.jsonl",
             "sha256": _sha256(payloads["igvf_vamp_seq"]),
             "byte_length": len(payloads["igvf_vamp_seq"]),
@@ -759,7 +813,6 @@ def _synthetic_functional_promotion_manifest_fixture() -> dict[str, Any]:
         },
         {
             "artifact_id": "igvf_sge-promoted-jsonl",
-            "source_id": "igvf_sge",
             "relative_path": "normalized/igvf_sge.jsonl",
             "sha256": _sha256(payloads["igvf_sge"]),
             "byte_length": len(payloads["igvf_sge"]),
@@ -786,9 +839,9 @@ def _synthetic_functional_promotion_manifest_fixture() -> dict[str, Any]:
         "manifest_content_hash": manifest["content_hash"],
         "required_identity_state": "GENOMIC_SPDI_VERIFIED",
         "artifacts": {
-            "mavedb_clipe": {k: v for k, v in artifacts[0].items() if k != "source_id"},
-            "igvf_vamp_seq": {k: v for k, v in artifacts[1].items() if k != "source_id"},
-            "igvf_sge": {k: v for k, v in artifacts[2].items() if k != "source_id"},
+            "mavedb_clipe": dict(artifacts[0]),
+            "igvf_vamp_seq": dict(artifacts[1]),
+            "igvf_sge": dict(artifacts[2]),
         },
     }
     return {"manifest": manifest, "expected": expected, "payloads_by_source": payloads}
@@ -836,14 +889,59 @@ def _minimal_manifest_and_payload(bundle_api: dict[str, Any]) -> tuple[dict[str,
         )
     ]
     payload = bundle_api["canonical_coverage_jsonl_bytes"](rows)
+    zero_source_patterns = {key: 0 for key in SOURCE_MEMBERSHIP_PATTERN_KEYS}
+    overlap_source_patterns = dict(zero_source_patterns)
+    overlap_source_patterns["mavedb_clipe+igvf_vamp_seq"] = 1
     stats = {
-        "functional": {"verified_observations": 2, "unique_spdi": 1, "source_unique": {"mavedb_clipe": 1, "igvf_vamp_seq": 1, "igvf_sge": 0}},
+        "functional": {
+            "verified_observations": 2,
+            "unique_spdi": 1,
+            "source_unique": {"mavedb_clipe": 1, "igvf_vamp_seq": 1, "igvf_sge": 0},
+            "source_membership_patterns": overlap_source_patterns,
+        },
         "cohorts": {
-            "vus": {"identities": 1, "TSC1": 0, "TSC2": 1, "functional_overlap_unique": 1, "source_overlap_unique": {"mavedb_clipe": 1, "igvf_vamp_seq": 1, "igvf_sge": 0}},
-            "priority": {"identities": 0, "candidate_LP_review": 0, "candidate_LB_review": 0, "TSC1": 0, "TSC2": 0, "functional_overlap_unique": 0, "candidate_LP_review_overlap": 0, "candidate_LB_review_overlap": 0, "source_overlap_unique": {"mavedb_clipe": 0, "igvf_vamp_seq": 0, "igvf_sge": 0}},
-            "prospective_holdout": {"identities": 0, "TSC1": 0, "TSC2": 0, "functional_overlap_unique": 0, "source_overlap_unique": {"mavedb_clipe": 0, "igvf_vamp_seq": 0, "igvf_sge": 0}},
-            "atlas_contrast": {"raw_records": 1, "resolved_unique_spdi": 1, "unresolved_records": 0, "functional_overlap_unique": 1, "source_overlap_unique": {"mavedb_clipe": 1, "igvf_vamp_seq": 1, "igvf_sge": 0}},
-            "atlas_anchor": {"identities": 0, "functional_overlap_unique": 0, "source_overlap_unique": {"mavedb_clipe": 0, "igvf_vamp_seq": 0, "igvf_sge": 0}, "prospective_holdout_overlap": 0},
+            "vus": {
+                "identities": 1,
+                "TSC1": 0,
+                "TSC2": 1,
+                "functional_overlap_unique": 1,
+                "source_overlap_unique": {"mavedb_clipe": 1, "igvf_vamp_seq": 1, "igvf_sge": 0},
+                "source_membership_patterns": overlap_source_patterns,
+            },
+            "priority": {
+                "identities": 0,
+                "candidate_LP_review": 0,
+                "candidate_LB_review": 0,
+                "TSC1": 0,
+                "TSC2": 0,
+                "functional_overlap_unique": 0,
+                "candidate_LP_review_overlap": 0,
+                "candidate_LB_review_overlap": 0,
+                "source_overlap_unique": {"mavedb_clipe": 0, "igvf_vamp_seq": 0, "igvf_sge": 0},
+                "source_membership_patterns": zero_source_patterns,
+            },
+            "prospective_holdout": {
+                "identities": 0,
+                "TSC1": 0,
+                "TSC2": 0,
+                "functional_overlap_unique": 0,
+                "source_overlap_unique": {"mavedb_clipe": 0, "igvf_vamp_seq": 0, "igvf_sge": 0},
+                "source_membership_patterns": zero_source_patterns,
+            },
+            "atlas_contrast": {
+                "raw_records": 1,
+                "resolved_unique_spdi": 1,
+                "unresolved_records": 0,
+                "functional_overlap_unique": 1,
+                "source_overlap_unique": {"mavedb_clipe": 1, "igvf_vamp_seq": 1, "igvf_sge": 0},
+                "source_membership_patterns": overlap_source_patterns,
+            },
+            "atlas_anchor": {
+                "identities": 0,
+                "functional_overlap_unique": 0,
+                "source_overlap_unique": {"mavedb_clipe": 0, "igvf_vamp_seq": 0, "igvf_sge": 0},
+                "prospective_holdout_overlap": 0,
+            },
         },
         "cross_cohort": {
             "vus__prospective_holdout": 0,
@@ -855,7 +953,15 @@ def _minimal_manifest_and_payload(bundle_api: dict[str, Any]) -> tuple[dict[str,
             "functional__prospective_holdout__atlas_contrast": 0,
             "functional__atlas_contrast_outside_vus_holdout": 0,
         },
-        "functional_cohort_membership_patterns": {"NONE": 0, "VUS": 0, "VUS+ATLAS_CONTRAST": 1, "PROSPECTIVE_HOLDOUT": 0, "PROSPECTIVE_HOLDOUT+ATLAS_CONTRAST": 0, "PROSPECTIVE_HOLDOUT+ATLAS_ANCHOR": 0, "ATLAS_CONTRAST": 0},
+        "functional_cohort_membership_patterns": {
+            "NONE": 0,
+            "VUS": 0,
+            "VUS+ATLAS_CONTRAST": 1,
+            "PROSPECTIVE_HOLDOUT": 0,
+            "PROSPECTIVE_HOLDOUT+ATLAS_CONTRAST": 0,
+            "PROSPECTIVE_HOLDOUT+ATLAS_ANCHOR": 0,
+            "ATLAS_CONTRAST": 0,
+        },
         "leakage_markers": {"PROSPECTIVE_HOLDOUT": 0, "ATLAS_CONTEXT": 1, "PROSPECTIVE_HOLDOUT+ATLAS_CONTEXT": 0},
     }
     manifest = bundle_api["build_coverage_bundle_manifest"](
@@ -910,6 +1016,28 @@ def _compute_statistics(
     missing = required - set(sig.parameters)
     assert not missing, f"compute_coverage_statistics missing required full-context parameters: {sorted(missing)}"
     return fn(coverage_rows=coverage_rows, **full_context)
+
+
+def _invoke_validate_manifest_content_hash(validate_fn: Any, manifest: dict[str, Any]) -> Any:
+    sig = inspect.signature(validate_fn)
+    if "manifest" in sig.parameters:
+        return validate_fn(manifest=manifest)
+    if len(sig.parameters) == 1:
+        return validate_fn(manifest)
+    raise AssertionError(f"validate_manifest_content_hash unsupported signature: {sig}")
+
+
+def _assert_nonnegative_int_tree(value: Any, *, path: str) -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            _assert_nonnegative_int_tree(child, path=f"{path}.{key}")
+        return
+    assert isinstance(value, int) and not isinstance(value, bool), f"{path} must be int, got {type(value).__name__}"
+    assert value >= 0, f"{path} must be nonnegative"
+
+
+def _pattern_membership_sum(patterns: dict[str, int], source: str) -> int:
+    return sum(count for pattern, count in patterns.items() if source in pattern.split("+"))
 
 
 def test_fc00_binding_spec_exists_and_is_v1_0_0() -> None:
@@ -1126,11 +1254,11 @@ def test_fc04c_functional_promotion_manifest_exact_pins_and_raw_artifact_payload
             expected_pins=deepcopy(fixture["expected"]),
         )
 
-    wrong_source = deepcopy(fixture["manifest"])
-    wrong_source["artifacts"][0]["source_id"] = "not_a_real_source"
+    unknown_artifact = deepcopy(fixture["manifest"])
+    unknown_artifact["artifacts"][0]["artifact_id"] = "not-a-pinned-artifact-id"
     with pytest.raises(err):
         api["validate_functional_promotion_manifest"](
-            promotion_manifest=wrong_source,
+            promotion_manifest=unknown_artifact,
             expected_pins=deepcopy(fixture["expected"]),
         )
 
@@ -1139,6 +1267,15 @@ def test_fc04c_functional_promotion_manifest_exact_pins_and_raw_artifact_payload
     with pytest.raises(err):
         api["validate_functional_promotion_manifest"](
             promotion_manifest=duplicate,
+            expected_pins=deepcopy(fixture["expected"]),
+        )
+
+    missing_artifact = deepcopy(fixture["manifest"])
+    missing_artifact["artifacts"] = missing_artifact["artifacts"][:-1]
+    missing_artifact["counts"]["artifacts"] = 2
+    with pytest.raises(err):
+        api["validate_functional_promotion_manifest"](
+            promotion_manifest=missing_artifact,
             expected_pins=deepcopy(fixture["expected"]),
         )
 
@@ -1451,6 +1588,60 @@ def test_fc06_vus_validation_uses_raw_byte_pins_and_enforces_schema_duplicate_id
             expected_gene_counts={"TSC1": 2249, "TSC2": 4369},
         )
 
+    contig_mismatch = deepcopy(rows)
+    contig_mismatch[0]["contig"] = "chr16"
+    with pytest.raises(err):
+        api["validate_vus_inputs"](
+            manifest_payload=_jsonl_bytes(contig_mismatch),
+            provenance_payload=provenance_payload,
+            bias_payload=bias_payload,
+            expected_manifest_pin=_pin_from_payload(
+                payload=_jsonl_bytes(contig_mismatch),
+                relative_path="contig_mismatch.jsonl",
+                row_count=len(contig_mismatch),
+                required_fields=["accession", "contig", "variant_id", "vcf_key"],
+            ),
+            expected_provenance_pin=expected_provenance,
+            expected_bias_pin=expected_bias,
+            expected_gene_counts={"TSC1": 2249, "TSC2": 4369},
+        )
+
+    variant_id_mismatch = deepcopy(rows)
+    variant_id_mismatch[0]["variant_id"] = "NC_000009.12:100000:A:T"
+    with pytest.raises(err):
+        api["validate_vus_inputs"](
+            manifest_payload=_jsonl_bytes(variant_id_mismatch),
+            provenance_payload=provenance_payload,
+            bias_payload=bias_payload,
+            expected_manifest_pin=_pin_from_payload(
+                payload=_jsonl_bytes(variant_id_mismatch),
+                relative_path="variant_id_mismatch.jsonl",
+                row_count=len(variant_id_mismatch),
+                required_fields=["accession", "contig", "variant_id", "vcf_key"],
+            ),
+            expected_provenance_pin=expected_provenance,
+            expected_bias_pin=expected_bias,
+            expected_gene_counts={"TSC1": 2249, "TSC2": 4369},
+        )
+
+    vcf_pos_mismatch = deepcopy(rows)
+    vcf_pos_mismatch[0]["vcf_key"] = "chr9:100000:A:G"
+    with pytest.raises(err):
+        api["validate_vus_inputs"](
+            manifest_payload=_jsonl_bytes(vcf_pos_mismatch),
+            provenance_payload=provenance_payload,
+            bias_payload=bias_payload,
+            expected_manifest_pin=_pin_from_payload(
+                payload=_jsonl_bytes(vcf_pos_mismatch),
+                relative_path="vcf_pos_mismatch.jsonl",
+                row_count=len(vcf_pos_mismatch),
+                required_fields=["accession", "contig", "variant_id", "vcf_key"],
+            ),
+            expected_provenance_pin=expected_provenance,
+            expected_bias_pin=expected_bias,
+            expected_gene_counts={"TSC1": 2249, "TSC2": 4369},
+        )
+
 
 def test_fc07_priority_subset_raw_pins_queue_contract_and_exact_set_equality() -> None:
     api = _ingest_api()
@@ -1479,10 +1670,14 @@ def test_fc07_priority_subset_raw_pins_queue_contract_and_exact_set_equality() -
             "run_pins": {"code_commit": "synthetic", "source_snapshot": "clinvar_2026-07-07"},
         }
     )
-    queue_pin = _pin_from_payload(payload=queue_payload, relative_path="priority_queue.jsonl", row_count=164)
-    queue_pin["exact_fields"] = list(REAL_PRIORITY_QUEUE_PIN["exact_fields"])
-    queue_pin["required_review_state"] = "POLICY_BLOCKED"
-    queue_pin["required_gate_status"] = "UNVERIFIED"
+    def _queue_pin(payload: bytes, *, relative_path: str, row_count: int) -> dict[str, Any]:
+        pin = _pin_from_payload(payload=payload, relative_path=relative_path, row_count=row_count)
+        pin["exact_fields"] = list(REAL_PRIORITY_QUEUE_PIN["exact_fields"])
+        pin["required_review_state"] = "POLICY_BLOCKED"
+        pin["required_gate_status"] = "UNVERIFIED"
+        return pin
+
+    queue_pin = _queue_pin(queue_payload, relative_path="priority_queue.jsonl", row_count=164)
     aggregate_pin = _pin_from_payload(payload=aggregate_payload, relative_path="aggregate_manifest.json", row_count=1)
     aggregate_pin["required_values"] = json.loads(aggregate_payload.decode("utf-8"))
 
@@ -1524,7 +1719,7 @@ def test_fc07_priority_subset_raw_pins_queue_contract_and_exact_set_equality() -
             aggregate_manifest_payload=aggregate_payload,
             queue_payload=_jsonl_bytes(queue_drift),
             expected={"candidate_LP_review": 157, "candidate_LB_review": 7, "total": 164, "gene_counts": {"TSC1": 52, "TSC2": 112}},
-            queue_pin=_pin_from_payload(payload=_jsonl_bytes(queue_drift), relative_path="queue_drift.jsonl", row_count=164),
+            queue_pin=_queue_pin(_jsonl_bytes(queue_drift), relative_path="queue_drift.jsonl", row_count=164),
             aggregate_manifest_pin=aggregate_pin,
             predictor_policy={"schema": "bp4pp3-predictor-policy/2", "status": "approved", "mode": "disabled_manual"},
             scorer_config_pin={"path": "synthetic/scorer", "raw_sha256": "a" * 64},
@@ -1543,7 +1738,140 @@ def test_fc07_priority_subset_raw_pins_queue_contract_and_exact_set_equality() -
             aggregate_manifest_payload=aggregate_payload,
             queue_payload=_jsonl_bytes(duplicate_queue),
             expected={"candidate_LP_review": 157, "candidate_LB_review": 7, "total": 164, "gene_counts": {"TSC1": 52, "TSC2": 112}},
-            queue_pin=_pin_from_payload(payload=_jsonl_bytes(duplicate_queue), relative_path="queue_dup.jsonl", row_count=165),
+            queue_pin=_queue_pin(_jsonl_bytes(duplicate_queue), relative_path="queue_dup.jsonl", row_count=165),
+            aggregate_manifest_pin=aggregate_pin,
+            predictor_policy={"schema": "bp4pp3-predictor-policy/2", "status": "approved", "mode": "disabled_manual"},
+            scorer_config_pin={"path": "synthetic/scorer", "raw_sha256": "a" * 64},
+            eval_config_pin={"path": "synthetic/eval", "raw_sha256": "b" * 64},
+            lineage_policy_pin={"path": "synthetic/lineage", "raw_sha256": "c" * 64},
+            packet_policy_pin={"path": "synthetic/packet", "raw_sha256": "d" * 64},
+            reproduce_census_strata_fn=_reproduce_fn,
+        )
+
+    malformed_spdi = deepcopy(queue_rows)
+    malformed_spdi[0]["canonical_spdi"] = "NC_000016.10:200000:N:T"
+    with pytest.raises(err):
+        api["reproduce_priority_subset"](
+            vus_manifest_payload=_jsonl_bytes(vus_rows),
+            bias_payload=_tsv_bytes(["variant_id", "acmgClassification"], [[r["variant_id"], "unused"] for r in vus_rows]),
+            aggregate_manifest_payload=aggregate_payload,
+            queue_payload=_jsonl_bytes(malformed_spdi),
+            expected={"candidate_LP_review": 157, "candidate_LB_review": 7, "total": 164, "gene_counts": {"TSC1": 52, "TSC2": 112}},
+            queue_pin=_queue_pin(_jsonl_bytes(malformed_spdi), relative_path="queue_malformed_spdi.jsonl", row_count=164),
+            aggregate_manifest_pin=aggregate_pin,
+            predictor_policy={"schema": "bp4pp3-predictor-policy/2", "status": "approved", "mode": "disabled_manual"},
+            scorer_config_pin={"path": "synthetic/scorer", "raw_sha256": "a" * 64},
+            eval_config_pin={"path": "synthetic/eval", "raw_sha256": "b" * 64},
+            lineage_policy_pin={"path": "synthetic/lineage", "raw_sha256": "c" * 64},
+            packet_policy_pin={"path": "synthetic/packet", "raw_sha256": "d" * 64},
+            reproduce_census_strata_fn=_reproduce_fn,
+        )
+
+    wrong_gene = deepcopy(queue_rows)
+    wrong_gene[0]["gene"] = "TSC2" if wrong_gene[0]["canonical_spdi"].startswith("NC_000009.12:") else "TSC1"
+    with pytest.raises(err):
+        api["reproduce_priority_subset"](
+            vus_manifest_payload=_jsonl_bytes(vus_rows),
+            bias_payload=_tsv_bytes(["variant_id", "acmgClassification"], [[r["variant_id"], "unused"] for r in vus_rows]),
+            aggregate_manifest_payload=aggregate_payload,
+            queue_payload=_jsonl_bytes(wrong_gene),
+            expected={"candidate_LP_review": 157, "candidate_LB_review": 7, "total": 164, "gene_counts": {"TSC1": 52, "TSC2": 112}},
+            queue_pin=_queue_pin(_jsonl_bytes(wrong_gene), relative_path="queue_wrong_gene.jsonl", row_count=164),
+            aggregate_manifest_pin=aggregate_pin,
+            predictor_policy={"schema": "bp4pp3-predictor-policy/2", "status": "approved", "mode": "disabled_manual"},
+            scorer_config_pin={"path": "synthetic/scorer", "raw_sha256": "a" * 64},
+            eval_config_pin={"path": "synthetic/eval", "raw_sha256": "b" * 64},
+            lineage_policy_pin={"path": "synthetic/lineage", "raw_sha256": "c" * 64},
+            packet_policy_pin={"path": "synthetic/packet", "raw_sha256": "d" * 64},
+            reproduce_census_strata_fn=_reproduce_fn,
+        )
+
+    duplicate_packet_id = deepcopy(queue_rows)
+    duplicate_packet_id[1]["packet_id"] = duplicate_packet_id[0]["packet_id"]
+    with pytest.raises(err):
+        api["reproduce_priority_subset"](
+            vus_manifest_payload=_jsonl_bytes(vus_rows),
+            bias_payload=_tsv_bytes(["variant_id", "acmgClassification"], [[r["variant_id"], "unused"] for r in vus_rows]),
+            aggregate_manifest_payload=aggregate_payload,
+            queue_payload=_jsonl_bytes(duplicate_packet_id),
+            expected={"candidate_LP_review": 157, "candidate_LB_review": 7, "total": 164, "gene_counts": {"TSC1": 52, "TSC2": 112}},
+            queue_pin=_queue_pin(_jsonl_bytes(duplicate_packet_id), relative_path="queue_dup_packet_id.jsonl", row_count=164),
+            aggregate_manifest_pin=aggregate_pin,
+            predictor_policy={"schema": "bp4pp3-predictor-policy/2", "status": "approved", "mode": "disabled_manual"},
+            scorer_config_pin={"path": "synthetic/scorer", "raw_sha256": "a" * 64},
+            eval_config_pin={"path": "synthetic/eval", "raw_sha256": "b" * 64},
+            lineage_policy_pin={"path": "synthetic/lineage", "raw_sha256": "c" * 64},
+            packet_policy_pin={"path": "synthetic/packet", "raw_sha256": "d" * 64},
+            reproduce_census_strata_fn=_reproduce_fn,
+        )
+
+    duplicate_evidence_hash = deepcopy(queue_rows)
+    duplicate_evidence_hash[1]["evidence_core_hash"] = duplicate_evidence_hash[0]["evidence_core_hash"]
+    with pytest.raises(err):
+        api["reproduce_priority_subset"](
+            vus_manifest_payload=_jsonl_bytes(vus_rows),
+            bias_payload=_tsv_bytes(["variant_id", "acmgClassification"], [[r["variant_id"], "unused"] for r in vus_rows]),
+            aggregate_manifest_payload=aggregate_payload,
+            queue_payload=_jsonl_bytes(duplicate_evidence_hash),
+            expected={"candidate_LP_review": 157, "candidate_LB_review": 7, "total": 164, "gene_counts": {"TSC1": 52, "TSC2": 112}},
+            queue_pin=_queue_pin(_jsonl_bytes(duplicate_evidence_hash), relative_path="queue_dup_evidence_hash.jsonl", row_count=164),
+            aggregate_manifest_pin=aggregate_pin,
+            predictor_policy={"schema": "bp4pp3-predictor-policy/2", "status": "approved", "mode": "disabled_manual"},
+            scorer_config_pin={"path": "synthetic/scorer", "raw_sha256": "a" * 64},
+            eval_config_pin={"path": "synthetic/eval", "raw_sha256": "b" * 64},
+            lineage_policy_pin={"path": "synthetic/lineage", "raw_sha256": "c" * 64},
+            packet_policy_pin={"path": "synthetic/packet", "raw_sha256": "d" * 64},
+            reproduce_census_strata_fn=_reproduce_fn,
+        )
+
+    contradiction_not_bool = deepcopy(queue_rows)
+    contradiction_not_bool[0]["contradiction"] = 1
+    with pytest.raises(err):
+        api["reproduce_priority_subset"](
+            vus_manifest_payload=_jsonl_bytes(vus_rows),
+            bias_payload=_tsv_bytes(["variant_id", "acmgClassification"], [[r["variant_id"], "unused"] for r in vus_rows]),
+            aggregate_manifest_payload=aggregate_payload,
+            queue_payload=_jsonl_bytes(contradiction_not_bool),
+            expected={"candidate_LP_review": 157, "candidate_LB_review": 7, "total": 164, "gene_counts": {"TSC1": 52, "TSC2": 112}},
+            queue_pin=_queue_pin(_jsonl_bytes(contradiction_not_bool), relative_path="queue_contradiction_not_bool.jsonl", row_count=164),
+            aggregate_manifest_pin=aggregate_pin,
+            predictor_policy={"schema": "bp4pp3-predictor-policy/2", "status": "approved", "mode": "disabled_manual"},
+            scorer_config_pin={"path": "synthetic/scorer", "raw_sha256": "a" * 64},
+            eval_config_pin={"path": "synthetic/eval", "raw_sha256": "b" * 64},
+            lineage_policy_pin={"path": "synthetic/lineage", "raw_sha256": "c" * 64},
+            packet_policy_pin={"path": "synthetic/packet", "raw_sha256": "d" * 64},
+            reproduce_census_strata_fn=_reproduce_fn,
+        )
+
+    quality_flags_not_list = deepcopy(queue_rows)
+    quality_flags_not_list[0]["quality_flags"] = "NEEDS_REVIEW"
+    with pytest.raises(err):
+        api["reproduce_priority_subset"](
+            vus_manifest_payload=_jsonl_bytes(vus_rows),
+            bias_payload=_tsv_bytes(["variant_id", "acmgClassification"], [[r["variant_id"], "unused"] for r in vus_rows]),
+            aggregate_manifest_payload=aggregate_payload,
+            queue_payload=_jsonl_bytes(quality_flags_not_list),
+            expected={"candidate_LP_review": 157, "candidate_LB_review": 7, "total": 164, "gene_counts": {"TSC1": 52, "TSC2": 112}},
+            queue_pin=_queue_pin(_jsonl_bytes(quality_flags_not_list), relative_path="queue_quality_flags_not_list.jsonl", row_count=164),
+            aggregate_manifest_pin=aggregate_pin,
+            predictor_policy={"schema": "bp4pp3-predictor-policy/2", "status": "approved", "mode": "disabled_manual"},
+            scorer_config_pin={"path": "synthetic/scorer", "raw_sha256": "a" * 64},
+            eval_config_pin={"path": "synthetic/eval", "raw_sha256": "b" * 64},
+            lineage_policy_pin={"path": "synthetic/lineage", "raw_sha256": "c" * 64},
+            packet_policy_pin={"path": "synthetic/packet", "raw_sha256": "d" * 64},
+            reproduce_census_strata_fn=_reproduce_fn,
+        )
+
+    quality_flags_non_string = deepcopy(queue_rows)
+    quality_flags_non_string[0]["quality_flags"] = ["ok", 123]
+    with pytest.raises(err):
+        api["reproduce_priority_subset"](
+            vus_manifest_payload=_jsonl_bytes(vus_rows),
+            bias_payload=_tsv_bytes(["variant_id", "acmgClassification"], [[r["variant_id"], "unused"] for r in vus_rows]),
+            aggregate_manifest_payload=aggregate_payload,
+            queue_payload=_jsonl_bytes(quality_flags_non_string),
+            expected={"candidate_LP_review": 157, "candidate_LB_review": 7, "total": 164, "gene_counts": {"TSC1": 52, "TSC2": 112}},
+            queue_pin=_queue_pin(_jsonl_bytes(quality_flags_non_string), relative_path="queue_quality_flags_non_string.jsonl", row_count=164),
             aggregate_manifest_pin=aggregate_pin,
             predictor_policy={"schema": "bp4pp3-predictor-policy/2", "status": "approved", "mode": "disabled_manual"},
             scorer_config_pin={"path": "synthetic/scorer", "raw_sha256": "a" * 64},
@@ -1644,6 +1972,57 @@ def test_fc08_holdout_validation_uses_raw_byte_pins_enforces_schema_and_blocks_l
             forbidden_reads=["benchmark.jsonl"],
         )
 
+    contig_mismatch = deepcopy(rows)
+    contig_mismatch[0]["contig"] = "chr16"
+    with pytest.raises(err):
+        api["validate_prospective_holdout_inputs"](
+            manifest_payload=_jsonl_bytes(contig_mismatch),
+            provenance_payload=provenance_payload,
+            expected_manifest_pin=_pin_from_payload(
+                payload=_jsonl_bytes(contig_mismatch),
+                relative_path="holdout_contig_mismatch.jsonl",
+                row_count=len(contig_mismatch),
+                required_fields=["accession", "contig", "variant_id", "vcf_key"],
+            ),
+            expected_provenance_pin=provenance_pin,
+            expected_gene_counts={"TSC1": 718, "TSC2": 1890},
+            forbidden_reads=["benchmark.jsonl"],
+        )
+
+    variant_id_mismatch = deepcopy(rows)
+    variant_id_mismatch[0]["variant_id"] = "NC_000009.12:500000:A:T"
+    with pytest.raises(err):
+        api["validate_prospective_holdout_inputs"](
+            manifest_payload=_jsonl_bytes(variant_id_mismatch),
+            provenance_payload=provenance_payload,
+            expected_manifest_pin=_pin_from_payload(
+                payload=_jsonl_bytes(variant_id_mismatch),
+                relative_path="holdout_variant_id_mismatch.jsonl",
+                row_count=len(variant_id_mismatch),
+                required_fields=["accession", "contig", "variant_id", "vcf_key"],
+            ),
+            expected_provenance_pin=provenance_pin,
+            expected_gene_counts={"TSC1": 718, "TSC2": 1890},
+            forbidden_reads=["benchmark.jsonl"],
+        )
+
+    vcf_pos_mismatch = deepcopy(rows)
+    vcf_pos_mismatch[0]["vcf_key"] = "chr9:500000:A:G"
+    with pytest.raises(err):
+        api["validate_prospective_holdout_inputs"](
+            manifest_payload=_jsonl_bytes(vcf_pos_mismatch),
+            provenance_payload=provenance_payload,
+            expected_manifest_pin=_pin_from_payload(
+                payload=_jsonl_bytes(vcf_pos_mismatch),
+                relative_path="holdout_vcf_pos_mismatch.jsonl",
+                row_count=len(vcf_pos_mismatch),
+                required_fields=["accession", "contig", "variant_id", "vcf_key"],
+            ),
+            expected_provenance_pin=provenance_pin,
+            expected_gene_counts={"TSC1": 718, "TSC2": 1890},
+            forbidden_reads=["benchmark.jsonl"],
+        )
+
 
 def test_fc09_atlas_contrast_loader_must_call_public_load_identity_map_seam_and_replay_inventory() -> None:
     api = _ingest_api()
@@ -1653,7 +2032,7 @@ def test_fc09_atlas_contrast_loader_must_call_public_load_identity_map_seam_and_
         "map_payload",
         "lock_payload",
         "raw_inventory_payload",
-        "response_bundle_payload",
+        "response_bundle_observed",
         "expected_map_pin",
         "expected_lock_pin",
         "expected_raw_inventory_pin",
@@ -1705,15 +2084,20 @@ def test_fc09_atlas_contrast_loader_must_call_public_load_identity_map_seam_and_
         {"schema": "atlas.raw_identity_map.v2", "map_record_count": 35, "records": [{"raw_record_id": row["raw_record_id"]} for row in raw_inventory_rows]},
         sort_keys=False,
     ).encode("utf-8")
-    lock_payload = yaml.safe_dump(
-        {"schema": "atlas.raw_identity_map_lock.v2", "map_content_hash": "synthetic-map-content-hash"},
-        sort_keys=False,
-    ).encode("utf-8")
+    lock_payload_body = {"schema": "atlas.raw_identity_map_lock.v2", "map_content_hash": "synthetic-map-content-hash"}
+    lock_payload = _yaml_bytes(lock_payload_body, sort_keys=True)
+    lock_payload_body["lock_content_hash"] = _identity_map_lock_content_hash(lock_payload)
+    lock_payload = _yaml_bytes(lock_payload_body, sort_keys=True)
     raw_inventory_payload = yaml.safe_dump(
         {"schema": "atlas.discovery_inventory.raw.v1", "row_count": 35, "records": raw_inventory_rows},
         sort_keys=False,
     ).encode("utf-8")
-    response_bundle_payload = _json_bytes({"file_count": 88, "byte_count": 904564})
+    response_bundle_observed = _response_bundle_observed(
+        {
+            "official_responses/alpha.json": b'{"id":"alpha","status":"ok"}\n',
+            "official_responses/beta.json": b'{"id":"beta","status":"ok"}\n',
+        }
+    )
     expected_map_pin = {
         "schema": "atlas.raw_identity_map.v2",
         "sha256": _sha256(map_payload),
@@ -1722,20 +2106,14 @@ def test_fc09_atlas_contrast_loader_must_call_public_load_identity_map_seam_and_
     }
     expected_lock_pin = {
         "schema": "atlas.raw_identity_map_lock.v2",
-        "sha256": _sha256(lock_payload),
-        "byte_length": len(lock_payload),
+        "lock_content_hash": lock_payload_body["lock_content_hash"],
     }
     expected_raw_inventory_pin = {
         "sha256": _sha256(raw_inventory_payload),
         "byte_length": len(raw_inventory_payload),
         "row_count": 35,
     }
-    expected_response_bundle_pin = {
-        "sha256": _sha256(response_bundle_payload),
-        "byte_length": len(response_bundle_payload),
-        "file_count": 88,
-        "byte_count": 904564,
-    }
+    expected_response_bundle_pin = dict(response_bundle_observed)
 
     result = api["load_atlas_contrast_replays"](
         map_path=Path("synthetic/raw_identity_map.yaml"),
@@ -1746,7 +2124,7 @@ def test_fc09_atlas_contrast_loader_must_call_public_load_identity_map_seam_and_
         map_payload=map_payload,
         lock_payload=lock_payload,
         raw_inventory_payload=raw_inventory_payload,
-        response_bundle_payload=response_bundle_payload,
+        response_bundle_observed=response_bundle_observed,
         raw_inventory_rows=raw_inventory_rows,
         expected_map_pin=expected_map_pin,
         expected_lock_pin=expected_lock_pin,
@@ -1779,7 +2157,7 @@ def test_fc09_atlas_contrast_loader_must_call_public_load_identity_map_seam_and_
             map_payload=map_payload,
             lock_payload=lock_payload,
             raw_inventory_payload=raw_inventory_payload,
-            response_bundle_payload=response_bundle_payload,
+            response_bundle_observed=response_bundle_observed,
             raw_inventory_rows=raw_inventory_rows,
             expected_map_pin=expected_map_pin,
             expected_lock_pin=expected_lock_pin,
@@ -1802,9 +2180,84 @@ def test_fc09_atlas_contrast_loader_must_call_public_load_identity_map_seam_and_
             map_payload=map_payload,
             lock_payload=lock_payload,
             raw_inventory_payload=raw_inventory_payload,
-            response_bundle_payload=response_bundle_payload,
+            response_bundle_observed=response_bundle_observed,
             raw_inventory_rows=raw_inventory_rows,
             expected_map_pin=bad_map_pin,
+            expected_lock_pin=expected_lock_pin,
+            expected_raw_inventory_pin=expected_raw_inventory_pin,
+            expected_response_bundle_pin=expected_response_bundle_pin,
+            expected_counts={"raw_records": 35, "resolved_unique_spdi": 25, "unresolved_records": 10},
+            load_disease_pack_fn=_fake_load_disease_pack,
+            load_identity_map_fn=_fake_load_identity_map,
+        )
+
+    bad_lock_payload = _yaml_bytes(
+        {
+            "schema": "atlas.raw_identity_map_lock.v2",
+            "map_content_hash": "mutated-map-content-hash",
+            "lock_content_hash": lock_payload_body["lock_content_hash"],
+        },
+        sort_keys=True,
+    )
+    with pytest.raises(err):
+        api["load_atlas_contrast_replays"](
+            map_path=Path("synthetic/raw_identity_map.yaml"),
+            response_root=Path("synthetic/official_responses"),
+            lock_path=Path("synthetic/lock.yaml"),
+            disease_pack_path=Path("synthetic/pack.yaml"),
+            raw_inventory_path=Path("synthetic/discovery_inventory.raw.yaml"),
+            map_payload=map_payload,
+            lock_payload=bad_lock_payload,
+            raw_inventory_payload=raw_inventory_payload,
+            response_bundle_observed=response_bundle_observed,
+            raw_inventory_rows=raw_inventory_rows,
+            expected_map_pin=expected_map_pin,
+            expected_lock_pin=expected_lock_pin,
+            expected_raw_inventory_pin=expected_raw_inventory_pin,
+            expected_response_bundle_pin=expected_response_bundle_pin,
+            expected_counts={"raw_records": 35, "resolved_unique_spdi": 25, "unresolved_records": 10},
+            load_disease_pack_fn=_fake_load_disease_pack,
+            load_identity_map_fn=_fake_load_identity_map,
+        )
+
+    bad_lock_pin = dict(expected_lock_pin)
+    bad_lock_pin["lock_content_hash"] = "0" * 64
+    with pytest.raises(err):
+        api["load_atlas_contrast_replays"](
+            map_path=Path("synthetic/raw_identity_map.yaml"),
+            response_root=Path("synthetic/official_responses"),
+            lock_path=Path("synthetic/lock.yaml"),
+            disease_pack_path=Path("synthetic/pack.yaml"),
+            raw_inventory_path=Path("synthetic/discovery_inventory.raw.yaml"),
+            map_payload=map_payload,
+            lock_payload=lock_payload,
+            raw_inventory_payload=raw_inventory_payload,
+            response_bundle_observed=response_bundle_observed,
+            raw_inventory_rows=raw_inventory_rows,
+            expected_map_pin=expected_map_pin,
+            expected_lock_pin=bad_lock_pin,
+            expected_raw_inventory_pin=expected_raw_inventory_pin,
+            expected_response_bundle_pin=expected_response_bundle_pin,
+            expected_counts={"raw_records": 35, "resolved_unique_spdi": 25, "unresolved_records": 10},
+            load_disease_pack_fn=_fake_load_disease_pack,
+            load_identity_map_fn=_fake_load_identity_map,
+        )
+
+    bad_response_observed = dict(response_bundle_observed)
+    bad_response_observed["byte_count"] += 1
+    with pytest.raises(err):
+        api["load_atlas_contrast_replays"](
+            map_path=Path("synthetic/raw_identity_map.yaml"),
+            response_root=Path("synthetic/official_responses"),
+            lock_path=Path("synthetic/lock.yaml"),
+            disease_pack_path=Path("synthetic/pack.yaml"),
+            raw_inventory_path=Path("synthetic/discovery_inventory.raw.yaml"),
+            map_payload=map_payload,
+            lock_payload=lock_payload,
+            raw_inventory_payload=raw_inventory_payload,
+            response_bundle_observed=bad_response_observed,
+            raw_inventory_rows=raw_inventory_rows,
+            expected_map_pin=expected_map_pin,
             expected_lock_pin=expected_lock_pin,
             expected_raw_inventory_pin=expected_raw_inventory_pin,
             expected_response_bundle_pin=expected_response_bundle_pin,
@@ -1969,6 +2422,121 @@ def test_fc12_statistics_use_full_cohort_sets_not_only_coverage_rows() -> None:
     assert stats["cohorts"]["atlas_contrast"]["unresolved_records"] == 10
 
 
+def test_fc12b_manifest_coverage_statistics_nested_whitelist_arithmetic_and_hash_guard() -> None:
+    bundle_api = _bundle_api()
+    manifest_err = bundle_api["CoverageManifestError"]
+    boundary_err = bundle_api["CoverageBundleBoundaryError"]
+    manifest, _ = _minimal_manifest_and_payload(bundle_api)
+    stats = manifest["coverage_statistics"]
+
+    assert set(stats) == {
+        "functional",
+        "cohorts",
+        "cross_cohort",
+        "functional_cohort_membership_patterns",
+        "leakage_markers",
+    }
+    assert set(stats["functional"]) == {"verified_observations", "unique_spdi", "source_unique", "source_membership_patterns"}
+    assert set(stats["cohorts"]) == {"vus", "priority", "prospective_holdout", "atlas_contrast", "atlas_anchor"}
+    assert set(stats["cohorts"]["vus"]) == {"identities", "TSC1", "TSC2", "functional_overlap_unique", "source_overlap_unique", "source_membership_patterns"}
+    assert set(stats["cohorts"]["priority"]) == {
+        "identities",
+        "candidate_LP_review",
+        "candidate_LB_review",
+        "TSC1",
+        "TSC2",
+        "functional_overlap_unique",
+        "candidate_LP_review_overlap",
+        "candidate_LB_review_overlap",
+        "source_overlap_unique",
+        "source_membership_patterns",
+    }
+    assert set(stats["cohorts"]["prospective_holdout"]) == {"identities", "TSC1", "TSC2", "functional_overlap_unique", "source_overlap_unique", "source_membership_patterns"}
+    assert set(stats["cohorts"]["atlas_contrast"]) == {
+        "raw_records",
+        "resolved_unique_spdi",
+        "unresolved_records",
+        "functional_overlap_unique",
+        "source_overlap_unique",
+        "source_membership_patterns",
+    }
+    assert set(stats["cohorts"]["atlas_anchor"]) == {"identities", "functional_overlap_unique", "source_overlap_unique", "prospective_holdout_overlap"}
+    assert set(stats["cross_cohort"]) == {
+        "vus__prospective_holdout",
+        "priority__prospective_holdout",
+        "vus__atlas_contrast",
+        "priority__atlas_contrast",
+        "prospective_holdout__atlas_contrast",
+        "functional__vus__atlas_contrast",
+        "functional__prospective_holdout__atlas_contrast",
+        "functional__atlas_contrast_outside_vus_holdout",
+    }
+    assert set(stats["functional_cohort_membership_patterns"]) == set(FUNCTIONAL_COHORT_MEMBERSHIP_PATTERN_KEYS)
+    assert set(stats["leakage_markers"]) == {"PROSPECTIVE_HOLDOUT", "ATLAS_CONTEXT", "PROSPECTIVE_HOLDOUT+ATLAS_CONTEXT"}
+
+    _assert_nonnegative_int_tree(stats, path="coverage_statistics")
+
+    artifact = manifest["artifacts"][0]
+    assert manifest["counts"]["rows"] == stats["functional"]["unique_spdi"] == artifact["row_count"]
+    assert sum(stats["functional"]["source_unique"].values()) == stats["functional"]["verified_observations"]
+    assert sum(stats["functional"]["source_membership_patterns"].values()) == stats["functional"]["unique_spdi"]
+    for source in SOURCE_ORDER:
+        assert _pattern_membership_sum(stats["functional"]["source_membership_patterns"], source) == stats["functional"]["source_unique"][source]
+
+    for cohort_name in ("vus", "priority", "prospective_holdout", "atlas_contrast"):
+        cohort = stats["cohorts"][cohort_name]
+        assert set(cohort["source_membership_patterns"]) == set(SOURCE_MEMBERSHIP_PATTERN_KEYS)
+        assert sum(cohort["source_membership_patterns"].values()) == cohort["functional_overlap_unique"]
+        for source in SOURCE_ORDER:
+            assert _pattern_membership_sum(cohort["source_membership_patterns"], source) == cohort["source_overlap_unique"][source]
+
+    for cohort_name in ("vus", "priority", "prospective_holdout"):
+        cohort = stats["cohorts"][cohort_name]
+        assert cohort["TSC1"] + cohort["TSC2"] == cohort["identities"]
+        assert cohort["functional_overlap_unique"] <= cohort["identities"]
+        assert cohort["functional_overlap_unique"] <= stats["functional"]["unique_spdi"]
+    assert stats["cohorts"]["atlas_contrast"]["functional_overlap_unique"] <= stats["cohorts"]["atlas_contrast"]["resolved_unique_spdi"]
+    assert stats["cohorts"]["atlas_anchor"]["functional_overlap_unique"] <= stats["cohorts"]["atlas_anchor"]["identities"]
+    assert stats["cohorts"]["atlas_anchor"]["prospective_holdout_overlap"] <= stats["cohorts"]["atlas_anchor"]["functional_overlap_unique"]
+
+    assert stats["cross_cohort"]["vus__prospective_holdout"] <= min(stats["cohorts"]["vus"]["identities"], stats["cohorts"]["prospective_holdout"]["identities"])
+    assert stats["cross_cohort"]["priority__prospective_holdout"] <= min(stats["cohorts"]["priority"]["identities"], stats["cohorts"]["prospective_holdout"]["identities"])
+    assert stats["cross_cohort"]["vus__atlas_contrast"] <= min(stats["cohorts"]["vus"]["identities"], stats["cohorts"]["atlas_contrast"]["resolved_unique_spdi"])
+    assert stats["cross_cohort"]["priority__atlas_contrast"] <= min(stats["cohorts"]["priority"]["identities"], stats["cohorts"]["atlas_contrast"]["resolved_unique_spdi"])
+    assert stats["cross_cohort"]["prospective_holdout__atlas_contrast"] <= min(
+        stats["cohorts"]["prospective_holdout"]["identities"],
+        stats["cohorts"]["atlas_contrast"]["resolved_unique_spdi"],
+    )
+    assert stats["cross_cohort"]["functional__vus__atlas_contrast"] <= stats["cohorts"]["vus"]["functional_overlap_unique"]
+    assert stats["cross_cohort"]["functional__vus__atlas_contrast"] <= stats["cohorts"]["atlas_contrast"]["functional_overlap_unique"]
+    assert stats["cross_cohort"]["functional__prospective_holdout__atlas_contrast"] <= stats["cohorts"]["prospective_holdout"]["functional_overlap_unique"]
+    assert stats["cross_cohort"]["functional__prospective_holdout__atlas_contrast"] <= stats["cohorts"]["atlas_contrast"]["functional_overlap_unique"]
+    assert stats["cross_cohort"]["functional__atlas_contrast_outside_vus_holdout"] <= stats["cohorts"]["atlas_contrast"]["functional_overlap_unique"]
+
+    assert sum(stats["functional_cohort_membership_patterns"].values()) == stats["functional"]["unique_spdi"]
+    assert stats["leakage_markers"]["PROSPECTIVE_HOLDOUT"] == (
+        stats["functional_cohort_membership_patterns"]["PROSPECTIVE_HOLDOUT"]
+        + stats["functional_cohort_membership_patterns"]["PROSPECTIVE_HOLDOUT+ATLAS_CONTRAST"]
+        + stats["functional_cohort_membership_patterns"]["PROSPECTIVE_HOLDOUT+ATLAS_ANCHOR"]
+    )
+    assert stats["leakage_markers"]["ATLAS_CONTEXT"] == (
+        stats["functional_cohort_membership_patterns"]["VUS+ATLAS_CONTRAST"]
+        + stats["functional_cohort_membership_patterns"]["PROSPECTIVE_HOLDOUT+ATLAS_CONTRAST"]
+        + stats["functional_cohort_membership_patterns"]["PROSPECTIVE_HOLDOUT+ATLAS_ANCHOR"]
+        + stats["functional_cohort_membership_patterns"]["ATLAS_CONTRAST"]
+    )
+    assert stats["leakage_markers"]["PROSPECTIVE_HOLDOUT+ATLAS_CONTEXT"] == (
+        stats["functional_cohort_membership_patterns"]["PROSPECTIVE_HOLDOUT+ATLAS_CONTRAST"]
+        + stats["functional_cohort_membership_patterns"]["PROSPECTIVE_HOLDOUT+ATLAS_ANCHOR"]
+    )
+
+    _invoke_validate_manifest_content_hash(bundle_api["validate_manifest_content_hash"], deepcopy(manifest))
+    mutated = deepcopy(manifest)
+    mutated["coverage_statistics"]["functional"]["source_membership_patterns"]["spdi"] = 1
+    with pytest.raises((manifest_err, boundary_err)):
+        _invoke_validate_manifest_content_hash(bundle_api["validate_manifest_content_hash"], mutated)
+
+
 def test_fc13_manifest_uses_coverage_statistics_field_and_expected_pilot_comparison_uses_it() -> None:
     bundle_api = _bundle_api()
     operator = _load_operator_module()
@@ -1983,6 +2551,16 @@ def test_fc13_manifest_uses_coverage_statistics_field_and_expected_pilot_compari
 
     pilot_manifest = {"coverage_statistics": deepcopy(EXPECTED_PILOT)}
     helper(manifest=pilot_manifest, expected_pilot=deepcopy(EXPECTED_PILOT))
+
+    bool_leak = {"coverage_statistics": deepcopy(EXPECTED_PILOT)}
+    bool_leak["coverage_statistics"]["functional_cohort_membership_patterns"]["VUS+ATLAS_CONTRAST"] = True
+    with pytest.raises(op_error):
+        helper(manifest=bool_leak, expected_pilot=deepcopy(EXPECTED_PILOT))
+
+    float_leak = {"coverage_statistics": deepcopy(EXPECTED_PILOT)}
+    float_leak["coverage_statistics"]["functional_cohort_membership_patterns"]["VUS+ATLAS_CONTRAST"] = 1.0
+    with pytest.raises(op_error):
+        helper(manifest=float_leak, expected_pilot=deepcopy(EXPECTED_PILOT))
 
     with pytest.raises(op_error):
         helper(manifest={"expected_pilot": deepcopy(EXPECTED_PILOT)}, expected_pilot=deepcopy(EXPECTED_PILOT))
@@ -2255,7 +2833,7 @@ def test_fc16_static_import_boundaries_allow_only_named_seams_and_forbid_network
                     break
 
     assert not offenders, "domain boundary violations:\n" + "\n".join(offenders)
-    assert required_seams_seen == ALLOWED_DOMAIN_SEAMS, f"missing required seams: {sorted(ALLOWED_DOMAIN_SEAMS - required_seams_seen)}"
+    assert REQUIRED_DOMAIN_SEAMS.issubset(required_seams_seen), f"missing required seams: {sorted(REQUIRED_DOMAIN_SEAMS - required_seams_seen)}"
 
 
 def test_fc17_production_overlap_literals_are_forbidden_outside_operator_expected_pilot_gate() -> None:
@@ -2353,15 +2931,16 @@ def test_fc19_committed_summary_is_present_and_aggregate_only() -> None:
     if not SUMMARY_PATH.is_file():
         pytest.fail(f"committed summary is missing: {SUMMARY_PATH}")
     summary = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))
-    assert set(summary).issubset(SUMMARY_TOP_LEVEL_WHITELIST), (
-        f"summary contains non-whitelisted keys: {sorted(set(summary) - SUMMARY_TOP_LEVEL_WHITELIST)}"
+    assert set(summary) == SUMMARY_TOP_LEVEL_KEYS, (
+        f"summary top-level keys mismatch. expected={sorted(SUMMARY_TOP_LEVEL_KEYS)} actual={sorted(summary)}"
     )
-    assert {"schema", "bundle_id", "manifest_content_hash", "boundaries"}.issubset(summary)
     assert summary["schema"] == SUMMARY_SCHEMA
     assert summary["bundle_id"] == OUTPUT_BUNDLE_ID
     assert summary["boundaries"] == BOUNDARIES
 
     serialized = json.dumps(summary, sort_keys=True)
     serialized_lower = serialized.lower()
+    assert '"label_access"' in serialized_lower
+    assert '"ps3_bs3_use"' in serialized_lower
     assert not any(token in serialized_lower for token in FORBIDDEN_QUOTED_ROW_KEYS)
     assert not re.search(r"\bNC_0000(?:09\.12|16\.10):\d+:[ACGT]+:[ACGT]+\b", serialized)
