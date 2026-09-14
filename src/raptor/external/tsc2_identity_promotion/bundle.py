@@ -76,6 +76,37 @@ _OVERLAP_PAIR_KEYS = frozenset(
     {"mavedb_clipe__igvf_sge", "igvf_vamp_seq__igvf_sge", "mavedb_clipe__igvf_vamp_seq"}
 )
 
+#: The two source_ids each pairwise overlap key is computed from -- used
+#: to bound each pairwise count by ``min`` of its two source counts.
+_OVERLAP_PAIR_SOURCES: dict[str, tuple[str, str]] = {
+    "mavedb_clipe__igvf_sge": ("mavedb_clipe", "igvf_sge"),
+    "igvf_vamp_seq__igvf_sge": ("igvf_vamp_seq", "igvf_sge"),
+    "mavedb_clipe__igvf_vamp_seq": ("mavedb_clipe", "igvf_vamp_seq"),
+}
+
+#: The exact, whitelisted (artifact_id -> relative_path) mapping this
+#: slice's three promoted per-source JSONL artifacts must use -- an
+#: artifact_id outside this map (however plausible-looking, e.g. a
+#: clinical/HGVS-sounding id smuggled in by a self-hashed, otherwise
+#: internally-consistent manifest) or a relative_path that does not match
+#: its artifact_id's pinned value is always rejected. Reject missing,
+#: extra or alternate artifact_id/relative_path pairings.
+_CANONICAL_ARTIFACT_RELATIVE_PATHS: dict[str, str] = {
+    "mavedb_clipe-promoted-jsonl": "normalized/mavedb_clipe.jsonl",
+    "igvf_vamp_seq-promoted-jsonl": "normalized/igvf_vamp_seq.jsonl",
+    "igvf_sge-promoted-jsonl": "normalized/igvf_sge.jsonl",
+}
+
+#: The exact, fixed boundaries mapping every promotion manifest must
+#: carry verbatim -- no additional/missing key and no value other than
+#: ``"forbidden"`` is ever tolerated, regardless of whether the manifest
+#: is otherwise internally self-hash-consistent.
+_REQUIRED_BOUNDARIES: dict[str, str] = {
+    "network": "forbidden",
+    "clinical_use": "forbidden",
+    "evidence_strength_use": "forbidden",
+}
+
 _REQUIRED_MANIFEST_FIELDS = frozenset(
     {
         "schema",
@@ -144,6 +175,18 @@ def _validate_artifact_record(artifact: Any, *, index: int) -> None:
     if not isinstance(artifact["artifact_id"], str) or not artifact["artifact_id"].strip():
         raise PromotionManifestError(f"artifacts[{index}].artifact_id must be a non-blank string")
     _validate_safe_relative_path(artifact["relative_path"], context=f"artifacts[{index}]")
+    canonical_relative_path = _CANONICAL_ARTIFACT_RELATIVE_PATHS.get(artifact["artifact_id"])
+    if canonical_relative_path is None:
+        raise PromotionManifestError(
+            f"artifacts[{index}].artifact_id {artifact['artifact_id']!r} is not one of the exact "
+            f"whitelisted artifact_ids {sorted(_CANONICAL_ARTIFACT_RELATIVE_PATHS)!r}"
+        )
+    if artifact["relative_path"] != canonical_relative_path:
+        raise PromotionManifestError(
+            f"artifacts[{index}].relative_path {artifact['relative_path']!r} does not match the "
+            f"pinned relative_path {canonical_relative_path!r} for artifact_id "
+            f"{artifact['artifact_id']!r}"
+        )
     byte_length = artifact["byte_length"]
     if not isinstance(byte_length, int) or isinstance(byte_length, bool) or byte_length < 0:
         raise PromotionManifestError(f"artifacts[{index}].byte_length must be a non-negative int")
@@ -207,6 +250,15 @@ def _validate_manifest_contract(manifest: dict[str, Any], *, require_content_has
         seen_relative_paths.add(relative_path)
         total_row_count += artifact["row_count"]
 
+    if seen_artifact_ids != set(_CANONICAL_ARTIFACT_RELATIVE_PATHS):
+        missing_ids = set(_CANONICAL_ARTIFACT_RELATIVE_PATHS) - seen_artifact_ids
+        extra_ids = seen_artifact_ids - set(_CANONICAL_ARTIFACT_RELATIVE_PATHS)
+        raise PromotionManifestError(
+            "manifest.artifacts must contain exactly the three whitelisted artifact_ids "
+            f"{sorted(_CANONICAL_ARTIFACT_RELATIVE_PATHS)!r}; missing={sorted(missing_ids)!r} "
+            f"extra={sorted(extra_ids)!r}"
+        )
+
     counts = manifest["counts"]
     if not isinstance(counts, dict) or set(counts) != {"rows"}:
         raise PromotionManifestError("manifest.counts must have exactly the field 'rows'")
@@ -260,6 +312,9 @@ def _validate_manifest_contract(manifest: dict[str, Any], *, require_content_has
         raise PromotionManifestError(
             f"manifest.variant_kind_counts must have exactly the keys {sorted(ALLOWED_VARIANT_KINDS)!r}"
         )
+    for kind, count in variant_kind_counts.items():
+        if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+            raise PromotionManifestError(f"manifest.variant_kind_counts[{kind!r}] must be a non-negative int")
     if sum(variant_kind_counts.values()) != counts["rows"]:
         raise PromotionManifestError("manifest.variant_kind_counts values do not sum to manifest.counts.rows")
 
@@ -286,11 +341,6 @@ def _validate_manifest_contract(manifest: dict[str, Any], *, require_content_has
         value = manifest[field_name]
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:
             raise PromotionManifestError(f"manifest.{field_name} must be a non-negative int")
-    if manifest["verified_unique_spdi"] + manifest["duplicate_verified_observations"] != manifest["verified_observations"]:
-        raise PromotionManifestError(
-            "manifest.verified_unique_spdi + manifest.duplicate_verified_observations must equal "
-            "manifest.verified_observations"
-        )
 
     source_overlap = manifest["source_overlap"]
     if not isinstance(source_overlap, dict) or set(source_overlap) != {"pairwise", "triple"}:
@@ -307,6 +357,39 @@ def _validate_manifest_contract(manifest: dict[str, Any], *, require_content_has
     if not isinstance(triple, int) or isinstance(triple, bool) or triple < 0:
         raise PromotionManifestError("manifest.source_overlap.triple must be a non-negative int")
 
+    # Overlap set arithmetic (spec's cross-source overlap invariants): each
+    # pairwise intersection can never exceed either of its two source
+    # counts, the triple intersection can never exceed any pairwise
+    # intersection, and verified_unique_spdi/duplicate_verified_observations
+    # are EXACTLY determined (never merely bounded) by inclusion-exclusion
+    # over the three verified-observation sets.
+    for pair_key, (source_a, source_b) in _OVERLAP_PAIR_SOURCES.items():
+        bound = min(verified_observations_by_source[source_a], verified_observations_by_source[source_b])
+        if pairwise[pair_key] > bound:
+            raise PromotionManifestError(
+                f"manifest.source_overlap.pairwise[{pair_key!r}] {pairwise[pair_key]!r} exceeds the "
+                f"maximum possible intersection {bound!r} of sources {source_a!r}/{source_b!r}"
+            )
+    triple_bound = min(pairwise.values())
+    if triple > triple_bound:
+        raise PromotionManifestError(
+            f"manifest.source_overlap.triple {triple!r} exceeds the maximum possible triple "
+            f"intersection {triple_bound!r} (bounded by the smallest pairwise intersection)"
+        )
+    expected_unique_spdi = sum(verified_observations_by_source.values()) - sum(pairwise.values()) + triple
+    if manifest["verified_unique_spdi"] != expected_unique_spdi:
+        raise PromotionManifestError(
+            f"manifest.verified_unique_spdi {manifest['verified_unique_spdi']!r} does not match the "
+            "inclusion-exclusion value derived from verified_observations_by_source/source_overlap "
+            f"{expected_unique_spdi!r}"
+        )
+    expected_duplicate_observations = manifest["verified_observations"] - manifest["verified_unique_spdi"]
+    if manifest["duplicate_verified_observations"] != expected_duplicate_observations:
+        raise PromotionManifestError(
+            f"manifest.duplicate_verified_observations {manifest['duplicate_verified_observations']!r} "
+            f"does not match verified_observations - verified_unique_spdi {expected_duplicate_observations!r}"
+        )
+
     conservation = manifest["conservation"]
     if not isinstance(conservation, dict) or set(conservation) != _REQUIRED_CONSERVATION_FIELDS:
         raise PromotionManifestError(
@@ -322,6 +405,11 @@ def _validate_manifest_contract(manifest: dict[str, Any], *, require_content_has
         )
     if conservation["output_rows"] != counts["rows"]:
         raise PromotionManifestError("manifest.conservation.output_rows must equal manifest.counts.rows")
+
+    if manifest["boundaries"] != _REQUIRED_BOUNDARIES:
+        raise PromotionManifestError(
+            f"manifest.boundaries must be exactly {_REQUIRED_BOUNDARIES!r}, got {manifest['boundaries']!r}"
+        )
 
 
 def compute_manifest_content_hash(manifest: dict[str, Any]) -> str:
@@ -579,7 +667,17 @@ def build_committed_summary(manifest: dict[str, Any]) -> dict[str, Any]:
     conservation. NEVER includes a per-row identity, HGVS/SPDI string, raw
     score, source functional class, or any clinical/evidence-strength
     claim (enforced structurally: this function is a strict field-
-    whitelist projection)."""
+    whitelist projection).
+
+    Always fully re-validates ``manifest`` (schema/whitelist/arithmetic
+    invariants AND its own recomputed ``content_hash``) via
+    ``validate_manifest_content_hash`` BEFORE projecting any field: a
+    manifest that is internally self-hash-consistent (i.e. its
+    ``content_hash`` was recomputed after tampering) but violates the
+    artifact-id whitelist, the exact boundaries mapping, or any count/
+    arithmetic invariant must never reach the committed summary."""
+    validate_manifest_content_hash(manifest)
+
     artifact_integrity = {
         artifact["artifact_id"]: {
             "sha256": artifact["sha256"],

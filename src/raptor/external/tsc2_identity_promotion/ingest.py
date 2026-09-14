@@ -64,7 +64,7 @@ from raptor.external.tsc2_functional.model import (
     NormalizedFunctionalRow,
 )
 from raptor.external.tsc2_sources.bundle import BundleBoundaryError as _SourceBundleBoundaryError
-from raptor.external.tsc2_sources.bundle import _safe_join, _validate_run_name
+from raptor.external.tsc2_sources.bundle import _validate_run_name
 from raptor.external.tsc2_vamp_crosswalk.model import (
     REQUIRED_CROSSWALK_ROW_FIELDS,
     CrosswalkContractError,
@@ -295,6 +295,30 @@ def _validate_relative_path_safe(relative_path: Any, *, label: str) -> None:
         )
 
 
+def _validate_no_symlink_components(base: Path, relative_path: str, *, label: str) -> Path:
+    """Walk from ``base`` down through each path component of
+    ``relative_path``, inspecting EVERY unresolved component (including
+    ``base`` itself) with ``Path.is_symlink()`` -- which uses ``lstat``
+    and never follows a link -- BEFORE any ``resolve()``/open. Rejects a
+    symlink/reparse point at any ancestor OR at the leaf itself, even when
+    its target would still resolve to a location inside ``base`` (a
+    same-directory/sibling symlink is exactly as untrusted as one that
+    escapes ``base``: neither is ever a real, directly-published file).
+    Returns the final (still-unresolved) joined path if every component is
+    a real (non-symlink) entry or does not yet exist."""
+    if base.is_symlink():
+        raise InputPinMismatchError(f"{label}: run directory {base} is a symlink/reparse point; refusing for safety")
+    current = base
+    for part in PurePosixPath(relative_path).parts:
+        current = current / part
+        if current.is_symlink():
+            raise InputPinMismatchError(
+                f"{label}: path component {current} is a symlink/reparse point; refusing to read "
+                "through a symlink even when its target remains inside the run directory"
+            )
+    return current
+
+
 def _read_pinned_artifact(*, root: Path | str, run_name: str, artifact: dict[str, Any], label: str) -> bytes:
     try:
         _validate_run_name(run_name)
@@ -305,10 +329,19 @@ def _read_pinned_artifact(*, root: Path | str, run_name: str, artifact: dict[str
     _validate_relative_path_safe(relative_path, label=label)
 
     run_dir = Path(root) / run_name
+    artifact_path = _validate_no_symlink_components(run_dir, relative_path, label=label)
+
+    # Containment is structurally guaranteed once every component is
+    # confirmed real (no ".."/absolute components are permitted by
+    # ``_validate_relative_path_safe`` and no symlink can redirect the
+    # walk) -- this resolve()+relative_to() is preserved as a defense-in-
+    # depth containment check, never the FIRST safety check performed.
     try:
-        artifact_path = _safe_join(run_dir, relative_path)
-    except _SourceBundleBoundaryError as exc:
-        raise InputPinMismatchError(f"{label}: {exc}") from exc
+        resolved_artifact_path = artifact_path.resolve()
+        resolved_run_dir = run_dir.resolve()
+        resolved_artifact_path.relative_to(resolved_run_dir)
+    except ValueError as exc:
+        raise InputPinMismatchError(f"{label}: artifact path escapes its run directory {run_dir}") from exc
 
     if artifact_path.is_symlink() or not artifact_path.is_file():
         raise InputPinMismatchError(f"{label}: pinned artifact not found at a trusted path {artifact_path}")
