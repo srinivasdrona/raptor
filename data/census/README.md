@@ -120,6 +120,18 @@ Raw publication and functional-dataset bytes remain outside Git. IGVF licence
 review remains required, and no source is activated for classification or
 assay-specific evidence.
 
+`r611q_literature_expansion_2026-09-15.json` records the bounded,
+aggregate-only $TSC2$ $R611Q$ literature expansion. The LitVar2/ClinVar union
+added 69 PMID leads beyond the pinned baseline; PubMed resolved 68, Europe PMC
+resolved 68 with 64 abstracts, and 27 metadata-level CC BY candidates were
+independently checked against their JATS licence declarations. Twenty-six full
+texts were retained externally and one was licence-rejected. The external
+bundle is pinned by manifest content hash
+`ed14ea509857e22f1ae058632e61599f080d033d64a0057f9aad10c55bd360f5`.
+Article identities, abstracts, raw responses, and full text remain outside Git.
+This acquisition assigns no evidence strength, $PS3$/$BS3$, Atlas claim,
+classification, or clinical authorization.
+
 `tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json` (ADR-0012) is the
 packet-free, non-identifying binding census aggregate over the same
 6,618-VUS TSC1/TSC2 run under the PP3/BP4-disabled-automated-emission /
