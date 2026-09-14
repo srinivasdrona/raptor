@@ -2620,7 +2620,7 @@ def test_ac12_operator_summary_output_contract_and_publication_order_without_net
     module = _load_operator_module()
     parser = _symbol(module, "build_arg_parser")()
     cfg = _minimal_operator_config()
-    cfg["committed_summary_path"] = "data/census/r611q_literature_expansion_2026-09-15.json"
+    cfg["committed_summary_path"] = f"data/census/{tmp_path.name}-summary-output-contract.json"
     config_path = tmp_path / "r611q-config.yaml"
     config_path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
     baseline_path = tmp_path / "baseline.json"
@@ -2799,9 +2799,91 @@ def test_ac14_committed_summary_pilot_file_is_present_and_aggregate_only() -> No
     )
     summary = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))
     _assert_aggregate_only_summary(summary)
+
+    assert summary["schema"] == "raptor.external.r611q_literature_committed_summary.v1"
+    assert summary["bundle_id"] == "r611q-literature-expansion-2026-09-15"
+    assert summary["manifest_content_hash"] == "ed14ea509857e22f1ae058632e61599f080d033d64a0057f9aad10c55bd360f5"
+    assert summary["baseline_hashes"] == {
+        "baseline_manifest": "8dd13997581fc06998edd0bc73042ae1e8a059bbd2d0dccef4656da1166d1468"
+    }
+    assert summary["source_response_hashes"] == {
+        "clinvar_pubmed_links": "1e991d68bcc15628cc55e0e81580d8ebaaf8a2b36ff8095255f2792b6a848a46",
+        "clinvar_uid_search": "d49f7a05d5a9bc20fc93d1db04fc53385699119e1cc3df5b03c21a8692ae0ceb",
+        "europe_pmc": "c4a78e49454206638036b09d2e9c7980ab87fb2e7dfbd5602f6e0341e1fc7243",
+        "litvar2_publications": "ad783af1751db255d6349be963aba85ff2573e584ba5541b509d6b51f8c17e21",
+        "pubmed": "c74e9d94fa4bd29e674f15a6fff54a28a9480d343829cfdd9dea63c1022fa46f",
+    }
+
+    expected_counts = {
+        "article_index_rows": 69,
+        "artifacts": 32,
+        "baseline_union_overlap": 23,
+        "clinvar_pmids": 50,
+        "discovery_union_pmids": 92,
+        "europe_pmc_abstracts": 64,
+        "europe_pmc_open_access": 36,
+        "europe_pmc_pmcids": 44,
+        "europe_pmc_records_returned": 68,
+        "fulltext_acquired": 26,
+        "fulltext_candidates": 27,
+        "licence_absent": 34,
+        "licence_cc_by": 27,
+        "licence_cc_by_nc_nd": 6,
+        "licence_cc_by_nc_sa": 1,
+        "litvar2_clinvar_intersection": 9,
+        "litvar2_pmids": 51,
+        "new_pmid_leads": 69,
+        "pubmed_abstracts": 64,
+        "pubmed_dois": 68,
+        "pubmed_pmcids": 45,
+        "pubmed_records_returned": 68,
+        "pubmed_records_unresolved": 1,
+        "sources": 7,
+    }
     counts = summary["counts"]
+    assert counts == expected_counts
     for axis in PROBE_COUNT_AXES:
         assert axis in counts, f"summary counts missing required probe axis {axis!r}"
         assert isinstance(counts[axis], int)
         assert not isinstance(counts[axis], bool)
         assert counts[axis] >= 0
+    assert counts["fulltext_candidates"] - counts["fulltext_acquired"] == 1
+
+    assert summary["licence_counts"] == {
+        "ABSENT": 34,
+        "CC BY": 27,
+        "CC BY-NC-ND": 6,
+        "CC BY-NC-SA": 1,
+    }
+    assert summary["unresolved_counts"] == {
+        "europe_pmc_unresolved_pmids": 1,
+        "pubmed_missing_pmids": 1,
+    }
+    assert summary["fulltext_artifact_hashes"] == [
+        "07f346d53b82d9d62efbe2115b7aea75aaa7f77bb034444aa3a815aecb55c006",
+        "15730bf06c240888030d56d18d6cc90520c3e6d6fc7f5ecc7e4563d5e5bdad47",
+        "184a9a3b0fc0ddcdf30068058038be9b8ed1342c6c777c50f97f1dd7e4b11902",
+        "1e1c0e664d579133ff32d7f24b2da4d01099959ee392137d1826b013d501f077",
+        "1ed004e886c6e38d4792a4abddee63203f970cc45984c76304d55648e8e28f59",
+        "245dc4c9a1491f0a969389d6c5b76d3d3d41d5afbd7ec9fb69e0b0c70102c7fd",
+        "42086752d4ee01d0bf8eeba2f89f6c912787cb6f5ddf18b24290b16cbee64ad8",
+        "463cbb96b70cf728ed910ce98fb43d42fba0163a8ec47b71c83155a608cef0be",
+        "4855edc5471559172fe0408238b2237a300556b0d3d7a2ba70fe6ba682913a61",
+        "4da944bc6c6dd329d6660a58f1594b330b0a5d2f9494ccab6d36b71fcd17f055",
+        "50fbec0e4f8280d7582c9f8704bcc2dd6264950455572728fff0c3397c37fdb0",
+        "6a1bf4de2c239fa77d4ef5e2c3b4b9d73a6949cd2401e3ca6551cc60361696b1",
+        "6fed7695407ddbb9c4c67e1eca3b97791c1c00a037c3c202c3747413484b6a6e",
+        "720c3b840b5d243b67c4ee21dba0264323d0876cdfe901e0255849f41e25ec81",
+        "750171d2edae9906a61264c616695afe8c0f4d59d4f3e0184fd445d2f6aea2eb",
+        "86def6999fb9831958dc8c293792a4f1a931ea68fdf996a88d77296801fca962",
+        "99acbfbd3bb2b483b0e32191c566a93af5eb2464499fdd7af0ec423ed0be7f92",
+        "a9df065656d09cf2963139df1c92b1958127a2742f028f2e097170706c0aac0b",
+        "baa625287d7ae896cd7639d79edd60e9b37c33d86cdd0ec2950f70b939fc4bf0",
+        "bb9a25c49ab320f3548c6f08428e5672dc01dc9d0b5039fa229b8f488d7734e6",
+        "bfec32091b8ec96654f341ec17957e89bfff49324faca5b9d9baeb47c324e1ab",
+        "c2c23116e19d23622bb057649e515b36e1775185379559551a10fbc582749ab6",
+        "c6989a3c448197bdda9203b8dff030e3e9e41af4a74ed74bbe35f34420e065b4",
+        "cbeda19c963f10b88fbe71db153fa337d27223d8bbebb2eda8e7335a6462ad0c",
+        "e255ffc149d2dd1816aafba1c3ad1bd0ba0476851f6e23b144f8ab178f3349e8",
+        "fd0c440cbc6648f53a2ade82dec6f41ecdb45a40b829be6fc999e80dd7beedf5",
+    ]
