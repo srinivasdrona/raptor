@@ -1,0 +1,426 @@
+schema: raptor.external.tsc2_functional_coverage_config.v1
+config_id: tsc2-functional-coverage-map-v1
+spec: docs/project/specs/raptor-v2-functional-coverage-map-v1.yaml
+spec_id: raptor-v2-functional-coverage-map-v1
+spec_version: "1.0.0"
+
+inputs:
+  functional_identity_promotion:
+    environment_variable: RAPTOR_TSC2_FUNCTIONAL_IDENTITY_PROMOTION_ROOT
+    run_name: tsc2-functional-identity-promotion-2026-09-14
+    bundle_id: tsc2-functional-identity-promotion-2026-09-14
+    manifest_filename: bundle_manifest.json
+    manifest_content_hash: c66639976bf9369cfd07568011a85f5ac50fd0ea9467c54210768574645941ed
+    artifacts:
+      mavedb_clipe:
+        artifact_id: mavedb_clipe-promoted-jsonl
+        relative_path: normalized/mavedb_clipe.jsonl
+        sha256: 9241052425a0a785b7da23edef678365f485a2ba973568bf3c5b38270399e2ff
+        byte_length: 106045
+        row_count: 208
+      igvf_vamp_seq:
+        artifact_id: igvf_vamp_seq-promoted-jsonl
+        relative_path: normalized/igvf_vamp_seq.jsonl
+        sha256: dc639dd6ec0f9aeaf4113f5b36d46a2d715d5830eb6dbb370860925a7c9648db
+        byte_length: 5116593
+        row_count: 9253
+      igvf_sge:
+        artifact_id: igvf_sge-promoted-jsonl
+        relative_path: normalized/igvf_sge.jsonl
+        sha256: 2292e5770911e13fcd2536287fd04fc7f23354c9bc81ebf01533aa441114ea52
+        byte_length: 227381
+        row_count: 453
+    required_identity_state: GENOMIC_SPDI_VERIFIED
+    expected:
+      source_verified_observations:
+        mavedb_clipe: 208
+        igvf_vamp_seq: 9050
+        igvf_sge: 423
+      verified_observations: 9681
+      verified_unique_spdi: 9552
+      duplicate_cross_source_observations: 129
+
+  vus_universe:
+    identity_root_environment_variable: RAPTOR_TSC_VUS_IDENTITY_ROOT
+    bias_root_environment_variable: RAPTOR_TSC_VUS_BIAS_ROOT
+    manifest:
+      relative_path: tsc_vus_input.manifest.jsonl
+      sha256: 7f9937521a425e73b31422fa9191c90e67fa80cc58f351517ac732b1d32fcbba
+      byte_length: 838920
+      row_count: 6618
+      required_fields: [accession, contig, variant_id, vcf_key]
+    provenance:
+      relative_path: tsc_vus_input.provenance.json
+      sha256: 7272529546ad43ac0196523ad83d66eab8388a66a08f589bf10fc296b2110f55
+      byte_length: 784
+      required_values:
+        conservation_count: 6618
+        corpus_kind: clinvar_vus_internal_evidence_census
+        authorization: internal_non_authoritative_evidence_only
+        source_snapshot: clinvar_2026-07-07
+        manifest_hash: 7f9937521a425e73b31422fa9191c90e67fa80cc58f351517ac732b1d32fcbba
+        identity_file_sha256: c4ec45f036addeb38661adb21e16396482bb4e5ef54326b7c9662479cd33024e
+        vcf_hash: 3fff6de7ae9b2b202642e498c4c49532cf1aaf5c2734f0e8341d5ace88fa3a09
+    bias_tsv:
+      relative_path: tsc_vus_input.bias_output.tsv
+      sha256: 0a55cab470d3de93f06cd87ba30957fd1674c0ae2098ec86350f5aaac1a1162e
+      byte_length: 6095122
+      row_count: 6618
+    gene_counts:
+      TSC1: 2249
+      TSC2: 4369
+
+  priority_subset_policy:
+    rule: >-
+      Reproduce the current disabled/manual VUS census strata through
+      raptor.census.strata.reproduce_census_strata. The priority subset is
+      exactly candidate_LP_review union candidate_LB_review. Independently
+      load the frozen external candidate-priority queue and require its
+      canonical-SPDI set to equal the reproduced subset exactly. Never read a
+      committed aggregate as the identity oracle and never use the BIAS
+      acmgClassification column.
+    queue_root_environment_variable: RAPTOR_TSC_PRIORITY_QUEUE_ROOT
+    queue_run_name: corrected-review-packets-2026-07-22-r1
+    aggregate_manifest:
+      relative_path: aggregate_manifest.json
+      sha256: 516f3607636d169205fa8584c88ad635afa62a06d046ddb0c300859453e17f0e
+      byte_length: 3051
+      required_values:
+        universe_size: 6618
+        conservation:
+          manifest_identities: 6618
+          bias_rows: 6618
+          candidate_LP_review: 157
+          candidate_LB_review: 7
+          no_deterministic_resolution: 6424
+          manual_review: 30
+        source_hashes:
+          manifest_sha256: 7f9937521a425e73b31422fa9191c90e67fa80cc58f351517ac732b1d32fcbba
+          bias_tsv_sha256: 0a55cab470d3de93f06cd87ba30957fd1674c0ae2098ec86350f5aaac1a1162e
+          input_vcf_sha256: 3fff6de7ae9b2b202642e498c4c49532cf1aaf5c2734f0e8341d5ace88fa3a09
+        run_pins:
+          code_commit: 74a37d14be4f2bf99a56dc49d537446d6a4b3c88
+          source_snapshot: clinvar_2026-07-07
+    queue:
+      relative_path: candidate_priority_queue.jsonl
+      sha256: 013be368aa8243aabbde03023cff1ec01d7487bcb2e35c6715259edb625d3670
+      byte_length: 61713
+      row_count: 164
+      exact_fields:
+        - packet_id
+        - evidence_core_hash
+        - canonical_spdi
+        - gene
+        - review_state
+        - gate_status
+        - quality_flags
+        - contradiction
+      required_review_state: POLICY_BLOCKED
+      required_gate_status: UNVERIFIED
+    approved_predictor_policy:
+      path: configs/eval/bp4pp3_predictor_policy.json
+      canonical_lf_sha256: 85e9e92fa9f4c221c02af30e787315a88ed2bef51f6f58d25c5dc267eb55a34a
+      required_values:
+        schema: bp4pp3-predictor-policy/2
+        status: approved
+        mode: disabled_manual
+    scorer_config:
+      path: configs/acmg/tsc.yaml
+      raw_sha256: 1ba8066accd8eda16e20518abbeaedb61247fea372675f519f02a8574ff9350e
+    eval_config:
+      path: configs/eval/tsc2.yaml
+      raw_sha256: ea4ff684bdc2ae6b079f352816b3993ac813af0e2654b851c30c1f4ef577a293
+    lineage_policy:
+      path: configs/eval/bias_lineage.yaml
+      raw_sha256: d2312b2c74f125204ababe9731fc4e37a8e0f30d1608b75f8457aae6591689df
+    packet_policy:
+      path: configs/packet/candidate_direction.yaml
+      raw_sha256: 778882c500adc43bfca8e6311d3d2038f96e32f05faff7dcda50560ee3448d67
+    expected:
+      candidate_LP_review: 157
+      candidate_LB_review: 7
+      total: 164
+      gene_counts:
+        TSC1: 52
+        TSC2: 112
+
+  prospective_holdout:
+    environment_variable: RAPTOR_TSC_PROSPECTIVE_HOLDOUT_ROOT
+    source_run: clinvar-2026-08-v3-prospective-run
+    manifest:
+      relative_path: holdout_input.manifest.jsonl
+      sha256: 809ac116a7e0c33e5749173f683f10fd8cd623b5d04ef4919cb972dd9196ace8
+      byte_length: 325794
+      row_count: 2608
+      required_fields: [accession, contig, variant_id, vcf_key]
+    provenance:
+      relative_path: holdout_input.provenance.json
+      sha256: 58c4732fd4eed308b4b576393f65a37acfff951d9e6062490d1526ec8109f8fd
+      byte_length: 354
+      required_values:
+        archive_sha256: 230ba6d5ac0869bfb46fecb8d19bd8dbfa9a133bfda2e3f8f5b5b662ae7bf500
+        benchmark_snapshot: clinvar_2026-08-monthly-amendment-v3
+        conservation_count: 2608
+        manifest_hash: 809ac116a7e0c33e5749173f683f10fd8cd623b5d04ef4919cb972dd9196ace8
+        vcf_hash: ea0f97bdd896e96f7f64c1f5f6ceda4e2e43156485bf635a6d11f7369dc4e77b
+    forbidden_reads:
+      - benchmark.jsonl
+      - train_dev.jsonl
+      - holdout.jsonl
+      - terminal_eval.json
+      - prospective_evidence.json
+      - any label or adjudication artifact
+    gene_counts:
+      TSC1: 718
+      TSC2: 1890
+
+  atlas_contrast_identities:
+    identity_map_root_environment_variable: RAPTOR_ATLAS_TSC2_IDENTITY_MAP_ROOT
+    raw_inventory_root_environment_variable: RAPTOR_ATLAS_TSC2_PANEL_ROOT
+    map:
+      relative_path: raw_identity_map.yaml
+      raw_sha256: f993d069a8d679953eff2af10c07dfe993746cf3211e8ac2f678fce94e0dcbf7
+      byte_length: 38067
+      schema: atlas.raw_identity_map.v2
+      map_content_hash: 3adbf3484de28607fa3c133b2bebc4a9d7926b4c2d5b3863b0634507c599cd26
+      map_record_count: 35
+    official_response_root_relative_path: official_responses
+    response_bundle:
+      sha256: fbedf2aae5aa26936807f2d8f26389a18a861fc884b461fdd8ebaf6b7e9f96bc
+      file_count: 88
+      byte_count: 904564
+    raw_inventory:
+      relative_path: discovery_inventory.raw.yaml
+      sha256: fee39ffa9c826b6e0ccb85ad583b09c2f81794036b115d91a91eab521365befb
+      byte_length: 6062
+      row_count: 35
+    tracked_lock:
+      path: configs/atlas/panels/tsc2/atlas-phase2-raw-identity-map-lock-v4.yaml
+      schema: atlas.raw_identity_map_lock.v2
+      lock_content_hash: 85bc2b10e65bd8140a775537204f3c7c7048cd5444d7057fbea9501b7cd4b104
+    disease_pack:
+      path: configs/atlas/packs/tsc2/pack.yaml
+      pack_id: tsc2
+      pack_version: 1.0.0-phase1
+      pack_content_hash: 1294478c6d112f91e5719ee345d2b5be1925567ec4f4abdff50b0e092ff08927
+    loading_rule: >-
+      Use raptor.atlas.identity_map.load_identity_map with the tracked lock,
+      disease pack, raw inventory and official response root. Replay every raw
+      inventory row through the returned offline mapper. Do not read the
+      label-bearing candidate_universe.yaml.
+    expected:
+      raw_records: 35
+      resolved_unique_spdi: 25
+      unresolved_records: 10
+
+  atlas_anchor:
+    path: data/atlas/runs/2026-08-03/r611q_gate_result.json
+    raw_sha256: 63792ff7df903beba8e0630299b0d694c7d11b51810e351f0af08cacfa675442
+    schema: raptor.atlas_public_gate_result.v1
+    required:
+      run_id: r611q-gate1-7-v1
+      scope: deterministic_fidelity_only
+      variant:
+        spdi: NC_000016.10:2070570:G:A
+      gate_8: BLOCKED_HUMAN_REVIEW
+      accepted_claim_count: 0
+      promote_candidate_invoked: false
+
+coverage_row_contract:
+  schema: raptor.external.tsc2_functional_coverage_row.v1
+  exact_fields:
+    - schema
+    - spdi
+    - source_ids
+    - observation_count
+    - vus_2026_07
+    - priority_stratum
+    - prospective_holdout_2026_08
+    - atlas_contrast_candidate
+    - atlas_anchor_r611q
+    - leakage_markers
+  source_order: [mavedb_clipe, igvf_vamp_seq, igvf_sge]
+  priority_stratum_values: [candidate_LP_review, candidate_LB_review, null]
+  leakage_marker_order: [PROSPECTIVE_HOLDOUT, ATLAS_CONTEXT]
+  invariants:
+    - exactly one row per verified functional SPDI
+    - rows sorted lexicographically by SPDI
+    - source_ids are unique and follow source_order
+    - observation_count equals len(source_ids)
+    - priority_stratum is non-null only when vus_2026_07 is true
+    - PROSPECTIVE_HOLDOUT is present iff prospective_holdout_2026_08 is true
+    - ATLAS_CONTEXT is present iff atlas_contrast_candidate or atlas_anchor_r611q is true
+    - no score, functional class, label, ACMG criterion or evidence strength is present
+
+join_rules:
+  - exact SPDI equality only; no trim, left-shift, liftover or accession substitution
+  - VUS and holdout manifests must each contain unique variant_id and vcf_key values
+  - the priority subset must be reproduced from all 6,618 VUS rows before overlap
+  - VUS and prospective holdout identity sets must be disjoint
+  - Atlas unresolved identities are counted but never joined
+  - the Atlas anchor is separate from the contrast-candidate identity map
+  - source overlap is membership coverage only, never functional agreement
+
+output:
+  external_bundle:
+    environment_variable: RAPTOR_TSC2_FUNCTIONAL_COVERAGE_ROOT
+    default_root: ~/raptor-data/external/tsc2-functional-coverage
+    run_name: tsc2-functional-coverage-map-2026-09-14
+    bundle_id: tsc2-functional-coverage-map-2026-09-14
+    manifest_schema: raptor.external.tsc2_functional_coverage_bundle.v1
+    manifest_filename: bundle_manifest.json
+    artifacts:
+      coverage:
+        artifact_id: tsc2-functional-coverage-jsonl
+        relative_path: coverage/functional_identity_coverage.jsonl
+        row_count: 9552
+    create_only: true
+    symlink_and_reparse_safe: true
+    manifest_last: true
+  committed_summary:
+    path: data/census/tsc2_functional_coverage_map_2026-09-14.json
+    schema: raptor.external.tsc2_functional_coverage_summary.v1
+    contains:
+      - exact input hashes and self-hashes
+      - source and unique functional identity counts
+      - cohort sizes and gene counts
+      - aggregate exact-SPDI coverage by cohort and source
+      - aggregate source-membership patterns
+      - aggregate cross-cohort intersections
+      - aggregate leakage-marker counts
+      - Atlas resolved/unresolved and anchor boundary counts
+      - output artifact and manifest hashes
+    excludes:
+      - SPDI, HGVS, VCF key or raw-record identity
+      - raw scores or functional classes
+      - benchmark or holdout labels
+      - BIAS rationale or classification fields
+      - Atlas observation, claim, source-span or classification metadata
+
+expected_pilot:
+  functional:
+    verified_observations: 9681
+    unique_spdi: 9552
+    source_unique:
+      mavedb_clipe: 208
+      igvf_vamp_seq: 9050
+      igvf_sge: 423
+    source_membership_patterns:
+      mavedb_clipe: 164
+      igvf_vamp_seq: 8959
+      igvf_sge: 307
+      mavedb_clipe+igvf_vamp_seq: 6
+      mavedb_clipe+igvf_sge: 31
+      igvf_vamp_seq+igvf_sge: 78
+      mavedb_clipe+igvf_vamp_seq+igvf_sge: 7
+  cohorts:
+    vus:
+      identities: 6618
+      TSC1: 2249
+      TSC2: 4369
+      functional_overlap_unique: 335
+      source_overlap_unique:
+        mavedb_clipe: 66
+        igvf_vamp_seq: 194
+        igvf_sge: 105
+      source_membership_patterns:
+        mavedb_clipe: 50
+        igvf_vamp_seq: 178
+        igvf_sge: 79
+        mavedb_clipe+igvf_vamp_seq: 2
+        mavedb_clipe+igvf_sge: 12
+        igvf_vamp_seq+igvf_sge: 12
+        mavedb_clipe+igvf_vamp_seq+igvf_sge: 2
+    priority:
+      identities: 164
+      candidate_LP_review: 157
+      candidate_LB_review: 7
+      TSC1: 52
+      TSC2: 112
+      functional_overlap_unique: 4
+      candidate_LP_review_overlap: 4
+      candidate_LB_review_overlap: 0
+      source_overlap_unique:
+        mavedb_clipe: 0
+        igvf_vamp_seq: 0
+        igvf_sge: 4
+    prospective_holdout:
+      identities: 2608
+      TSC1: 718
+      TSC2: 1890
+      functional_overlap_unique: 171
+      source_overlap_unique:
+        mavedb_clipe: 25
+        igvf_vamp_seq: 122
+        igvf_sge: 40
+      source_membership_patterns:
+        mavedb_clipe: 19
+        igvf_vamp_seq: 111
+        igvf_sge: 26
+        mavedb_clipe+igvf_vamp_seq: 1
+        mavedb_clipe+igvf_sge: 4
+        igvf_vamp_seq+igvf_sge: 9
+        mavedb_clipe+igvf_vamp_seq+igvf_sge: 1
+    atlas_contrast:
+      raw_records: 35
+      resolved_unique_spdi: 25
+      unresolved_records: 10
+      functional_overlap_unique: 6
+      source_overlap_unique:
+        mavedb_clipe: 3
+        igvf_vamp_seq: 2
+        igvf_sge: 2
+      source_membership_patterns:
+        mavedb_clipe: 2
+        igvf_vamp_seq: 1
+        igvf_sge: 2
+        mavedb_clipe+igvf_vamp_seq: 1
+        mavedb_clipe+igvf_sge: 0
+        igvf_vamp_seq+igvf_sge: 0
+        mavedb_clipe+igvf_vamp_seq+igvf_sge: 0
+    atlas_anchor:
+      identities: 1
+      functional_overlap_unique: 1
+      source_overlap_unique:
+        mavedb_clipe: 1
+        igvf_vamp_seq: 0
+        igvf_sge: 0
+      prospective_holdout_overlap: 1
+  cross_cohort:
+    vus__prospective_holdout: 0
+    priority__prospective_holdout: 0
+    vus__atlas_contrast: 3
+    priority__atlas_contrast: 0
+    prospective_holdout__atlas_contrast: 3
+    functional__vus__atlas_contrast: 1
+    functional__prospective_holdout__atlas_contrast: 3
+    functional__atlas_contrast_outside_vus_holdout: 2
+  functional_cohort_membership_patterns:
+    NONE: 9044
+    VUS: 334
+    VUS+ATLAS_CONTRAST: 1
+    PROSPECTIVE_HOLDOUT: 167
+    PROSPECTIVE_HOLDOUT+ATLAS_CONTRAST: 3
+    PROSPECTIVE_HOLDOUT+ATLAS_ANCHOR: 1
+    ATLAS_CONTRAST: 2
+  leakage_markers:
+    PROSPECTIVE_HOLDOUT: 171
+    ATLAS_CONTEXT: 7
+    PROSPECTIVE_HOLDOUT+ATLAS_CONTEXT: 4
+
+boundaries:
+  network: forbidden
+  score_semantic_use: forbidden
+  score_output: forbidden
+  label_access: forbidden
+  clinical_use: forbidden
+  evidence_strength_use: forbidden
+  ps3_bs3_use: forbidden
+  atlas_claim_promotion: forbidden
+
+implementation:
+  package: src/raptor/external/tsc2_functional_coverage/
+  operator: scripts/build_tsc2_functional_coverage_map.py
+  config: configs/external/tsc2_functional_coverage_map_v1.yaml
+  tests: tests/external/test_tsc2_functional_coverage_map.py
+  publication: reuse hardened external no-clobber bundle primitive
