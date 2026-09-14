@@ -254,6 +254,34 @@ def _validate_no_symlink_components(root: Path, run_name: str | None, relative_p
     return current
 
 
+def _assert_no_symlink_ancestry(path: Path, *, label: str, require_absolute: bool = False) -> None:
+    """Reject a symlink/reparse point anywhere from the filesystem anchor
+    down to ``path`` itself, walking lexically (never ``resolve()``)
+    using the monkeypatchable ``_is_symlink_or_reparse_point`` predicate
+    -- so an aliased ancestor can't hide behind ``path`` itself not being
+    a symlink. A relative ``path`` is anchored at the current working
+    directory by lexical join only (never resolved), UNLESS
+    ``require_absolute`` is set, in which case a relative ``path`` is
+    itself rejected (used for the repository-tracked scorer/eval/
+    lineage/packet policy paths, which are always supplied as absolute
+    paths by this slice's real callers)."""
+    path = Path(path)
+    if not path.is_absolute():
+        if require_absolute:
+            raise CoverageInputError(f"{label}: path must be absolute, got {path!s}")
+        path = Path.cwd() / path
+    current = Path(path.anchor)
+    if _is_symlink_or_reparse_point(current):
+        raise CoverageInputError(f"{label}: {current} is a symlink/reparse point; refusing for safety")
+    for part in path.parts[1:]:
+        current = current / part
+        if _is_symlink_or_reparse_point(current):
+            raise CoverageInputError(
+                f"{label}: path component {current} is a symlink/reparse point; refusing to read "
+                "through a symlink"
+            )
+
+
 def read_input_payload(
     *,
     root: Path | str,
@@ -747,6 +775,7 @@ def _real_reproduce_census_strata(
 
     for pin, label in ((scorer_config_pin, "scorer_config"), (eval_config_pin, "eval_config")):
         config_path = Path(pin["path"])
+        _assert_no_symlink_ancestry(config_path, label=label, require_absolute=True)
         raw_bytes = config_path.read_bytes()
         observed_sha256 = hashlib.sha256(raw_bytes).hexdigest()
         if observed_sha256.lower() != str(pin["raw_sha256"]).lower():
@@ -810,7 +839,9 @@ def reproduce_priority_subset(
         )
     for pin, label in ((lineage_policy_pin, "lineage_policy"), (packet_policy_pin, "packet_policy")):
         if reproduce_census_strata_fn is None:
-            raw_bytes = Path(pin["path"]).read_bytes()
+            policy_path = Path(pin["path"])
+            _assert_no_symlink_ancestry(policy_path, label=label, require_absolute=True)
+            raw_bytes = policy_path.read_bytes()
             observed_sha256 = hashlib.sha256(raw_bytes).hexdigest()
             if observed_sha256.lower() != str(pin["raw_sha256"]).lower():
                 raise CoverageInputError(
@@ -991,13 +1022,18 @@ def load_atlas_contrast_replays(
     count, and the caller-observed response-tree commitment fields
     (``response_bundle_observed``, already computed by the caller --
     typically by walking the response root the same way the public loader
-    itself will) against ``expected_*_pin`` -- all BEFORE the public
+    itself will) against ``expected_*_pin``. Every one of ``map_path``/
+    ``lock_path``/``raw_inventory_path``/``response_root``/
+    ``disease_pack_path`` is then lexically checked (anchor-to-leaf, via
+    the monkeypatchable ``_is_symlink_or_reparse_point``) for a symlink/
+    junction/reparse point -- all BEFORE the public
     ``raptor.atlas.pack.load_disease_pack``/``raptor.atlas.identity_map.
     load_identity_map`` seams are ever invoked (never reimplementing
-    their own internal hash/lock/pack-binding verification). Every raw
-    inventory row is then replayed through the returned offline mapper.
-    Resolved and unresolved records are preserved exactly (never joined
-    together); an unresolved record must never carry a non-null
+    their own internal hash/lock/pack-binding verification, and never
+    re-reading bytes already independently hash-verified above). Every
+    raw inventory row is then replayed through the returned offline
+    mapper. Resolved and unresolved records are preserved exactly (never
+    joined together); an unresolved record must never carry a non-null
     ``spdi_canonical``, and every resolved ``spdi_canonical`` must be a
     canonical TSC1/TSC2 SPDI string. Typed ``AtlasPackError``/
     ``AtlasIdentityMapError`` raised by the public loaders are translated
@@ -1055,6 +1091,20 @@ def load_atlas_contrast_replays(
                 f"atlas response_bundle: observed {field_name} {response_bundle_observed.get(field_name)!r} "
                 f"does not match the pinned expectation {expected_response_bundle_pin[field_name]!r}"
             )
+
+    # Precheck every path this function hands to the public loader seams
+    # for a symlink/junction/reparse point anywhere from the filesystem
+    # anchor down to the leaf -- BEFORE either seam is ever invoked. This
+    # never re-reads bytes already independently hash-verified above; it
+    # only guards the PATHS the public loaders will themselves open.
+    for path_value, label in (
+        (map_path, "atlas_raw_identity_map_path"),
+        (lock_path, "atlas_tracked_lock_path"),
+        (raw_inventory_path, "atlas_raw_inventory_path"),
+        (response_root, "atlas_response_root"),
+        (disease_pack_path, "atlas_disease_pack_path"),
+    ):
+        _assert_no_symlink_ancestry(Path(path_value), label=label)
 
     if load_disease_pack_fn is None:
         from raptor.atlas.pack import load_disease_pack as load_disease_pack_fn  # type: ignore[assignment]

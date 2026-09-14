@@ -287,6 +287,11 @@ def _validate_source_dicts(cohort: dict[str, Any], *, context: str, functional_o
     source_unique = _require_exact_keys(
         cohort["source_overlap_unique"], set(SOURCE_ORDER), context=f"{context}.source_overlap_unique"
     )
+    for source in SOURCE_ORDER:
+        if source_unique[source] > functional_overlap:
+            raise CoverageManifestError(
+                f"{context}.source_overlap_unique[{source!r}] exceeds {context}.functional_overlap_unique"
+            )
     if "source_membership_patterns" in cohort:
         patterns = _require_exact_keys(
             cohort["source_membership_patterns"], set(_SOURCE_MEMBERSHIP_PATTERN_KEYS),
@@ -364,6 +369,34 @@ def _validate_coverage_statistics(stats: dict[str, Any], *, counts: dict[str, An
         priority_cohort, context="coverage_statistics.cohorts.priority",
         functional_overlap=priority_cohort["functional_overlap_unique"],
     )
+    if priority_cohort["candidate_LP_review"] + priority_cohort["candidate_LB_review"] != priority_cohort["identities"]:
+        raise CoverageManifestError(
+            "coverage_statistics.cohorts.priority: candidate_LP_review + candidate_LB_review != identities"
+        )
+    if priority_cohort["candidate_LP_review"] > priority_cohort["identities"]:
+        raise CoverageManifestError(
+            "coverage_statistics.cohorts.priority.candidate_LP_review exceeds identities"
+        )
+    if priority_cohort["candidate_LB_review"] > priority_cohort["identities"]:
+        raise CoverageManifestError(
+            "coverage_statistics.cohorts.priority.candidate_LB_review exceeds identities"
+        )
+    if (
+        priority_cohort["candidate_LP_review_overlap"] + priority_cohort["candidate_LB_review_overlap"]
+        != priority_cohort["functional_overlap_unique"]
+    ):
+        raise CoverageManifestError(
+            "coverage_statistics.cohorts.priority: candidate_LP_review_overlap + "
+            "candidate_LB_review_overlap != functional_overlap_unique"
+        )
+    if priority_cohort["candidate_LP_review_overlap"] > priority_cohort["candidate_LP_review"]:
+        raise CoverageManifestError(
+            "coverage_statistics.cohorts.priority.candidate_LP_review_overlap exceeds candidate_LP_review"
+        )
+    if priority_cohort["candidate_LB_review_overlap"] > priority_cohort["candidate_LB_review"]:
+        raise CoverageManifestError(
+            "coverage_statistics.cohorts.priority.candidate_LB_review_overlap exceeds candidate_LB_review"
+        )
 
     for cohort_name in ("vus", "priority", "prospective_holdout"):
         cohort = cohorts[cohort_name]

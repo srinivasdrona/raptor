@@ -88,7 +88,7 @@ DEFAULT_CONFIG = REPO_ROOT / "configs" / "external" / "tsc2_functional_coverage_
 #: ``DEFAULT_CONFIG`` -- so neither a byte-identical copy at a different
 #: path nor a symlink alias, nor a silently drifted ``DEFAULT_CONFIG``
 #: itself, is ever trusted.
-CONFIG_CANONICAL_LF_SHA256 = "e5082dcbe75338949f386c6b193016befc0f9f7e56b6371267ba07584576ad05"
+CONFIG_CANONICAL_LF_SHA256 = "b70d0fbf5d3117c4d0057f5df0846315809097d41c9d8c582e0c424a3dcc58de"
 
 _FUNCTIONAL_PROMOTION_ROOT_ENV = "RAPTOR_TSC2_FUNCTIONAL_IDENTITY_PROMOTION_ROOT"
 _VUS_IDENTITY_ROOT_ENV = "RAPTOR_TSC_VUS_IDENTITY_ROOT"
