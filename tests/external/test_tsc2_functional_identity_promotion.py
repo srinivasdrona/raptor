@@ -2626,3 +2626,95 @@ def test_fp16_config_pins_all_input_hashes_and_output_names_from_spec() -> None:
         "dropped_rows": 0,
         "duplicate_source_rows": 0,
     }
+
+
+def test_fp17_committed_summary_exists_and_matches_final_pilot_contract_without_row_level_content() -> None:
+    if not SUMMARY_PATH.is_file():
+        pytest.fail(f"committed summary is missing: {SUMMARY_PATH}")
+
+    summary = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))
+    assert set(summary) == {
+        "schema",
+        "bundle_id",
+        "manifest_content_hash",
+        "input_manifest_hashes",
+        "artifact_integrity",
+        "source_row_counts",
+        "identity_state_counts",
+        "unresolved_reason_counts",
+        "variant_kind_counts",
+        "verified_observations_by_source",
+        "verified_observations",
+        "verified_unique_spdi",
+        "duplicate_verified_observations",
+        "source_overlap",
+        "conservation",
+        "boundaries",
+    }
+    assert summary["schema"] == PROMOTION_SUMMARY_SCHEMA
+    assert summary["bundle_id"] == OUTPUT_BUNDLE_ID
+    assert summary["manifest_content_hash"] == "c66639976bf9369cfd07568011a85f5ac50fd0ea9467c54210768574645941ed"
+    assert summary["input_manifest_hashes"] == {
+        "functional_normalization": FUNCTIONAL_MANIFEST_HASH,
+        "clipe_projector": CLIPE_MANIFEST_HASH,
+        "vamp_crosswalk": VAMP_MANIFEST_HASH,
+    }
+    assert summary["source_row_counts"] == EXPECTED_SOURCE_ROWS
+    assert summary["identity_state_counts"] == EXPECTED_IDENTITY_STATE_COUNTS
+    assert summary["unresolved_reason_counts"] == EXPECTED_UNRESOLVED_REASON_COUNTS
+    assert summary["variant_kind_counts"] == EXPECTED_VARIANT_KIND_COUNTS
+    assert summary["verified_observations_by_source"] == EXPECTED_VERIFIED_BY_SOURCE
+    assert summary["verified_observations"] == EXPECTED_VERIFIED_OBSERVATIONS
+    assert summary["verified_unique_spdi"] == EXPECTED_VERIFIED_UNIQUE_SPDI
+    assert summary["duplicate_verified_observations"] == EXPECTED_DUPLICATE_VERIFIED_OBSERVATIONS
+    assert summary["source_overlap"] == {"pairwise": EXPECTED_PAIRWISE, "triple": EXPECTED_TRIPLE}
+    assert summary["conservation"] == {
+        "input_rows": EXPECTED_TOTAL_ROWS,
+        "output_rows": EXPECTED_TOTAL_ROWS,
+        "dropped_rows": 0,
+        "duplicate_source_rows": 0,
+    }
+    assert summary["artifact_integrity"] == {
+        "mavedb_clipe-promoted-jsonl": {
+            "sha256": "9241052425a0a785b7da23edef678365f485a2ba973568bf3c5b38270399e2ff",
+            "byte_length": 106045,
+            "row_count": 208,
+        },
+        "igvf_vamp_seq-promoted-jsonl": {
+            "sha256": "dc639dd6ec0f9aeaf4113f5b36d46a2d715d5830eb6dbb370860925a7c9648db",
+            "byte_length": 5116593,
+            "row_count": 9253,
+        },
+        "igvf_sge-promoted-jsonl": {
+            "sha256": "2292e5770911e13fcd2536287fd04fc7f23354c9bc81ebf01533aa441114ea52",
+            "byte_length": 227381,
+            "row_count": 453,
+        },
+    }
+    assert summary["boundaries"] == REQUIRED_BOUNDARIES
+
+    serialized = json.dumps(summary, sort_keys=True)
+    lowered = serialized.lower()
+    forbidden_row_tokens = (
+        '"source_id"',
+        '"source_row"',
+        '"source_record_id"',
+        '"gene"',
+        '"transcript"',
+        '"protein_accession"',
+        '"hgvs_c"',
+        '"hgvs_p"',
+        '"hgvs_g"',
+        '"genomic_spdi"',
+        '"tx_spdi"',
+        '"spdi"',
+        '"score_name"',
+        '"score_raw"',
+        '"requested_url"',
+        '"final_url"',
+        '"raw_body"',
+        '"raw_attempt"',
+    )
+    assert not any(token in serialized for token in forbidden_row_tokens)
+    assert "http://" not in lowered and "https://" not in lowered
+    assert not any(token in lowered for token in FORBIDDEN_CLINICAL_TOKENS)
