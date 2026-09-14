@@ -88,6 +88,10 @@ _VAMP_CROSSWALK_ROOT_ENV = "RAPTOR_TSC2_VAMP_CROSSWALK_ROOT"
 _OUTPUT_ROOT_ENV = "RAPTOR_TSC2_FUNCTIONAL_IDENTITY_PROMOTION_ROOT"
 _DEFAULT_OUTPUT_ROOT = Path.home() / "raptor-data" / "external" / "tsc2-functional-identity-promotion"
 
+_INPUT_ROOT_ENV_VARS = frozenset(
+    {_FUNCTIONAL_NORMALIZATION_ROOT_ENV, _CLIPE_PROJECTOR_ROOT_ENV, _VAMP_CROSSWALK_ROOT_ENV}
+)
+
 _SOURCE_ORDER: tuple[str, ...] = ("mavedb_clipe", "igvf_vamp_seq", "igvf_sge")
 
 
@@ -107,17 +111,23 @@ def _load_config(config_path: Path) -> dict[str, Any]:
 
 
 def _resolve_root(*, cli_value: Path | None, env_var: str, default: Path | None = None) -> Path:
-    """Resolve an operator root explicitly: the CLI flag if given,
-    otherwise the pinned environment variable, otherwise ``default`` (only
-    the output root has one) -- NEVER the current working directory."""
+    """Resolve a root as CLI flag > environment variable > ``default``,
+    applying only ``expanduser()`` (never resolving symlinks or the
+    working directory). For the three pinned input roots, the result
+    must be absolute regardless of its source."""
     if cli_value is not None:
-        return cli_value.expanduser()
-    env_value = os.environ.get(env_var)
-    if env_value and env_value.strip():
-        return Path(env_value).expanduser()
-    if default is not None:
-        return default.expanduser()
-    raise FunctionalIdentityPromotionOperatorError(f"no root supplied and ${env_var} is not set")
+        root = cli_value.expanduser()
+    elif os.environ.get(env_var, "").strip():
+        root = Path(os.environ[env_var]).expanduser()
+    elif default is not None:
+        root = default.expanduser()
+    else:
+        raise FunctionalIdentityPromotionOperatorError(f"no root supplied and ${env_var} is not set")
+    if env_var in _INPUT_ROOT_ENV_VARS and not root.is_absolute():
+        raise FunctionalIdentityPromotionOperatorError(
+            f"${env_var} root must be an absolute path, got relative path {root!s}"
+        )
+    return root
 
 
 def _assert_no_symlink_ancestor(path: Path, *, context: str) -> None:
