@@ -283,12 +283,6 @@ def _validate_probe_reference_counts(*, observed: dict[str, Any], expected: dict
             )
 
 
-# Deprecated alias kept solely for pre-existing callers that still bind to
-# the pre-rename private name; the real implementation and its docstring
-# live on ``_validate_probe_reference_counts`` above.
-_validate_expected_counts = _validate_probe_reference_counts
-
-
 def run_ingestion(
     *,
     config: dict[str, Any],
