@@ -66,6 +66,11 @@ VAMP_CROSSWALK_ROWS = 9253
 OUTPUT_RUN_NAME = "tsc2-functional-identity-promotion-2026-09-14"
 OUTPUT_BUNDLE_ID = "tsc2-functional-identity-promotion-2026-09-14"
 SUMMARY_PATH = REPO_ROOT / "data" / "census" / "tsc2_functional_identity_promotion_2026-09-14.json"
+PROMOTED_ARTIFACTS = [
+    ("mavedb_clipe-promoted-jsonl", "normalized/mavedb_clipe.jsonl"),
+    ("igvf_vamp_seq-promoted-jsonl", "normalized/igvf_vamp_seq.jsonl"),
+    ("igvf_sge-promoted-jsonl", "normalized/igvf_sge.jsonl"),
+]
 
 EXPECTED_TOTAL_ROWS = 9914
 EXPECTED_SOURCE_ROWS = {"mavedb_clipe": 208, "igvf_vamp_seq": 9253, "igvf_sge": 453}
@@ -115,6 +120,11 @@ FORBIDDEN_IMPORT_PREFIXES = (
 )
 FORBIDDEN_NETWORK_IMPORTS = ("urllib.request", "requests", "httpx", "aiohttp")
 FORBIDDEN_CLINICAL_TOKENS = ("classification", "pathogenic", "benign", "ps3", "bs3", "clinical_label")
+REQUIRED_BOUNDARIES = {
+    "network": "forbidden",
+    "clinical_use": "forbidden",
+    "evidence_strength_use": "forbidden",
+}
 
 
 def _sha256(blob: bytes) -> str:
@@ -847,12 +857,205 @@ def _tiny_promotable_fixture() -> dict[str, Any]:
     }
 
 
-def test_fp00_binding_spec_exists_and_is_v1_0_0() -> None:
+def _tiny_promoted_rows() -> list[dict[str, Any]]:
+    return [
+        _functional_row(
+            source_id="mavedb_clipe",
+            source_row=1,
+            source_record_id="urn:mavedb:00001201-a-1#1",
+            variant_kind="MISSENSE",
+            identity_state="GENOMIC_SPDI_VERIFIED",
+            unresolved_reason=None,
+            protein_accession=None,
+            hgvs_c=f"{TRANSCRIPT}:c.1600G>A",
+            hgvs_p="p.Gly534Arg",
+            hgvs_g="NC_000016.10:g.2065519G>A",
+            spdi="NC_000016.10:2065518:G:A",
+            score_raw="0.61",
+        ),
+        _functional_row(
+            source_id="mavedb_clipe",
+            source_row=2,
+            source_record_id="urn:mavedb:00001201-a-1#2",
+            variant_kind="STOP_GAINED",
+            identity_state="GENOMIC_SPDI_VERIFIED",
+            unresolved_reason=None,
+            protein_accession=None,
+            hgvs_c=f"{TRANSCRIPT}:c.1627_1629delinsTGA",
+            hgvs_p="p.Pro543Ter",
+            hgvs_g="NC_000016.10:g.2065546_2065548delinsTGA",
+            spdi="NC_000016.10:2065545:CCG:TGA",
+            score_raw="-0.71",
+        ),
+        _functional_row(
+            source_id="igvf_vamp_seq",
+            source_row=1,
+            source_record_id="ENSP00000219476.3:p.Gly534Arg",
+            variant_kind="MISSENSE",
+            identity_state="GENOMIC_SPDI_VERIFIED",
+            unresolved_reason=None,
+            protein_accession=VAMP_PROTEIN_ACCESSION,
+            hgvs_c=f"{TRANSCRIPT}:c.1600G>A",
+            hgvs_p="p.Gly534Arg",
+            hgvs_g="NC_000016.10:g.2065519G>A",
+            spdi="NC_000016.10:2065518:G:A",
+            score_raw="0.62",
+        ),
+        _functional_row(
+            source_id="igvf_vamp_seq",
+            source_row=2,
+            source_record_id="ENSP00000219476.3:p.Pro543Ter",
+            variant_kind="STOP_GAINED",
+            identity_state="GENOMIC_CROSSWALK_LENGTH_MISMATCH",
+            unresolved_reason="SOURCE_GENOMIC_INTERVAL_NOT_EQUIVALENT_TO_CDNA_REPLACEMENT",
+            protein_accession=VAMP_PROTEIN_ACCESSION,
+            hgvs_c=f"{TRANSCRIPT}:c.1627_1629delinsTGA",
+            hgvs_p="p.Pro543Ter",
+            hgvs_g=None,
+            spdi=None,
+            score_raw="-0.64",
+        ),
+        _functional_row(
+            source_id="igvf_vamp_seq",
+            source_row=3,
+            source_record_id="ENSP00000219476.3:p.Met600Val",
+            variant_kind="MISSENSE",
+            identity_state="PROTEIN_ONLY_ARCHIVE_CROSSWALK_ABSENT",
+            unresolved_reason="PROTEIN_VARIANT_NOT_IN_ARCHIVE",
+            protein_accession=VAMP_PROTEIN_ACCESSION,
+            hgvs_c=None,
+            hgvs_p="p.Met600Val",
+            hgvs_g=None,
+            spdi=None,
+            score_raw="0.01",
+        ),
+        _functional_row(
+            source_id="igvf_sge",
+            source_row=1,
+            source_record_id="NC_000016.10:g.2065519G>A",
+            variant_kind="MISSENSE",
+            identity_state="GENOMIC_SPDI_VERIFIED",
+            unresolved_reason=None,
+            protein_accession=None,
+            hgvs_c=f"{TRANSCRIPT}:c.1600G>A",
+            hgvs_p="p.Gly534Arg",
+            hgvs_g="NC_000016.10:g.2065519G>A",
+            spdi="NC_000016.10:2065518:G:A",
+            score_raw="0.55",
+        ),
+        _functional_row(
+            source_id="igvf_sge",
+            source_row=2,
+            source_record_id="NC_000016.10:g.2065546_2065548delinsTGA",
+            variant_kind="STOP_GAINED",
+            identity_state="GENOMIC_REFERENCE_MISMATCH",
+            unresolved_reason="REFERENCE_ALLELE_MISMATCH",
+            protein_accession=None,
+            hgvs_c=f"{TRANSCRIPT}:c.1627_1629delinsTGA",
+            hgvs_p="p.Pro543Ter",
+            hgvs_g=None,
+            spdi=None,
+            score_raw="-0.30",
+        ),
+    ]
+
+
+def _tiny_promotion_manifest_fixture(api: dict[str, Any]) -> dict[str, Any]:
+    promoted_rows = _tiny_promoted_rows()
+    rows_by_source = {
+        "mavedb_clipe": [row for row in promoted_rows if row["source_id"] == "mavedb_clipe"],
+        "igvf_vamp_seq": [row for row in promoted_rows if row["source_id"] == "igvf_vamp_seq"],
+        "igvf_sge": [row for row in promoted_rows if row["source_id"] == "igvf_sge"],
+    }
+    payloads_by_source = {
+        source_id: api["canonical_jsonl_bytes"](rows)
+        for source_id, rows in rows_by_source.items()
+    }
+    payloads_by_artifact_id = {
+        artifact_id: payloads_by_source[source_id]
+        for (artifact_id, _relative_path), source_id in zip(
+            PROMOTED_ARTIFACTS, ("mavedb_clipe", "igvf_vamp_seq", "igvf_sge")
+        )
+    }
+    artifacts = []
+    for (artifact_id, relative_path), source_id in zip(
+        PROMOTED_ARTIFACTS, ("mavedb_clipe", "igvf_vamp_seq", "igvf_sge")
+    ):
+        payload = payloads_by_source[source_id]
+        artifacts.append(
+            {
+                "artifact_id": artifact_id,
+                "relative_path": relative_path,
+                "sha256": _sha256(payload),
+                "byte_length": len(payload),
+                "row_count": len(rows_by_source[source_id]),
+            }
+        )
+
+    build_args = {
+        "bundle_id": OUTPUT_BUNDLE_ID,
+        "created_at": "2026-09-14T00:00:00Z",
+        "input_manifests": {
+            "functional_normalization": FUNCTIONAL_MANIFEST_HASH,
+            "clipe_projector": CLIPE_MANIFEST_HASH,
+            "vamp_crosswalk": VAMP_MANIFEST_HASH,
+        },
+        "artifacts": artifacts,
+        "counts": {"rows": len(promoted_rows)},
+        "source_row_counts": {"mavedb_clipe": 2, "igvf_vamp_seq": 3, "igvf_sge": 2},
+        "identity_state_counts": {
+            "GENOMIC_SPDI_VERIFIED": 4,
+            "GENOMIC_REFERENCE_MISMATCH": 1,
+            "GENOMIC_CROSSWALK_LENGTH_MISMATCH": 1,
+            "PROTEIN_ONLY_ARCHIVE_CROSSWALK_ABSENT": 1,
+            "REFERENCE_CONTROL": 0,
+            "TRANSCRIPT_ONLY_PROJECTOR_REQUIRED": 0,
+            "PROTEIN_ONLY_CROSSWALK_REQUIRED": 0,
+        },
+        "unresolved_reason_counts": {
+            "REFERENCE_ALLELE_MISMATCH": 1,
+            "SOURCE_GENOMIC_INTERVAL_NOT_EQUIVALENT_TO_CDNA_REPLACEMENT": 1,
+            "PROTEIN_VARIANT_NOT_IN_ARCHIVE": 1,
+            "NOT_A_VARIANT": 0,
+            "CDNA_PROJECTOR_REQUIRED": 0,
+            "NUCLEOTIDE_CROSSWALK_REQUIRED": 0,
+        },
+        "variant_kind_counts": {
+            "MISSENSE": 4,
+            "SYNONYMOUS": 0,
+            "STOP_GAINED": 3,
+            "OTHER": 0,
+            "REFERENCE_CONTROL": 0,
+        },
+        "verified_observations_by_source": {"mavedb_clipe": 2, "igvf_vamp_seq": 1, "igvf_sge": 1},
+        "verified_observations": 4,
+        "verified_unique_spdi": 2,
+        "duplicate_verified_observations": 2,
+        "source_overlap": {
+            "pairwise": {"mavedb_clipe__igvf_sge": 1, "igvf_vamp_seq__igvf_sge": 1, "mavedb_clipe__igvf_vamp_seq": 1},
+            "triple": 1,
+        },
+        "conservation": {"input_rows": len(promoted_rows), "output_rows": len(promoted_rows), "dropped_rows": 0, "duplicate_source_rows": 0},
+        "boundaries": dict(REQUIRED_BOUNDARIES),
+    }
+    manifest = api["build_identity_promotion_manifest"](**build_args)
+    return {
+        "promoted_rows": promoted_rows,
+        "rows_by_source": rows_by_source,
+        "payloads_by_source": payloads_by_source,
+        "payloads_by_artifact_id": payloads_by_artifact_id,
+        "artifacts": artifacts,
+        "build_args": build_args,
+        "manifest": manifest,
+    }
+
+
+def test_fp00_binding_spec_exists_and_is_v1_0_1() -> None:
     if not SPEC_PATH.is_file():
         pytest.fail(f"binding spec is missing: {SPEC_PATH}")
     spec = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))
     assert spec["spec_id"] == "raptor-v2-functional-identity-promotion-v1"
-    assert spec["spec_version"] == "1.0.0"
+    assert spec["spec_version"] == "1.0.1"
 
 
 def test_fp01_existing_row_schema_stays_exact_17_fields_and_adds_new_state_reason_bindings() -> None:
@@ -1161,6 +1364,46 @@ def test_fp05_pinned_artifact_reads_use_trusted_paths_and_reject_escape_or_symli
             clipe_projector_root=cp_root,
             vamp_crosswalk_root=vx_root,
             validated_inputs=symlink_validated,
+        )
+
+    # Symlink target remains inside the same run directory; still reject
+    # any symlinked artifact path before path resolution/following.
+    inrun_target = fn_root / run_names["functional_normalization"] / "normalized" / "inrun-target.jsonl"
+    inrun_target.write_bytes(expected_payloads["functional_normalization"]["mavedb_clipe"])
+    inrun_link = fn_root / run_names["functional_normalization"] / "normalized" / "inrun-link.jsonl"
+    if inrun_link.exists() or inrun_link.is_symlink():
+        inrun_link.unlink()
+    inrun_link.symlink_to(inrun_target.name)
+    inrun_symlink_validated = deepcopy(validated)
+    inrun_symlink_validated["functional_normalization_bundle"]["artifacts"]["mavedb_clipe"]["relative_path"] = (
+        "normalized/inrun-link.jsonl"
+    )
+    with pytest.raises(err):
+        api["read_pinned_artifact_payloads"](
+            functional_normalization_root=fn_root,
+            clipe_projector_root=cp_root,
+            vamp_crosswalk_root=vx_root,
+            validated_inputs=inrun_symlink_validated,
+        )
+
+    # Component symlink inside run tree should also be rejected.
+    component_target_dir = fn_root / run_names["functional_normalization"] / "normalized-target"
+    component_target_dir.mkdir(parents=True, exist_ok=True)
+    (component_target_dir / "mavedb.jsonl").write_bytes(expected_payloads["functional_normalization"]["mavedb_clipe"])
+    component_link_dir = fn_root / run_names["functional_normalization"] / "normalized-component-link"
+    if component_link_dir.exists() or component_link_dir.is_symlink():
+        component_link_dir.unlink()
+    component_link_dir.symlink_to(component_target_dir, target_is_directory=True)
+    component_symlink_validated = deepcopy(validated)
+    component_symlink_validated["functional_normalization_bundle"]["artifacts"]["mavedb_clipe"]["relative_path"] = (
+        "normalized-component-link/mavedb.jsonl"
+    )
+    with pytest.raises(err):
+        api["read_pinned_artifact_payloads"](
+            functional_normalization_root=fn_root,
+            clipe_projector_root=cp_root,
+            vamp_crosswalk_root=vx_root,
+            validated_inputs=component_symlink_validated,
         )
 
 
@@ -1551,78 +1794,14 @@ def test_fp12_operator_expected_pilot_gate_checks_all_axes_before_publication() 
 
 def test_fp13_canonical_jsonl_manifest_crossrefs_and_aggregate_only_summary_contract() -> None:
     api = _promotion_bundle_api()
-    fixture = _tiny_promotable_fixture()
-    promoted = fixture["functional_rows"]
+    fixture = _tiny_promotion_manifest_fixture(api)
+    promoted = fixture["promoted_rows"]
+    manifest = fixture["manifest"]
     payload_all = api["canonical_jsonl_bytes"](promoted)
     assert payload_all.endswith(b"\n")
     assert payload_all == api["canonical_jsonl_bytes"](list(promoted))
-
-    promoted_mavedb = [row for row in promoted if row["source_id"] == "mavedb_clipe"]
-    promoted_vamp = [row for row in promoted if row["source_id"] == "igvf_vamp_seq"]
-    promoted_sge = [row for row in promoted if row["source_id"] == "igvf_sge"]
-    payload_mavedb = api["canonical_jsonl_bytes"](promoted_mavedb)
-    payload_vamp = api["canonical_jsonl_bytes"](promoted_vamp)
-    payload_sge = api["canonical_jsonl_bytes"](promoted_sge)
-
-    manifest = api["build_identity_promotion_manifest"](
-        bundle_id=OUTPUT_BUNDLE_ID,
-        created_at="2026-09-14T00:00:00Z",
-        input_manifests={
-            "functional_normalization": FUNCTIONAL_MANIFEST_HASH,
-            "clipe_projector": CLIPE_MANIFEST_HASH,
-            "vamp_crosswalk": VAMP_MANIFEST_HASH,
-        },
-        artifacts=[
-            {
-                "artifact_id": "normalized-mavedb-clipe",
-                "relative_path": "normalized/mavedb_clipe.jsonl",
-                "sha256": _sha256(payload_mavedb),
-                "byte_length": len(payload_mavedb),
-                "row_count": len(promoted_mavedb),
-            },
-            {
-                "artifact_id": "normalized-igvf-vamp-seq",
-                "relative_path": "normalized/igvf_vamp_seq.jsonl",
-                "sha256": _sha256(payload_vamp),
-                "byte_length": len(payload_vamp),
-                "row_count": len(promoted_vamp),
-            },
-            {
-                "artifact_id": "normalized-igvf-sge",
-                "relative_path": "normalized/igvf_sge.jsonl",
-                "sha256": _sha256(payload_sge),
-                "byte_length": len(payload_sge),
-                "row_count": len(promoted_sge),
-            },
-        ],
-        counts={"rows": len(promoted)},
-        source_row_counts={"mavedb_clipe": 2, "igvf_vamp_seq": 3, "igvf_sge": 2},
-        identity_state_counts={
-            "GENOMIC_SPDI_VERIFIED": 4,
-            "GENOMIC_REFERENCE_MISMATCH": 1,
-            "GENOMIC_CROSSWALK_LENGTH_MISMATCH": 1,
-            "PROTEIN_ONLY_ARCHIVE_CROSSWALK_ABSENT": 1,
-            "REFERENCE_CONTROL": 0,
-            "TRANSCRIPT_ONLY_PROJECTOR_REQUIRED": 0,
-            "PROTEIN_ONLY_CROSSWALK_REQUIRED": 0,
-        },
-        unresolved_reason_counts={
-            "REFERENCE_ALLELE_MISMATCH": 1,
-            "SOURCE_GENOMIC_INTERVAL_NOT_EQUIVALENT_TO_CDNA_REPLACEMENT": 1,
-            "PROTEIN_VARIANT_NOT_IN_ARCHIVE": 1,
-            "NOT_A_VARIANT": 0,
-            "CDNA_PROJECTOR_REQUIRED": 0,
-            "NUCLEOTIDE_CROSSWALK_REQUIRED": 0,
-        },
-        variant_kind_counts={"MISSENSE": 4, "SYNONYMOUS": 0, "STOP_GAINED": 3, "OTHER": 0, "REFERENCE_CONTROL": 0},
-        verified_observations_by_source={"mavedb_clipe": 2, "igvf_vamp_seq": 1, "igvf_sge": 1},
-        verified_observations=4,
-        verified_unique_spdi=2,
-        duplicate_verified_observations=2,
-        source_overlap={"pairwise": {"mavedb_clipe__igvf_sge": 1, "igvf_vamp_seq__igvf_sge": 1, "mavedb_clipe__igvf_vamp_seq": 1}, "triple": 1},
-        conservation={"input_rows": len(promoted), "output_rows": len(promoted), "dropped_rows": 0, "duplicate_source_rows": 0},
-        boundaries={"clinical_use": "forbidden", "evidence_strength_use": "forbidden", "network": "forbidden"},
-    )
+    assert [(artifact["artifact_id"], artifact["relative_path"]) for artifact in manifest["artifacts"]] == PROMOTED_ARTIFACTS
+    assert manifest["boundaries"] == REQUIRED_BOUNDARIES
     assert manifest["schema"] == PROMOTION_BUNDLE_SCHEMA
     assert manifest["content_hash"] == api["compute_manifest_content_hash"](manifest)
     api["validate_manifest_content_hash"](manifest)
@@ -1655,76 +1834,142 @@ def test_fp13_canonical_jsonl_manifest_crossrefs_and_aggregate_only_summary_cont
     assert "score_raw" not in merged
 
 
+def test_fp13a_manifest_artifact_whitelist_rejects_noncanonical_ids_and_paths() -> None:
+    api = _promotion_bundle_api()
+    fixture = _tiny_promotion_manifest_fixture(api)
+    base_args = deepcopy(fixture["build_args"])
+    err = api["PromotionManifestError"]
+
+    bad_id = deepcopy(base_args)
+    bad_id["artifacts"][0]["artifact_id"] = "clinical_hgvs_rows"
+    with pytest.raises(err):
+        api["build_identity_promotion_manifest"](**bad_id)
+
+    bad_hgvs_like_id = deepcopy(base_args)
+    bad_hgvs_like_id["artifacts"][1]["artifact_id"] = "hgvs_g_rows"
+    with pytest.raises(err):
+        api["build_identity_promotion_manifest"](**bad_hgvs_like_id)
+
+    bad_path = deepcopy(base_args)
+    bad_path["artifacts"][2]["relative_path"] = "normalized/igvf_sge_alt.jsonl"
+    with pytest.raises(err):
+        api["build_identity_promotion_manifest"](**bad_path)
+
+
+def test_fp13b_manifest_boundaries_are_exact_and_summary_validates_manifest_first() -> None:
+    api = _promotion_bundle_api()
+    fixture = _tiny_promotion_manifest_fixture(api)
+    manifest = fixture["manifest"]
+    err = api["PromotionManifestError"]
+    assert manifest["boundaries"] == REQUIRED_BOUNDARIES
+
+    for drifted_boundaries in (
+        {"network": "allowed", "clinical_use": "forbidden", "evidence_strength_use": "forbidden"},
+        {"network": "forbidden", "clinical_use": "forbidden"},
+        {"network": "forbidden", "clinical_use": "forbidden", "evidence_strength_use": "forbidden", "extra": "forbidden"},
+    ):
+        drifted = deepcopy(manifest)
+        drifted["boundaries"] = drifted_boundaries
+        drifted["content_hash"] = api["compute_manifest_content_hash"](drifted)
+        with pytest.raises(err):
+            api["validate_manifest_content_hash"](drifted)
+
+    summary_drift = deepcopy(manifest)
+    summary_drift["boundaries"] = {
+        "network": "forbidden",
+        "clinical_use": "forbidden",
+        "evidence_strength_use": "forbidden",
+        "unexpected": "forbidden",
+    }
+    summary_drift["content_hash"] = api["compute_manifest_content_hash"](summary_drift)
+    with pytest.raises(err):
+        api["build_committed_summary"](summary_drift)
+
+
+def test_fp13c_variant_kind_counts_require_nonnegative_ints_and_no_bool() -> None:
+    api = _promotion_bundle_api()
+    fixture = _tiny_promotion_manifest_fixture(api)
+    manifest = fixture["manifest"]
+    err = api["PromotionManifestError"]
+
+    for key, invalid_value in (("MISSENSE", -1), ("STOP_GAINED", "3"), ("OTHER", True)):
+        drifted = deepcopy(manifest)
+        drifted["variant_kind_counts"][key] = invalid_value
+        drifted["content_hash"] = api["compute_manifest_content_hash"](drifted)
+        with pytest.raises(err):
+            api["validate_manifest_content_hash"](drifted)
+
+
+def test_fp13d_overlap_arithmetic_invariants_reject_impossible_self_hashed_manifests() -> None:
+    api = _promotion_bundle_api()
+    fixture = _tiny_promotion_manifest_fixture(api)
+    manifest = fixture["manifest"]
+    err = api["PromotionManifestError"]
+
+    verified_by_source = manifest["verified_observations_by_source"]
+    pairwise = manifest["source_overlap"]["pairwise"]
+    triple = manifest["source_overlap"]["triple"]
+    unique_expected = (
+        sum(verified_by_source.values())
+        - sum(pairwise.values())
+        + triple
+    )
+    assert manifest["verified_unique_spdi"] == unique_expected
+    assert manifest["duplicate_verified_observations"] == manifest["verified_observations"] - manifest["verified_unique_spdi"]
+
+    too_large_pairwise = deepcopy(manifest)
+    too_large_pairwise["source_overlap"]["pairwise"]["mavedb_clipe__igvf_vamp_seq"] = 3
+    too_large_pairwise["content_hash"] = api["compute_manifest_content_hash"](too_large_pairwise)
+    with pytest.raises(err):
+        api["validate_manifest_content_hash"](too_large_pairwise)
+
+    too_large_triple = deepcopy(manifest)
+    too_large_triple["source_overlap"]["triple"] = 2
+    too_large_triple["content_hash"] = api["compute_manifest_content_hash"](too_large_triple)
+    with pytest.raises(err):
+        api["validate_manifest_content_hash"](too_large_triple)
+
+    wrong_unique = deepcopy(manifest)
+    wrong_unique["verified_unique_spdi"] = 3
+    wrong_unique["content_hash"] = api["compute_manifest_content_hash"](wrong_unique)
+    with pytest.raises(err):
+        api["validate_manifest_content_hash"](wrong_unique)
+
+    wrong_duplicate = deepcopy(manifest)
+    wrong_duplicate["duplicate_verified_observations"] = 1
+    wrong_duplicate["content_hash"] = api["compute_manifest_content_hash"](wrong_duplicate)
+    with pytest.raises(err):
+        api["validate_manifest_content_hash"](wrong_duplicate)
+
+
+def test_fp13e_summary_rejects_artifact_and_boundary_drift_even_with_self_hash() -> None:
+    api = _promotion_bundle_api()
+    fixture = _tiny_promotion_manifest_fixture(api)
+    manifest = fixture["manifest"]
+    err = api["PromotionManifestError"]
+
+    artifact_drift = deepcopy(manifest)
+    artifact_drift["artifacts"][0]["artifact_id"] = "clinical_variant_export"
+    artifact_drift["content_hash"] = api["compute_manifest_content_hash"](artifact_drift)
+    with pytest.raises(err):
+        api["build_committed_summary"](artifact_drift)
+
+    boundary_drift = deepcopy(manifest)
+    boundary_drift["boundaries"] = {"network": "forbidden", "clinical_use": "forbidden", "evidence_strength_use": "forbidden", "scope": "all"}
+    boundary_drift["content_hash"] = api["compute_manifest_content_hash"](boundary_drift)
+    with pytest.raises(err):
+        api["build_committed_summary"](boundary_drift)
+
+
 def test_fp14_publication_is_no_clobber_and_refuses_inside_repo_preexisting_or_symlinked_destinations(
     tmp_path: Path,
 ) -> None:
     api = _promotion_bundle_api()
     source_bundle_module = _load_module("raptor.external.tsc2_sources.bundle")
     assert api["_publish_directory_no_replace"] is _symbol(source_bundle_module, "_publish_directory_no_replace")
-
-    payload = api["canonical_jsonl_bytes"](
-        [
-            _functional_row(
-                source_id="mavedb_clipe",
-                source_row=1,
-                source_record_id="urn:mavedb:pub#1",
-                variant_kind="MISSENSE",
-                identity_state="GENOMIC_SPDI_VERIFIED",
-                unresolved_reason=None,
-                protein_accession=None,
-                hgvs_c=f"{TRANSCRIPT}:c.1600G>A",
-                hgvs_p="p.Gly534Arg",
-                hgvs_g="NC_000016.10:g.2065519G>A",
-                spdi="NC_000016.10:2065518:G:A",
-                score_raw="0.10",
-            )
-        ]
-    )
-    manifest = api["build_identity_promotion_manifest"](
-        bundle_id=OUTPUT_BUNDLE_ID,
-        created_at="2026-09-14T00:00:00Z",
-        input_manifests={
-            "functional_normalization": "1" * 64,
-            "clipe_projector": "2" * 64,
-            "vamp_crosswalk": "3" * 64,
-        },
-        artifacts=[
-            {
-                "artifact_id": "normalized-mavedb-clipe",
-                "relative_path": "normalized/mavedb_clipe.jsonl",
-                "sha256": _sha256(payload),
-                "byte_length": len(payload),
-                "row_count": 1,
-            }
-        ],
-        counts={"rows": 1},
-        source_row_counts={"mavedb_clipe": 1, "igvf_vamp_seq": 0, "igvf_sge": 0},
-        identity_state_counts={
-            "GENOMIC_SPDI_VERIFIED": 1,
-            "GENOMIC_REFERENCE_MISMATCH": 0,
-            "GENOMIC_CROSSWALK_LENGTH_MISMATCH": 0,
-            "PROTEIN_ONLY_ARCHIVE_CROSSWALK_ABSENT": 0,
-            "REFERENCE_CONTROL": 0,
-            "TRANSCRIPT_ONLY_PROJECTOR_REQUIRED": 0,
-            "PROTEIN_ONLY_CROSSWALK_REQUIRED": 0,
-        },
-        unresolved_reason_counts={
-            "REFERENCE_ALLELE_MISMATCH": 0,
-            "SOURCE_GENOMIC_INTERVAL_NOT_EQUIVALENT_TO_CDNA_REPLACEMENT": 0,
-            "PROTEIN_VARIANT_NOT_IN_ARCHIVE": 0,
-            "NOT_A_VARIANT": 0,
-            "CDNA_PROJECTOR_REQUIRED": 0,
-            "NUCLEOTIDE_CROSSWALK_REQUIRED": 0,
-        },
-        variant_kind_counts={"MISSENSE": 1, "SYNONYMOUS": 0, "STOP_GAINED": 0, "OTHER": 0, "REFERENCE_CONTROL": 0},
-        verified_observations_by_source={"mavedb_clipe": 1, "igvf_vamp_seq": 0, "igvf_sge": 0},
-        verified_observations=1,
-        verified_unique_spdi=1,
-        duplicate_verified_observations=0,
-        source_overlap={"pairwise": {"mavedb_clipe__igvf_sge": 0, "igvf_vamp_seq__igvf_sge": 0, "mavedb_clipe__igvf_vamp_seq": 0}, "triple": 0},
-        conservation={"input_rows": 1, "output_rows": 1, "dropped_rows": 0, "duplicate_source_rows": 0},
-        boundaries={"clinical_use": "forbidden", "evidence_strength_use": "forbidden", "network": "forbidden"},
-    )
+    fixture = _tiny_promotion_manifest_fixture(api)
+    manifest = fixture["manifest"]
+    payloads = fixture["payloads_by_artifact_id"]
     output_root = tmp_path / "external"
     output_root.mkdir(parents=True, exist_ok=True)
     preexisting = output_root / OUTPUT_RUN_NAME
@@ -1735,7 +1980,7 @@ def test_fp14_publication_is_no_clobber_and_refuses_inside_repo_preexisting_or_s
             output_root=output_root,
             run_name=OUTPUT_RUN_NAME,
             manifest=manifest,
-            payloads={"normalized-mavedb-clipe": payload},
+            payloads=payloads,
         )
     assert preexisting.exists()
     assert list(preexisting.iterdir()) == []
@@ -1748,7 +1993,7 @@ def test_fp14_publication_is_no_clobber_and_refuses_inside_repo_preexisting_or_s
             output_root=repo_root / "inside-repo",
             run_name=OUTPUT_RUN_NAME,
             manifest=manifest,
-            payloads={"normalized-mavedb-clipe": payload},
+            payloads=payloads,
         )
 
     linked = tmp_path / "linked-root"
@@ -1759,7 +2004,7 @@ def test_fp14_publication_is_no_clobber_and_refuses_inside_repo_preexisting_or_s
             output_root=linked,
             run_name=OUTPUT_RUN_NAME,
             manifest=manifest,
-            payloads={"normalized-mavedb-clipe": payload},
+            payloads=payloads,
         )
 
 
@@ -1796,7 +2041,7 @@ def test_fp16_config_pins_all_input_hashes_and_output_names_from_spec() -> None:
         pytest.fail(f"functional identity promotion config is not implemented: {CONFIG_PATH}")
     config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
     assert config["spec_id"] == "raptor-v2-functional-identity-promotion-v1"
-    assert config["spec_version"] == "1.0.0"
+    assert config["spec_version"] == "1.0.1"
 
     functional = config["inputs"]["functional_normalization_bundle"]
     assert functional["run_name"] == FUNCTIONAL_RUN_NAME
