@@ -550,9 +550,9 @@ def _identity_map_lock_content_hash(lock_payload: bytes) -> str:
     parsed = yaml.safe_load(lock_payload.decode("utf-8"))
     if not isinstance(parsed, dict):
         raise ValueError("lock payload must decode to a mapping")
-    stripped = dict(parsed)
-    stripped.pop("lock_content_hash", None)
-    return _sha256(_yaml_bytes(stripped, sort_keys=True))
+    atlas_identity_map = import_module("raptor.atlas.identity_map")
+    lock_hash_fn = _symbol(atlas_identity_map, "identity_map_lock_content_hash")
+    return lock_hash_fn(parsed)
 
 
 def _response_bundle_observed(file_payloads: dict[str, bytes]) -> dict[str, Any]:
