@@ -494,7 +494,7 @@ def _jats_xml_without_licence_paragraph(*, pmcid: str) -> str:
 def _minimal_operator_config() -> dict[str, Any]:
     return {
         "schema": "raptor.external.r611q_literature_expansion_config.v1",
-        "config_version": "1.0.1",
+        "config_version": "1.0.2",
         "variant": {
             "gene": "TSC2",
             "rsid": "rs28934872",
@@ -2020,8 +2020,6 @@ def test_ac12_operator_probe_reference_structure_validation_and_drift_tolerance_
 
     assert "probe_reference_counts" in source_text
     assert "_validate_probe_reference_counts(" in source_text
-    assert "probe_expected_counts" not in source_text
-    assert "_validate_expected_counts(" not in source_text
     assert re.search(
         r"_validate_probe_reference_counts\([^)]*probe_reference_counts",
         source_text,
@@ -2251,7 +2249,7 @@ def test_ac12_operator_pubmed_slice_is_single_batch_and_raw_pubmed_urls_are_boun
 ) -> None:
     module = _load_operator_module()
     config = _minimal_operator_config()
-    config["probe_expected_counts"] = {key: 0 for key in PROBE_COUNT_AXES}
+    config["probe_reference_counts"] = {key: 0 for key in PROBE_COUNT_AXES}
     config["sources"]["pubmed"]["batch_size"] = 3
     baseline_path = tmp_path / "baseline.json"
     baseline_path.write_text("{}", encoding="utf-8")
@@ -2378,7 +2376,7 @@ def test_ac12_operator_pubmed_slice_is_single_batch_and_raw_pubmed_urls_are_boun
         ],
     )
     monkeypatch.setattr(module.parse_mod, "to_article_index_jsonl", lambda rows: "\n".join(json.dumps(row) for row in rows))
-    monkeypatch.setattr(module, "_validate_expected_counts", lambda **_kwargs: None)
+    monkeypatch.setattr(module, "_validate_probe_reference_counts", lambda **_kwargs: None)
 
     efetch_urls: list[str] = []
 
@@ -2440,7 +2438,7 @@ def test_ac12_operator_pubmed_slice_rejects_multi_batch_need(
 ) -> None:
     module = _load_operator_module()
     config = _minimal_operator_config()
-    config["probe_expected_counts"] = {key: 0 for key in PROBE_COUNT_AXES}
+    config["probe_reference_counts"] = {key: 0 for key in PROBE_COUNT_AXES}
     config["sources"]["pubmed"]["batch_size"] = 2
     baseline_path = tmp_path / "baseline.json"
     baseline_path.write_text("{}", encoding="utf-8")
@@ -2481,7 +2479,7 @@ def test_ac12_operator_pubmed_slice_rejects_multi_batch_need(
             "source_membership": {"9101": ["litvar2"], "9102": ["litvar2"], "9103": ["litvar2"]},
         },
     )
-    monkeypatch.setattr(module, "_validate_expected_counts", lambda **_kwargs: None)
+    monkeypatch.setattr(module, "_validate_probe_reference_counts", lambda **_kwargs: None)
     monkeypatch.setattr(
         module.endpoint_mod,
         "request_with_transport",
@@ -2758,7 +2756,7 @@ def test_ac13_config_matches_v1_spec_endpoints_expected_counts_and_output_names(
     assert isinstance(config, dict)
 
     assert config["schema"] == "raptor.external.r611q_literature_expansion_config.v1"
-    assert config["config_version"] == "1.0.1"
+    assert config["config_version"] == "1.0.2"
     assert config["bundle_id"] == spec["output"]["external_bundle"]["bundle_id"]
     assert config["run_name"] == spec["output"]["external_bundle"]["run_name"]
     assert (
@@ -2787,7 +2785,7 @@ def test_ac13_config_matches_v1_spec_endpoints_expected_counts_and_output_names(
         config["sources"]["fulltext"]["required_jats_licence"]
         == spec["sources"]["fulltext"]["required_jats_licence"]
     )
-    assert config["probe_expected_counts"] == spec["probe_observation"]["counts"]
+    assert config["probe_reference_counts"] == spec["probe_observation"]["counts"]
     assert (
         config["article_index"]["exact_fields"]
         == spec["article_index"]["exact_fields"]
