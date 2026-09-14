@@ -511,6 +511,7 @@ def _minimal_operator_config() -> dict[str, Any]:
         "output": {
             "environment_variable": "RAPTOR_R611Q_LITERATURE_ROOT",
         },
+        "probe_reference_counts": {key: 0 for key in PROBE_COUNT_AXES},
         "sources": {
             "litvar2_publications": {
                 "endpoint": "https://www.ncbi.nlm.nih.gov/research/litvar2-api/variant/get/litvar%40rs28934872%23%23/publications?format=json",
@@ -1990,12 +1991,12 @@ def test_ac12_operator_cli_exposes_dry_run_baseline_pin_and_dry_run_writes_nothi
         assert not any(dry_output_root.rglob("*")), "dry-run must write nothing"
 
 
-def test_ac12_operator_expected_probe_gate_and_fulltext_payload_mapping_contract() -> None:
+def test_ac12_operator_probe_reference_structure_validation_and_drift_tolerance_contract() -> None:
     source_text = _operator_source_text()
     module = _load_operator_module()
 
-    validate_expected_counts = _symbol(module, "_validate_expected_counts")
-    validate_expected_counts(
+    validate_probe_reference_counts = _symbol(module, "_validate_probe_reference_counts")
+    validate_probe_reference_counts(
         observed={"a": 1, "b": 0},
         expected={"a": 1, "b": 0},
     )
@@ -2004,20 +2005,29 @@ def test_ac12_operator_expected_probe_gate_and_fulltext_payload_mapping_contract
         ({"a": 1, "b": 0, "c": 1}, {"a": 1, "b": 0}),  # extra key
         ({"a": True, "b": 0}, {"a": 1, "b": 0}),  # bool != int
         ({"a": 1.0, "b": 0}, {"a": 1, "b": 0}),  # float != int
-        ({"a": 2, "b": 0}, {"a": 1, "b": 0}),  # value mismatch
+        ({"a": 1, "b": 0}, {"a": True, "b": 0}),  # bool expected invalid
+        ({"a": 1, "b": 0}, {"a": 1.0, "b": 0}),  # float expected invalid
     ]
     for observed, expected in invalid_cases:
         with pytest.raises(Exception, match="key|type|count|expected|observed|mismatch"):
-            validate_expected_counts(observed=observed, expected=expected)
+            validate_probe_reference_counts(observed=observed, expected=expected)
 
-    assert "probe_expected_counts" in source_text
-    assert "_validate_expected_counts(" in source_text
+    for observed, expected in (
+        ({"a": 2, "b": 0}, {"a": 1, "b": 0}),
+        ({"a": 1, "b": 3}, {"a": 1, "b": 0}),
+    ):
+        validate_probe_reference_counts(observed=observed, expected=expected)
+
+    assert "probe_reference_counts" in source_text
+    assert "_validate_probe_reference_counts(" in source_text
+    assert "probe_expected_counts" not in source_text
+    assert "_validate_expected_counts(" not in source_text
     assert re.search(
-        r"_validate_expected_counts\([^)]*probe_expected_counts",
+        r"_validate_probe_reference_counts\([^)]*probe_reference_counts",
         source_text,
         flags=re.DOTALL,
     ) is not None
-    validate_idx = source_text.find("_validate_expected_counts(")
+    validate_idx = source_text.find("_validate_probe_reference_counts(")
     for publication_step in ("build_bundle_manifest(", "write_bundle_run("):
         step_idx = source_text.find(publication_step)
         if step_idx != -1:
@@ -2030,6 +2040,209 @@ def test_ac12_operator_expected_probe_gate_and_fulltext_payload_mapping_contract
     assert "fulltext/" in source_text or "fulltext" in source_text
     assert re.search(r"artifact_payloads\[[^\]]+\]\s*=", source_text) is not None
     assert re.search(r"for\s+.*fulltext.*:\s*\n\s+pass\b", source_text, flags=re.IGNORECASE) is None
+
+
+def test_ac12_operator_count_drift_is_diagnostic_and_allows_bundle_and_summary_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_operator_module()
+    config = _minimal_operator_config()
+    config["probe_reference_counts"] = {key: 0 for key in PROBE_COUNT_AXES}
+    config["committed_summary_path"] = f"data/census/{tmp_path.name}-probe-drift-summary.json"
+    config_path = tmp_path / "r611q-config.yaml"
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    baseline_path = tmp_path / "baseline.json"
+    baseline_path.write_text("{}", encoding="utf-8")
+    summary_path = (REPO_ROOT / config["committed_summary_path"]).resolve()
+    if summary_path.exists():
+        summary_path.unlink()
+
+    monkeypatch.setattr(
+        module,
+        "_validate_plan",
+        lambda _cfg: {
+            "litvar_url": "https://example.org/litvar",
+            "esearch_url": "https://example.org/esearch",
+            "elink_url": "https://example.org/elink",
+            "tool": "raptor",
+            "clinvar_uid": "12397",
+        },
+    )
+    monkeypatch.setattr(module, "_load_baseline_bytes", lambda _path: b"{}")
+    monkeypatch.setattr(module, "_make_transport", lambda _rate_limiter: (lambda _url: {}))
+    monkeypatch.setattr(
+        module.parse_mod,
+        "parse_baseline_manifest",
+        lambda **_kwargs: {"pmid_publications": [], "raw_sha256": "1" * 64},
+    )
+    monkeypatch.setattr(
+        module.parse_mod,
+        "parse_litvar_publications",
+        lambda _payload: {"pmids": ["9101"], "pmcids": [], "pmid_count": 1, "pmcid_count": 0},
+    )
+    monkeypatch.setattr(module.parse_mod, "parse_clinvar_uid_esearch", lambda _payload, *, expected_uid: expected_uid)
+    monkeypatch.setattr(module.parse_mod, "parse_clinvar_pubmed_links", lambda _payload, *, expected_uid: [])
+    monkeypatch.setattr(
+        module.parse_mod,
+        "derive_discovery_membership",
+        lambda **_kwargs: {
+            "litvar2_pmids": 1,
+            "clinvar_pmids": 0,
+            "intersection_pmids": 0,
+            "union_pmids": 1,
+            "new_pmids": ["9101"],
+            "source_membership": {"9101": ["litvar2"]},
+        },
+    )
+    monkeypatch.setattr(
+        module.endpoint_mod,
+        "build_pubmed_efetch_url",
+        lambda *, pmids, tool: f"https://example.org/efetch?tool={tool}&id={','.join(pmids)}",
+    )
+    monkeypatch.setattr(
+        module.endpoint_mod,
+        "build_europe_pmc_core_url",
+        lambda *, pmids, page_size: f"https://example.org/core?pageSize={page_size}&ids={','.join(pmids)}",
+    )
+    monkeypatch.setattr(
+        module.endpoint_mod,
+        "request_with_transport",
+        lambda *, requested_url, transport: {
+            "requested_url": requested_url,
+            "final_url": requested_url,
+            "http_status": 200,
+            "media_type": "application/json",
+            "body": b"{}",
+            "byte_length": 2,
+            "sha256": _sha256_bytes(b"{}"),
+        },
+    )
+    monkeypatch.setattr(
+        module.parse_mod,
+        "parse_pubmed_articles_xml",
+        lambda _xml, *, expected_pmids: {
+            "articles": [
+                {
+                    "pmid": expected_pmids[0],
+                    "pmcid": None,
+                    "doi": "10.1000/r611q-drift",
+                    "title": "R611Q drift sentinel",
+                    "publication_date": "2026-01-01",
+                    "publication_date_precision": "day",
+                    "abstract": None,
+                }
+            ],
+            "requested_but_missing_pmids": [],
+        },
+    )
+    monkeypatch.setattr(
+        module.parse_mod,
+        "parse_europe_pmc_core",
+        lambda _payload, *, requested_pmids: {
+            "records": [
+                {
+                    "pmid": requested_pmids[0],
+                    "pmcid": None,
+                    "doi": "10.1000/r611q-drift",
+                    "title": "R611Q drift sentinel",
+                    "abstract": "Europe PMC abstract present despite zero planning reference.",
+                    "is_open_access": "N",
+                    "licence": None,
+                }
+            ],
+            "requested_but_unresolved_pmids": [],
+            "counts": {"records_returned": 1, "pmcid_count": 0, "abstract_count": 1},
+        },
+    )
+    monkeypatch.setattr(module.parse_mod, "select_cc_by_fulltext_candidates", lambda _records: [])
+    monkeypatch.setattr(
+        module.parse_mod,
+        "build_article_index_records",
+        lambda **_kwargs: [
+            {
+                "schema": "raptor.external.r611q_literature_article.v1",
+                "pmid": "9101",
+                "discovery_sources": ["litvar2"],
+                "pubmed_status": "RESOLVED",
+                "pmcid": None,
+                "doi": "10.1000/r611q-drift",
+                "title": "R611Q drift sentinel",
+                "publication_date": "2026-01-01",
+                "publication_date_precision": "day",
+                "abstract": None,
+                "europe_pmc_status": "RESOLVED",
+                "is_open_access": "N",
+                "licence": None,
+                "fulltext_status": "NOT_ELIGIBLE",
+                "fulltext_artifact_id": None,
+            }
+        ],
+    )
+    monkeypatch.setattr(module.parse_mod, "to_article_index_jsonl", lambda rows: "\n".join(json.dumps(row) for row in rows))
+
+    publication_calls: list[str] = []
+    captured_manifest: dict[str, Any] = {}
+
+    def fake_build_bundle_manifest(**kwargs):
+        counts = dict(kwargs["counts"])
+        counts["sources"] = len(kwargs["sources"])
+        counts["artifacts"] = len(kwargs["artifacts"])
+        counts["fulltext_acquired"] = 0
+        manifest = {
+            "bundle_id": kwargs["bundle_id"],
+            "counts": counts,
+            "content_hash": "f" * 64,
+        }
+        captured_manifest.clear()
+        captured_manifest.update(manifest)
+        return manifest
+
+    monkeypatch.setattr(module.bundle_mod, "build_bundle_manifest", fake_build_bundle_manifest)
+
+    def fake_write_bundle_run(**_kwargs):
+        publication_calls.append("bundle")
+        return {"run_dir": tmp_path / "run", "manifest_path": tmp_path / "run" / MANIFEST_FILENAME}
+
+    monkeypatch.setattr(module.bundle_mod, "write_bundle_run", fake_write_bundle_run)
+
+    def fake_build_committed_summary(_manifest):
+        publication_calls.append("summary")
+        return {"schema": "test.summary"}
+
+    monkeypatch.setattr(module.bundle_mod, "build_committed_summary", fake_build_committed_summary)
+
+    class _MemoryWriter:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+        def write(self, _payload: bytes) -> int:
+            return 0
+
+    monkeypatch.setattr(module, "open", lambda *_args, **_kwargs: _MemoryWriter(), raising=False)
+
+    rc = module.main(
+        [
+            "--config",
+            str(config_path),
+            "--baseline-manifest",
+            str(baseline_path),
+            "--summary-output",
+            str(summary_path),
+        ]
+    )
+    assert rc == 0
+    assert publication_calls == ["bundle", "summary"]
+    assert captured_manifest["counts"]["europe_pmc_abstracts"] == 1
+    assert config["probe_reference_counts"]["europe_pmc_abstracts"] == 0
+    assert (
+        captured_manifest["counts"]["europe_pmc_abstracts"]
+        > config["probe_reference_counts"]["europe_pmc_abstracts"]
+    )
+    assert not summary_path.exists()
 
 
 def test_ac12_operator_pubmed_slice_is_single_batch_and_raw_pubmed_urls_are_bound(
