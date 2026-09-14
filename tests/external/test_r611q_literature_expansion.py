@@ -494,7 +494,7 @@ def _jats_xml_without_licence_paragraph(*, pmcid: str) -> str:
 def _minimal_operator_config() -> dict[str, Any]:
     return {
         "schema": "raptor.external.r611q_literature_expansion_config.v1",
-        "config_version": "1.0.0",
+        "config_version": "1.0.1",
         "variant": {
             "gene": "TSC2",
             "rsid": "rs28934872",
@@ -1166,12 +1166,13 @@ def test_ac08_jats_error_typing_contract_and_operator_catches_only_licence_rejec
     parse_module = _load_module("raptor.external.r611q_literature.parse")
     parse_api = _parse_api()
     base_error = parse_api["R611QLiteratureParseError"]
-    licence_error = getattr(parse_module, "JatsLicenceRejectedError", base_error)
-    identity_error = getattr(parse_module, "JatsIdentityError", base_error)
+    assert hasattr(parse_module, "JatsLicenceRejectedError")
+    assert hasattr(parse_module, "JatsIdentityError")
+    licence_error = getattr(parse_module, "JatsLicenceRejectedError")
+    identity_error = getattr(parse_module, "JatsIdentityError")
     assert issubclass(licence_error, base_error)
     assert issubclass(identity_error, base_error)
-    if hasattr(parse_module, "JatsLicenceRejectedError") and hasattr(parse_module, "JatsIdentityError"):
-        assert licence_error is not identity_error
+    assert licence_error is not identity_error
 
     with pytest.raises(licence_error):
         parse_api["parse_cc_by_jats_fulltext"](
@@ -1708,6 +1709,115 @@ def test_ac10_validate_manifest_hash_enforces_extension_contract_and_detects_mut
             api["validate_manifest_hash"](candidate)
 
 
+def test_ac10_manifest_hash_binds_exact_raw_response_and_fulltext_artifact_hashes() -> None:
+    api = _bundle_api()
+    raw_litvar_body = b'{"pmids":[1,2],"pmcids":["PMC1"],"pmids_count":2}'
+    raw_clinvar_body = b'{"esearchresult":{"idlist":["12397"]}}'
+    fulltext_a_body = b"<article>A</article>"
+    fulltext_b_body = b"<article>B</article>"
+
+    artifacts = [
+        _artifact_record(
+            artifact_id="raw-litvar2-publications",
+            source_id="litvar2_publications",
+            relative_path="raw/litvar2-publications.json",
+            body=raw_litvar_body,
+            role="RAW_RESPONSE",
+        ),
+        _artifact_record(
+            artifact_id="raw-clinvar-uid-search",
+            source_id="clinvar_uid_search",
+            relative_path="raw/clinvar-esearch.json",
+            body=raw_clinvar_body,
+            role="RAW_RESPONSE",
+        ),
+        _artifact_record(
+            artifact_id="fulltext-PMC1001",
+            source_id="fulltext",
+            relative_path="fulltext/PMC1001.xml",
+            body=fulltext_a_body,
+            role="FULLTEXT_XML",
+        ),
+        _artifact_record(
+            artifact_id="fulltext-PMC1002",
+            source_id="fulltext",
+            relative_path="fulltext/PMC1002.xml",
+            body=fulltext_b_body,
+            role="FULLTEXT_XML",
+        ),
+    ]
+    sources = [
+        _source_record(
+            source_id="litvar2_publications",
+            source_kind="litvar2_publications",
+            artifact_ids=["raw-litvar2-publications"],
+        ),
+        _source_record(
+            source_id="clinvar_uid_search",
+            source_kind="clinvar_uid_search",
+            artifact_ids=["raw-clinvar-uid-search"],
+        ),
+        _source_record(
+            source_id="fulltext",
+            source_kind="fulltext",
+            artifact_ids=["fulltext-PMC1001", "fulltext-PMC1002"],
+        ),
+    ]
+    manifest = api["build_bundle_manifest"](
+        bundle_id="r611q-literature-expansion-2026-09-15",
+        created_at="2026-09-15T00:00:00Z",
+        query={"gene": "TSC2", "variant": "R611Q"},
+        artifacts=artifacts,
+        sources=sources,
+        truncation={},
+        boundaries={"network": "operator-only", "external_output_only": True},
+        source_response_hashes={
+            "litvar2_publications": "f" * 64,
+            "unrelated": "e" * 64,
+        },
+        counts={"fulltext_candidates": 2},
+    )
+    expected_source_hashes = {
+        artifact["source_id"]: artifact["sha256"]
+        for artifact in artifacts
+        if artifact["role"] == "RAW_RESPONSE"
+    }
+    expected_fulltext_hashes = sorted(
+        [artifact["sha256"] for artifact in artifacts if artifact["role"] == "FULLTEXT_XML"]
+    )
+    assert manifest["source_response_hashes"] == expected_source_hashes
+    assert manifest["fulltext_artifact_hashes"] == expected_fulltext_hashes
+    api["validate_manifest_hash"](manifest)
+
+    mutation_cases = [
+        (
+            "same-shape-replaced-digests",
+            lambda m: m.__setitem__(
+                "source_response_hashes",
+                {key: ("a" * 64 if index == 0 else "b" * 64) for index, key in enumerate(m["source_response_hashes"])},
+            ),
+        ),
+        (
+            "extra-source-response-key",
+            lambda m: m["source_response_hashes"].__setitem__("rogue", "c" * 64),
+        ),
+        (
+            "missing-source-response-key",
+            lambda m: m["source_response_hashes"].pop("clinvar_uid_search", None),
+        ),
+        (
+            "same-shape-unrelated-fulltext-hashes",
+            lambda m: m.__setitem__("fulltext_artifact_hashes", ["0" * 64, "1" * 64]),
+        ),
+    ]
+    for _name, mutate in mutation_cases:
+        candidate = json.loads(json.dumps(manifest))
+        mutate(candidate)
+        candidate["content_hash"] = api["compute_bundle_content_hash"](candidate)
+        with pytest.raises(Exception, match="source_response_hashes|fulltext_artifact_hashes|derived|hash|invalid|key"):
+            api["validate_manifest_hash"](candidate)
+
+
 def test_ac10_build_committed_summary_coerces_unresolved_lists_to_counts_and_validates_first() -> None:
     api = _bundle_api()
     manifest = {
@@ -1922,6 +2032,354 @@ def test_ac12_operator_expected_probe_gate_and_fulltext_payload_mapping_contract
     assert re.search(r"for\s+.*fulltext.*:\s*\n\s+pass\b", source_text, flags=re.IGNORECASE) is None
 
 
+def test_ac12_operator_pubmed_slice_is_single_batch_and_raw_pubmed_urls_are_bound(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_operator_module()
+    config = _minimal_operator_config()
+    config["probe_expected_counts"] = {key: 0 for key in PROBE_COUNT_AXES}
+    config["sources"]["pubmed"]["batch_size"] = 3
+    baseline_path = tmp_path / "baseline.json"
+    baseline_path.write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(
+        module,
+        "_validate_plan",
+        lambda _cfg: {
+            "litvar_url": "https://example.org/litvar",
+            "esearch_url": "https://example.org/esearch",
+            "elink_url": "https://example.org/elink",
+            "tool": "raptor",
+            "clinvar_uid": "12397",
+        },
+    )
+    monkeypatch.setattr(module, "_load_baseline_bytes", lambda _path: b"{}")
+    monkeypatch.setattr(
+        module.parse_mod,
+        "parse_baseline_manifest",
+        lambda **_kwargs: {"pmid_publications": [], "raw_sha256": "1" * 64},
+    )
+    monkeypatch.setattr(
+        module.parse_mod,
+        "parse_litvar_publications",
+        lambda _payload: {"pmids": ["9101", "9102", "9103"], "pmcids": [], "pmid_count": 3, "pmcid_count": 0},
+    )
+    monkeypatch.setattr(module.parse_mod, "parse_clinvar_uid_esearch", lambda _payload, *, expected_uid: expected_uid)
+    monkeypatch.setattr(module.parse_mod, "parse_clinvar_pubmed_links", lambda _payload, *, expected_uid: ["9102"])
+    monkeypatch.setattr(
+        module.parse_mod,
+        "derive_discovery_membership",
+        lambda **_kwargs: {
+            "litvar2_pmids": 3,
+            "clinvar_pmids": 1,
+            "intersection_pmids": 1,
+            "union_pmids": 3,
+            "new_pmids": ["9101", "9102", "9103"],
+            "source_membership": {"9101": ["litvar2"], "9102": ["litvar2", "clinvar"], "9103": ["litvar2"]},
+        },
+    )
+    monkeypatch.setattr(
+        module.parse_mod,
+        "parse_pubmed_articles_xml",
+        lambda _xml, *, expected_pmids: {
+            "articles": [
+                {
+                    "pmid": expected_pmids[0],
+                    "pmcid": "PMC9101",
+                    "doi": "10.1000/a",
+                    "title": "A",
+                    "publication_date": "2026-01-01",
+                    "publication_date_precision": "day",
+                    "abstract": "a",
+                }
+            ],
+            "requested_but_missing_pmids": expected_pmids[1:],
+        },
+    )
+    monkeypatch.setattr(
+        module.parse_mod,
+        "parse_europe_pmc_core",
+        lambda _payload, *, requested_pmids: {
+            "records": [],
+            "requested_but_unresolved_pmids": list(requested_pmids),
+            "counts": {"records_returned": 0, "pmcid_count": 0, "abstract_count": 0},
+        },
+    )
+    monkeypatch.setattr(module.parse_mod, "select_cc_by_fulltext_candidates", lambda _records: [])
+    monkeypatch.setattr(
+        module.parse_mod,
+        "build_article_index_records",
+        lambda **_kwargs: [
+            {
+                "schema": "raptor.external.r611q_literature_article.v1",
+                "pmid": "9101",
+                "discovery_sources": ["litvar2"],
+                "pubmed_status": "RESOLVED",
+                "pmcid": "PMC9101",
+                "doi": "10.1000/a",
+                "title": "A",
+                "publication_date": "2026-01-01",
+                "publication_date_precision": "day",
+                "abstract": "a",
+                "europe_pmc_status": "UNRESOLVED",
+                "is_open_access": "N",
+                "licence": None,
+                "fulltext_status": "NOT_ELIGIBLE",
+                "fulltext_artifact_id": None,
+            },
+            {
+                "schema": "raptor.external.r611q_literature_article.v1",
+                "pmid": "9102",
+                "discovery_sources": ["litvar2", "clinvar"],
+                "pubmed_status": "UNRESOLVED",
+                "pmcid": None,
+                "doi": None,
+                "title": None,
+                "publication_date": None,
+                "publication_date_precision": None,
+                "abstract": None,
+                "europe_pmc_status": "UNRESOLVED",
+                "is_open_access": "N",
+                "licence": None,
+                "fulltext_status": "NOT_ELIGIBLE",
+                "fulltext_artifact_id": None,
+            },
+            {
+                "schema": "raptor.external.r611q_literature_article.v1",
+                "pmid": "9103",
+                "discovery_sources": ["litvar2"],
+                "pubmed_status": "UNRESOLVED",
+                "pmcid": None,
+                "doi": None,
+                "title": None,
+                "publication_date": None,
+                "publication_date_precision": None,
+                "abstract": None,
+                "europe_pmc_status": "UNRESOLVED",
+                "is_open_access": "N",
+                "licence": None,
+                "fulltext_status": "NOT_ELIGIBLE",
+                "fulltext_artifact_id": None,
+            },
+        ],
+    )
+    monkeypatch.setattr(module.parse_mod, "to_article_index_jsonl", lambda rows: "\n".join(json.dumps(row) for row in rows))
+    monkeypatch.setattr(module, "_validate_expected_counts", lambda **_kwargs: None)
+
+    efetch_urls: list[str] = []
+
+    def fake_build_pubmed_efetch_url(*, pmids: list[str], tool: str) -> str:
+        url = (
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+            f"?db=pubmed&retmode=xml&tool={tool}&id={','.join(pmids)}"
+        )
+        efetch_urls.append(url)
+        return url
+
+    monkeypatch.setattr(module.endpoint_mod, "build_pubmed_efetch_url", fake_build_pubmed_efetch_url)
+
+    def fake_request_with_transport(*, requested_url: str, transport):
+        body = b"{}"
+        return {
+            "requested_url": requested_url,
+            "final_url": requested_url,
+            "http_status": 200,
+            "media_type": "application/json",
+            "body": body,
+            "byte_length": len(body),
+            "sha256": _sha256_bytes(body),
+        }
+
+    monkeypatch.setattr(module.endpoint_mod, "request_with_transport", fake_request_with_transport)
+
+    captured: dict[str, Any] = {}
+
+    def fake_build_bundle_manifest(**kwargs):
+        captured.update(kwargs)
+        return {
+            "bundle_id": kwargs["bundle_id"],
+            "counts": {"sources": len(kwargs["sources"]), "artifacts": len(kwargs["artifacts"])},
+            "content_hash": "f" * 64,
+        }
+
+    monkeypatch.setattr(module.bundle_mod, "build_bundle_manifest", fake_build_bundle_manifest)
+
+    result = module.run_ingestion(
+        config=config,
+        baseline_manifest_path=baseline_path,
+        transport=lambda _url: {},
+    )
+    assert result["manifest"]["content_hash"] == "f" * 64
+    assert len(efetch_urls) == 1
+    assert "batched" not in efetch_urls[0]
+    pubmed_artifacts = [a for a in captured["artifacts"] if a["source_id"] == "pubmed"]
+    assert len(pubmed_artifacts) == 1
+    assert pubmed_artifacts[0]["requested_url"] == efetch_urls[0]
+    assert pubmed_artifacts[0]["final_url"] == efetch_urls[0]
+    assert pubmed_artifacts[0]["requested_url"] != "batched"
+    assert pubmed_artifacts[0]["final_url"] != "batched"
+
+
+def test_ac12_operator_pubmed_slice_rejects_multi_batch_need(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_operator_module()
+    config = _minimal_operator_config()
+    config["probe_expected_counts"] = {key: 0 for key in PROBE_COUNT_AXES}
+    config["sources"]["pubmed"]["batch_size"] = 2
+    baseline_path = tmp_path / "baseline.json"
+    baseline_path.write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(
+        module,
+        "_validate_plan",
+        lambda _cfg: {
+            "litvar_url": "https://example.org/litvar",
+            "esearch_url": "https://example.org/esearch",
+            "elink_url": "https://example.org/elink",
+            "tool": "raptor",
+            "clinvar_uid": "12397",
+        },
+    )
+    monkeypatch.setattr(module, "_load_baseline_bytes", lambda _path: b"{}")
+    monkeypatch.setattr(
+        module.parse_mod,
+        "parse_baseline_manifest",
+        lambda **_kwargs: {"pmid_publications": [], "raw_sha256": "1" * 64},
+    )
+    monkeypatch.setattr(
+        module.parse_mod,
+        "parse_litvar_publications",
+        lambda _payload: {"pmids": ["9101", "9102", "9103"], "pmcids": [], "pmid_count": 3, "pmcid_count": 0},
+    )
+    monkeypatch.setattr(module.parse_mod, "parse_clinvar_uid_esearch", lambda _payload, *, expected_uid: expected_uid)
+    monkeypatch.setattr(module.parse_mod, "parse_clinvar_pubmed_links", lambda _payload, *, expected_uid: [])
+    monkeypatch.setattr(
+        module.parse_mod,
+        "derive_discovery_membership",
+        lambda **_kwargs: {
+            "litvar2_pmids": 3,
+            "clinvar_pmids": 0,
+            "intersection_pmids": 0,
+            "union_pmids": 3,
+            "new_pmids": ["9101", "9102", "9103"],
+            "source_membership": {"9101": ["litvar2"], "9102": ["litvar2"], "9103": ["litvar2"]},
+        },
+    )
+    monkeypatch.setattr(module, "_validate_expected_counts", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        module.endpoint_mod,
+        "request_with_transport",
+        lambda **_kwargs: {
+            "requested_url": "https://example.org/x",
+            "final_url": "https://example.org/x",
+            "http_status": 200,
+            "media_type": "application/json",
+            "body": b"{}",
+            "byte_length": 2,
+            "sha256": _sha256_bytes(b"{}"),
+        },
+    )
+    monkeypatch.setattr(
+        module.parse_mod,
+        "parse_pubmed_articles_xml",
+        lambda _xml, *, expected_pmids: {"articles": [], "requested_but_missing_pmids": expected_pmids},
+    )
+    monkeypatch.setattr(
+        module.parse_mod,
+        "parse_europe_pmc_core",
+        lambda _payload, *, requested_pmids: {"records": [], "requested_but_unresolved_pmids": requested_pmids, "counts": {"records_returned": 0, "pmcid_count": 0, "abstract_count": 0}},
+    )
+    monkeypatch.setattr(module.parse_mod, "select_cc_by_fulltext_candidates", lambda _records: [])
+    monkeypatch.setattr(module.parse_mod, "build_article_index_records", lambda **_kwargs: [])
+    monkeypatch.setattr(module.parse_mod, "to_article_index_jsonl", lambda _rows: "")
+    monkeypatch.setattr(
+        module.bundle_mod,
+        "build_bundle_manifest",
+        lambda **_kwargs: {"bundle_id": "x", "counts": {"sources": 0, "artifacts": 0}, "content_hash": "f" * 64},
+    )
+
+    with pytest.raises(module.R611QOperatorError, match="batch|bounded|single|slice|batch_size|new pmid"):
+        module.run_ingestion(
+            config=config,
+            baseline_manifest_path=baseline_path,
+            transport=lambda _url: {},
+        )
+
+
+def test_ac12_operator_rate_floor_rejects_invalid_values_before_transport(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_operator_module()
+    config = _minimal_operator_config()
+    config_path = tmp_path / "r611q-config.yaml"
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    baseline_path = tmp_path / "baseline.json"
+    baseline_path.write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(
+        module,
+        "_validate_plan",
+        lambda _cfg: {
+            "litvar_url": "https://example.org/litvar",
+            "esearch_url": "https://example.org/esearch",
+            "elink_url": "https://example.org/elink",
+            "tool": "raptor",
+            "clinvar_uid": "12397",
+        },
+    )
+    monkeypatch.setattr(
+        module,
+        "run_ingestion",
+        lambda **_kwargs: {"manifest": {"counts": {"sources": 0, "artifacts": 0}, "content_hash": "f" * 64}, "artifact_payloads": {}},
+    )
+    monkeypatch.setattr(
+        module.bundle_mod,
+        "write_bundle_run",
+        lambda **_kwargs: {"run_dir": tmp_path / "run", "manifest_path": tmp_path / "run" / "bundle_manifest.json"},
+    )
+
+    transport_calls: list[float] = []
+
+    def fake_make_transport(rate_limiter):
+        transport_calls.append(float(getattr(rate_limiter, "_min_interval_by_host", {"x": -1}).get("eutils.ncbi.nlm.nih.gov", -1)))
+        return lambda _url: {}
+
+    monkeypatch.setattr(module, "_make_transport", fake_make_transport)
+
+    for bad in ("0", "-0.01", "nan", "inf"):
+        transport_calls.clear()
+        rc = module.main(
+            [
+                "--config",
+                str(config_path),
+                "--baseline-manifest",
+                str(baseline_path),
+                "--min-ncbi-interval-seconds",
+                bad,
+            ]
+        )
+        assert rc == 1
+        assert transport_calls == []
+
+    rc = module.main(
+        [
+            "--config",
+            str(config_path),
+            "--baseline-manifest",
+            str(baseline_path),
+            "--min-ncbi-interval-seconds",
+            "0.5",
+        ]
+    )
+    assert rc == 0
+    assert len(transport_calls) == 1
+    assert transport_calls[0] >= 0.5
+
+
 def test_ac12_operator_summary_output_contract_and_publication_order_without_network(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -2087,7 +2545,7 @@ def test_ac13_config_matches_v1_spec_endpoints_expected_counts_and_output_names(
     assert isinstance(config, dict)
 
     assert config["schema"] == "raptor.external.r611q_literature_expansion_config.v1"
-    assert config["config_version"] == "1.0.0"
+    assert config["config_version"] == "1.0.1"
     assert config["bundle_id"] == spec["output"]["external_bundle"]["bundle_id"]
     assert config["run_name"] == spec["output"]["external_bundle"]["run_name"]
     assert (
