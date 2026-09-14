@@ -1,0 +1,325 @@
+schema: raptor.project.spec.v1
+spec_id: raptor-v2-functional-identity-promotion-v1
+spec_version: 1.0.0
+status: APPROVED_BUILD
+created_at: '2026-09-14'
+owner: human-terminal-authority
+branch: feature/raptor-v2-functional-identity-promotion-v1
+stacked_on:
+  branch: feature/raptor-v2-identity-crosswalk-v1
+  commit: f4e488aea5a1af8d0fa3bad1788b803e04a8b0d5
+
+objective: >-
+  Consume the frozen cliPE and VAMP crosswalk bundles into a new immutable
+  $TSC2$ functional-normalization run. Upgrade only exact, bundle-verified
+  mappings to $\text{GRCh38}$ genomic SPDI, extend row validation to
+  reference-verified equal-length multi-base delins, preserve every unresolved
+  row with an explicit state, and commit only aggregate coverage and
+  cross-assay overlap counts.
+
+non_goals:
+  - mutation of any prior external bundle or committed summary
+  - source score transformation, threshold reproduction or calibration
+  - ClinVar, VUS, prospective-holdout or Atlas overlap
+  - $PS3$/$BS3$, classification or evidence-strength assignment
+  - heuristic repair of 57 VAMP cross-exon coordinate rows
+  - inference for 146 VAMP rows absent from the archived crosswalk
+  - adjudication of 27 SGE reference-mismatch rows
+  - network access
+
+workflow:
+  planner: GPT-5.6-Sol
+  red_tests: GPT-5.3-Codex
+  builder: Claude-Sonnet-5
+  checker: GPT-5.6-Terra-xhigh
+  integrator: GPT-5.6-Sol
+  terminal_authority: human-owner
+
+inputs:
+  functional_normalization_bundle:
+    environment_variable: RAPTOR_TSC2_FUNCTIONAL_NORMALIZATION_ROOT
+    run_name: tsc2-functional-identity-normalization-pilot-2026-09-11
+    bundle_id: tsc2-functional-identity-normalization-pilot-2026-09-11
+    manifest_content_hash: 74f15f22cfb6e876a8fab3a16c841e6f33317eadd58ef04547e4c060162afb48
+    artifacts:
+      mavedb_clipe:
+        relative_path: normalized/mavedb_clipe.jsonl
+        row_count: 208
+        byte_length: 102100
+        sha256: 2328f46bf5a2ae087eddeaa2ad0fb6f44de2b60a2e9e3ad0c034c73907f5031e
+      igvf_vamp_seq:
+        relative_path: normalized/igvf_vamp_seq.jsonl
+        row_count: 9253
+        byte_length: 4522418
+        sha256: 26f34a7a8d52d01ffbdef50427ac1ab0b268a523a29a55ce77452fc56bb83adb
+      igvf_sge:
+        relative_path: normalized/igvf_sge.jsonl
+        row_count: 453
+        byte_length: 227381
+        sha256: 2292e5770911e13fcd2536287fd04fc7f23354c9bc81ebf01533aa441114ea52
+  clipe_projector_bundle:
+    environment_variable: RAPTOR_TSC2_CDNA_PROJECTOR_ROOT
+    run_name: tsc2-clipe-cdna-spdi-projector-2026-09-12
+    bundle_id: tsc2-clipe-cdna-spdi-projector-2026-09-12
+    manifest_content_hash: 247665b9758860124b196d037b913626b7699b87ba1bb1c32b0e461bb4473529
+    mapping:
+      relative_path: mapping/mavedb_clipe_nm000548_5_to_nc000016_10.jsonl
+      row_count: 208
+      byte_length: 143028
+      sha256: 44c75161b77d15a3eff53b576d9b1ac0264365169ea9f42d4581461e0759db7d
+      required_status: PROJECTED_FASTA_VERIFIED
+  vamp_crosswalk_bundle:
+    environment_variable: RAPTOR_TSC2_VAMP_CROSSWALK_ROOT
+    run_name: tsc2-vamp-genomic-crosswalk-2026-09-12
+    bundle_id: tsc2-vamp-genomic-crosswalk-2026-09-12
+    manifest_content_hash: f80759aa43874d201efb69c52b611d9ebd8c40712159bf1f291c86195dd33ba0
+    crosswalk:
+      relative_path: crosswalk/igvf_vamp_seq_genomic_crosswalk.jsonl
+      row_count: 9253
+      byte_length: 3558841
+      sha256: e8c2c6aea9039586f2c7244d36fcf4629a0a99ac91bd4c469038430c34aa9896
+  identity_pins:
+    gene: TSC2
+    transcript: NM_000548.5
+    genomic_accession: NC_000016.10
+    assembly: GRCh38
+
+row_contract_amendment:
+  schema: raptor.external.normalized_functional_row.v1
+  rule: >-
+    Preserve the existing exact 17-field row shape. Extend only the allowed
+    state/reason vocabulary and verified hgvs_g/SPDI cross-check.
+  add_identity_states:
+    - GENOMIC_CROSSWALK_LENGTH_MISMATCH
+    - PROTEIN_ONLY_ARCHIVE_CROSSWALK_ABSENT
+  add_unresolved_reasons:
+    - SOURCE_GENOMIC_INTERVAL_NOT_EQUIVALENT_TO_CDNA_REPLACEMENT
+    - PROTEIN_VARIANT_NOT_IN_ARCHIVE
+  state_reason_bindings:
+    GENOMIC_CROSSWALK_LENGTH_MISMATCH: SOURCE_GENOMIC_INTERVAL_NOT_EQUIVALENT_TO_CDNA_REPLACEMENT
+    PROTEIN_ONLY_ARCHIVE_CROSSWALK_ABSENT: PROTEIN_VARIANT_NOT_IN_ARCHIVE
+  verified_spdi:
+    allowed_shapes: [SNV, EQUAL_LENGTH_DELINS]
+    snv_hgvs_g: 'NC_000016.10:g.<pos1><ref>><alt>'
+    delins_hgvs_g: 'NC_000016.10:g.<start1>_<end1>delins<inserted>'
+    invariants:
+      - SPDI accession is NC_000016.10
+      - SPDI deleted and inserted sequences are non-empty uppercase ACGT
+      - SNV hgvs_g position equals SPDI position + 1 and ref/alt agree
+      - DELINS hgvs_g start equals SPDI position + 1
+      - DELINS hgvs_g end equals start + len(SPDI deleted) - 1
+      - DELINS inserted sequence equals SPDI inserted sequence
+      - DELINS deleted and inserted lengths are equal
+  spdi_to_hgvs_g:
+    rule: >-
+      Derive hgvs_g deterministically from the already verified mapping SPDI;
+      never call a network service. One-base substitutions use g.<pos><ref>><alt>.
+      Multi-base equal-length replacements use g.<start>_<end>delins<inserted>.
+
+join_rules:
+  clipe:
+    normalized_source_id: mavedb_clipe
+    join_key: [source_row, source_record_id]
+    mapping_requirements:
+      - mapping source_row is contiguous 1..208
+      - mapping source_record_id equals normalized row source_record_id
+      - mapping hgvs_c equals normalized row hgvs_c
+      - every mapping status is PROJECTED_FASTA_VERIFIED
+    promoted_fields:
+      assembly: GRCh38
+      transcript: NM_000548.5
+      spdi: mapping.genomic_spdi
+      hgvs_g: derived from mapping.genomic_spdi
+      identity_state: GENOMIC_SPDI_VERIFIED
+      unresolved_reason: null
+    expected:
+      input_rows: 208
+      promoted_rows: 208
+      unresolved_rows: 0
+  vamp:
+    normalized_source_id: igvf_vamp_seq
+    join_key: [source_row, protein_variant]
+    protein_variant_rule: >-
+      normalized protein_accession + ':' + normalized hgvs_p must equal the
+      crosswalk protein_variant exactly.
+    status_mapping:
+      CROSSWALK_SPDI_VERIFIED:
+        assembly: GRCh38
+        transcript: NM_000548.5
+        hgvs_c: "'NM_000548.5:' + crosswalk.hgvs_c"
+        spdi: crosswalk.genomic_spdi
+        hgvs_g: derived from crosswalk.genomic_spdi
+        identity_state: GENOMIC_SPDI_VERIFIED
+        unresolved_reason: null
+      SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH:
+        assembly: null
+        transcript: NM_000548.5
+        hgvs_c: "'NM_000548.5:' + crosswalk.hgvs_c"
+        spdi: null
+        hgvs_g: null
+        identity_state: GENOMIC_CROSSWALK_LENGTH_MISMATCH
+        unresolved_reason: SOURCE_GENOMIC_INTERVAL_NOT_EQUIVALENT_TO_CDNA_REPLACEMENT
+      ARCHIVE_CROSSWALK_ABSENT:
+        assembly: null
+        transcript: null
+        hgvs_c: null
+        spdi: null
+        hgvs_g: null
+        identity_state: PROTEIN_ONLY_ARCHIVE_CROSSWALK_ABSENT
+        unresolved_reason: PROTEIN_VARIANT_NOT_IN_ARCHIVE
+      SOURCE_COORDINATE_REFERENCE_MISMATCH:
+        rule: >-
+          Allowed by the source crosswalk schema but pinned to count zero.
+          Any occurrence aborts this promotion run rather than being silently
+          mapped onto the SGE-specific reference-mismatch state.
+    expected:
+      input_rows: 9253
+      promoted_rows: 9050
+      length_mismatch_rows: 57
+      archive_absent_rows: 146
+      reference_mismatch_rows: 0
+  sge:
+    normalized_source_id: igvf_sge
+    rule: >-
+      Copy every row byte-equivalently at the semantic field level. Revalidate
+      the row contract; do not alter its identity state, score or source order.
+    expected:
+      input_rows: 453
+      verified_rows: 423
+      reference_mismatch_rows: 27
+      reference_controls: 3
+
+output:
+  external_bundle:
+    environment_variable: RAPTOR_TSC2_FUNCTIONAL_IDENTITY_PROMOTION_ROOT
+    default_root: ~/raptor-data/external/tsc2-functional-identity-promotion
+    run_name: tsc2-functional-identity-promotion-2026-09-14
+    bundle_id: tsc2-functional-identity-promotion-2026-09-14
+    manifest_schema: raptor.external.tsc2_functional_identity_promotion_bundle.v1
+    artifacts:
+      - normalized/mavedb_clipe.jsonl
+      - normalized/igvf_vamp_seq.jsonl
+      - normalized/igvf_sge.jsonl
+      - bundle_manifest.json
+    create_only: true
+    symlink_safe: true
+    manifest_last: true
+  committed_summary:
+    path: data/census/tsc2_functional_identity_promotion_2026-09-14.json
+    schema: raptor.external.tsc2_functional_identity_promotion_summary.v1
+    contains:
+      - all three input manifest hashes
+      - output manifest and artifact hashes
+      - source row counts
+      - identity state and unresolved reason counts
+      - verified observations and unique-SPDI counts
+      - pairwise and triple source overlap counts
+      - explicit clinical/evidence-strength forbidden boundaries
+    excludes:
+      - per-row identities or HGVS/SPDI
+      - raw scores or functional classes
+      - clinical labels or evidence strengths
+
+expected_pilot:
+  total_rows: 9914
+  source_rows:
+    mavedb_clipe: 208
+    igvf_vamp_seq: 9253
+    igvf_sge: 453
+  identity_state_counts:
+    GENOMIC_SPDI_VERIFIED: 9681
+    GENOMIC_REFERENCE_MISMATCH: 27
+    GENOMIC_CROSSWALK_LENGTH_MISMATCH: 57
+    PROTEIN_ONLY_ARCHIVE_CROSSWALK_ABSENT: 146
+    REFERENCE_CONTROL: 3
+    TRANSCRIPT_ONLY_PROJECTOR_REQUIRED: 0
+    PROTEIN_ONLY_CROSSWALK_REQUIRED: 0
+  unresolved_reason_counts:
+    REFERENCE_ALLELE_MISMATCH: 27
+    SOURCE_GENOMIC_INTERVAL_NOT_EQUIVALENT_TO_CDNA_REPLACEMENT: 57
+    PROTEIN_VARIANT_NOT_IN_ARCHIVE: 146
+    NOT_A_VARIANT: 3
+    CDNA_PROJECTOR_REQUIRED: 0
+    NUCLEOTIDE_CROSSWALK_REQUIRED: 0
+  variant_kind_counts:
+    MISSENSE: 9340
+    SYNONYMOUS: 496
+    STOP_GAINED: 63
+    OTHER: 12
+    REFERENCE_CONTROL: 3
+  verified_observations_by_source:
+    mavedb_clipe: 208
+    igvf_vamp_seq: 9050
+    igvf_sge: 423
+  verified_observations: 9681
+  verified_unique_spdi: 9552
+  duplicate_verified_observations: 129
+  source_overlap:
+    pairwise:
+      mavedb_clipe__igvf_sge: 38
+      igvf_vamp_seq__igvf_sge: 85
+      mavedb_clipe__igvf_vamp_seq: 13
+    triple: 7
+  conservation:
+    input_rows: 9914
+    output_rows: 9914
+    dropped_rows: 0
+    duplicate_source_rows: 0
+
+implementation:
+  package: src/raptor/external/tsc2_identity_promotion/
+  operator: scripts/promote_tsc2_functional_identities.py
+  config: configs/external/tsc2_functional_identity_promotion_v1.yaml
+  tests: tests/external/test_tsc2_functional_identity_promotion.py
+  modified_existing:
+    - src/raptor/external/tsc2_functional/model.py
+  network_boundary: forbidden
+  publication: reuse hardened no-clobber external bundle primitive
+
+acceptance_criteria:
+  - id: FP-01
+    rule: All three input manifests and five required artifact bytes match exact pins before joins.
+  - id: FP-02
+    rule: No library or operator network I/O is permitted.
+  - id: FP-03
+    rule: Existing normalized rows and crosswalk rows are revalidated against their exact schemas.
+  - id: FP-04
+    rule: cliPE join is exact on source_row/source_record_id/hgvs_c and promotes 208/208 rows.
+  - id: FP-05
+    rule: VAMP join is exact on source_row/full protein token and conserves 9,253 rows.
+  - id: FP-06
+    rule: VAMP statuses map exactly to 9,050 verified, 57 length-mismatch and 146 archive-absent rows.
+  - id: FP-07
+    rule: SGE rows are copied without changing any semantic field.
+  - id: FP-08
+    rule: Verified row validation supports exact SNV and equal-length multi-base delins only.
+  - id: FP-09
+    rule: SPDI-to-hgvs_g conversion is deterministic and cross-validated by the row model.
+  - id: FP-10
+    rule: Every source row key is unique and all 9,914 rows are conserved.
+  - id: FP-11
+    rule: Expected state/reason/kind/source/overlap counts match before publication.
+  - id: FP-12
+    rule: Output JSONL and manifest hashes are deterministic and byte-sensitive.
+  - id: FP-13
+    rule: External publication is create-only, symlink-safe, race-safe and outside Git.
+  - id: FP-14
+    rule: The committed summary is aggregate-only and binds to the output manifest hash.
+  - id: FP-15
+    rule: No output assigns clinical status, $PS3$/$BS3$ or evidence strength.
+
+failure_cases:
+  - any input manifest/artifact hash drift
+  - schema or source-row conservation drift
+  - cliPE mapping not fully successful or join mismatch
+  - VAMP unknown/reference-mismatch status or join mismatch
+  - verified SPDI not on NC_000016.10
+  - invalid SNV/delins hgvs_g derivation
+  - cross-source overlap count drift
+  - attempted mutation/overwrite of a prior bundle
+
+follow_on:
+  - compute overlaps with VUS, prospective holdout and Atlas identities
+  - reproduce VAMP-seq, SGE and cliPE score transformations
+  - define calibration/leakage partitions
+  - evaluate assay-specific $PS3$/$BS3$ only in a separately approved policy slice
