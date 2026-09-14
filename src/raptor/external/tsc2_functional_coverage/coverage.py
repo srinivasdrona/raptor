@@ -189,11 +189,19 @@ def compute_coverage_statistics(
     and cross-cohort intersections are correct even where a cohort
     identity has no functional coverage at all. Only the functional
     overlap/source-membership aggregates are derived from
-    ``coverage_rows``. Raises ``CoverageBuildError`` if any coverage row
-    fails schema revalidation, if ``priority_spdis``/``priority_by_spdi``
-    disagree or violate their fixed vocabulary/VUS-subset invariant, if
-    the VUS/holdout cohorts intersect, if a cohort's gene counts do not
-    sum to its identity count, or if the Atlas raw/resolved/unresolved
+    ``coverage_rows``. After schema-revalidating every row, each row's
+    ``vus_2026_07``/``priority_stratum``/``prospective_holdout_2026_08``/
+    ``atlas_contrast_candidate``/``atlas_anchor_r611q`` flags must exactly
+    agree with membership computed fresh from the supplied full cohort
+    sets/map/anchor -- any single row's disagreement (including a null
+    ``priority_stratum`` where ``priority_by_spdi`` assigns a value, or
+    vice versa) aborts before any statistic is computed. Raises
+    ``CoverageBuildError`` if any coverage row fails schema revalidation
+    or carries a disagreeing membership flag, if
+    ``priority_spdis``/``priority_by_spdi`` disagree or violate
+    their fixed vocabulary/VUS-subset invariant, if the VUS/holdout
+    cohorts intersect, if a cohort's gene counts do not sum to its
+    identity count, or if the Atlas raw/resolved/unresolved
     counts are not internally consistent."""
     validated_rows: list[dict[str, Any]] = []
     for row in coverage_rows:
@@ -202,6 +210,39 @@ def compute_coverage_statistics(
         except (CoverageContractError, TypeError) as exc:
             raise CoverageBuildError(f"coverage row failed schema revalidation: {exc}") from exc
     coverage_rows = validated_rows
+
+    for row in coverage_rows:
+        spdi = row["spdi"]
+        expected_vus = spdi in vus_spdis
+        if row["vus_2026_07"] != expected_vus:
+            raise CoverageBuildError(
+                f"coverage row {spdi!r} vus_2026_07={row['vus_2026_07']!r} disagrees with vus_spdis "
+                f"membership {expected_vus!r}"
+            )
+        expected_priority_stratum = priority_by_spdi.get(spdi)
+        if row["priority_stratum"] != expected_priority_stratum:
+            raise CoverageBuildError(
+                f"coverage row {spdi!r} priority_stratum={row['priority_stratum']!r} disagrees with "
+                f"priority_by_spdi {expected_priority_stratum!r}"
+            )
+        expected_holdout = spdi in prospective_holdout_spdis
+        if row["prospective_holdout_2026_08"] != expected_holdout:
+            raise CoverageBuildError(
+                f"coverage row {spdi!r} prospective_holdout_2026_08={row['prospective_holdout_2026_08']!r} "
+                f"disagrees with prospective_holdout_spdis membership {expected_holdout!r}"
+            )
+        expected_atlas_contrast = spdi in atlas_contrast_spdis
+        if row["atlas_contrast_candidate"] != expected_atlas_contrast:
+            raise CoverageBuildError(
+                f"coverage row {spdi!r} atlas_contrast_candidate={row['atlas_contrast_candidate']!r} "
+                f"disagrees with atlas_contrast_spdis membership {expected_atlas_contrast!r}"
+            )
+        expected_atlas_anchor = atlas_anchor_spdi is not None and spdi == atlas_anchor_spdi
+        if row["atlas_anchor_r611q"] != expected_atlas_anchor:
+            raise CoverageBuildError(
+                f"coverage row {spdi!r} atlas_anchor_r611q={row['atlas_anchor_r611q']!r} disagrees with "
+                f"atlas_anchor_spdi membership {expected_atlas_anchor!r}"
+            )
 
     if vus_spdis & prospective_holdout_spdis:
         raise CoverageBuildError("VUS and prospective-holdout identity sets must be disjoint")

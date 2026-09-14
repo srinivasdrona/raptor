@@ -42,7 +42,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import yaml
 
@@ -81,6 +81,15 @@ from raptor.external.tsc2_functional_coverage.ingest import (  # noqa: E402
 
 DEFAULT_CONFIG = REPO_ROOT / "configs" / "external" / "tsc2_functional_coverage_map_v1.yaml"
 
+#: The pinned canonical-LF (CRLF/CR normalized to LF) SHA-256 of the ONE
+#: trusted config file (spec_version 1.0.1). ``_load_config`` compares
+#: this fixed constant against a freshly-read file's canonical bytes --
+#: never a hash recomputed from whatever file happens to be at
+#: ``DEFAULT_CONFIG`` -- so neither a byte-identical copy at a different
+#: path nor a symlink alias, nor a silently drifted ``DEFAULT_CONFIG``
+#: itself, is ever trusted.
+CONFIG_CANONICAL_LF_SHA256 = "e5082dcbe75338949f386c6b193016befc0f9f7e56b6371267ba07584576ad05"
+
 _FUNCTIONAL_PROMOTION_ROOT_ENV = "RAPTOR_TSC2_FUNCTIONAL_IDENTITY_PROMOTION_ROOT"
 _VUS_IDENTITY_ROOT_ENV = "RAPTOR_TSC_VUS_IDENTITY_ROOT"
 _VUS_BIAS_ROOT_ENV = "RAPTOR_TSC_VUS_BIAS_ROOT"
@@ -113,9 +122,52 @@ class Tsc2FunctionalCoverageMapOperatorError(RuntimeError):
 
 
 def _load_config(config_path: Path) -> dict[str, Any]:
+    """Load, path-safety-check and hash-verify the operator's ONE trusted
+    config file. ``config_path`` must be absolute; every path component
+    from the filesystem anchor down to the leaf must be free of a
+    symlink/junction/reparse point (checked BEFORE any ``resolve()``);
+    the resolved path must equal exactly the resolved ``DEFAULT_CONFIG``
+    (no alias, copy or symlink substitution is ever trusted, however
+    byte-identical); and its canonical-LF (CRLF/CR normalized to LF)
+    bytes must match the pinned ``CONFIG_CANONICAL_LF_SHA256`` BEFORE any
+    ``yaml.safe_load`` is ever attempted. Every OS/decode/YAML failure is
+    translated narrowly into ``Tsc2FunctionalCoverageMapOperatorError``."""
+    config_path = Path(config_path)
+    if not config_path.is_absolute():
+        raise Tsc2FunctionalCoverageMapOperatorError(f"config path must be absolute, got {config_path!s}")
+
+    _assert_no_symlink_ancestor(config_path, context="config")
+
+    try:
+        resolved_config_path = config_path.resolve()
+        resolved_default_config = DEFAULT_CONFIG.resolve()
+    except OSError as exc:
+        raise Tsc2FunctionalCoverageMapOperatorError(f"config: unable to resolve {config_path}: {exc}") from exc
+    if resolved_config_path != resolved_default_config:
+        raise Tsc2FunctionalCoverageMapOperatorError(
+            f"config path {config_path} does not resolve to the canonical config path {DEFAULT_CONFIG}; "
+            "no alias/copy/symlink substitution is ever trusted"
+        )
+
     if not config_path.is_file():
         raise Tsc2FunctionalCoverageMapOperatorError(f"config file not found: {config_path}")
-    loaded = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    try:
+        raw_bytes = config_path.read_bytes()
+    except OSError as exc:
+        raise Tsc2FunctionalCoverageMapOperatorError(f"config: unable to read {config_path}: {exc}") from exc
+
+    canonical_bytes = raw_bytes.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    observed_sha256 = hashlib.sha256(canonical_bytes).hexdigest()
+    if observed_sha256.lower() != CONFIG_CANONICAL_LF_SHA256.lower():
+        raise Tsc2FunctionalCoverageMapOperatorError(
+            f"config canonical-LF sha256 mismatch: expected {CONFIG_CANONICAL_LF_SHA256!r}, observed "
+            f"{observed_sha256!r}"
+        )
+
+    try:
+        loaded = yaml.safe_load(canonical_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, yaml.YAMLError) as exc:
+        raise Tsc2FunctionalCoverageMapOperatorError(f"config {config_path} is not valid YAML: {exc}") from exc
     if not isinstance(loaded, dict):
         raise Tsc2FunctionalCoverageMapOperatorError(f"config {config_path} did not parse to a mapping")
     return loaded
@@ -239,6 +291,25 @@ def _read_repo_file_raw(*, relative_path: str, label: str) -> bytes:
     if not path.is_file():
         raise Tsc2FunctionalCoverageMapOperatorError(f"{label}: file not found at {path}")
     return path.read_bytes()
+
+
+def _compute_response_bundle_observed(
+    response_root: Path, *, compute_bundle_hash_fn: Callable[[Path], tuple[str, int, int]] | None = None,
+) -> dict[str, Any]:
+    """Compute the Atlas official-response-tree commitment
+    (``{sha256, file_count, byte_count}``) this operator passes to
+    ``ingest.load_atlas_contrast_replays`` as ``response_bundle_observed``.
+    ``response_root`` (and every one of its ancestors) is checked for a
+    symlink/junction/reparse point BEFORE any tree-hash call is ever made
+    -- never after. ``compute_bundle_hash_fn`` defaults to the real
+    ``raptor.atlas.identity_map._compute_bundle_hash`` seam; tests may
+    inject a stand-in to decouple this path-safety gate from a real
+    directory walk."""
+    _assert_no_symlink_ancestor(response_root, context="atlas_response_root")
+    if compute_bundle_hash_fn is None:
+        from raptor.atlas.identity_map import _compute_bundle_hash as compute_bundle_hash_fn
+    sha256, file_count, byte_count = compute_bundle_hash_fn(response_root)
+    return {"sha256": sha256, "file_count": file_count, "byte_count": byte_count}
 
 
 def _validate_expected_pilot_result(*, manifest: dict[str, Any], expected_pilot: dict[str, Any]) -> None:
@@ -501,12 +572,7 @@ def main(argv: list[str] | None = None) -> int:
         # not the panel root (spec
         # ``atlas_contrast_identities.official_response_root_relative_path``).
         response_root = atlas_identity_map_root / atlas_cfg["official_response_root_relative_path"]
-        from raptor.atlas.identity_map import _compute_bundle_hash
-
-        response_sha256, response_file_count, response_byte_count = _compute_bundle_hash(response_root)
-        response_bundle_observed = {
-            "sha256": response_sha256, "file_count": response_file_count, "byte_count": response_byte_count,
-        }
+        response_bundle_observed = _compute_response_bundle_observed(response_root)
 
         atlas_result = load_atlas_contrast_replays(
             map_path=atlas_identity_map_root / atlas_cfg["map"]["relative_path"],

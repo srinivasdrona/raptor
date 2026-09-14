@@ -392,7 +392,75 @@ def _validate_coverage_statistics(stats: dict[str, Any], *, counts: dict[str, An
             "functional_overlap_unique"
         )
 
-    _require_exact_keys(stats["cross_cohort"], _CROSS_COHORT_KEYS, context="coverage_statistics.cross_cohort")
+    cross_cohort = _require_exact_keys(
+        stats["cross_cohort"], _CROSS_COHORT_KEYS, context="coverage_statistics.cross_cohort"
+    )
+    if cross_cohort["vus__prospective_holdout"] != 0:
+        raise CoverageManifestError(
+            "coverage_statistics.cross_cohort.vus__prospective_holdout must be exactly 0 (VUS and "
+            "prospective-holdout are disjoint)"
+        )
+    if cross_cohort["priority__prospective_holdout"] != 0:
+        raise CoverageManifestError(
+            "coverage_statistics.cross_cohort.priority__prospective_holdout must be exactly 0 "
+            "(priority is a subset of VUS, which is disjoint from prospective-holdout)"
+        )
+
+    vus_identities = cohorts["vus"]["identities"]
+    priority_identities = cohorts["priority"]["identities"]
+    holdout_identities = cohorts["prospective_holdout"]["identities"]
+    atlas_resolved = cohorts["atlas_contrast"]["resolved_unique_spdi"]
+    if cross_cohort["vus__atlas_contrast"] > min(vus_identities, atlas_resolved):
+        raise CoverageManifestError(
+            "coverage_statistics.cross_cohort.vus__atlas_contrast exceeds min(cohorts.vus.identities, "
+            "cohorts.atlas_contrast.resolved_unique_spdi)"
+        )
+    if cross_cohort["prospective_holdout__atlas_contrast"] > min(holdout_identities, atlas_resolved):
+        raise CoverageManifestError(
+            "coverage_statistics.cross_cohort.prospective_holdout__atlas_contrast exceeds "
+            "min(cohorts.prospective_holdout.identities, cohorts.atlas_contrast.resolved_unique_spdi)"
+        )
+    if cross_cohort["priority__atlas_contrast"] > min(
+        priority_identities, atlas_resolved, cross_cohort["vus__atlas_contrast"]
+    ):
+        raise CoverageManifestError(
+            "coverage_statistics.cross_cohort.priority__atlas_contrast exceeds "
+            "min(cohorts.priority.identities, cohorts.atlas_contrast.resolved_unique_spdi, "
+            "cross_cohort.vus__atlas_contrast)"
+        )
+
+    vus_functional_overlap = cohorts["vus"]["functional_overlap_unique"]
+    holdout_functional_overlap = cohorts["prospective_holdout"]["functional_overlap_unique"]
+    atlas_functional_overlap = cohorts["atlas_contrast"]["functional_overlap_unique"]
+    if cross_cohort["functional__vus__atlas_contrast"] > min(
+        vus_functional_overlap, atlas_functional_overlap, cross_cohort["vus__atlas_contrast"]
+    ):
+        raise CoverageManifestError(
+            "coverage_statistics.cross_cohort.functional__vus__atlas_contrast exceeds "
+            "min(cohorts.vus.functional_overlap_unique, cohorts.atlas_contrast.functional_overlap_unique, "
+            "cross_cohort.vus__atlas_contrast)"
+        )
+    if cross_cohort["functional__prospective_holdout__atlas_contrast"] > min(
+        holdout_functional_overlap, atlas_functional_overlap, cross_cohort["prospective_holdout__atlas_contrast"]
+    ):
+        raise CoverageManifestError(
+            "coverage_statistics.cross_cohort.functional__prospective_holdout__atlas_contrast exceeds "
+            "min(cohorts.prospective_holdout.functional_overlap_unique, cohorts.atlas_contrast."
+            "functional_overlap_unique, cross_cohort.prospective_holdout__atlas_contrast)"
+        )
+    expected_outside = (
+        atlas_functional_overlap
+        - cross_cohort["functional__vus__atlas_contrast"]
+        - cross_cohort["functional__prospective_holdout__atlas_contrast"]
+    )
+    if cross_cohort["functional__atlas_contrast_outside_vus_holdout"] != expected_outside:
+        raise CoverageManifestError(
+            "coverage_statistics.cross_cohort.functional__atlas_contrast_outside_vus_holdout does not "
+            "equal cohorts.atlas_contrast.functional_overlap_unique - cross_cohort."
+            "functional__vus__atlas_contrast - cross_cohort.functional__prospective_holdout__atlas_contrast "
+            "(VUS/holdout are disjoint, so the Atlas functional overlap partitions exactly into these "
+            "three exclusive categories)"
+        )
 
     membership_patterns = _require_exact_keys(
         stats["functional_cohort_membership_patterns"], set(_FUNCTIONAL_COHORT_MEMBERSHIP_PATTERN_KEYS),
@@ -643,6 +711,22 @@ def _assert_no_reparse_ancestry(path: Path, *, role: str) -> None:
             )
 
 
+def _cleanup_staging_dir(staging_dir: Path) -> None:
+    """Remove ``staging_dir`` (a directory this process itself created and
+    is solely responsible for). Raises ``CoverageBundleBoundaryError``
+    naming the staging-cleanup failure on any ``OSError`` -- never a
+    silently-swallowed ``ignore_errors=True`` removal. A concurrently-
+    vanished directory (``FileNotFoundError``) is not an error."""
+    try:
+        shutil.rmtree(staging_dir)
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        raise CoverageBundleBoundaryError(
+            f"staging cleanup failed: unable to remove staging directory {staging_dir}: {exc}"
+        ) from exc
+
+
 def publish_coverage_bundle(
     *,
     repo_root: Path,
@@ -769,7 +853,7 @@ def publish_coverage_bundle(
             # content this process itself created; a competing writer's
             # already-published final directory is never touched.
             if staging_dir.exists():
-                shutil.rmtree(staging_dir, ignore_errors=True)
+                _cleanup_staging_dir(staging_dir)
     finally:
         _release_reservation(reservation_path)
 
