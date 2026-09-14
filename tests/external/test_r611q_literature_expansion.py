@@ -1692,6 +1692,100 @@ def test_ac12_operator_expected_probe_gate_and_fulltext_payload_mapping_contract
     assert re.search(r"for\s+.*fulltext.*:\s*\n\s+pass\b", source_text, flags=re.IGNORECASE) is None
 
 
+def test_ac12_operator_summary_output_contract_and_publication_order_without_network(
+    tmp_path: Path,
+) -> None:
+    source_text = _operator_source_text()
+    assert "--summary-output" in source_text
+    assert "committed_summary_path" in source_text
+    assert "build_committed_summary(" in source_text
+    assert "write_bundle_run(" in source_text
+    assert ".resolve()" in source_text
+    assert "relative_to(REPO_ROOT" in source_text or "is_relative_to(REPO_ROOT" in source_text
+    assert ".exists()" in source_text
+
+    main_start = source_text.find("def main(")
+    assert main_start != -1
+    main_text = source_text[main_start:]
+    write_idx = main_text.find("write_bundle_run(")
+    build_summary_idx = main_text.find("build_committed_summary(")
+    summary_write_idx = main_text.find("summary_output")
+    assert write_idx != -1 and build_summary_idx != -1 and summary_write_idx != -1
+    assert write_idx < build_summary_idx < summary_write_idx
+
+    module = _load_operator_module()
+    parser = _symbol(module, "build_arg_parser")()
+    cfg = _minimal_operator_config()
+    cfg["committed_summary_path"] = "data/census/r611q_literature_expansion_2026-09-15.json"
+    config_path = tmp_path / "r611q-config.yaml"
+    config_path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+    baseline_path = tmp_path / "baseline.json"
+    baseline_path.write_text("{}", encoding="utf-8")
+
+    explicit_summary_path = (REPO_ROOT / cfg["committed_summary_path"]).resolve()
+    if explicit_summary_path.exists():
+        pytest.fail(
+            "test requires a non-existing summary path for create-only validation: "
+            f"{explicit_summary_path}"
+        )
+
+    args = parser.parse_args(
+        [
+            "--config",
+            str(config_path),
+            "--baseline-manifest",
+            str(baseline_path),
+            "--dry-run",
+            "--summary-output",
+            str(explicit_summary_path),
+        ]
+    )
+    assert Path(args.summary_output).resolve() == explicit_summary_path
+
+    rc = _symbol(module, "main")(
+        [
+            "--config",
+            str(config_path),
+            "--baseline-manifest",
+            str(baseline_path),
+            "--dry-run",
+            "--summary-output",
+            str(explicit_summary_path),
+        ]
+    )
+    assert rc == 0
+    assert not explicit_summary_path.exists(), "dry-run must not create summary output"
+
+    outside_path = (tmp_path / "outside-summary.json").resolve()
+    preexisting_inside = explicit_summary_path
+    preexisting_inside.parent.mkdir(parents=True, exist_ok=True)
+    preexisting_inside.write_text("{}", encoding="utf-8")
+    try:
+        assert _symbol(module, "main")(
+            [
+                "--config",
+                str(config_path),
+                "--baseline-manifest",
+                str(baseline_path),
+                "--summary-output",
+                str(outside_path),
+            ]
+        ) == 1
+        assert _symbol(module, "main")(
+            [
+                "--config",
+                str(config_path),
+                "--baseline-manifest",
+                str(baseline_path),
+                "--summary-output",
+                str(preexisting_inside),
+            ]
+        ) == 1
+    finally:
+        if preexisting_inside.exists():
+            preexisting_inside.unlink()
+
+
 def test_ac13_config_matches_v1_spec_endpoints_expected_counts_and_output_names() -> None:
     if not SPEC_PATH.is_file():
         pytest.fail(f"spec file not found: {SPEC_PATH}")
