@@ -262,6 +262,8 @@ def _validate_manifest_contract(manifest: dict[str, Any], *, require_content_has
     counts = manifest["counts"]
     if not isinstance(counts, dict) or set(counts) != {"rows"}:
         raise PromotionManifestError("manifest.counts must have exactly the field 'rows'")
+    if not isinstance(counts["rows"], int) or isinstance(counts["rows"], bool) or counts["rows"] < 0:
+        raise PromotionManifestError(f"manifest.counts.rows must be a non-negative int, got {counts['rows']!r}")
     if total_row_count != counts["rows"]:
         raise PromotionManifestError(
             f"sum of artifact row_count values {total_row_count!r} does not match manifest.counts.rows "
@@ -298,6 +300,10 @@ def _validate_manifest_contract(manifest: dict[str, Any], *, require_content_has
         raise PromotionManifestError(
             f"manifest.unresolved_reason_counts must have exactly the keys {sorted(expected_unresolved_keys)!r}"
         )
+    for reason, count in unresolved_reason_counts.items():
+        if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+            raise PromotionManifestError(f"manifest.unresolved_reason_counts[{reason!r}] must be a non-negative int")
+
     for state, reason in IDENTITY_STATE_TO_UNRESOLVED_REASON.items():
         if reason is None:
             continue
@@ -376,6 +382,46 @@ def _validate_manifest_contract(manifest: dict[str, Any], *, require_content_has
             f"manifest.source_overlap.triple {triple!r} exceeds the maximum possible triple "
             f"intersection {triple_bound!r} (bounded by the smallest pairwise intersection)"
         )
+
+    # Venn-region nonnegativity (A=mavedb_clipe, B=igvf_vamp_seq,
+    # C=igvf_sge): each disjoint region implied by the pinned
+    # pairwise/triple counts must itself be >= 0, catching impossible
+    # overlap shapes that the upper-bound checks above miss.
+    ab_only = pairwise["mavedb_clipe__igvf_vamp_seq"] - triple
+    ac_only = pairwise["mavedb_clipe__igvf_sge"] - triple
+    bc_only = pairwise["igvf_vamp_seq__igvf_sge"] - triple
+    a_only = (
+        verified_observations_by_source["mavedb_clipe"]
+        - pairwise["mavedb_clipe__igvf_vamp_seq"]
+        - pairwise["mavedb_clipe__igvf_sge"]
+        + triple
+    )
+    b_only = (
+        verified_observations_by_source["igvf_vamp_seq"]
+        - pairwise["mavedb_clipe__igvf_vamp_seq"]
+        - pairwise["igvf_vamp_seq__igvf_sge"]
+        + triple
+    )
+    c_only = (
+        verified_observations_by_source["igvf_sge"]
+        - pairwise["mavedb_clipe__igvf_sge"]
+        - pairwise["igvf_vamp_seq__igvf_sge"]
+        + triple
+    )
+    for region_name, region_value in (
+        ("AB_only", ab_only),
+        ("AC_only", ac_only),
+        ("BC_only", bc_only),
+        ("A_only", a_only),
+        ("B_only", b_only),
+        ("C_only", c_only),
+    ):
+        if region_value < 0:
+            raise PromotionManifestError(
+                f"manifest.source_overlap implies a negative Venn region {region_name}={region_value!r}; "
+                "the pinned pairwise/triple overlap counts describe an impossible overlap shape"
+            )
+
     expected_unique_spdi = sum(verified_observations_by_source.values()) - sum(pairwise.values()) + triple
     if manifest["verified_unique_spdi"] != expected_unique_spdi:
         raise PromotionManifestError(

@@ -50,6 +50,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import stat
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
@@ -295,23 +297,47 @@ def _validate_relative_path_safe(relative_path: Any, *, label: str) -> None:
         )
 
 
-def _validate_no_symlink_components(base: Path, relative_path: str, *, label: str) -> Path:
-    """Walk from ``base`` down through each path component of
-    ``relative_path``, inspecting EVERY unresolved component (including
-    ``base`` itself) with ``Path.is_symlink()`` -- which uses ``lstat``
-    and never follows a link -- BEFORE any ``resolve()``/open. Rejects a
-    symlink/reparse point at any ancestor OR at the leaf itself, even when
-    its target would still resolve to a location inside ``base`` (a
-    same-directory/sibling symlink is exactly as untrusted as one that
-    escapes ``base``: neither is ever a real, directly-published file).
-    Returns the final (still-unresolved) joined path if every component is
-    a real (non-symlink) entry or does not yet exist."""
-    if base.is_symlink():
-        raise InputPinMismatchError(f"{label}: run directory {base} is a symlink/reparse point; refusing for safety")
-    current = base
-    for part in PurePosixPath(relative_path).parts:
+def _is_symlink_or_reparse_point(path: Path) -> bool:
+    """True iff ``path`` is a POSIX symlink, a Windows junction, or
+    otherwise carries ``FILE_ATTRIBUTE_REPARSE_POINT`` -- checked via
+    lstat-style calls that never follow the link. A missing path is
+    ``False``; any other OS-level inspection failure becomes
+    ``InputPinMismatchError`` instead of a raw ``OSError``."""
+    try:
+        if path.is_symlink():
+            return True
+        isjunction = getattr(os.path, "isjunction", None)
+        if isjunction is not None and isjunction(path):
+            return True
+        st = os.lstat(path)
+    except FileNotFoundError:
+        return False
+    except OSError as exc:
+        raise InputPinMismatchError(f"unable to inspect {path} for a symlink/reparse point: {exc}") from exc
+    reparse_attribute = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", None)
+    file_attributes = getattr(st, "st_file_attributes", None)
+    return bool(file_attributes is not None and reparse_attribute is not None and file_attributes & reparse_attribute)
+
+
+def _validate_no_symlink_components(root: Path, run_name: str, relative_path: str, *, label: str) -> Path:
+    """Reject a symlink/reparse point anywhere from the filesystem anchor
+    down to the artifact leaf, walking lexically (never ``resolve()``)
+    so an aliased *ancestor* of a caller-supplied ``root`` can't hide
+    behind ``root`` itself not being a symlink. A relative ``root`` is
+    anchored at ``cwd`` by lexical join only. Every cumulative component
+    -- the anchor, each of ``root``'s own directories, ``run_name``, and
+    each ``relative_path`` segment -- is checked with
+    ``_is_symlink_or_reparse_point`` before any ``resolve()``/open, and a
+    same-directory symlink is rejected exactly like an escaping one."""
+    root = Path(root)
+    if not root.is_absolute():
+        root = Path.cwd() / root
+    current = Path(root.anchor)
+    if _is_symlink_or_reparse_point(current):
+        raise InputPinMismatchError(f"{label}: {current} is a symlink/reparse point; refusing for safety")
+    for part in (*root.parts[1:], run_name, *PurePosixPath(relative_path).parts):
         current = current / part
-        if current.is_symlink():
+        if _is_symlink_or_reparse_point(current):
             raise InputPinMismatchError(
                 f"{label}: path component {current} is a symlink/reparse point; refusing to read "
                 "through a symlink even when its target remains inside the run directory"
@@ -329,7 +355,7 @@ def _read_pinned_artifact(*, root: Path | str, run_name: str, artifact: dict[str
     _validate_relative_path_safe(relative_path, label=label)
 
     run_dir = Path(root) / run_name
-    artifact_path = _validate_no_symlink_components(run_dir, relative_path, label=label)
+    artifact_path = _validate_no_symlink_components(Path(root), run_name, relative_path, label=label)
 
     # Containment is structurally guaranteed once every component is
     # confirmed real (no ".."/absolute components are permitted by
@@ -343,7 +369,7 @@ def _read_pinned_artifact(*, root: Path | str, run_name: str, artifact: dict[str
     except ValueError as exc:
         raise InputPinMismatchError(f"{label}: artifact path escapes its run directory {run_dir}") from exc
 
-    if artifact_path.is_symlink() or not artifact_path.is_file():
+    if _is_symlink_or_reparse_point(artifact_path) or not artifact_path.is_file():
         raise InputPinMismatchError(f"{label}: pinned artifact not found at a trusted path {artifact_path}")
 
     payload = artifact_path.read_bytes()
