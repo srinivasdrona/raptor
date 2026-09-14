@@ -73,7 +73,7 @@ SUMMARY_TOP_LEVEL_KEYS = {
     "source_response_hashes",
     "counts",
     "licence_counts",
-    "unresolved",
+    "unresolved_counts",
     "boundaries",
     "fulltext_artifact_hashes",
 }
@@ -88,7 +88,7 @@ FORBIDDEN_PER_ARTICLE_KEYS = (
 )
 
 FORBIDDEN_ID_VALUE_PATTERNS = (
-    re.compile(r'"pmid:\d{4,10}"', re.IGNORECASE),
+    re.compile(r'"(?:pmid:)?\d{4,10}"', re.IGNORECASE),
     re.compile(r'"pmc\d{4,}"', re.IGNORECASE),
     re.compile(r'"10\.\d{4,9}/[^"]+"', re.IGNORECASE),
 )
@@ -368,8 +368,12 @@ def _pubmed_xml_with_extra_pmid() -> str:
 """
 
 
-def _europe_pmc_core_payload(*, bad_open_access: str | None = None, bad_licence: str | None = None) -> str:
-    payload = {
+def _europe_pmc_core_payload_dict(
+    *,
+    bad_open_access: str | None = None,
+    bad_licence: str | None = None,
+) -> dict[str, Any]:
+    return {
         "hitCount": 3,
         "resultList": {
             "result": [
@@ -412,7 +416,17 @@ def _europe_pmc_core_payload(*, bad_open_access: str | None = None, bad_licence:
             ]
         },
     }
-    return json.dumps(payload, sort_keys=True, separators=(",", ":"))
+
+
+def _europe_pmc_core_payload(*, bad_open_access: str | None = None, bad_licence: str | None = None) -> str:
+    return json.dumps(
+        _europe_pmc_core_payload_dict(
+            bad_open_access=bad_open_access,
+            bad_licence=bad_licence,
+        ),
+        sort_keys=True,
+        separators=(",", ":"),
+    )
 
 
 def _jats_xml(*, pmcid: str, licence_text: str) -> str:
@@ -518,6 +532,15 @@ def _assert_aggregate_only_summary(summary: dict[str, Any]) -> None:
     assert isinstance(summary["counts"]["fulltext_candidates"], int)
     assert isinstance(summary["counts"]["fulltext_acquired"], int)
     assert summary["counts"]["fulltext_acquired"] == len(summary["fulltext_artifact_hashes"])
+    assert summary["counts"]["fulltext_candidates"] >= summary["counts"]["fulltext_acquired"]
+
+    unresolved = summary["unresolved_counts"]
+    assert isinstance(unresolved, dict)
+    assert unresolved
+    for value in unresolved.values():
+        assert isinstance(value, int)
+        assert not isinstance(value, bool)
+        assert value >= 0
 
     serialized = json.dumps(summary, sort_keys=True)
     lowered = serialized.lower()
@@ -525,6 +548,12 @@ def _assert_aggregate_only_summary(summary: dict[str, Any]) -> None:
         assert forbidden_key not in lowered
     for pattern in FORBIDDEN_ID_VALUE_PATTERNS:
         assert pattern.search(serialized) is None
+
+
+def _operator_source_text() -> str:
+    if not OPERATOR_SCRIPT.is_file():
+        pytest.fail(f"R611Q literature operator script is not implemented: {OPERATOR_SCRIPT}")
+    return OPERATOR_SCRIPT.read_text(encoding="utf-8")
 
 
 def test_ac01_required_surface_files_exist() -> None:
@@ -607,8 +636,8 @@ def test_ac02_endpoint_builders_and_final_url_binding_are_exact_and_substitution
     assert europe_params["pageSize"] == ["1000"]
     assert europe_params["format"] == ["json"]
     query = europe_params["query"][0]
-    assert "SRC:MED" in query
-    assert "9101" in query and "9102" in query
+    assert query == "(EXT_ID:9101 OR EXT_ID:9102) AND SRC:MED"
+    assert query != "EXT_ID:(9101 OR 9102) AND SRC:MED"
 
     fulltext_url = api["build_europe_pmc_fulltext_xml_url"](pmcid="PMC9101")
     assert (
@@ -645,6 +674,14 @@ def test_ac02_endpoint_builders_and_final_url_binding_are_exact_and_substitution
         api["assert_allowed_final_url"](
             requested_url=europe_pmc_core_url,
             final_url=_replace_query_params(europe_pmc_core_url, {"query": "EXT_ID:9999"}),
+        )
+    with pytest.raises(api["EndpointSecurityError"], match="query|substitution"):
+        api["assert_allowed_final_url"](
+            requested_url=europe_pmc_core_url,
+            final_url=_replace_query_params(
+                europe_pmc_core_url,
+                {"query": "EXT_ID:(9101 OR 9102) AND SRC:MED"},
+            ),
         )
     with pytest.raises(api["EndpointSecurityError"], match="pmcid|substitution|path"):
         api["assert_allowed_final_url"](
@@ -904,6 +941,52 @@ def test_ac07_europe_pmc_core_parser_rejects_invalid_open_access_or_licence(
             )
 
 
+def test_ac07_europe_pmc_core_parser_rejects_hitcount_source_identity_and_field_drift() -> None:
+    api = _parse_api()
+    baseline = _europe_pmc_core_payload_dict()
+    bad_cases = []
+
+    case = json.loads(json.dumps(baseline))
+    case["hitCount"] = "3"
+    bad_cases.append(case)
+
+    case = json.loads(json.dumps(baseline))
+    case["hitCount"] = -1
+    bad_cases.append(case)
+
+    case = json.loads(json.dumps(baseline))
+    case["resultList"]["result"][0]["source"] = "PMC"
+    bad_cases.append(case)
+
+    case = json.loads(json.dumps(baseline))
+    case["resultList"]["result"][0]["id"] = "9199"
+    case["resultList"]["result"][0]["pmid"] = "9101"
+    bad_cases.append(case)
+
+    case = json.loads(json.dumps(baseline))
+    case["resultList"]["result"][0]["doi"] = "NOT-A-DOI"
+    bad_cases.append(case)
+
+    case = json.loads(json.dumps(baseline))
+    case["resultList"]["result"][0]["doi"] = "10.1000/UPPER.CASE"
+    bad_cases.append(case)
+
+    case = json.loads(json.dumps(baseline))
+    case["resultList"]["result"][0]["title"] = 123
+    bad_cases.append(case)
+
+    case = json.loads(json.dumps(baseline))
+    case["resultList"]["result"][0]["abstractText"] = {"x": 1}
+    bad_cases.append(case)
+
+    for case_payload in bad_cases:
+        with pytest.raises(api["R611QLiteratureParseError"], match="hitcount|source|id|pmid|doi|title|abstract|type"):
+            api["parse_europe_pmc_core"](
+                json.dumps(case_payload, sort_keys=True, separators=(",", ":")),
+                requested_pmids=["9101", "9102", "9103", "9104"],
+            )
+
+
 def test_ac08_cc_by_candidate_selection_and_jats_parser_enforce_exact_cc_by_only() -> None:
     api = _parse_api()
     records = [
@@ -938,6 +1021,12 @@ def test_ac08_cc_by_candidate_selection_and_jats_parser_enforce_exact_cc_by_only
         "Distributed under CC BY-ND 4.0.",
         "Distributed under CC BY-SA 4.0.",
         "Distributed under CC BY-NC-ND 4.0.",
+        "Distributed under the Creative Commons Attribution-NonCommercial License.",
+        "Distributed under the Creative Commons Attribution-NoDerivatives License.",
+        "Distributed under the Creative Commons Attribution-ShareAlike License.",
+        "License URL: https://creativecommons.org/licenses/by-nc/4.0/",
+        "License URL: https://creativecommons.org/licenses/by-nd/4.0/",
+        "License URL: https://creativecommons.org/licenses/by-sa/4.0/",
     ]
     for licence_text in negative_licences:
         with pytest.raises(api["R611QLiteratureParseError"], match="NC|ND|SA|CC BY|license|licence"):
@@ -1073,6 +1162,163 @@ def test_ac09_article_index_jsonl_is_deterministic_has_exact_fields_and_one_row_
                 fulltext_status_by_pmcid={},
             )
 
+    rejected_rows = api["build_article_index_records"](
+        new_pmids=["9101"],
+        source_membership={"9101": ["litvar2"]},
+        pubmed_articles=[
+            {
+                "pmid": "9101",
+                "pmcid": "PMC9101",
+                "doi": "10.1000/r611q.9101",
+                "title": "A",
+                "publication_date": "2026-09-15",
+                "publication_date_precision": "day",
+                "abstract": "a",
+            }
+        ],
+        europe_pmc_records=[
+            {"pmid": "9101", "is_open_access": "Y", "licence": "CC BY", "pmcid": "PMC9101", "doi": None}
+        ],
+        fulltext_status_by_pmcid={"PMC9101": {"fulltext_status": "JATS_LICENCE_REJECTED", "artifact_id": None}},
+    )
+    assert rejected_rows[0]["fulltext_status"] == "JATS_LICENCE_REJECTED"
+    assert rejected_rows[0]["fulltext_status"] != "NOT_ELIGIBLE"
+
+    bad_index_cases = [
+        {
+            "new_pmids": ["9101", "9101"],  # duplicate new PMID
+            "pubmed_articles": pubmed_articles,
+            "europe_pmc_records": europe_pmc_records,
+            "fulltext_status_by_pmcid": {},
+        },
+        {
+            "new_pmids": ["9101"],
+            "pubmed_articles": [
+                {
+                    "pmid": "9101",
+                    "pmcid": "PMC9101",
+                    "doi": "10.1000/r611q.9101",
+                    "title": "A",
+                    "publication_date": "2026-09-15",
+                    "publication_date_precision": "day",
+                    "abstract": "a",
+                },
+                {
+                    "pmid": "9101",
+                    "pmcid": "PMC9101",
+                    "doi": "10.1000/r611q.9101",
+                    "title": "B",
+                    "publication_date": "2026-09-15",
+                    "publication_date_precision": "day",
+                    "abstract": "b",
+                },
+            ],  # duplicate PubMed record
+            "europe_pmc_records": [],
+            "fulltext_status_by_pmcid": {},
+        },
+        {
+            "new_pmids": ["9101"],
+            "pubmed_articles": [
+                {
+                    "pmid": "9101",
+                    "pmcid": "PMC9101",
+                    "doi": "10.1000/r611q.9101",
+                    "title": "A",
+                    "publication_date": "2026-09-15",
+                    "publication_date_precision": "day",
+                    "abstract": "a",
+                }
+            ],
+            "europe_pmc_records": [
+                {"pmid": "9101", "is_open_access": "Y", "licence": "CC BY", "pmcid": "PMC9101", "doi": None},
+                {"pmid": "9101", "is_open_access": "Y", "licence": "CC BY", "pmcid": "PMC9101", "doi": None},
+            ],  # duplicate Europe PMC record
+            "fulltext_status_by_pmcid": {},
+        },
+        {
+            "new_pmids": ["9101"],
+            "pubmed_articles": [
+                {
+                    "pmid": "9101",
+                    "pmcid": "PMC9101",
+                    "doi": "10.1000/r611q.9101",
+                    "title": "A",
+                    "publication_date": "2026-09-15",
+                    "publication_date_precision": "day",
+                    "abstract": "a",
+                }
+            ],
+            "europe_pmc_records": [],
+            "fulltext_status_by_pmcid": {"PMC9999": {"fulltext_status": "ACQUIRED_CC_BY", "artifact_id": "ft-x"}},  # unknown PMCID
+        },
+        {
+            "new_pmids": ["9101"],
+            "pubmed_articles": [
+                {
+                    "pmid": "9101",
+                    "pmcid": "PMC9101",
+                    "doi": "10.1000/r611q.9101",
+                    "title": "A",
+                    "publication_date": "2026-09-15",
+                    "publication_date_precision": "day",
+                    "abstract": "a",
+                }
+            ],
+            "europe_pmc_records": [],
+            "fulltext_status_by_pmcid": {"PMC9101": {"fulltext_status": "UNKNOWN_STATUS", "artifact_id": None}},
+        },
+        {
+            "new_pmids": ["9101"],
+            "pubmed_articles": [
+                {
+                    "pmid": "9101",
+                    "pmcid": "PMC9101",
+                    "doi": "10.1000/r611q.9101",
+                    "title": "A",
+                    "publication_date": "2026-09-15",
+                    "publication_date_precision": "day",
+                    "abstract": "a",
+                }
+            ],
+            "europe_pmc_records": [],
+            "fulltext_status_by_pmcid": {
+                "PMC9101": {"fulltext_status": "JATS_LICENCE_REJECTED", "artifact_id": "should-be-null"}
+            },  # invalid status consistency
+        },
+    ]
+    for case in bad_index_cases:
+        with pytest.raises(api["R611QLiteratureParseError"], match="duplicate|pmid|pmcid|fulltext|status|unknown"):
+            api["build_article_index_records"](
+                new_pmids=case["new_pmids"],
+                source_membership={"9101": ["litvar2"]} if "9101" in case["new_pmids"] else source_membership,
+                pubmed_articles=case["pubmed_articles"],
+                europe_pmc_records=case["europe_pmc_records"],
+                fulltext_status_by_pmcid=case["fulltext_status_by_pmcid"],
+            )
+
+    with pytest.raises(api["R611QLiteratureParseError"], match="row|field|status|artifact"):
+        api["to_article_index_jsonl"](
+            [
+                {
+                    "schema": "raptor.external.r611q_literature_article.v1",
+                    "pmid": "9101",
+                    "discovery_sources": ["litvar2"],
+                    "pubmed_status": "RESOLVED",
+                    "pmcid": "PMC9101",
+                    "doi": "10.1000/r611q.9101",
+                    "title": "A",
+                    "publication_date": "2026-09-15",
+                    "publication_date_precision": "day",
+                    "abstract": "a",
+                    "europe_pmc_status": "RESOLVED",
+                    "is_open_access": "Y",
+                    "licence": "CC BY",
+                    "fulltext_status": "ACQUIRED_CC_BY",
+                    "fulltext_artifact_id": None,  # inconsistent
+                }
+            ]
+        )
+
 
 def test_ac10_bundle_manifest_self_hash_create_only_write_and_aggregate_only_summary(
     tmp_path: Path,
@@ -1173,6 +1419,147 @@ def test_ac10_bundle_manifest_self_hash_create_only_write_and_aggregate_only_sum
     _assert_aggregate_only_summary(summary)
 
 
+def test_ac10_validate_manifest_hash_enforces_extension_contract_and_detects_mutations() -> None:
+    api = _bundle_api()
+    article_index_body = (
+        b'{"schema":"raptor.external.r611q_literature_article.v1","pmid":"9101"}\n'
+        b'{"schema":"raptor.external.r611q_literature_article.v1","pmid":"9102"}\n'
+    )
+    fulltext_body = _jats_xml(
+        pmcid="PMC9101",
+        licence_text="Distributed under the Creative Commons Attribution License (CC BY 4.0).",
+    ).encode("utf-8")
+    artifacts = [
+        _artifact_record(
+            artifact_id="normalized-article-index",
+            source_id="article_index",
+            relative_path="normalized/article-index.jsonl",
+            body=article_index_body,
+            role="ARTICLE_INDEX",
+        ),
+        _artifact_record(
+            artifact_id="fulltext-PMC9101",
+            source_id="fulltext",
+            relative_path="fulltext/PMC9101.xml",
+            body=fulltext_body,
+            role="FULLTEXT_XML",
+        ),
+    ]
+    sources = [
+        _source_record(
+            source_id="article_index",
+            source_kind="article_index",
+            artifact_ids=["normalized-article-index"],
+        ),
+        _source_record(
+            source_id="fulltext",
+            source_kind="fulltext",
+            artifact_ids=["fulltext-PMC9101"],
+        ),
+    ]
+    manifest = api["build_bundle_manifest"](
+        bundle_id="r611q-literature-expansion-2026-09-15",
+        created_at="2026-09-15T00:00:00Z",
+        query={"gene": "TSC2", "variant": "R611Q"},
+        artifacts=artifacts,
+        sources=sources,
+        truncation={},
+        boundaries={"network": "operator-only", "external_output_only": True},
+    )
+    manifest.update(
+        {
+            "baseline_hashes": {"discovery_shelf_sources": "1" * 64},
+            "source_response_hashes": {
+                "litvar2_publications": "2" * 64,
+                "clinvar_uid_search": "3" * 64,
+                "clinvar_pubmed_links": "4" * 64,
+                "pubmed_efetch": "5" * 64,
+                "europe_pmc_core": "6" * 64,
+            },
+            "fulltext_artifact_hashes": ["7" * 64],
+            "counts": {
+                "sources": len(sources),
+                "artifacts": len(artifacts),
+                "new_pmids": 2,
+                "article_index_rows": 2,
+                "fulltext_candidates": 2,
+                "fulltext_acquired": 1,
+            },
+            "unresolved": {
+                "pubmed_missing_pmids": ["9104"],
+                "europe_pmc_unresolved_pmids": ["9103"],
+            },
+        }
+    )
+    manifest["content_hash"] = api["compute_bundle_content_hash"](manifest)
+    api["validate_manifest_hash"](manifest)
+
+    mutation_cases = [
+        ("arbitrary-extra-key", lambda m: m.__setitem__("unexpected_extra", True)),
+        ("bool-count", lambda m: m["counts"].__setitem__("new_pmids", True)),
+        ("count-drift", lambda m: m["counts"].__setitem__("sources", 999)),
+        ("nested-identity-injection", lambda m: m["unresolved"].__setitem__("pubmed_missing_pmids", ["9104", "9104", "bad"])),
+        ("unsorted-fulltext-hashes", lambda m: m.__setitem__("fulltext_artifact_hashes", ["f" * 64, "0" * 64])),
+        ("acquired-count-drift", lambda m: m["counts"].__setitem__("fulltext_acquired", 2)),
+        ("new-pmids-row-count-drift", lambda m: m["counts"].__setitem__("article_index_rows", 1)),
+    ]
+    for _name, mutate in mutation_cases:
+        candidate = json.loads(json.dumps(manifest))
+        mutate(candidate)
+        candidate["content_hash"] = api["compute_bundle_content_hash"](candidate)
+        with pytest.raises(Exception, match="schema|key|type|count|pmid|duplicate|unexpected|invalid"):
+            api["validate_manifest_hash"](candidate)
+
+
+def test_ac10_build_committed_summary_coerces_unresolved_lists_to_counts_and_validates_first() -> None:
+    api = _bundle_api()
+    manifest = {
+        "schema": "raptor.external.r611q_literature_bundle.v1",
+        "bundle_id": "r611q-literature-expansion-2026-09-15",
+        "created_at": "2026-09-15T00:00:00Z",
+        "query": {"gene": "TSC2", "variant": "R611Q"},
+        "artifacts": [],
+        "sources": [],
+        "counts": {
+            "sources": 0,
+            "artifacts": 0,
+            "new_pmids": 3,
+            "article_index_rows": 3,
+            "fulltext_candidates": 2,
+            "fulltext_acquired": 1,
+        },
+        "truncation": {},
+        "boundaries": {"network": "operator-only", "external_output_only": True},
+        "baseline_hashes": {"discovery_shelf_sources": "1" * 64},
+        "source_response_hashes": {
+            "litvar2_publications": "2" * 64,
+            "clinvar_uid_search": "3" * 64,
+            "clinvar_pubmed_links": "4" * 64,
+            "pubmed_efetch": "5" * 64,
+            "europe_pmc_core": "6" * 64,
+        },
+        "licence_counts": {"CC BY": 1, "CC BY-NC-ND": 1, "CC BY-NC-SA": 0, "absent": 1},
+        "unresolved": {
+            "pubmed_missing_pmids": ["9103", "9104"],
+            "europe_pmc_unresolved_pmids": ["9104"],
+        },
+        "fulltext_artifact_hashes": ["7" * 64],
+    }
+    manifest["content_hash"] = api["compute_bundle_content_hash"](manifest)
+    summary = api["build_committed_summary"](manifest)
+    _assert_aggregate_only_summary(summary)
+    assert summary["unresolved_counts"] == {
+        "pubmed_missing_pmids": 2,
+        "europe_pmc_unresolved_pmids": 1,
+    }
+
+    bad_manifest = dict(manifest)
+    bad_manifest["arbitrary_key"] = "should-fail"
+    bad_manifest["content_hash"] = api["compute_bundle_content_hash"](bad_manifest)
+    with pytest.raises(Exception, match="schema|key|validation|unexpected|invalid"):
+        api["build_committed_summary"](bad_manifest)
+
+
 def test_ac11_static_package_boundaries_no_network_imports_and_no_forbidden_domain_crossings() -> None:
     if not PACKAGE_ROOT.exists():
         pytest.fail(f"R611Q literature package is not implemented: {PACKAGE_ROOT}")
@@ -1263,6 +1650,48 @@ def test_ac12_operator_cli_exposes_dry_run_baseline_pin_and_dry_run_writes_nothi
         assert not any(dry_output_root.rglob("*")), "dry-run must write nothing"
 
 
+def test_ac12_operator_expected_probe_gate_and_fulltext_payload_mapping_contract() -> None:
+    source_text = _operator_source_text()
+    module = _load_operator_module()
+
+    validate_expected_counts = _symbol(module, "_validate_expected_counts")
+    validate_expected_counts(
+        observed={"a": 1, "b": 0},
+        expected={"a": 1, "b": 0},
+    )
+    invalid_cases = [
+        ({"a": 1}, {"a": 1, "b": 0}),  # missing key
+        ({"a": 1, "b": 0, "c": 1}, {"a": 1, "b": 0}),  # extra key
+        ({"a": True, "b": 0}, {"a": 1, "b": 0}),  # bool != int
+        ({"a": 1.0, "b": 0}, {"a": 1, "b": 0}),  # float != int
+        ({"a": 2, "b": 0}, {"a": 1, "b": 0}),  # value mismatch
+    ]
+    for observed, expected in invalid_cases:
+        with pytest.raises(Exception, match="key|type|count|expected|observed|mismatch"):
+            validate_expected_counts(observed=observed, expected=expected)
+
+    assert "probe_expected_counts" in source_text
+    assert "_validate_expected_counts(" in source_text
+    assert re.search(
+        r"_validate_expected_counts\([^)]*probe_expected_counts",
+        source_text,
+        flags=re.DOTALL,
+    ) is not None
+    validate_idx = source_text.find("_validate_expected_counts(")
+    for publication_step in ("build_bundle_manifest(", "write_bundle_run("):
+        step_idx = source_text.find(publication_step)
+        if step_idx != -1:
+            assert validate_idx != -1
+            assert validate_idx < step_idx, (
+                f"expected-probe validation must run before publication step {publication_step}"
+            )
+
+    assert "artifact_payloads" in source_text
+    assert "fulltext/" in source_text or "fulltext" in source_text
+    assert re.search(r"artifact_payloads\[[^\]]+\]\s*=", source_text) is not None
+    assert re.search(r"for\s+.*fulltext.*:\s*\n\s+pass\b", source_text, flags=re.IGNORECASE) is None
+
+
 def test_ac13_config_matches_v1_spec_endpoints_expected_counts_and_output_names() -> None:
     if not SPEC_PATH.is_file():
         pytest.fail(f"spec file not found: {SPEC_PATH}")
@@ -1289,7 +1718,6 @@ def test_ac13_config_matches_v1_spec_endpoints_expected_counts_and_output_names(
         "clinvar_pubmed_links",
         "pubmed",
         "europe_pmc",
-        "fulltext",
     ):
         assert config["sources"][source_key]["endpoint"] == spec["sources"][source_key]["endpoint"]
 
