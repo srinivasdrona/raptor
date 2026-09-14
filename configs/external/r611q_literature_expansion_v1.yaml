@@ -1,0 +1,154 @@
+# RAPTOR v2 R611Q literature-expansion configuration
+# (docs/project/specs/raptor-v2-r611q-literature-expansion-v1.yaml).
+#
+# Loaded ONLY by scripts/fetch_r611q_literature_expansion.py (the sole
+# network-I/O entry point for this slice); raptor.external.r611q_literature
+# itself performs no network I/O and never reads this file. Every
+# endpoint/expected-count/output value below is copied verbatim from the
+# spec's `sources`/`probe_observation`/`article_index` sections -- this is
+# acquisition configuration, not ACMG evidence, a classification input, or
+# SourceOps declaration/registry configuration.
+
+schema: raptor.external.r611q_literature_expansion_config.v1
+config_version: 1.0.0
+
+variant:
+  gene: TSC2
+  rsid: rs28934872
+  spdi: NC_000016.10:2070570:G:A
+  hgvs_c: NM_000548.5:c.1832G>A
+  hgvs_p: NP_000539.2:p.Arg611Gln
+  litvar_id: 'litvar@rs28934872##'
+  clinvar_uid: '12397'
+
+bundle_id: r611q-literature-expansion-2026-09-15
+run_name: r611q-literature-expansion-2026-09-15
+committed_summary_path: data/census/r611q_literature_expansion_2026-09-15.json
+
+baseline:
+  environment_variable: RAPTOR_R611Q_BASELINE_MANIFEST
+  schema: rescuescreen.r611q.discovery_shelf_sources.v1
+  sha256: '8dd13997581fc06998edd0bc73042ae1e8a059bbd2d0dccef4656da1166d1468'
+  byte_length: 26297
+  expected:
+    pmid_publications: 31
+    doi_only_publications: 2
+
+output:
+  environment_variable: RAPTOR_R611Q_LITERATURE_ROOT
+  default_root: '~/raptor-data/external/r611q-literature'
+  artifacts:
+    - raw/litvar2-publications.json
+    - raw/clinvar-esearch.json
+    - raw/clinvar-pubmed-links.json
+    - raw/pubmed-efetch.xml
+    - raw/europepmc-core.json
+    - normalized/article-index.jsonl
+    - fulltext/{pmcid}.xml
+    - bundle_manifest.json
+
+rate_limits:
+  # NCBI E-utilities/LitVar2: at least this many seconds between requests to
+  # eutils.ncbi.nlm.nih.gov / www.ncbi.nlm.nih.gov without an API key.
+  ncbi_without_api_key_min_interval_seconds: 0.34
+  # Europe PMC has no documented hard rate limit for this modest request
+  # volume; a conservative fixed interval is still applied defensively.
+  europe_pmc_min_interval_seconds: 0.34
+
+sources:
+  litvar2_publications:
+    role: variant_publication_discovery
+    endpoint: >-
+      https://www.ncbi.nlm.nih.gov/research/litvar2-api/variant/get/litvar%40rs28934872%23%23/publications?format=json
+
+  clinvar_uid_search:
+    role: variant_record_resolution
+    endpoint: >-
+      https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=clinvar&term=rs28934872&retmode=json&retmax=20&tool=raptor
+    expected_uid: '12397'
+
+  clinvar_pubmed_links:
+    role: citation_discovery
+    endpoint: >-
+      https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi?dbfrom=clinvar&db=pubmed&id=12397&linkname=clinvar_pubmed&retmode=json&tool=raptor
+
+  pubmed:
+    role: bibliographic_metadata_and_abstracts
+    endpoint: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi
+    db: pubmed
+    rettype: abstract
+    retmode: xml
+    tool: raptor
+    batch_size: 200
+
+  europe_pmc:
+    role: article_identity_access_and_licence_enrichment
+    endpoint: https://www.ebi.ac.uk/europepmc/webservices/rest/search
+    result_type: core
+    page_size: 1000
+    format: json
+
+  fulltext:
+    role: explicitly_licensed_primary_text
+    endpoint_template: >-
+      https://www.ebi.ac.uk/europepmc/webservices/rest/{pmcid}/fullTextXML
+    allowed_metadata_licences: [CC BY]
+    required_jats_licence: CC BY
+
+# Mirrors the spec's probe_observation.counts exactly -- a planning oracle,
+# never a source pin. The operator gates every expected count before
+# publication (delivery_checks) but never assumes these exact values will
+# be reproduced by a later real run.
+probe_expected_counts:
+  litvar2_pmids: 51
+  clinvar_pmids: 50
+  litvar2_clinvar_intersection: 9
+  discovery_union_pmids: 92
+  baseline_union_overlap: 23
+  new_pmid_leads: 69
+  pubmed_records_returned: 68
+  pubmed_records_unresolved: 1
+  pubmed_abstracts: 64
+  pubmed_pmcids: 45
+  pubmed_dois: 68
+  europe_pmc_records_returned: 67
+  europe_pmc_abstracts: 63
+  europe_pmc_pmcids: 44
+  europe_pmc_open_access: 35
+  licence_cc_by: 27
+  licence_cc_by_nc_nd: 6
+  licence_cc_by_nc_sa: 1
+  licence_absent: 33
+  fulltext_candidates: 27
+
+article_index:
+  schema: raptor.external.r611q_literature_article.v1
+  exact_fields:
+    - schema
+    - pmid
+    - discovery_sources
+    - pubmed_status
+    - pmcid
+    - doi
+    - title
+    - publication_date
+    - publication_date_precision
+    - abstract
+    - europe_pmc_status
+    - is_open_access
+    - licence
+    - fulltext_status
+    - fulltext_artifact_id
+
+# Circularity guard: every source above is an untrusted discovery lead or
+# non-gating bibliographic metadata, never ACMG criteria, never
+# raptor.scorer/BiasEvidenceSource input, and never a claim/classification.
+circularity_guard:
+  forbidden_consumers:
+    - raptor.scorer
+    - raptor.eval.benchmark
+    - raptor.eval.gate
+    - raptor.eval.harness
+    - raptor.eval.knowns
+    - raptor.atlas
+  forbidden_criteria: [PS3, BS3]
