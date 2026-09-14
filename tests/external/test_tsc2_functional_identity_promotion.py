@@ -217,6 +217,29 @@ def _operator_reparse_predicate_target(operator_module: Any) -> tuple[Any, str]:
     )
 
 
+def _operator_minimal_config() -> dict[str, Any]:
+    return {
+        "inputs": {
+            "functional_normalization_bundle": {"run_name": "fn-run", "manifest_filename": "bundle_manifest.json"},
+            "clipe_projector_bundle": {"run_name": "cp-run", "manifest_filename": "bundle_manifest.json"},
+            "vamp_crosswalk_bundle": {"run_name": "vx-run", "manifest_filename": "bundle_manifest.json"},
+        },
+        "output": {
+            "external_bundle": {"run_name": "out-run", "bundle_id": "out-bundle", "artifacts": {}},
+            "committed_summary": {"boundaries": dict(REQUIRED_BOUNDARIES)},
+        },
+        "expected_pilot": {},
+    }
+
+
+def _operator_input_root_env_vars(operator_module: Any) -> tuple[str, str, str]:
+    return (
+        getattr(operator_module, "_FUNCTIONAL_NORMALIZATION_ROOT_ENV"),
+        getattr(operator_module, "_CLIPE_PROJECTOR_ROOT_ENV"),
+        getattr(operator_module, "_VAMP_CROSSWALK_ROOT_ENV"),
+    )
+
+
 def _module_imports(path: Path) -> list[tuple[str, int]]:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     found: list[tuple[str, int]] = []
@@ -1063,12 +1086,12 @@ def _tiny_promotion_manifest_fixture(api: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def test_fp00_binding_spec_exists_and_is_v1_0_4() -> None:
+def test_fp00_binding_spec_exists_and_is_v1_0_5() -> None:
     if not SPEC_PATH.is_file():
         pytest.fail(f"binding spec is missing: {SPEC_PATH}")
     spec = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))
     assert spec["spec_id"] == "raptor-v2-functional-identity-promotion-v1"
-    assert spec["spec_version"] == "1.0.4"
+    assert spec["spec_version"] == "1.0.5"
 
 
 def test_fp01_existing_row_schema_stays_exact_17_fields_and_adds_new_state_reason_bindings() -> None:
@@ -2091,6 +2114,126 @@ def test_fp12b_operator_manifest_read_reparse_predicate_is_probed_and_errors_wra
         )
 
 
+def test_fp12c_operator_input_roots_reject_relative_cli_and_accept_absolute(tmp_path: Path) -> None:
+    operator = _load_operator_module()
+    resolve_root = getattr(operator, "_resolve_root", None)
+    if resolve_root is None:
+        pytest.fail("operator must define _resolve_root(cli_value, env_var, default=...)")
+    domain_error = getattr(operator, "FunctionalIdentityPromotionOperatorError", RuntimeError)
+    input_env_vars = _operator_input_root_env_vars(operator)
+
+    for env_var in input_env_vars:
+        with pytest.raises(domain_error):
+            resolve_root(cli_value=Path("relative-input-root"), env_var=env_var)
+
+    for env_var in input_env_vars:
+        absolute_root = (tmp_path / env_var.lower()).resolve()
+        assert resolve_root(cli_value=absolute_root, env_var=env_var) == absolute_root
+
+    output_default = getattr(operator, "_DEFAULT_OUTPUT_ROOT")
+    output_env_var = getattr(operator, "_OUTPUT_ROOT_ENV")
+    assert (
+        resolve_root(cli_value=None, env_var=output_env_var, default=output_default)
+        == output_default.expanduser()
+    )
+
+
+def test_fp12d_operator_input_roots_reject_relative_env_and_accept_absolute(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    operator = _load_operator_module()
+    resolve_root = getattr(operator, "_resolve_root", None)
+    if resolve_root is None:
+        pytest.fail("operator must define _resolve_root(cli_value, env_var, default=...)")
+    domain_error = getattr(operator, "FunctionalIdentityPromotionOperatorError", RuntimeError)
+    input_env_vars = _operator_input_root_env_vars(operator)
+
+    for env_var in input_env_vars:
+        monkeypatch.setenv(env_var, "relative/from/env")
+        with pytest.raises(domain_error):
+            resolve_root(cli_value=None, env_var=env_var)
+
+    for env_var in input_env_vars:
+        absolute_root = (tmp_path / f"env-{env_var.lower()}").resolve()
+        monkeypatch.setenv(env_var, str(absolute_root))
+        assert resolve_root(cli_value=None, env_var=env_var) == absolute_root
+
+
+def test_fp12e_main_rejects_relative_cli_input_root_before_manifest_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    operator = _load_operator_module()
+    domain_error = getattr(operator, "FunctionalIdentityPromotionOperatorError", RuntimeError)
+
+    read_manifest_calls = {"count": 0}
+
+    def _fake_load_config(_config_path: Path) -> dict[str, Any]:
+        return _operator_minimal_config()
+
+    def _fake_read_bundle_manifest(**_kwargs: Any) -> dict[str, Any]:
+        read_manifest_calls["count"] += 1
+        raise domain_error("should not read any manifest when an input root is relative")
+
+    monkeypatch.setattr(operator, "_load_config", _fake_load_config)
+    monkeypatch.setattr(operator, "_read_bundle_manifest", _fake_read_bundle_manifest)
+
+    rc = operator.main(
+        [
+            "--config",
+            str(tmp_path / "synthetic-config.yaml"),
+            "--functional-normalization-root",
+            "relative-functional-root",
+            "--clipe-projector-root",
+            str((tmp_path / "absolute-clipe-root").resolve()),
+            "--vamp-crosswalk-root",
+            str((tmp_path / "absolute-vamp-root").resolve()),
+            "--output-root",
+            str((tmp_path / "absolute-output-root").resolve()),
+        ]
+    )
+    assert rc == 1
+    assert read_manifest_calls["count"] == 0
+
+
+def test_fp12f_main_rejects_relative_env_input_root_before_manifest_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    operator = _load_operator_module()
+    domain_error = getattr(operator, "FunctionalIdentityPromotionOperatorError", RuntimeError)
+    fn_env, _cp_env, _vx_env = _operator_input_root_env_vars(operator)
+
+    read_manifest_calls = {"count": 0}
+
+    def _fake_load_config(_config_path: Path) -> dict[str, Any]:
+        return _operator_minimal_config()
+
+    def _fake_read_bundle_manifest(**_kwargs: Any) -> dict[str, Any]:
+        read_manifest_calls["count"] += 1
+        raise domain_error("should not read any manifest when an input root env value is relative")
+
+    monkeypatch.setattr(operator, "_load_config", _fake_load_config)
+    monkeypatch.setattr(operator, "_read_bundle_manifest", _fake_read_bundle_manifest)
+    monkeypatch.setenv(fn_env, "relative-functional-root-from-env")
+
+    rc = operator.main(
+        [
+            "--config",
+            str(tmp_path / "synthetic-config.yaml"),
+            "--clipe-projector-root",
+            str((tmp_path / "absolute-clipe-root").resolve()),
+            "--vamp-crosswalk-root",
+            str((tmp_path / "absolute-vamp-root").resolve()),
+            "--output-root",
+            str((tmp_path / "absolute-output-root").resolve()),
+        ]
+    )
+    assert rc == 1
+    assert read_manifest_calls["count"] == 0
+
+
 def test_fp13_canonical_jsonl_manifest_crossrefs_and_aggregate_only_summary_contract() -> None:
     api = _promotion_bundle_api()
     fixture = _tiny_promotion_manifest_fixture(api)
@@ -2420,7 +2563,7 @@ def test_fp16_config_pins_all_input_hashes_and_output_names_from_spec() -> None:
         pytest.fail(f"functional identity promotion config is not implemented: {CONFIG_PATH}")
     config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
     assert config["spec_id"] == "raptor-v2-functional-identity-promotion-v1"
-    assert config["spec_version"] == "1.0.4"
+    assert config["spec_version"] == "1.0.5"
 
     functional = config["inputs"]["functional_normalization_bundle"]
     assert functional["run_name"] == FUNCTIONAL_RUN_NAME

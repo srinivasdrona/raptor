@@ -1,6 +1,6 @@
 schema: raptor.project.spec.v1
 spec_id: raptor-v2-functional-identity-promotion-v1
-spec_version: 1.0.4
+spec_version: 1.0.5
 status: APPROVED_BUILD
 created_at: '2026-09-14'
 owner: human-terminal-authority
@@ -313,7 +313,10 @@ acceptance_criteria:
       checked for symlink/reparse status before resolution, from the supplied
       root lexical anchor through every supplied-root, run, and leaf component,
       including Windows junctions/reparse points and links whose target remains
-      inside the run directory.
+      inside the run directory. All three input bundle roots (functional
+      normalization, cliPE projector, VAMP crosswalk), whether supplied by CLI
+      flags or environment variables, must be absolute; relative input roots
+      fail closed before any manifest filesystem read/resolution.
   - id: FP-17
     rule: >-
       Manifest artifacts are exactly the three pinned output IDs/paths and
