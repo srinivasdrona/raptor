@@ -204,6 +204,19 @@ def _load_operator_module():
     return module
 
 
+def _operator_reparse_predicate_target(operator_module: Any) -> tuple[Any, str]:
+    direct = getattr(operator_module, "_is_symlink_or_reparse_point", None)
+    if callable(direct):
+        return operator_module, "_is_symlink_or_reparse_point"
+    for value in vars(operator_module).values():
+        predicate = getattr(value, "_is_symlink_or_reparse_point", None)
+        if callable(predicate):
+            return value, "_is_symlink_or_reparse_point"
+    pytest.fail(
+        "operator must expose _is_symlink_or_reparse_point(path) or call it via an imported module namespace"
+    )
+
+
 def _module_imports(path: Path) -> list[tuple[str, int]]:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     found: list[tuple[str, int]] = []
@@ -1050,12 +1063,12 @@ def _tiny_promotion_manifest_fixture(api: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def test_fp00_binding_spec_exists_and_is_v1_0_3() -> None:
+def test_fp00_binding_spec_exists_and_is_v1_0_4() -> None:
     if not SPEC_PATH.is_file():
         pytest.fail(f"binding spec is missing: {SPEC_PATH}")
     spec = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))
     assert spec["spec_id"] == "raptor-v2-functional-identity-promotion-v1"
-    assert spec["spec_version"] == "1.0.3"
+    assert spec["spec_version"] == "1.0.4"
 
 
 def test_fp01_existing_row_schema_stays_exact_17_fields_and_adds_new_state_reason_bindings() -> None:
@@ -1973,6 +1986,111 @@ def test_fp12_operator_expected_pilot_gate_checks_all_axes_before_publication() 
     assert first_seen["_validate_expected_pilot_result"] < first_seen["publish_identity_promotion_bundle"]
 
 
+def test_fp12a_operator_manifest_read_rejects_posix_symlink_ancestor(tmp_path: Path) -> None:
+    operator = _load_operator_module()
+    read_manifest = getattr(operator, "_read_bundle_manifest", None)
+    if read_manifest is None:
+        pytest.fail("operator must define _read_bundle_manifest(root, run_name, manifest_filename, label)")
+    domain_error = getattr(operator, "FunctionalIdentityPromotionOperatorError", RuntimeError)
+
+    run_name = "synthetic-fn-run"
+    real_root = tmp_path / "real-root"
+    run_dir = real_root / run_name
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "bundle_manifest.json").write_text(json.dumps({"schema": "synthetic"}, sort_keys=True), encoding="utf-8")
+
+    alias_root = tmp_path / "alias-root"
+    if alias_root.exists() or alias_root.is_symlink():
+        alias_root.unlink()
+    alias_root.symlink_to(real_root, target_is_directory=True)
+    with pytest.raises(domain_error):
+        read_manifest(
+            root=alias_root,
+            run_name=run_name,
+            manifest_filename="bundle_manifest.json",
+            label="functional_normalization_bundle",
+        )
+
+
+def test_fp12b_operator_manifest_read_reparse_predicate_is_probed_and_errors_wrapped(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    operator = _load_operator_module()
+    read_manifest = getattr(operator, "_read_bundle_manifest", None)
+    if read_manifest is None:
+        pytest.fail("operator must define _read_bundle_manifest(root, run_name, manifest_filename, label)")
+    domain_error = getattr(operator, "FunctionalIdentityPromotionOperatorError", RuntimeError)
+    helper_error = getattr(operator, "InputPinMismatchError", RuntimeError)
+    predicate_owner, predicate_name = _operator_reparse_predicate_target(operator)
+
+    sentinel = "sentinel-reparse-component"
+    run_name = "synthetic-fn-run"
+    supplied_root = tmp_path / "input-root" / sentinel
+    run_dir = supplied_root / run_name
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "bundle_manifest.json").write_text(
+        json.dumps({"schema": "synthetic", "content_hash": "0" * 64}, sort_keys=True),
+        encoding="utf-8",
+    )
+
+    probed: list[str] = []
+
+    def _fake_reparse_predicate(path: Path) -> bool:
+        text = str(path).replace("\\", "/")
+        probed.append(text)
+        return sentinel in text
+
+    loads_called = {"value": False}
+    original_json_loads = operator.json.loads
+
+    def _tracking_json_loads(raw: str, *args: Any, **kwargs: Any) -> Any:
+        loads_called["value"] = True
+        return original_json_loads(raw, *args, **kwargs)
+
+    monkeypatch.setattr(predicate_owner, predicate_name, _fake_reparse_predicate)
+    monkeypatch.setattr(operator.json, "loads", _tracking_json_loads)
+    with pytest.raises(domain_error):
+        read_manifest(
+            root=supplied_root,
+            run_name=run_name,
+            manifest_filename="bundle_manifest.json",
+            label="functional_normalization_bundle",
+        )
+    assert any(sentinel in path for path in probed)
+    assert loads_called["value"] is False
+
+    def _raising_oserror(path: Path) -> bool:
+        text = str(path).replace("\\", "/")
+        if sentinel in text:
+            raise OSError("synthetic lstat failure")
+        return False
+
+    monkeypatch.setattr(predicate_owner, predicate_name, _raising_oserror)
+    with pytest.raises(domain_error):
+        read_manifest(
+            root=supplied_root,
+            run_name=run_name,
+            manifest_filename="bundle_manifest.json",
+            label="functional_normalization_bundle",
+        )
+
+    def _raising_input_pin_error(path: Path) -> bool:
+        text = str(path).replace("\\", "/")
+        if sentinel in text:
+            raise helper_error("synthetic helper error")
+        return False
+
+    monkeypatch.setattr(predicate_owner, predicate_name, _raising_input_pin_error)
+    with pytest.raises(domain_error):
+        read_manifest(
+            root=supplied_root,
+            run_name=run_name,
+            manifest_filename="bundle_manifest.json",
+            label="functional_normalization_bundle",
+        )
+
+
 def test_fp13_canonical_jsonl_manifest_crossrefs_and_aggregate_only_summary_contract() -> None:
     api = _promotion_bundle_api()
     fixture = _tiny_promotion_manifest_fixture(api)
@@ -2302,7 +2420,7 @@ def test_fp16_config_pins_all_input_hashes_and_output_names_from_spec() -> None:
         pytest.fail(f"functional identity promotion config is not implemented: {CONFIG_PATH}")
     config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
     assert config["spec_id"] == "raptor-v2-functional-identity-promotion-v1"
-    assert config["spec_version"] == "1.0.3"
+    assert config["spec_version"] == "1.0.4"
 
     functional = config["inputs"]["functional_normalization_bundle"]
     assert functional["run_name"] == FUNCTIONAL_RUN_NAME
