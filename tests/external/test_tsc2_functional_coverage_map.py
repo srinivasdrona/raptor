@@ -3589,6 +3589,27 @@ def test_fc19_committed_summary_is_present_and_aggregate_only() -> None:
     )
     assert summary["schema"] == SUMMARY_SCHEMA
     assert summary["bundle_id"] == OUTPUT_BUNDLE_ID
+    assert summary["manifest_content_hash"] == "b079eca8d126eab468e42af140ebc646e5e3f021b5c2d819bb7fbb890cd7d101"
+    assert summary["input_hashes"] == {
+        "functional_identity_promotion": FUNCTIONAL_PROMOTION_MANIFEST_HASH,
+        "vus_manifest": REAL_VUS_MANIFEST_PIN["sha256"],
+        "prospective_holdout_manifest": REAL_HOLDOUT_MANIFEST_PIN["sha256"],
+        "atlas_identity_map": REAL_ATLAS_MAP_PIN["map_content_hash"],
+    }
+    assert summary["functional"] == EXPECTED_PILOT["functional"]
+    assert summary["cohorts"] == EXPECTED_PILOT["cohorts"]
+    assert summary["cross_cohort"] == EXPECTED_PILOT["cross_cohort"]
+    assert summary["functional_cohort_membership_patterns"] == EXPECTED_PILOT["functional_cohort_membership_patterns"]
+    assert summary["leakage_markers"] == EXPECTED_PILOT["leakage_markers"]
+    assert summary["output_artifacts"] == [
+        {
+            "artifact_id": "tsc2-functional-coverage-jsonl",
+            "relative_path": "coverage/functional_identity_coverage.jsonl",
+            "sha256": "5cf08b4747c3f01e5f4f96863a6b1f79617e142941ecd3e51ae9a64ebe4ced33",
+            "byte_length": 2983168,
+            "row_count": 9552,
+        }
+    ]
     assert summary["boundaries"] == BOUNDARIES
 
     serialized = json.dumps(summary, sort_keys=True)
