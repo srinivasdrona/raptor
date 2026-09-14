@@ -1,6 +1,6 @@
 schema: raptor.project.spec.v1
 spec_id: raptor-v2-r611q-literature-expansion-v1
-spec_version: 1.0.1
+spec_version: 1.0.2
 status: APPROVED_BUILD
 created_at: '2026-09-15'
 owner: human-terminal-authority
@@ -110,7 +110,7 @@ sources:
 
 probe_observation:
   observed_at: '2026-09-15'
-  role: planning_oracle_not_source_pin
+  role: planning_reference_not_acceptance_gate
   raw_response_sha256:
     litvar2_publications: ad783af1751db255d6349be963aba85ff2573e584ba5541b509d6b51f8c17e21
     clinvar_uid_search: d49f7a05d5a9bc20fc93d1db04fc53385699119e1cc3df5b03c21a8692ae0ceb
@@ -216,6 +216,9 @@ delivery_checks:
   - every downloaded JATS licence is independently checked
   - all output is external/create-only and the manifest is written last
   - the committed summary is aggregate-only
+  - live source counts are recorded; the planning reference is diagnostic only,
+    and source additions/removals never fail publication when structural and
+    arithmetic checks pass
   - source_response_hashes exactly equal the hashes of all RAW_RESPONSE artifacts
   - fulltext_artifact_hashes exactly equal the sorted hashes of all FULLTEXT_XML artifacts
   - caller rate-limit overrides are finite and may only increase configured minimum intervals
