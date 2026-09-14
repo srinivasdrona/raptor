@@ -1,0 +1,140 @@
+schema: raptor.external.tsc2_functional_identity_promotion_config.v1
+config_id: tsc2-functional-identity-promotion-v1
+spec: docs/project/specs/raptor-v2-functional-identity-promotion-v1.yaml
+spec_id: raptor-v2-functional-identity-promotion-v1
+spec_version: "1.0.0"
+
+inputs:
+  functional_normalization_bundle:
+    environment_variable: RAPTOR_TSC2_FUNCTIONAL_NORMALIZATION_ROOT
+    run_name: tsc2-functional-identity-normalization-pilot-2026-09-11
+    bundle_id: tsc2-functional-identity-normalization-pilot-2026-09-11
+    manifest_filename: bundle_manifest.json
+    manifest_content_hash: 74f15f22cfb6e876a8fab3a16c841e6f33317eadd58ef04547e4c060162afb48
+    artifacts:
+      mavedb_clipe:
+        artifact_id: mavedb_clipe-normalized-jsonl
+        relative_path: normalized/mavedb_clipe.jsonl
+        sha256: 2328f46bf5a2ae087eddeaa2ad0fb6f44de2b60a2e9e3ad0c034c73907f5031e
+        byte_length: 102100
+        row_count: 208
+      igvf_vamp_seq:
+        artifact_id: igvf_vamp_seq-normalized-jsonl
+        relative_path: normalized/igvf_vamp_seq.jsonl
+        sha256: 26f34a7a8d52d01ffbdef50427ac1ab0b268a523a29a55ce77452fc56bb83adb
+        byte_length: 4522418
+        row_count: 9253
+      igvf_sge:
+        artifact_id: igvf_sge-normalized-jsonl
+        relative_path: normalized/igvf_sge.jsonl
+        sha256: 2292e5770911e13fcd2536287fd04fc7f23354c9bc81ebf01533aa441114ea52
+        byte_length: 227381
+        row_count: 453
+  clipe_projector_bundle:
+    environment_variable: RAPTOR_TSC2_CDNA_PROJECTOR_ROOT
+    run_name: tsc2-clipe-cdna-spdi-projector-2026-09-12
+    bundle_id: tsc2-clipe-cdna-spdi-projector-2026-09-12
+    manifest_filename: bundle_manifest.json
+    manifest_content_hash: 247665b9758860124b196d037b913626b7699b87ba1bb1c32b0e461bb4473529
+    mapping:
+      artifact_id: mapping-jsonl
+      relative_path: mapping/mavedb_clipe_nm000548_5_to_nc000016_10.jsonl
+      sha256: 44c75161b77d15a3eff53b576d9b1ac0264365169ea9f42d4581461e0759db7d
+      byte_length: 143028
+      row_count: 208
+      required_status: PROJECTED_FASTA_VERIFIED
+  vamp_crosswalk_bundle:
+    environment_variable: RAPTOR_TSC2_VAMP_CROSSWALK_ROOT
+    run_name: tsc2-vamp-genomic-crosswalk-2026-09-12
+    bundle_id: tsc2-vamp-genomic-crosswalk-2026-09-12
+    manifest_filename: bundle_manifest.json
+    manifest_content_hash: f80759aa43874d201efb69c52b611d9ebd8c40712159bf1f291c86195dd33ba0
+    crosswalk:
+      artifact_id: crosswalk-jsonl
+      relative_path: crosswalk/igvf_vamp_seq_genomic_crosswalk.jsonl
+      sha256: e8c2c6aea9039586f2c7244d36fcf4629a0a99ac91bd4c469038430c34aa9896
+      byte_length: 3558841
+      row_count: 9253
+  identity_pins:
+    gene: TSC2
+    transcript: NM_000548.5
+    genomic_accession: NC_000016.10
+    assembly: GRCh38
+
+output:
+  external_bundle:
+    environment_variable: RAPTOR_TSC2_FUNCTIONAL_IDENTITY_PROMOTION_ROOT
+    default_root: ~/raptor-data/external/tsc2-functional-identity-promotion
+    run_name: tsc2-functional-identity-promotion-2026-09-14
+    bundle_id: tsc2-functional-identity-promotion-2026-09-14
+    manifest_filename: bundle_manifest.json
+    manifest_schema: raptor.external.tsc2_functional_identity_promotion_bundle.v1
+    artifacts:
+      mavedb_clipe:
+        artifact_id: mavedb_clipe-promoted-jsonl
+        relative_path: normalized/mavedb_clipe.jsonl
+      igvf_vamp_seq:
+        artifact_id: igvf_vamp_seq-promoted-jsonl
+        relative_path: normalized/igvf_vamp_seq.jsonl
+      igvf_sge:
+        artifact_id: igvf_sge-promoted-jsonl
+        relative_path: normalized/igvf_sge.jsonl
+  committed_summary:
+    path: data/census/tsc2_functional_identity_promotion_2026-09-14.json
+    schema: raptor.external.tsc2_functional_identity_promotion_summary.v1
+    boundaries:
+      clinical_use: forbidden
+      evidence_strength_use: forbidden
+      network: forbidden
+
+expected_pilot:
+  total_rows: 9914
+  source_rows:
+    mavedb_clipe: 208
+    igvf_vamp_seq: 9253
+    igvf_sge: 453
+  identity_state_counts:
+    GENOMIC_SPDI_VERIFIED: 9681
+    GENOMIC_REFERENCE_MISMATCH: 27
+    GENOMIC_CROSSWALK_LENGTH_MISMATCH: 57
+    PROTEIN_ONLY_ARCHIVE_CROSSWALK_ABSENT: 146
+    REFERENCE_CONTROL: 3
+    TRANSCRIPT_ONLY_PROJECTOR_REQUIRED: 0
+    PROTEIN_ONLY_CROSSWALK_REQUIRED: 0
+  unresolved_reason_counts:
+    REFERENCE_ALLELE_MISMATCH: 27
+    SOURCE_GENOMIC_INTERVAL_NOT_EQUIVALENT_TO_CDNA_REPLACEMENT: 57
+    PROTEIN_VARIANT_NOT_IN_ARCHIVE: 146
+    NOT_A_VARIANT: 3
+    CDNA_PROJECTOR_REQUIRED: 0
+    NUCLEOTIDE_CROSSWALK_REQUIRED: 0
+  variant_kind_counts:
+    MISSENSE: 9340
+    SYNONYMOUS: 496
+    STOP_GAINED: 63
+    OTHER: 12
+    REFERENCE_CONTROL: 3
+  verified_observations_by_source:
+    mavedb_clipe: 208
+    igvf_vamp_seq: 9050
+    igvf_sge: 423
+  verified_observations: 9681
+  verified_unique_spdi: 9552
+  duplicate_verified_observations: 129
+  source_overlap:
+    pairwise:
+      mavedb_clipe__igvf_sge: 38
+      igvf_vamp_seq__igvf_sge: 85
+      mavedb_clipe__igvf_vamp_seq: 13
+    triple: 7
+  conservation:
+    input_rows: 9914
+    output_rows: 9914
+    dropped_rows: 0
+    duplicate_source_rows: 0
+
+boundaries:
+  clinical_use: forbidden
+  evidence_strength_use: forbidden
+  network: forbidden
+  publication: external_output_only

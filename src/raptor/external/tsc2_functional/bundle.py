@@ -494,7 +494,15 @@ def build_committed_summary(manifest: dict[str, Any]) -> dict[str, Any]:
     for state, reason in IDENTITY_STATE_TO_UNRESOLVED_REASON.items():
         if reason is None:
             continue
-        unresolved_reason_counts[reason] = identity_state_counts.get(state, 0)
+        # Only surface a reason for a state this particular manifest's
+        # identity_state_counts actually reports on -- the row-contract
+        # amendment (raptor-v2-functional-identity-promotion-v1) adds
+        # states/reasons this earlier functional-normalization bundle
+        # schema never assigns, and this summary must never grow new
+        # zero-valued keys for a vocabulary a manifest never used.
+        if state not in identity_state_counts:
+            continue
+        unresolved_reason_counts[reason] = identity_state_counts[state]
 
     source_row_counts = {
         artifact["source_id"]: artifact["row_count"] for artifact in manifest["artifacts"]
