@@ -1,6 +1,6 @@
 schema: raptor.project.spec.v1
 spec_id: raptor-v2-functional-identity-promotion-v1
-spec_version: 1.0.0
+spec_version: 1.0.1
 status: APPROVED_BUILD
 created_at: '2026-09-14'
 owner: human-terminal-authority
@@ -307,6 +307,21 @@ acceptance_criteria:
     rule: The committed summary is aggregate-only and binds to the output manifest hash.
   - id: FP-15
     rule: No output assigns clinical status, $PS3$/$BS3$ or evidence strength.
+  - id: FP-16
+    rule: >-
+      Every unresolved artifact-path component is checked for symlink/reparse
+      status before resolution, including links whose target remains inside the
+      run directory.
+  - id: FP-17
+    rule: >-
+      Manifest artifacts are exactly the three pinned output IDs/paths and
+      boundaries are exactly network/clinical/evidence-strength forbidden;
+      arbitrary manifest keys cannot flow into the committed summary.
+  - id: FP-18
+    rule: >-
+      Count dictionaries contain non-negative integers and source-overlap
+      values satisfy pairwise/triple bounds plus inclusion-exclusion equality
+      for verified_unique_spdi.
 
 failure_cases:
   - any input manifest/artifact hash drift
