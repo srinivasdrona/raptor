@@ -93,6 +93,36 @@ FORBIDDEN_ID_VALUE_PATTERNS = (
     re.compile(r'"10\.\d{4,9}/[^"]+"', re.IGNORECASE),
 )
 
+PROBE_COUNT_AXES = (
+    "litvar2_pmids",
+    "clinvar_pmids",
+    "litvar2_clinvar_intersection",
+    "discovery_union_pmids",
+    "baseline_union_overlap",
+    "new_pmid_leads",
+    "pubmed_records_returned",
+    "pubmed_records_unresolved",
+    "pubmed_abstracts",
+    "pubmed_pmcids",
+    "pubmed_dois",
+    "europe_pmc_records_returned",
+    "europe_pmc_abstracts",
+    "europe_pmc_pmcids",
+    "europe_pmc_open_access",
+    "licence_cc_by",
+    "licence_cc_by_nc_nd",
+    "licence_cc_by_nc_sa",
+    "licence_absent",
+    "fulltext_candidates",
+)
+
+ROLLUP_COUNT_AXES = (
+    "article_index_rows",
+    "fulltext_acquired",
+    "sources",
+    "artifacts",
+)
+
 
 def _load_module(module_name: str):
     try:
@@ -527,6 +557,11 @@ def _assert_aggregate_only_summary(summary: dict[str, Any]) -> None:
         assert re.fullmatch(r"[0-9a-f]{64}", digest) is not None
 
     assert isinstance(summary["counts"], dict)
+    for axis in (*PROBE_COUNT_AXES, *ROLLUP_COUNT_AXES):
+        assert axis in summary["counts"], f"summary counts missing required axis {axis!r}"
+        assert isinstance(summary["counts"][axis], int)
+        assert not isinstance(summary["counts"][axis], bool)
+        assert summary["counts"][axis] >= 0
     assert "fulltext_candidates" in summary["counts"]
     assert "fulltext_acquired" in summary["counts"]
     assert isinstance(summary["counts"]["fulltext_candidates"], int)
@@ -541,6 +576,45 @@ def _assert_aggregate_only_summary(summary: dict[str, Any]) -> None:
         assert isinstance(value, int)
         assert not isinstance(value, bool)
         assert value >= 0
+
+    counts = summary["counts"]
+    assert (
+        counts["litvar2_pmids"] + counts["clinvar_pmids"] - counts["litvar2_clinvar_intersection"]
+        == counts["discovery_union_pmids"]
+    )
+    assert counts["baseline_union_overlap"] + counts["new_pmid_leads"] == counts["discovery_union_pmids"]
+    assert counts["pubmed_records_returned"] + counts["pubmed_records_unresolved"] == counts["new_pmid_leads"]
+    assert (
+        counts["europe_pmc_records_returned"] + unresolved.get("europe_pmc_unresolved_pmids", 0)
+        == counts["new_pmid_leads"]
+    )
+    assert unresolved.get("pubmed_missing_pmids", 0) == counts["pubmed_records_unresolved"]
+    assert counts["pubmed_abstracts"] <= counts["pubmed_records_returned"]
+    assert counts["pubmed_pmcids"] <= counts["pubmed_records_returned"]
+    assert counts["pubmed_dois"] <= counts["pubmed_records_returned"]
+    assert counts["europe_pmc_abstracts"] <= counts["europe_pmc_records_returned"]
+    assert counts["europe_pmc_pmcids"] <= counts["europe_pmc_records_returned"]
+    assert counts["europe_pmc_open_access"] <= counts["europe_pmc_records_returned"]
+    assert counts["fulltext_candidates"] <= counts["licence_cc_by"]
+    assert counts["fulltext_acquired"] <= counts["fulltext_candidates"]
+    assert counts["article_index_rows"] == counts["new_pmid_leads"]
+    assert (
+        counts["licence_cc_by"]
+        + counts["licence_cc_by_nc_nd"]
+        + counts["licence_cc_by_nc_sa"]
+        + counts["licence_absent"]
+        == counts["europe_pmc_records_returned"]
+    )
+
+    licence_counts = summary["licence_counts"]
+    assert isinstance(licence_counts, dict)
+    licence_sum = 0
+    for value in licence_counts.values():
+        assert isinstance(value, int)
+        assert not isinstance(value, bool)
+        assert value >= 0
+        licence_sum += value
+    assert licence_sum == counts["europe_pmc_records_returned"]
 
     serialized = json.dumps(summary, sort_keys=True)
     lowered = serialized.lower()
@@ -1051,6 +1125,45 @@ def test_ac08_cc_by_candidate_selection_and_jats_parser_enforce_exact_cc_by_only
         )
 
 
+def test_ac08_jats_error_typing_contract_and_operator_catches_only_licence_rejections() -> None:
+    parse_module = _load_module("raptor.external.r611q_literature.parse")
+    parse_api = _parse_api()
+    base_error = parse_api["R611QLiteratureParseError"]
+    licence_error = getattr(parse_module, "JatsLicenceRejectedError", base_error)
+    identity_error = getattr(parse_module, "JatsIdentityError", base_error)
+    assert issubclass(licence_error, base_error)
+    assert issubclass(identity_error, base_error)
+    if hasattr(parse_module, "JatsLicenceRejectedError") and hasattr(parse_module, "JatsIdentityError"):
+        assert licence_error is not identity_error
+
+    with pytest.raises(licence_error):
+        parse_api["parse_cc_by_jats_fulltext"](
+            _jats_xml_without_licence_paragraph(pmcid="PMC9101"),
+            expected_pmcid="PMC9101",
+        )
+    with pytest.raises(licence_error):
+        parse_api["parse_cc_by_jats_fulltext"](
+            _jats_xml(
+                pmcid="PMC9101",
+                licence_text="Distributed under CC BY-NC 4.0.",
+            ),
+            expected_pmcid="PMC9101",
+        )
+    with pytest.raises(identity_error):
+        parse_api["parse_cc_by_jats_fulltext"](
+            "<article><front><article-meta></front></article>",
+            expected_pmcid="PMC9101",
+        )
+    with pytest.raises(identity_error):
+        parse_api["parse_cc_by_jats_fulltext"](
+            _jats_xml(
+                pmcid="PMC9999",
+                licence_text="Distributed under the Creative Commons Attribution License (CC BY 4.0).",
+            ),
+            expected_pmcid="PMC9101",
+        )
+
+
 def test_ac09_article_index_jsonl_is_deterministic_has_exact_fields_and_one_row_per_lead() -> None:
     api = _parse_api()
     new_pmids = ["9101", "9102", "9104"]
@@ -1379,6 +1492,34 @@ def test_ac10_bundle_manifest_self_hash_create_only_write_and_aggregate_only_sum
         sources=sources,
         truncation={},
         boundaries={"network": "operator-only", "external_output_only": True},
+        counts={
+            "litvar2_pmids": 3,
+            "clinvar_pmids": 2,
+            "litvar2_clinvar_intersection": 1,
+            "discovery_union_pmids": 4,
+            "baseline_union_overlap": 1,
+            "new_pmid_leads": 3,
+            "pubmed_records_returned": 2,
+            "pubmed_records_unresolved": 1,
+            "pubmed_abstracts": 1,
+            "pubmed_pmcids": 1,
+            "pubmed_dois": 2,
+            "europe_pmc_records_returned": 2,
+            "europe_pmc_abstracts": 1,
+            "europe_pmc_pmcids": 1,
+            "europe_pmc_open_access": 1,
+            "licence_cc_by": 1,
+            "licence_cc_by_nc_nd": 1,
+            "licence_cc_by_nc_sa": 0,
+            "licence_absent": 0,
+            "fulltext_candidates": 1,
+            "article_index_rows": 3,
+        },
+        unresolved={
+            "pubmed_missing_pmids": ["9104"],
+            "europe_pmc_unresolved_pmids": ["9103"],
+        },
+        licence_counts={"CC BY": 1, "CC BY-NC-ND": 1, "CC BY-NC-SA": 0, "ABSENT": 0},
     )
     assert manifest["bundle_id"] == "r611q-literature-expansion-2026-09-15"
     assert manifest["content_hash"] == api["compute_bundle_content_hash"](manifest)
@@ -1480,9 +1621,28 @@ def test_ac10_validate_manifest_hash_enforces_extension_contract_and_detects_mut
             "counts": {
                 "sources": len(sources),
                 "artifacts": len(artifacts),
+                "litvar2_pmids": 5,
+                "clinvar_pmids": 4,
+                "litvar2_clinvar_intersection": 2,
+                "discovery_union_pmids": 7,
+                "baseline_union_overlap": 5,
+                "new_pmid_leads": 2,
+                "pubmed_records_returned": 1,
+                "pubmed_records_unresolved": 1,
+                "pubmed_abstracts": 1,
+                "pubmed_pmcids": 1,
+                "pubmed_dois": 1,
+                "europe_pmc_records_returned": 1,
+                "europe_pmc_abstracts": 1,
+                "europe_pmc_pmcids": 1,
+                "europe_pmc_open_access": 1,
+                "licence_cc_by": 1,
+                "licence_cc_by_nc_nd": 0,
+                "licence_cc_by_nc_sa": 0,
+                "licence_absent": 0,
+                "fulltext_candidates": 1,
                 "new_pmids": 2,
                 "article_index_rows": 2,
-                "fulltext_candidates": 2,
                 "fulltext_acquired": 1,
             },
             "unresolved": {
@@ -1523,10 +1683,29 @@ def test_ac10_build_committed_summary_coerces_unresolved_lists_to_counts_and_val
         "counts": {
             "sources": 0,
             "artifacts": 0,
-            "new_pmids": 3,
-            "article_index_rows": 3,
-            "fulltext_candidates": 2,
+            "litvar2_pmids": 6,
+            "clinvar_pmids": 5,
+            "litvar2_clinvar_intersection": 2,
+            "discovery_union_pmids": 9,
+            "baseline_union_overlap": 6,
+            "new_pmid_leads": 3,
+            "pubmed_records_returned": 1,
+            "pubmed_records_unresolved": 2,
+            "pubmed_abstracts": 1,
+            "pubmed_pmcids": 1,
+            "pubmed_dois": 1,
+            "europe_pmc_records_returned": 2,
+            "europe_pmc_abstracts": 1,
+            "europe_pmc_pmcids": 1,
+            "europe_pmc_open_access": 1,
+            "licence_cc_by": 1,
+            "licence_cc_by_nc_nd": 1,
+            "licence_cc_by_nc_sa": 0,
+            "licence_absent": 0,
+            "fulltext_candidates": 1,
             "fulltext_acquired": 1,
+            "article_index_rows": 3,
+            "new_pmids": 3,
         },
         "truncation": {},
         "boundaries": {"network": "operator-only", "external_output_only": True},
@@ -1538,7 +1717,7 @@ def test_ac10_build_committed_summary_coerces_unresolved_lists_to_counts_and_val
             "pubmed_efetch": "5" * 64,
             "europe_pmc_core": "6" * 64,
         },
-        "licence_counts": {"CC BY": 1, "CC BY-NC-ND": 1, "CC BY-NC-SA": 0, "absent": 1},
+        "licence_counts": {"CC BY": 1, "CC BY-NC-ND": 1, "CC BY-NC-SA": 0, "ABSENT": 0},
         "unresolved": {
             "pubmed_missing_pmids": ["9103", "9104"],
             "europe_pmc_unresolved_pmids": ["9104"],
@@ -1552,6 +1731,20 @@ def test_ac10_build_committed_summary_coerces_unresolved_lists_to_counts_and_val
         "pubmed_missing_pmids": 2,
         "europe_pmc_unresolved_pmids": 1,
     }
+
+    arithmetic_mutations = [
+        lambda s: s["counts"].__setitem__("discovery_union_pmids", s["counts"]["discovery_union_pmids"] + 1),
+        lambda s: s["counts"].__setitem__("pubmed_records_unresolved", s["counts"]["pubmed_records_unresolved"] + 1),
+        lambda s: s["counts"].__setitem__("europe_pmc_records_returned", s["counts"]["europe_pmc_records_returned"] + 1),
+        lambda s: s["counts"].__setitem__("licence_absent", s["counts"]["licence_absent"] + 1),
+        lambda s: s["counts"].__setitem__("fulltext_candidates", s["counts"]["licence_cc_by"] + 1),
+        lambda s: s["counts"].__setitem__("article_index_rows", s["counts"]["new_pmid_leads"] + 1),
+    ]
+    for mutate in arithmetic_mutations:
+        candidate = json.loads(json.dumps(summary))
+        mutate(candidate)
+        with pytest.raises(AssertionError):
+            _assert_aggregate_only_summary(candidate)
 
     bad_manifest = dict(manifest)
     bad_manifest["arbitrary_key"] = "should-fail"
@@ -1694,12 +1887,17 @@ def test_ac12_operator_expected_probe_gate_and_fulltext_payload_mapping_contract
 
 def test_ac12_operator_summary_output_contract_and_publication_order_without_network(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     source_text = _operator_source_text()
     assert "--summary-output" in source_text
     assert "committed_summary_path" in source_text
     assert "build_committed_summary(" in source_text
     assert "write_bundle_run(" in source_text
+    assert "parse_cc_by_jats_fulltext(" in source_text
+    assert "except parse_mod.JatsLicenceRejectedError" in source_text
+    assert "except parse_mod.R611QLiteratureParseError:" not in source_text
     assert ".resolve()" in source_text
     assert "relative_to(REPO_ROOT" in source_text or "is_relative_to(REPO_ROOT" in source_text
     assert ".exists()" in source_text
@@ -1785,6 +1983,60 @@ def test_ac12_operator_summary_output_contract_and_publication_order_without_net
         if preexisting_inside.exists():
             preexisting_inside.unlink()
 
+    assert not explicit_summary_path.exists()
+
+    def fake_run_ingestion(**_kwargs):
+        return {
+            "manifest": {
+                "counts": {"sources": 2, "artifacts": 3},
+                "content_hash": "f" * 64,
+            },
+            "artifact_payloads": {},
+        }
+
+    monkeypatch.setattr(module, "run_ingestion", fake_run_ingestion)
+    monkeypatch.setattr(
+        module.bundle_mod,
+        "write_bundle_run",
+        lambda **_kwargs: {"run_dir": tmp_path / "external-run", "manifest_path": tmp_path / "m.json"},
+    )
+    monkeypatch.setattr(
+        module.bundle_mod,
+        "build_committed_summary",
+        lambda _manifest: {
+            "schema": "raptor.external.r611q_literature_committed_summary.v1",
+            "bundle_id": cfg["bundle_id"],
+            "manifest_content_hash": "f" * 64,
+            "baseline_hashes": {"baseline_manifest": "1" * 64},
+            "source_response_hashes": {"litvar2_publications": "2" * 64},
+            "counts": {"sources": 2, "artifacts": 3},
+            "licence_counts": {},
+            "unresolved_counts": {"pubmed_missing_pmids": 0, "europe_pmc_unresolved_pmids": 0},
+            "boundaries": {"network": "operator-only", "external_output_only": True},
+            "fulltext_artifact_hashes": [],
+        },
+    )
+
+    def fail_open(*_args, **_kwargs):
+        raise OSError("simulated summary write race")
+
+    monkeypatch.setattr(module, "open", fail_open, raising=False)
+    rc = _symbol(module, "main")(
+        [
+            "--config",
+            str(config_path),
+            "--baseline-manifest",
+            str(baseline_path),
+            "--summary-output",
+            str(explicit_summary_path),
+        ]
+    )
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert "error:" in captured.err.lower()
+    assert "failed to write committed summary" in captured.err.lower()
+    assert "traceback" not in captured.err.lower()
+
 
 def test_ac13_config_matches_v1_spec_endpoints_expected_counts_and_output_names() -> None:
     if not SPEC_PATH.is_file():
@@ -1841,3 +2093,7 @@ def test_ac14_committed_summary_pilot_file_is_present_and_aggregate_only() -> No
     )
     summary = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))
     _assert_aggregate_only_summary(summary)
+    spec = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))
+    expected_probe_counts = spec["probe_observation"]["counts"]
+    for key, expected_value in expected_probe_counts.items():
+        assert summary["counts"][key] == expected_value
