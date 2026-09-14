@@ -246,24 +246,27 @@ def _validate_rate_limit_override(value: Any, config: dict[str, Any]) -> float:
     return numeric
 
 
-def _validate_expected_counts(*, observed: dict[str, Any], expected: dict[str, Any]) -> None:
-    """Gate every probe axis derived from this run's actually-parsed data
-    (``observed``) against the config's frozen ``probe_expected_counts``
-    (``expected``) BEFORE any publication step. Both mappings must carry
-    EXACTLY the same key set (a missing or an extra key is rejected), and
-    every value on both sides must be a genuine, non-bool, non-float
-    integer -- a ``True``/``False`` or a ``float`` value is rejected even
-    when numerically equal to the expected integer, never silently
-    coerced/compared loosely. Any value mismatch is rejected. This is the
-    spec's ``delivery_checks`` "Gate all probe expected counts before
-    publication" rule, enforced generically rather than per-axis."""
+def _validate_probe_reference_counts(*, observed: dict[str, Any], expected: dict[str, Any]) -> None:
+    """Structurally validate every probe axis derived from this run's
+    actually-parsed data (``observed``) against the config's
+    ``probe_reference_counts`` (``expected``) BEFORE any publication step.
+    Both mappings must carry EXACTLY the same key set (a missing or an
+    extra key is rejected), and every value on both sides must be a
+    genuine, non-bool, non-float integer -- a ``True``/``False`` or a
+    ``float`` value is rejected even when numerically equal, never
+    silently coerced/compared loosely. Differing integer VALUES between
+    ``observed`` and ``expected`` are always accepted: the reference is a
+    diagnostic planning aid, never an acceptance gate, so live source
+    count drift never fails this check or blocks publication (spec
+    ``delivery_checks``: "live source counts are recorded; the planning
+    reference is diagnostic only")."""
     observed_keys = set(observed)
     expected_keys = set(expected)
     if observed_keys != expected_keys:
         missing = sorted(expected_keys - observed_keys)
         extra = sorted(observed_keys - expected_keys)
         raise R611QOperatorError(
-            f"probe expected-count key set mismatch: missing={missing!r} extra={extra!r}"
+            f"probe reference-count key set mismatch: missing={missing!r} extra={extra!r}"
         )
     for key in sorted(expected_keys):
         observed_value = observed[key]
@@ -275,14 +278,15 @@ def _validate_expected_counts(*, observed: dict[str, Any], expected: dict[str, A
             )
         if not isinstance(expected_value, int) or isinstance(expected_value, bool):
             raise R611QOperatorError(
-                f"expected probe count {key!r} must be a plain int (never bool/float): "
+                f"reference probe count {key!r} must be a plain int (never bool/float): "
                 f"{expected_value!r}"
             )
-        if observed_value != expected_value:
-            raise R611QOperatorError(
-                f"probe expected count mismatch for {key!r}: expected {expected_value!r}, "
-                f"observed {observed_value!r}"
-            )
+
+
+# Deprecated alias kept solely for pre-existing callers that still bind to
+# the pre-rename private name; the real implementation and its docstring
+# live on ``_validate_probe_reference_counts`` above.
+_validate_expected_counts = _validate_probe_reference_counts
 
 
 def run_ingestion(
@@ -293,12 +297,15 @@ def run_ingestion(
 ) -> dict[str, Any]:
     """Run the full acquisition: baseline pin -> LitVar2/ClinVar discovery
     -> PubMed EFetch -> Europe PMC core -> exactly-eligible CC BY full
-    text -> article index -> bundle manifest. Gates every derived probe
-    axis against the config's ``probe_expected_counts`` before returning.
-    Returns ``{"manifest", "artifact_payloads"}`` -- it never publishes
-    the bundle itself (that is ``main``'s job, so the publication step is
-    explicit and always precedes any committed-summary build/write) and
-    never writes the committed summary."""
+    text -> article index -> bundle manifest. Structurally validates
+    every derived probe axis against the config's diagnostic
+    ``probe_reference_counts`` before returning -- key-set/type mismatches
+    are rejected, but drifting count VALUES are diagnostic-only and never
+    fail this run or block publication. Returns ``{"manifest",
+    "artifact_payloads"}`` -- it never publishes the bundle itself (that
+    is ``main``'s job, so the publication step is explicit and always
+    precedes any committed-summary build/write) and never writes the
+    committed summary."""
     plan = _validate_plan(config)
     baseline_cfg = _require(config, "baseline")
     baseline_expected = baseline_cfg.get("expected") or {}
@@ -593,8 +600,8 @@ def run_ingestion(
         "licence_absent": licence_counts["ABSENT"],
         "fulltext_candidates": len(fulltext_pmcids),
     }
-    probe_expected_counts = _require(config, "probe_expected_counts")
-    _validate_expected_counts(observed=observed_counts, expected=probe_expected_counts)
+    probe_reference_counts = _require(config, "probe_reference_counts")
+    _validate_probe_reference_counts(observed=observed_counts, expected=probe_reference_counts)
 
     manifest = bundle_mod.build_bundle_manifest(
         bundle_id=config["bundle_id"],

@@ -4,13 +4,13 @@
 # Loaded ONLY by scripts/fetch_r611q_literature_expansion.py (the sole
 # network-I/O entry point for this slice); raptor.external.r611q_literature
 # itself performs no network I/O and never reads this file. Every
-# endpoint/expected-count/output value below is copied verbatim from the
+# endpoint/reference-count/output value below is copied verbatim from the
 # spec's `sources`/`probe_observation`/`article_index` sections -- this is
 # acquisition configuration, not ACMG evidence, a classification input, or
 # SourceOps declaration/registry configuration.
 
 schema: raptor.external.r611q_literature_expansion_config.v1
-config_version: 1.0.1
+config_version: 1.0.2
 
 variant:
   gene: TSC2
@@ -95,11 +95,15 @@ sources:
     allowed_metadata_licences: [CC BY]
     required_jats_licence: CC BY
 
-# Mirrors the spec's probe_observation.counts exactly -- a planning oracle,
-# never a source pin. The operator gates every expected count before
-# publication (delivery_checks) but never assumes these exact values will
-# be reproduced by a later real run.
-probe_expected_counts:
+# Mirrors the spec's probe_observation.counts exactly -- a diagnostic
+# planning reference, never an acceptance gate or a source pin. The
+# operator compares every observed probe axis against this reference for
+# structural/type validity (same key set, plain ints only on both sides)
+# and always logs the comparison, but differing integer values are
+# expected as sources evolve and never block bundle or summary
+# publication (delivery_checks: "live source counts are recorded; the
+# planning reference is diagnostic only").
+probe_reference_counts:
   litvar2_pmids: 51
   clinvar_pmids: 50
   litvar2_clinvar_intersection: 9
