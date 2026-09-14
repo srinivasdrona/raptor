@@ -1,6 +1,6 @@
 schema: raptor.project.spec.v1
 spec_id: raptor-v2-functional-coverage-map-v1
-spec_version: 1.0.1
+spec_version: 1.0.2
 status: APPROVED_BUILD
 created_at: '2026-09-14'
 owner: human-terminal-authority
@@ -40,7 +40,7 @@ workflow:
 operator_config:
   path: configs/external/tsc2_functional_coverage_map_v1.yaml
   hash_algorithm: canonical_lf_sha256
-  canonical_lf_sha256: e5082dcbe75338949f386c6b193016befc0f9f7e56b6371267ba07584576ad05
+  canonical_lf_sha256: b70d0fbf5d3117c4d0057f5df0846315809097d41c9d8c582e0c424a3dcc58de
   rule: >-
     The operator accepts only this exact repository path and verifies its
     canonical-LF SHA-256 before YAML parsing. A relative path, alternate path,
@@ -545,6 +545,17 @@ acceptance_criteria:
       A staging-directory cleanup failure is surfaced as an explicit typed
       publication error; cleanup errors are never ignored or silently shaped
       as success.
+  - id: FC-22
+    rule: >-
+      Every pinned repository policy/config and the Atlas disease-pack path
+      are checked from lexical filesystem anchor to leaf for symlink, junction
+      and reparse status before bytes are read or a public loader opens them.
+  - id: FC-23
+    rule: >-
+      Priority counts conserve exactly: LP plus LB equals priority identities,
+      LP-overlap plus LB-overlap equals priority functional overlap, each
+      overlap is bounded by its stratum count, and each source overlap is
+      bounded by priority functional overlap.
 
 failure_cases:
   - any input hash, self-hash, schema, count or provenance drift
@@ -560,6 +571,8 @@ failure_cases:
   - any coverage-row flag inconsistent with full cohort membership
   - any impossible cross-cohort aggregate
   - any suppressed staging cleanup failure
+  - any repository policy/config or disease-pack reparse component
+  - any inconsistent priority stratum or source-overlap arithmetic
 
 follow_on:
   - reproduce cliPE, VAMP-seq and SGE score transformations without using the prospective holdout
