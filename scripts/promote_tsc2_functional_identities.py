@@ -72,6 +72,7 @@ from raptor.external.tsc2_identity_promotion.ingest import (  # noqa: E402
     InputPinMismatchError,
     PromotionInvariantError,
     PromotionJoinError,
+    _is_symlink_or_reparse_point,
     compute_verified_spdi_overlap,
     promote_functional_identities,
     read_pinned_artifact_payloads,
@@ -122,11 +123,21 @@ def _resolve_root(*, cli_value: Path | None, env_var: str, default: Path | None 
 def _assert_no_symlink_ancestor(path: Path, *, context: str) -> None:
     """Raise ``FunctionalIdentityPromotionOperatorError`` if ``path``
     itself, or any of its ancestor directories, is a symlink/reparse
-    point. Never follows a symlink to decide this -- ``Path.is_symlink``
-    inspects the link itself, never its target."""
+    point -- reusing the shared ``_is_symlink_or_reparse_point`` predicate
+    (POSIX symlink/Windows junction/reparse-point aware, never following
+    the link) rather than duplicating that detection here. Any
+    ``OSError``/``InputPinMismatchError`` raised by the predicate itself
+    is wrapped with this operator's own error type; a predicate result of
+    ``True`` raises this function's own domain error directly."""
     current = path
     while True:
-        if current.is_symlink():
+        try:
+            is_reparse = _is_symlink_or_reparse_point(current)
+        except (InputPinMismatchError, OSError) as exc:
+            raise FunctionalIdentityPromotionOperatorError(
+                f"{context}: unable to inspect {current} for a symlink/reparse point: {exc}"
+            ) from exc
+        if is_reparse:
             raise FunctionalIdentityPromotionOperatorError(
                 f"{context} path {path} has a symlink/reparse ancestor at {current}; refusing to "
                 "read through a symlink"

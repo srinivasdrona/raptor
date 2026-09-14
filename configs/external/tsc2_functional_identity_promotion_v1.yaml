@@ -2,7 +2,7 @@ schema: raptor.external.tsc2_functional_identity_promotion_config.v1
 config_id: tsc2-functional-identity-promotion-v1
 spec: docs/project/specs/raptor-v2-functional-identity-promotion-v1.yaml
 spec_id: raptor-v2-functional-identity-promotion-v1
-spec_version: "1.0.3"
+spec_version: "1.0.4"
 
 inputs:
   functional_normalization_bundle:
