@@ -1,6 +1,6 @@
 schema: raptor.project.spec.v1
 spec_id: raptor-v2-functional-coverage-map-v1
-spec_version: 1.0.0
+spec_version: 1.0.1
 status: APPROVED_BUILD
 created_at: '2026-09-14'
 owner: human-terminal-authority
@@ -36,6 +36,16 @@ workflow:
   checker: GPT-5.6-Terra-xhigh
   integrator: GPT-5.6-Sol
   terminal_authority: human-owner
+
+operator_config:
+  path: configs/external/tsc2_functional_coverage_map_v1.yaml
+  hash_algorithm: canonical_lf_sha256
+  canonical_lf_sha256: e5082dcbe75338949f386c6b193016befc0f9f7e56b6371267ba07584576ad05
+  rule: >-
+    The operator accepts only this exact repository path and verifies its
+    canonical-LF SHA-256 before YAML parsing. A relative path, alternate path,
+    symlink/reparse path or byte-drifted copy fails before any external input
+    read or expected-pilot comparison.
 
 identity_contract:
   assembly: GRCh38
@@ -308,6 +318,8 @@ join_rules:
   - Atlas unresolved identities are counted but never joined
   - the Atlas anchor is separate from the contrast-candidate identity map
   - source overlap is membership coverage only, never functional agreement
+  - every coverage-row cohort flag and priority stratum must equal membership
+    recomputed from the full validated cohort sets and priority mapping
 
 output:
   external_bundle:
@@ -324,6 +336,7 @@ output:
     create_only: true
     symlink_and_reparse_safe: true
     manifest_last: true
+    cleanup_failure: explicit_typed_error
   committed_summary:
     path: data/census/tsc2_functional_coverage_map_2026-09-14.json
     schema: raptor.external.tsc2_functional_coverage_summary.v1
@@ -508,6 +521,30 @@ acceptance_criteria:
     rule: The committed summary is a strict aggregate-only whitelist bound to the output manifest and artifact hashes.
   - id: FC-16
     rule: No output authorizes classification, evidence strength, $PS3$/$BS3$, Atlas promotion, threshold selection or calibration.
+  - id: FC-17
+    rule: >-
+      The operator verifies the exact canonical repository config path and
+      canonical-LF SHA-256 before parsing it; caller-supplied replacement
+      configs are forbidden.
+  - id: FC-18
+    rule: >-
+      The Atlas official-response root and every lexical ancestor are checked
+      for symlink, junction and reparse status before any response-tree hash.
+  - id: FC-19
+    rule: >-
+      Coverage statistics rederive every row's VUS, priority, prospective,
+      Atlas-contrast and Atlas-anchor membership from the full validated
+      identity sets and reject any row-flag disagreement.
+  - id: FC-20
+    rule: >-
+      Cross-cohort counts obey disjointness, subset, intersection bounds and
+      exact functional-Atlas partition arithmetic even in a self-hashed
+      manifest.
+  - id: FC-21
+    rule: >-
+      A staging-directory cleanup failure is surfaced as an explicit typed
+      publication error; cleanup errors are never ignored or silently shaped
+      as success.
 
 failure_cases:
   - any input hash, self-hash, schema, count or provenance drift
@@ -519,6 +556,10 @@ failure_cases:
   - any score or classification field entering coverage logic or output
   - any expected aggregate drift
   - any overwrite, in-repository output or unsafe path component
+  - any alternate, relative, symlinked or hash-drifted operator config
+  - any coverage-row flag inconsistent with full cohort membership
+  - any impossible cross-cohort aggregate
+  - any suppressed staging cleanup failure
 
 follow_on:
   - reproduce cliPE, VAMP-seq and SGE score transformations without using the prospective holdout
