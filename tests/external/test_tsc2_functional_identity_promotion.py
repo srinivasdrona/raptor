@@ -1050,12 +1050,12 @@ def _tiny_promotion_manifest_fixture(api: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def test_fp00_binding_spec_exists_and_is_v1_0_2() -> None:
+def test_fp00_binding_spec_exists_and_is_v1_0_3() -> None:
     if not SPEC_PATH.is_file():
         pytest.fail(f"binding spec is missing: {SPEC_PATH}")
     spec = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))
     assert spec["spec_id"] == "raptor-v2-functional-identity-promotion-v1"
-    assert spec["spec_version"] == "1.0.2"
+    assert spec["spec_version"] == "1.0.3"
 
 
 def test_fp01_existing_row_schema_stays_exact_17_fields_and_adds_new_state_reason_bindings() -> None:
@@ -1416,6 +1416,79 @@ def test_fp05_pinned_artifact_reads_use_trusted_paths_and_reject_escape_or_symli
     with pytest.raises(err):
         api["read_pinned_artifact_payloads"](
             functional_normalization_root=fn_root_symlink,
+            clipe_projector_root=cp_root,
+            vamp_crosswalk_root=vx_root,
+            validated_inputs=validated,
+        )
+
+
+def test_fp05b_pinned_artifact_reads_reject_symlinked_lexical_parent_of_supplied_root(
+    tmp_path: Path,
+) -> None:
+    api = _promotion_ingest_api()
+    fixture = _source_manifests_fixture()
+    validated = api["validate_input_bundle_manifests"](
+        functional_normalization_manifest=deepcopy(fixture["functional_normalization_manifest"]),
+        clipe_projector_manifest=deepcopy(fixture["clipe_manifest"]),
+        vamp_crosswalk_manifest=deepcopy(fixture["vamp_manifest"]),
+        expected_pins=deepcopy(fixture["expected_pins"]),
+    )
+    err = api["InputPinMismatchError"]
+    expected_payloads = fixture["artifact_payloads"]
+    run_names = fixture["run_names"]
+
+    real_parent = tmp_path / "real-parent"
+    real_fn_root = real_parent / "root"
+    cp_root = tmp_path / "clipe"
+    vx_root = tmp_path / "vamp"
+    for root, run_name in (
+        (real_fn_root, run_names["functional_normalization"]),
+        (cp_root, run_names["clipe_projector"]),
+        (vx_root, run_names["vamp_crosswalk"]),
+    ):
+        (root / run_name).mkdir(parents=True, exist_ok=True)
+
+    fn_artifacts = validated["functional_normalization_bundle"]["artifacts"]
+    cp_mapping = validated["clipe_projector_bundle"]["mapping"]
+    vx_crosswalk = validated["vamp_crosswalk_bundle"]["crosswalk"]
+    (real_fn_root / run_names["functional_normalization"] / fn_artifacts["mavedb_clipe"]["relative_path"]).parent.mkdir(
+        parents=True, exist_ok=True
+    )
+    (real_fn_root / run_names["functional_normalization"] / fn_artifacts["mavedb_clipe"]["relative_path"]).write_bytes(
+        expected_payloads["functional_normalization"]["mavedb_clipe"]
+    )
+    (real_fn_root / run_names["functional_normalization"] / fn_artifacts["igvf_vamp_seq"]["relative_path"]).parent.mkdir(
+        parents=True, exist_ok=True
+    )
+    (real_fn_root / run_names["functional_normalization"] / fn_artifacts["igvf_vamp_seq"]["relative_path"]).write_bytes(
+        expected_payloads["functional_normalization"]["igvf_vamp_seq"]
+    )
+    (real_fn_root / run_names["functional_normalization"] / fn_artifacts["igvf_sge"]["relative_path"]).parent.mkdir(
+        parents=True, exist_ok=True
+    )
+    (real_fn_root / run_names["functional_normalization"] / fn_artifacts["igvf_sge"]["relative_path"]).write_bytes(
+        expected_payloads["functional_normalization"]["igvf_sge"]
+    )
+    (cp_root / run_names["clipe_projector"] / cp_mapping["relative_path"]).parent.mkdir(parents=True, exist_ok=True)
+    (cp_root / run_names["clipe_projector"] / cp_mapping["relative_path"]).write_bytes(
+        expected_payloads["clipe_projector_mapping"]
+    )
+    (vx_root / run_names["vamp_crosswalk"] / vx_crosswalk["relative_path"]).parent.mkdir(parents=True, exist_ok=True)
+    (vx_root / run_names["vamp_crosswalk"] / vx_crosswalk["relative_path"]).write_bytes(
+        expected_payloads["vamp_crosswalk"]
+    )
+
+    alias_parent = tmp_path / "alias-parent"
+    if alias_parent.exists() or alias_parent.is_symlink():
+        alias_parent.unlink()
+    alias_parent.symlink_to(real_parent, target_is_directory=True)
+    supplied_root = alias_parent / "root"
+    assert alias_parent.is_symlink()
+    assert supplied_root.exists()
+    assert not supplied_root.is_symlink()
+    with pytest.raises(err):
+        api["read_pinned_artifact_payloads"](
+            functional_normalization_root=supplied_root,
             clipe_projector_root=cp_root,
             vamp_crosswalk_root=vx_root,
             validated_inputs=validated,
@@ -2229,7 +2302,7 @@ def test_fp16_config_pins_all_input_hashes_and_output_names_from_spec() -> None:
         pytest.fail(f"functional identity promotion config is not implemented: {CONFIG_PATH}")
     config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
     assert config["spec_id"] == "raptor-v2-functional-identity-promotion-v1"
-    assert config["spec_version"] == "1.0.2"
+    assert config["spec_version"] == "1.0.3"
 
     functional = config["inputs"]["functional_normalization_bundle"]
     assert functional["run_name"] == FUNCTIONAL_RUN_NAME
