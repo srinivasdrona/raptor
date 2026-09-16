@@ -28,7 +28,10 @@ real frozen inputs):
    own self-hash and every referenced artifact's bytes on disk (never
    trusting the manifest's recorded hashes without recomputing them).
 2. ``extract_jats_blocks`` secure-parses one frozen JATS XML document
-   (rejecting a DOCTYPE/ENTITY declaration, requiring ``article/body``,
+   (allowing an absent DOCTYPE or exactly the allowlisted external JATS
+   1.4 ``PUBLIC`` declaration -- never resolved/fetched -- and rejecting
+   an ENTITY declaration, an internal subset, a ``SYSTEM``-only or any
+   other unknown/malformed DOCTYPE, and requiring ``article/body`` while
    excluding ``ref-list``) into the smallest matching ``p``/``tr``/
    ``caption`` blocks, each carrying deterministic NFC/whitespace-
    collapsed text, a ``text-char:<start>:<end>`` locator into the
@@ -210,6 +213,26 @@ REQUIRED_CONTEXT_FIELDS: tuple[str, ...] = (
 
 _HEX64_PATTERN = re.compile(r"^[0-9a-fA-F]{64}$")
 _LOCATOR_PATTERN = re.compile(r"^text-char:(\d+):(\d+)$")
+
+#: The single external, standard JATS 1.4 DOCTYPE declaration this parser
+#: allowlists WITHOUT ever resolving/fetching it (spec's
+#: ``deterministic_preselection.jats_extraction.doctype_policy``). The
+#: system id is compared by BASENAME (see ``_system_id_basename``): a real
+#: acquired JATS file may declare it with a path/URL prefix, which never
+#: changes which (never-fetched) DTD it names.
+ALLOWLISTED_JATS_DOCTYPE_PUBLIC_ID = (
+    "-//NLM//DTD JATS (Z39.96) Journal Archiving and Interchange DTD with MathML3 v1.4 20241031//EN"
+)
+ALLOWLISTED_JATS_DOCTYPE_SYSTEM_ID = "JATS-archivearticle1-4-mathml3.dtd"
+
+_DOCTYPE_PUBLIC_PATTERN = re.compile(
+    r"\s*<!DOCTYPE\s+([A-Za-z_:][A-Za-z0-9_.:-]*)\s+PUBLIC\s+(['\"])(.+?)\2\s+(['\"])(.+?)\4\s*>\s*",
+    re.IGNORECASE | re.DOTALL,
+)
+_DOCTYPE_SYSTEM_ONLY_PATTERN = re.compile(
+    r"\s*<!DOCTYPE\s+([A-Za-z_:][A-Za-z0-9_.:-]*)\s+SYSTEM\s+(['\"])(.+?)\2\s*>\s*",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 class DeltaReviewError(ValueError):
@@ -565,9 +588,106 @@ def _legacy_context_text_for_block(tag: str, node: ET.Element, parent_by_child: 
     return ""
 
 
+def _system_id_basename(system_id: str) -> str:
+    """The final path/URL component of a DOCTYPE ``SYSTEM``/``PUBLIC``
+    identifier -- a real acquired JATS file may declare its (never
+    fetched) external subset with a directory or URL prefix, which never
+    changes which allowlisted DTD it names."""
+    return system_id.replace("\\", "/").rsplit("/", 1)[-1]
+
+
+def _scan_doctype_declarations(xml_text: str) -> list[str]:
+    """Return every top-level ``<!DOCTYPE ...>`` declaration found in
+    ``xml_text`` (quote- and internal-subset-bracket aware, so a ``>``
+    inside a quoted public/system id or an internal subset never
+    terminates the declaration early). Raises ``DeltaReviewError`` if a
+    declaration's closing ``>`` is never found (malformed)."""
+    declarations: list[str] = []
+    lowered = xml_text.lower()
+    cursor = 0
+    while True:
+        start = lowered.find("<!doctype", cursor)
+        if start == -1:
+            break
+        i = start + len("<!doctype")
+        in_single = False
+        in_double = False
+        bracket_depth = 0
+        closed = False
+        while i < len(xml_text):
+            ch = xml_text[i]
+            if ch == "'" and not in_double:
+                in_single = not in_single
+            elif ch == '"' and not in_single:
+                in_double = not in_double
+            elif not in_single and not in_double:
+                if ch == "[":
+                    bracket_depth += 1
+                elif ch == "]":
+                    bracket_depth = max(0, bracket_depth - 1)
+                elif ch == ">" and bracket_depth == 0:
+                    declarations.append(xml_text[start : i + 1])
+                    cursor = i + 1
+                    closed = True
+                    break
+            i += 1
+        if not closed:
+            raise DeltaReviewError("JATS XML DOCTYPE declaration is malformed (no closing '>' found)")
+    return declarations
+
+
+def _validate_doctype_policy(xml_text: str) -> None:
+    """Enforce the spec's ``doctype_policy`` BEFORE the XML parser ever
+    sees ``xml_text``: an ENTITY declaration is always forbidden; more
+    than one DOCTYPE declaration is forbidden; an absent DOCTYPE is
+    allowed; and the single allowed DOCTYPE form is an external ``PUBLIC``
+    declaration for the ``article`` root naming exactly the allowlisted
+    JATS 1.4 public id (and matching system-id basename) with NO internal
+    subset. A ``SYSTEM``-only, internal-subset, unknown-id or otherwise
+    malformed declaration is rejected. Raises ``DeltaReviewError`` on any
+    violation; never resolves/fetches the external DTD itself (this
+    function performs no I/O)."""
+    if re.search(r"<!\s*entity\b", xml_text, flags=re.IGNORECASE):
+        raise DeltaReviewError("JATS XML ENTITY declaration is forbidden for secure parsing")
+
+    declarations = _scan_doctype_declarations(xml_text)
+    if len(declarations) > 1:
+        raise DeltaReviewError("multiple DOCTYPE declarations are forbidden for secure parsing")
+    if not declarations:
+        return
+
+    declaration = declarations[0]
+    if "[" in declaration or "]" in declaration:
+        raise DeltaReviewError("internal subset in a JATS DOCTYPE declaration is forbidden")
+
+    public_match = _DOCTYPE_PUBLIC_PATTERN.fullmatch(declaration)
+    if public_match:
+        root_name = public_match.group(1)
+        public_id = " ".join(public_match.group(3).split())
+        system_id = public_match.group(5).strip()
+        if root_name.lower() != "article":
+            raise DeltaReviewError("JATS XML DOCTYPE root element must be 'article'")
+        if (
+            public_id != ALLOWLISTED_JATS_DOCTYPE_PUBLIC_ID
+            or _system_id_basename(system_id) != ALLOWLISTED_JATS_DOCTYPE_SYSTEM_ID
+        ):
+            raise DeltaReviewError(
+                "JATS XML DOCTYPE public/system pair is not allowlisted: unknown external "
+                "standard JATS DTD reference"
+            )
+        return
+
+    system_only_match = _DOCTYPE_SYSTEM_ONLY_PATTERN.fullmatch(declaration)
+    if system_only_match:
+        raise DeltaReviewError("JATS XML DOCTYPE SYSTEM-only declaration is forbidden")
+
+    raise DeltaReviewError("JATS XML DOCTYPE declaration is malformed or not allowlisted")
+
+
 def extract_jats_blocks(*, xml_text: str) -> dict[str, Any]:
-    """Secure-parse ``xml_text`` (rejecting a DOCTYPE/ENTITY declaration
-    BEFORE ever invoking the XML parser) and extract the smallest matching
+    """Secure-parse ``xml_text`` (enforcing the DOCTYPE policy and
+    rejecting an ENTITY declaration BEFORE ever invoking the XML parser --
+    see ``_validate_doctype_policy``) and extract the smallest matching
     ``p``/``tr``/``caption`` blocks under ``article/body`` (excluding the
     ``ref-list`` subtree entirely). Each block gets deterministic NFC/
     whitespace-collapsed text, a ``text-char:<start>:<end>`` locator into
@@ -575,16 +695,14 @@ def extract_jats_blocks(*, xml_text: str) -> dict[str, Any]:
     ``match_aliases``) and section/table context (a transposed table row
     preserves its label/caption/column headers and matching cell
     coordinates). Returns ``{"joined_text": str, "blocks": [...]}``.
-    Raises ``DeltaReviewError`` if a DOCTYPE/ENTITY declaration is present,
-    the document fails to parse, the root element is not ``article``, or
-    ``article/body`` is absent."""
+    Raises ``DeltaReviewError`` if the DOCTYPE policy is violated, an
+    ENTITY declaration is present, the document fails to parse, the root
+    element is not ``article``, or ``article/body`` is absent. The
+    standard-library XML parser never resolves or fetches an external
+    DTD, so an allowlisted DOCTYPE never triggers network I/O."""
     if not isinstance(xml_text, str):
         raise DeltaReviewError("xml_text must be a string")
-    lowered = xml_text.lower()
-    if "<!doctype" in lowered:
-        raise DeltaReviewError("JATS XML DOCTYPE declaration is forbidden for secure parsing")
-    if "<!entity" in lowered:
-        raise DeltaReviewError("JATS XML ENTITY declaration is forbidden for secure parsing")
+    _validate_doctype_policy(xml_text)
 
     try:
         root = ET.fromstring(xml_text)
@@ -1265,6 +1383,8 @@ __all__ = [
     "DELTA_BUNDLE_MANIFEST_SCHEMA",
     "DELTA_PREPARATION_MANIFEST_SCHEMA",
     "COMMITTED_SUMMARY_SCHEMA",
+    "ALLOWLISTED_JATS_DOCTYPE_PUBLIC_ID",
+    "ALLOWLISTED_JATS_DOCTYPE_SYSTEM_ID",
     "CANONICAL_ALIASES",
     "CONDITIONAL_LEGACY_ALIASES",
     "ARTICLE_INDEX_FIELDS",

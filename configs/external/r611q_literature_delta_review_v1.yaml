@@ -1,5 +1,5 @@
 schema: raptor.external.r611q_literature_delta_review_config.v1
-config_version: 1.0.1
+config_version: 1.0.2
 spec: docs/project/specs/raptor-v2-r611q-literature-delta-review-v1.yaml
 
 bundle_id: r611q-literature-delta-review-2026-09-16
@@ -96,7 +96,20 @@ deterministic_preselection:
     - acquired_cc_by_jats_body
   jats_extraction:
     parser: standard_library_xml
-    reject_document_type_declaration: true
+    doctype_policy:
+      absent: allowed
+      external_standard_jats: allowlisted_without_resolution
+      internal_subset: forbidden
+      system_only: forbidden
+      allowed:
+        - public_id: >-
+            -//NLM//DTD JATS (Z39.96) Journal Archiving and Interchange DTD
+            with MathML3 v1.4 20241031//EN
+          system_id: JATS-archivearticle1-4-mathml3.dtd
+      parser_network_behavior: >-
+        The standard-library parser does not resolve or fetch the external DTD.
+        The declaration is syntax-checked against this exact allowlist before
+        parsing.
     reject_entity_declaration: true
     required_root_content: article/body
     excluded_subtrees:

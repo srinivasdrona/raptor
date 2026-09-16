@@ -53,6 +53,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -161,61 +162,141 @@ def verify_baseline_inputs(config: dict[str, Any], *, args: argparse.Namespace) 
     }
 
 
-def _collect_recursive(obj: Any, keys: frozenset[str], out: set[str]) -> None:
-    if isinstance(obj, dict):
-        for key, value in obj.items():
-            if key in keys and isinstance(value, str) and value:
-                out.add(value)
-            _collect_recursive(value, keys, out)
-    elif isinstance(obj, (list, tuple)):
-        for item in obj:
-            _collect_recursive(item, keys, out)
-
-
-def derive_baseline_source_ids(master_inventory_bytes: bytes) -> set[str]:
-    """Best-effort, schema-tolerant extraction of the pinned RescueScreen
-    master inventory's own source identities (as ``PMID:<pmid>`` strings,
-    matching this package's own review-record ``source_id`` convention),
-    used ONLY to reject a source-identity collision between a delta-review
-    candidate and the existing baseline inventory. Never rewrites, edits
-    or republishes any part of the master inventory itself. Raises
-    ``DeltaReviewOperatorError`` if the inventory contains no recognizable
-    pmid identifier at all (fails loud rather than silently proceeding
-    with an empty baseline set, which would defeat the collision guard)."""
+def _decode_master_inventory_payload(master_inventory_bytes: bytes) -> dict[str, Any]:
     try:
         payload = json.loads(master_inventory_bytes.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise DeltaReviewOperatorError(f"RescueScreen master inventory is not valid UTF-8 JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise DeltaReviewOperatorError("RescueScreen master inventory must decode to a JSON object")
+    return payload
 
-    raw_pmids: set[str] = set()
-    _collect_recursive(payload, frozenset({"pmid", "PMID"}), raw_pmids)
-    source_ids = {f"PMID:{pmid}" for pmid in raw_pmids}
-    if not source_ids:
+
+def _extract_master_inventory_source_ids(payload: dict[str, Any]) -> set[str]:
+    """Strictly extract the master inventory's own publication source ids
+    from its TOP-LEVEL ``publications`` list ONLY -- never from any other
+    or nested key. Each publication entry must carry a unique, non-blank
+    ``source_id`` string (PMID- or DOI-based; DOI-only entries are
+    included exactly as recorded). When a publication also carries an
+    ``identifiers`` mapping with a ``pmid`` entry, that pmid MUST be
+    consistent with the entry's own ``source_id`` (``PMID:<pmid>``) -- the
+    only cross-check performed; no other nested field (e.g. a ``notes``
+    sibling key) is ever read. Raises ``DeltaReviewOperatorError`` on any
+    malformed shape."""
+    publications = payload.get("publications")
+    if not isinstance(publications, list):
         raise DeltaReviewOperatorError(
-            "RescueScreen master inventory did not yield any recognizable pmid identifier; "
-            "refusing to proceed with an empty baseline collision set"
+            f"master inventory 'publications' must be a list matching its schema, found "
+            f"{type(publications).__name__}"
         )
+    source_ids: set[str] = set()
+    for entry in publications:
+        if not isinstance(entry, dict):
+            raise DeltaReviewOperatorError(f"master inventory publication entry must be a mapping: {entry!r}")
+        source_id = entry.get("source_id")
+        if not isinstance(source_id, str) or not source_id.strip():
+            raise DeltaReviewOperatorError(
+                f"master inventory publication entry has a blank/non-string source_id: {entry!r}"
+            )
+        if source_id in source_ids:
+            raise DeltaReviewOperatorError(
+                f"master inventory has a duplicate source_id across publications: {source_id!r}"
+            )
+        identifiers = entry.get("identifiers")
+        if identifiers is not None:
+            if not isinstance(identifiers, dict):
+                raise DeltaReviewOperatorError(
+                    f"master inventory publication {source_id!r} 'identifiers' must be a mapping: "
+                    f"{identifiers!r}"
+                )
+            pmid = identifiers.get("pmid")
+            if pmid is not None:
+                expected_source_id = f"PMID:{pmid}"
+                if source_id != expected_source_id:
+                    raise DeltaReviewOperatorError(
+                        "master inventory publication pmid identifier is inconsistent with its "
+                        f"own source_id: identifiers.pmid={pmid!r} implies source_id "
+                        f"{expected_source_id!r}, found {source_id!r}"
+                    )
+        source_ids.add(source_id)
     return source_ids
 
 
-def derive_proposition_vocabulary(master_inventory_bytes: bytes) -> set[str]:
-    """Best-effort, schema-tolerant extraction of the pinned RescueScreen
-    master inventory's own proposition-identifier vocabulary. Raises
-    ``DeltaReviewOperatorError`` if none is found (fails loud rather than
-    silently allowing every ``proposition_ids`` value through)."""
-    try:
-        payload = json.loads(master_inventory_bytes.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise DeltaReviewOperatorError(f"RescueScreen master inventory is not valid UTF-8 JSON: {exc}") from exc
-
-    propositions: set[str] = set()
-    _collect_recursive(payload, frozenset({"proposition_id", "proposition_ids", "propositions"}), propositions)
-    if not propositions:
+def _extract_master_inventory_proposition_vocabulary(payload: dict[str, Any]) -> set[str]:
+    """Strictly extract the master inventory's proposition-identifier
+    vocabulary from its TOP-LEVEL ``proposition_vocabulary`` mapping ONLY
+    (keys only -- the description values are never treated as
+    identifiers, and no nested/other key is ever harvested). Raises
+    ``DeltaReviewOperatorError`` on any malformed shape."""
+    vocabulary = payload.get("proposition_vocabulary")
+    if not isinstance(vocabulary, dict):
         raise DeltaReviewOperatorError(
-            "RescueScreen master inventory did not yield any recognizable proposition "
-            "identifier; refusing to proceed with an empty proposition vocabulary"
+            f"master inventory 'proposition_vocabulary' must be a mapping matching its schema, "
+            f"found {type(vocabulary).__name__}"
         )
-    return propositions
+    proposition_ids: set[str] = set()
+    for key, value in vocabulary.items():
+        if not isinstance(key, str) or not key.strip():
+            raise DeltaReviewOperatorError(
+                f"master inventory proposition_vocabulary has a blank/non-string identifier: {key!r}"
+            )
+        if not isinstance(value, str):
+            raise DeltaReviewOperatorError(
+                f"master inventory proposition_vocabulary[{key!r}] must be a string description, "
+                f"found {type(value).__name__}"
+            )
+        proposition_ids.add(key)
+    return proposition_ids
+
+
+def derive_baseline_source_ids(master_inventory_bytes: bytes) -> set[str]:
+    """Strictly parse the pinned RescueScreen master inventory (a single
+    decode/validate pass -- see ``_extract_master_inventory_source_ids``)
+    and return its exact publication source-id set, used ONLY to reject a
+    source-identity collision between a delta-review candidate and the
+    existing baseline inventory. Never rewrites, edits or republishes any
+    part of the master inventory itself. Wraps the same strict extraction
+    ``parse_master_inventory`` uses, for call-site compatibility with
+    callers that do not know the expected publication count up front."""
+    payload = _decode_master_inventory_payload(master_inventory_bytes)
+    return _extract_master_inventory_source_ids(payload)
+
+
+def derive_proposition_vocabulary(master_inventory_bytes: bytes) -> set[str]:
+    """Strictly parse the pinned RescueScreen master inventory (a single
+    decode/validate pass -- see
+    ``_extract_master_inventory_proposition_vocabulary``) and return its
+    exact top-level proposition-vocabulary key set."""
+    payload = _decode_master_inventory_payload(master_inventory_bytes)
+    return _extract_master_inventory_proposition_vocabulary(payload)
+
+
+def parse_master_inventory(*, master_inventory_bytes: bytes, expected_publications: int) -> dict[str, Any]:
+    """The strict, public, single-parse master-inventory reader: decodes
+    ``master_inventory_bytes`` exactly once, enforces its ``publications``
+    list has EXACTLY ``expected_publications`` entries (a pinned-count
+    structural-drift guard beyond the acquisition manifest's own byte-hash
+    pin), and returns ``{"source_ids": set[str], "proposition_vocabulary":
+    set[str]}`` via the same strict extraction ``derive_baseline_source_
+    ids``/``derive_proposition_vocabulary`` wrap. Raises
+    ``DeltaReviewOperatorError`` on any malformed shape or a publication-
+    count mismatch."""
+    payload = _decode_master_inventory_payload(master_inventory_bytes)
+    publications = payload.get("publications")
+    if not isinstance(publications, list):
+        raise DeltaReviewOperatorError(
+            f"master inventory 'publications' must be a list matching its schema, found "
+            f"{type(publications).__name__}"
+        )
+    if len(publications) != expected_publications:
+        raise DeltaReviewOperatorError(
+            f"master inventory publication count mismatch: expected_publications="
+            f"{expected_publications!r}, found {len(publications)!r}"
+        )
+    return {
+        "source_ids": _extract_master_inventory_source_ids(payload),
+        "proposition_vocabulary": _extract_master_inventory_proposition_vocabulary(payload),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -223,7 +304,23 @@ def derive_proposition_vocabulary(master_inventory_bytes: bytes) -> set[str]:
 # ---------------------------------------------------------------------------
 
 
-def read_article_index_rows(manifest: dict[str, Any], bundle_root: Path, article_index_relative_path: str) -> list[dict[str, Any]]:
+_CANONICAL_PMID_PATTERN = re.compile(r"^[1-9][0-9]*$")
+
+
+def read_article_index_rows(
+    manifest: dict[str, Any], bundle_root: Path, article_index_relative_path: str
+) -> list[dict[str, Any]]:
+    """Strictly parse and structurally validate every article-index row
+    BEFORE any deterministic scanning begins: exact field set, an exact
+    article schema value, a canonical (non-zero-padded, positive)
+    numeric-string ``pmid``, scalar (string-or-null) ``pmcid``/``doi``
+    identity fields, no duplicate ``pmid``, and rows in strictly ascending
+    numeric ``pmid`` order. This catches structural drift even when the
+    acquisition manifest's own pinned hashes still recompute correctly (a
+    byte-identical file can still fail this stricter structural contract).
+    ``manifest`` is accepted for interface symmetry with the acquisition-
+    manifest validation step but is not itself read here. Raises
+    ``DeltaReviewOperatorError`` on any violation."""
     path = bundle_root / article_index_relative_path
     rows: list[dict[str, Any]] = []
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -232,8 +329,86 @@ def read_article_index_rows(manifest: dict[str, Any], bundle_root: Path, article
         row = json.loads(line)
         if not isinstance(row, dict) or set(row) != dr.ARTICLE_INDEX_FIELDS:
             raise DeltaReviewOperatorError(f"article index row does not have the exact expected fields: {row!r}")
+        if row.get("schema") != dr.ARTICLE_INDEX_SCHEMA:
+            raise DeltaReviewOperatorError(
+                f"article index row schema does not match the expected article schema "
+                f"{dr.ARTICLE_INDEX_SCHEMA!r}: {row.get('schema')!r}"
+            )
+        pmid = row.get("pmid")
+        if not isinstance(pmid, str) or not _CANONICAL_PMID_PATTERN.match(pmid):
+            raise DeltaReviewOperatorError(
+                f"article index row pmid is not a canonical positive-integer pmid string: {pmid!r}"
+            )
+        for field in ("pmcid", "doi"):
+            value = row.get(field)
+            if value is not None and not isinstance(value, str):
+                raise DeltaReviewOperatorError(
+                    f"article index row identity field {field!r} must be a scalar string or null, "
+                    f"found {type(value).__name__}: {value!r}"
+                )
         rows.append(row)
+
+    seen_pmids: set[str] = set()
+    for row in rows:
+        pmid = row["pmid"]
+        if pmid in seen_pmids:
+            raise DeltaReviewOperatorError(f"article index has a duplicate pmid; rows must be unique: {pmid!r}")
+        seen_pmids.add(pmid)
+
+    numeric_pmids = [int(row["pmid"]) for row in rows]
+    if numeric_pmids != sorted(numeric_pmids):
+        raise DeltaReviewOperatorError(
+            "article index rows are not sorted by pmid in strictly ascending numeric order"
+        )
+
     return rows
+
+
+def _validate_fulltext_artifact_identities(article_index_rows: list[dict[str, Any]], manifest: dict[str, Any]) -> None:
+    """Cross-check every ``fulltext_status == ACQUIRED_CC_BY`` row's
+    ``fulltext_artifact_id`` against the acquisition manifest's own
+    artifact identity BEFORE any scanning begins: the referenced artifact
+    must exist; when the row carries a pmcid, the artifact's own
+    ``relative_path`` must contain that pmcid (relative-path
+    consistency); and, ONLY when the artifact's own ``source_id`` already
+    encodes a per-article pmcid identity (``pmcid:<PMCID>`` -- some
+    acquisition-bundle generations instead use a generic, role-only
+    ``source_id`` such as ``fulltext`` for every full-text artifact, which
+    carries no per-article identity to check beyond existence and the
+    byte/hash verification ``validate_acquisition_manifest`` already
+    performs), that ``source_id`` must also agree with the row's own
+    pmcid. This never trusts ``fulltext_artifact_id`` as a bare lookup
+    without first confirming the manifest's own artifact record is
+    identity-consistent with that same article. Raises
+    ``DeltaReviewOperatorError`` on any mismatch."""
+    artifacts_by_id = {artifact["artifact_id"]: artifact for artifact in manifest.get("artifacts", [])}
+    for row in article_index_rows:
+        if row.get("fulltext_status") != _FULLTEXT_ACQUIRED_STATUS or not row.get("fulltext_artifact_id"):
+            continue
+        artifact_id = row["fulltext_artifact_id"]
+        artifact = artifacts_by_id.get(artifact_id)
+        if artifact is None:
+            raise DeltaReviewOperatorError(
+                f"article {row.get('pmid')!r} references unknown fulltext_artifact_id {artifact_id!r}"
+            )
+        pmcid = row.get("pmcid")
+        source_id = artifact.get("source_id")
+        if pmcid and isinstance(source_id, str) and source_id.startswith("pmcid:"):
+            expected_source_id = f"pmcid:{pmcid}"
+            if source_id != expected_source_id:
+                raise DeltaReviewOperatorError(
+                    f"article {row.get('pmid')!r} fulltext artifact {artifact_id!r} source_id "
+                    f"{source_id!r} is inconsistent with the article's own pmcid identity "
+                    f"{expected_source_id!r}"
+                )
+        if pmcid:
+            relative_path = artifact.get("relative_path") or ""
+            if pmcid not in relative_path:
+                raise DeltaReviewOperatorError(
+                    f"article {row.get('pmid')!r} fulltext artifact {artifact_id!r} relative_path "
+                    f"{relative_path!r} is inconsistent with the article's own pmcid identity "
+                    f"{pmcid!r}"
+                )
 
 
 def _artifact_relative_path_by_id(manifest: dict[str, Any]) -> dict[str, str]:
@@ -450,8 +625,8 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--acquisition-bundle-root", type=Path, required=True, help="root of the already-published r611q_literature acquisition bundle (contains bundle_manifest.json)")
     parser.add_argument("--rescuescreen-source-manifest", type=Path, required=True, help="path to the pinned RescueScreen discovery-shelf source manifest JSON")
     parser.add_argument("--rescuescreen-master-inventory", type=Path, required=True, help="path to the pinned RescueScreen master source inventory JSON")
-    parser.add_argument("--atlas-expert-packet", type=Path, required=True, help="path to the pinned Atlas expert-review packet JSON")
-    parser.add_argument("--atlas-expert-form", type=Path, required=True, help="path to the pinned Atlas expert-review form JSON")
+    parser.add_argument("--atlas-expert-packet", type=Path, required=True, help="path to the pinned Atlas expert-review packet (Markdown; hash/byte-length verified, never parsed as JSON)")
+    parser.add_argument("--atlas-expert-form", type=Path, required=True, help="path to the pinned Atlas expert-review form (hash/byte-length verified, never parsed as JSON)")
     parser.add_argument("--output-root", type=Path, default=None, help=f"external run root (default: ${DEFAULT_EXTERNAL_ROOT_ENV} or {DEFAULT_EXTERNAL_ROOT})")
     parser.add_argument("--repo-root", type=Path, default=REPO_ROOT, help="repository root (the external bundle must never resolve inside it)")
 
@@ -469,11 +644,30 @@ def _verify_inputs_and_scan(config: dict[str, Any], args: argparse.Namespace) ->
     )
     manifest = validated["manifest"]
 
+    # Enforce the configured acquisition manifest schema/bundle_id AFTER
+    # the exact hash pin (validate_acquisition_manifest already
+    # re-verified the manifest's own self-hash and every artifact's
+    # bytes): a byte-identical manifest can still drift structurally
+    # relative to what this config expects to be reading.
+    expected_schema = acquisition_pin.get("schema")
+    if expected_schema is not None and manifest.get("schema") != expected_schema:
+        raise DeltaReviewOperatorError(
+            f"acquisition manifest schema does not match the configured pin: expected "
+            f"{expected_schema!r}, found {manifest.get('schema')!r}"
+        )
+    expected_bundle_id = acquisition_pin.get("bundle_id")
+    if expected_bundle_id is not None and manifest.get("bundle_id") != expected_bundle_id:
+        raise DeltaReviewOperatorError(
+            f"acquisition manifest bundle_id does not match the configured pin: expected "
+            f"{expected_bundle_id!r}, found {manifest.get('bundle_id')!r}"
+        )
+
     baseline_bytes = verify_baseline_inputs(config, args=args)
 
     article_index_rows = read_article_index_rows(
         manifest, args.acquisition_bundle_root, acquisition_pin["article_index"]["relative_path"]
     )
+    _validate_fulltext_artifact_identities(article_index_rows, manifest)
 
     scan = scan_acquisition_bundle(manifest=manifest, bundle_root=args.acquisition_bundle_root, article_index_rows=article_index_rows)
 
@@ -579,8 +773,46 @@ def _read_review_records_jsonl(path: Path) -> list[dict[str, Any]]:
     return records
 
 
+def _resolve_and_preflight_summary_target(config: dict[str, Any], repo_root: Path) -> Path:
+    """Resolve ``config['committed_summary_path']`` against the CANONICAL
+    (fully resolved) repository root and preflight it BEFORE any external
+    bundle publication is attempted: it must resolve strictly inside
+    ``repo_root`` (an absolute or ``..``-escaping configured path is
+    rejected) and must not already exist (or be a symlink/reparse point).
+    Raises ``DeltaReviewOperatorError`` on either violation -- an invalid
+    or pre-existing summary target means NO external run is ever
+    attempted, preserving create-only semantics."""
+    repo_root_resolved = Path(repo_root).resolve()
+    configured = config["committed_summary_path"]
+    candidate = repo_root_resolved / configured
+    resolved = candidate.resolve()
+    try:
+        resolved.relative_to(repo_root_resolved)
+    except ValueError as exc:
+        raise DeltaReviewOperatorError(
+            f"configured committed_summary_path {configured!r} must resolve inside the canonical "
+            f"repository root {repo_root_resolved}; refusing to publish anything externally "
+            f"(resolved to {resolved})"
+        ) from exc
+    if resolved.is_symlink() or resolved.exists():
+        raise DeltaReviewOperatorError(
+            f"committed summary target {resolved} already exists or is a symlink/reparse point; "
+            "the summary is create-only and this run is refused before any external publication"
+        )
+    return resolved
+
+
 def run_publish(args: argparse.Namespace) -> int:
     config = load_config(args.config)
+
+    # Preflight the (optional) committed-summary target FIRST -- before any
+    # input verification/scanning or external publication is attempted --
+    # so an invalid or pre-existing summary target never leaves a
+    # partially-published external run behind.
+    summary_target: Path | None = None
+    if args.write_summary:
+        summary_target = _resolve_and_preflight_summary_target(config, args.repo_root)
+
     prepared = _verify_inputs_and_scan(config, args)
 
     baseline_source_ids = derive_baseline_source_ids(prepared["baseline_bytes"]["rescuescreen_master_inventory"])
@@ -643,6 +875,21 @@ def run_publish(args: argparse.Namespace) -> int:
     rescuescreen_pin = config["inputs"]["rescuescreen_baseline"]
     atlas_pin = config["inputs"]["atlas_baseline"]
 
+    # title_or_abstract_candidate_sources / fulltext_body_candidate_sources
+    # both count UNIQUE candidate SOURCES, never candidate SPAN records --
+    # a source with both a matching title span and a matching abstract
+    # span is still exactly one candidate source.
+    title_or_abstract_sources = {
+        f"PMID:{span['article_identity']['pmid']}"
+        for span in prepared["candidate_spans"]
+        if span["surface"] in (_TITLE_SURFACE, _ABSTRACT_SURFACE)
+    }
+    fulltext_body_sources = {
+        f"PMID:{span['article_identity']['pmid']}"
+        for span in prepared["candidate_spans"]
+        if span["surface"] == _JATS_BODY_SURFACE
+    }
+
     manifest: dict[str, Any] = {
         "schema": dr.DELTA_BUNDLE_MANIFEST_SCHEMA,
         "bundle_id": config["bundle_id"],
@@ -658,18 +905,8 @@ def run_publish(args: argparse.Namespace) -> int:
         "counts": {
             "article_rows": len(prepared["article_index_rows"]),
             "exact_alias_candidate_sources": len(prepared["candidate_source_ids"]),
-            "title_or_abstract_candidate_sources": sum(
-                1
-                for span in prepared["candidate_spans"]
-                if span["surface"] in (_TITLE_SURFACE, _ABSTRACT_SURFACE)
-            ),
-            "fulltext_body_candidate_sources": len(
-                {
-                    f"PMID:{span['article_identity']['pmid']}"
-                    for span in prepared["candidate_spans"]
-                    if span["surface"] == _JATS_BODY_SURFACE
-                }
-            ),
+            "title_or_abstract_candidate_sources": len(title_or_abstract_sources),
+            "fulltext_body_candidate_sources": len(fulltext_body_sources),
             "acquired_fulltexts_without_exact_alias": sum(
                 1
                 for row in prepared["article_index_rows"]
@@ -699,6 +936,16 @@ def run_publish(args: argparse.Namespace) -> int:
     }
     manifest["content_hash"] = dr.compute_manifest_content_hash(manifest)
 
+    # Stage the committed-summary bytes BEFORE the external bundle is
+    # published: if building/serializing the summary itself would fail,
+    # that failure must happen before, not after, external publication --
+    # a failure here can never leave a published external bundle without
+    # a matching (attempted) summary write.
+    summary_payload: bytes | None = None
+    if summary_target is not None:
+        summary = dr.build_committed_summary(manifest)
+        summary_payload = (json.dumps(summary, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
     output_root = args.output_root or resolve_external_root(config)
     run_name = args.run_name or config["run_name"]
     result = dr.write_delta_bundle(
@@ -711,14 +958,21 @@ def run_publish(args: argparse.Namespace) -> int:
     print(f"delta-review bundle written: {result['run_dir']}")
     print(f"content_hash={manifest['content_hash']}")
 
-    if args.write_summary:
-        summary = dr.build_committed_summary(manifest)
-        summary_path = args.repo_root / config["committed_summary_path"]
-        payload = (json.dumps(summary, indent=2, sort_keys=True) + "\n").encode("utf-8")
-        summary_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(str(summary_path), "xb") as handle:
-            handle.write(payload)
-        print(f"committed summary written: {summary_path}")
+    if summary_target is not None:
+        try:
+            summary_target.parent.mkdir(parents=True, exist_ok=True)
+            with open(str(summary_target), "xb") as handle:
+                handle.write(summary_payload)
+        except OSError as exc:
+            # Sanitized, single-line, typed failure -- never a raw
+            # traceback: the external bundle was already published
+            # successfully above, and only this separately opted-into
+            # summary write failed.
+            raise DeltaReviewOperatorError(
+                f"failed to write committed summary (create-only) to {summary_target} after "
+                f"external publication already succeeded ({type(exc).__name__})"
+            ) from exc
+        print(f"committed summary written: {summary_target}")
 
     return 0
 
