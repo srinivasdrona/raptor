@@ -217,9 +217,14 @@ _LOCATOR_PATTERN = re.compile(r"^text-char:(\d+):(\d+)$")
 #: The single external, standard JATS 1.4 DOCTYPE declaration this parser
 #: allowlists WITHOUT ever resolving/fetching it (spec's
 #: ``deterministic_preselection.jats_extraction.doctype_policy``). The
-#: system id is compared by BASENAME (see ``_system_id_basename``): a real
-#: acquired JATS file may declare it with a path/URL prefix, which never
-#: changes which (never-fetched) DTD it names.
+#: system id is compared for EXACT LITERAL equality against this value --
+#: after quote removal ONLY (the raw text captured between the
+#: declaration's own quote characters). No path normalization, URL
+#: parsing, percent-decoding, whitespace collapse, drive/scheme handling,
+#: dot-segment resolution or basename extraction is ever applied: a
+#: system id declared with any path/URL/query/fragment prefix or suffix,
+#: any percent-escape, any backslash, any drive letter or any ``.``/``..``
+#: segment is rejected as unallowlisted, never coerced into a match.
 ALLOWLISTED_JATS_DOCTYPE_PUBLIC_ID = (
     "-//NLM//DTD JATS (Z39.96) Journal Archiving and Interchange DTD with MathML3 v1.4 20241031//EN"
 )
@@ -588,14 +593,6 @@ def _legacy_context_text_for_block(tag: str, node: ET.Element, parent_by_child: 
     return ""
 
 
-def _system_id_basename(system_id: str) -> str:
-    """The final path/URL component of a DOCTYPE ``SYSTEM``/``PUBLIC``
-    identifier -- a real acquired JATS file may declare its (never
-    fetched) external subset with a directory or URL prefix, which never
-    changes which allowlisted DTD it names."""
-    return system_id.replace("\\", "/").rsplit("/", 1)[-1]
-
-
 def _scan_doctype_declarations(xml_text: str) -> list[str]:
     """Return every top-level ``<!DOCTYPE ...>`` declaration found in
     ``xml_text`` (quote- and internal-subset-bracket aware, so a ``>``
@@ -642,11 +639,16 @@ def _validate_doctype_policy(xml_text: str) -> None:
     than one DOCTYPE declaration is forbidden; an absent DOCTYPE is
     allowed; and the single allowed DOCTYPE form is an external ``PUBLIC``
     declaration for the ``article`` root naming exactly the allowlisted
-    JATS 1.4 public id (and matching system-id basename) with NO internal
-    subset. A ``SYSTEM``-only, internal-subset, unknown-id or otherwise
-    malformed declaration is rejected. Raises ``DeltaReviewError`` on any
-    violation; never resolves/fetches the external DTD itself (this
-    function performs no I/O)."""
+    JATS 1.4 public id AND system id -- the system id is compared for
+    EXACT LITERAL equality after quote removal only (no path
+    normalization, URL parsing, percent-decoding, whitespace collapse, or
+    basename extraction; a URL/path/query/fragment/percent/backslash/
+    drive/dot-segment-qualified variant is rejected as unallowlisted, not
+    coerced into a match) -- with NO internal subset. A ``SYSTEM``-only,
+    internal-subset, unknown-id or otherwise malformed declaration is
+    rejected. Raises ``DeltaReviewError`` on any violation; never
+    resolves/fetches the external DTD itself (this function performs no
+    I/O)."""
     if re.search(r"<!\s*entity\b", xml_text, flags=re.IGNORECASE):
         raise DeltaReviewError("JATS XML ENTITY declaration is forbidden for secure parsing")
 
@@ -664,13 +666,15 @@ def _validate_doctype_policy(xml_text: str) -> None:
     if public_match:
         root_name = public_match.group(1)
         public_id = " ".join(public_match.group(3).split())
-        system_id = public_match.group(5).strip()
+        # System id: quote removal ONLY (the raw captured group content
+        # between the declaration's own quote characters) -- no
+        # `.strip()`, no path/URL handling, no case-folding. A literal
+        # byte-for-byte match against ALLOWLISTED_JATS_DOCTYPE_SYSTEM_ID
+        # is required.
+        system_id = public_match.group(5)
         if root_name.lower() != "article":
             raise DeltaReviewError("JATS XML DOCTYPE root element must be 'article'")
-        if (
-            public_id != ALLOWLISTED_JATS_DOCTYPE_PUBLIC_ID
-            or _system_id_basename(system_id) != ALLOWLISTED_JATS_DOCTYPE_SYSTEM_ID
-        ):
+        if public_id != ALLOWLISTED_JATS_DOCTYPE_PUBLIC_ID or system_id != ALLOWLISTED_JATS_DOCTYPE_SYSTEM_ID:
             raise DeltaReviewError(
                 "JATS XML DOCTYPE public/system pair is not allowlisted: unknown external "
                 "standard JATS DTD reference"
