@@ -1465,6 +1465,78 @@ def test_ac10_existing_claims_and_gate8_state_cannot_change() -> None:
         )
 
 
+def test_ac10b_review_records_reject_duplicate_source_rows_for_true_one_to_one_coverage() -> None:
+    api = _delta_api()
+    records, candidate_source_ids, baseline_source_ids, proposition_vocab = _good_review_records("cand-dup")
+
+    duplicated = json.loads(_canonical_json(records))
+    duplicated.append(json.loads(_canonical_json(duplicated[0])))
+    with pytest.raises(api["DeltaReviewError"], match="one-to-one|duplicate|source"):
+        api["validate_review_records"](
+            review_records=duplicated,
+            candidate_source_ids=candidate_source_ids,
+            baseline_source_ids=baseline_source_ids,
+            proposition_vocabulary=proposition_vocab,
+            allowed_claim_ids={"r611q-claim-0", "r611q-claim-1"},
+        )
+
+
+def test_ac10c_review_records_require_sorted_unique_string_proposition_ids() -> None:
+    api = _delta_api()
+    records, candidate_source_ids, baseline_source_ids, proposition_vocab = _good_review_records("cand-prop")
+
+    bad_order = json.loads(_canonical_json(records))
+    bad_order[0]["proposition_ids"] = ["prop-syn-002", "prop-syn-001", "prop-syn-001"]
+    with pytest.raises(api["DeltaReviewError"], match="proposition_ids|sorted|unique|string"):
+        api["validate_review_records"](
+            review_records=bad_order,
+            candidate_source_ids=candidate_source_ids,
+            baseline_source_ids=baseline_source_ids,
+            proposition_vocabulary=proposition_vocab,
+            allowed_claim_ids={"r611q-claim-0", "r611q-claim-1"},
+        )
+
+    bad_type = json.loads(_canonical_json(records))
+    bad_type[0]["proposition_ids"] = [7]
+    with pytest.raises(api["DeltaReviewError"], match="proposition_ids|string"):
+        api["validate_review_records"](
+            review_records=bad_type,
+            candidate_source_ids=candidate_source_ids,
+            baseline_source_ids=baseline_source_ids,
+            proposition_vocabulary=proposition_vocab | {7},
+            allowed_claim_ids={"r611q-claim-0", "r611q-claim-1"},
+        )
+
+
+def test_ac10d_review_records_require_baseline_relation_and_claim_id_coherence() -> None:
+    api = _delta_api()
+    records, candidate_source_ids, baseline_source_ids, proposition_vocab = _good_review_records("cand-rel")
+
+    bad_no_relation_claim = json.loads(_canonical_json(records))
+    bad_no_relation_claim[1]["baseline_relation"] = "NO_DIRECT_RELATION"
+    bad_no_relation_claim[1]["baseline_claim_id"] = "r611q-claim-1"
+    with pytest.raises(api["DeltaReviewError"], match="NO_DIRECT_RELATION|baseline_claim_id|null"):
+        api["validate_review_records"](
+            review_records=bad_no_relation_claim,
+            candidate_source_ids=candidate_source_ids,
+            baseline_source_ids=baseline_source_ids,
+            proposition_vocabulary=proposition_vocab,
+            allowed_claim_ids={"r611q-claim-0", "r611q-claim-1"},
+        )
+
+    bad_support_missing_claim = json.loads(_canonical_json(records))
+    bad_support_missing_claim[0]["baseline_relation"] = "SUPPORTS"
+    bad_support_missing_claim[0]["baseline_claim_id"] = None
+    with pytest.raises(api["DeltaReviewError"], match="baseline_relation|baseline_claim_id|allowed claim"):
+        api["validate_review_records"](
+            review_records=bad_support_missing_claim,
+            candidate_source_ids=candidate_source_ids,
+            baseline_source_ids=baseline_source_ids,
+            proposition_vocabulary=proposition_vocab,
+            allowed_claim_ids={"r611q-claim-0", "r611q-claim-1"},
+        )
+
+
 def test_ac11_write_path_is_external_create_only_and_manifest_written_last_without_symlink_escape(tmp_path: Path) -> None:
     api = _delta_api()
 
@@ -2253,6 +2325,39 @@ def _publish_stubbed_review_records() -> list[dict[str, Any]]:
     ]
 
 
+def _publish_completed_review_records() -> list[dict[str, Any]]:
+    record = {
+        "schema": REVIEW_RECORD_SCHEMA,
+        "source_id": "PMID:91000001",
+        "article_identity": {"pmid": "91000001", "pmcid": None, "doi": "10.9999/syn.publish.001"},
+        "candidate_id": "cand-syn-001",
+        "source_role": "NOT_RELEVANT",
+        "primary_result_state": "NO_R611Q_RESULT",
+        "baseline_relation": "NO_DIRECT_RELATION",
+        "baseline_claim_id": None,
+        "delta_value": "NO_MATERIAL_DELTA",
+        "proposition_ids": [],
+        "context": {
+            "r611q_role": "none",
+            "model_system": "n/a",
+            "perturbation": "n/a",
+            "comparator": "n/a",
+            "readout": "n/a",
+            "directness": "none",
+            "assay_lineage": "none",
+            "independence": "n/a",
+            "limitations": "no direct R611Q signal in available text",
+        },
+        "review_kind": "MODEL_ASSISTED_SOURCE_TRIAGE",
+        "acceptance_state": "PROPOSED_UNACCEPTED",
+        "human_gate_8_effect": "NONE",
+        "claim_change": "NONE",
+        "gate_8_change": "NONE",
+    }
+    _assert_no_cribbing(record)
+    return [record]
+
+
 def _publish_argv(
     *,
     tmp_path: Path,
@@ -2309,13 +2414,15 @@ def _install_publish_harness(
     review_records: list[dict[str, Any]],
     write_calls: list[dict[str, Any]],
     captured_manifests: list[dict[str, Any]],
+    patch_review_validator: bool = True,
 ) -> None:
     monkeypatch.setattr(module, "load_config", lambda _path: config)
     monkeypatch.setattr(module, "_verify_inputs_and_scan", lambda *_args, **_kwargs: prepared)
     monkeypatch.setattr(module, "derive_baseline_source_ids", lambda _bytes: {"PMID:80000001"})
     monkeypatch.setattr(module, "derive_proposition_vocabulary", lambda _bytes: {"prop-syn-alpha"})
     monkeypatch.setattr(module, "_read_review_records_jsonl", lambda _path: review_records)
-    monkeypatch.setattr(module.dr, "validate_review_records", lambda **_kwargs: None)
+    if patch_review_validator:
+        monkeypatch.setattr(module.dr, "validate_review_records", lambda **_kwargs: None)
     monkeypatch.setattr(module, "render_addendum", lambda **_kwargs: "# synthetic addendum\n")
 
     def _fake_write_delta_bundle(**kwargs):
@@ -2567,3 +2674,146 @@ def test_ac25_publish_counts_title_or_abstract_candidate_sources_as_unique_sourc
     assert rc == 0
     assert captured_manifests, "test harness did not capture a published manifest"
     assert captured_manifests[-1]["counts"]["title_or_abstract_candidate_sources"] == 1
+
+
+def test_ac26_prepare_template_keeps_null_scientific_and_context_values() -> None:
+    module = _load_operator_module()
+    prepared = _publish_stubbed_prepared()
+    template = module.build_review_record_template(
+        candidate_source_ids={"PMID:91000001"},
+        candidate_spans=prepared["candidate_spans"],
+        article_identity_by_source={"PMID:91000001": {"pmid": "91000001", "pmcid": None, "doi": "10.9999/syn.publish.001"}},
+    )
+    assert isinstance(template, list)
+    assert len(template) == 1
+    record = template[0]
+    assert record["source_role"] is None
+    assert record["primary_result_state"] is None
+    assert record["baseline_relation"] is None
+    assert record["baseline_claim_id"] is None
+    assert record["delta_value"] is None
+    assert record["proposition_ids"] == []
+    for key in REQUIRED_CONTEXT_FIELDS:
+        assert key in record["context"]
+        assert record["context"][key] is None
+
+
+def test_ac27_publish_rejects_article_identity_mismatch_for_selected_candidate_source(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    module = _load_operator_module()
+    repo_root = tmp_path / "repo-identity-mismatch"
+    output_root = tmp_path / "external-identity-mismatch"
+    repo_root.mkdir()
+    output_root.mkdir()
+
+    config = {
+        "bundle_id": "synthetic-delta-bundle",
+        "run_name": "synthetic-run",
+        "committed_summary_path": "data/census/synthetic-summary-identity-mismatch.json",
+        "supervised_delta_review": {"baseline_relation": {"claims": ["r611q-claim-0", "r611q-claim-1"]}},
+        "inputs": {
+            "acquisition_bundle": {
+                "manifest_content_hash": "a" * 64,
+                "manifest_file_sha256": "b" * 64,
+            },
+            "rescuescreen_baseline": {
+                "source_manifest": {"sha256": "c" * 64},
+                "master_source_inventory": {"sha256": "d" * 64},
+            },
+            "atlas_baseline": {
+                "expert_packet": {"sha256": "e" * 64},
+                "expert_form": {"sha256": "f" * 64},
+            },
+        },
+    }
+    prepared = _publish_stubbed_prepared()
+    review_records = _publish_completed_review_records()
+    review_records[0]["article_identity"] = {"pmid": "91000999", "pmcid": None, "doi": "10.9999/syn.publish.999"}
+
+    write_calls: list[dict[str, Any]] = []
+    captured_manifests: list[dict[str, Any]] = []
+    _install_publish_harness(
+        module=module,
+        monkeypatch=monkeypatch,
+        config=config,
+        prepared=prepared,
+        review_records=review_records,
+        write_calls=write_calls,
+        captured_manifests=captured_manifests,
+        patch_review_validator=False,
+    )
+
+    rc = module.main(_publish_argv(tmp_path=tmp_path, repo_root=repo_root, output_root=output_root, write_summary=False))
+    captured = capsys.readouterr()
+    assert rc == 1, "publish must reject review-record article_identity mismatches against selected candidate/source"
+    assert "article_identity" in captured.err.lower()
+    assert not write_calls, "identity mismatch must fail before final external publication"
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        ("model_system", None),
+        ("readout", "   "),
+        ("limitations", ""),
+        ("limitations", []),
+    ],
+)
+def test_ac28_publish_rejects_null_or_blank_context_values_in_final_review_records(
+    field_name: str,
+    value: Any,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    module = _load_operator_module()
+    repo_root = tmp_path / f"repo-null-context-{field_name}"
+    output_root = tmp_path / f"external-null-context-{field_name}"
+    repo_root.mkdir()
+    output_root.mkdir()
+
+    config = {
+        "bundle_id": "synthetic-delta-bundle",
+        "run_name": "synthetic-run",
+        "committed_summary_path": "data/census/synthetic-summary-null-context.json",
+        "supervised_delta_review": {"baseline_relation": {"claims": ["r611q-claim-0", "r611q-claim-1"]}},
+        "inputs": {
+            "acquisition_bundle": {
+                "manifest_content_hash": "a" * 64,
+                "manifest_file_sha256": "b" * 64,
+            },
+            "rescuescreen_baseline": {
+                "source_manifest": {"sha256": "c" * 64},
+                "master_source_inventory": {"sha256": "d" * 64},
+            },
+            "atlas_baseline": {
+                "expert_packet": {"sha256": "e" * 64},
+                "expert_form": {"sha256": "f" * 64},
+            },
+        },
+    }
+    prepared = _publish_stubbed_prepared()
+    review_records = _publish_completed_review_records()
+    review_records[0]["context"][field_name] = value
+
+    write_calls: list[dict[str, Any]] = []
+    captured_manifests: list[dict[str, Any]] = []
+    _install_publish_harness(
+        module=module,
+        monkeypatch=monkeypatch,
+        config=config,
+        prepared=prepared,
+        review_records=review_records,
+        write_calls=write_calls,
+        captured_manifests=captured_manifests,
+        patch_review_validator=False,
+    )
+
+    rc = module.main(_publish_argv(tmp_path=tmp_path, repo_root=repo_root, output_root=output_root, write_summary=False))
+    captured = capsys.readouterr()
+    assert rc == 1, "final publish must reject null/blank context values even though prepare templates may use nulls"
+    assert "context" in captured.err.lower()
+    assert not write_calls, "invalid final context values must fail before final external publication"
