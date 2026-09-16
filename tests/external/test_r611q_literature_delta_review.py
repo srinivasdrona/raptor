@@ -6,6 +6,7 @@ import importlib.util
 import inspect
 import json
 import re
+import socket
 import unicodedata
 import xml.etree.ElementTree as ET
 from importlib import import_module
@@ -207,6 +208,11 @@ SUMMARY_FORBIDDEN_KEYS = (
     '"reviewer_output"',
 )
 
+ALLOWLISTED_JATS_DOCTYPE_PUBLIC_ID = (
+    "-//NLM//DTD JATS (Z39.96) Journal Archiving and Interchange DTD with MathML3 v1.4 20241031//EN"
+)
+ALLOWLISTED_JATS_DOCTYPE_SYSTEM_ID = "JATS-archivearticle1-4-mathml3.dtd"
+
 
 def _load_module(module_name: str):
     try:
@@ -314,8 +320,92 @@ def _node_text(node: ET.Element) -> str:
     return _normalize_text(" ".join(part for part in node.itertext()))
 
 
-def _contains_declaration(xml_text: str, token: str) -> bool:
-    return token in xml_text.lower()
+def _forbid_real_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _no_network(*_args, **_kwargs):
+        raise AssertionError("network access is forbidden in this suite")
+
+    monkeypatch.setattr(socket, "create_connection", _no_network)
+
+
+def _allowlisted_jats_doctype_declaration() -> str:
+    return (
+        "<!DOCTYPE article PUBLIC "
+        f"\"{ALLOWLISTED_JATS_DOCTYPE_PUBLIC_ID}\" "
+        f"\"{ALLOWLISTED_JATS_DOCTYPE_SYSTEM_ID}\">"
+    )
+
+
+def _scan_doctype_declarations(xml_text: str) -> list[str]:
+    declarations: list[str] = []
+    lowered = xml_text.lower()
+    cursor = 0
+    while True:
+        start = lowered.find("<!doctype", cursor)
+        if start == -1:
+            break
+        i = start + len("<!doctype")
+        in_single = False
+        in_double = False
+        bracket_depth = 0
+        while i < len(xml_text):
+            ch = xml_text[i]
+            if ch == "'" and not in_double:
+                in_single = not in_single
+            elif ch == '"' and not in_single:
+                in_double = not in_double
+            elif not in_single and not in_double:
+                if ch == "[":
+                    bracket_depth += 1
+                elif ch == "]":
+                    bracket_depth = max(0, bracket_depth - 1)
+                elif ch == ">" and bracket_depth == 0:
+                    declarations.append(xml_text[start : i + 1])
+                    cursor = i + 1
+                    break
+            i += 1
+        else:
+            raise ValueError("DOCTYPE declaration is malformed")
+    return declarations
+
+
+def _validate_oracle_doctype_policy(xml_text: str) -> None:
+    if re.search(r"<!\s*entity\b", xml_text, flags=re.IGNORECASE):
+        raise ValueError("ENTITY declaration is forbidden")
+
+    declarations = _scan_doctype_declarations(xml_text)
+    if len(declarations) > 1:
+        raise ValueError("multiple DOCTYPE declarations are forbidden")
+    if not declarations:
+        return
+
+    declaration = declarations[0]
+    if "[" in declaration or "]" in declaration:
+        raise ValueError("internal subset in DOCTYPE is forbidden")
+
+    public_match = re.fullmatch(
+        r"\s*<!DOCTYPE\s+([A-Za-z_:][A-Za-z0-9_.:-]*)\s+PUBLIC\s+(['\"])(.+?)\2\s+(['\"])(.+?)\4\s*>\s*",
+        declaration,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if public_match:
+        root_name = public_match.group(1)
+        public_id = " ".join(public_match.group(3).split())
+        system_id = public_match.group(5).strip()
+        if root_name.lower() != "article":
+            raise ValueError("DOCTYPE root must be article")
+        if public_id != ALLOWLISTED_JATS_DOCTYPE_PUBLIC_ID or system_id != ALLOWLISTED_JATS_DOCTYPE_SYSTEM_ID:
+            raise ValueError("DOCTYPE public/system pair is not allowlisted")
+        return
+
+    system_only_match = re.fullmatch(
+        r"\s*<!DOCTYPE\s+([A-Za-z_:][A-Za-z0-9_.:-]*)\s+SYSTEM\s+(['\"])(.+?)\2\s*>\s*",
+        declaration,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if system_only_match:
+        raise ValueError("DOCTYPE SYSTEM-only declaration is forbidden")
+
+    raise ValueError("DOCTYPE declaration is malformed or not allowlisted")
 
 
 def _is_descendant(node: ET.Element, ancestor: ET.Element, parent_by_child: dict[ET.Element, ET.Element]) -> bool:
@@ -467,10 +557,7 @@ def _context_for_block(node: ET.Element, tag: str, parent_by_child: dict[ET.Elem
 
 
 def _oracle_extract_smallest_matching_blocks(xml_text: str) -> dict[str, Any]:
-    if _contains_declaration(xml_text, "<!doctype"):
-        raise ValueError("DOCTYPE is forbidden")
-    if _contains_declaration(xml_text, "<!entity"):
-        raise ValueError("ENTITY is forbidden")
+    _validate_oracle_doctype_policy(xml_text)
 
     root = ET.fromstring(xml_text)
     if _local_name(root.tag) != "article":
@@ -792,8 +879,12 @@ def test_oracle01_anti_cribbing_guard_accepts_synthetic_fixtures_only() -> None:
     _assert_no_cribbing(fixture)
 
 
-def test_oracle02_secure_jats_oracle_rejects_declarations_and_extracts_smallest_blocks_in_order() -> None:
-    xml = """<?xml version="1.0" encoding="UTF-8"?>
+def test_oracle02_secure_jats_oracle_doctype_policy_and_block_extraction(monkeypatch: pytest.MonkeyPatch) -> None:
+    _forbid_real_network(monkeypatch)
+
+    doctype = _allowlisted_jats_doctype_declaration()
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+{doctype}
 <article>
   <body>
     <sec>
@@ -835,8 +926,26 @@ def test_oracle02_secure_jats_oracle_rejects_declarations_and_extracts_smallest_
         assert block["matched_aliases"] == sorted(block["matched_aliases"], key=lambda v: (v.casefold(), v))
         assert _slice_locator(extracted["joined_text"], block["locator"]) == block["text"]
 
-    with pytest.raises(ValueError, match="DOCTYPE"):
-        _oracle_extract_smallest_matching_blocks("<!DOCTYPE article><article><body><p>R611Q</p></body></article>")
+    with pytest.raises(ValueError, match="SYSTEM-only"):
+        _oracle_extract_smallest_matching_blocks(
+            "<!DOCTYPE article SYSTEM \"JATS-archivearticle1-4-mathml3.dtd\"><article><body><p>R611Q</p></body></article>"
+        )
+    with pytest.raises(ValueError, match="allowlisted|public/system"):
+        _oracle_extract_smallest_matching_blocks(
+            "<!DOCTYPE article PUBLIC \"-//NLM//DTD unexpected//EN\" \"JATS-archivearticle1-4-mathml3.dtd\"><article><body><p>R611Q</p></body></article>"
+        )
+    with pytest.raises(ValueError, match="internal subset"):
+        _oracle_extract_smallest_matching_blocks(
+            "<!DOCTYPE article PUBLIC \"-//NLM//DTD JATS (Z39.96) Journal Archiving and Interchange DTD with MathML3 v1.4 20241031//EN\" \"JATS-archivearticle1-4-mathml3.dtd\" [ ]><article><body><p>R611Q</p></body></article>"
+        )
+    with pytest.raises(ValueError, match="multiple DOCTYPE"):
+        _oracle_extract_smallest_matching_blocks(
+            "<!DOCTYPE article PUBLIC \"-//NLM//DTD JATS (Z39.96) Journal Archiving and Interchange DTD with MathML3 v1.4 20241031//EN\" \"JATS-archivearticle1-4-mathml3.dtd\"><!DOCTYPE article PUBLIC \"-//NLM//DTD JATS (Z39.96) Journal Archiving and Interchange DTD with MathML3 v1.4 20241031//EN\" \"JATS-archivearticle1-4-mathml3.dtd\"><article><body><p>R611Q</p></body></article>"
+        )
+    with pytest.raises(ValueError, match="malformed"):
+        _oracle_extract_smallest_matching_blocks(
+            "<!DOCTYPE article PUBLIC \"-//NLM//DTD JATS (Z39.96) Journal Archiving and Interchange DTD with MathML3 v1.4 20241031//EN\" ><article><body><p>R611Q</p></body></article>"
+        )
     with pytest.raises(ValueError, match="ENTITY"):
         _oracle_extract_smallest_matching_blocks(
             "<!ENTITY boom 'x'><article><body><p>R611Q</p></body></article>"
@@ -933,8 +1042,20 @@ def test_ac02_config_matches_spec_input_pins_and_output_names() -> None:
         pytest.fail(f"spec file not found: {SPEC_PATH}")
     spec = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))
     assert isinstance(spec, dict)
-    assert spec["spec_version"] == "1.0.1"
+    assert spec["spec_version"] == "1.0.2"
     jats = spec["deterministic_preselection"]["jats_extraction"]
+    doctype_policy = jats["doctype_policy"]
+    assert doctype_policy["absent"] == "allowed"
+    assert doctype_policy["external_standard_jats"] == "allowlisted_without_resolution"
+    assert doctype_policy["internal_subset"] == "forbidden"
+    assert doctype_policy["system_only"] == "forbidden"
+    assert doctype_policy["allowed"] == [
+        {
+            "public_id": ALLOWLISTED_JATS_DOCTYPE_PUBLIC_ID,
+            "system_id": ALLOWLISTED_JATS_DOCTYPE_SYSTEM_ID,
+        }
+    ]
+    assert "does not resolve or fetch the external DTD" in doctype_policy["parser_network_behavior"]
     assert jats["block_tags"] == ["p", "tr", "caption"]
     assert "complete table row" in jats["block_selection"]
     assert "isolated table cell" in jats["block_selection"]
@@ -973,6 +1094,7 @@ def test_ac02_config_matches_spec_input_pins_and_output_names() -> None:
         == spec["inputs"]["acquisition_bundle"]["manifest_byte_length"]
     )
     assert config["inputs"]["acquisition_bundle"]["article_index"] == spec["inputs"]["acquisition_bundle"]["article_index"]
+    assert config["deterministic_preselection"]["jats_extraction"]["doctype_policy"] == doctype_policy
     assert config["deterministic_preselection"]["jats_extraction"]["block_tags"] == ["p", "tr", "caption"]
     assert (
         config["deterministic_preselection"]["jats_extraction"]["context_capture"]["table_row"]
@@ -1036,9 +1158,14 @@ def test_ac04_validate_acquisition_manifest_self_hash_artifacts_and_article_inde
         )
 
 
-def test_ac05_secure_jats_parser_contract_enforces_required_root_body_and_smallest_blocks() -> None:
+def test_ac05_secure_jats_parser_contract_enforces_doctype_policy_required_root_body_and_smallest_blocks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     api = _delta_api()
-    xml = """<?xml version="1.0" encoding="UTF-8"?>
+    _forbid_real_network(monkeypatch)
+    doctype = _allowlisted_jats_doctype_declaration()
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+{doctype}
 <article>
   <body>
     <sec>
@@ -1076,8 +1203,49 @@ def test_ac05_secure_jats_parser_contract_enforces_required_root_body_and_smalle
         assert isinstance(block.get("context"), dict)
         assert _slice_locator(parsed["joined_text"], block["locator"]) == block["text"]
 
-    with pytest.raises(api["DeltaReviewError"], match="DOCTYPE|declaration"):
-        api["extract_jats_blocks"](xml_text="<!DOCTYPE article><article><body><p>R611Q</p></body></article>")
+    with pytest.raises(api["DeltaReviewError"], match="SYSTEM-only|doctype|forbidden"):
+        api["extract_jats_blocks"](
+            xml_text=(
+                "<!DOCTYPE article SYSTEM \"JATS-archivearticle1-4-mathml3.dtd\">"
+                "<article><body><p>R611Q</p></body></article>"
+            )
+        )
+    with pytest.raises(api["DeltaReviewError"], match="allowlisted|public|system|unknown"):
+        api["extract_jats_blocks"](
+            xml_text=(
+                "<!DOCTYPE article PUBLIC \"-//NLM//DTD unknown//EN\" "
+                "\"JATS-archivearticle1-4-mathml3.dtd\"><article><body><p>R611Q</p></body></article>"
+            )
+        )
+    with pytest.raises(api["DeltaReviewError"], match="internal|subset|doctype"):
+        api["extract_jats_blocks"](
+            xml_text=(
+                "<!DOCTYPE article PUBLIC "
+                "\"-//NLM//DTD JATS (Z39.96) Journal Archiving and Interchange DTD with MathML3 v1.4 20241031//EN\" "
+                "\"JATS-archivearticle1-4-mathml3.dtd\" [ ]>"
+                "<article><body><p>R611Q</p></body></article>"
+            )
+        )
+    with pytest.raises(api["DeltaReviewError"], match="multiple|doctype"):
+        api["extract_jats_blocks"](
+            xml_text=(
+                "<!DOCTYPE article PUBLIC "
+                "\"-//NLM//DTD JATS (Z39.96) Journal Archiving and Interchange DTD with MathML3 v1.4 20241031//EN\" "
+                "\"JATS-archivearticle1-4-mathml3.dtd\">"
+                "<!DOCTYPE article PUBLIC "
+                "\"-//NLM//DTD JATS (Z39.96) Journal Archiving and Interchange DTD with MathML3 v1.4 20241031//EN\" "
+                "\"JATS-archivearticle1-4-mathml3.dtd\">"
+                "<article><body><p>R611Q</p></body></article>"
+            )
+        )
+    with pytest.raises(api["DeltaReviewError"], match="malformed|doctype"):
+        api["extract_jats_blocks"](
+            xml_text=(
+                "<!DOCTYPE article PUBLIC "
+                "\"-//NLM//DTD JATS (Z39.96) Journal Archiving and Interchange DTD with MathML3 v1.4 20241031//EN\">"
+                "<article><body><p>R611Q</p></body></article>"
+            )
+        )
     with pytest.raises(api["DeltaReviewError"], match="ENTITY|declaration"):
         api["extract_jats_blocks"](xml_text="<!ENTITY boom 'x'><article><body><p>R611Q</p></body></article>")
     with pytest.raises(api["DeltaReviewError"], match="article/body|required"):
