@@ -1,0 +1,317 @@
+schema: raptor.project.spec.v1
+spec_id: raptor-v2-r611q-literature-delta-review-v1
+spec_version: 1.0.0
+status: APPROVED_BUILD
+created_at: '2026-09-16'
+owner: human-terminal-authority
+branch: feature/raptor-v2-r611q-literature-delta-review-v1
+stacked_on:
+  branch: feature/raptor-v2-r611q-literature-expansion-v1
+  commit: 4ee975ddcd0a22ff3426171eee7c91f6ecd87d5f
+
+objective: >-
+  Measure whether the 69-publication $TSC2$ $R611Q$ acquisition delta adds
+  primary evidence, useful assay context, a contradiction, or a material
+  evidence gap beyond the existing RescueScreen inventory and unreviewed Atlas
+  packet. Deterministically preselect exact variant mentions from the frozen
+  local corpus, verify candidate spans, and materialize a supervised,
+  explicitly unaccepted addendum.
+
+decision_question: >-
+  Did the systematic acquisition delta materially improve the existing
+  $R611Q$ package enough to justify updating it or expanding source coverage?
+
+non_goals:
+  - rereview or regenerate the existing 33-publication RescueScreen inventory
+  - modify the existing RescueScreen inventory or Atlas expert-review packet
+  - accept an Atlas claim or change Gate 8
+  - treat model-assisted source triage as qualified human review
+  - assign $PS3$, $BS3$, pathogenicity, clinical significance or evidence strength
+  - infer treatment efficacy or make a treatment recommendation
+  - retrieve another source or make any network request
+  - expand to the historical $TSC2$ publication union
+  - interpret absence of an exact alias as absence of relevant evidence
+
+variant:
+  gene: TSC2
+  rsid: rs28934872
+  spdi: NC_000016.10:2070570:G:A
+  hgvs_c: NM_000548.5:c.1832G>A
+  hgvs_p: NP_000539.2:p.Arg611Gln
+
+inputs:
+  acquisition_bundle:
+    schema: raptor.external.r611q_literature_bundle.v1
+    bundle_id: r611q-literature-expansion-2026-09-15
+    manifest_content_hash: ed14ea509857e22f1ae058632e61599f080d033d64a0057f9aad10c55bd360f5
+    manifest_file_sha256: e827db16d9052a10b47ad2cdf620b07b9773b2ccc8641b034fe2986de82d1c7a
+    manifest_byte_length: 29156
+    article_index:
+      relative_path: normalized/article-index.jsonl
+      sha256: dbc3ed426f4381e15321e77dcb8beab820df6ad9cffd2c1f13af72f9e2809e26
+      byte_length: 132645
+      rows: 69
+    fulltext:
+      acquired_cc_by: 26
+      metadata_cc_by_candidates: 27
+      jats_licence_rejected: 1
+    rule: >-
+      The bundle is immutable input. Every referenced artifact byte length and
+      digest is recomputed from disk before review.
+
+  rescuescreen_baseline:
+    source_manifest:
+      schema: rescuescreen.r611q.discovery_shelf_sources.v1
+      sha256: 8dd13997581fc06998edd0bc73042ae1e8a059bbd2d0dccef4656da1166d1468
+      byte_length: 26297
+      pmid_publications: 31
+      doi_only_publications: 2
+    master_source_inventory:
+      sha256: b0717d711eb9203868b3c956562cc8c0297f197ec1bf19599c11d819603154ef
+      byte_length: 112258
+      publications: 33
+      rule: >-
+        Read only for source-identity deduplication, proposition vocabulary,
+        assay-lineage comparison and delta assessment. Existing records are
+        never rewritten.
+
+  atlas_baseline:
+    expert_packet:
+      sha256: ac456eeac4bd6e0c6a41320d3687575e058d1016e92ddd2e8b140dabfdcbe4e2
+      byte_length: 8094
+    expert_form:
+      sha256: 0e9d096559f36fcfde2f3340cf9af54a4328ddb74791d9ddef4df1edc54151ba
+      byte_length: 2148
+    state:
+      proposed_claims: 2
+      accepted_claims: 0
+      scientific_sufficiency_reviewed: false
+      gate_8: BLOCKED_HUMAN_REVIEW
+    rule: >-
+      Delta records may describe their relation to the two existing proposed
+      claims but cannot edit, accept, reject or supersede either claim.
+
+deterministic_preselection:
+  article_surfaces:
+    - title
+    - abstract
+    - acquired_cc_by_jats_body
+  jats_extraction:
+    parser: standard_library_xml
+    reject_document_type_declaration: true
+    reject_entity_declaration: true
+    required_root_content: article/body
+    excluded_subtrees:
+      - ref-list
+    block_tags:
+      - p
+      - td
+      - th
+      - caption
+    block_selection: >-
+      Emit the smallest configured block containing a match. Do not emit an
+      ancestor block when a configured descendant block already contains the
+      same text.
+    block_normalization:
+      unicode: NFC
+      whitespace: collapse_to_single_ascii_space
+      join_blocks: LF
+    locator: text-char:<start>:<end>
+    locator_surface: deterministic_joined_body_text
+
+  alias_classes:
+    canonical:
+      - rs28934872
+      - c.1832G>A
+      - NM_000548.5:c.1832G>A
+      - p.Arg611Gln
+      - NP_000539.2:p.Arg611Gln
+      - Arg611Gln
+      - p.R611Q
+      - R611Q
+    conditional_legacy:
+      - 1832G>A
+      - G1832A
+    conditional_rule: >-
+      A legacy nucleotide-only alias is a candidate only when its smallest
+      block also names $TSC2$, tuberin or another canonical alias.
+    matching:
+      case_sensitive: false
+      require_token_boundaries: true
+      allow_whitespace_around_hgvs_arrow: true
+      deduplicate_multiple_aliases_within_one_block: true
+
+  dispositions:
+    - EXACT_ALIAS_CANDIDATE
+    - NO_EXACT_ALIAS_IN_AVAILABLE_TEXT
+    - SOURCE_TEXT_UNAVAILABLE
+  interpretation_boundary: >-
+    Preselection is lexical recall, not scientific relevance. A source with no
+    match remains unreviewed rather than being labelled irrelevant.
+  frozen_input_observation:
+    role: deterministic_regression_for_pinned_bytes
+    article_rows: 69
+    exact_alias_candidate_sources: 8
+    title_or_abstract_candidate_sources: 0
+    fulltext_body_candidate_sources: 8
+    acquired_fulltexts_without_exact_alias: 18
+    sources_without_acquired_fulltext: 43
+
+candidate_span:
+  schema: raptor.external.r611q_literature_delta_candidate_span.v1
+  exact_fields:
+    - schema
+    - candidate_id
+    - article_identity
+    - source_artifact_id
+    - source_artifact_sha256
+    - surface
+    - block_index
+    - block_tag
+    - locator
+    - exact_quote
+    - exact_quote_sha256
+    - matched_aliases
+    - review_state
+  invariants:
+    - candidate_id is deterministic from source identity, surface and block index
+    - article_identity agrees exactly with the acquisition article index
+    - source artifact bytes and hash agree exactly with the acquisition manifest
+    - locator reproduces exact_quote from the deterministic extracted surface
+    - matched_aliases is a sorted, unique, non-empty list
+    - review_state is exactly PROPOSED_UNACCEPTED
+
+supervised_delta_review:
+  purpose: >-
+    Classify only the eight lexical candidates by source role and delta value,
+    preserving exact source wording, assay context and lineage limitations.
+    This is model-assisted preparation for future human review, not Gate 8.
+  record_schema: raptor.external.r611q_literature_delta_review_record.v1
+  one_record_per: exact alias candidate source
+  source_roles:
+    - DIRECT_ALLELE_EXPERIMENT
+    - ALLELE_BEARING_MODEL_CONTEXT
+    - CLINICAL_CASE_IDENTITY
+    - SECONDARY_REVIEW
+    - NOT_RELEVANT
+  primary_result_states:
+    - PRIMARY_R611Q_RESULT
+    - PRIMARY_VARIANT_BEARING_MODEL_RESULT
+    - CASE_OR_COHORT_OBSERVATION
+    - SECONDARY_SYNTHESIS_ONLY
+    - NO_R611Q_RESULT
+  baseline_relation:
+    allowed:
+      - SUPPORTS
+      - NARROWS
+      - CONTRADICTS
+      - ORTHOGONAL
+      - NO_DIRECT_RELATION
+    claims:
+      - r611q-claim-0
+      - r611q-claim-1
+  delta_value:
+    allowed:
+      - NEW_PRIMARY_OBSERVATION
+      - NEW_ASSAY_OR_MODEL_CONTEXT
+      - NEW_CLINICAL_OCCURRENCE
+      - SECONDARY_ONLY
+      - NO_MATERIAL_DELTA
+  required_context_fields:
+    - r611q_role
+    - model_system
+    - perturbation
+    - comparator
+    - readout
+    - directness
+    - assay_lineage
+    - independence
+    - limitations
+  proposition_rule: >-
+    Proposition identifiers must come from the pinned RescueScreen inventory.
+    Secondary reviews cannot support or contradict a proposition. Results
+    measured only in an $R611Q$-bearing model are indirect context and cannot
+    be promoted into direct allele-mechanism statements.
+  required_state:
+    review_kind: MODEL_ASSISTED_SOURCE_TRIAGE
+    acceptance_state: PROPOSED_UNACCEPTED
+    human_gate_8_effect: NONE
+
+output:
+  external_bundle:
+    root_environment_variable: RAPTOR_R611Q_DELTA_REVIEW_ROOT
+    default_root: ~/raptor-data/external/r611q-literature-delta-review
+    run_name: r611q-literature-delta-review-2026-09-16
+    bundle_id: r611q-literature-delta-review-2026-09-16
+    create_only: true
+    artifacts:
+      - normalized/article-dispositions.jsonl
+      - normalized/candidate-spans.jsonl
+      - reviewed/review-records.jsonl
+      - reviewed/R611Q_LITERATURE_DELTA_ADDENDUM.md
+      - bundle_manifest.json
+  committed_summary:
+    path: data/census/r611q_literature_delta_review_2026-09-16.json
+    contains:
+      - input hashes
+      - article, availability and lexical-candidate counts
+      - source-role and delta-value counts
+      - candidate-span count
+      - relation-to-baseline aggregate counts
+      - explicit zero accepted claims and unchanged Gate 8 state
+      - external artifact hashes
+      - non-clinical boundaries
+    excludes:
+      - PMID, PMCID, DOI, title or per-article identity
+      - source quote, abstract, article text or locator
+      - proposed scientific statement
+      - reviewer-agent output or chain of thought
+      - patient-level information
+      - classification or evidence-strength assertion
+
+implementation:
+  package: src/raptor/external/r611q_literature/delta_review.py
+  operator: scripts/build_r611q_literature_delta_review.py
+  config: configs/external/r611q_literature_delta_review_v1.yaml
+  tests: tests/external/test_r611q_literature_delta_review.py
+  reuse:
+    - raptor.external.r611q_literature.bundle manifest and create-only patterns
+    - raptor.atlas citation text-char locator semantics
+    - RescueScreen category, proposition and lineage vocabulary
+
+delivery_checks:
+  - every input file is hash- and byte-length-verified before parsing
+  - the acquisition manifest self-hash and every referenced artifact are reverified
+  - the operator is offline and imports no network client
+  - all 69 article-index rows receive exactly one deterministic disposition
+  - candidate sources are exactly the lexical subset of frozen available text
+  - reference-list mentions never create candidates
+  - every candidate quote and locator re-verifies against deterministic extracted text
+  - review records are exactly one-to-one with candidate sources
+  - review source identities cannot collide with the pinned baseline inventory
+  - every scientific annotation remains PROPOSED_UNACCEPTED
+  - secondary sources cannot support or contradict propositions
+  - model-context results cannot become direct allele-mechanism claims
+  - no review record changes either existing proposed claim or Gate 8 state
+  - all output is external and create-only; the manifest is written last
+  - the committed summary is an exact aggregate-only derivation of the manifest
+
+stop_go:
+  update_existing_package_if:
+    - at least one NEW_PRIMARY_OBSERVATION is exact-span verified
+    - a verified result NARROWS or CONTRADICTS an existing proposed claim
+    - new assay/model context materially changes an existing limitation or evidence gap
+  stop_r611q_expansion_if:
+    - all eight candidates are secondary, case-only, indirect duplicates or no material delta
+  consider_broader_source_expansion_only_if: >-
+    The bounded delta demonstrates useful primary-source yield that cannot be
+    achieved more efficiently through targeted priority-variant searches.
+
+boundaries:
+  existing_package_mutation: forbidden
+  accepted_claims: 0
+  atlas_gate_8_change: forbidden
+  clinical_use: forbidden
+  evidence_strength_use: forbidden
+  ps3_bs3_use: forbidden
+  treatment_recommendation: forbidden
