@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import importlib.util
+import inspect
 import json
 import re
 import unicodedata
@@ -1459,3 +1460,187 @@ def test_ac13_pilot_summary_regression_file_is_intentionally_red_until_present_a
     serialized = _canonical_json(summary).lower()
     for forbidden in SUMMARY_FORBIDDEN_KEYS:
         assert forbidden not in serialized
+
+
+def _synthetic_master_inventory_payload() -> dict[str, Any]:
+    payload = {
+        "schema": "rescuescreen.r611q.master_source_inventory.v1",
+        "publications": [
+            {
+                "source_id": "PMID:91000001",
+                "identifiers": {"pmid": "91000001", "doi": "10.9999/syn.delta.001"},
+                "notes": {"pmid": "77777777", "propositions": "nested-noise-proposition-a"},
+            },
+            {
+                "source_id": "DOI:10.9999/syn.delta.002",
+                "identifiers": {"doi": "10.9999/syn.delta.002"},
+                "notes": {"pmid": "88888888", "propositions": "nested-noise-proposition-b"},
+            },
+            {
+                "source_id": "PMID:91000003",
+                "identifiers": {"pmid": "91000003"},
+                "notes": {"propositions": ["nested-array-entry-must-not-be-harvested"]},
+            },
+        ],
+        "proposition_vocabulary": {
+            "prop-syn-alpha": "Synthetic baseline proposition alpha.",
+            "prop-syn-beta": "Synthetic baseline proposition beta.",
+        },
+        "unrelated": {"pmid": "99999999", "propositions": "top-level-noise-proposition"},
+    }
+    _assert_no_cribbing(payload)
+    return payload
+
+
+def _master_inventory_bytes(payload: dict[str, Any]) -> bytes:
+    return (_canonical_json(payload) + "\n").encode("utf-8")
+
+
+def test_ac14_master_inventory_source_ids_are_extracted_from_publications_only() -> None:
+    module = _load_operator_module()
+    derive = _symbol(module, "derive_baseline_source_ids")
+
+    payload = _synthetic_master_inventory_payload()
+    source_ids = derive(_master_inventory_bytes(payload))
+    assert source_ids == {
+        "PMID:91000001",
+        "DOI:10.9999/syn.delta.002",
+        "PMID:91000003",
+    }
+    assert "PMID:77777777" not in source_ids
+    assert "PMID:88888888" not in source_ids
+    assert "PMID:99999999" not in source_ids
+
+
+def test_ac15_master_inventory_proposition_vocabulary_uses_top_level_mapping_keys_only() -> None:
+    module = _load_operator_module()
+    derive = _symbol(module, "derive_proposition_vocabulary")
+
+    payload = _synthetic_master_inventory_payload()
+    proposition_ids = derive(_master_inventory_bytes(payload))
+    assert proposition_ids == {"prop-syn-alpha", "prop-syn-beta"}
+    assert "nested-noise-proposition-a" not in proposition_ids
+    assert "nested-noise-proposition-b" not in proposition_ids
+    assert "top-level-noise-proposition" not in proposition_ids
+
+
+@pytest.mark.parametrize(
+    ("payload_mutation", "error_pattern"),
+    [
+        (
+            lambda payload: payload.__setitem__(
+                "publications",
+                {
+                    "source_id": "PMID:91000001",
+                    "identifiers": {"pmid": "91000001"},
+                },
+            ),
+            r"publications|list|schema",
+        ),
+        (
+            lambda payload: payload.__setitem__(
+                "publications",
+                [
+                    {
+                        "source_id": "PMID:91000001",
+                        "identifiers": {"pmid": "91000001"},
+                    },
+                    {
+                        "source_id": "PMID:91000001",
+                        "identifiers": {"pmid": "91000001"},
+                    },
+                ],
+            ),
+            r"duplicate|source_id|publications",
+        ),
+        (
+            lambda payload: payload.__setitem__(
+                "publications",
+                [
+                    {
+                        "source_id": "PMID:91000001",
+                        "identifiers": {"pmid": "91009999"},
+                    }
+                ],
+            ),
+            r"pmid|identifier|inconsistent|source_id",
+        ),
+    ],
+)
+def test_ac16_master_inventory_source_id_derivation_rejects_malformed_publications(
+    payload_mutation,
+    error_pattern: str,
+) -> None:
+    module = _load_operator_module()
+    derive = _symbol(module, "derive_baseline_source_ids")
+    error_cls = _symbol(module, "DeltaReviewOperatorError")
+
+    payload = _synthetic_master_inventory_payload()
+    payload_mutation(payload)
+    with pytest.raises(error_cls, match=error_pattern):
+        derive(_master_inventory_bytes(payload))
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {
+            "schema": "rescuescreen.r611q.master_source_inventory.v1",
+            "publications": [],
+            "proposition_vocabulary": ["prop-syn-alpha"],
+        },
+        {
+            "schema": "rescuescreen.r611q.master_source_inventory.v1",
+            "publications": [],
+            "proposition_vocabulary": {"": "blank identifier is forbidden"},
+        },
+        {
+            "schema": "rescuescreen.r611q.master_source_inventory.v1",
+            "publications": [],
+            "proposition_vocabulary": {"prop-syn-alpha": 17},
+        },
+    ],
+)
+def test_ac17_master_inventory_proposition_vocabulary_rejects_wrong_shape_or_types(payload: dict[str, Any]) -> None:
+    module = _load_operator_module()
+    derive = _symbol(module, "derive_proposition_vocabulary")
+    error_cls = _symbol(module, "DeltaReviewOperatorError")
+
+    with pytest.raises(error_cls, match=r"proposition|vocabulary|mapping|identifier|string|type"):
+        derive(_master_inventory_bytes(payload))
+
+
+def test_ac18_master_inventory_public_parser_contract_supports_expected_publication_count() -> None:
+    module = _load_operator_module()
+    parser = getattr(module, "parse_master_inventory", None)
+    if parser is None:
+        pytest.fail(
+            "expected strict public parser API is missing: "
+            "parse_master_inventory(master_inventory_bytes, expected_publications) -> "
+            "{source_ids, proposition_vocabulary}"
+        )
+
+    sig = inspect.signature(parser)
+    assert "master_inventory_bytes" in sig.parameters
+    assert "expected_publications" in sig.parameters
+
+    payload = _synthetic_master_inventory_payload()
+    parsed = parser(
+        master_inventory_bytes=_master_inventory_bytes(payload),
+        expected_publications=3,
+    )
+    assert isinstance(parsed, dict)
+    assert set(parsed) == {"source_ids", "proposition_vocabulary"}
+    assert parsed["source_ids"] == {
+        "PMID:91000001",
+        "DOI:10.9999/syn.delta.002",
+        "PMID:91000003",
+    }
+    assert parsed["proposition_vocabulary"] == {"prop-syn-alpha", "prop-syn-beta"}
+
+    error_cls = _symbol(module, "DeltaReviewOperatorError")
+    with pytest.raises(error_cls, match=r"expected_publications|publication count|mismatch"):
+        parser(
+            master_inventory_bytes=_master_inventory_bytes(payload),
+            expected_publications=2,
+        )
