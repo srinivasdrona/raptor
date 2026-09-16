@@ -56,6 +56,7 @@ CANDIDATE_SPAN_FIELDS = frozenset(
         "surface",
         "block_index",
         "block_tag",
+        "context",
         "locator",
         "exact_quote",
         "exact_quote_sha256",
@@ -308,6 +309,10 @@ def _normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", normalized).strip()
 
 
+def _node_text(node: ET.Element) -> str:
+    return _normalize_text(" ".join(part for part in node.itertext()))
+
+
 def _contains_declaration(xml_text: str, token: str) -> bool:
     return token in xml_text.lower()
 
@@ -342,6 +347,124 @@ def _oracle_match_aliases(text: str) -> list[str]:
     return merged
 
 
+def _ancestor_chain(node: ET.Element, parent_by_child: dict[ET.Element, ET.Element]) -> list[ET.Element]:
+    chain = [node]
+    cursor = node
+    while cursor in parent_by_child:
+        cursor = parent_by_child[cursor]
+        chain.append(cursor)
+    return chain
+
+
+def _nearest_ancestor_by_tag(
+    node: ET.Element,
+    *,
+    parent_by_child: dict[ET.Element, ET.Element],
+    tag: str,
+) -> ET.Element | None:
+    cursor: ET.Element | None = node
+    while cursor is not None:
+        if _local_name(cursor.tag) == tag:
+            return cursor
+        cursor = parent_by_child.get(cursor)
+    return None
+
+
+def _section_title_path(node: ET.Element, parent_by_child: dict[ET.Element, ET.Element]) -> list[str]:
+    titles: list[str] = []
+    for ancestor in reversed(_ancestor_chain(node, parent_by_child)):
+        if _local_name(ancestor.tag) != "sec":
+            continue
+        title_node = next((child for child in list(ancestor) if _local_name(child.tag) == "title"), None)
+        if title_node is None:
+            continue
+        title_text = _node_text(title_node)
+        if title_text:
+            titles.append(title_text)
+    return titles
+
+
+def _table_headers_for_row(row: ET.Element, parent_by_child: dict[ET.Element, ET.Element]) -> list[str]:
+    table_node = _nearest_ancestor_by_tag(row, parent_by_child=parent_by_child, tag="table")
+    if table_node is None:
+        return []
+    for tr in table_node.iter():
+        if _local_name(tr.tag) != "tr":
+            continue
+        headers = [
+            _node_text(cell)
+            for cell in list(tr)
+            if _local_name(cell.tag) == "th" and _node_text(cell)
+        ]
+        if headers:
+            return headers
+    return []
+
+
+def _row_match_coordinates(
+    row: ET.Element,
+    parent_by_child: dict[ET.Element, ET.Element],
+) -> list[dict[str, int]]:
+    table_node = _nearest_ancestor_by_tag(row, parent_by_child=parent_by_child, tag="table")
+    row_number = 1
+    if table_node is not None:
+        ordered_rows = [node for node in table_node.iter() if _local_name(node.tag) == "tr"]
+        for idx, candidate in enumerate(ordered_rows, start=1):
+            if candidate is row:
+                row_number = idx
+                break
+
+    coordinates: list[dict[str, int]] = []
+    col_idx = 0
+    for child in list(row):
+        child_tag = _local_name(child.tag)
+        if child_tag not in {"td", "th"}:
+            continue
+        col_idx += 1
+        cell_text = _node_text(child)
+        if not cell_text:
+            continue
+        if _oracle_match_aliases(cell_text):
+            coordinates.append({"row": row_number, "column": col_idx})
+    return coordinates
+
+
+def _context_for_block(node: ET.Element, tag: str, parent_by_child: dict[ET.Element, ET.Element]) -> dict[str, Any]:
+    section_path = _section_title_path(node, parent_by_child)
+    context: dict[str, Any] = {"section_title_path": section_path}
+
+    if tag == "tr":
+        wrap = _nearest_ancestor_by_tag(node, parent_by_child=parent_by_child, tag="table-wrap")
+        label_text = None
+        caption_text = None
+        if wrap is not None:
+            label_node = next((child for child in list(wrap) if _local_name(child.tag) == "label"), None)
+            if label_node is not None:
+                candidate_label = _node_text(label_node)
+                label_text = candidate_label or None
+            caption_node = next((child for child in list(wrap) if _local_name(child.tag) == "caption"), None)
+            if caption_node is not None:
+                candidate_caption = _node_text(caption_node)
+                caption_text = candidate_caption or None
+        context.update(
+            {
+                "table_label": label_text,
+                "table_caption": caption_text,
+                "column_headers": _table_headers_for_row(node, parent_by_child),
+                "matching_cell_coordinates": _row_match_coordinates(node, parent_by_child),
+            }
+        )
+    elif tag == "caption":
+        wrap = _nearest_ancestor_by_tag(node, parent_by_child=parent_by_child, tag="table-wrap")
+        if wrap is not None:
+            label_node = next((child for child in list(wrap) if _local_name(child.tag) == "label"), None)
+            if label_node is not None:
+                candidate_label = _node_text(label_node)
+                context["table_label"] = candidate_label or None
+
+    return context
+
+
 def _oracle_extract_smallest_matching_blocks(xml_text: str) -> dict[str, Any]:
     if _contains_declaration(xml_text, "<!doctype"):
         raise ValueError("DOCTYPE is forbidden")
@@ -360,8 +483,8 @@ def _oracle_extract_smallest_matching_blocks(xml_text: str) -> dict[str, Any]:
         for child in parent:
             parent_by_child[child] = parent
 
-    block_tags = {"p", "td", "th", "caption"}
-    blocks: list[tuple[ET.Element, str, str, list[str]]] = []
+    block_tags = {"p", "tr", "caption"}
+    blocks: list[tuple[ET.Element, str, str, list[str], dict[str, Any]]] = []
 
     def walk(node: ET.Element, excluded: bool = False) -> None:
         tag = _local_name(node.tag)
@@ -369,32 +492,33 @@ def _oracle_extract_smallest_matching_blocks(xml_text: str) -> dict[str, Any]:
         if next_excluded:
             return
         if tag in block_tags:
-            text = _normalize_text("".join(node.itertext()))
+            text = _node_text(node)
             if text:
                 matches = _oracle_match_aliases(text)
-                blocks.append((node, tag, text, matches))
+                context = _context_for_block(node, tag, parent_by_child)
+                blocks.append((node, tag, text, matches, context))
         for child in list(node):
             walk(child, excluded=next_excluded)
 
     walk(body)
 
-    selected: list[tuple[str, str, list[str]]] = []
-    for node, tag, text, matches in blocks:
+    selected: list[tuple[str, str, list[str], dict[str, Any]]] = []
+    for node, tag, text, matches, context in blocks:
         if not matches:
             continue
         has_matching_descendant = any(
-            other_matches and _is_descendant(other_node, node, parent_by_child)
-            for other_node, _other_tag, _other_text, other_matches in blocks
+            other_matches and _other_text == text and _is_descendant(other_node, node, parent_by_child)
+            for other_node, _other_tag, _other_text, other_matches, _other_context in blocks
             if other_node is not node
         )
         if has_matching_descendant:
             continue
-        selected.append((tag, text, matches))
+        selected.append((tag, text, matches, context))
 
     joined_text_parts: list[str] = []
     records: list[dict[str, Any]] = []
     cursor = 0
-    for index, (tag, text, matches) in enumerate(selected):
+    for index, (tag, text, matches, context) in enumerate(selected):
         joined_text_parts.append(text)
         start = cursor
         end = cursor + len(text)
@@ -402,6 +526,7 @@ def _oracle_extract_smallest_matching_blocks(xml_text: str) -> dict[str, Any]:
             {
                 "block_index": index,
                 "block_tag": tag,
+                "context": context,
                 "locator": f"text-char:{start}:{end}",
                 "text": text,
                 "matched_aliases": matches,
@@ -434,6 +559,7 @@ def _oracle_candidate_span(
     surface: str,
     block_index: int,
     block_tag: str,
+    context: dict[str, Any],
     locator: str,
     exact_quote: str,
     matched_aliases: list[str],
@@ -448,6 +574,7 @@ def _oracle_candidate_span(
         "surface": surface,
         "block_index": block_index,
         "block_tag": block_tag,
+        "context": context,
         "locator": locator,
         "exact_quote": exact_quote,
         "exact_quote_sha256": _sha256_bytes(exact_quote.encode("utf-8")),
@@ -669,29 +796,41 @@ def test_oracle02_secure_jats_oracle_rejects_declarations_and_extracts_smallest_
 <article>
   <body>
     <sec>
+      <title>Results</title>
       <p>Noise paragraph with no alias mention.</p>
-      <p>Parent carrier <caption>R611Q mention in caption</caption> trailing words.</p>
       <table-wrap>
+        <label>Table 2</label>
+        <caption>R611Q mention in caption</caption>
         <table>
+          <thead>
+            <tr><th>Case</th><th>Allele</th><th>Readout</th></tr>
+          </thead>
           <tbody>
-            <tr><td>The tuberin signal includes c.1832G > A in assay text.</td></tr>
-            <tr><th>rs28934872 appears in header context.</th></tr>
+            <tr><td>C-01</td><td>c.1832G > A</td><td>signal up</td></tr>
+            <tr><td>C-02</td><td>wildtype</td><td>baseline</td></tr>
           </tbody>
         </table>
       </table-wrap>
       <ref-list>
         <ref><mixed-citation>R611Q inside references must be ignored.</mixed-citation></ref>
       </ref-list>
-      <p>Cafe\u0301 control with R611Q normalized form.</p>
+      <p>Cafe\u0301 control with rs28934872 normalized form.</p>
     </sec>
   </body>
 </article>"""
     extracted = _oracle_extract_smallest_matching_blocks(xml)
     blocks = extracted["blocks"]
-    assert [item["block_tag"] for item in blocks] == ["caption", "td", "th", "p"]
+    assert [item["block_tag"] for item in blocks] == ["caption", "tr", "p"]
     assert "references must be ignored" not in extracted["joined_text"].lower()
-    assert "Café control with R611Q normalized form." in extracted["joined_text"]
+    assert "Café control with rs28934872 normalized form." in extracted["joined_text"]
+    row_context = blocks[1]["context"]
+    assert row_context["section_title_path"] == ["Results"]
+    assert row_context["table_label"] == "Table 2"
+    assert row_context["table_caption"] == "R611Q mention in caption"
+    assert row_context["column_headers"] == ["Case", "Allele", "Readout"]
+    assert row_context["matching_cell_coordinates"] == [{"row": 2, "column": 2}]
     for block in blocks:
+        assert "context" in block
         assert block["matched_aliases"] == sorted(block["matched_aliases"], key=lambda v: (v.casefold(), v))
         assert _slice_locator(extracted["joined_text"], block["locator"]) == block["text"]
 
@@ -728,6 +867,7 @@ def test_oracle04_candidate_oracle_hash_and_locator_are_reproducible() -> None:
         surface="acquired_cc_by_jats_body",
         block_index=1,
         block_tag="p",
+        context={"section_title_path": ["Synthetic section"]},
         locator=locator,
         exact_quote=quote,
         matched_aliases=["R611Q", "p.R611Q", "R611Q"],
@@ -739,6 +879,7 @@ def test_oracle04_candidate_oracle_hash_and_locator_are_reproducible() -> None:
         surface="acquired_cc_by_jats_body",
         block_index=1,
         block_tag="p",
+        context={"section_title_path": ["Synthetic section"]},
         locator=locator,
         exact_quote=quote,
         matched_aliases=["p.R611Q", "R611Q"],
@@ -747,6 +888,37 @@ def test_oracle04_candidate_oracle_hash_and_locator_are_reproducible() -> None:
     assert span_a["matched_aliases"] == ["p.R611Q", "R611Q"]
     assert span_a["exact_quote_sha256"] == _sha256_bytes(quote.encode("utf-8"))
     assert set(span_a) == CANDIDATE_SPAN_FIELDS
+
+
+def test_oracle05_transposed_table_context_preserves_headers_and_coordinates() -> None:
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<article>
+  <body>
+    <sec>
+      <title>Supplement</title>
+      <table-wrap>
+        <label>Table T</label>
+        <caption>Transposed synthetic matrix</caption>
+        <table>
+          <tbody>
+            <tr><th>Axis</th><th>Case-1</th><th>Case-2</th></tr>
+            <tr><th>Allele</th><td>R611Q</td><td>wildtype</td></tr>
+            <tr><th>Readout</th><td>high</td><td>baseline</td></tr>
+          </tbody>
+        </table>
+      </table-wrap>
+    </sec>
+  </body>
+</article>"""
+    parsed = _oracle_extract_smallest_matching_blocks(xml)
+    assert [item["block_tag"] for item in parsed["blocks"]] == ["tr"]
+    row = parsed["blocks"][0]
+    assert row["context"]["section_title_path"] == ["Supplement"]
+    assert row["context"]["table_label"] == "Table T"
+    assert row["context"]["table_caption"] == "Transposed synthetic matrix"
+    assert row["context"]["column_headers"] == ["Axis", "Case-1", "Case-2"]
+    assert row["context"]["matching_cell_coordinates"] == [{"row": 2, "column": 2}]
+    assert _slice_locator(parsed["joined_text"], row["locator"]) == row["text"]
 
 
 def test_ac01_required_surface_files_exist() -> None:
@@ -758,12 +930,26 @@ def test_ac01_required_surface_files_exist() -> None:
 def test_ac02_config_matches_spec_input_pins_and_output_names() -> None:
     if not SPEC_PATH.is_file():
         pytest.fail(f"spec file not found: {SPEC_PATH}")
+    spec = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))
+    assert isinstance(spec, dict)
+    assert spec["spec_version"] == "1.0.1"
+    jats = spec["deterministic_preselection"]["jats_extraction"]
+    assert jats["block_tags"] == ["p", "tr", "caption"]
+    assert "complete table row" in jats["block_selection"]
+    assert "isolated table cell" in jats["block_selection"]
+    assert jats["context_capture"]["paragraph"] == ["ordered section-title path"]
+    assert jats["context_capture"]["table_row"] == [
+        "table label",
+        "table caption",
+        "column headers",
+        "matching cell coordinates",
+    ]
+    assert "transposed table" in jats["context_capture"]["rule"]
+    assert "context" in spec["candidate_span"]["exact_fields"]
+
     if not CONFIG_PATH.is_file():
         pytest.fail(f"config file not found: {CONFIG_PATH}")
-
-    spec = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))
     config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
-    assert isinstance(spec, dict)
     assert isinstance(config, dict)
 
     assert config["schema"] == "raptor.external.r611q_literature_delta_review_config.v1"
@@ -786,6 +972,12 @@ def test_ac02_config_matches_spec_input_pins_and_output_names() -> None:
         == spec["inputs"]["acquisition_bundle"]["manifest_byte_length"]
     )
     assert config["inputs"]["acquisition_bundle"]["article_index"] == spec["inputs"]["acquisition_bundle"]["article_index"]
+    assert config["deterministic_preselection"]["jats_extraction"]["block_tags"] == ["p", "tr", "caption"]
+    assert (
+        config["deterministic_preselection"]["jats_extraction"]["context_capture"]["table_row"]
+        == jats["context_capture"]["table_row"]
+    )
+    assert "context" in config["candidate_span"]["exact_fields"]
     assert config["inputs"]["rescuescreen_baseline"] == spec["inputs"]["rescuescreen_baseline"]
     assert config["inputs"]["atlas_baseline"] == spec["inputs"]["atlas_baseline"]
     assert config["output"]["artifacts"] == spec["output"]["external_bundle"]["artifacts"]
@@ -849,7 +1041,19 @@ def test_ac05_secure_jats_parser_contract_enforces_required_root_body_and_smalle
 <article>
   <body>
     <sec>
-      <p>Parent <caption>R611Q in caption only</caption> tail.</p>
+      <title>Clinical details</title>
+      <table-wrap>
+        <label>Table A</label>
+        <caption>Row-wise assay summary for R611Q</caption>
+        <table>
+          <thead>
+            <tr><th>Case</th><th>Allele</th><th>Signal</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>S1</td><td>G1832A</td><td>high</td></tr>
+          </tbody>
+        </table>
+      </table-wrap>
       <p>Legacy 1832G>A with TSC2 context.</p>
       <ref-list><ref><mixed-citation>R611Q in references</mixed-citation></ref></ref-list>
     </sec>
@@ -859,9 +1063,16 @@ def test_ac05_secure_jats_parser_contract_enforces_required_root_body_and_smalle
     assert isinstance(parsed, dict)
     assert isinstance(parsed["joined_text"], str)
     assert isinstance(parsed["blocks"], list)
-    assert [block["block_tag"] for block in parsed["blocks"]] == ["caption", "p"]
+    assert [block["block_tag"] for block in parsed["blocks"]] == ["caption", "tr", "p"]
+    row_context = parsed["blocks"][1]["context"]
+    assert row_context["section_title_path"] == ["Clinical details"]
+    assert row_context["table_label"] == "Table A"
+    assert row_context["table_caption"] == "Row-wise assay summary for R611Q"
+    assert row_context["column_headers"] == ["Case", "Allele", "Signal"]
+    assert row_context["matching_cell_coordinates"] == [{"row": 2, "column": 2}]
     assert "references" not in parsed["joined_text"].lower()
     for block in parsed["blocks"]:
+        assert isinstance(block.get("context"), dict)
         assert _slice_locator(parsed["joined_text"], block["locator"]) == block["text"]
 
     with pytest.raises(api["DeltaReviewError"], match="DOCTYPE|declaration"):
@@ -893,8 +1104,8 @@ def test_ac07_candidate_span_schema_ids_aliases_source_hashes_and_locator_reprod
     api = _delta_api()
     fx = _synthetic_acquisition_bundle(tmp_path)
 
-    joined = "alpha\nbeta R611Q and c.1832 G > A in tuberin context\ngamma"
-    quote = "beta R611Q and c.1832 G > A in tuberin context"
+    joined = "alpha\nbeta R611Q and c.1832G > A in tuberin context\ngamma"
+    quote = "beta R611Q and c.1832G > A in tuberin context"
     span = _oracle_candidate_span(
         article_identity={"pmid": "99000001", "pmcid": "PMC9900001", "doi": "10.9999/syn.0001"},
         source_artifact_id="fulltext/PMC9900001.xml",
@@ -902,7 +1113,8 @@ def test_ac07_candidate_span_schema_ids_aliases_source_hashes_and_locator_reprod
         surface="acquired_cc_by_jats_body",
         block_index=1,
         block_tag="p",
-        locator="text-char:6:52",
+        context={"section_title_path": ["Results", "Table context"]},
+        locator="text-char:6:51",
         exact_quote=quote,
         matched_aliases=["R611Q", "c.1832G>A", "R611Q"],
     )
@@ -921,6 +1133,16 @@ def test_ac07_candidate_span_schema_ids_aliases_source_hashes_and_locator_reprod
     with pytest.raises(api["DeltaReviewError"], match="matched_aliases|sorted|unique|non-empty"):
         api["validate_candidate_spans"](
             candidate_spans=bad_spans,
+            article_index_rows=fx["rows"],
+            source_artifact_hashes=fx["source_hashes"],
+            joined_surface_text_by_artifact={"fulltext/PMC9900001.xml": joined},
+        )
+
+    bad_context = json.loads(_canonical_json(candidate_spans))
+    del bad_context[0]["context"]
+    with pytest.raises(api["DeltaReviewError"], match="context|exact required fields|deterministic"):
+        api["validate_candidate_spans"](
+            candidate_spans=bad_context,
             article_index_rows=fx["rows"],
             source_artifact_hashes=fx["source_hashes"],
             joined_surface_text_by_artifact={"fulltext/PMC9900001.xml": joined},
