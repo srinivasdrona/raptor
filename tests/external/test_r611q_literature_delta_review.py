@@ -1644,3 +1644,700 @@ def test_ac18_master_inventory_public_parser_contract_supports_expected_publicat
             master_inventory_bytes=_master_inventory_bytes(payload),
             expected_publications=2,
         )
+
+
+def _valid_article_index_row(
+    *,
+    pmid: str = "91000001",
+    pmcid: str | None = None,
+    doi: str | None = None,
+    fulltext_status: str = "UNAVAILABLE",
+    fulltext_artifact_id: str | None = None,
+) -> dict[str, Any]:
+    row = {
+        "schema": ARTICLE_INDEX_SCHEMA,
+        "pmid": pmid,
+        "discovery_sources": ["litvar2"],
+        "pubmed_status": "RESOLVED",
+        "pmcid": pmcid,
+        "doi": doi,
+        "title": "Synthetic title without prohibited content.",
+        "publication_date": "2026-06-01",
+        "publication_date_precision": "day",
+        "abstract": "Synthetic abstract without prohibited content.",
+        "europe_pmc_status": "RESOLVED",
+        "is_open_access": False,
+        "licence": None,
+        "fulltext_status": fulltext_status,
+        "fulltext_artifact_id": fulltext_artifact_id,
+    }
+    _assert_no_cribbing(row)
+    return row
+
+
+def _write_synthetic_acquisition_bundle(
+    tmp_path: Path,
+    *,
+    rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    bundle_root = tmp_path / "acq-bundle"
+    (bundle_root / "normalized").mkdir(parents=True)
+    article_index_rel = "normalized/article-index.jsonl"
+    article_index_bytes = (
+        "".join(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n" for row in rows).encode("utf-8")
+    )
+    (bundle_root / article_index_rel).write_bytes(article_index_bytes)
+
+    manifest = {
+        "schema": "raptor.external.r611q_literature_bundle.v1",
+        "bundle_id": "synthetic-acquisition-bundle",
+        "artifacts": [
+            {
+                "artifact_id": "article-index",
+                "source_id": "pubmed:synthetic",
+                "role": "ARTICLE_INDEX",
+                "relative_path": article_index_rel,
+                "byte_length": len(article_index_bytes),
+                "sha256": _sha256_bytes(article_index_bytes),
+            }
+        ],
+        "counts": {"sources": 1, "artifacts": 1},
+        "content_hash": "",
+    }
+    manifest["content_hash"] = _manifest_content_hash(manifest)
+    manifest_bytes = (_canonical_json(manifest) + "\n").encode("utf-8")
+    manifest_path = bundle_root / MANIFEST_FILENAME
+    manifest_path.write_bytes(manifest_bytes)
+
+    return {
+        "bundle_root": bundle_root,
+        "manifest_path": manifest_path,
+        "expected_manifest_content_hash": manifest["content_hash"],
+        "expected_manifest_file_sha256": _sha256_bytes(manifest_bytes),
+        "expected_manifest_byte_length": len(manifest_bytes),
+        "expected_article_index": {
+            "relative_path": article_index_rel,
+            "sha256": _sha256_bytes(article_index_bytes),
+            "byte_length": len(article_index_bytes),
+            "rows": len(rows),
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    ("rows", "expect_pattern"),
+    [
+        (
+            [
+                _valid_article_index_row(pmid="91000002"),
+                _valid_article_index_row(pmid="91000001"),
+            ],
+            r"sorted|pmid|numeric",
+        ),
+        (
+            [
+                _valid_article_index_row(pmid="91000001"),
+                _valid_article_index_row(pmid="91000001"),
+            ],
+            r"duplicate|pmid|unique",
+        ),
+        (
+            [
+                _valid_article_index_row(pmid="091000001"),
+            ],
+            r"canonical|pmid",
+        ),
+        (
+            [
+                dict(_valid_article_index_row(pmid="91000001"), schema="other.schema"),
+            ],
+            r"schema|article",
+        ),
+        (
+            [
+                dict(_valid_article_index_row(pmid="91000001"), doi=["10.9999/syn.bad.type"]),
+            ],
+            r"identity|scalar|type|doi",
+        ),
+    ],
+)
+def test_ac19_article_index_row_parser_rejects_structural_drift_even_with_recomputed_pins(
+    tmp_path: Path,
+    rows: list[dict[str, Any]],
+    expect_pattern: str,
+) -> None:
+    module = _load_operator_module()
+    delta = _delta_api()
+
+    fx = _write_synthetic_acquisition_bundle(tmp_path, rows=rows)
+    validated = delta["validate_acquisition_manifest"](
+        manifest_path=fx["manifest_path"],
+        bundle_root=fx["bundle_root"],
+        expected_manifest_content_hash=fx["expected_manifest_content_hash"],
+        expected_manifest_file_sha256=fx["expected_manifest_file_sha256"],
+        expected_manifest_byte_length=fx["expected_manifest_byte_length"],
+        expected_article_index=fx["expected_article_index"],
+    )
+    assert validated["article_index_row_count"] == len(rows)
+
+    with pytest.raises(_symbol(module, "DeltaReviewOperatorError"), match=expect_pattern):
+        module.read_article_index_rows(
+            validated["manifest"],
+            fx["bundle_root"],
+            fx["expected_article_index"]["relative_path"],
+        )
+
+
+def test_ac20_verify_inputs_enforces_acquisition_manifest_schema_and_bundle_id_after_hash_validation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_operator_module()
+    error_cls = _symbol(module, "DeltaReviewOperatorError")
+
+    bundle_root = tmp_path / "bundle"
+    (bundle_root / "normalized").mkdir(parents=True)
+    article_index_rel = "normalized/article-index.jsonl"
+    rows = [_valid_article_index_row(pmid="91000001")]
+    (bundle_root / article_index_rel).write_text(
+        "".join(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+    config = {
+        "inputs": {
+            "acquisition_bundle": {
+                "schema": "raptor.external.r611q_literature_bundle.v1",
+                "bundle_id": "expected-bundle-id",
+                "manifest_content_hash": "f" * 64,
+                "manifest_file_sha256": "e" * 64,
+                "manifest_byte_length": 123,
+                "article_index": {
+                    "relative_path": article_index_rel,
+                    "sha256": "d" * 64,
+                    "byte_length": 456,
+                    "rows": 1,
+                },
+            }
+        }
+    }
+    args = type(
+        "_Args",
+        (),
+        {
+            "acquisition_bundle_root": bundle_root,
+            "rescuescreen_source_manifest": tmp_path / "rescuescreen-source.json",
+            "rescuescreen_master_inventory": tmp_path / "rescuescreen-master.json",
+            "atlas_expert_packet": tmp_path / "atlas-packet.json",
+            "atlas_expert_form": tmp_path / "atlas-form.json",
+        },
+    )()
+
+    monkeypatch.setattr(
+        module.dr,
+        "validate_acquisition_manifest",
+        lambda **_kwargs: {
+            "manifest": {
+                "schema": "wrong.synthetic.schema",
+                "bundle_id": "unexpected-bundle-id",
+                "artifacts": [],
+            },
+            "article_index_row_count": 1,
+        },
+    )
+    monkeypatch.setattr(module, "verify_baseline_inputs", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(
+        module,
+        "scan_acquisition_bundle",
+        lambda **_kwargs: {
+            "dispositions": [],
+            "candidate_spans": [],
+            "candidate_source_ids": set(),
+            "source_artifact_hashes": {},
+            "joined_surface_text_by_artifact": {},
+        },
+    )
+    monkeypatch.setattr(module.dr, "validate_article_dispositions", lambda **_kwargs: None)
+    monkeypatch.setattr(module.dr, "validate_candidate_spans", lambda **_kwargs: None)
+
+    with pytest.raises(error_cls, match=r"schema|bundle_id|acquisition"):
+        module._verify_inputs_and_scan(config, args)
+
+
+def test_ac21_verify_inputs_rejects_fulltext_artifact_source_identity_mismatch_before_scan(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_operator_module()
+    error_cls = _symbol(module, "DeltaReviewOperatorError")
+
+    bundle_root = tmp_path / "bundle-source-mismatch"
+    (bundle_root / "normalized").mkdir(parents=True)
+    article_index_rel = "normalized/article-index.jsonl"
+    row = _valid_article_index_row(
+        pmid="91000001",
+        pmcid="PMC91000001",
+        doi="10.9999/syn.delta.021",
+        fulltext_status="ACQUIRED_CC_BY",
+        fulltext_artifact_id="fulltext-1",
+    )
+    (bundle_root / article_index_rel).write_text(
+        json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+
+    config = {
+        "inputs": {
+            "acquisition_bundle": {
+                "schema": "raptor.external.r611q_literature_bundle.v1",
+                "bundle_id": "synthetic-acq",
+                "manifest_content_hash": "f" * 64,
+                "manifest_file_sha256": "e" * 64,
+                "manifest_byte_length": 123,
+                "article_index": {
+                    "relative_path": article_index_rel,
+                    "sha256": "d" * 64,
+                    "byte_length": 456,
+                    "rows": 1,
+                },
+            }
+        }
+    }
+    args = type(
+        "_Args",
+        (),
+        {
+            "acquisition_bundle_root": bundle_root,
+            "rescuescreen_source_manifest": tmp_path / "rescuescreen-source.json",
+            "rescuescreen_master_inventory": tmp_path / "rescuescreen-master.json",
+            "atlas_expert_packet": tmp_path / "atlas-packet.json",
+            "atlas_expert_form": tmp_path / "atlas-form.json",
+        },
+    )()
+
+    scan_calls = {"count": 0}
+
+    monkeypatch.setattr(
+        module.dr,
+        "validate_acquisition_manifest",
+        lambda **_kwargs: {
+            "manifest": {
+                "schema": "raptor.external.r611q_literature_bundle.v1",
+                "bundle_id": "synthetic-acq",
+                "artifacts": [
+                    {
+                        "artifact_id": "fulltext-1",
+                        "source_id": "pmcid:PMC99999999",
+                        "role": "FULLTEXT_XML",
+                        "relative_path": "fulltext/PMC91000001.xml",
+                        "byte_length": 12,
+                        "sha256": "0" * 64,
+                    }
+                ],
+            },
+            "article_index_row_count": 1,
+        },
+    )
+    monkeypatch.setattr(module, "verify_baseline_inputs", lambda *_args, **_kwargs: {})
+
+    def _fake_scan(**_kwargs):
+        scan_calls["count"] += 1
+        return {
+            "dispositions": [],
+            "candidate_spans": [],
+            "candidate_source_ids": set(),
+            "source_artifact_hashes": {},
+            "joined_surface_text_by_artifact": {},
+        }
+
+    monkeypatch.setattr(module, "scan_acquisition_bundle", _fake_scan)
+    monkeypatch.setattr(module.dr, "validate_article_dispositions", lambda **_kwargs: None)
+    monkeypatch.setattr(module.dr, "validate_candidate_spans", lambda **_kwargs: None)
+
+    caught: Exception | None = None
+    try:
+        module._verify_inputs_and_scan(config, args)
+    except Exception as exc:  # pragma: no cover - exercised in RED stage
+        caught = exc
+
+    assert isinstance(caught, error_cls), (
+        "fulltext_artifact_id rows must be cross-checked against manifest artifact/source identity "
+        "before scanning"
+    )
+    assert scan_calls["count"] == 0, "scan must not run when fulltext_artifact_id/source identity is inconsistent"
+
+
+def _publish_stubbed_prepared(*, include_dual_surface_spans: bool = False) -> dict[str, Any]:
+    row = _valid_article_index_row(pmid="91000001", doi="10.9999/syn.publish.001")
+    base_span = {
+        "schema": CANDIDATE_SPAN_SCHEMA,
+        "candidate_id": "cand-syn-001",
+        "article_identity": {"pmid": "91000001", "pmcid": None, "doi": "10.9999/syn.publish.001"},
+        "source_artifact_id": "title:PMID:91000001",
+        "source_artifact_sha256": "a" * 64,
+        "surface": "title",
+        "block_index": 0,
+        "block_tag": "title",
+        "context": {"section_title_path": ["title"]},
+        "locator": "text-char:0:20",
+        "exact_quote": "Synthetic title quote",
+        "exact_quote_sha256": _sha256_bytes(b"Synthetic title quote"),
+        "matched_aliases": ["R611Q"],
+        "review_state": "PROPOSED_UNACCEPTED",
+    }
+    spans = [base_span]
+    if include_dual_surface_spans:
+        abstract_span = dict(base_span)
+        abstract_span.update(
+            {
+                "candidate_id": "cand-syn-002",
+                "source_artifact_id": "abstract:PMID:91000001",
+                "surface": "abstract",
+                "block_tag": "abstract",
+                "context": {"section_title_path": ["abstract"]},
+                "exact_quote": "Synthetic abstract quote",
+                "exact_quote_sha256": _sha256_bytes(b"Synthetic abstract quote"),
+            }
+        )
+        spans.append(abstract_span)
+    return {
+        "manifest": {"schema": "unused", "bundle_id": "unused"},
+        "article_index_rows": [row],
+        "baseline_bytes": {"rescuescreen_master_inventory": b"{}"},
+        "dispositions": [{"article_identity": {"pmid": "91000001", "pmcid": None, "doi": "10.9999/syn.publish.001"}, "disposition": "EXACT_ALIAS_CANDIDATE"}],
+        "candidate_spans": spans,
+        "candidate_source_ids": {"PMID:91000001"},
+        "source_artifact_hashes": {
+            "title:PMID:91000001": "a" * 64,
+            "abstract:PMID:91000001": "a" * 64,
+        },
+        "joined_surface_text_by_artifact": {},
+    }
+
+
+def _publish_stubbed_review_records() -> list[dict[str, Any]]:
+    return [
+        {
+            "source_id": "PMID:91000001",
+            "candidate_id": "cand-syn-001",
+            "source_role": "NOT_RELEVANT",
+            "delta_value": "NO_MATERIAL_DELTA",
+            "baseline_relation": "NO_DIRECT_RELATION",
+        }
+    ]
+
+
+def _publish_argv(
+    *,
+    tmp_path: Path,
+    repo_root: Path,
+    output_root: Path,
+    write_summary: bool = True,
+) -> list[str]:
+    config_path = tmp_path / "operator-config.yaml"
+    config_path.write_text("schema: synthetic\n", encoding="utf-8")
+    acq_root = tmp_path / "acq-root"
+    acq_root.mkdir(exist_ok=True)
+    review_records = tmp_path / "review-records.jsonl"
+    review_records.write_text("{}", encoding="utf-8")
+    for name in (
+        "rescuescreen-source.json",
+        "rescuescreen-master.json",
+        "atlas-packet.json",
+        "atlas-form.json",
+    ):
+        (tmp_path / name).write_text("{}", encoding="utf-8")
+
+    argv = [
+        "publish",
+        "--config",
+        str(config_path),
+        "--acquisition-bundle-root",
+        str(acq_root),
+        "--rescuescreen-source-manifest",
+        str(tmp_path / "rescuescreen-source.json"),
+        "--rescuescreen-master-inventory",
+        str(tmp_path / "rescuescreen-master.json"),
+        "--atlas-expert-packet",
+        str(tmp_path / "atlas-packet.json"),
+        "--atlas-expert-form",
+        str(tmp_path / "atlas-form.json"),
+        "--output-root",
+        str(output_root),
+        "--repo-root",
+        str(repo_root),
+        "--review-records",
+        str(review_records),
+    ]
+    if write_summary:
+        argv.append("--write-summary")
+    return argv
+
+
+def _install_publish_harness(
+    *,
+    module: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    config: dict[str, Any],
+    prepared: dict[str, Any],
+    review_records: list[dict[str, Any]],
+    write_calls: list[dict[str, Any]],
+    captured_manifests: list[dict[str, Any]],
+) -> None:
+    monkeypatch.setattr(module, "load_config", lambda _path: config)
+    monkeypatch.setattr(module, "_verify_inputs_and_scan", lambda *_args, **_kwargs: prepared)
+    monkeypatch.setattr(module, "derive_baseline_source_ids", lambda _bytes: {"PMID:80000001"})
+    monkeypatch.setattr(module, "derive_proposition_vocabulary", lambda _bytes: {"prop-syn-alpha"})
+    monkeypatch.setattr(module, "_read_review_records_jsonl", lambda _path: review_records)
+    monkeypatch.setattr(module.dr, "validate_review_records", lambda **_kwargs: None)
+    monkeypatch.setattr(module, "render_addendum", lambda **_kwargs: "# synthetic addendum\n")
+
+    def _fake_write_delta_bundle(**kwargs):
+        write_calls.append({"run_name": kwargs["run_name"], "output_root": kwargs["output_root"]})
+        captured_manifests.append(kwargs["manifest"])
+        return {"run_dir": Path(kwargs["output_root"]) / kwargs["run_name"]}
+
+    monkeypatch.setattr(module.dr, "write_delta_bundle", _fake_write_delta_bundle)
+
+
+def test_ac22_publish_write_summary_rejects_outside_repo_summary_target_before_external_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_operator_module()
+    repo_root = tmp_path / "repo"
+    output_root = tmp_path / "external"
+    repo_root.mkdir()
+    output_root.mkdir()
+
+    outside_summary = (tmp_path / "outside" / "summary.json").resolve()
+    config = {
+        "bundle_id": "synthetic-delta-bundle",
+        "run_name": "synthetic-run",
+        "committed_summary_path": str(outside_summary),
+        "supervised_delta_review": {"baseline_relation": {"claims": ["r611q-claim-0", "r611q-claim-1"]}},
+        "inputs": {
+            "acquisition_bundle": {
+                "manifest_content_hash": "a" * 64,
+                "manifest_file_sha256": "b" * 64,
+            },
+            "rescuescreen_baseline": {
+                "source_manifest": {"sha256": "c" * 64},
+                "master_source_inventory": {"sha256": "d" * 64},
+            },
+            "atlas_baseline": {
+                "expert_packet": {"sha256": "e" * 64},
+                "expert_form": {"sha256": "f" * 64},
+            },
+        },
+    }
+    prepared = _publish_stubbed_prepared()
+    review_records = _publish_stubbed_review_records()
+    write_calls: list[dict[str, Any]] = []
+    captured_manifests: list[dict[str, Any]] = []
+    _install_publish_harness(
+        module=module,
+        monkeypatch=monkeypatch,
+        config=config,
+        prepared=prepared,
+        review_records=review_records,
+        write_calls=write_calls,
+        captured_manifests=captured_manifests,
+    )
+
+    class _MemoryWriter:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def write(self, _payload: bytes) -> int:
+            return 0
+
+    monkeypatch.setattr(module, "open", lambda *_args, **_kwargs: _MemoryWriter(), raising=False)
+
+    rc = module.main(_publish_argv(tmp_path=tmp_path, repo_root=repo_root, output_root=output_root, write_summary=True))
+    assert rc == 1
+    assert not write_calls, "invalid summary target must block external bundle publication"
+
+
+def test_ac23_publish_write_summary_rejects_preexisting_repo_summary_target_before_external_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_operator_module()
+    error_cls = _symbol(module, "DeltaReviewOperatorError")
+    repo_root = tmp_path / "repo-existing-summary"
+    output_root = tmp_path / "external-existing-summary"
+    repo_root.mkdir()
+    output_root.mkdir()
+    summary_rel = "data/census/synthetic-summary.json"
+    summary_path = repo_root / summary_rel
+    summary_path.parent.mkdir(parents=True)
+    summary_path.write_text("{}", encoding="utf-8")
+
+    config = {
+        "bundle_id": "synthetic-delta-bundle",
+        "run_name": "synthetic-run",
+        "committed_summary_path": summary_rel,
+        "supervised_delta_review": {"baseline_relation": {"claims": ["r611q-claim-0", "r611q-claim-1"]}},
+        "inputs": {
+            "acquisition_bundle": {
+                "manifest_content_hash": "a" * 64,
+                "manifest_file_sha256": "b" * 64,
+            },
+            "rescuescreen_baseline": {
+                "source_manifest": {"sha256": "c" * 64},
+                "master_source_inventory": {"sha256": "d" * 64},
+            },
+            "atlas_baseline": {
+                "expert_packet": {"sha256": "e" * 64},
+                "expert_form": {"sha256": "f" * 64},
+            },
+        },
+    }
+    prepared = _publish_stubbed_prepared()
+    review_records = _publish_stubbed_review_records()
+    write_calls: list[dict[str, Any]] = []
+    captured_manifests: list[dict[str, Any]] = []
+    _install_publish_harness(
+        module=module,
+        monkeypatch=monkeypatch,
+        config=config,
+        prepared=prepared,
+        review_records=review_records,
+        write_calls=write_calls,
+        captured_manifests=captured_manifests,
+    )
+
+    parser = _symbol(module, "build_arg_parser")()
+    args = parser.parse_args(
+        _publish_argv(tmp_path=tmp_path, repo_root=repo_root, output_root=output_root, write_summary=True)
+    )
+
+    caught: Exception | None = None
+    try:
+        module.run_publish(args)
+    except Exception as exc:  # pragma: no cover - exercised in RED stage
+        caught = exc
+
+    assert isinstance(caught, error_cls), "pre-existing summary target must fail as a typed operator error"
+    assert not write_calls, "pre-existing summary target must block external bundle publication"
+
+
+def test_ac24_publish_summary_write_oserror_is_sanitized_without_traceback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    module = _load_operator_module()
+    repo_root = tmp_path / "repo-oserror"
+    output_root = tmp_path / "external-oserror"
+    repo_root.mkdir()
+    output_root.mkdir()
+
+    config = {
+        "bundle_id": "synthetic-delta-bundle",
+        "run_name": "synthetic-run",
+        "committed_summary_path": "data/census/synthetic-summary-oserror.json",
+        "supervised_delta_review": {"baseline_relation": {"claims": ["r611q-claim-0", "r611q-claim-1"]}},
+        "inputs": {
+            "acquisition_bundle": {
+                "manifest_content_hash": "a" * 64,
+                "manifest_file_sha256": "b" * 64,
+            },
+            "rescuescreen_baseline": {
+                "source_manifest": {"sha256": "c" * 64},
+                "master_source_inventory": {"sha256": "d" * 64},
+            },
+            "atlas_baseline": {
+                "expert_packet": {"sha256": "e" * 64},
+                "expert_form": {"sha256": "f" * 64},
+            },
+        },
+    }
+    prepared = _publish_stubbed_prepared()
+    review_records = _publish_stubbed_review_records()
+    write_calls: list[dict[str, Any]] = []
+    captured_manifests: list[dict[str, Any]] = []
+    _install_publish_harness(
+        module=module,
+        monkeypatch=monkeypatch,
+        config=config,
+        prepared=prepared,
+        review_records=review_records,
+        write_calls=write_calls,
+        captured_manifests=captured_manifests,
+    )
+
+    def _raise_oserror(*_args, **_kwargs):
+        raise OSError("synthetic summary write failure")
+
+    monkeypatch.setattr(module, "open", _raise_oserror, raising=False)
+    argv = _publish_argv(tmp_path=tmp_path, repo_root=repo_root, output_root=output_root, write_summary=True)
+
+    try:
+        rc = module.main(argv)
+    except Exception as exc:  # pragma: no cover - exercised in RED stage
+        pytest.fail(f"operator main leaked unsanitized exception instead of typed/sanitized error: {exc!r}")
+        return
+
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert "error:" in captured.err.lower()
+    assert "traceback" not in captured.err.lower()
+
+
+def test_ac25_publish_counts_title_or_abstract_candidate_sources_as_unique_source_ids(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_operator_module()
+    repo_root = tmp_path / "repo-counts"
+    output_root = tmp_path / "external-counts"
+    repo_root.mkdir()
+    output_root.mkdir()
+
+    config = {
+        "bundle_id": "synthetic-delta-bundle",
+        "run_name": "synthetic-run",
+        "committed_summary_path": "data/census/synthetic-summary-counts.json",
+        "supervised_delta_review": {"baseline_relation": {"claims": ["r611q-claim-0", "r611q-claim-1"]}},
+        "inputs": {
+            "acquisition_bundle": {
+                "manifest_content_hash": "a" * 64,
+                "manifest_file_sha256": "b" * 64,
+            },
+            "rescuescreen_baseline": {
+                "source_manifest": {"sha256": "c" * 64},
+                "master_source_inventory": {"sha256": "d" * 64},
+            },
+            "atlas_baseline": {
+                "expert_packet": {"sha256": "e" * 64},
+                "expert_form": {"sha256": "f" * 64},
+            },
+        },
+    }
+    prepared = _publish_stubbed_prepared(include_dual_surface_spans=True)
+    review_records = _publish_stubbed_review_records()
+    write_calls: list[dict[str, Any]] = []
+    captured_manifests: list[dict[str, Any]] = []
+    _install_publish_harness(
+        module=module,
+        monkeypatch=monkeypatch,
+        config=config,
+        prepared=prepared,
+        review_records=review_records,
+        write_calls=write_calls,
+        captured_manifests=captured_manifests,
+    )
+
+    parser = _symbol(module, "build_arg_parser")()
+    args = parser.parse_args(
+        _publish_argv(tmp_path=tmp_path, repo_root=repo_root, output_root=output_root, write_summary=False)
+    )
+    rc = module.run_publish(args)
+    assert rc == 0
+    assert captured_manifests, "test harness did not capture a published manifest"
+    assert captured_manifests[-1]["counts"]["title_or_abstract_candidate_sources"] == 1
