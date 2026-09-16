@@ -1046,20 +1046,28 @@ def validate_review_records(
     allowed_claim_ids: set[str],
 ) -> None:
     """Enforce the supervised-review contract over ``review_records``:
-    exact field set/schema, enum vocabularies for ``source_role``/
-    ``primary_result_state``/``baseline_relation``/``delta_value``,
-    ``baseline_claim_id`` membership in ``allowed_claim_ids`` (or
-    ``None``), ``proposition_ids`` membership in
-    ``proposition_vocabulary``, the exact required ``context`` field set,
-    that a ``SECONDARY_REVIEW`` source role never ``SUPPORTS``/
-    ``CONTRADICTS`` a proposition, that an
+    exact field set/schema, no duplicate ``source_id`` rows (a genuine
+    one-to-one check, not merely a post-hoc set comparison), enum
+    vocabularies for ``source_role``/``primary_result_state``/
+    ``baseline_relation``/``delta_value``, ``proposition_ids`` as a
+    sorted, unique list of strings each in ``proposition_vocabulary``,
+    the exact required ``context`` field set with every value non-null/
+    non-blank (``limitations`` may be a non-empty string or a non-empty
+    list of non-blank strings) -- this is the FINAL validator; a
+    ``prepare``-stage template's ``null`` placeholders are never passed
+    through it -- that a ``SECONDARY_REVIEW`` source role never
+    ``SUPPORTS``/``CONTRADICTS`` a proposition, that an
     ``ALLELE_BEARING_MODEL_CONTEXT`` source role is never promoted to a
-    direct ``PRIMARY_R611Q_RESULT``, that ``review_kind``/
-    ``acceptance_state``/``human_gate_8_effect`` are fixed to the
-    required model-assisted-unaccepted state, that ``claim_change``/
-    ``gate_8_change`` are always ``NONE``, that no record's ``source_id``
-    collides with ``baseline_source_ids``, and that the record set is
-    exactly one-to-one with ``candidate_source_ids``. Raises
+    direct ``PRIMARY_R611Q_RESULT``, that ``baseline_relation`` and
+    ``baseline_claim_id`` cohere exactly (``NO_DIRECT_RELATION`` iff
+    ``baseline_claim_id`` is ``None``; every other relation requires a
+    non-null ``baseline_claim_id`` in ``allowed_claim_ids``), that
+    ``review_kind``/``acceptance_state``/``human_gate_8_effect`` are
+    fixed to the required model-assisted-unaccepted state, that
+    ``claim_change``/``gate_8_change`` are always ``NONE``, that no
+    record's ``source_id`` collides with ``baseline_source_ids``, and
+    that the record set is exactly one-to-one with
+    ``candidate_source_ids``. Raises
     ``DeltaReviewError`` on any violation."""
     if not isinstance(review_records, list):
         raise DeltaReviewError("review_records must be a list")
@@ -1082,6 +1090,11 @@ def validate_review_records(
                 f"review source identity collision with the pinned baseline inventory: "
                 f"{source_id!r} already exists in the RescueScreen baseline"
             )
+        if source_id in observed_source_ids:
+            raise DeltaReviewError(
+                "review records are not exactly one-to-one with candidate sources: duplicate "
+                f"source row for source_id {source_id!r}"
+            )
 
         if record["source_role"] not in SOURCE_ROLES:
             raise DeltaReviewError(f"review record source_role is not a valid enum value: {record['source_role']!r}")
@@ -1098,16 +1111,17 @@ def validate_review_records(
         if record["delta_value"] not in DELTA_VALUES:
             raise DeltaReviewError(f"review record delta_value is not a valid enum value: {record['delta_value']!r}")
 
-        baseline_claim_id = record["baseline_claim_id"]
-        if baseline_claim_id is not None and baseline_claim_id not in allowed_claim_ids:
-            raise DeltaReviewError(
-                f"review record baseline_claim_id is not one of the allowed baseline claim ids "
-                f"{sorted(allowed_claim_ids)!r}: {baseline_claim_id!r}"
-            )
-
         proposition_ids = record["proposition_ids"]
         if not isinstance(proposition_ids, list):
             raise DeltaReviewError("review record proposition_ids must be a list")
+        if not all(isinstance(p, str) for p in proposition_ids):
+            raise DeltaReviewError(
+                f"review record proposition_ids must contain only strings: {proposition_ids!r}"
+            )
+        if len(proposition_ids) != len(set(proposition_ids)) or proposition_ids != sorted(proposition_ids):
+            raise DeltaReviewError(
+                f"review record proposition_ids must be sorted and unique: {proposition_ids!r}"
+            )
         for proposition_id in proposition_ids:
             if proposition_id not in proposition_vocabulary:
                 raise DeltaReviewError(
@@ -1122,6 +1136,22 @@ def validate_review_records(
                 "review record context does not have the exact required context fields "
                 f"{sorted(REQUIRED_CONTEXT_FIELDS)!r}: {observed!r}"
             )
+        for field in REQUIRED_CONTEXT_FIELDS:
+            value = context[field]
+            if field == "limitations":
+                is_valid = (isinstance(value, str) and value.strip() != "") or (
+                    isinstance(value, list)
+                    and bool(value)
+                    and all(isinstance(item, str) and item.strip() != "" for item in value)
+                )
+            else:
+                is_valid = isinstance(value, str) and value.strip() != ""
+            if not is_valid:
+                raise DeltaReviewError(
+                    f"review record context field {field!r} must be a non-null/non-blank value "
+                    "in a final (non-template) review record -- limitations may be a non-empty "
+                    f"string or a non-empty list of non-blank strings: {value!r}"
+                )
 
         if record["source_role"] == "SECONDARY_REVIEW" and record["baseline_relation"] in ("SUPPORTS", "CONTRADICTS"):
             raise DeltaReviewError(
@@ -1137,6 +1167,21 @@ def validate_review_records(
                 "context results and cannot be promoted into a direct PRIMARY_R611Q_RESULT "
                 "allele-mechanism statement"
             )
+
+        baseline_claim_id = record["baseline_claim_id"]
+        if record["baseline_relation"] == "NO_DIRECT_RELATION":
+            if baseline_claim_id is not None:
+                raise DeltaReviewError(
+                    "review record baseline_relation NO_DIRECT_RELATION requires baseline_claim_id "
+                    f"to be null: {baseline_claim_id!r}"
+                )
+        else:
+            if baseline_claim_id is None or baseline_claim_id not in allowed_claim_ids:
+                raise DeltaReviewError(
+                    f"review record baseline_relation {record['baseline_relation']!r} requires a "
+                    f"non-null baseline_claim_id that is one of the allowed claim ids "
+                    f"{sorted(allowed_claim_ids)!r}: {baseline_claim_id!r}"
+                )
 
         if record["review_kind"] != "MODEL_ASSISTED_SOURCE_TRIAGE":
             raise DeltaReviewError(

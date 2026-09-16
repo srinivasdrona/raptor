@@ -823,9 +823,11 @@ def run_publish(args: argparse.Namespace) -> int:
 
     representative = representative_candidate_ids(prepared["candidate_spans"])
     valid_candidate_ids_by_source: dict[str, set[str]] = {}
+    spans_by_candidate_id: dict[str, dict[str, Any]] = {}
     for span in prepared["candidate_spans"]:
         source_id = f"PMID:{span['article_identity']['pmid']}"
         valid_candidate_ids_by_source.setdefault(source_id, set()).add(span["candidate_id"])
+        spans_by_candidate_id[span["candidate_id"]] = span
     for record in review_records:
         source_id = record.get("source_id")
         candidate_id = record.get("candidate_id")
@@ -834,6 +836,21 @@ def run_publish(args: argparse.Namespace) -> int:
             raise DeltaReviewOperatorError(
                 f"review record for {source_id!r} references candidate_id {candidate_id!r}, which "
                 f"is not one of that source's own candidate spans {sorted(valid_ids)!r}"
+            )
+        # Bind the record's own article_identity exactly to the selected
+        # candidate span BEFORE any publication: a record whose
+        # article_identity does not agree with the span/source it claims
+        # to review must never reach the final bundle.
+        selected_span = spans_by_candidate_id.get(candidate_id)
+        if (
+            selected_span is not None
+            and "article_identity" in record
+            and record["article_identity"] != selected_span["article_identity"]
+        ):
+            raise DeltaReviewOperatorError(
+                f"review record for {source_id!r} article_identity {record['article_identity']!r} "
+                "does not match the selected candidate span's own article_identity "
+                f"{selected_span['article_identity']!r}"
             )
 
     dr.validate_review_records(
@@ -890,6 +907,36 @@ def run_publish(args: argparse.Namespace) -> int:
         if span["surface"] == _JATS_BODY_SURFACE
     }
 
+    # canonical_alias_candidate_sources / conditional_legacy_only_candidate_sources:
+    # derived PER UNIQUE SOURCE from its own spans' matched_aliases -- a
+    # source counts as "canonical" if ANY of its spans matched a
+    # canonical alias, and as "legacy-only" only when it matched a
+    # conditional legacy alias (e.g. G1832A/1832G>A) on AT LEAST ONE span
+    # but never a canonical alias anywhere. Every candidate source is
+    # exactly one of these two (canonical_alias_candidate_sources +
+    # conditional_legacy_only_candidate_sources == exact_alias_candidate_
+    # sources), since a candidate source's disposition already requires
+    # at least one canonical-or-conditional-legacy alias match.
+    _canonical_alias_set = set(dr.CANONICAL_ALIASES)
+    _legacy_alias_set = set(dr.CONDITIONAL_LEGACY_ALIASES)
+    source_has_canonical: dict[str, bool] = {}
+    source_has_legacy: dict[str, bool] = {}
+    for span in prepared["candidate_spans"]:
+        source_id = f"PMID:{span['article_identity']['pmid']}"
+        matched = set(span.get("matched_aliases", []))
+        if matched & _canonical_alias_set:
+            source_has_canonical[source_id] = True
+        if matched & _legacy_alias_set:
+            source_has_legacy[source_id] = True
+    canonical_alias_candidate_sources = {
+        source_id for source_id in prepared["candidate_source_ids"] if source_has_canonical.get(source_id)
+    }
+    conditional_legacy_only_candidate_sources = {
+        source_id
+        for source_id in prepared["candidate_source_ids"]
+        if source_has_legacy.get(source_id) and not source_has_canonical.get(source_id)
+    }
+
     manifest: dict[str, Any] = {
         "schema": dr.DELTA_BUNDLE_MANIFEST_SCHEMA,
         "bundle_id": config["bundle_id"],
@@ -907,6 +954,8 @@ def run_publish(args: argparse.Namespace) -> int:
             "exact_alias_candidate_sources": len(prepared["candidate_source_ids"]),
             "title_or_abstract_candidate_sources": len(title_or_abstract_sources),
             "fulltext_body_candidate_sources": len(fulltext_body_sources),
+            "canonical_alias_candidate_sources": len(canonical_alias_candidate_sources),
+            "conditional_legacy_only_candidate_sources": len(conditional_legacy_only_candidate_sources),
             "acquired_fulltexts_without_exact_alias": sum(
                 1
                 for row in prepared["article_index_rows"]
