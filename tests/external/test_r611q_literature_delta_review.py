@@ -934,6 +934,17 @@ def test_oracle02_secure_jats_oracle_doctype_policy_and_block_extraction(monkeyp
         _oracle_extract_smallest_matching_blocks(
             "<!DOCTYPE article PUBLIC \"-//NLM//DTD unexpected//EN\" \"JATS-archivearticle1-4-mathml3.dtd\"><article><body><p>R611Q</p></body></article>"
         )
+    for system_id in (
+        "https://example.invalid/JATS-archivearticle1-4-mathml3.dtd",
+        "../JATS-archivearticle1-4-mathml3.dtd",
+        r"C:\tmp\JATS-archivearticle1-4-mathml3.dtd",
+    ):
+        with pytest.raises(ValueError, match="allowlisted|public/system"):
+            _oracle_extract_smallest_matching_blocks(
+                "<!DOCTYPE article PUBLIC "
+                "\"-//NLM//DTD JATS (Z39.96) Journal Archiving and Interchange DTD with MathML3 v1.4 20241031//EN\" "
+                f"\"{system_id}\"><article><body><p>R611Q</p></body></article>"
+            )
     with pytest.raises(ValueError, match="internal subset"):
         _oracle_extract_smallest_matching_blocks(
             "<!DOCTYPE article PUBLIC \"-//NLM//DTD JATS (Z39.96) Journal Archiving and Interchange DTD with MathML3 v1.4 20241031//EN\" \"JATS-archivearticle1-4-mathml3.dtd\" [ ]><article><body><p>R611Q</p></body></article>"
@@ -1261,6 +1272,19 @@ def test_ac05_secure_jats_parser_contract_enforces_doctype_policy_required_root_
                 "\"JATS-archivearticle1-4-mathml3.dtd\"><article><body><p>R611Q</p></body></article>"
             )
         )
+    for system_id in (
+        "https://example.invalid/JATS-archivearticle1-4-mathml3.dtd",
+        "../JATS-archivearticle1-4-mathml3.dtd",
+        r"C:\tmp\JATS-archivearticle1-4-mathml3.dtd",
+    ):
+        with pytest.raises(api["DeltaReviewError"], match="allowlisted|public|system|forbidden|unknown"):
+            api["extract_jats_blocks"](
+                xml_text=(
+                    "<!DOCTYPE article PUBLIC "
+                    "\"-//NLM//DTD JATS (Z39.96) Journal Archiving and Interchange DTD with MathML3 v1.4 20241031//EN\" "
+                    f"\"{system_id}\"><article><body><p>R611Q</p></body></article>"
+                )
+            )
     with pytest.raises(api["DeltaReviewError"], match="internal|subset|doctype"):
         api["extract_jats_blocks"](
             xml_text=(
