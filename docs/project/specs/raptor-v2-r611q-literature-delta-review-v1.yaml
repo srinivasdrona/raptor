@@ -1,6 +1,6 @@
 schema: raptor.project.spec.v1
 spec_id: raptor-v2-r611q-literature-delta-review-v1
-spec_version: 1.0.2
+spec_version: 1.0.3
 status: APPROVED_BUILD
 created_at: '2026-09-16'
 owner: human-terminal-authority
@@ -175,11 +175,19 @@ deterministic_preselection:
   frozen_input_observation:
     role: deterministic_regression_for_pinned_bytes
     article_rows: 69
-    exact_alias_candidate_sources: 8
+    exact_alias_candidate_sources: 10
     title_or_abstract_candidate_sources: 0
-    fulltext_body_candidate_sources: 8
-    acquired_fulltexts_without_exact_alias: 18
+    fulltext_body_candidate_sources: 10
+    canonical_alias_candidate_sources: 8
+    conditional_legacy_only_candidate_sources: 2
+    candidate_spans: 14
+    acquired_fulltexts_without_exact_alias: 16
     sources_without_acquired_fulltext: 43
+    correction_note: >-
+      The preliminary canonical-alias probe found eight sources. The complete
+      pinned-rule replay added two genuine $TSC2$-contextual $G1832A$ sources
+      from the patient-621 lineage. They are model-context candidates, not new
+      independent allele observations.
 
 candidate_span:
   schema: raptor.external.r611q_literature_delta_candidate_span.v1
@@ -209,7 +217,7 @@ candidate_span:
 
 supervised_delta_review:
   purpose: >-
-    Classify only the eight lexical candidates by source role and delta value,
+    Classify only the ten lexical candidates by source role and delta value,
     preserving exact source wording, assay context and lineage limitations.
     This is model-assisted preparation for future human review, not Gate 8.
   record_schema: raptor.external.r611q_literature_delta_review_record.v1
@@ -330,7 +338,7 @@ stop_go:
     - a verified result NARROWS or CONTRADICTS an existing proposed claim
     - new assay/model context materially changes an existing limitation or evidence gap
   stop_r611q_expansion_if:
-    - all eight candidates are secondary, case-only, indirect duplicates or no material delta
+    - all ten candidates are secondary, case-only, indirect duplicates or no material delta
   consider_broader_source_expansion_only_if: >-
     The bounded delta demonstrates useful primary-source yield that cannot be
     achieved more efficiently through targeted priority-variant searches.
