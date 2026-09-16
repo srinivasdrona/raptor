@@ -963,6 +963,28 @@ def test_oracle03_alias_oracle_enforces_boundaries_casefold_and_conditional_lega
     assert _oracle_match_aliases("Legacy 1832G>A plus R611Q context.") == ["1832G>A", "R611Q"]
 
 
+def test_ac00_conditional_legacy_g1832a_requires_tsc2_context_in_same_paragraph() -> None:
+    api = _delta_api()
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<article>
+  <body>
+    <sec>
+      <title>Synthetic context check</title>
+      <p>G1832A appears with TSC2 context and should become a lexical candidate.</p>
+      <p>G1832A appears without context and must remain non-candidate.</p>
+    </sec>
+  </body>
+</article>"""
+    parsed = api["extract_jats_blocks"](xml_text=xml)
+    assert isinstance(parsed, dict)
+    assert isinstance(parsed["blocks"], list)
+    assert len(parsed["blocks"]) == 1
+    block = parsed["blocks"][0]
+    assert block["block_tag"] == "p"
+    assert block["matched_aliases"] == ["G1832A"]
+    assert "with TSC2 context" in block["text"]
+
+
 def test_oracle04_candidate_oracle_hash_and_locator_are_reproducible() -> None:
     article_identity = {"pmid": "99000001", "pmcid": "PMC9900001", "doi": "10.9999/syn.0001"}
     joined = "alpha\nbeta R611Q sentence\ngamma"
@@ -1042,7 +1064,7 @@ def test_ac02_config_matches_spec_input_pins_and_output_names() -> None:
         pytest.fail(f"spec file not found: {SPEC_PATH}")
     spec = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))
     assert isinstance(spec, dict)
-    assert spec["spec_version"] == "1.0.2"
+    assert spec["spec_version"] == "1.0.3"
     jats = spec["deterministic_preselection"]["jats_extraction"]
     doctype_policy = jats["doctype_policy"]
     assert doctype_policy["absent"] == "allowed"
@@ -1068,6 +1090,21 @@ def test_ac02_config_matches_spec_input_pins_and_output_names() -> None:
     ]
     assert "transposed table" in jats["context_capture"]["rule"]
     assert "context" in spec["candidate_span"]["exact_fields"]
+    frozen = spec["deterministic_preselection"]["frozen_input_observation"]
+    assert frozen["article_rows"] == 69
+    assert frozen["exact_alias_candidate_sources"] == 10
+    assert frozen["title_or_abstract_candidate_sources"] == 0
+    assert frozen["fulltext_body_candidate_sources"] == 10
+    assert frozen["canonical_alias_candidate_sources"] == 8
+    assert frozen["conditional_legacy_only_candidate_sources"] == 2
+    assert frozen["candidate_spans"] == 14
+    assert frozen["acquired_fulltexts_without_exact_alias"] == 16
+    assert frozen["sources_without_acquired_fulltext"] == 43
+    assert frozen["exact_alias_candidate_sources"] + frozen["acquired_fulltexts_without_exact_alias"] == 26
+    assert (
+        frozen["canonical_alias_candidate_sources"] + frozen["conditional_legacy_only_candidate_sources"]
+        == frozen["exact_alias_candidate_sources"]
+    )
 
     if not CONFIG_PATH.is_file():
         pytest.fail(f"config file not found: {CONFIG_PATH}")
@@ -1101,6 +1138,13 @@ def test_ac02_config_matches_spec_input_pins_and_output_names() -> None:
         == jats["context_capture"]["table_row"]
     )
     assert "context" in config["candidate_span"]["exact_fields"]
+    config_frozen = config["deterministic_preselection"]["frozen_input_observation"]
+    assert config_frozen["article_rows"] == frozen["article_rows"]
+    assert config_frozen["exact_alias_candidate_sources"] == frozen["exact_alias_candidate_sources"]
+    assert config_frozen["title_or_abstract_candidate_sources"] == frozen["title_or_abstract_candidate_sources"]
+    assert config_frozen["fulltext_body_candidate_sources"] == frozen["fulltext_body_candidate_sources"]
+    assert config_frozen["acquired_fulltexts_without_exact_alias"] == frozen["acquired_fulltexts_without_exact_alias"]
+    assert config_frozen["sources_without_acquired_fulltext"] == frozen["sources_without_acquired_fulltext"]
     assert config["inputs"]["rescuescreen_baseline"] == spec["inputs"]["rescuescreen_baseline"]
     assert config["inputs"]["atlas_baseline"] == spec["inputs"]["atlas_baseline"]
     assert config["output"]["artifacts"] == spec["output"]["external_bundle"]["artifacts"]
@@ -1554,13 +1598,15 @@ def test_ac12_committed_summary_is_exact_aggregate_derivation_and_excludes_sensi
         },
         "counts": {
             "article_rows": 69,
-            "exact_alias_candidate_sources": 8,
+            "exact_alias_candidate_sources": 10,
             "title_or_abstract_candidate_sources": 0,
-            "fulltext_body_candidate_sources": 8,
-            "acquired_fulltexts_without_exact_alias": 18,
+            "fulltext_body_candidate_sources": 10,
+            "canonical_alias_candidate_sources": 8,
+            "conditional_legacy_only_candidate_sources": 2,
+            "acquired_fulltexts_without_exact_alias": 16,
             "sources_without_acquired_fulltext": 43,
-            "candidate_span_count": 8,
-            "review_record_count": 8,
+            "candidate_span_count": 14,
+            "review_record_count": 10,
             "accepted_claims": 0,
         },
         "source_role_counts": {
@@ -1614,16 +1660,28 @@ def test_ac13_pilot_summary_regression_file_is_intentionally_red_until_present_a
 
     summary = json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))
     assert isinstance(summary, dict)
-    assert summary.get("counts", {}).get("article_rows") == 69
-    assert summary.get("counts", {}).get("exact_alias_candidate_sources") == 8
-    assert summary.get("counts", {}).get("title_or_abstract_candidate_sources") == 0
-    assert summary.get("counts", {}).get("fulltext_body_candidate_sources") == 8
-    assert summary.get("counts", {}).get("acquired_fulltexts_without_exact_alias") == 18
-    assert summary.get("counts", {}).get("sources_without_acquired_fulltext") == 43
-    for value in summary.get("counts", {}).values():
+    counts = summary.get("counts", {})
+    assert counts.get("article_rows") == 69
+    assert counts.get("exact_alias_candidate_sources") == 10
+    assert counts.get("title_or_abstract_candidate_sources") == 0
+    assert counts.get("fulltext_body_candidate_sources") == 10
+    assert counts.get("canonical_alias_candidate_sources") == 8
+    assert counts.get("conditional_legacy_only_candidate_sources") == 2
+    assert counts.get("candidate_span_count") == 14
+    assert counts.get("acquired_fulltexts_without_exact_alias") == 16
+    assert counts.get("sources_without_acquired_fulltext") == 43
+    assert counts["exact_alias_candidate_sources"] + counts["acquired_fulltexts_without_exact_alias"] == 26
+    assert (
+        counts["canonical_alias_candidate_sources"] + counts["conditional_legacy_only_candidate_sources"]
+        == counts["exact_alias_candidate_sources"]
+    )
+    for value in counts.values():
         assert isinstance(value, int)
         assert not isinstance(value, bool)
         assert value >= 0
+    state = summary.get("state", {})
+    assert state.get("accepted_claims") == 0
+    assert state.get("human_gate_8_effect") == "NONE"
 
     serialized = _canonical_json(summary).lower()
     for forbidden in SUMMARY_FORBIDDEN_KEYS:
