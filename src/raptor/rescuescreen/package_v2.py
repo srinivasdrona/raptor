@@ -1842,16 +1842,43 @@ def publish_repository_summary_descriptor_relative(
     ``O_NOFOLLOW`` / descriptor-relative-open support, this fails closed
     with ``PackageV2Error`` before writing anything -- there is no
     path-based fallback.
+
+    Defense in depth: even though the CLI operator already validates
+    ``repository_summary_target``/``json_name``/``readme_name`` before
+    calling this function, this function validates them again itself, at
+    entry, before checking descriptor capabilities or touching the
+    filesystem -- so a direct caller can never reach ``os.open``/``os.mkdir``
+    with an absolute, ``..``-containing, backslash-containing, NUL-containing,
+    whitespace-padded, or otherwise unsafe value, nor with a JSON/README name
+    other than exactly ``package_summary.json``/``README.md``.
+    ``repository_summary_target`` is split with
+    ``_validate_safe_relative_posix_path`` rather than
+    ``PurePosixPath(...).parts``: the latter silently normalizes away empty
+    (``//``) and ``.`` components, which would let an unsafe input pass as
+    if it were already safe.
     """
+
+    repository_summary_target_parts = _validate_safe_relative_posix_path(
+        repository_summary_target, description="repository_summary_target", min_components=2
+    )
+    _validate_relative_single_component(json_name, description="json_name")
+    _require(json_name == "package_summary.json", f"json_name must be exactly 'package_summary.json': {json_name!r}")
+    _validate_relative_single_component(readme_name, description="readme_name")
+    _require(readme_name == "README.md", f"readme_name must be exactly 'README.md': {readme_name!r}")
+
+    repo_root = Path(repo_root)
+    _reject_symlink_ancestry(repo_root, "repository root")
+    _require(
+        repo_root.is_dir() and not repo_root.is_symlink(),
+        f"repository root must already exist as a real directory: {repo_root}",
+    )
 
     _require_descriptor_capabilities()
 
-    parts = PurePosixPath(repository_summary_target).parts
-    _require(len(parts) >= 1, "repository summary target must be a nonblank relative path")
+    parts = repository_summary_target_parts
     parent_components = parts[:-1]
     final_name = parts[-1]
 
-    repo_root = Path(repo_root)
     repo_root_fd = _open_dir_nofollow(repo_root, dir_fd=None, description="repository root")
     try:
         _verify_dir_fd_identity(repo_root_fd, repo_root, dir_fd=None, description="repository root")
