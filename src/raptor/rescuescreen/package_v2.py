@@ -18,7 +18,6 @@ import copy
 import hashlib
 import json
 import os
-import secrets as _secrets
 import stat
 from pathlib import Path, PurePosixPath
 import re
@@ -1336,77 +1335,11 @@ def _write_exclusive_via_dir_fd(dir_fd: int, name: str, payload: bytes) -> None:
         os.close(file_fd)
 
 
-def _read_via_dir_fd(dir_fd: int, name: str) -> bytes:
-    """Read the full contents of ``name`` relative to ``dir_fd``, never
-    following a symlink at that exact name."""
-
-    try:
-        file_fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=dir_fd)
-    except OSError as exc:
-        raise PackageV2Error(f"could not read {name} via directory descriptor: {exc}") from exc
-    try:
-        chunks: list[bytes] = []
-        while True:
-            chunk = os.read(file_fd, 1 << 20)
-            if not chunk:
-                break
-            chunks.append(chunk)
-        return b"".join(chunks)
-    finally:
-        os.close(file_fd)
-
-
 def _unlink_via_dir_fd_best_effort(dir_fd: int, name: str) -> None:
     try:
         os.unlink(name, dir_fd=dir_fd)
     except OSError:
         pass
-
-
-def _rmdir_if_still_ours(dir_fd: int, name: str, claimed_dev_ino: tuple[int, int] | None) -> None:
-    """Remove ``name`` (relative to ``dir_fd``) only if a fresh, non-following
-    stat shows it is still the exact directory this invocation claimed
-    (matching device/inode, a real directory, not a symlink). ``rmdir``
-    itself refuses a non-empty directory, so no separate emptiness probe is
-    needed. A racing symlink or anything else standing there is never
-    touched."""
-
-    if claimed_dev_ino is None:
-        return
-    try:
-        current_stat = os.stat(name, dir_fd=dir_fd, follow_symlinks=False)
-    except OSError:
-        return
-    still_ours = (
-        not stat.S_ISLNK(current_stat.st_mode)
-        and stat.S_ISDIR(current_stat.st_mode)
-        and (current_stat.st_dev, current_stat.st_ino) == claimed_dev_ino
-    )
-    if not still_ours:
-        return
-    try:
-        os.rmdir(name, dir_fd=dir_fd)
-    except OSError:
-        pass
-
-
-def _create_unique_child_dir(dir_fd: int, *, prefix: str, attempts: int = 8) -> str:
-    """Atomically claim a uniquely-named child directory under ``dir_fd``
-    via a bare ``os.mkdir(name, dir_fd=dir_fd)`` (retried on an exceedingly
-    unlikely name collision), returning the claimed name."""
-
-    last_exc: OSError | None = None
-    for _ in range(attempts):
-        candidate = f"{prefix}{_secrets.token_hex(8)}"
-        try:
-            os.mkdir(candidate, 0o700, dir_fd=dir_fd)
-        except FileExistsError as exc:
-            last_exc = exc
-            continue
-        return candidate
-    raise PackageV2Error(
-        f"could not create a unique staging directory name after {attempts} attempts"
-    ) from last_exc
 
 
 def _traverse_dir_nofollow(start_fd: int, components: Sequence[str], *, description: str) -> int:
@@ -1438,58 +1371,32 @@ def _traverse_dir_nofollow(start_fd: int, components: Sequence[str], *, descript
     return current_fd
 
 
-def _cleanup_staging_via_dir_fd(
-    root_fd: int,
-    staging_fd: int,
-    staging_name: str,
-    staged_names: Sequence[str],
-    staging_dev_ino: tuple[int, int] | None,
-) -> None:
-    """Best-effort, descriptor-relative removal of everything this
-    invocation staged: unlink each staged file via ``staging_fd`` (safe
-    regardless of what ``staging_name`` currently names, since this is
-    anchored to the open descriptor, not the name), then remove the staging
-    directory *entry* itself via ``root_fd`` -- but only if a fresh,
-    non-following stat of ``staging_name`` still shows the exact directory
-    this invocation claimed (matching device/inode, a real directory, not a
-    symlink). If ``_publish_directory_no_replace`` already removed the
-    original entry pre-commit and something else has since reused the same
-    name (a competitor), that stat will show a different identity (or a
-    missing entry), and this function leaves it completely untouched --
-    idempotent and safe to call even if publication already removed some or
-    all of the original staging content.
-    """
-
-    for name in staged_names:
-        _unlink_via_dir_fd_best_effort(staging_fd, name)
-    _rmdir_if_still_ours(root_fd, staging_name, staging_dev_ino)
-
-
 def _publish_directory_no_replace(
     *,
     root_fd: int,
     root_path: Path,
-    staging_name: str,
-    staging_fd: int,
-    staging_dev_ino: tuple[int, int],
-    payload_names: Sequence[str],
     destination_name: str,
+    payload_names: Sequence[str],
+    artifacts: Mapping[str, bytes],
+    manifest_name: str,
+    manifest_bytes: bytes,
 ) -> tuple[str, ...]:
-    """Publish everything staged under ``staging_name``/``staging_fd`` (a
-    child directory of ``root_fd``, already fully populated with
-    ``payload_names`` plus ``package_manifest.json``) into a freshly claimed
-    child of ``root_fd`` named ``destination_name``, with the manifest
-    copied last as the commit marker.
+    """Publish already-verified, in-memory payload bytes plus the manifest
+    into a freshly claimed child of ``root_fd`` named ``destination_name``,
+    with the manifest written last as the commit marker.
 
     This is the genuine cross-platform no-clobber replacement for a plain
     ``os.rename(staging_dir, destination_dir)``: on POSIX, renaming a
     directory onto an existing *empty* directory silently replaces it, which
     is unsafe if some other process or a leftover run already claimed that
-    exact path. ``destination_name`` is instead claimed with a bare
-    ``os.mkdir(destination_name, dir_fd=root_fd)``, which unconditionally
-    raises ``FileExistsError`` for any pre-existing empty directory, file,
-    or symlink at that name -- never a silent replace -- and this function
-    never calls ``os.rename``.
+    exact path. There is no staging directory at all here -- every payload
+    and the manifest are already verified bytes held in memory (no
+    ``tempfile.mkdtemp``, no ``.staging-`` path, no path-based write under
+    the output root anywhere). ``destination_name`` is instead claimed
+    directly with a bare ``os.mkdir(destination_name, dir_fd=root_fd)``,
+    which unconditionally raises ``FileExistsError`` for any pre-existing
+    empty directory, file, or symlink at that name -- never a silent
+    replace -- and this function never calls ``os.rename``.
 
     A racing attacker can still try to swap the claimed name for a symlink
     in the instant between that ``os.mkdir`` returning and the next
@@ -1508,24 +1415,21 @@ def _publish_directory_no_replace(
     and ``root_fd`` itself is re-checked against ``root_path`` to catch a
     root swapped out from under the whole operation.
 
-    Non-manifest files are copied first; the staging directory is removed
-    once they are all in place (pre-commit) -- but only if a fresh,
-    non-following stat of ``staging_name`` still shows the exact directory
-    identified by ``staging_dev_ino`` (the identity verified when the caller
-    opened it): if something else has since reused that name, it is left
-    untouched. The manifest is written last. A destination that exists
-    without a manifest is therefore unpublished/invalid.
+    Payload files are written first; the manifest is written last as the
+    commit marker. A destination directory that exists without a manifest
+    is therefore unpublished/invalid.
 
-    On any failure, only the files this call wrote through the destination
-    descriptor are removed (descriptor-relative, so this remains safe even
-    if the name has been swapped), the descriptor is closed, and the
-    destination entry itself is removed only if a fresh, non-following stat
-    shows it is still the exact entry this call claimed. A racing symlink or
-    an outside target is never touched or removed.
+    On any failure, only the files this call actually wrote through the
+    destination descriptor are removed (descriptor-relative, so this
+    remains safe even if the name has been swapped) and the descriptor is
+    closed -- the claimed directory name itself is never removed by name.
+    If the entry is still present afterward, it remains as an empty,
+    unpublished tombstone (no commit marker); if the path was swapped to a
+    symlink, that competitor path is left completely untouched. A retry
+    against a tombstone fails create-only at the initial ``os.mkdir``, since
+    the name still exists -- explicit owner cleanup is required before
+    retrying.
     """
-
-    manifest_name = "package_manifest.json"
-    manifest_bytes = _read_via_dir_fd(staging_fd, manifest_name)
 
     try:
         os.mkdir(destination_name, 0o755, dir_fd=root_fd)
@@ -1538,25 +1442,15 @@ def _publish_directory_no_replace(
 
     dest_fd = _open_dir_nofollow(destination_name, dir_fd=root_fd, description="destination directory")
 
-    claimed_dev_ino: tuple[int, int] | None = None
     written_order: list[str] = []
     try:
-        claimed_dev_ino = _verify_dir_fd_identity(
+        _verify_dir_fd_identity(
             dest_fd, destination_name, dir_fd=root_fd, description="destination directory"
         )
 
         for name in payload_names:
-            payload = _read_via_dir_fd(staging_fd, name)
-            _write_exclusive_via_dir_fd(dest_fd, name, payload)
+            _write_exclusive_via_dir_fd(dest_fd, name, artifacts[name])
             written_order.append(name)
-
-        # Remove staging pre-commit: unlink its contents (descriptor-
-        # relative via staging_fd, safe regardless of naming), then remove
-        # the staging directory entry itself via root_fd -- but only if it
-        # still identifies the exact directory this invocation claimed.
-        for name in (*payload_names, manifest_name):
-            _unlink_via_dir_fd_best_effort(staging_fd, name)
-        _rmdir_if_still_ours(root_fd, staging_name, staging_dev_ino)
 
         _write_exclusive_via_dir_fd(dest_fd, manifest_name, manifest_bytes)
         written_order.append(manifest_name)
@@ -1567,7 +1461,6 @@ def _publish_directory_no_replace(
         for name in reversed(written_order):
             _unlink_via_dir_fd_best_effort(dest_fd, name)
         os.close(dest_fd)
-        _rmdir_if_still_ours(root_fd, destination_name, claimed_dev_ino)
         raise
     else:
         os.close(dest_fd)
@@ -1594,18 +1487,16 @@ def render_external_package(
     that omit it.
 
     Publication is fully descriptor-relative and POSIX-only (RAPTOR
-    publishes from WSL/Linux): ``output_root`` is opened once with
-    ``O_DIRECTORY | O_NOFOLLOW`` and that descriptor is held open for the
-    entire operation. A uniquely-named staging directory is created and
-    opened the same way, descriptor-relative to the root, and every payload
-    plus the manifest is written into it with exclusive, no-follow creates
-    (never ``tempfile.mkdtemp`` or a path-based write under ``output_root``).
-    Publication into the create-only package directory then goes through
-    ``_publish_directory_no_replace`` -- see that function for the exact
-    no-clobber, manifest-last, symlink-swap-resistant contract. Any failure
-    removes only the paths this invocation created -- never a
-    pre-existing/racing final directory -- and every descriptor opened here
-    is closed on every path, success or failure.
+    publishes from WSL/Linux), and uses no staging directory at all:
+    ``artifacts`` are already verified, in-memory bytes, and the manifest is
+    built in memory too (never ``tempfile.mkdtemp``, no ``.staging-`` path,
+    no path-based write under ``output_root`` anywhere). ``output_root`` is
+    opened once with ``O_DIRECTORY | O_NOFOLLOW`` and that descriptor is
+    held open for the entire operation. Publication into the create-only
+    package directory then goes through ``_publish_directory_no_replace``
+    -- see that function for the exact no-clobber, manifest-last,
+    symlink-swap-resistant, tombstone-on-failure contract. Every descriptor
+    opened here is closed on every path, success or failure.
 
     On a platform or filesystem lacking the required ``O_DIRECTORY`` /
     ``O_NOFOLLOW`` / descriptor-relative-open support, this fails closed
@@ -1642,63 +1533,41 @@ def render_external_package(
         set(artifacts) == set(payload_names),
         "external render requires exactly the four payload artifacts",
     )
+    for name in payload_names:
+        _require(isinstance(artifacts[name], (bytes, bytearray)), f"artifact payload must be bytes: {name}")
 
     package_dir = output_root / package_id
     _reject_symlink_ancestry(package_dir, "external package path")
+
+    manifest_name = "package_manifest.json"
+    manifest_rows = [
+        {"name": name, "sha256": _sha256_bytes(artifacts[name]), "byte_length": len(artifacts[name])}
+        for name in payload_names
+    ]
+    manifest: dict[str, Any] = {
+        "schema": PACKAGE_MANIFEST_SCHEMA,
+        "package_id": package_id,
+        "create_only": True,
+        "repository_summary_target": repository_summary_target,
+        "artifacts": manifest_rows,
+    }
+    manifest["manifest_content_hash"] = _canonical_json_hash(manifest, drop_field="manifest_content_hash")
+    manifest_bytes = _canonical_json_bytes(manifest)
 
     root_fd = _open_dir_nofollow(output_root, dir_fd=None, description="external package output root")
     try:
         _verify_dir_fd_identity(
             root_fd, output_root, dir_fd=None, description="external package output root"
         )
-
-        staging_name = _create_unique_child_dir(root_fd, prefix=f".{package_id}.staging-")
-        staged_names_for_cleanup: list[str] = []
-        staging_dev_ino: tuple[int, int] | None = None
-        staging_fd = _open_dir_nofollow(staging_name, dir_fd=root_fd, description="staging directory")
-        try:
-            staging_dev_ino = _verify_dir_fd_identity(
-                staging_fd, staging_name, dir_fd=root_fd, description="staging directory"
-            )
-
-            manifest_rows: list[dict[str, Any]] = []
-            for name in payload_names:
-                payload = artifacts[name]
-                _require(isinstance(payload, (bytes, bytearray)), f"artifact payload must be bytes: {name}")
-                _write_exclusive_via_dir_fd(staging_fd, name, payload)
-                staged_names_for_cleanup.append(name)
-                manifest_rows.append(
-                    {"name": name, "sha256": _sha256_bytes(payload), "byte_length": len(payload)}
-                )
-
-            manifest: dict[str, Any] = {
-                "schema": PACKAGE_MANIFEST_SCHEMA,
-                "package_id": package_id,
-                "create_only": True,
-                "repository_summary_target": repository_summary_target,
-                "artifacts": manifest_rows,
-            }
-            manifest["manifest_content_hash"] = _canonical_json_hash(manifest, drop_field="manifest_content_hash")
-            manifest_bytes = _canonical_json_bytes(manifest)
-            _write_exclusive_via_dir_fd(staging_fd, "package_manifest.json", manifest_bytes)
-            staged_names_for_cleanup.append("package_manifest.json")
-
-            written_order = _publish_directory_no_replace(
-                root_fd=root_fd,
-                root_path=output_root,
-                staging_name=staging_name,
-                staging_fd=staging_fd,
-                staging_dev_ino=staging_dev_ino,
-                payload_names=payload_names,
-                destination_name=package_id,
-            )
-        except BaseException:
-            _cleanup_staging_via_dir_fd(
-                root_fd, staging_fd, staging_name, staged_names_for_cleanup, staging_dev_ino
-            )
-            raise
-        finally:
-            os.close(staging_fd)
+        written_order = _publish_directory_no_replace(
+            root_fd=root_fd,
+            root_path=output_root,
+            destination_name=package_id,
+            payload_names=payload_names,
+            artifacts=artifacts,
+            manifest_name=manifest_name,
+            manifest_bytes=manifest_bytes,
+        )
     finally:
         os.close(root_fd)
 
@@ -1769,13 +1638,18 @@ class RepositorySummaryPublication:
     Returned by ``publish_repository_summary_descriptor_relative``. The
     parent and final directory descriptors are held open across the call so
     that, if the subsequent external-package render fails, ``rollback()``
-    can undo the summary precisely (descriptor-relative unlink of exactly
-    the files this invocation wrote, then an identity-checked ``rmdir`` of
-    exactly the final directory entry this invocation created) before an
-    external package is ever finalized. If the external render succeeds,
-    call ``commit()`` instead, which simply closes the descriptors and
-    leaves the summary in place. Exactly one of ``commit``/``rollback`` must
-    be called exactly once; both are safe to call at most once.
+    can undo the summary precisely: a descriptor-relative unlink of exactly
+    the files this invocation wrote, via the held final-directory
+    descriptor -- safe even if the claimed name has since been swapped,
+    since the descriptor is pinned to the original directory regardless of
+    what the name currently resolves to. The claimed directory *name* is
+    never removed by ``rmdir``; if it remains after rollback it is left as
+    an empty, unpublished tombstone (no ``package_summary.json`` commit
+    marker) requiring explicit owner cleanup before a retry. If the
+    external render succeeds, call ``commit()`` instead, which simply
+    closes the descriptors and leaves the summary in place. Exactly one of
+    ``commit``/``rollback`` must be called exactly once; both are safe to
+    call at most once.
     """
 
     def __init__(
@@ -1785,13 +1659,11 @@ class RepositorySummaryPublication:
         final_fd: int,
         final_name: str,
         written_names: tuple[str, ...],
-        claimed_dev_ino: tuple[int, int] | None,
     ) -> None:
         self._parent_fd = parent_fd
         self._final_fd = final_fd
         self._final_name = final_name
         self._written_names = written_names
-        self._claimed_dev_ino = claimed_dev_ino
         self._disposed = False
 
     def commit(self) -> None:
@@ -1805,9 +1677,8 @@ class RepositorySummaryPublication:
 
     def rollback(self) -> None:
         """Undo the summary: descriptor-relative unlink of the files this
-        invocation wrote, then remove the final directory entry only if a
-        fresh, non-following stat shows it is still the exact entry this
-        invocation claimed. A racing symlink or anything else is untouched.
+        invocation wrote. The claimed directory name is never removed by
+        ``rmdir`` -- an empty, unpublished tombstone may remain.
         """
 
         if self._disposed:
@@ -1816,7 +1687,6 @@ class RepositorySummaryPublication:
         for name in reversed(self._written_names):
             _unlink_via_dir_fd_best_effort(self._final_fd, name)
         os.close(self._final_fd)
-        _rmdir_if_still_ours(self._parent_fd, self._final_name, self._claimed_dev_ino)
         os.close(self._parent_fd)
 
 
@@ -1842,10 +1712,11 @@ def publish_repository_summary_descriptor_relative(
     then re-opened with ``O_NOFOLLOW`` and identity-checked exactly like the
     external package's destination claim (see
     ``_publish_directory_no_replace``): a post-claim symlink swap fails the
-    re-open or the identity check before any write. Both JSON and README are
-    then written via the final directory's descriptor, exclusively and
-    without ever following a symlink -- never ``Path.write_text`` or any
-    other path-based create. Identity is re-verified once more before this
+    re-open or the identity check before any write. ``README.md`` is
+    written first, then ``package_summary.json`` last as the commit marker,
+    both via the final directory's descriptor, exclusively and without
+    ever following a symlink -- never ``Path.write_text`` or any other
+    path-based create. Identity is re-verified once more before this
     function returns successfully.
 
     The parent and final descriptors are intentionally *not* closed here;
@@ -1853,8 +1724,11 @@ def publish_repository_summary_descriptor_relative(
     the caller can roll the summary back precisely if the external package
     render that follows fails, or commit (closing the descriptors, leaving
     the summary in place) once that render succeeds. On any failure inside
-    this function itself, everything it created is rolled back and every
-    descriptor it opened is closed before the exception propagates.
+    this function itself, only the files it actually wrote are removed
+    (descriptor-relative); the claimed directory name is never removed by
+    ``rmdir`` -- an empty, unpublished tombstone (no commit marker) may
+    remain, and every descriptor this function opened is closed before the
+    exception propagates.
 
     On a platform or filesystem lacking the required ``O_DIRECTORY`` /
     ``O_NOFOLLOW`` / descriptor-relative-open support, this fails closed
@@ -1922,26 +1796,30 @@ def publish_repository_summary_descriptor_relative(
         final_fd = _open_dir_nofollow(
             final_name, dir_fd=parent_fd, description="repository summary directory"
         )
-        claimed_dev_ino: tuple[int, int] | None = None
         written_names: list[str] = []
         try:
-            claimed_dev_ino = _verify_dir_fd_identity(
+            _verify_dir_fd_identity(
                 final_fd, final_name, dir_fd=parent_fd, description="repository summary directory"
             )
 
-            _write_exclusive_via_dir_fd(final_fd, json_name, json_bytes)
-            written_names.append(json_name)
+            # README.md is written first; package_summary.json is written
+            # last, as the commit marker.
             _write_exclusive_via_dir_fd(final_fd, readme_name, readme_bytes)
             written_names.append(readme_name)
+            _write_exclusive_via_dir_fd(final_fd, json_name, json_bytes)
+            written_names.append(json_name)
 
             _verify_dir_fd_identity(
                 final_fd, final_name, dir_fd=parent_fd, description="repository summary directory"
             )
         except BaseException:
+            # Only the files this invocation actually wrote are removed,
+            # descriptor-relative; the claimed directory name is never
+            # rmdir'd -- if it remains, it is an empty, unpublished
+            # tombstone (no package_summary.json commit marker).
             for name in reversed(written_names):
                 _unlink_via_dir_fd_best_effort(final_fd, name)
             os.close(final_fd)
-            _rmdir_if_still_ours(parent_fd, final_name, claimed_dev_ino)
             raise
     except BaseException:
         os.close(parent_fd)
@@ -1952,7 +1830,6 @@ def publish_repository_summary_descriptor_relative(
         final_fd=final_fd,
         final_name=final_name,
         written_names=tuple(written_names),
-        claimed_dev_ino=claimed_dev_ino,
     )
 
 

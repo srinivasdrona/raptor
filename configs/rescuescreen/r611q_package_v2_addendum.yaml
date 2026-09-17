@@ -1,6 +1,6 @@
 schema: raptor.rescuescreen.r611q_package_v2_addendum_config.v1
 spec_id: r611q-package-v2-addendum-v1
-spec_version: 1.0.3
+spec_version: 1.0.4
 
 v1_repository_package:
   literature:
@@ -77,10 +77,15 @@ output:
   publication_protocol:
     platform: POSIX_dir_fd_required
     root_open: O_DIRECTORY_and_O_NOFOLLOW
-    staging_and_final_creation: descriptor_relative
+    payload_source: verified_in_memory_bytes
+    final_creation: descriptor_relative_exclusive_claim
     artifact_writes: O_CREAT_O_EXCL_O_NOFOLLOW
     commit_marker: package_manifest.json_written_last
     final_root_identity_check: required
+    failure_cleanup: >-
+      Remove only invocation-created files through the pinned directory descriptor.
+      Never remove the claimed directory by name; an empty directory may remain as an
+      unpublished tombstone and requires explicit owner cleanup before retry.
     unsupported_platform: fail_closed
   external_artifacts:
     - R611Q_EXPERT_REVIEW_PACKET_V2.md
@@ -96,6 +101,11 @@ output:
       trusted_existing_parent: data/rescuescreen/r611q
       parent_open: descriptor_relative_from_repo_root_with_O_NOFOLLOW
       final_directory_creation: descriptor_relative_create_only
-      file_writes: O_CREAT_O_EXCL_O_NOFOLLOW
+      file_writes:
+        - README.md_first
+        - package_summary.json_last_as_commit_marker
+      write_flags: O_CREAT_O_EXCL_O_NOFOLLOW
       final_identity_check: required
-      rollback: descriptor_relative_invocation_created_paths_only
+      rollback: >-
+        Descriptor-relative removal of invocation-created files only. Never remove the
+        claimed directory by name; an empty unpublished tombstone may remain after failure.
