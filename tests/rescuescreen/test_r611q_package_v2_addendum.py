@@ -110,6 +110,25 @@ PACKAGE_MANIFEST_SCHEMA = "raptor.external.r611q_package_v2_addendum_manifest.v1
 MANIFEST_LINE_RE = re.compile(r"^([0-9a-f]{64})  ([^\x00]+)$")
 TEXT_CHAR_LOCATOR_RE = re.compile(r"^text-char:\d+:\d+$")
 
+EXPECTED_EXTERNAL_PUBLICATION_PROTOCOL = {
+    "platform": "POSIX_dir_fd_required",
+    "root_open": "O_DIRECTORY_and_O_NOFOLLOW",
+    "staging_and_final_creation": "descriptor_relative",
+    "artifact_writes": "O_CREAT_O_EXCL_O_NOFOLLOW",
+    "commit_marker": "package_manifest.json_written_last",
+    "final_root_identity_check": "required",
+    "unsupported_platform": "fail_closed",
+}
+
+EXPECTED_SUMMARY_PUBLICATION_PROTOCOL = {
+    "trusted_existing_parent": "data/rescuescreen/r611q",
+    "parent_open": "descriptor_relative_from_repo_root_with_O_NOFOLLOW",
+    "final_directory_creation": "descriptor_relative_create_only",
+    "file_writes": "O_CREAT_O_EXCL_O_NOFOLLOW",
+    "final_identity_check": "required",
+    "rollback": "descriptor_relative_invocation_created_paths_only",
+}
+
 
 def _sha256_bytes(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
@@ -682,14 +701,17 @@ def _prepare_operator_fixture_and_config(
     config = copy.deepcopy(fixture.config_defaults)
     output = config.setdefault("output", {})
     output["package_id"] = "r611q-package-v2-addendum-2026-09-17"
+    output["root_must_preexist"] = True
+    output["publication_protocol"] = copy.deepcopy(EXPECTED_EXTERNAL_PUBLICATION_PROTOCOL)
     output["external_artifacts"] = list(EXPECTED_EXTERNAL_ARTIFACTS)
     output["repository_summary"] = {
         "directory": repository_summary_directory,
         "json_path": f"{repository_summary_directory}/package_summary.json",
         "readme_path": f"{repository_summary_directory}/README.md",
+        "publication_protocol": copy.deepcopy(EXPECTED_SUMMARY_PUBLICATION_PROTOCOL),
     }
     config["spec_id"] = "r611q-package-v2-addendum-v1"
-    config["spec_version"] = "1.0.2"
+    config["spec_version"] = "1.0.3"
 
     config_path = tmp_path / "operator_config.yaml"
     config_path.write_text(
@@ -759,7 +781,7 @@ def test_r611q_pv2a_ac01_spec_surface_and_exact_pins() -> None:
 
     assert spec["schema"] == "raptor.project.spec.v1"
     assert spec["spec_id"] == "r611q-package-v2-addendum-v1"
-    assert spec["spec_version"] == "1.0.2"
+    assert spec["spec_version"] == "1.0.3"
     implementation = spec["implementation"]
     assert implementation["package"] == "src/raptor/rescuescreen/package_v2.py"
     assert implementation["operator"] == "scripts/build_r611q_package_v2_addendum.py"
@@ -769,12 +791,15 @@ def test_r611q_pv2a_ac01_spec_surface_and_exact_pins() -> None:
 
     external = spec["output"]["external_package"]
     assert external["environment_variable"] == "RAPTOR_R611Q_PACKAGE_V2_ROOT"
+    assert external["root_must_preexist"] is True
     assert external["run_name"] == "r611q-package-v2-addendum-2026-09-17"
     assert external["package_id"] == "r611q-package-v2-addendum-2026-09-17"
     assert tuple(external["artifacts"]) == EXPECTED_EXTERNAL_ARTIFACTS
+    assert external["publication_protocol"] == EXPECTED_EXTERNAL_PUBLICATION_PROTOCOL
     assert spec["output"]["repository_summary"]["directory"] == "data/rescuescreen/r611q/package-v2-addendum"
     assert spec["output"]["repository_summary"]["json_path"] == "data/rescuescreen/r611q/package-v2-addendum/package_summary.json"
     assert spec["output"]["repository_summary"]["readme_path"] == "data/rescuescreen/r611q/package-v2-addendum/README.md"
+    assert spec["output"]["repository_summary"]["publication_protocol"] == EXPECTED_SUMMARY_PUBLICATION_PROTOCOL
 
     expected_structure_manifest_pin = {
         "directory": "data/rescuescreen/r611q/structure-readiness-v1",
@@ -797,9 +822,12 @@ def test_r611q_pv2a_ac01_config_exact_pins_and_output_names() -> None:
 
     config = _read_yaml_mapping(CONFIG_PATH)
     assert config["spec_id"] == "r611q-package-v2-addendum-v1"
-    assert config["spec_version"] == "1.0.2"
+    assert config["spec_version"] == "1.0.3"
     assert config["output"]["package_id"] == "r611q-package-v2-addendum-2026-09-17"
+    assert config["output"]["root_must_preexist"] is True
     assert tuple(config["output"]["external_artifacts"]) == EXPECTED_EXTERNAL_ARTIFACTS
+    assert config["output"]["publication_protocol"] == EXPECTED_EXTERNAL_PUBLICATION_PROTOCOL
+    assert config["output"]["repository_summary"]["publication_protocol"] == EXPECTED_SUMMARY_PUBLICATION_PROTOCOL
 
 
 def test_r611q_pv2a_ac02_offline_static_import_boundary() -> None:
@@ -1302,9 +1330,10 @@ def test_r611q_pv2a_ac12_operator_synthetic_end_to_end_contract(tmp_path: Path) 
         yaml.safe_dump(
             {
                 "spec_id": "r611q-package-v2-addendum-v1",
-                "spec_version": "1.0.2",
+                "spec_version": "1.0.3",
                 "output": {
                     "package_id": "r611q-package-v2-addendum-2026-09-17",
+                    "root_must_preexist": True,
                     "external_artifacts": list(EXPECTED_EXTERNAL_ARTIFACTS),
                 },
             },
@@ -1314,6 +1343,7 @@ def test_r611q_pv2a_ac12_operator_synthetic_end_to_end_contract(tmp_path: Path) 
         encoding="utf-8",
     )
     out_root = tmp_path / "external-out"
+    out_root.mkdir(parents=True, exist_ok=True)
     summary_root = tmp_path / "repo-summary-out"
 
     run = subprocess.run(
@@ -1334,6 +1364,227 @@ def test_r611q_pv2a_ac12_operator_synthetic_end_to_end_contract(tmp_path: Path) 
         env={**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")},
     )
     assert run.returncode == 0, run.stderr or run.stdout
+
+
+def test_r611q_pv2a_publication_rejects_absent_external_root_before_any_write(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    (
+        module,
+        fixture,
+        config_path,
+        summary_dir,
+        summary_json_path,
+        summary_readme_path,
+        repo_root,
+        package_id,
+    ) = _prepare_operator_fixture_and_config(tmp_path)
+    output_root = (tmp_path / "absent-external-root").resolve()
+    package_dir = output_root / package_id
+    assert not output_root.exists()
+
+    exit_code = _run_operator_main(
+        module,
+        config_path=config_path,
+        repo_root=repo_root,
+        v1_packet_path=fixture.packet_path.resolve(),
+        v1_form_path=fixture.form_path.resolve(),
+        delta_bundle_root=fixture.delta_bundle_root.resolve(),
+        output_root=output_root,
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "r611q-package-v2-addendum error:" in captured.err
+    assert "Traceback" not in captured.err
+    assert not output_root.exists(), "root_must_preexist requires rejecting absent output root before any write"
+    assert not package_dir.exists(), "final external package must not be created when output root is absent"
+    assert not summary_dir.exists(), "summary directory must not be created when output root precheck fails"
+    assert not summary_json_path.exists()
+    assert not summary_readme_path.exists()
+
+
+def test_r611q_pv2a_publication_external_root_descriptor_race_rejected(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _require_package_v2_module()
+    publish_seam = getattr(module, "_publish_directory_no_replace", None)
+    assert callable(publish_seam), "render_external_package must publish through _publish_directory_no_replace"
+
+    output_root = (tmp_path / "external-root").resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    package_id = "r611q-package-v2-addendum-2026-09-17"
+    package_dir = output_root / package_id
+    attacker_target = (tmp_path / "attacker-external-target").resolve()
+    attacker_target.mkdir(parents=True, exist_ok=True)
+
+    symlink_probe = tmp_path / "root-race-symlink-probe"
+    try:
+        symlink_probe.symlink_to(attacker_target, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation unavailable in this environment")
+    finally:
+        if symlink_probe.is_symlink():
+            symlink_probe.unlink()
+
+    artifacts = {
+        "R611Q_EXPERT_REVIEW_PACKET_V2.md": b"# packet\n",
+        "R611Q_EXPERT_REVIEW_FORM_V2.yaml": b"schema: atlas.expert_review_form.v2\n",
+        "R611Q_PACKAGE_V2_IMPACT.json": b"{\"impact\":\"bounded\"}\n",
+        "R611Q_PACKAGE_V2_SUMMARY.md": b"# summary\n",
+    }
+
+    real_open = module.os.open
+    real_rmdir = module.os.rmdir
+    injected = {"done": False}
+
+    def swap_root_after_descriptor_open(path: Any, flags: int, *args: Any, **kwargs: Any):
+        try:
+            candidate = Path(path)
+        except TypeError:
+            return real_open(path, flags, *args, **kwargs)
+        required_flags = module.os.O_RDONLY | module.os.O_DIRECTORY | module.os.O_NOFOLLOW
+        if (
+            not injected["done"]
+            and kwargs.get("dir_fd") is None
+            and candidate == output_root
+            and (flags & required_flags) == required_flags
+        ):
+            fd = real_open(path, flags, *args, **kwargs)
+            assert not any(output_root.iterdir()), "output root must be pinned before staging/final creation"
+            real_rmdir(path)
+            candidate.symlink_to(attacker_target, target_is_directory=True)
+            injected["done"] = True
+            return fd
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(module.os, "open", swap_root_after_descriptor_open)
+
+    with pytest.raises((module.PackageV2Error, OSError)):
+        module.render_external_package(
+            output_root,
+            package_id=package_id,
+            repository_summary_target="data/rescuescreen/r611q/package-v2-addendum",
+            artifacts=artifacts,
+        )
+
+    assert injected["done"], "test must inject the output-root descriptor race"
+    assert output_root.is_symlink(), "racing symlink must remain untouched on failure"
+    assert output_root.resolve() == attacker_target
+    assert not (attacker_target / package_id).exists(), "attacker target must not receive final package content"
+    assert list(attacker_target.rglob("*")) == [], "attacker target must remain empty"
+    assert not list(attacker_target.glob(f".{package_id}.staging-*")), "no staging content may leak to attacker target"
+
+
+def test_r611q_pv2a_publication_summary_final_dir_descriptor_race_rejected(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (
+        module,
+        fixture,
+        config_path,
+        summary_dir,
+        summary_json_path,
+        summary_readme_path,
+        repo_root,
+        package_id,
+    ) = _prepare_operator_fixture_and_config(tmp_path)
+    output_root = (tmp_path / "external-outside").resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    package_dir = output_root / package_id
+    attacker_target = (tmp_path / "attacker-summary-target").resolve()
+    attacker_target.mkdir(parents=True, exist_ok=True)
+    assert not summary_dir.exists()
+
+    symlink_probe = tmp_path / "summary-race-symlink-probe"
+    try:
+        symlink_probe.symlink_to(attacker_target, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation unavailable in this environment")
+    finally:
+        if symlink_probe.is_symlink():
+            symlink_probe.unlink()
+
+    real_open = module.os.open
+    injected = {"done": False}
+
+    def swap_summary_dir_after_open(path: Any, flags: int, *args: Any, **kwargs: Any):
+        dir_fd = kwargs.get("dir_fd")
+        try:
+            name = Path(path).name
+        except TypeError:
+            return real_open(path, flags, *args, **kwargs)
+        required_flags = module.os.O_RDONLY | module.os.O_DIRECTORY | module.os.O_NOFOLLOW
+        if (
+            not injected["done"]
+            and dir_fd is not None
+            and name == "package-v2-addendum"
+            and (flags & required_flags) == required_flags
+        ):
+            fd = real_open(path, flags, *args, **kwargs)
+            module.os.rmdir(path, dir_fd=dir_fd)
+            summary_dir.symlink_to(attacker_target, target_is_directory=True)
+            injected["done"] = True
+            return fd
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(module.os, "open", swap_summary_dir_after_open)
+
+    exit_code = _run_operator_main(
+        module,
+        config_path=config_path,
+        repo_root=repo_root,
+        v1_packet_path=fixture.packet_path.resolve(),
+        v1_form_path=fixture.form_path.resolve(),
+        delta_bundle_root=fixture.delta_bundle_root.resolve(),
+        output_root=output_root,
+    )
+    captured = capsys.readouterr()
+
+    assert injected["done"], "test must inject the summary final-directory descriptor race"
+    assert exit_code == 1
+    assert "r611q-package-v2-addendum error:" in captured.err
+    assert "Traceback" not in captured.err
+    assert summary_dir.is_symlink(), "racing summary symlink should remain untouched"
+    assert summary_dir.resolve() == attacker_target
+    assert not summary_json_path.exists(), "summary JSON must not be written through symlink-swapped directory"
+    assert not summary_readme_path.exists(), "summary README must not be written through symlink-swapped directory"
+    assert list(attacker_target.rglob("*")) == [], "attacker summary target must remain empty"
+    assert not package_dir.exists(), "external package must not be published after summary race failure"
+
+
+def test_r611q_pv2a_publication_render_fails_closed_without_descriptor_support(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _require_package_v2_module()
+    output_root = (tmp_path / "external-root").resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    package_id = "r611q-package-v2-addendum-2026-09-17"
+    package_dir = output_root / package_id
+    artifacts = {
+        "R611Q_EXPERT_REVIEW_PACKET_V2.md": b"# packet\n",
+        "R611Q_EXPERT_REVIEW_FORM_V2.yaml": b"schema: atlas.expert_review_form.v2\n",
+        "R611Q_PACKAGE_V2_IMPACT.json": b"{\"impact\":\"bounded\"}\n",
+        "R611Q_PACKAGE_V2_SUMMARY.md": b"# summary\n",
+    }
+
+    monkeypatch.setattr(module.os, "supports_dir_fd", ())
+    with pytest.raises(module.PackageV2Error) as excinfo:
+        module.render_external_package(
+            output_root,
+            package_id=package_id,
+            repository_summary_target="data/rescuescreen/r611q/package-v2-addendum",
+            artifacts=artifacts,
+        )
+    message = str(excinfo.value)
+    assert "refusing to fall back to path-based writes" in message
+    assert not package_dir.exists(), "fail-closed descriptor capability check must prevent final package creation"
+    assert not list(output_root.glob(f".{package_id}.staging-*")), "staging must be cleaned on fail-closed rejection"
 
 
 def test_r611q_pv2a_publication_preexisting_summary_fails_before_external_creation(
