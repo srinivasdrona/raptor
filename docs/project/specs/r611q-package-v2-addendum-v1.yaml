@@ -1,6 +1,6 @@
 schema: raptor.project.spec.v1
 spec_id: r611q-package-v2-addendum-v1
-spec_version: 1.0.1
+spec_version: 1.0.2
 status: APPROVED_BUILD
 created_at: '2026-09-17'
 owner: human-terminal-authority
@@ -65,8 +65,8 @@ inputs:
     structure_readiness:
       directory: data/rescuescreen/r611q/structure-readiness-v1
       manifest_path: data/rescuescreen/r611q/structure-readiness-v1/manifest.sha256
-      manifest_file_sha256: 1d7bc9f02cf16e83b15c5ab8e584756b21c2a0b7657eb56e8a93a784aafaf0e3
-      manifest_byte_length: 2662
+      manifest_file_sha256: 5e0ecb473ff906eb45c9c76007bfcd7c3877d411cbaf6b8c63c398493484e82a
+      manifest_byte_length: 2633
       files_listed: 29
     readiness_summary:
       path: data/rescuescreen/r611q/RESCUESCREEN_EVIDENCE_READINESS_SUMMARY.md
@@ -75,8 +75,8 @@ inputs:
     rule: >-
       Every manifest file and every file it lists is recomputed from disk.
       Exact file-set coverage is required. No v1 byte may be changed by this
-      package. Pins refer to the tracked bytes materialized in this package
-      branch, not another worktree's line-ending conversion.
+      package. The structure-readiness pack's tracked LF bytes are canonical;
+      `.gitattributes` must prevent `core.autocrlf` from converting them.
 
   atlas_expert_packet_v1:
     packet:
@@ -257,9 +257,20 @@ implementation:
   config: configs/rescuescreen/r611q_package_v2_addendum.yaml
   tests: tests/rescuescreen/test_r611q_package_v2_addendum.py
   network: forbidden
+  integration_updates:
+    - path: .gitattributes
+      rule: >-
+        Force all text under structure-readiness-v1 to LF and preserve gzip
+        artifacts as binary so checked-out bytes match the existing manifest.
+    - path: tests/rescuescreen/test_import_and_firewall.py
+      rule: >-
+        Extend the exact RescueScreen module allowlist by package_v2.py only;
+        apply every existing network, cross-lane and execution-surface check to
+        the new module.
 
 delivery_checks:
   - every v1 manifest file hash and every listed v1 file hash is reverified
+  - structure-readiness working-tree bytes match their existing LF manifest under core.autocrlf
   - v1 manifest file sets remain exact and no v1 file is written
   - expert packet/form v1 bytes match their pins
   - delta manifest self-hash, file hash and required artifact hashes match
@@ -277,6 +288,7 @@ delivery_checks:
   - stage execution remains unauthorized
   - output is external/create-only, path-contained and manifest-last
   - repository summary is an exact aggregate-only projection
+  - the RescueScreen firewall admits only package_v2.py as the additive module and remains otherwise unchanged
 
 boundaries:
   model_assisted_review_is_human_review: false
