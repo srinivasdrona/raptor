@@ -550,6 +550,7 @@ def main(argv: list[str] | None = None) -> int:
         # --- Publish the repository summary first (its own staged, tracked,
         # all-or-nothing write), then the external package last, so a summary
         # failure never leaves a finalized external package behind.
+        created_summary_root: Path | None = None
         if write_repository_summary:
             assert summary_dir is not None and summary_json_path is not None and summary_readme_path is not None
             summary, readme = build_repository_summary(
@@ -575,13 +576,30 @@ def main(argv: list[str] | None = None) -> int:
                 raise
             print(f"R611Q package-v2 addendum: repository summary written: {summary_dir}")
 
-        package_dir, written = render_external_package(
-            output_root,
-            package_id=package_id,
-            repository_summary_target=repository_summary_target,
-            artifacts=result["external_artifacts"],
-            repo_root=repo_root_resolved,
-        )
+        try:
+            package_dir, written = render_external_package(
+                output_root,
+                package_id=package_id,
+                repository_summary_target=repository_summary_target,
+                artifacts=result["external_artifacts"],
+                repo_root=repo_root_resolved,
+            )
+        except BaseException:
+            # The repository summary already succeeded (if enabled); an
+            # external-publication failure must not leave it behind. Remove
+            # only what this invocation created: prefer the single tracked
+            # created root (preflight already guaranteed summary_dir did not
+            # exist beforehand), falling back to the two specific files if
+            # for some reason the root was not tracked. Never a pre-existing
+            # ancestor and never a broad/wildcard deletion.
+            if write_repository_summary:
+                if created_summary_root is not None:
+                    shutil.rmtree(created_summary_root, ignore_errors=True)
+                elif summary_json_path is not None and summary_readme_path is not None:
+                    for path in (summary_json_path, summary_readme_path):
+                        if path.exists():
+                            path.unlink()
+            raise
         print(f"R611Q package-v2 addendum: external package written: {package_dir} ({len(written)} files)")
 
         return 0
