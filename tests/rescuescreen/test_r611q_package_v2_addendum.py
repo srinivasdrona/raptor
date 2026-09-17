@@ -108,6 +108,7 @@ ALLOWED_DECISIONS = ("support", "revise", "reject", "defer")
 DELTA_SCHEMA = "raptor.external.r611q_literature_delta_review_bundle.v1"
 PACKAGE_MANIFEST_SCHEMA = "raptor.external.r611q_package_v2_addendum_manifest.v1"
 MANIFEST_LINE_RE = re.compile(r"^([0-9a-f]{64})  ([^\x00]+)$")
+TEXT_CHAR_LOCATOR_RE = re.compile(r"^text-char:\d+:\d+$")
 
 
 def _sha256_bytes(payload: bytes) -> str:
@@ -365,6 +366,100 @@ def _select_boundary_record(
     if len(matches) > 1:
         raise AssertionError(f"expected exactly one semantic boundary match; found {len(matches)}")
     return matches[0]
+
+
+def _canonical_source_id_from_article_identity(article_identity: Mapping[str, Any]) -> str:
+    assert isinstance(article_identity, Mapping), "article_identity must be a mapping"
+    for key, prefix in (("pmid", "PMID"), ("PMCID", "PMCID"), ("doi", "DOI")):
+        raw = article_identity.get(key)
+        if raw is None and key == "PMCID":
+            raw = article_identity.get("pmcid")
+        value = str(raw).strip() if raw is not None else ""
+        if value:
+            return f"{prefix}:{value}"
+    raise AssertionError("article_identity must provide PMID, PMCID, or DOI")
+
+
+def _build_selector_identity_fixture(
+    *,
+    duplicate_record_quote_fields: bool,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    article_identity = {"pmid": "99999999", "pmcid": "PMC9000001", "doi": "10.0000/synthetic.r611q.001"}
+    source_id = _canonical_source_id_from_article_identity(article_identity)
+    exact_quote = "Grouped HEK293T tagged-overexpression co-IP reports no observed effect on TSC2-TSC2 association."
+    locator = "text-char:40:142"
+    exact_quote_sha256 = _sha256_bytes(exact_quote.encode("utf-8"))
+
+    primary_span = {
+        "candidate_id": "cand-selector-001",
+        "source_id": source_id,
+        "article_identity": copy.deepcopy(article_identity),
+        "exact_quote": exact_quote,
+        "locator": locator,
+        "exact_quote_sha256": exact_quote_sha256,
+        # Kept for compatibility with the current synthetic contract helper.
+        "quote_sha256": exact_quote_sha256,
+    }
+    context_span = {
+        "candidate_id": "cand-selector-noise",
+        "source_id": "PMID:11111111",
+        "article_identity": {"pmid": "11111111", "pmcid": "", "doi": ""},
+        "exact_quote": "Context-only observation",
+        "locator": "text-char:1:24",
+        "exact_quote_sha256": _sha256_bytes(b"Context-only observation"),
+        "quote_sha256": _sha256_bytes(b"Context-only observation"),
+    }
+    candidate_spans = [primary_span, context_span]
+
+    primary_record = {
+        "candidate_id": primary_span["candidate_id"],
+        "source_id": source_id,
+        "article_identity": copy.deepcopy(article_identity),
+        "source_role": "DIRECT_ALLELE_EXPERIMENT",
+        "primary_result_state": "PRIMARY_R611Q_RESULT",
+        "baseline_relation": "NARROWS",
+        "novelty": "NEW_PRIMARY_OBSERVATION",
+        "claim_kind": "P_COMPLEX_BINDING",
+        "acceptance_state": "PROPOSED_UNACCEPTED",
+        "gate_effect": "NONE",
+        "accepted_claim_count": 0,
+        "gate_8_state": "BLOCKED_HUMAN_REVIEW",
+        "contradiction_state": "NONE",
+    }
+    if duplicate_record_quote_fields:
+        primary_record.update(
+            {
+                "exact_quote": primary_span["exact_quote"],
+                "locator": primary_span["locator"],
+                "quote_sha256": primary_span["quote_sha256"],
+            }
+        )
+
+    context_record = {
+        "candidate_id": context_span["candidate_id"],
+        "source_id": context_span["source_id"],
+        "article_identity": copy.deepcopy(context_span["article_identity"]),
+        "source_role": "SECONDARY_CONTEXT",
+        "primary_result_state": "CONTEXT_ONLY",
+        "baseline_relation": "NARROWS",
+        "novelty": "KNOWN",
+        "claim_kind": "BACKGROUND",
+        "acceptance_state": "PROPOSED_UNACCEPTED",
+        "gate_effect": "NONE",
+        "accepted_claim_count": 0,
+        "gate_8_state": "BLOCKED_HUMAN_REVIEW",
+        "contradiction_state": "NONE",
+    }
+    if duplicate_record_quote_fields:
+        context_record.update(
+            {
+                "exact_quote": context_span["exact_quote"],
+                "locator": context_span["locator"],
+                "quote_sha256": context_span["quote_sha256"],
+            }
+        )
+
+    return [primary_record, context_record], candidate_spans
 
 
 def _compose_packet_v2(v1_packet_bytes: bytes, *, boundary_record: Mapping[str, Any]) -> bytes:
@@ -839,6 +934,82 @@ def test_r611q_pv2a_ac05_delta_bundle_oracle_rejects_invalid_boundary_states() -
     gate_effect[0]["gate_8_state"] = "SATISFIED"
     with pytest.raises(AssertionError):
         _select_boundary_record(gate_effect, candidate_spans)
+
+
+def test_r611q_pv2a_selector_source_integrity_real_schema_does_not_require_record_quote_duplication() -> None:
+    review_records, candidate_spans = _build_selector_identity_fixture(duplicate_record_quote_fields=False)
+    selected = _select_boundary_record(review_records, candidate_spans)
+    assert selected["candidate_id"] == candidate_spans[0]["candidate_id"]
+
+
+def test_r611q_pv2a_selector_source_integrity_rejects_article_identity_mismatch_despite_matching_candidate_id() -> None:
+    review_records, candidate_spans = _build_selector_identity_fixture(duplicate_record_quote_fields=True)
+    review_records[0]["article_identity"] = {"pmid": "22222222", "pmcid": "PMC2222222", "doi": "10.0000/mismatch"}
+    with pytest.raises(AssertionError):
+        _select_boundary_record(review_records, candidate_spans)
+
+
+def test_r611q_pv2a_selector_source_integrity_rejects_source_id_not_canonical_for_article_identity() -> None:
+    review_records, candidate_spans = _build_selector_identity_fixture(duplicate_record_quote_fields=True)
+    noncanonical = "PMCID:PMC9000001"
+    review_records[0]["source_id"] = noncanonical
+    candidate_spans[0]["source_id"] = noncanonical
+    with pytest.raises(AssertionError):
+        _select_boundary_record(review_records, candidate_spans)
+
+
+@pytest.mark.parametrize("missing_field", ["candidate_id", "source_id", "article_identity"])
+def test_r611q_pv2a_selector_source_integrity_rejects_missing_record_identity(
+    missing_field: str,
+) -> None:
+    review_records, candidate_spans = _build_selector_identity_fixture(duplicate_record_quote_fields=True)
+    if missing_field == "article_identity":
+        review_records[0][missing_field] = {}
+    else:
+        review_records[0][missing_field] = "   "
+    with pytest.raises(AssertionError):
+        _select_boundary_record(review_records, candidate_spans)
+
+
+def test_r611q_pv2a_selector_source_integrity_rejects_duplicate_candidate_spans() -> None:
+    review_records, candidate_spans = _build_selector_identity_fixture(duplicate_record_quote_fields=True)
+    candidate_spans.append(copy.deepcopy(candidate_spans[0]))
+    with pytest.raises(AssertionError):
+        _select_boundary_record(review_records, candidate_spans)
+
+
+def test_r611q_pv2a_selector_source_integrity_rejects_candidate_quote_hash_mismatch() -> None:
+    review_records, candidate_spans = _build_selector_identity_fixture(duplicate_record_quote_fields=True)
+    tampered_hash = "f" * 64
+    candidate_spans[0]["exact_quote_sha256"] = tampered_hash
+    candidate_spans[0]["quote_sha256"] = tampered_hash
+    review_records[0]["quote_sha256"] = tampered_hash
+    with pytest.raises(AssertionError):
+        _select_boundary_record(review_records, candidate_spans)
+
+
+@pytest.mark.parametrize(
+    "state_value",
+    ["ACCEPTED", "ACCEPTED_WITH_NARROWER_WORDING", "REJECTED", "PENDING", None, "__MISSING__"],
+)
+def test_r611q_pv2a_selector_acceptance_boundary_rejects_non_unaccepted_states(state_value: Any) -> None:
+    review_records, candidate_spans = _build_selector_identity_fixture(duplicate_record_quote_fields=True)
+    if state_value == "__MISSING__":
+        review_records[0].pop("acceptance_state", None)
+    else:
+        review_records[0]["acceptance_state"] = state_value
+    with pytest.raises(AssertionError):
+        _select_boundary_record(review_records, candidate_spans)
+
+
+@pytest.mark.parametrize("gate_effect_value", ["SATISFIES", "BLOCKED_HUMAN_REVIEW", "", None])
+def test_r611q_pv2a_selector_acceptance_boundary_rejects_non_none_gate_effects(
+    gate_effect_value: Any,
+) -> None:
+    review_records, candidate_spans = _build_selector_identity_fixture(duplicate_record_quote_fields=True)
+    review_records[0]["gate_effect"] = gate_effect_value
+    with pytest.raises(AssertionError):
+        _select_boundary_record(review_records, candidate_spans)
 
 
 def test_r611q_pv2a_ac06_packet_v2_composition_keeps_exact_prefix_and_boundary_language() -> None:
