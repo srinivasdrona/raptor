@@ -84,8 +84,8 @@ EXPECTED_REPO_V1_MANIFEST_PINS = {
     },
     "structure-readiness-v1": {
         "directory": R611Q_DATA_ROOT / "structure-readiness-v1",
-        "manifest_sha256": "1d7bc9f02cf16e83b15c5ab8e584756b21c2a0b7657eb56e8a93a784aafaf0e3",
-        "manifest_byte_length": 2662,
+        "manifest_sha256": "5e0ecb473ff906eb45c9c76007bfcd7c3877d411cbaf6b8c63c398493484e82a",
+        "manifest_byte_length": 2633,
         "files_listed": 29,
     },
 }
@@ -567,14 +567,13 @@ def test_r611q_pv2a_ac01_spec_surface_and_exact_pins() -> None:
 
     assert spec["schema"] == "raptor.project.spec.v1"
     assert spec["spec_id"] == "r611q-package-v2-addendum-v1"
-    assert spec["spec_version"] == "1.0.1"
-    assert spec["implementation"] == {
-        "package": "src/raptor/rescuescreen/package_v2.py",
-        "operator": "scripts/build_r611q_package_v2_addendum.py",
-        "config": "configs/rescuescreen/r611q_package_v2_addendum.yaml",
-        "tests": "tests/rescuescreen/test_r611q_package_v2_addendum.py",
-        "network": "forbidden",
-    }
+    assert spec["spec_version"] == "1.0.2"
+    implementation = spec["implementation"]
+    assert implementation["package"] == "src/raptor/rescuescreen/package_v2.py"
+    assert implementation["operator"] == "scripts/build_r611q_package_v2_addendum.py"
+    assert implementation["config"] == "configs/rescuescreen/r611q_package_v2_addendum.yaml"
+    assert implementation["tests"] == "tests/rescuescreen/test_r611q_package_v2_addendum.py"
+    assert implementation["network"] == "forbidden"
 
     external = spec["output"]["external_package"]
     assert external["environment_variable"] == "RAPTOR_R611Q_PACKAGE_V2_ROOT"
@@ -606,7 +605,7 @@ def test_r611q_pv2a_ac01_config_exact_pins_and_output_names() -> None:
 
     config = _read_yaml_mapping(CONFIG_PATH)
     assert config["spec_id"] == "r611q-package-v2-addendum-v1"
-    assert config["spec_version"] == "1.0.1"
+    assert config["spec_version"] == "1.0.2"
     assert config["output"]["package_id"] == "r611q-package-v2-addendum-2026-09-17"
     assert tuple(config["output"]["external_artifacts"]) == EXPECTED_EXTERNAL_ARTIFACTS
 
@@ -629,6 +628,72 @@ def test_r611q_pv2a_ac02_offline_static_import_boundary() -> None:
 def test_r611q_pv2a_ac03_v1_manifest_oracle_enforces_exact_pins_and_coverage() -> None:
     for pin in EXPECTED_REPO_V1_MANIFEST_PINS.values():
         _verify_manifest_file_set(pin["directory"], expected_manifest_pin=pin)
+
+
+def test_r611q_pv2a_ac03_structure_manifest_lf_normalization_and_git_eol_contract() -> None:
+    gitattributes_path = REPO_ROOT / ".gitattributes"
+    assert gitattributes_path.is_file(), f"missing .gitattributes: {gitattributes_path}"
+    lines = gitattributes_path.read_text(encoding="utf-8").splitlines()
+    effective_lines = [line.strip() for line in lines if line.strip() and not line.lstrip().startswith("#")]
+
+    lf_rule_index = next(
+        (
+            index
+            for index, line in enumerate(effective_lines)
+            if line.startswith("data/rescuescreen/r611q/structure-readiness-v1/** ")
+            and "text" in line.split()
+            and "eol=lf" in line.split()
+        ),
+        None,
+    )
+    assert lf_rule_index is not None, "missing recursive LF rule for structure-readiness-v1/**"
+
+    gzip_override_index = next(
+        (
+            index
+            for index, line in enumerate(effective_lines)
+            if line.startswith("data/rescuescreen/r611q/structure-readiness-v1/**/*.gz ")
+            and ("-text" in line.split() or "binary" in line.split())
+        ),
+        None,
+    )
+    assert gzip_override_index is not None, "missing recursive gzip binary/-text override for structure-readiness-v1/**/*.gz"
+    assert gzip_override_index > lf_rule_index, "gzip override must appear after recursive LF rule"
+
+    manifest_entries = _parse_sha256_manifest(
+        EXPECTED_REPO_V1_MANIFEST_PINS["structure-readiness-v1"]["directory"] / "manifest.sha256"
+    )
+    tracked_non_gzip = [
+        f"data/rescuescreen/r611q/structure-readiness-v1/{relative_path}"
+        for _, relative_path in manifest_entries
+        if not relative_path.endswith(".gz")
+    ]
+    result = subprocess.run(
+        ["git", "--no-pager", "ls-files", "--eol", "--", *tracked_non_gzip],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr or result.stdout
+
+    rows = [line for line in result.stdout.splitlines() if line.strip()]
+    observed_by_path: dict[str, str] = {}
+    for row in rows:
+        if "\t" not in row:
+            continue
+        _, path = row.split("\t", 1)
+        observed_by_path[path] = row
+    missing_paths = [path for path in tracked_non_gzip if path not in observed_by_path]
+    assert not missing_paths, f"git ls-files --eol missing tracked paths: {missing_paths}"
+
+    for path in tracked_non_gzip:
+        meta = observed_by_path[path].split("\t", 1)[0]
+        worktree_tokens = [token for token in meta.split() if token.startswith("w/")]
+        assert worktree_tokens, f"unable to parse git --eol row for {path!r}: {observed_by_path[path]!r}"
+        assert all(token != "w/crlf" for token in worktree_tokens), f"worktree CRLF forbidden for {path}: {observed_by_path[path]}"
 
 
 def test_r611q_pv2a_ac03_manifest_parser_rejects_traversal_duplicate_and_unsorted(tmp_path: Path) -> None:
@@ -941,7 +1006,7 @@ def test_r611q_pv2a_ac12_operator_synthetic_end_to_end_contract(tmp_path: Path) 
         yaml.safe_dump(
             {
                 "spec_id": "r611q-package-v2-addendum-v1",
-                "spec_version": "1.0.1",
+                "spec_version": "1.0.2",
                 "output": {
                     "package_id": "r611q-package-v2-addendum-2026-09-17",
                     "external_artifacts": list(EXPECTED_EXTERNAL_ARTIFACTS),

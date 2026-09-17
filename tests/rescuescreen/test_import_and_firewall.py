@@ -10,7 +10,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RESCUESCREEN_SRC_DIR = REPO_ROOT / "src" / "raptor" / "rescuescreen"
-EXPECTED_MODULE_FILES = {"__init__.py", "model.py", "gates.py", "cli.py"}
+EXPECTED_MODULE_FILES = {"__init__.py", "model.py", "gates.py", "cli.py", "package_v2.py"}
 BASELINE_HEAD = "5919fc091534e04e9cebd1f9e5a3f299aba13e54"
 
 FORBIDDEN_IMPORT_PREFIXES = (
