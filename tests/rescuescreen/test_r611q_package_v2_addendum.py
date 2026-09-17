@@ -655,6 +655,93 @@ def _require_package_v2_module():
     return module
 
 
+def _load_operator_module() -> Any:
+    if not OPERATOR_SCRIPT_PATH.is_file():
+        pytest.fail(f"implementation missing: {OPERATOR_SCRIPT_PATH}")
+
+    spec = importlib.util.spec_from_file_location(
+        "r611q_package_v2_addendum_operator",
+        OPERATOR_SCRIPT_PATH,
+    )
+    if spec is None or spec.loader is None:
+        pytest.fail(f"unable to load operator module spec: {OPERATOR_SCRIPT_PATH}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _prepare_operator_fixture_and_config(
+    tmp_path: Path,
+    *,
+    repository_summary_directory: str = "data/rescuescreen/r611q/package-v2-addendum",
+) -> tuple[Any, Any, Path, Path, Path, Path, Path, str]:
+    module = _load_operator_module()
+    fixture_root = tmp_path / "operator-fixture"
+    fixture = module._materialize_offline_fixture(fixture_root)
+
+    config = copy.deepcopy(fixture.config_defaults)
+    output = config.setdefault("output", {})
+    output["package_id"] = "r611q-package-v2-addendum-2026-09-17"
+    output["external_artifacts"] = list(EXPECTED_EXTERNAL_ARTIFACTS)
+    output["repository_summary"] = {
+        "directory": repository_summary_directory,
+        "json_path": f"{repository_summary_directory}/package_summary.json",
+        "readme_path": f"{repository_summary_directory}/README.md",
+    }
+    config["spec_id"] = "r611q-package-v2-addendum-v1"
+    config["spec_version"] = "1.0.2"
+
+    config_path = tmp_path / "operator_config.yaml"
+    config_path.write_text(
+        yaml.safe_dump(config, sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+
+    expected_summary_dir = (fixture.repo_root / repository_summary_directory).resolve()
+    expected_summary_json = expected_summary_dir / "package_summary.json"
+    expected_summary_readme = expected_summary_dir / "README.md"
+    return (
+        module,
+        fixture,
+        config_path,
+        expected_summary_dir,
+        expected_summary_json,
+        expected_summary_readme,
+        fixture.repo_root.resolve(),
+        output["package_id"],
+    )
+
+
+def _run_operator_main(
+    module: Any,
+    *,
+    config_path: Path,
+    repo_root: Path,
+    v1_packet_path: Path,
+    v1_form_path: Path,
+    delta_bundle_root: Path,
+    output_root: Path,
+    repository_summary_dir: Path | None = None,
+) -> int:
+    argv = [
+        "--config",
+        str(config_path),
+        "--repo-root",
+        str(repo_root),
+        "--v1-packet",
+        str(v1_packet_path),
+        "--v1-form",
+        str(v1_form_path),
+        "--delta-bundle-root",
+        str(delta_bundle_root),
+        "--output-root",
+        str(output_root),
+    ]
+    if repository_summary_dir is not None:
+        argv.extend(["--repository-summary-dir", str(repository_summary_dir)])
+    return int(module.main(argv))
+
+
 def _import_names_for(path: Path) -> set[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     names: set[str] = set()
@@ -1247,3 +1334,168 @@ def test_r611q_pv2a_ac12_operator_synthetic_end_to_end_contract(tmp_path: Path) 
         env={**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")},
     )
     assert run.returncode == 0, run.stderr or run.stdout
+
+
+def test_r611q_pv2a_publication_preexisting_summary_fails_before_external_creation(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    (
+        module,
+        fixture,
+        config_path,
+        _summary_dir,
+        summary_json_path,
+        _summary_readme_path,
+        _repo_root,
+        package_id,
+    ) = _prepare_operator_fixture_and_config(tmp_path)
+    summary_json_path.parent.mkdir(parents=True, exist_ok=True)
+    summary_json_path.write_text("{\"preexisting\":true}\n", encoding="utf-8")
+
+    output_root = (tmp_path / "external-outside").resolve()
+    package_dir = output_root / package_id
+
+    exit_code = _run_operator_main(
+        module,
+        config_path=config_path,
+        repo_root=fixture.repo_root.resolve(),
+        v1_packet_path=fixture.packet_path.resolve(),
+        v1_form_path=fixture.form_path.resolve(),
+        delta_bundle_root=fixture.delta_bundle_root.resolve(),
+        output_root=output_root,
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "r611q-package-v2-addendum error:" in captured.err
+    assert "Traceback" not in captured.err
+    assert not package_dir.exists(), "external package must not be created before summary create-only preflight"
+
+
+@pytest.mark.parametrize(
+    "summary_dir_builder",
+    ["inside-repo-alternate", "outside-repo"],
+)
+def test_r611q_pv2a_publication_repository_summary_dir_must_match_configured_target(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    summary_dir_builder: str,
+) -> None:
+    (
+        module,
+        fixture,
+        config_path,
+        expected_summary_dir,
+        _summary_json_path,
+        _summary_readme_path,
+        repo_root,
+        package_id,
+    ) = _prepare_operator_fixture_and_config(tmp_path)
+    output_root = (tmp_path / "external-outside").resolve()
+    package_dir = output_root / package_id
+
+    if summary_dir_builder == "inside-repo-alternate":
+        repository_summary_dir = (repo_root / "data" / "rescuescreen" / "r611q" / "alternate-summary-target").resolve()
+    else:
+        repository_summary_dir = (tmp_path / "outside-summary-target").resolve()
+    assert repository_summary_dir != expected_summary_dir
+
+    exit_code = _run_operator_main(
+        module,
+        config_path=config_path,
+        repo_root=repo_root,
+        v1_packet_path=fixture.packet_path.resolve(),
+        v1_form_path=fixture.form_path.resolve(),
+        delta_bundle_root=fixture.delta_bundle_root.resolve(),
+        output_root=output_root,
+        repository_summary_dir=repository_summary_dir,
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "r611q-package-v2-addendum error:" in captured.err
+    assert "Traceback" not in captured.err
+    assert not package_dir.exists(), "external package must not be published when repository-summary-dir is non-canonical"
+
+
+def test_r611q_pv2a_publication_external_output_root_must_resolve_outside_repo(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    (
+        module,
+        fixture,
+        config_path,
+        _summary_dir,
+        _summary_json_path,
+        _summary_readme_path,
+        repo_root,
+        package_id,
+    ) = _prepare_operator_fixture_and_config(tmp_path)
+    output_root = (repo_root / "external-package-under-repo-root").resolve()
+    package_dir = output_root / package_id
+
+    exit_code = _run_operator_main(
+        module,
+        config_path=config_path,
+        repo_root=repo_root,
+        v1_packet_path=fixture.packet_path.resolve(),
+        v1_form_path=fixture.form_path.resolve(),
+        delta_bundle_root=fixture.delta_bundle_root.resolve(),
+        output_root=output_root,
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "r611q-package-v2-addendum error:" in captured.err
+    assert "Traceback" not in captured.err
+    assert not package_dir.exists(), "external package root inside repo must be rejected before publication"
+
+
+def test_r611q_pv2a_publication_summary_create_only_is_atomic_and_sanitized(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (
+        module,
+        fixture,
+        config_path,
+        _summary_dir,
+        summary_json_path,
+        summary_readme_path,
+        repo_root,
+        package_id,
+    ) = _prepare_operator_fixture_and_config(tmp_path)
+    output_root = (tmp_path / "external-outside").resolve()
+    package_dir = output_root / package_id
+
+    real_write_text = Path.write_text
+    target_readme = summary_readme_path.resolve()
+
+    def fail_second_summary_write(path_obj: Path, text: str, *args: Any, **kwargs: Any) -> int:
+        candidate = Path(path_obj).resolve()
+        if candidate == target_readme:
+            raise module.PackageV2Error("simulated second-file write failure")
+        return int(real_write_text(path_obj, text, *args, **kwargs))
+
+    monkeypatch.setattr(Path, "write_text", fail_second_summary_write)
+
+    exit_code = _run_operator_main(
+        module,
+        config_path=config_path,
+        repo_root=repo_root,
+        v1_packet_path=fixture.packet_path.resolve(),
+        v1_form_path=fixture.form_path.resolve(),
+        delta_bundle_root=fixture.delta_bundle_root.resolve(),
+        output_root=output_root,
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "r611q-package-v2-addendum error:" in captured.err
+    assert "Traceback" not in captured.err
+    assert not summary_json_path.exists(), "summary publication must be all-or-nothing on second-file write failure"
+    assert not summary_readme_path.exists(), "summary publication must be all-or-nothing on second-file write failure"
+    assert not package_dir.exists(), "external package must not be finalized when summary publication is interrupted"
