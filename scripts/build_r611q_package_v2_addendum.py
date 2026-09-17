@@ -517,7 +517,6 @@ def main(argv: list[str] | None = None) -> int:
         package_id = config["output"]["package_id"]
         repository_summary_target = config["output"]["repository_summary"]["directory"]
         write_repository_summary = not args.no_write_repository_summary
-        root_must_preexist = bool(config.get("output", {}).get("root_must_preexist", True))
 
         # --- Preflight everything before any write, in the required order:
         # (1) repository-summary target, (2) external output root/package
@@ -566,11 +565,14 @@ def main(argv: list[str] | None = None) -> int:
         _require_outside_repo(output_root, repo_root_resolved, "external package output root")
         _reject_symlink_ancestry(output_root, "external package output root")
         _reject_symlink_ancestry(package_dir, "external package path")
-        if root_must_preexist:
-            _require_or_raise(
-                output_root.is_dir() and not output_root.is_symlink(),
-                f"external package output root must already exist as a real directory: {output_root}",
-            )
+        # validate_output_publication_paths already enforced
+        # output.root_must_preexist is present and exactly True -- there is
+        # no supported policy under which the output root is created for
+        # the caller or the precheck is skipped, so this is unconditional.
+        _require_or_raise(
+            output_root.is_dir() and not output_root.is_symlink(),
+            f"external package output root must already exist as a real directory: {output_root}",
+        )
         _require_or_raise(
             not package_dir.exists(),
             f"external package path already exists (create-only contract): {package_dir}",

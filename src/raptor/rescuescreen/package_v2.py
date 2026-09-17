@@ -245,22 +245,44 @@ def _validate_safe_relative_posix_path(
 
 
 def validate_output_publication_paths(config: Mapping[str, Any]) -> None:
-    """Validate every operator-config path that governs where this
-    invocation will publish, before any build/publish/preflight descriptor
-    call is made.
+    """Validate every operator-config path/policy value that governs where
+    and whether this invocation will publish, before any build/publish/
+    preflight descriptor call is made.
 
-    Validates ``output.package_id`` as a single safe relative component, and
+    Validates ``output.package_id`` as a single safe relative component,
     ``output.repository_summary.directory``/``json_path``/``readme_path`` as
     safe, normalized, POSIX-relative paths whose ``json_path``/``readme_path``
     parents equal the configured directory exactly and whose file names are
-    exactly ``package_summary.json``/``README.md``. Pure and read-only: it
-    never touches the filesystem, and raises ``PackageV2Error`` on the first
-    unsafe value found.
+    exactly ``package_summary.json``/``README.md``, and ``output.
+    root_must_preexist`` as a genuine boolean equal to exactly ``True``
+    (present, of type ``bool`` -- not merely truthy, and not an ``int`` such
+    as ``1``, which in Python is not a ``bool`` instance -- never ``False``,
+    ``None``, a string, or absent). RAPTOR's publication contract requires
+    the external output root to already exist as a real directory; there is
+    no supported "create the root for me" or "skip the precheck" policy, so
+    any other value is rejected here, before the operator ever acts on it.
+    Pure and read-only: it never touches the filesystem, and raises
+    ``PackageV2Error`` on the first unsafe/invalid value found.
     """
 
     output = config.get("output") if isinstance(config, Mapping) else None
     _require(isinstance(output, Mapping), "config is missing an 'output' mapping")
     assert isinstance(output, Mapping)
+
+    _require(
+        "root_must_preexist" in output,
+        "config is missing required 'output.root_must_preexist'",
+    )
+    root_must_preexist_value = output.get("root_must_preexist")
+    _require(
+        isinstance(root_must_preexist_value, bool),
+        "output.root_must_preexist must be a boolean (exactly True), "
+        f"not {type(root_must_preexist_value).__name__}: {root_must_preexist_value!r}",
+    )
+    _require(
+        root_must_preexist_value is True,
+        f"output.root_must_preexist must be exactly True: {root_must_preexist_value!r}",
+    )
 
     _validate_relative_single_component(output.get("package_id"), description="output.package_id")
 
