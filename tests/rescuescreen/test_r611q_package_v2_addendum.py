@@ -764,6 +764,29 @@ def _run_operator_main(
     return int(module.main(argv))
 
 
+def _write_operator_config(config_path: Path, config: Mapping[str, Any]) -> None:
+    config_path.write_text(
+        yaml.safe_dump(dict(config), sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+
+
+def _install_publication_call_guards(module: Any, monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
+    called = {"summary_publish": False, "external_render": False}
+
+    def unexpected_summary_publish(*_args: Any, **_kwargs: Any):
+        called["summary_publish"] = True
+        raise module.PackageV2Error("unexpected summary publication call before path validation")
+
+    def unexpected_external_render(*_args: Any, **_kwargs: Any):
+        called["external_render"] = True
+        raise module.PackageV2Error("unexpected external publication call before path validation")
+
+    monkeypatch.setattr(module, "publish_repository_summary_descriptor_relative", unexpected_summary_publish)
+    monkeypatch.setattr(module, "render_external_package", unexpected_external_render)
+    return called
+
+
 def _import_names_for(path: Path) -> set[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     names: set[str] = set()
@@ -1998,3 +2021,310 @@ def test_r611q_pv2a_publication_rejects_post_claim_symlink_swap_race(
     assert package_dir.resolve() == attacker_target, "racing symlink target should remain attacker-controlled"
     assert list(attacker_target.rglob("*")) == [], "failed publication must not materialize payload/manifest in attacker target"
     assert not list(output_root.glob(f".{package_id}.staging-*")), "staging directories must be cleaned on publication failure"
+
+
+@pytest.mark.parametrize(
+    ("label", "package_id_template"),
+    [
+        ("absolute_posix", "{ABS}/outside-package"),
+        ("dotdot", ".."),
+        ("dot", "."),
+        ("nested_slash", "nested/package"),
+        ("backslash", "nested\\package"),
+        ("drive_colon", "C:package"),
+        ("nul", "bad\x00package"),
+        ("leading_whitespace", " package"),
+        ("trailing_whitespace", "package "),
+    ],
+)
+def test_r611q_pv2a_descriptor_relative_escape_render_rejects_unsafe_package_id(
+    tmp_path: Path,
+    label: str,
+    package_id_template: str,
+) -> None:
+    module = _require_package_v2_module()
+    output_root = (tmp_path / f"external-root-{label}").resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    outside_abs_root = (tmp_path / "outside-absolute-target").resolve()
+    package_id = package_id_template.replace("{ABS}", outside_abs_root.as_posix())
+
+    artifacts = {
+        "R611Q_EXPERT_REVIEW_PACKET_V2.md": b"# packet\n",
+        "R611Q_EXPERT_REVIEW_FORM_V2.yaml": b"schema: atlas.expert_review_form.v2\n",
+        "R611Q_PACKAGE_V2_IMPACT.json": b"{\"impact\":\"bounded\"}\n",
+        "R611Q_PACKAGE_V2_SUMMARY.md": b"# summary\n",
+    }
+
+    with pytest.raises(module.PackageV2Error):
+        module.render_external_package(
+            output_root,
+            package_id=package_id,
+            repository_summary_target="data/rescuescreen/r611q/package-v2-addendum",
+            artifacts=artifacts,
+        )
+
+    assert not outside_abs_root.exists(), "unsafe absolute package_id must not create an outside directory"
+    assert not any(output_root.iterdir()), "unsafe package_id must be rejected before external publication writes"
+
+
+@pytest.mark.parametrize(
+    ("label", "bad_package_id_template"),
+    [
+        ("absolute_posix", "{ABS}/outside-package"),
+        ("dotdot", ".."),
+        ("dot", "."),
+        ("nested_slash", "nested/package"),
+        ("backslash", "nested\\package"),
+        ("drive_colon", "C:package"),
+        ("nul", "bad\x00package"),
+        ("leading_whitespace", " package"),
+        ("trailing_whitespace", "package "),
+    ],
+)
+def test_r611q_pv2a_descriptor_relative_escape_operator_rejects_unsafe_package_id_before_publication(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    label: str,
+    bad_package_id_template: str,
+) -> None:
+    (
+        module,
+        fixture,
+        config_path,
+        summary_dir,
+        summary_json_path,
+        summary_readme_path,
+        repo_root,
+        _package_id,
+    ) = _prepare_operator_fixture_and_config(tmp_path)
+    output_root = (tmp_path / f"external-outside-{label}").resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    outside_abs_root = (tmp_path / "outside-absolute-target").resolve()
+    bad_package_id = bad_package_id_template.replace("{ABS}", outside_abs_root.as_posix())
+
+    config = _read_yaml_mapping(config_path)
+    config["output"]["package_id"] = bad_package_id
+    _write_operator_config(config_path, config)
+    called = _install_publication_call_guards(module, monkeypatch)
+
+    exit_code = _run_operator_main(
+        module,
+        config_path=config_path,
+        repo_root=repo_root,
+        v1_packet_path=fixture.packet_path.resolve(),
+        v1_form_path=fixture.form_path.resolve(),
+        delta_bundle_root=fixture.delta_bundle_root.resolve(),
+        output_root=output_root,
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "r611q-package-v2-addendum error:" in captured.err
+    assert "Traceback" not in captured.err
+    assert not called["summary_publish"], "unsafe package_id must fail before summary publication path"
+    assert not called["external_render"], "unsafe package_id must fail before external publication path"
+    assert not outside_abs_root.exists(), "unsafe package_id must not create outside directories"
+    assert not summary_dir.exists(), "unsafe package_id must fail before summary directory creation"
+    assert not summary_json_path.exists()
+    assert not summary_readme_path.exists()
+    assert not any(output_root.iterdir()), "unsafe package_id must fail before external output writes"
+
+
+@pytest.mark.parametrize(
+    ("label", "directory_value", "json_path_value", "readme_path_value"),
+    [
+        (
+            "directory_absolute",
+            "{ABS}/summary-out",
+            "{ABS}/summary-out/package_summary.json",
+            "{ABS}/summary-out/README.md",
+        ),
+        (
+            "directory_empty_component",
+            "data/rescuescreen/r611q//package-v2-addendum",
+            "data/rescuescreen/r611q//package-v2-addendum/package_summary.json",
+            "data/rescuescreen/r611q//package-v2-addendum/README.md",
+        ),
+        (
+            "directory_dot_component",
+            "data/rescuescreen/r611q/./package-v2-addendum",
+            "data/rescuescreen/r611q/./package-v2-addendum/package_summary.json",
+            "data/rescuescreen/r611q/./package-v2-addendum/README.md",
+        ),
+        (
+            "directory_dotdot_component",
+            "data/rescuescreen/r611q/../package-v2-addendum",
+            "data/rescuescreen/r611q/../package-v2-addendum/package_summary.json",
+            "data/rescuescreen/r611q/../package-v2-addendum/README.md",
+        ),
+        (
+            "directory_backslash",
+            "data\\rescuescreen\\r611q\\package-v2-addendum",
+            "data\\rescuescreen\\r611q\\package-v2-addendum\\package_summary.json",
+            "data\\rescuescreen\\r611q\\package-v2-addendum\\README.md",
+        ),
+        (
+            "directory_drive_colon",
+            "C:/rescuescreen/r611q/package-v2-addendum",
+            "C:/rescuescreen/r611q/package-v2-addendum/package_summary.json",
+            "C:/rescuescreen/r611q/package-v2-addendum/README.md",
+        ),
+        (
+            "directory_nul",
+            "data/rescuescreen/r611q/package-v2-\x00addendum",
+            "data/rescuescreen/r611q/package-v2-\x00addendum/package_summary.json",
+            "data/rescuescreen/r611q/package-v2-\x00addendum/README.md",
+        ),
+        (
+            "directory_single_component",
+            "package-v2-addendum",
+            "package-v2-addendum/package_summary.json",
+            "package-v2-addendum/README.md",
+        ),
+        (
+            "json_parent_mismatch",
+            "data/rescuescreen/r611q/package-v2-addendum",
+            "data/rescuescreen/r611q/alternate-target/package_summary.json",
+            "data/rescuescreen/r611q/package-v2-addendum/README.md",
+        ),
+        (
+            "json_escape_parent",
+            "data/rescuescreen/r611q/package-v2-addendum",
+            "data/rescuescreen/r611q/package-v2-addendum/../escape/package_summary.json",
+            "data/rescuescreen/r611q/package-v2-addendum/README.md",
+        ),
+        (
+            "json_absolute",
+            "data/rescuescreen/r611q/package-v2-addendum",
+            "{ABS}/absolute-summary/package_summary.json",
+            "data/rescuescreen/r611q/package-v2-addendum/README.md",
+        ),
+        (
+            "readme_parent_mismatch",
+            "data/rescuescreen/r611q/package-v2-addendum",
+            "data/rescuescreen/r611q/package-v2-addendum/package_summary.json",
+            "data/rescuescreen/r611q/alternate-target/README.md",
+        ),
+        (
+            "readme_absolute",
+            "data/rescuescreen/r611q/package-v2-addendum",
+            "data/rescuescreen/r611q/package-v2-addendum/package_summary.json",
+            "{ABS}/absolute-summary/README.md",
+        ),
+        (
+            "json_wrong_filename",
+            "data/rescuescreen/r611q/package-v2-addendum",
+            "data/rescuescreen/r611q/package-v2-addendum/summary.json",
+            "data/rescuescreen/r611q/package-v2-addendum/README.md",
+        ),
+        (
+            "readme_wrong_filename",
+            "data/rescuescreen/r611q/package-v2-addendum",
+            "data/rescuescreen/r611q/package-v2-addendum/package_summary.json",
+            "data/rescuescreen/r611q/package-v2-addendum/README.txt",
+        ),
+    ],
+)
+def test_r611q_pv2a_descriptor_relative_escape_operator_rejects_summary_path_mutations_before_publication(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    label: str,
+    directory_value: str,
+    json_path_value: str,
+    readme_path_value: str,
+) -> None:
+    (
+        module,
+        fixture,
+        config_path,
+        summary_dir,
+        summary_json_path,
+        summary_readme_path,
+        repo_root,
+        package_id,
+    ) = _prepare_operator_fixture_and_config(tmp_path)
+    output_root = (tmp_path / f"external-outside-{label}").resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    package_dir = output_root / package_id
+    outside_abs_root = (tmp_path / "outside-summary-target").resolve()
+
+    directory = directory_value.replace("{ABS}", outside_abs_root.as_posix())
+    json_path = json_path_value.replace("{ABS}", outside_abs_root.as_posix())
+    readme_path = readme_path_value.replace("{ABS}", outside_abs_root.as_posix())
+
+    config = _read_yaml_mapping(config_path)
+    summary_output = config["output"]["repository_summary"]
+    summary_output["directory"] = directory
+    summary_output["json_path"] = json_path
+    summary_output["readme_path"] = readme_path
+    _write_operator_config(config_path, config)
+    called = _install_publication_call_guards(module, monkeypatch)
+
+    exit_code = _run_operator_main(
+        module,
+        config_path=config_path,
+        repo_root=repo_root,
+        v1_packet_path=fixture.packet_path.resolve(),
+        v1_form_path=fixture.form_path.resolve(),
+        delta_bundle_root=fixture.delta_bundle_root.resolve(),
+        output_root=output_root,
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "r611q-package-v2-addendum error:" in captured.err
+    assert "Traceback" not in captured.err
+    assert not called["summary_publish"], "summary path validation must fail before summary publication"
+    assert not called["external_render"], "summary path validation must fail before external publication"
+    assert not outside_abs_root.exists(), "unsafe summary path mutation must not create outside directories"
+    assert not summary_dir.exists(), "mutated summary path config must fail before summary publication writes"
+    assert not summary_json_path.exists()
+    assert not summary_readme_path.exists()
+    assert not package_dir.exists(), "mutated summary path config must fail before external publication"
+    assert "repository summary written:" not in captured.out
+    assert "external package written:" not in captured.out
+
+
+def test_r611q_pv2a_descriptor_relative_escape_operator_accepts_exact_real_shape_paths(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    (
+        module,
+        fixture,
+        config_path,
+        summary_dir,
+        summary_json_path,
+        summary_readme_path,
+        repo_root,
+        package_id,
+    ) = _prepare_operator_fixture_and_config(tmp_path)
+    output_root = (tmp_path / "external-outside-positive").resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    package_dir = output_root / package_id
+
+    config = _read_yaml_mapping(config_path)
+    summary_output = config["output"]["repository_summary"]
+    assert summary_output["directory"] == "data/rescuescreen/r611q/package-v2-addendum"
+    assert summary_output["json_path"] == "data/rescuescreen/r611q/package-v2-addendum/package_summary.json"
+    assert summary_output["readme_path"] == "data/rescuescreen/r611q/package-v2-addendum/README.md"
+    _write_operator_config(config_path, config)
+
+    exit_code = _run_operator_main(
+        module,
+        config_path=config_path,
+        repo_root=repo_root,
+        v1_packet_path=fixture.packet_path.resolve(),
+        v1_form_path=fixture.form_path.resolve(),
+        delta_bundle_root=fixture.delta_bundle_root.resolve(),
+        output_root=output_root,
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0, captured.err or captured.out
+    assert package_dir.is_dir()
+    assert summary_dir.is_dir()
+    assert summary_json_path.is_file()
+    assert summary_readme_path.is_file()
