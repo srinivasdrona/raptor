@@ -2781,16 +2781,17 @@ def test_r611q_pv2a_publication_freezes_artifact_snapshot_before_manifest_and_wr
         def replace(self, key: str, value: Any) -> None:
             self._items[key] = value
 
-    artifacts = MutableArtifacts(
+    caller_summary_payload = bytearray(b"# summary\n")
+    caller_artifacts = MutableArtifacts(
         {
             "R611Q_EXPERT_REVIEW_PACKET_V2.md": b"# packet\n",
             "R611Q_EXPERT_REVIEW_FORM_V2.yaml": b"schema: atlas.expert_review_form.v2\n",
             "R611Q_PACKAGE_V2_IMPACT.json": b"{\"impact\":\"bounded\"}\n",
-            "R611Q_PACKAGE_V2_SUMMARY.md": bytearray(b"# summary\n"),
+            "R611Q_PACKAGE_V2_SUMMARY.md": caller_summary_payload,
         }
     )
     pre_mutation_snapshot = {
-        name: bytes(artifacts[name]) for name in EXPECTED_EXTERNAL_ARTIFACTS[:-1]
+        name: bytes(caller_artifacts[name]) for name in EXPECTED_EXTERNAL_ARTIFACTS[:-1]
     }
 
     real_publish = module._publish_directory_no_replace
@@ -2807,10 +2808,14 @@ def test_r611q_pv2a_publication_freezes_artifact_snapshot_before_manifest_and_wr
         manifest_bytes: bytes,
     ) -> tuple[str, ...]:
         if not injected["done"]:
-            summary_payload = artifacts["R611Q_PACKAGE_V2_SUMMARY.md"]
-            assert isinstance(summary_payload, bytearray)
-            summary_payload.extend(b"mutated-after-manifest\n")
-            artifacts.replace("R611Q_EXPERT_REVIEW_PACKET_V2.md", b"# packet replaced after manifest\n")
+            for name in payload_names:
+                payload = artifacts[name]
+                assert isinstance(payload, bytes), (
+                    f"publish seam must receive immutable bytes payload for {name}; got {type(payload)!r}"
+                )
+
+            caller_summary_payload.extend(b"mutated-after-manifest\n")
+            caller_artifacts.replace("R611Q_EXPERT_REVIEW_PACKET_V2.md", b"# packet replaced after manifest\n")
             injected["done"] = True
         return real_publish(
             root_fd=root_fd,
@@ -2828,9 +2833,14 @@ def test_r611q_pv2a_publication_freezes_artifact_snapshot_before_manifest_and_wr
         output_root,
         package_id=package_id,
         repository_summary_target="data/rescuescreen/r611q/package-v2-addendum",
-        artifacts=artifacts,
+        artifacts=caller_artifacts,
     )
     assert injected["done"], "test must mutate caller-owned artifacts after manifest rows are computed"
+    assert bytes(caller_summary_payload) != pre_mutation_snapshot["R611Q_PACKAGE_V2_SUMMARY.md"]
+    assert (
+        bytes(caller_artifacts["R611Q_EXPERT_REVIEW_PACKET_V2.md"])
+        != pre_mutation_snapshot["R611Q_EXPERT_REVIEW_PACKET_V2.md"]
+    )
 
     manifest = json.loads((package_dir / "package_manifest.json").read_text(encoding="utf-8"))
     for row in manifest["artifacts"]:
