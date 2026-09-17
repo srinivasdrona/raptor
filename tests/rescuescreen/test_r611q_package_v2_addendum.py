@@ -2380,6 +2380,150 @@ def test_r611q_pv2a_descriptor_relative_escape_operator_accepts_exact_real_shape
     assert summary_readme_path.is_file()
 
 
+@pytest.mark.parametrize(
+    ("label", "value", "remove"),
+    [
+        ("false", False, False),
+        ("null", None, False),
+        ("missing", None, True),
+        ("string-true", "true", False),
+        ("int-1", 1, False),
+    ],
+)
+def test_r611q_pv2a_root_must_preexist_invalid_values_fail_before_publication_surfaces(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    label: str,
+    value: Any,
+    remove: bool,
+) -> None:
+    (
+        module,
+        fixture,
+        config_path,
+        summary_dir,
+        summary_json_path,
+        summary_readme_path,
+        repo_root,
+        package_id,
+    ) = _prepare_operator_fixture_and_config(tmp_path)
+    output_root = (tmp_path / f"absent-external-root-{label}").resolve()
+    package_dir = output_root / package_id
+    assert not output_root.exists()
+
+    config = _read_yaml_mapping(config_path)
+    output = config["output"]
+    if remove:
+        output.pop("root_must_preexist", None)
+    else:
+        output["root_must_preexist"] = value
+    _write_operator_config(config_path, config)
+
+    called = {"build_summary": False, "summary_publish": False, "external_render": False}
+
+    def unexpected_build_summary(*_args: Any, **_kwargs: Any):
+        called["build_summary"] = True
+        raise module.PackageV2Error("unexpected build_repository_summary call before root_must_preexist validation")
+
+    def unexpected_summary_publish(*_args: Any, **_kwargs: Any):
+        called["summary_publish"] = True
+        raise module.PackageV2Error(
+            "unexpected publish_repository_summary_descriptor_relative call before root_must_preexist validation"
+        )
+
+    def unexpected_external_render(*_args: Any, **_kwargs: Any):
+        called["external_render"] = True
+        raise module.PackageV2Error("unexpected render_external_package call before root_must_preexist validation")
+
+    monkeypatch.setattr(module, "build_repository_summary", unexpected_build_summary)
+    monkeypatch.setattr(module, "publish_repository_summary_descriptor_relative", unexpected_summary_publish)
+    monkeypatch.setattr(module, "render_external_package", unexpected_external_render)
+
+    package_module = _require_package_v2_module()
+    open_calls = {"count": 0}
+    mkdir_calls = {"count": 0}
+    real_open = package_module.os.open
+    real_mkdir = package_module.os.mkdir
+
+    def capture_open(*args: Any, **kwargs: Any):
+        open_calls["count"] += 1
+        return real_open(*args, **kwargs)
+
+    def capture_mkdir(path: Any, mode: int = 0o777, *, dir_fd: int | None = None) -> None:
+        mkdir_calls["count"] += 1
+        if dir_fd is None:
+            real_mkdir(path, mode)
+        else:
+            real_mkdir(path, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(package_module.os, "open", capture_open)
+    monkeypatch.setattr(package_module.os, "mkdir", capture_mkdir)
+
+    exit_code = _run_operator_main(
+        module,
+        config_path=config_path,
+        repo_root=repo_root,
+        v1_packet_path=fixture.packet_path.resolve(),
+        v1_form_path=fixture.form_path.resolve(),
+        delta_bundle_root=fixture.delta_bundle_root.resolve(),
+        output_root=output_root,
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "r611q-package-v2-addendum error:" in captured.err
+    assert "Traceback" not in captured.err
+    assert "root_must_preexist" in captured.err
+    assert not called["build_summary"], "must fail before build_repository_summary"
+    assert not called["summary_publish"], "must fail before publish_repository_summary_descriptor_relative"
+    assert not called["external_render"], "must fail before render_external_package"
+    assert open_calls["count"] == 0, "must fail before any publication os.open call"
+    assert mkdir_calls["count"] == 0, "must fail before any publication os.mkdir call"
+    assert not output_root.exists(), "invalid root_must_preexist must not create external root/tombstone"
+    _assert_external_package_unpublished(package_dir)
+    _assert_repository_summary_unpublished(summary_dir, summary_json_path, summary_readme_path)
+
+
+def test_r611q_pv2a_validate_output_publication_paths_rejects_non_boolean_root_must_preexist_if_exposed(
+    tmp_path: Path,
+) -> None:
+    module = _load_operator_module()
+    validator = getattr(module, "validate_output_publication_paths", None)
+    if not callable(validator):
+        pytest.skip("validate_output_publication_paths not exposed by operator module")
+
+    (
+        _operator_module,
+        _fixture,
+        config_path,
+        _summary_dir,
+        _summary_json_path,
+        _summary_readme_path,
+        _repo_root,
+        _package_id,
+    ) = _prepare_operator_fixture_and_config(tmp_path)
+    base_config = _read_yaml_mapping(config_path)
+
+    valid_config = copy.deepcopy(base_config)
+    valid_config["output"]["root_must_preexist"] = True
+    validator(valid_config)
+
+    for label, value, remove in (
+        ("false", False, False),
+        ("null", None, False),
+        ("missing", None, True),
+        ("string-true", "true", False),
+        ("int-1", 1, False),
+    ):
+        invalid_config = copy.deepcopy(base_config)
+        if remove:
+            invalid_config["output"].pop("root_must_preexist", None)
+        else:
+            invalid_config["output"]["root_must_preexist"] = value
+        with pytest.raises(module.PackageV2Error, match="root_must_preexist"):
+            validator(invalid_config)
+
 def _install_summary_publish_input_guards(
     module: Any, monkeypatch: pytest.MonkeyPatch
 ) -> dict[str, int]:
