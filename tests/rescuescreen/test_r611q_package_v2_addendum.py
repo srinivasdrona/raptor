@@ -1499,3 +1499,47 @@ def test_r611q_pv2a_publication_summary_create_only_is_atomic_and_sanitized(
     assert not summary_json_path.exists(), "summary publication must be all-or-nothing on second-file write failure"
     assert not summary_readme_path.exists(), "summary publication must be all-or-nothing on second-file write failure"
     assert not package_dir.exists(), "external package must not be finalized when summary publication is interrupted"
+
+
+def test_r611q_pv2a_publication_rolls_back_summary_when_external_render_fails(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (
+        module,
+        fixture,
+        config_path,
+        summary_dir,
+        summary_json_path,
+        summary_readme_path,
+        repo_root,
+        package_id,
+    ) = _prepare_operator_fixture_and_config(tmp_path)
+    output_root = (tmp_path / "external-outside").resolve()
+    package_dir = output_root / package_id
+    assert not summary_dir.exists(), "test fixture expects summary directory to be create-on-run"
+
+    def fail_render_after_summary(*args: Any, **kwargs: Any):
+        raise module.PackageV2Error("simulated external render failure after summary publication")
+
+    monkeypatch.setattr(module, "render_external_package", fail_render_after_summary)
+
+    exit_code = _run_operator_main(
+        module,
+        config_path=config_path,
+        repo_root=repo_root,
+        v1_packet_path=fixture.packet_path.resolve(),
+        v1_form_path=fixture.form_path.resolve(),
+        delta_bundle_root=fixture.delta_bundle_root.resolve(),
+        output_root=output_root,
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "r611q-package-v2-addendum error:" in captured.err
+    assert "Traceback" not in captured.err
+    assert not package_dir.exists(), "external package must not exist on render failure"
+    assert not summary_json_path.exists(), "summary JSON must be rolled back when external render fails"
+    assert not summary_readme_path.exists(), "summary README must be rolled back when external render fails"
+    assert not summary_dir.exists(), "newly created summary directory must be removed on second-phase failure"
