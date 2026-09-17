@@ -1490,6 +1490,53 @@ def _publish_directory_no_replace(
     return tuple(written_order)
 
 
+def preflight_external_output_root(raw_path: Path, repo_root: Path) -> Path:
+    """Read-only preflight of the external package output root, using the
+    caller's exact lexical path -- never a path already substituted by an
+    earlier ``.resolve()``.
+
+    Intended to run before repository-summary publication, so an invalid or
+    racing output root fails before any file is written at all: ``raw_path``
+    must be absolute, neither it nor any ancestor may be a symlink/reparse
+    point (checked lexically), and it must already exist as a real,
+    non-symlink directory. It is then opened once with ``O_DIRECTORY |
+    O_NOFOLLOW`` and its identity verified (``fstat`` vs a non-following
+    ``lstat``) before anything else is trusted about it. While that
+    descriptor is held open -- pinning the check to the exact directory
+    that was just verified, regardless of what the name currently resolves
+    to -- the outside-repository-root check is performed (this is the only
+    step that calls ``.resolve()``, which follows symlinks and so must not
+    run against an unpinned name). Identity is re-verified immediately
+    afterward, before the descriptor is closed, to catch a root swapped out
+    from under the check during that resolve. Returns the resolved path for
+    display/logging only; it must never be reused to open, create, or write
+    anything -- callers must keep passing ``raw_path`` (the original
+    lexical ``Path``) onward, including to ``render_external_package``,
+    which repeats this same pin-then-resolve-then-reverify discipline
+    itself immediately before publication.
+    """
+
+    raw_path = Path(raw_path)
+    _require(raw_path.is_absolute(), "external package output root must be absolute")
+    _reject_symlink_ancestry(raw_path, "external package output root")
+    _require(
+        raw_path.is_dir() and not raw_path.is_symlink(),
+        f"external package output root must already exist as a real directory: {raw_path}",
+    )
+
+    _require_descriptor_capabilities()
+
+    root_fd = _open_dir_nofollow(raw_path, dir_fd=None, description="external package output root")
+    try:
+        _verify_dir_fd_identity(root_fd, raw_path, dir_fd=None, description="external package output root")
+        resolved = _require_outside_repo(raw_path, Path(repo_root), "external package output root")
+        _verify_dir_fd_identity(root_fd, raw_path, dir_fd=None, description="external package output root")
+    finally:
+        os.close(root_fd)
+
+    return resolved
+
+
 def render_external_package(
     output_root: Path,
     *,
@@ -1503,22 +1550,34 @@ def render_external_package(
     ``output_root`` must already exist as a real, non-symlink directory --
     this function never creates it. ``output_root`` must be absolute, and
     neither it nor any ancestor may be a symlink/reparse point (checked
-    lexically, before resolution). When ``repo_root`` is given (used by the
-    CLI), ``output_root`` must additionally resolve outside it -- this
-    keyword is optional and preserves compatibility with existing callers
-    that omit it.
+    lexically, before resolution). Callers must always pass the original,
+    unresolved lexical path they were given -- never a substitute produced
+    by calling ``.resolve()`` on it beforehand, since that would follow
+    symlinks unpinned and could silently hand this function an attacker's
+    target instead of the directory the caller actually named. When
+    ``repo_root`` is given (used by the CLI), ``output_root`` must
+    additionally resolve outside it -- this keyword is optional and
+    preserves compatibility with existing callers that omit it.
 
-    Publication is fully descriptor-relative and POSIX-only (RAPTOR
-    publishes from WSL/Linux), and uses no staging directory at all:
-    ``artifacts`` are already verified, in-memory bytes, and the manifest is
-    built in memory too (never ``tempfile.mkdtemp``, no ``.staging-`` path,
-    no path-based write under ``output_root`` anywhere). ``output_root`` is
-    opened once with ``O_DIRECTORY | O_NOFOLLOW`` and that descriptor is
-    held open for the entire operation. Publication into the create-only
-    package directory then goes through ``_publish_directory_no_replace``
-    -- see that function for the exact no-clobber, manifest-last,
-    symlink-swap-resistant, tombstone-on-failure contract. Every descriptor
-    opened here is closed on every path, success or failure.
+    Trust is established in a specific order to close a resolve-time race:
+    ``output_root`` is opened with ``O_DIRECTORY | O_NOFOLLOW`` and its
+    identity verified *before* the only step that resolves symlinks (the
+    outside-repository-root check, when ``repo_root`` is given). With that
+    descriptor already pinned to the exact directory just verified, the
+    resolve() used for the outside-repo check cannot be redirected by a
+    same-name swap; identity is re-verified immediately afterward, before
+    any artifact is written, to catch a root swapped out from under the
+    check during that resolve. Publication is fully descriptor-relative and
+    POSIX-only (RAPTOR publishes from WSL/Linux), and uses no staging
+    directory at all: ``artifacts`` are already verified, in-memory bytes,
+    and the manifest is built in memory too (never ``tempfile.mkdtemp``, no
+    ``.staging-`` path, no path-based write under ``output_root``
+    anywhere). The same pinned descriptor is held open for the entire
+    operation and used for the create-only publication that follows via
+    ``_publish_directory_no_replace`` -- see that function for the exact
+    no-clobber, manifest-last, symlink-swap-resistant, tombstone-on-failure
+    contract. Every descriptor opened here is closed on every path, success
+    or failure.
 
     On a platform or filesystem lacking the required ``O_DIRECTORY`` /
     ``O_NOFOLLOW`` / descriptor-relative-open support, this fails closed
@@ -1540,8 +1599,6 @@ def render_external_package(
     output_root = Path(output_root)
     _require(output_root.is_absolute(), "external render root must be absolute")
     _reject_symlink_ancestry(output_root, "external package output root")
-    if repo_root is not None:
-        _require_outside_repo(output_root, Path(repo_root), "external package output root")
 
     _require_descriptor_capabilities()
 
@@ -1568,9 +1625,6 @@ def render_external_package(
     # cannot change what is actually hashed or written.
     frozen_artifacts: dict[str, bytes] = {name: bytes(artifacts[name]) for name in payload_names}
 
-    package_dir = output_root / package_id
-    _reject_symlink_ancestry(package_dir, "external package path")
-
     manifest_name = "package_manifest.json"
     manifest_rows = [
         {"name": name, "sha256": _sha256_bytes(frozen_artifacts[name]), "byte_length": len(frozen_artifacts[name])}
@@ -1586,11 +1640,34 @@ def render_external_package(
     manifest["manifest_content_hash"] = _canonical_json_hash(manifest, drop_field="manifest_content_hash")
     manifest_bytes = _canonical_json_bytes(manifest)
 
+    # Open and pin the output root *before* the only step that resolves
+    # symlinks (the outside-repository-root check below): once this
+    # descriptor is open and its identity verified, a name swap of
+    # ``output_root`` cannot redirect anything that follows, because every
+    # later operation is anchored to this descriptor rather than the name.
+    # Doing the outside-repo resolve() first (as a lexical, unpinned path)
+    # would let a root swapped in between silently substitute an attacker
+    # target for the remainder of the trust chain.
     root_fd = _open_dir_nofollow(output_root, dir_fd=None, description="external package output root")
     try:
         _verify_dir_fd_identity(
             root_fd, output_root, dir_fd=None, description="external package output root"
         )
+
+        if repo_root is not None:
+            _require_outside_repo(output_root, Path(repo_root), "external package output root")
+
+        # Re-verify immediately after the resolve() above: if the name was
+        # swapped during that call, the root this descriptor is pinned to
+        # no longer matches what ``output_root`` currently lexically names,
+        # and publication must fail before any artifact is ever written.
+        _verify_dir_fd_identity(
+            root_fd, output_root, dir_fd=None, description="external package output root"
+        )
+
+        package_dir = output_root / package_id
+        _reject_symlink_ancestry(package_dir, "external package path")
+
         written_order = _publish_directory_no_replace(
             root_fd=root_fd,
             root_path=output_root,

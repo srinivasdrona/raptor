@@ -50,6 +50,7 @@ from raptor.rescuescreen.package_v2 import (  # noqa: E402
     _require_outside_repo,
     build_r611q_package_v2_addendum,
     build_repository_summary,
+    preflight_external_output_root,
     publish_repository_summary_descriptor_relative,
     render_external_package,
     validate_output_publication_paths,
@@ -559,23 +560,23 @@ def main(argv: list[str] | None = None) -> int:
 
         package_dir_raw = output_root_raw / package_id
         _reject_symlink_ancestry(output_root_raw, "external package output root")
+        # Read-only preflight against the caller's exact lexical output
+        # root -- never a path already substituted by an earlier
+        # .resolve() -- so an invalid, absent, or racing root fails before
+        # the repository summary is ever written. The resolved path
+        # returned here is for display only and is never reused to open,
+        # create, or write anything; render_external_package repeats this
+        # same pin-then-resolve-then-reverify discipline itself,
+        # immediately before publication, against this same raw path. This
+        # runs before the package-path ancestry check below so a swap
+        # injected after this point is still caught -- by
+        # render_external_package's own pinned-descriptor checks -- rather
+        # than silently short-circuiting before that call is ever made.
+        preflight_external_output_root(output_root_raw, repo_root_resolved)
         _reject_symlink_ancestry(package_dir_raw, "external package path")
-        output_root = output_root_raw.resolve()
-        package_dir = output_root / package_id
-        _require_outside_repo(output_root, repo_root_resolved, "external package output root")
-        _reject_symlink_ancestry(output_root, "external package output root")
-        _reject_symlink_ancestry(package_dir, "external package path")
-        # validate_output_publication_paths already enforced
-        # output.root_must_preexist is present and exactly True -- there is
-        # no supported policy under which the output root is created for
-        # the caller or the precheck is skipped, so this is unconditional.
         _require_or_raise(
-            output_root.is_dir() and not output_root.is_symlink(),
-            f"external package output root must already exist as a real directory: {output_root}",
-        )
-        _require_or_raise(
-            not package_dir.exists(),
-            f"external package path already exists (create-only contract): {package_dir}",
+            not package_dir_raw.exists(),
+            f"external package path already exists (create-only contract): {package_dir_raw}",
         )
 
         # --- Publish the repository summary first (fully descriptor-
@@ -610,7 +611,7 @@ def main(argv: list[str] | None = None) -> int:
 
         try:
             package_dir, written = render_external_package(
-                output_root,
+                output_root_raw,
                 package_id=package_id,
                 repository_summary_target=repository_summary_target,
                 artifacts=result["external_artifacts"],
