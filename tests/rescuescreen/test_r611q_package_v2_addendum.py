@@ -418,8 +418,9 @@ def _build_selector_identity_fixture(
         "source_role": "DIRECT_ALLELE_EXPERIMENT",
         "primary_result_state": "PRIMARY_R611Q_RESULT",
         "baseline_relation": "NARROWS",
-        "novelty": "NEW_PRIMARY_OBSERVATION",
+        "delta_value": "NEW_PRIMARY_OBSERVATION",
         "claim_kind": "P_COMPLEX_BINDING",
+        "proposition_ids": ["P_COMPLEX_BINDING"],
         "acceptance_state": "PROPOSED_UNACCEPTED",
         "gate_effect": "NONE",
         "accepted_claim_count": 0,
@@ -442,8 +443,9 @@ def _build_selector_identity_fixture(
         "source_role": "SECONDARY_CONTEXT",
         "primary_result_state": "CONTEXT_ONLY",
         "baseline_relation": "NARROWS",
-        "novelty": "KNOWN",
+        "delta_value": "KNOWN",
         "claim_kind": "BACKGROUND",
+        "proposition_ids": ["BACKGROUND"],
         "acceptance_state": "PROPOSED_UNACCEPTED",
         "gate_effect": "NONE",
         "accepted_claim_count": 0,
@@ -460,6 +462,14 @@ def _build_selector_identity_fixture(
         )
 
     return [primary_record, context_record], candidate_spans
+
+
+def _selector_error_type_from_module(module: Any) -> type[BaseException]:
+    for error_name in ("BoundarySelectionError", "PackageV2Error"):
+        candidate = getattr(module, error_name, None)
+        if isinstance(candidate, type) and issubclass(candidate, Exception):
+            return candidate
+    pytest.fail("package_v2 module does not expose a selector error type")
 
 
 def _compose_packet_v2(v1_packet_bytes: bytes, *, boundary_record: Mapping[str, Any]) -> bytes:
@@ -937,55 +947,79 @@ def test_r611q_pv2a_ac05_delta_bundle_oracle_rejects_invalid_boundary_states() -
 
 
 def test_r611q_pv2a_selector_source_integrity_real_schema_does_not_require_record_quote_duplication() -> None:
+    module = _require_package_v2_module()
     review_records, candidate_spans = _build_selector_identity_fixture(duplicate_record_quote_fields=False)
-    selected = _select_boundary_record(review_records, candidate_spans)
+    selected = module.select_boundary_observation(review_records, candidate_spans)
     assert selected["candidate_id"] == candidate_spans[0]["candidate_id"]
+    assert selected["source_id"] == candidate_spans[0]["source_id"]
+    assert selected["article_identity"] == candidate_spans[0]["article_identity"]
+    assert selected["locator"] == candidate_spans[0]["locator"]
+    assert selected["quote_sha256"] == candidate_spans[0]["exact_quote_sha256"]
 
 
 def test_r611q_pv2a_selector_source_integrity_rejects_article_identity_mismatch_despite_matching_candidate_id() -> None:
+    module = _require_package_v2_module()
+    selector_error = _selector_error_type_from_module(module)
     review_records, candidate_spans = _build_selector_identity_fixture(duplicate_record_quote_fields=True)
     review_records[0]["article_identity"] = {"pmid": "22222222", "pmcid": "PMC2222222", "doi": "10.0000/mismatch"}
-    with pytest.raises(AssertionError):
-        _select_boundary_record(review_records, candidate_spans)
+    with pytest.raises(selector_error):
+        module.select_boundary_observation(review_records, candidate_spans)
 
 
 def test_r611q_pv2a_selector_source_integrity_rejects_source_id_not_canonical_for_article_identity() -> None:
+    module = _require_package_v2_module()
+    selector_error = _selector_error_type_from_module(module)
     review_records, candidate_spans = _build_selector_identity_fixture(duplicate_record_quote_fields=True)
     noncanonical = "PMCID:PMC9000001"
     review_records[0]["source_id"] = noncanonical
     candidate_spans[0]["source_id"] = noncanonical
-    with pytest.raises(AssertionError):
-        _select_boundary_record(review_records, candidate_spans)
+    with pytest.raises(selector_error):
+        module.select_boundary_observation(review_records, candidate_spans)
+
+
+def test_r611q_pv2a_selector_source_integrity_rejects_source_mismatch() -> None:
+    module = _require_package_v2_module()
+    selector_error = _selector_error_type_from_module(module)
+    review_records, candidate_spans = _build_selector_identity_fixture(duplicate_record_quote_fields=True)
+    review_records[0]["source_id"] = "PMID:88888888"
+    with pytest.raises(selector_error):
+        module.select_boundary_observation(review_records, candidate_spans)
 
 
 @pytest.mark.parametrize("missing_field", ["candidate_id", "source_id", "article_identity"])
 def test_r611q_pv2a_selector_source_integrity_rejects_missing_record_identity(
     missing_field: str,
 ) -> None:
+    module = _require_package_v2_module()
+    selector_error = _selector_error_type_from_module(module)
     review_records, candidate_spans = _build_selector_identity_fixture(duplicate_record_quote_fields=True)
     if missing_field == "article_identity":
         review_records[0][missing_field] = {}
     else:
-        review_records[0][missing_field] = "   "
-    with pytest.raises(AssertionError):
-        _select_boundary_record(review_records, candidate_spans)
+        review_records[0].pop(missing_field, None)
+    with pytest.raises(selector_error):
+        module.select_boundary_observation(review_records, candidate_spans)
 
 
 def test_r611q_pv2a_selector_source_integrity_rejects_duplicate_candidate_spans() -> None:
+    module = _require_package_v2_module()
+    selector_error = _selector_error_type_from_module(module)
     review_records, candidate_spans = _build_selector_identity_fixture(duplicate_record_quote_fields=True)
     candidate_spans.append(copy.deepcopy(candidate_spans[0]))
-    with pytest.raises(AssertionError):
-        _select_boundary_record(review_records, candidate_spans)
+    with pytest.raises(selector_error):
+        module.select_boundary_observation(review_records, candidate_spans)
 
 
 def test_r611q_pv2a_selector_source_integrity_rejects_candidate_quote_hash_mismatch() -> None:
+    module = _require_package_v2_module()
+    selector_error = _selector_error_type_from_module(module)
     review_records, candidate_spans = _build_selector_identity_fixture(duplicate_record_quote_fields=True)
     tampered_hash = "f" * 64
     candidate_spans[0]["exact_quote_sha256"] = tampered_hash
     candidate_spans[0]["quote_sha256"] = tampered_hash
     review_records[0]["quote_sha256"] = tampered_hash
-    with pytest.raises(AssertionError):
-        _select_boundary_record(review_records, candidate_spans)
+    with pytest.raises(selector_error):
+        module.select_boundary_observation(review_records, candidate_spans)
 
 
 @pytest.mark.parametrize(
@@ -993,23 +1027,27 @@ def test_r611q_pv2a_selector_source_integrity_rejects_candidate_quote_hash_misma
     ["ACCEPTED", "ACCEPTED_WITH_NARROWER_WORDING", "REJECTED", "PENDING", None, "__MISSING__"],
 )
 def test_r611q_pv2a_selector_acceptance_boundary_rejects_non_unaccepted_states(state_value: Any) -> None:
+    module = _require_package_v2_module()
+    selector_error = _selector_error_type_from_module(module)
     review_records, candidate_spans = _build_selector_identity_fixture(duplicate_record_quote_fields=True)
     if state_value == "__MISSING__":
         review_records[0].pop("acceptance_state", None)
     else:
         review_records[0]["acceptance_state"] = state_value
-    with pytest.raises(AssertionError):
-        _select_boundary_record(review_records, candidate_spans)
+    with pytest.raises(selector_error):
+        module.select_boundary_observation(review_records, candidate_spans)
 
 
 @pytest.mark.parametrize("gate_effect_value", ["SATISFIES", "BLOCKED_HUMAN_REVIEW", "", None])
 def test_r611q_pv2a_selector_acceptance_boundary_rejects_non_none_gate_effects(
     gate_effect_value: Any,
 ) -> None:
+    module = _require_package_v2_module()
+    selector_error = _selector_error_type_from_module(module)
     review_records, candidate_spans = _build_selector_identity_fixture(duplicate_record_quote_fields=True)
     review_records[0]["gate_effect"] = gate_effect_value
-    with pytest.raises(AssertionError):
-        _select_boundary_record(review_records, candidate_spans)
+    with pytest.raises(selector_error):
+        module.select_boundary_observation(review_records, candidate_spans)
 
 
 def test_r611q_pv2a_ac06_packet_v2_composition_keeps_exact_prefix_and_boundary_language() -> None:
