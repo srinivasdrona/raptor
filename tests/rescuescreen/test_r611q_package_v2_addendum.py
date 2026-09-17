@@ -1996,6 +1996,104 @@ def test_r611q_pv2a_publication_symlink_ancestry_rejected_for_output_and_summary
     assert not summary_readme_path.exists(), "symlinked summary path ancestry must be rejected before summary publication"
 
 
+def test_r611q_pv2a_operator_lexical_output_root_swap_is_not_trusted_across_resolve_handoff(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (
+        module,
+        fixture,
+        config_path,
+        summary_dir,
+        summary_json_path,
+        summary_readme_path,
+        repo_root,
+        package_id,
+    ) = _prepare_operator_fixture_and_config(tmp_path)
+    lexical_output_root = (tmp_path / "external-root-lexical").resolve()
+    lexical_output_root.mkdir(parents=True, exist_ok=True)
+    attacker_target = (tmp_path / "attacker-outside-target").resolve()
+    attacker_target.mkdir(parents=True, exist_ok=True)
+    attacker_package_dir = attacker_target / package_id
+
+    symlink_probe = tmp_path / "lexical-root-swap-probe"
+    try:
+        symlink_probe.symlink_to(attacker_target, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation unavailable in this environment")
+    finally:
+        if symlink_probe.is_symlink():
+            symlink_probe.unlink()
+
+    real_reject_symlink_ancestry = module._reject_symlink_ancestry
+    swap_state = {"done": False}
+
+    def swap_after_initial_raw_output_root_check(path: Path, description: str) -> None:
+        real_reject_symlink_ancestry(path, description)
+        candidate = Path(path)
+        if (
+            not swap_state["done"]
+            and description == "external package path"
+            and candidate == (lexical_output_root / package_id)
+            and lexical_output_root.exists()
+            and lexical_output_root.is_dir()
+            and not lexical_output_root.is_symlink()
+        ):
+            module.os.rmdir(lexical_output_root)
+            lexical_output_root.symlink_to(attacker_target, target_is_directory=True)
+            swap_state["done"] = True
+
+    observed_render_output_root: dict[str, Path | None] = {"value": None}
+    real_render_external_package = module.render_external_package
+
+    def require_lexical_output_root_handoff(
+        output_root: Path,
+        *,
+        package_id: str,
+        repository_summary_target: str,
+        artifacts: Mapping[str, bytes],
+        repo_root: Path | None = None,
+    ) -> tuple[Path, tuple[str, ...]]:
+        observed_render_output_root["value"] = Path(output_root)
+        if Path(output_root) != lexical_output_root:
+            raise module.PackageV2Error(
+                "operator must hand off the original lexical output_root path to render_external_package"
+            )
+        return real_render_external_package(
+            output_root,
+            package_id=package_id,
+            repository_summary_target=repository_summary_target,
+            artifacts=artifacts,
+            repo_root=repo_root,
+        )
+
+    monkeypatch.setattr(module, "_reject_symlink_ancestry", swap_after_initial_raw_output_root_check)
+    monkeypatch.setattr(module, "render_external_package", require_lexical_output_root_handoff)
+
+    exit_code = _run_operator_main(
+        module,
+        config_path=config_path,
+        repo_root=repo_root,
+        v1_packet_path=fixture.packet_path.resolve(),
+        v1_form_path=fixture.form_path.resolve(),
+        delta_bundle_root=fixture.delta_bundle_root.resolve(),
+        output_root=lexical_output_root,
+    )
+    captured = capsys.readouterr()
+
+    assert swap_state["done"], "test must inject lexical output_root symlink swap after raw preflight check"
+    assert exit_code == 1
+    assert "r611q-package-v2-addendum error:" in captured.err
+    assert "Traceback" not in captured.err
+    assert observed_render_output_root["value"] == lexical_output_root
+    assert lexical_output_root.is_symlink(), "supplied lexical output root symlink must remain untouched on failure"
+    assert lexical_output_root.resolve() == attacker_target
+    assert not attacker_package_dir.exists(), "attacker target must not receive a package directory"
+    assert list(attacker_target.rglob("*")) == [], "attacker target must remain empty"
+    _assert_repository_summary_unpublished(summary_dir, summary_json_path, summary_readme_path)
+
+
 def test_r611q_pv2a_publication_rejects_post_claim_symlink_swap_race(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
