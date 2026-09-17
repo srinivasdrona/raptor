@@ -1,6 +1,6 @@
 schema: raptor.project.spec.v1
 spec_id: r611q-package-v2-addendum-v1
-spec_version: 1.0.2
+spec_version: 1.0.3
 status: APPROVED_BUILD
 created_at: '2026-09-17'
 owner: human-terminal-authority
@@ -225,9 +225,18 @@ output:
   external_package:
     environment_variable: RAPTOR_R611Q_PACKAGE_V2_ROOT
     default_root: ~/raptor-data/external/r611q-package-v2
+    root_must_preexist: true
     run_name: r611q-package-v2-addendum-2026-09-17
     package_id: r611q-package-v2-addendum-2026-09-17
     create_only: true
+    publication_protocol:
+      platform: POSIX_dir_fd_required
+      root_open: O_DIRECTORY_and_O_NOFOLLOW
+      staging_and_final_creation: descriptor_relative
+      artifact_writes: O_CREAT_O_EXCL_O_NOFOLLOW
+      commit_marker: package_manifest.json_written_last
+      final_root_identity_check: required
+      unsupported_platform: fail_closed
     artifacts:
       - R611Q_EXPERT_REVIEW_PACKET_V2.md
       - R611Q_EXPERT_REVIEW_FORM_V2.yaml
@@ -238,6 +247,13 @@ output:
     directory: data/rescuescreen/r611q/package-v2-addendum
     json_path: data/rescuescreen/r611q/package-v2-addendum/package_summary.json
     readme_path: data/rescuescreen/r611q/package-v2-addendum/README.md
+    publication_protocol:
+      trusted_existing_parent: data/rescuescreen/r611q
+      parent_open: descriptor_relative_from_repo_root_with_O_NOFOLLOW
+      final_directory_creation: descriptor_relative_create_only
+      file_writes: O_CREAT_O_EXCL_O_NOFOLLOW
+      final_identity_check: required
+      rollback: descriptor_relative_invocation_created_paths_only
     contains:
       - exact input and external artifact hashes
       - aggregate counts and impact states
@@ -287,6 +303,11 @@ delivery_checks:
   - accepted claims remain zero and Gate 8 remains BLOCKED_HUMAN_REVIEW
   - stage execution remains unauthorized
   - output is external/create-only, path-contained and manifest-last
+  - the external output root must pre-exist and is pinned by a no-follow directory descriptor
+  - external staging, destination claims and writes are relative to the pinned root descriptor
+  - repository-summary parent traversal, directory creation and writes are descriptor-relative
+  - swapping either checked path to a symlink cannot redirect a staging, payload, summary or manifest write
+  - unsupported non-POSIX publication platforms fail closed
   - repository summary is an exact aggregate-only projection
   - the RescueScreen firewall admits only package_v2.py as the additive module and remains otherwise unchanged
 
