@@ -11,6 +11,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 
@@ -113,10 +114,16 @@ TEXT_CHAR_LOCATOR_RE = re.compile(r"^text-char:\d+:\d+$")
 EXPECTED_EXTERNAL_PUBLICATION_PROTOCOL = {
     "platform": "POSIX_dir_fd_required",
     "root_open": "O_DIRECTORY_and_O_NOFOLLOW",
-    "staging_and_final_creation": "descriptor_relative",
+    "payload_source": "verified_in_memory_bytes",
+    "final_creation": "descriptor_relative_exclusive_claim",
     "artifact_writes": "O_CREAT_O_EXCL_O_NOFOLLOW",
     "commit_marker": "package_manifest.json_written_last",
     "final_root_identity_check": "required",
+    "failure_cleanup": (
+        "Remove only invocation-created files through the pinned directory descriptor. "
+        "Never remove the claimed directory by name; an empty directory may remain as an "
+        "unpublished tombstone and requires explicit owner cleanup before retry."
+    ),
     "unsupported_platform": "fail_closed",
 }
 
@@ -124,9 +131,13 @@ EXPECTED_SUMMARY_PUBLICATION_PROTOCOL = {
     "trusted_existing_parent": "data/rescuescreen/r611q",
     "parent_open": "descriptor_relative_from_repo_root_with_O_NOFOLLOW",
     "final_directory_creation": "descriptor_relative_create_only",
-    "file_writes": "O_CREAT_O_EXCL_O_NOFOLLOW",
+    "file_writes": ["README.md_first", "package_summary.json_last_as_commit_marker"],
+    "write_flags": "O_CREAT_O_EXCL_O_NOFOLLOW",
     "final_identity_check": "required",
-    "rollback": "descriptor_relative_invocation_created_paths_only",
+    "rollback": (
+        "Descriptor-relative removal of invocation-created files only. Never remove the "
+        "claimed directory by name; an empty unpublished tombstone may remain after failure."
+    ),
 }
 
 
@@ -711,7 +722,7 @@ def _prepare_operator_fixture_and_config(
         "publication_protocol": copy.deepcopy(EXPECTED_SUMMARY_PUBLICATION_PROTOCOL),
     }
     config["spec_id"] = "r611q-package-v2-addendum-v1"
-    config["spec_version"] = "1.0.3"
+    config["spec_version"] = "1.0.4"
 
     config_path = tmp_path / "operator_config.yaml"
     config_path.write_text(
@@ -787,6 +798,28 @@ def _install_publication_call_guards(module: Any, monkeypatch: pytest.MonkeyPatc
     return called
 
 
+def _assert_external_package_unpublished(package_dir: Path) -> None:
+    commit_marker = package_dir / "package_manifest.json"
+    assert not commit_marker.exists(), "external package is published only when package_manifest.json exists"
+    for artifact_name in EXPECTED_EXTERNAL_ARTIFACTS[:-1]:
+        assert not (package_dir / artifact_name).exists(), (
+            f"external payload {artifact_name} must be absent without commit marker"
+        )
+    if package_dir.exists():
+        assert package_dir.is_dir(), "unpublished external package tombstone must be a directory"
+        assert list(package_dir.iterdir()) == [], "unpublished external package tombstone must remain empty"
+
+
+def _assert_repository_summary_unpublished(summary_dir: Path, summary_json_path: Path, summary_readme_path: Path) -> None:
+    json_exists = summary_json_path.exists()
+    readme_exists = summary_readme_path.exists()
+    assert not json_exists, "summary is published only when package_summary.json exists"
+    assert not readme_exists, "README.md must not exist when package_summary.json commit marker is absent"
+    if summary_dir.exists():
+        assert summary_dir.is_dir(), "unpublished summary tombstone must be a directory"
+        assert list(summary_dir.iterdir()) == [], "unpublished summary tombstone must remain empty"
+
+
 def _import_names_for(path: Path) -> set[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     names: set[str] = set()
@@ -804,7 +837,7 @@ def test_r611q_pv2a_ac01_spec_surface_and_exact_pins() -> None:
 
     assert spec["schema"] == "raptor.project.spec.v1"
     assert spec["spec_id"] == "r611q-package-v2-addendum-v1"
-    assert spec["spec_version"] == "1.0.3"
+    assert spec["spec_version"] == "1.0.4"
     implementation = spec["implementation"]
     assert implementation["package"] == "src/raptor/rescuescreen/package_v2.py"
     assert implementation["operator"] == "scripts/build_r611q_package_v2_addendum.py"
@@ -845,7 +878,7 @@ def test_r611q_pv2a_ac01_config_exact_pins_and_output_names() -> None:
 
     config = _read_yaml_mapping(CONFIG_PATH)
     assert config["spec_id"] == "r611q-package-v2-addendum-v1"
-    assert config["spec_version"] == "1.0.3"
+    assert config["spec_version"] == "1.0.4"
     assert config["output"]["package_id"] == "r611q-package-v2-addendum-2026-09-17"
     assert config["output"]["root_must_preexist"] is True
     assert tuple(config["output"]["external_artifacts"]) == EXPECTED_EXTERNAL_ARTIFACTS
@@ -1353,7 +1386,7 @@ def test_r611q_pv2a_ac12_operator_synthetic_end_to_end_contract(tmp_path: Path) 
         yaml.safe_dump(
             {
                 "spec_id": "r611q-package-v2-addendum-v1",
-                "spec_version": "1.0.3",
+                "spec_version": "1.0.4",
                 "output": {
                     "package_id": "r611q-package-v2-addendum-2026-09-17",
                     "root_must_preexist": True,
@@ -1745,16 +1778,34 @@ def test_r611q_pv2a_publication_summary_create_only_is_atomic_and_sanitized(
     output_root = (tmp_path / "external-outside").resolve()
     package_dir = output_root / package_id
 
-    real_write_text = Path.write_text
-    target_readme = summary_readme_path.resolve()
+    package_module = _require_package_v2_module()
+    real_mkdir = package_module.os.mkdir
+    real_write = package_module._write_exclusive_via_dir_fd
+    summary_claim = {"inode": None, "readme_written": False, "injected": False}
 
-    def fail_second_summary_write(path_obj: Path, text: str, *args: Any, **kwargs: Any) -> int:
-        candidate = Path(path_obj).resolve()
-        if candidate == target_readme:
-            raise module.PackageV2Error("simulated second-file write failure")
-        return int(real_write_text(path_obj, text, *args, **kwargs))
+    def capture_summary_claim(path: Any, mode: int = 0o777, *, dir_fd: int | None = None) -> None:
+        if dir_fd is None:
+            real_mkdir(path, mode)
+            return
+        real_mkdir(path, mode, dir_fd=dir_fd)
+        path_str = os.fsdecode(path) if isinstance(path, (bytes, bytearray)) else str(path)
+        if path_str == "package-v2-addendum" and summary_claim["inode"] is None:
+            summary_claim["inode"] = package_module.os.stat(path, dir_fd=dir_fd, follow_symlinks=False).st_ino
 
-    monkeypatch.setattr(Path, "write_text", fail_second_summary_write)
+    def fail_summary_commit_marker_after_readme(dir_fd: int, name: str, payload: bytes) -> None:
+        inode = summary_claim["inode"]
+        if inode is not None and package_module.os.fstat(dir_fd).st_ino == inode:
+            if name == "README.md":
+                summary_claim["readme_written"] = True
+                real_write(dir_fd, name, payload)
+                return
+            if name == "package_summary.json" and summary_claim["readme_written"]:
+                summary_claim["injected"] = True
+                raise package_module.PackageV2Error("simulated summary commit-marker write failure")
+        real_write(dir_fd, name, payload)
+
+    monkeypatch.setattr(package_module.os, "mkdir", capture_summary_claim)
+    monkeypatch.setattr(package_module, "_write_exclusive_via_dir_fd", fail_summary_commit_marker_after_readme)
 
     exit_code = _run_operator_main(
         module,
@@ -1767,12 +1818,12 @@ def test_r611q_pv2a_publication_summary_create_only_is_atomic_and_sanitized(
     )
     captured = capsys.readouterr()
 
+    assert summary_claim["injected"], "test must fail package_summary.json write after README succeeds"
     assert exit_code == 1
     assert "r611q-package-v2-addendum error:" in captured.err
     assert "Traceback" not in captured.err
-    assert not summary_json_path.exists(), "summary publication must be all-or-nothing on second-file write failure"
-    assert not summary_readme_path.exists(), "summary publication must be all-or-nothing on second-file write failure"
-    assert not package_dir.exists(), "external package must not be finalized when summary publication is interrupted"
+    _assert_repository_summary_unpublished(summary_json_path.parent, summary_json_path, summary_readme_path)
+    _assert_external_package_unpublished(package_dir)
 
 
 def test_r611q_pv2a_publication_rolls_back_summary_when_external_render_fails(
@@ -1813,10 +1864,8 @@ def test_r611q_pv2a_publication_rolls_back_summary_when_external_render_fails(
     assert exit_code == 1
     assert "r611q-package-v2-addendum error:" in captured.err
     assert "Traceback" not in captured.err
-    assert not package_dir.exists(), "external package must not exist on render failure"
-    assert not summary_json_path.exists(), "summary JSON must be rolled back when external render fails"
-    assert not summary_readme_path.exists(), "summary README must be rolled back when external render fails"
-    assert not summary_dir.exists(), "newly created summary directory must be removed on second-phase failure"
+    _assert_external_package_unpublished(package_dir)
+    _assert_repository_summary_unpublished(summary_dir, summary_json_path, summary_readme_path)
 
 
 def test_r611q_pv2a_publication_no_replace_race_preserves_racing_directory_on_finalize(
@@ -2493,7 +2542,56 @@ def test_r611q_pv2a_summary_publish_helper_accepts_canonical_target_and_names(
         publication.commit()
 
 
-def test_r611q_pv2a_publication_staging_name_cleanup_ownership_race(
+def test_r611q_pv2a_publication_render_uses_verified_in_memory_payloads_without_staging_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _require_package_v2_module()
+    output_root = (tmp_path / "external-root").resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    package_id = "r611q-package-v2-addendum-2026-09-17"
+
+    artifacts = {
+        "R611Q_EXPERT_REVIEW_PACKET_V2.md": b"# packet\n",
+        "R611Q_EXPERT_REVIEW_FORM_V2.yaml": b"schema: atlas.expert_review_form.v2\n",
+        "R611Q_PACKAGE_V2_IMPACT.json": b"{\"impact\":\"bounded\"}\n",
+        "R611Q_PACKAGE_V2_SUMMARY.md": b"# summary\n",
+    }
+
+    real_mkdir = module.os.mkdir
+    mkdir_names: list[str] = []
+
+    def capture_mkdir_names(path: Any, mode: int = 0o777, *, dir_fd: int | None = None) -> None:
+        path_str = os.fsdecode(path) if isinstance(path, (bytes, bytearray)) else str(path)
+        mkdir_names.append(path_str)
+        if dir_fd is None:
+            real_mkdir(path, mode)
+        else:
+            real_mkdir(path, mode, dir_fd=dir_fd)
+
+    mkdtemp_calls = {"count": 0}
+    real_mkdtemp = tempfile.mkdtemp
+
+    def capture_mkdtemp(*args: Any, **kwargs: Any) -> str:
+        mkdtemp_calls["count"] += 1
+        return str(real_mkdtemp(*args, **kwargs))
+
+    monkeypatch.setattr(module.os, "mkdir", capture_mkdir_names)
+    monkeypatch.setattr(tempfile, "mkdtemp", capture_mkdtemp)
+
+    package_dir, _written = module.render_external_package(
+        output_root,
+        package_id=package_id,
+        repository_summary_target="data/rescuescreen/r611q/package-v2-addendum",
+        artifacts=artifacts,
+    )
+
+    assert (package_dir / "package_manifest.json").is_file(), "successful render must create manifest commit marker"
+    assert mkdtemp_calls["count"] == 0, "render must not use tempfile.mkdtemp/path-based staging"
+    assert not any(".staging-" in name for name in mkdir_names), "render must not claim any .staging-* directory"
+
+
+def test_r611q_pv2a_publication_external_cleanup_keeps_tombstone_and_never_rmdirs_claimed_name(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2511,49 +2609,43 @@ def test_r611q_pv2a_publication_staging_name_cleanup_ownership_race(
     }
 
     real_mkdir = module.os.mkdir
-    real_stat = module.os.stat
+    real_rmdir = module.os.rmdir
     real_write_exclusive = module._write_exclusive_via_dir_fd
+    destination = {"inode": None, "injected": False}
+    rmdir_destination_calls: list[str] = []
 
-    staging_capture: dict[str, Any] = {
-        "name": None,
-        "root_fd": None,
-        "staging_inode": None,
-    }
-    competitor: dict[str, Any] = {"created": False, "inode": None}
-
-    def capture_staging_name(path: Any, mode: int = 0o777, *, dir_fd: int | None = None) -> None:
-        real_mkdir(path, mode, dir_fd=dir_fd) if dir_fd is not None else real_mkdir(path, mode)
+    def capture_destination_claim(path: Any, mode: int = 0o777, *, dir_fd: int | None = None) -> None:
         if dir_fd is None:
+            real_mkdir(path, mode)
             return
+        real_mkdir(path, mode, dir_fd=dir_fd)
         path_str = os.fsdecode(path) if isinstance(path, (bytes, bytearray)) else str(path)
-        if path_str.startswith(f".{package_id}.staging-") and staging_capture["name"] is None:
-            inode_stat = real_stat(path, dir_fd=dir_fd, follow_symlinks=False)
-            staging_capture["name"] = path_str
-            staging_capture["root_fd"] = dir_fd
-            staging_capture["staging_inode"] = inode_stat.st_ino
+        if path_str == package_id and destination["inode"] is None:
+            destination["inode"] = module.os.stat(path, dir_fd=dir_fd, follow_symlinks=False).st_ino
 
-    def fail_final_manifest_write_after_staging_name_reuse(dir_fd: int, name: str, payload: bytes) -> None:
-        if name != "package_manifest.json":
-            real_write_exclusive(dir_fd, name, payload)
-            return
+    def capture_rmdir_calls(path: Any, *args: Any, **kwargs: Any) -> None:
+        path_str = os.fsdecode(path) if isinstance(path, (bytes, bytearray)) else str(path)
+        dir_fd = kwargs.get("dir_fd")
+        if dir_fd is not None and path_str == package_id:
+            rmdir_destination_calls.append(path_str)
+        if dir_fd is None:
+            real_rmdir(path)
+        else:
+            real_rmdir(path, dir_fd=dir_fd)
 
-        dir_stat = module.os.fstat(dir_fd)
-        if dir_stat.st_ino == staging_capture["staging_inode"]:
-            real_write_exclusive(dir_fd, name, payload)
-            return
+    def fail_destination_manifest_commit(dir_fd: int, name: str, payload: bytes) -> None:
+        if (
+            name == "package_manifest.json"
+            and destination["inode"] is not None
+            and module.os.fstat(dir_fd).st_ino == destination["inode"]
+        ):
+            destination["injected"] = True
+            raise module.PackageV2Error("simulated destination manifest commit failure")
+        real_write_exclusive(dir_fd, name, payload)
 
-        assert staging_capture["name"] is not None
-        assert staging_capture["root_fd"] is not None
-        staged_path = output_root / str(staging_capture["name"])
-        assert not staged_path.exists(), "original staging entry must already be removed before final manifest write"
-        real_mkdir(staging_capture["name"], 0o700, dir_fd=staging_capture["root_fd"])
-        competitor_stat = real_stat(staging_capture["name"], dir_fd=staging_capture["root_fd"], follow_symlinks=False)
-        competitor["inode"] = competitor_stat.st_ino
-        competitor["created"] = True
-        raise module.PackageV2Error("simulated final manifest write failure after staging-name reuse race")
-
-    monkeypatch.setattr(module.os, "mkdir", capture_staging_name)
-    monkeypatch.setattr(module, "_write_exclusive_via_dir_fd", fail_final_manifest_write_after_staging_name_reuse)
+    monkeypatch.setattr(module.os, "mkdir", capture_destination_claim)
+    monkeypatch.setattr(module.os, "rmdir", capture_rmdir_calls)
+    monkeypatch.setattr(module, "_write_exclusive_via_dir_fd", fail_destination_manifest_commit)
 
     with pytest.raises(module.PackageV2Error):
         module.render_external_package(
@@ -2563,12 +2655,101 @@ def test_r611q_pv2a_publication_staging_name_cleanup_ownership_race(
             artifacts=artifacts,
         )
 
-    assert staging_capture["name"] is not None, "test must capture the descriptor-relative staging child name"
-    assert competitor["created"], "test must recreate a competitor directory under the reused staging name"
-    competitor_path = output_root / str(staging_capture["name"])
-    assert competitor_path.exists(), "cleanup must not remove a competitor directory created under reused staging name"
-    assert competitor_path.is_dir(), "reused staging-name competitor must remain a directory"
-    assert competitor_path.stat().st_ino == competitor["inode"], "cleanup must preserve competitor directory identity"
-    assert list(competitor_path.iterdir()) == [], "competitor directory must remain untouched and empty"
-    assert not package_dir.exists(), "final package directory must be rolled back on final-manifest failure"
-    assert not (package_dir / "package_manifest.json").exists(), "no final package manifest may be published"
+    assert destination["injected"], "test must fail on final destination manifest commit"
+    assert not rmdir_destination_calls, "cleanup must not rmdir the claimed external package directory name"
+    assert package_dir.exists() and package_dir.is_dir(), "failed publish may leave an empty unpublished tombstone"
+    _assert_external_package_unpublished(package_dir)
+
+    with pytest.raises(module.PackageV2Error) as excinfo:
+        module.render_external_package(
+            output_root,
+            package_id=package_id,
+            repository_summary_target="data/rescuescreen/r611q/package-v2-addendum",
+            artifacts=artifacts,
+        )
+    assert "already exists" in str(excinfo.value).lower(), "retry to tombstone must fail create-only at destination claim"
+
+
+def test_r611q_pv2a_summary_cleanup_keeps_tombstone_and_never_rmdirs_claimed_name(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _require_package_v2_module()
+    repo_root = (tmp_path / "repo").resolve()
+    trusted_parent = repo_root / "data" / "rescuescreen" / "r611q"
+    trusted_parent.mkdir(parents=True, exist_ok=True)
+    summary_dir = trusted_parent / "package-v2-addendum"
+    summary_json_path = summary_dir / "package_summary.json"
+    summary_readme_path = summary_dir / "README.md"
+
+    json_bytes = b"{\"schema\":\"summary\"}\n"
+    readme_bytes = b"# summary\n"
+
+    real_mkdir = module.os.mkdir
+    real_rmdir = module.os.rmdir
+    real_write_exclusive = module._write_exclusive_via_dir_fd
+    summary_claim = {"inode": None, "readme_written": False, "injected": False}
+    rmdir_summary_calls: list[str] = []
+
+    def capture_summary_claim(path: Any, mode: int = 0o777, *, dir_fd: int | None = None) -> None:
+        if dir_fd is None:
+            real_mkdir(path, mode)
+            return
+        real_mkdir(path, mode, dir_fd=dir_fd)
+        path_str = os.fsdecode(path) if isinstance(path, (bytes, bytearray)) else str(path)
+        if path_str == "package-v2-addendum" and summary_claim["inode"] is None:
+            summary_claim["inode"] = module.os.stat(path, dir_fd=dir_fd, follow_symlinks=False).st_ino
+
+    def capture_summary_rmdir(path: Any, *args: Any, **kwargs: Any) -> None:
+        path_str = os.fsdecode(path) if isinstance(path, (bytes, bytearray)) else str(path)
+        dir_fd = kwargs.get("dir_fd")
+        if dir_fd is not None and path_str == "package-v2-addendum":
+            rmdir_summary_calls.append(path_str)
+        if dir_fd is None:
+            real_rmdir(path)
+        else:
+            real_rmdir(path, dir_fd=dir_fd)
+
+    def fail_summary_json_commit_after_readme(dir_fd: int, name: str, payload: bytes) -> None:
+        inode = summary_claim["inode"]
+        if inode is not None and module.os.fstat(dir_fd).st_ino == inode:
+            if name == "README.md":
+                summary_claim["readme_written"] = True
+                real_write_exclusive(dir_fd, name, payload)
+                return
+            if name == "package_summary.json" and summary_claim["readme_written"]:
+                summary_claim["injected"] = True
+                raise module.PackageV2Error("simulated summary commit-marker write failure")
+        real_write_exclusive(dir_fd, name, payload)
+
+    monkeypatch.setattr(module.os, "mkdir", capture_summary_claim)
+    monkeypatch.setattr(module.os, "rmdir", capture_summary_rmdir)
+    monkeypatch.setattr(module, "_write_exclusive_via_dir_fd", fail_summary_json_commit_after_readme)
+
+    with pytest.raises(module.PackageV2Error):
+        module.publish_repository_summary_descriptor_relative(
+            repo_root,
+            "data/rescuescreen/r611q/package-v2-addendum",
+            json_name="package_summary.json",
+            readme_name="README.md",
+            json_bytes=json_bytes,
+            readme_bytes=readme_bytes,
+        )
+
+    assert summary_claim["injected"], "test must fail on final package_summary.json commit-marker write"
+    assert not rmdir_summary_calls, "cleanup must not rmdir the claimed summary directory name"
+    assert summary_dir.exists() and summary_dir.is_dir(), "failed publish may leave an empty unpublished tombstone"
+    _assert_repository_summary_unpublished(summary_dir, summary_json_path, summary_readme_path)
+
+    with pytest.raises(module.PackageV2Error) as excinfo:
+        module.publish_repository_summary_descriptor_relative(
+            repo_root,
+            "data/rescuescreen/r611q/package-v2-addendum",
+            json_name="package_summary.json",
+            readme_name="README.md",
+            json_bytes=json_bytes,
+            readme_bytes=readme_bytes,
+        )
+    assert "already exists" in str(excinfo.value).lower(), (
+        "retry to summary tombstone must fail create-only at final directory claim"
+    )
