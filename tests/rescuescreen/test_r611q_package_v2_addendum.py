@@ -2754,3 +2754,130 @@ def test_r611q_pv2a_summary_cleanup_keeps_tombstone_and_never_rmdirs_claimed_nam
     assert "already exists" in str(excinfo.value).lower(), (
         "retry to summary tombstone must fail create-only at final directory claim"
     )
+
+
+def test_r611q_pv2a_publication_freezes_artifact_snapshot_before_manifest_and_writes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _require_package_v2_module()
+    output_root = (tmp_path / "external-root").resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    package_id = "r611q-package-v2-addendum-2026-09-17"
+
+    class MutableArtifacts(Mapping[str, Any]):
+        def __init__(self, initial: Mapping[str, Any]) -> None:
+            self._items = dict(initial)
+
+        def __iter__(self):
+            return iter(self._items)
+
+        def __len__(self) -> int:
+            return len(self._items)
+
+        def __getitem__(self, key: str) -> Any:
+            return self._items[key]
+
+        def replace(self, key: str, value: Any) -> None:
+            self._items[key] = value
+
+    artifacts = MutableArtifacts(
+        {
+            "R611Q_EXPERT_REVIEW_PACKET_V2.md": b"# packet\n",
+            "R611Q_EXPERT_REVIEW_FORM_V2.yaml": b"schema: atlas.expert_review_form.v2\n",
+            "R611Q_PACKAGE_V2_IMPACT.json": b"{\"impact\":\"bounded\"}\n",
+            "R611Q_PACKAGE_V2_SUMMARY.md": bytearray(b"# summary\n"),
+        }
+    )
+    pre_mutation_snapshot = {
+        name: bytes(artifacts[name]) for name in EXPECTED_EXTERNAL_ARTIFACTS[:-1]
+    }
+
+    real_publish = module._publish_directory_no_replace
+    injected = {"done": False}
+
+    def mutate_caller_owned_artifacts_after_manifest(
+        *,
+        root_fd: int,
+        root_path: Path,
+        destination_name: str,
+        payload_names: Any,
+        artifacts: Any,
+        manifest_name: str,
+        manifest_bytes: bytes,
+    ) -> tuple[str, ...]:
+        if not injected["done"]:
+            summary_payload = artifacts["R611Q_PACKAGE_V2_SUMMARY.md"]
+            assert isinstance(summary_payload, bytearray)
+            summary_payload.extend(b"mutated-after-manifest\n")
+            artifacts.replace("R611Q_EXPERT_REVIEW_PACKET_V2.md", b"# packet replaced after manifest\n")
+            injected["done"] = True
+        return real_publish(
+            root_fd=root_fd,
+            root_path=root_path,
+            destination_name=destination_name,
+            payload_names=payload_names,
+            artifacts=artifacts,
+            manifest_name=manifest_name,
+            manifest_bytes=manifest_bytes,
+        )
+
+    monkeypatch.setattr(module, "_publish_directory_no_replace", mutate_caller_owned_artifacts_after_manifest)
+
+    package_dir, _written_order = module.render_external_package(
+        output_root,
+        package_id=package_id,
+        repository_summary_target="data/rescuescreen/r611q/package-v2-addendum",
+        artifacts=artifacts,
+    )
+    assert injected["done"], "test must mutate caller-owned artifacts after manifest rows are computed"
+
+    manifest = json.loads((package_dir / "package_manifest.json").read_text(encoding="utf-8"))
+    for row in manifest["artifacts"]:
+        name = row["name"]
+        payload = (package_dir / name).read_bytes()
+        assert row["sha256"] == _sha256_bytes(payload), f"published {name} hash must match package_manifest.json"
+        assert row["byte_length"] == len(payload), f"published {name} length must match package_manifest.json"
+
+    assert (
+        package_dir / "R611Q_EXPERT_REVIEW_PACKET_V2.md"
+    ).read_bytes() == pre_mutation_snapshot["R611Q_EXPERT_REVIEW_PACKET_V2.md"]
+    assert (
+        package_dir / "R611Q_PACKAGE_V2_SUMMARY.md"
+    ).read_bytes() == pre_mutation_snapshot["R611Q_PACKAGE_V2_SUMMARY.md"]
+
+
+def test_r611q_pv2a_publication_rejects_invalid_payload_types_before_any_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _require_package_v2_module()
+    output_root = (tmp_path / "external-root").resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    package_id = "r611q-package-v2-addendum-2026-09-17"
+
+    artifacts: dict[str, Any] = {
+        "R611Q_EXPERT_REVIEW_PACKET_V2.md": b"# packet\n",
+        "R611Q_EXPERT_REVIEW_FORM_V2.yaml": "not-bytes",
+        "R611Q_PACKAGE_V2_IMPACT.json": b"{\"impact\":\"bounded\"}\n",
+        "R611Q_PACKAGE_V2_SUMMARY.md": b"# summary\n",
+    }
+
+    open_calls = {"count": 0}
+
+    def fail_if_open_called(*_args: Any, **_kwargs: Any):
+        open_calls["count"] += 1
+        raise AssertionError("invalid payload types must be rejected before any os.open call")
+
+    monkeypatch.setattr(module.os, "open", fail_if_open_called)
+
+    with pytest.raises(module.PackageV2Error):
+        module.render_external_package(
+            output_root,
+            package_id=package_id,
+            repository_summary_target="data/rescuescreen/r611q/package-v2-addendum",
+            artifacts=artifacts,
+        )
+
+    assert open_calls["count"] == 0, "invalid payload types must fail before descriptor-based writes/open calls"
+    assert not any(output_root.iterdir()), "invalid payload types must not write any artifact"
