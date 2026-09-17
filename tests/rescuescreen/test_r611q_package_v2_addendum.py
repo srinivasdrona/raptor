@@ -1,0 +1,966 @@
+from __future__ import annotations
+
+import ast
+import builtins
+import copy
+import hashlib
+import importlib
+import importlib.util
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path, PurePosixPath
+from typing import Any, Mapping
+
+import pytest
+import yaml
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SPEC_PATH = REPO_ROOT / "docs" / "project" / "specs" / "r611q-package-v2-addendum-v1.yaml"
+PACKAGE_MODULE_PATH = REPO_ROOT / "src" / "raptor" / "rescuescreen" / "package_v2.py"
+PACKAGE_MODULE_NAME = "raptor.rescuescreen.package_v2"
+OPERATOR_SCRIPT_PATH = REPO_ROOT / "scripts" / "build_r611q_package_v2_addendum.py"
+CONFIG_PATH = REPO_ROOT / "configs" / "rescuescreen" / "r611q_package_v2_addendum.yaml"
+R611Q_DATA_ROOT = REPO_ROOT / "data" / "rescuescreen" / "r611q"
+PILOT_SUMMARY_DIR = R611Q_DATA_ROOT / "package-v2-addendum"
+PILOT_SUMMARY_JSON_PATH = PILOT_SUMMARY_DIR / "package_summary.json"
+PILOT_SUMMARY_README_PATH = PILOT_SUMMARY_DIR / "README.md"
+
+EXPECTED_EXTERNAL_ARTIFACTS = (
+    "R611Q_EXPERT_REVIEW_PACKET_V2.md",
+    "R611Q_EXPERT_REVIEW_FORM_V2.yaml",
+    "R611Q_PACKAGE_V2_IMPACT.json",
+    "R611Q_PACKAGE_V2_SUMMARY.md",
+    "package_manifest.json",
+)
+
+REQUIRED_PACKAGE_API_EXPORTS = (
+    "build_r611q_package_v2_addendum",
+    "verify_repository_v1_manifests",
+    "validate_external_expert_inputs",
+    "validate_delta_bundle",
+    "select_boundary_observation",
+    "compose_packet_v2",
+    "compose_form_v2",
+    "build_impact_record_v2",
+    "render_external_package",
+    "build_repository_summary",
+)
+
+FORBIDDEN_IMPORT_PREFIXES = (
+    "socket",
+    "urllib",
+    "urllib3",
+    "requests",
+    "httpx",
+    "aiohttp",
+    "grpc",
+    "ftplib",
+    "telnetlib",
+    "smtplib",
+    "imaplib",
+    "poplib",
+    "raptor.eval",
+    "raptor.scorer",
+    "raptor.acmg",
+    "raptor.clinical",
+)
+
+EXPECTED_REPO_V1_MANIFEST_PINS = {
+    "literature-v1": {
+        "directory": R611Q_DATA_ROOT / "literature-v1",
+        "manifest_sha256": "3546b6e20fe0abd945f2079c381c6a9551d55c2c6d44dc8c573f1df4917020c3",
+        "manifest_byte_length": 548,
+        "files_listed": 6,
+    },
+    "synthesis-v1": {
+        "directory": R611Q_DATA_ROOT / "synthesis-v1",
+        "manifest_sha256": "cd56533c1cdb5735217a18e53e5a5bd72c53379f472d0d79adfa96ba9f0350a7",
+        "manifest_byte_length": 551,
+        "files_listed": 6,
+    },
+    "structure-readiness-v1": {
+        "directory": R611Q_DATA_ROOT / "structure-readiness-v1",
+        "manifest_sha256": "1d7bc9f02cf16e83b15c5ab8e584756b21c2a0b7657eb56e8a93a784aafaf0e3",
+        "manifest_byte_length": 2662,
+        "files_listed": 29,
+    },
+}
+
+EXPECTED_READINESS_SUMMARY_PIN = {
+    "path": R611Q_DATA_ROOT / "RESCUESCREEN_EVIDENCE_READINESS_SUMMARY.md",
+    "sha256": "8cacf0ff4bb026f851cf7779ac27496d5ee083869281b509cc01d1057acda1a7",
+    "byte_length": 29865,
+}
+
+BOUNDARY_SEMANTIC_CONSTRAINT = {
+    "source_role": "DIRECT_ALLELE_EXPERIMENT",
+    "primary_result_state": "PRIMARY_R611Q_RESULT",
+    "baseline_relation": "NARROWS",
+    "novelty": "NEW_PRIMARY_OBSERVATION",
+    "claim_kind": "P_COMPLEX_BINDING",
+}
+
+ALLOWED_DECISIONS = ("support", "revise", "reject", "defer")
+DELTA_SCHEMA = "raptor.external.r611q_literature_delta_review_bundle.v1"
+PACKAGE_MANIFEST_SCHEMA = "raptor.external.r611q_package_v2_addendum_manifest.v1"
+MANIFEST_LINE_RE = re.compile(r"^([0-9a-f]{64})  ([^\x00]+)$")
+
+
+def _sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _sha256_file(path: Path) -> str:
+    return _sha256_bytes(path.read_bytes())
+
+
+def _acceptable_file_hashes(path: Path) -> set[str]:
+    payload = path.read_bytes()
+    hashes = {_sha256_bytes(payload)}
+    if b"\r\n" not in payload:
+        return hashes
+    try:
+        text = payload.decode("utf-8")
+    except UnicodeDecodeError:
+        return hashes
+    hashes.add(_sha256_bytes(text.replace("\r\n", "\n").encode("utf-8")))
+    return hashes
+
+
+def _read_yaml_mapping(path: Path) -> dict[str, Any]:
+    parsed = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert isinstance(parsed, dict), f"{path} must parse to a mapping"
+    return parsed
+
+
+def _canonical_json_hash(mapping: Mapping[str, Any], *, drop_field: str | None = None) -> str:
+    payload = copy.deepcopy(dict(mapping))
+    if drop_field is not None:
+        payload.pop(drop_field, None)
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return _sha256_bytes(canonical)
+
+
+def _safe_relative_path(relative_path: str) -> None:
+    assert isinstance(relative_path, str) and relative_path, "manifest path must be a nonblank string"
+    assert "\\" not in relative_path, f"manifest path uses backslash: {relative_path!r}"
+    assert "\x00" not in relative_path, f"manifest path contains null byte: {relative_path!r}"
+    pure = PurePosixPath(relative_path)
+    assert not pure.is_absolute(), f"manifest path must be relative: {relative_path!r}"
+    assert not relative_path.startswith(("./", "../")), f"manifest path traversal: {relative_path!r}"
+    assert all(part not in {"", ".", ".."} for part in pure.parts), f"manifest path traversal: {relative_path!r}"
+    if pure.parts:
+        assert ":" not in pure.parts[0], f"manifest path must not include a drive letter: {relative_path!r}"
+
+
+def _parse_sha256_manifest(manifest_path: Path) -> list[tuple[str, str]]:
+    text = manifest_path.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    assert lines, f"{manifest_path} is empty"
+    parsed: list[tuple[str, str]] = []
+    for line_number, line in enumerate(lines, start=1):
+        match = MANIFEST_LINE_RE.fullmatch(line)
+        assert match, f"{manifest_path}:{line_number} must match 'sha256  relative/path'"
+        digest, relative_path = match.group(1), match.group(2)
+        _safe_relative_path(relative_path)
+        parsed.append((digest, relative_path))
+
+    listed_paths = [relative for _, relative in parsed]
+    assert listed_paths == sorted(listed_paths), f"{manifest_path} entries must be sorted by relative path"
+    assert len(listed_paths) == len(set(listed_paths)), f"{manifest_path} has duplicate relative paths"
+    return parsed
+
+
+def _verify_manifest_file_set(directory: Path, *, expected_manifest_pin: Mapping[str, Any]) -> None:
+    manifest_path = directory / "manifest.sha256"
+    manifest_bytes = manifest_path.read_bytes()
+    assert len(manifest_bytes) == expected_manifest_pin["manifest_byte_length"]
+    assert _sha256_bytes(manifest_bytes) == expected_manifest_pin["manifest_sha256"]
+
+    entries = _parse_sha256_manifest(manifest_path)
+    assert len(entries) == expected_manifest_pin["files_listed"]
+
+    actual_files = {
+        path.relative_to(directory).as_posix()
+        for path in directory.rglob("*")
+        if path.is_file() and path.name != "manifest.sha256"
+    }
+    listed_files = {relative_path for _, relative_path in entries}
+    assert listed_files == actual_files, f"{directory} manifest coverage mismatch"
+
+    for digest, relative_path in entries:
+        file_path = directory / relative_path
+        assert file_path.is_file(), f"manifest-listed file missing: {file_path}"
+        assert not file_path.is_symlink(), f"manifest-listed file must not be symlink/reparse: {file_path}"
+        assert digest in _acceptable_file_hashes(file_path), f"content hash mismatch for {file_path}"
+
+
+def _validate_pinned_file(path: Path, *, expected_sha256: str, expected_byte_length: int) -> None:
+    payload = path.read_bytes()
+    assert len(payload) == expected_byte_length, f"byte-length mismatch for {path}"
+    assert _sha256_bytes(payload) == expected_sha256, f"sha256 mismatch for {path}"
+
+
+def _build_synthetic_delta_bundle() -> tuple[dict[str, Any], dict[str, bytes], list[dict[str, Any]], list[dict[str, Any]]]:
+    quote = (
+        "Grouped overexpression co-IP in HEK293T reported no observed effect for "
+        "R611Q/R905Q/N1620S on TSC2-TSC2 self-association."
+    )
+    locator = "text-char:120:240"
+    quote_hash = _sha256_bytes(quote.encode("utf-8"))
+    candidate_id = "cand-synth-001"
+    source_id = "source-synth-a"
+
+    candidate_spans = [
+        {
+            "candidate_id": candidate_id,
+            "source_id": source_id,
+            "exact_quote": quote,
+            "locator": locator,
+            "quote_sha256": quote_hash,
+            "semantic_tags": ["PRIMARY", "GROUPED"],
+        },
+        {
+            "candidate_id": "cand-synth-noise",
+            "source_id": "source-synth-z",
+            "exact_quote": "Unrelated source text",
+            "locator": "text-char:3:27",
+            "quote_sha256": _sha256_bytes(b"Unrelated source text"),
+            "semantic_tags": ["CONTEXT_ONLY"],
+        },
+    ]
+
+    review_records = [
+        {
+            "candidate_id": candidate_id,
+            "source_id": source_id,
+            "exact_quote": quote,
+            "locator": locator,
+            "quote_sha256": quote_hash,
+            "source_role": "DIRECT_ALLELE_EXPERIMENT",
+            "primary_result_state": "PRIMARY_R611Q_RESULT",
+            "baseline_relation": "NARROWS",
+            "novelty": "NEW_PRIMARY_OBSERVATION",
+            "claim_kind": "P_COMPLEX_BINDING",
+            "accepted_claim_count": 0,
+            "gate_8_state": "BLOCKED_HUMAN_REVIEW",
+            "contradiction_state": "NONE",
+        },
+        {
+            "candidate_id": "cand-synth-noise",
+            "source_id": "source-synth-z",
+            "exact_quote": "Unrelated source text",
+            "locator": "text-char:3:27",
+            "quote_sha256": _sha256_bytes(b"Unrelated source text"),
+            "source_role": "SECONDARY_CONTEXT",
+            "primary_result_state": "CONTEXT_ONLY",
+            "baseline_relation": "NARROWS",
+            "novelty": "KNOWN",
+            "claim_kind": "BACKGROUND",
+            "accepted_claim_count": 0,
+            "gate_8_state": "BLOCKED_HUMAN_REVIEW",
+            "contradiction_state": "NONE",
+        },
+    ]
+
+    candidate_spans_bytes = ("\n".join(json.dumps(row, sort_keys=True) for row in candidate_spans) + "\n").encode("utf-8")
+    review_records_bytes = ("\n".join(json.dumps(row, sort_keys=True) for row in review_records) + "\n").encode("utf-8")
+    addendum_bytes = (
+        "# Synthetic addendum\n"
+        "- Contains one direct grouped boundary observation.\n"
+        "- No accepted claims and Gate 8 remains blocked.\n"
+    ).encode("utf-8")
+
+    artifacts = {
+        "normalized/candidate-spans.jsonl": candidate_spans_bytes,
+        "reviewed/review-records.jsonl": review_records_bytes,
+        "reviewed/R611Q_LITERATURE_DELTA_ADDENDUM.md": addendum_bytes,
+    }
+    required_artifacts: dict[str, dict[str, Any]] = {}
+    for relative_path, payload in artifacts.items():
+        key = {
+            "normalized/candidate-spans.jsonl": "candidate_spans",
+            "reviewed/review-records.jsonl": "review_records",
+            "reviewed/R611Q_LITERATURE_DELTA_ADDENDUM.md": "addendum",
+        }[relative_path]
+        required_artifacts[key] = {
+            "relative_path": relative_path,
+            "sha256": _sha256_bytes(payload),
+            "byte_length": len(payload),
+        }
+
+    manifest: dict[str, Any] = {
+        "schema": DELTA_SCHEMA,
+        "required_artifacts": required_artifacts,
+        "frozen_counts": {
+            "candidate_spans": 2,
+            "direct_grouped_experiments": 1,
+            "narrowing_relations": 1,
+            "contradictions": 0,
+            "accepted_claims": 0,
+        },
+    }
+    manifest["manifest_content_hash"] = _canonical_json_hash(manifest, drop_field="manifest_content_hash")
+    return manifest, artifacts, review_records, candidate_spans
+
+
+def _validate_delta_bundle_oracle(
+    manifest: Mapping[str, Any],
+    *,
+    manifest_file_sha256: str,
+    manifest_byte_length: int,
+    artifacts: Mapping[str, bytes],
+) -> None:
+    assert manifest["schema"] == DELTA_SCHEMA
+    assert manifest["manifest_content_hash"] == _canonical_json_hash(manifest, drop_field="manifest_content_hash")
+
+    required_artifacts = manifest["required_artifacts"]
+    assert set(required_artifacts) == {"candidate_spans", "review_records", "addendum"}
+    for key, descriptor in required_artifacts.items():
+        assert set(descriptor) == {"relative_path", "sha256", "byte_length"}
+        relative_path = descriptor["relative_path"]
+        assert relative_path in artifacts
+        payload = artifacts[relative_path]
+        assert descriptor["sha256"] == _sha256_bytes(payload)
+        assert descriptor["byte_length"] == len(payload)
+
+    expected_paths = {item["relative_path"] for item in required_artifacts.values()}
+    assert set(artifacts) == expected_paths, "no extra substitution artifact is allowed"
+
+    manifest_bytes = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    assert len(manifest_bytes) == manifest_byte_length
+    assert _sha256_bytes(manifest_bytes) == manifest_file_sha256
+
+
+def _select_boundary_record(
+    review_records: list[Mapping[str, Any]],
+    candidate_spans: list[Mapping[str, Any]],
+) -> Mapping[str, Any]:
+    span_by_identity = {(span["candidate_id"], span["source_id"]): span for span in candidate_spans}
+    matches: list[Mapping[str, Any]] = []
+
+    for record in review_records:
+        if record.get("contradiction_state") not in {"NONE", "NO_CONTRADICTION"}:
+            raise AssertionError("delta bundle contradiction is not allowed")
+        if int(record.get("accepted_claim_count", -1)) != 0:
+            raise AssertionError("delta bundle accepted claim count must remain zero")
+        if record.get("gate_8_state") != "BLOCKED_HUMAN_REVIEW":
+            raise AssertionError("Gate 8 effect must remain blocked")
+
+        if all(record.get(key) == value for key, value in BOUNDARY_SEMANTIC_CONSTRAINT.items()):
+            identity = (record["candidate_id"], record["source_id"])
+            span = span_by_identity.get(identity)
+            assert span is not None, "selected review record has no matching candidate span"
+            assert span["exact_quote"] == record["exact_quote"]
+            assert span["locator"] == record["locator"]
+            assert span["quote_sha256"] == record["quote_sha256"]
+            matches.append(record)
+
+    if not matches:
+        raise AssertionError("expected exactly one semantic boundary match; found zero")
+    if len(matches) > 1:
+        raise AssertionError(f"expected exactly one semantic boundary match; found {len(matches)}")
+    return matches[0]
+
+
+def _compose_packet_v2(v1_packet_bytes: bytes, *, boundary_record: Mapping[str, Any]) -> bytes:
+    section = (
+        "\n\n--- r611q-package-v2-addendum :: r611q-claim-2 ---\n"
+        "claim_id: r611q-claim-2\n"
+        "acceptance_state: PROPOSED_UNACCEPTED\n"
+        "baseline_relation: NARROWS\n"
+        "assertion: Grouped substitutions R611Q/R905Q/N1620S were reported in tagged-overexpression "
+        "HEK293T co-immunoprecipitation without an allele-specific magnitude for TSC2-TSC2 association.\n"
+        "limitation: Preserved TSC2-TSC2 self-association does not establish preserved TSC1 binding.\n"
+        "final_state: accepted_claims=0; gate_8=BLOCKED_HUMAN_REVIEW\n"
+        f"quote_sha256: {boundary_record['quote_sha256']}\n"
+    ).encode("utf-8")
+    return v1_packet_bytes + section
+
+
+def _build_form_v2(
+    v1_form_yaml_bytes: bytes,
+    *,
+    base_packet_sha256: str,
+    delta_manifest_hash: str,
+) -> dict[str, Any]:
+    parsed = yaml.safe_load(v1_form_yaml_bytes.decode("utf-8"))
+    assert isinstance(parsed, dict), "v1 form YAML must parse to a mapping"
+    claims = parsed.get("claims")
+    assert isinstance(claims, list) and len(claims) >= 2, "v1 form must contain at least two claims"
+
+    form_v2 = copy.deepcopy(parsed)
+    claim_zero, claim_one = copy.deepcopy(claims[0]), copy.deepcopy(claims[1])
+    form_v2["claims"] = [claim_zero, claim_one]
+    form_v2["claims"].append(
+        {
+            "claim_id": "r611q-claim-2",
+            "decision": None,
+            "decision_options": list(ALLOWED_DECISIONS),
+            "acceptance_state": "PROPOSED_UNACCEPTED",
+            "relation": "NARROWS_NOT_CONTRADICTS",
+            "limitations": [
+                "grouped_three_substitution_attribution",
+                "hek293t_tagged_overexpression_coip",
+                "no_allele_specific_magnitude",
+                "tsc2_tsc2_not_tsc1_binding",
+            ],
+        }
+    )
+
+    form_v2["packet_status"] = "UNREVIEWED"
+    form_v2["accepted_claim_count"] = 0
+    form_v2["gate_8_state"] = "BLOCKED_HUMAN_REVIEW"
+    form_v2["base_packet_sha256"] = base_packet_sha256
+    form_v2["base_form_sha256"] = _sha256_bytes(v1_form_yaml_bytes)
+    form_v2["delta_manifest_hash"] = delta_manifest_hash
+    return form_v2
+
+
+def _assert_form_v2_preserves_v1(form_v1: Mapping[str, Any], form_v2: Mapping[str, Any]) -> None:
+    assert form_v2["variant"] == form_v1["variant"]
+    assert form_v2["bindings"] == form_v1["bindings"]
+    assert form_v2["reviewer"] == form_v1["reviewer"]
+    assert form_v2["scope"] == form_v1["scope"]
+    assert form_v2["claims"][0] == form_v1["claims"][0]
+    assert form_v2["claims"][1] == form_v1["claims"][1]
+    assert len(form_v2["claims"]) == len(form_v1["claims"]) + 1
+    claim2 = form_v2["claims"][2]
+    assert claim2["claim_id"] == "r611q-claim-2"
+    assert claim2["decision"] is None
+    assert tuple(claim2["decision_options"]) == ALLOWED_DECISIONS
+    assert form_v2["packet_status"] == "UNREVIEWED"
+    assert int(form_v2["accepted_claim_count"]) == 0
+    assert form_v2["gate_8_state"] == "BLOCKED_HUMAN_REVIEW"
+
+
+def _validate_impact_record_oracle(impact: Mapping[str, Any]) -> None:
+    assert impact["literature_v1"] == "IMMUTABLE"
+    assert impact["synthesis_v1"] == "IMMUTABLE"
+    assert impact["structure_readiness_v1"] == "IMMUTABLE"
+    assert impact["route_effect"]["RH-2"] == "PLAUSIBLE_NOT_DEMONSTRATED"
+    assert impact["coip_interpretation"] == "TSC2-TSC2_NON_DISCRIMINATING"
+    assert impact["assay_falsifier"]["AF-4"] == "TSC1-TSC2_WITH_MATCHED_ABUNDANCE"
+    assert impact["model_contexts"] == {"count": 4, "package_effect": "CONTEXT_ONLY"}
+    assert impact["clinical_occurrences"] == {"count": 2, "package_effect": "OCCURRENCE_ONLY"}
+    assert impact["secondary_reviews"] == {"count": 3, "package_effect": "NO_PROPOSITION_SUPPORT"}
+    assert impact["contradictions"] == 0
+    assert impact["stage_execution_authorized"] is False
+    assert impact["historical_4169_expansion"] is False
+
+
+def _render_external_package_oracle(
+    output_root: Path,
+    *,
+    package_id: str,
+    repository_summary_target: str,
+    artifacts: Mapping[str, bytes],
+) -> tuple[Path, tuple[str, ...]]:
+    assert repository_summary_target == "data/rescuescreen/r611q/package-v2-addendum"
+    assert package_id == "r611q-package-v2-addendum-2026-09-17"
+    assert set(artifacts) == set(EXPECTED_EXTERNAL_ARTIFACTS[:-1]), "external render requires exact four payload artifacts"
+    assert output_root.is_absolute(), "external render root must be absolute"
+    assert not output_root.is_symlink(), "external render root must not be a symlink/reparse"
+
+    package_dir = output_root / package_id
+    if package_dir.exists():
+        raise AssertionError("external package path already exists (create-only contract)")
+    package_dir.mkdir(parents=True)
+
+    written_order: list[str] = []
+    manifest_rows: list[dict[str, Any]] = []
+    for artifact_name in EXPECTED_EXTERNAL_ARTIFACTS[:-1]:
+        target = package_dir / artifact_name
+        resolved_parent = target.resolve().parent
+        assert str(resolved_parent).startswith(str(package_dir.resolve())), "artifact path escaped package directory"
+        payload = artifacts[artifact_name]
+        target.write_bytes(payload)
+        written_order.append(artifact_name)
+        manifest_rows.append(
+            {
+                "name": artifact_name,
+                "sha256": _sha256_bytes(payload),
+                "byte_length": len(payload),
+            }
+        )
+
+    manifest = {
+        "schema": PACKAGE_MANIFEST_SCHEMA,
+        "package_id": package_id,
+        "create_only": True,
+        "repository_summary_target": repository_summary_target,
+        "artifacts": manifest_rows,
+    }
+    manifest["manifest_content_hash"] = _canonical_json_hash(manifest, drop_field="manifest_content_hash")
+    manifest_payload = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    (package_dir / "package_manifest.json").write_bytes(manifest_payload)
+    written_order.append("package_manifest.json")
+
+    return package_dir, tuple(written_order)
+
+
+def _derive_repository_summary_oracle(
+    *,
+    input_hashes: Mapping[str, str],
+    output_hashes: Mapping[str, str],
+    accepted_claim_count: int,
+    gate_8_state: str,
+    stage_execution_authorized: bool,
+) -> tuple[dict[str, Any], str]:
+    summary = {
+        "schema": "raptor.repository.r611q_package_v2_addendum_summary.v1",
+        "inputs": dict(input_hashes),
+        "outputs": dict(output_hashes),
+        "counts": {"accepted_claims": accepted_claim_count},
+        "state": {
+            "gate_8": gate_8_state,
+            "stage_execution_authorized": stage_execution_authorized,
+            "historical_tsc2_corpus_expansion": "deferred",
+        },
+        "decisions": {
+            "package_update_warranted": True,
+            "broader_historical_corpus_expansion_warranted": False,
+        },
+    }
+    readme = (
+        "# R611Q package-v2 addendum summary\n\n"
+        "This repository summary is aggregate-only. It includes input/output hashes, counts and state, "
+        "with no source-identity details.\n"
+    )
+    forbidden = ("pmid", "pmcid", "doi", "title", "candidate_id", "locator", "patient")
+    serialized = json.dumps(summary, sort_keys=True).lower() + "\n" + readme.lower()
+    assert all(token not in serialized for token in forbidden), "summary leaked restricted identity content"
+    return summary, readme
+
+
+def _require_package_v2_module():
+    try:
+        spec = importlib.util.find_spec(PACKAGE_MODULE_NAME)
+    except ModuleNotFoundError:
+        spec = None
+    if spec is None:
+        pytest.fail(f"implementation missing: {PACKAGE_MODULE_NAME} ({PACKAGE_MODULE_PATH})")
+    module = importlib.import_module(PACKAGE_MODULE_NAME)
+    missing = [name for name in REQUIRED_PACKAGE_API_EXPORTS if not hasattr(module, name)]
+    assert not missing, f"package_v2 API missing required exports: {missing}"
+    return module
+
+
+def _import_names_for(path: Path) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            names.add(node.module)
+    return names
+
+
+def test_r611q_pv2a_ac01_spec_surface_and_exact_pins() -> None:
+    assert SPEC_PATH.is_file(), f"missing spec: {SPEC_PATH}"
+    spec = _read_yaml_mapping(SPEC_PATH)
+
+    assert spec["schema"] == "raptor.project.spec.v1"
+    assert spec["spec_id"] == "r611q-package-v2-addendum-v1"
+    assert spec["spec_version"] == "1.0.0"
+    assert spec["implementation"] == {
+        "package": "src/raptor/rescuescreen/package_v2.py",
+        "operator": "scripts/build_r611q_package_v2_addendum.py",
+        "config": "configs/rescuescreen/r611q_package_v2_addendum.yaml",
+        "tests": "tests/rescuescreen/test_r611q_package_v2_addendum.py",
+        "network": "forbidden",
+    }
+
+    external = spec["output"]["external_package"]
+    assert external["environment_variable"] == "RAPTOR_R611Q_PACKAGE_V2_ROOT"
+    assert external["run_name"] == "r611q-package-v2-addendum-2026-09-17"
+    assert external["package_id"] == "r611q-package-v2-addendum-2026-09-17"
+    assert tuple(external["artifacts"]) == EXPECTED_EXTERNAL_ARTIFACTS
+    assert spec["output"]["repository_summary"]["directory"] == "data/rescuescreen/r611q/package-v2-addendum"
+    assert spec["output"]["repository_summary"]["json_path"] == "data/rescuescreen/r611q/package-v2-addendum/package_summary.json"
+    assert spec["output"]["repository_summary"]["readme_path"] == "data/rescuescreen/r611q/package-v2-addendum/README.md"
+
+
+def test_r611q_pv2a_ac01_required_package_operator_and_config_surfaces_exist() -> None:
+    missing = [str(path) for path in (PACKAGE_MODULE_PATH, OPERATOR_SCRIPT_PATH, CONFIG_PATH) if not path.is_file()]
+    assert not missing, f"implementation missing required addendum surfaces: {missing}"
+
+
+def test_r611q_pv2a_ac01_config_exact_pins_and_output_names() -> None:
+    if not CONFIG_PATH.is_file():
+        pytest.fail(f"implementation missing: {CONFIG_PATH}")
+
+    config = _read_yaml_mapping(CONFIG_PATH)
+    assert config["spec_id"] == "r611q-package-v2-addendum-v1"
+    assert config["spec_version"] == "1.0.0"
+    assert config["output"]["package_id"] == "r611q-package-v2-addendum-2026-09-17"
+    assert tuple(config["output"]["external_artifacts"]) == EXPECTED_EXTERNAL_ARTIFACTS
+
+
+def test_r611q_pv2a_ac02_offline_static_import_boundary() -> None:
+    if not PACKAGE_MODULE_PATH.is_file():
+        pytest.fail(f"implementation missing: {PACKAGE_MODULE_PATH}")
+    if not OPERATOR_SCRIPT_PATH.is_file():
+        pytest.fail(f"implementation missing: {OPERATOR_SCRIPT_PATH}")
+
+    for path in (PACKAGE_MODULE_PATH, OPERATOR_SCRIPT_PATH):
+        imports = _import_names_for(path)
+        for imported in imports:
+            for forbidden in FORBIDDEN_IMPORT_PREFIXES:
+                assert not (imported == forbidden or imported.startswith(f"{forbidden}.")), (
+                    f"{path} imports forbidden dependency {imported}"
+                )
+
+
+def test_r611q_pv2a_ac03_v1_manifest_oracle_enforces_exact_pins_and_coverage() -> None:
+    for pin in EXPECTED_REPO_V1_MANIFEST_PINS.values():
+        _verify_manifest_file_set(pin["directory"], expected_manifest_pin=pin)
+
+
+def test_r611q_pv2a_ac03_manifest_parser_rejects_traversal_duplicate_and_unsorted(tmp_path: Path) -> None:
+    good_dir = tmp_path / "bundle"
+    good_dir.mkdir()
+    (good_dir / "alpha.txt").write_text("alpha", encoding="utf-8")
+    (good_dir / "beta.txt").write_text("beta", encoding="utf-8")
+    good_manifest = (
+        f"{_sha256_file(good_dir / 'alpha.txt')}  alpha.txt\n"
+        f"{_sha256_file(good_dir / 'beta.txt')}  beta.txt\n"
+    )
+    manifest_path = good_dir / "manifest.sha256"
+    manifest_path.write_text(good_manifest, encoding="utf-8")
+    _parse_sha256_manifest(manifest_path)
+
+    bad_duplicate = (
+        f"{_sha256_file(good_dir / 'alpha.txt')}  alpha.txt\n"
+        f"{_sha256_file(good_dir / 'alpha.txt')}  alpha.txt\n"
+    )
+    manifest_path.write_text(bad_duplicate, encoding="utf-8")
+    with pytest.raises(AssertionError):
+        _parse_sha256_manifest(manifest_path)
+
+    bad_unsorted = (
+        f"{_sha256_file(good_dir / 'beta.txt')}  beta.txt\n"
+        f"{_sha256_file(good_dir / 'alpha.txt')}  alpha.txt\n"
+    )
+    manifest_path.write_text(bad_unsorted, encoding="utf-8")
+    with pytest.raises(AssertionError):
+        _parse_sha256_manifest(manifest_path)
+
+    bad_escape = f"{_sha256_file(good_dir / 'alpha.txt')}  ../escape.txt\n"
+    manifest_path.write_text(bad_escape, encoding="utf-8")
+    with pytest.raises(AssertionError):
+        _parse_sha256_manifest(manifest_path)
+
+
+def test_r611q_pv2a_ac03_oracle_manifest_verifier_never_writes_v1_files(monkeypatch: pytest.MonkeyPatch) -> None:
+    protected_roots = tuple(pin["directory"].resolve() for pin in EXPECTED_REPO_V1_MANIFEST_PINS.values())
+    real_open = builtins.open
+
+    def guarded_open(file: Any, mode: str = "r", *args: Any, **kwargs: Any):
+        try:
+            resolved = Path(file).resolve(strict=False)
+        except TypeError:
+            return real_open(file, mode, *args, **kwargs)
+
+        if any(str(resolved).startswith(str(root)) for root in protected_roots):
+            assert all(flag not in mode for flag in ("w", "a", "x", "+")), f"verifier attempted write mode {mode!r}"
+        return real_open(file, mode, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "open", guarded_open)
+    for pin in EXPECTED_REPO_V1_MANIFEST_PINS.values():
+        _verify_manifest_file_set(pin["directory"], expected_manifest_pin=pin)
+
+
+def test_r611q_pv2a_ac04_pinned_readiness_summary_hash_and_length() -> None:
+    _validate_pinned_file(
+        EXPECTED_READINESS_SUMMARY_PIN["path"],
+        expected_sha256=EXPECTED_READINESS_SUMMARY_PIN["sha256"],
+        expected_byte_length=EXPECTED_READINESS_SUMMARY_PIN["byte_length"],
+    )
+
+
+def test_r611q_pv2a_ac04_external_packet_form_byte_validation_oracle(tmp_path: Path) -> None:
+    packet_path = tmp_path / "packet_v1.md"
+    form_path = tmp_path / "form_v1.yaml"
+    packet_payload = b"# Synthetic packet v1\r\nLine two.\r\n"
+    form_payload = b"variant: TSC2-R611Q\nclaims:\n  - claim_id: r611q-claim-0\n"
+    packet_path.write_bytes(packet_payload)
+    form_path.write_bytes(form_payload)
+
+    _validate_pinned_file(
+        packet_path,
+        expected_sha256=_sha256_bytes(packet_payload),
+        expected_byte_length=len(packet_payload),
+    )
+    _validate_pinned_file(
+        form_path,
+        expected_sha256=_sha256_bytes(form_payload),
+        expected_byte_length=len(form_payload),
+    )
+
+    with pytest.raises(AssertionError):
+        _validate_pinned_file(packet_path, expected_sha256="0" * 64, expected_byte_length=len(packet_payload))
+
+
+def test_r611q_pv2a_ac05_delta_bundle_oracle_selects_exactly_one_semantic_boundary() -> None:
+    manifest, artifacts, review_records, candidate_spans = _build_synthetic_delta_bundle()
+    manifest_bytes = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    _validate_delta_bundle_oracle(
+        manifest,
+        manifest_file_sha256=_sha256_bytes(manifest_bytes),
+        manifest_byte_length=len(manifest_bytes),
+        artifacts=artifacts,
+    )
+
+    selected = _select_boundary_record(review_records, candidate_spans)
+    assert selected["claim_kind"] == "P_COMPLEX_BINDING"
+
+    remapped_reviews = copy.deepcopy(review_records)
+    remapped_spans = copy.deepcopy(candidate_spans)
+    remapped_reviews[0]["candidate_id"] = "cand-remapped"
+    remapped_spans[0]["candidate_id"] = "cand-remapped"
+    remapped_reviews[0]["source_id"] = "source-remapped"
+    remapped_spans[0]["source_id"] = "source-remapped"
+    remapped_selected = _select_boundary_record(remapped_reviews, remapped_spans)
+    assert remapped_selected["candidate_id"] == "cand-remapped"
+
+
+def test_r611q_pv2a_ac05_delta_bundle_oracle_rejects_invalid_boundary_states() -> None:
+    _, _, review_records, candidate_spans = _build_synthetic_delta_bundle()
+
+    zero_match = copy.deepcopy(review_records)
+    zero_match[0]["novelty"] = "KNOWN"
+    with pytest.raises(AssertionError):
+        _select_boundary_record(zero_match, candidate_spans)
+
+    multiple_match = copy.deepcopy(review_records)
+    extra = copy.deepcopy(multiple_match[0])
+    extra["candidate_id"] = "cand-extra"
+    extra["source_id"] = "source-extra"
+    multiple_match.append(extra)
+    extended_spans = copy.deepcopy(candidate_spans)
+    span_extra = copy.deepcopy(extended_spans[0])
+    span_extra["candidate_id"] = "cand-extra"
+    span_extra["source_id"] = "source-extra"
+    extended_spans.append(span_extra)
+    with pytest.raises(AssertionError):
+        _select_boundary_record(multiple_match, extended_spans)
+
+    contradictory = copy.deepcopy(review_records)
+    contradictory[0]["contradiction_state"] = "CONTRADICTS"
+    with pytest.raises(AssertionError):
+        _select_boundary_record(contradictory, candidate_spans)
+
+    accepted = copy.deepcopy(review_records)
+    accepted[0]["accepted_claim_count"] = 1
+    with pytest.raises(AssertionError):
+        _select_boundary_record(accepted, candidate_spans)
+
+    gate_effect = copy.deepcopy(review_records)
+    gate_effect[0]["gate_8_state"] = "SATISFIED"
+    with pytest.raises(AssertionError):
+        _select_boundary_record(gate_effect, candidate_spans)
+
+
+def test_r611q_pv2a_ac06_packet_v2_composition_keeps_exact_prefix_and_boundary_language() -> None:
+    _, _, review_records, candidate_spans = _build_synthetic_delta_bundle()
+    boundary = _select_boundary_record(review_records, candidate_spans)
+
+    packet_v1 = b"# Packet V1\r\nLine one with spacing.  \r\nLine two.\r\n"
+    packet_v2 = _compose_packet_v2(packet_v1, boundary_record=boundary)
+    assert packet_v2.startswith(packet_v1), "packet v2 must begin with exact v1 packet bytes"
+
+    text = packet_v2.decode("utf-8")
+    assert "r611q-claim-2" in text
+    assert "R611Q/R905Q/N1620S" in text
+    assert "HEK293T" in text
+    assert "tagged-overexpression" in text
+    assert "co-immunoprecipitation" in text
+    assert "no observed effect" not in text  # prevent direct quote copy from source artifact
+    assert "allele-specific magnitude" in text
+    assert "TSC2-TSC2" in text
+    assert "does not establish preserved TSC1 binding" in text
+    assert "NARROWS" in text and "CONTRADICTS" not in text
+    assert "PROPOSED_UNACCEPTED" in text
+    assert "accepted_claims=0" in text
+    assert "BLOCKED_HUMAN_REVIEW" in text
+
+
+def test_r611q_pv2a_ac07_form_v2_parsing_preserves_v1_and_appends_claim2() -> None:
+    form_v1 = {
+        "variant": {"gene": "TSC2", "protein": "p.Arg611Gln"},
+        "bindings": {"packet_id": "packet-v1-synth", "form_schema": "atlas.expert_review_form.v1"},
+        "reviewer": {"assigned_to": "reviewer-synth"},
+        "scope": "boundary-only",
+        "claims": [
+            {"claim_id": "r611q-claim-0", "decision": None, "decision_options": list(ALLOWED_DECISIONS)},
+            {"claim_id": "r611q-claim-1", "decision": None, "decision_options": list(ALLOWED_DECISIONS)},
+        ],
+        "packet_status": "UNREVIEWED",
+        "accepted_claim_count": 0,
+        "gate_8_state": "BLOCKED_HUMAN_REVIEW",
+    }
+    form_v1_bytes = yaml.safe_dump(form_v1, sort_keys=False, allow_unicode=True).encode("utf-8")
+    form_v2 = _build_form_v2(
+        form_v1_bytes,
+        base_packet_sha256="a" * 64,
+        delta_manifest_hash="b" * 64,
+    )
+    _assert_form_v2_preserves_v1(form_v1, form_v2)
+
+
+def test_r611q_pv2a_ac07_form_v2_rejects_mutated_original_claims() -> None:
+    form_v1 = {
+        "variant": {"gene": "TSC2", "protein": "p.Arg611Gln"},
+        "bindings": {"packet_id": "packet-v1-synth", "form_schema": "atlas.expert_review_form.v1"},
+        "reviewer": {"assigned_to": "reviewer-synth"},
+        "scope": "boundary-only",
+        "claims": [
+            {"claim_id": "r611q-claim-0", "decision": None, "decision_options": list(ALLOWED_DECISIONS)},
+            {"claim_id": "r611q-claim-1", "decision": None, "decision_options": list(ALLOWED_DECISIONS)},
+        ],
+        "packet_status": "UNREVIEWED",
+        "accepted_claim_count": 0,
+        "gate_8_state": "BLOCKED_HUMAN_REVIEW",
+    }
+    form_v1_bytes = yaml.safe_dump(form_v1, sort_keys=False, allow_unicode=True).encode("utf-8")
+    form_v2 = _build_form_v2(
+        form_v1_bytes,
+        base_packet_sha256="a" * 64,
+        delta_manifest_hash="b" * 64,
+    )
+    form_v2["claims"][1]["decision_options"] = ["tampered"]
+    with pytest.raises(AssertionError):
+        _assert_form_v2_preserves_v1(form_v1, form_v2)
+
+
+def test_r611q_pv2a_ac08_impact_record_oracle_preserves_boundaries() -> None:
+    impact = {
+        "literature_v1": "IMMUTABLE",
+        "synthesis_v1": "IMMUTABLE",
+        "structure_readiness_v1": "IMMUTABLE",
+        "route_effect": {"RH-2": "PLAUSIBLE_NOT_DEMONSTRATED"},
+        "coip_interpretation": "TSC2-TSC2_NON_DISCRIMINATING",
+        "assay_falsifier": {"AF-4": "TSC1-TSC2_WITH_MATCHED_ABUNDANCE"},
+        "model_contexts": {"count": 4, "package_effect": "CONTEXT_ONLY"},
+        "clinical_occurrences": {"count": 2, "package_effect": "OCCURRENCE_ONLY"},
+        "secondary_reviews": {"count": 3, "package_effect": "NO_PROPOSITION_SUPPORT"},
+        "contradictions": 0,
+        "stage_execution_authorized": False,
+        "historical_4169_expansion": False,
+    }
+    _validate_impact_record_oracle(impact)
+
+
+def test_r611q_pv2a_ac09_external_package_render_oracle_self_hashes_and_manifest_last(tmp_path: Path) -> None:
+    output_root = (tmp_path / "external").resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    artifacts = {
+        "R611Q_EXPERT_REVIEW_PACKET_V2.md": b"# packet v2\n",
+        "R611Q_EXPERT_REVIEW_FORM_V2.yaml": b"schema: atlas.expert_review_form.v2\n",
+        "R611Q_PACKAGE_V2_IMPACT.json": b"{\"impact\":\"bounded\"}\n",
+        "R611Q_PACKAGE_V2_SUMMARY.md": b"# summary\n",
+    }
+    package_dir, written_order = _render_external_package_oracle(
+        output_root,
+        package_id="r611q-package-v2-addendum-2026-09-17",
+        repository_summary_target="data/rescuescreen/r611q/package-v2-addendum",
+        artifacts=artifacts,
+    )
+    assert written_order == EXPECTED_EXTERNAL_ARTIFACTS
+    for name in EXPECTED_EXTERNAL_ARTIFACTS:
+        assert (package_dir / name).is_file(), f"missing external artifact {name}"
+
+    manifest = json.loads((package_dir / "package_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["schema"] == PACKAGE_MANIFEST_SCHEMA
+    assert manifest["manifest_content_hash"] == _canonical_json_hash(manifest, drop_field="manifest_content_hash")
+
+
+def test_r611q_pv2a_ac10_repository_summary_oracle_stays_aggregate_only() -> None:
+    summary, readme = _derive_repository_summary_oracle(
+        input_hashes={
+            "literature_manifest_sha256": "1" * 64,
+            "synthesis_manifest_sha256": "2" * 64,
+            "structure_manifest_sha256": "3" * 64,
+            "delta_manifest_sha256": "4" * 64,
+        },
+        output_hashes={
+            "packet_v2_sha256": "5" * 64,
+            "form_v2_sha256": "6" * 64,
+            "impact_sha256": "7" * 64,
+            "summary_sha256": "8" * 64,
+        },
+        accepted_claim_count=0,
+        gate_8_state="BLOCKED_HUMAN_REVIEW",
+        stage_execution_authorized=False,
+    )
+    assert summary["counts"]["accepted_claims"] == 0
+    assert summary["state"]["gate_8"] == "BLOCKED_HUMAN_REVIEW"
+    assert summary["state"]["stage_execution_authorized"] is False
+    assert "aggregate-only" in readme.lower()
+
+
+def test_r611q_pv2a_ac11_pilot_repo_summary_files_exist_then_pin_aggregate_only_contract() -> None:
+    if not PILOT_SUMMARY_JSON_PATH.is_file() or not PILOT_SUMMARY_README_PATH.is_file():
+        pytest.fail(
+            "pilot regression RED by design: missing "
+            "data/rescuescreen/r611q/package-v2-addendum/package_summary.json and/or README.md"
+        )
+
+    summary = json.loads(PILOT_SUMMARY_JSON_PATH.read_text(encoding="utf-8"))
+    readme = PILOT_SUMMARY_README_PATH.read_text(encoding="utf-8")
+    text = json.dumps(summary, sort_keys=True).lower() + "\n" + readme.lower()
+    forbidden = ("pmid", "pmcid", "doi", "title", "candidate_id", "locator", "patient")
+    assert all(token not in text for token in forbidden), "repository summary leaked source identity content"
+
+
+def test_r611q_pv2a_ac12_required_package_api_surface_for_end_to_end_operator() -> None:
+    _require_package_v2_module()
+
+
+def test_r611q_pv2a_ac12_operator_synthetic_end_to_end_contract(tmp_path: Path) -> None:
+    if not OPERATOR_SCRIPT_PATH.is_file():
+        pytest.fail(f"implementation missing: {OPERATOR_SCRIPT_PATH}")
+
+    synthetic_config = tmp_path / "synthetic_config.yaml"
+    synthetic_config.write_text(
+        yaml.safe_dump(
+            {
+                "spec_id": "r611q-package-v2-addendum-v1",
+                "spec_version": "1.0.0",
+                "output": {
+                    "package_id": "r611q-package-v2-addendum-2026-09-17",
+                    "external_artifacts": list(EXPECTED_EXTERNAL_ARTIFACTS),
+                },
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        encoding="utf-8",
+    )
+    out_root = tmp_path / "external-out"
+    summary_root = tmp_path / "repo-summary-out"
+
+    run = subprocess.run(
+        [
+            sys.executable,
+            str(OPERATOR_SCRIPT_PATH),
+            "--config",
+            str(synthetic_config),
+            "--output-root",
+            str(out_root),
+            "--repository-summary-dir",
+            str(summary_root),
+            "--offline",
+        ],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")},
+    )
+    assert run.returncode == 0, run.stderr or run.stdout
