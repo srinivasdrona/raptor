@@ -1823,18 +1823,35 @@ def test_r611q_pv2a_publication_no_replace_race_preserves_racing_directory_on_fi
     race_inode: dict[str, int] = {}
     race_injected = {"done": False}
 
-    def race_on_destination_claim(path: Any, mode: int = 0o777) -> None:
-        path_obj = Path(path)
-        if path_obj == package_dir and not race_injected["done"]:
+    def race_on_destination_claim(path: Any, mode: int = 0o777, *, dir_fd: int | None = None) -> None:
+        path_str = os.fsdecode(path) if isinstance(path, (bytes, bytearray)) else str(path)
+        path_obj = Path(path_str)
+        is_legacy_claim = dir_fd is None and path_obj == package_dir
+        is_descriptor_relative_claim = dir_fd is not None and path_str == package_id
+        if (is_legacy_claim or is_descriptor_relative_claim) and not race_injected["done"]:
             # Simulate an external racer claiming destination first:
             # create empty destination with a real mkdir and then force the
             # production destination-claim call to receive FileExistsError.
-            real_mkdir(path, mode)
-            race_inode["value"] = path_obj.stat().st_ino
+            if dir_fd is None:
+                real_mkdir(path, mode)
+            else:
+                real_mkdir(path, mode, dir_fd=dir_fd)
+            inode_stat = (
+                module.os.stat(path, dir_fd=dir_fd, follow_symlinks=False)
+                if dir_fd is not None
+                else module.os.stat(path, follow_symlinks=False)
+            )
+            race_inode["value"] = inode_stat.st_ino
             race_injected["done"] = True
-            real_mkdir(path, mode)  # raises FileExistsError on POSIX/WSL
+            if dir_fd is None:
+                real_mkdir(path, mode)  # raises FileExistsError on POSIX/WSL
+            else:
+                real_mkdir(path, mode, dir_fd=dir_fd)  # raises FileExistsError on POSIX/WSL
             return
-        real_mkdir(path, mode)
+        if dir_fd is None:
+            real_mkdir(path, mode)
+        else:
+            real_mkdir(path, mode, dir_fd=dir_fd)
 
     def forbid_rename(*_args: Any, **_kwargs: Any) -> None:
         raise AssertionError("render_external_package must not use os.rename for no-replace destination claim")
@@ -1941,17 +1958,30 @@ def test_r611q_pv2a_publication_rejects_post_claim_symlink_swap_race(
     real_rmdir = module.os.rmdir
     injected = {"done": False}
 
-    def swap_destination_to_symlink(path: Any, mode: int = 0o777) -> None:
-        path_obj = Path(path)
-        if path_obj == package_dir and not injected["done"]:
+    real_symlink = module.os.symlink
+
+    def swap_destination_to_symlink(path: Any, mode: int = 0o777, *, dir_fd: int | None = None) -> None:
+        path_str = os.fsdecode(path) if isinstance(path, (bytes, bytearray)) else str(path)
+        path_obj = Path(path_str)
+        is_legacy_claim = dir_fd is None and path_obj == package_dir
+        is_descriptor_relative_claim = dir_fd is not None and path_str == package_id
+        if (is_legacy_claim or is_descriptor_relative_claim) and not injected["done"]:
             # Simulate winning the race immediately after destination claim:
             # claim destination, replace with attacker symlink, then return.
-            real_mkdir(path, mode)
-            real_rmdir(path)
-            path_obj.symlink_to(attacker_target, target_is_directory=True)
+            if dir_fd is None:
+                real_mkdir(path, mode)
+                real_rmdir(path)
+                path_obj.symlink_to(attacker_target, target_is_directory=True)
+            else:
+                real_mkdir(path, mode, dir_fd=dir_fd)
+                real_rmdir(path, dir_fd=dir_fd)
+                real_symlink(str(attacker_target), path, target_is_directory=True, dir_fd=dir_fd)
             injected["done"] = True
             return
-        real_mkdir(path, mode)
+        if dir_fd is None:
+            real_mkdir(path, mode)
+        else:
+            real_mkdir(path, mode, dir_fd=dir_fd)
 
     monkeypatch.setattr(module.os, "mkdir", swap_destination_to_symlink)
 
