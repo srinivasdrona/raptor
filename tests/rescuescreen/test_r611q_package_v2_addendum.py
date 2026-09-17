@@ -1776,6 +1776,7 @@ def test_r611q_pv2a_publication_summary_create_only_is_atomic_and_sanitized(
         package_id,
     ) = _prepare_operator_fixture_and_config(tmp_path)
     output_root = (tmp_path / "external-outside").resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
     package_dir = output_root / package_id
 
     package_module = _require_package_v2_module()
