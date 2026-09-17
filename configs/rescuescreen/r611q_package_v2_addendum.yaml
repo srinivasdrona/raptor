@@ -1,6 +1,6 @@
 schema: raptor.rescuescreen.r611q_package_v2_addendum_config.v1
 spec_id: r611q-package-v2-addendum-v1
-spec_version: 1.0.1
+spec_version: 1.0.2
 
 v1_repository_package:
   literature:
@@ -18,8 +18,8 @@ v1_repository_package:
   structure_readiness:
     directory: data/rescuescreen/r611q/structure-readiness-v1
     manifest_path: data/rescuescreen/r611q/structure-readiness-v1/manifest.sha256
-    manifest_sha256: 1d7bc9f02cf16e83b15c5ab8e584756b21c2a0b7657eb56e8a93a784aafaf0e3
-    manifest_byte_length: 2662
+    manifest_sha256: 5e0ecb473ff906eb45c9c76007bfcd7c3877d411cbaf6b8c63c398493484e82a
+    manifest_byte_length: 2633
     files_listed: 29
   readiness_summary:
     path: data/rescuescreen/r611q/RESCUESCREEN_EVIDENCE_READINESS_SUMMARY.md

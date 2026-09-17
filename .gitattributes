@@ -17,3 +17,9 @@ scripts/run_masked_holdout_eval.py text eol=crlf
 # RescueScreen literature bundles carry byte-level SHA-256 manifests.
 data/rescuescreen/r611q/literature-v1/* text eol=lf
 data/rescuescreen/r611q/synthesis-v1/* text eol=lf
+
+# RescueScreen structure-readiness pack: force LF for every tracked text
+# artifact regardless of core.autocrlf, then restore the gzip artifacts to
+# binary so they are never subject to text/eol conversion.
+data/rescuescreen/r611q/structure-readiness-v1/** text eol=lf
+data/rescuescreen/r611q/structure-readiness-v1/**/*.gz -text
