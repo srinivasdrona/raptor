@@ -1536,12 +1536,22 @@ def render_external_package(
     for name in payload_names:
         _require(isinstance(artifacts[name], (bytes, bytearray)), f"artifact payload must be bytes: {name}")
 
+    # Freeze every payload into a new, immutable ``bytes`` object -- copying
+    # a ``bytearray`` -- in a plain local dict, immediately after key/type
+    # validation and before any manifest construction or descriptor call.
+    # From here on, ``artifacts`` (the caller-owned mapping) is never read
+    # again: the manifest rows/hash/length and every descriptor write are
+    # built solely from this frozen snapshot, so a caller that mutates its
+    # own mapping (or an object it handed us) concurrently with publication
+    # cannot change what is actually hashed or written.
+    frozen_artifacts: dict[str, bytes] = {name: bytes(artifacts[name]) for name in payload_names}
+
     package_dir = output_root / package_id
     _reject_symlink_ancestry(package_dir, "external package path")
 
     manifest_name = "package_manifest.json"
     manifest_rows = [
-        {"name": name, "sha256": _sha256_bytes(artifacts[name]), "byte_length": len(artifacts[name])}
+        {"name": name, "sha256": _sha256_bytes(frozen_artifacts[name]), "byte_length": len(frozen_artifacts[name])}
         for name in payload_names
     ]
     manifest: dict[str, Any] = {
@@ -1564,7 +1574,7 @@ def render_external_package(
             root_path=output_root,
             destination_name=package_id,
             payload_names=payload_names,
-            artifacts=artifacts,
+            artifacts=frozen_artifacts,
             manifest_name=manifest_name,
             manifest_bytes=manifest_bytes,
         )
