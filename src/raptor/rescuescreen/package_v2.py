@@ -17,6 +17,9 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
+import shutil
+import tempfile
 from pathlib import Path, PurePosixPath
 import re
 from typing import Any, Mapping, MutableMapping, Sequence
@@ -153,6 +156,61 @@ def _canonical_json_hash(mapping: Mapping[str, Any], *, drop_field: str) -> str:
 
 def _reject_symlink(path: Path, description: str) -> None:
     _require(not path.is_symlink(), f"{description} must not be a symlink/reparse point: {path}")
+
+
+def _reject_symlink_ancestry(path: Path, description: str) -> None:
+    """Reject ``path`` or any of its ancestors being a symlink/reparse point.
+
+    Walks from ``path`` up to the filesystem root. ``Path.is_symlink()``
+    returns ``False`` (never raises) for a component that does not exist, so
+    this is safe to call on paths that are not yet created.
+    """
+
+    current = Path(path)
+    while True:
+        _require(not current.is_symlink(), f"{description} must not be a symlink/reparse point: {current}")
+        parent = current.parent
+        if parent == current:
+            break
+        current = parent
+
+
+def _require_outside_repo(candidate: Path, repo_root: Path, description: str) -> Path:
+    candidate_resolved = Path(candidate).resolve()
+    repo_root_resolved = Path(repo_root).resolve()
+    _require(
+        candidate_resolved != repo_root_resolved,
+        f"{description} must resolve outside the repository root: {candidate_resolved}",
+    )
+    try:
+        candidate_resolved.relative_to(repo_root_resolved)
+    except ValueError:
+        return candidate_resolved
+    raise PackageV2Error(f"{description} must resolve outside the repository root: {candidate_resolved}")
+
+
+def _mkdir_tracked(path: Path) -> Path | None:
+    """Create ``path`` and any missing parents.
+
+    Returns the highest newly-created ancestor directory (the root of what
+    this call created), so a failure elsewhere can roll back with a single
+    targeted ``shutil.rmtree`` of exactly that directory -- never a broad or
+    wildcard deletion. Returns ``None`` if ``path`` already existed.
+    """
+
+    if path.exists():
+        return None
+    to_create: list[Path] = []
+    current = path
+    while not current.exists():
+        to_create.append(current)
+        parent = current.parent
+        if parent == current:
+            break
+        current = parent
+    for directory in reversed(to_create):
+        directory.mkdir()
+    return to_create[-1]
 
 
 def _reject_escape(root: Path, path: Path, description: str) -> None:
@@ -1028,19 +1086,27 @@ def render_external_package(
     package_id: str,
     repository_summary_target: str,
     artifacts: Mapping[str, bytes],
+    repo_root: Path | None = None,
 ) -> tuple[Path, tuple[str, ...]]:
     """Render the four payload artifacts plus package_manifest.json.
 
-    ``output_root`` must be absolute and not a symlink/reparse point. The
-    package directory (``output_root / package_id``) must not already exist
-    (create-only). Every artifact path is verified to stay inside the
-    package directory. ``package_manifest.json`` is always written last and
-    self-hashes over the other four artifacts' recorded hash/length rows.
+    ``output_root`` must be absolute and neither it nor any ancestor may be a
+    symlink/reparse point. When ``repo_root`` is given (used by the CLI),
+    ``output_root`` must additionally resolve outside it -- this keyword is
+    optional and preserves compatibility with existing callers that omit it.
+    The package directory (``output_root / package_id``) must not already
+    exist (create-only). All payloads are written to a staging directory
+    first, with ``package_manifest.json`` written last inside staging; the
+    staging directory is then published with a single no-replace rename. Any
+    failure removes only the staging directory this call created -- never a
+    partial final package directory.
     """
 
     output_root = Path(output_root)
     _require(output_root.is_absolute(), "external render root must be absolute")
-    _require(not output_root.is_symlink(), "external render root must not be a symlink/reparse point")
+    _reject_symlink_ancestry(output_root, "external package output root")
+    if repo_root is not None:
+        _require_outside_repo(output_root, Path(repo_root), "external package output root")
 
     payload_names = EXPECTED_EXTERNAL_ARTIFACTS[:-1]
     _require(
@@ -1048,43 +1114,53 @@ def render_external_package(
         "external render requires exactly the four payload artifacts",
     )
 
-    output_root.mkdir(parents=True, exist_ok=True)
     package_dir = output_root / package_id
+    _reject_symlink_ancestry(package_dir, "external package path")
     _require(
         not package_dir.exists(),
         f"external package path already exists (create-only contract): {package_dir}",
     )
-    package_dir.mkdir(parents=True)
-    package_dir_resolved = package_dir.resolve()
 
-    written_order: list[str] = []
-    manifest_rows: list[dict[str, Any]] = []
-    for name in payload_names:
-        target = package_dir / name
+    output_root.mkdir(parents=True, exist_ok=True)
+    staging_dir = Path(tempfile.mkdtemp(prefix=f".{package_id}.staging-", dir=str(output_root)))
+    try:
+        staging_dir_resolved = staging_dir.resolve()
+        written_order: list[str] = []
+        manifest_rows: list[dict[str, Any]] = []
+        for name in payload_names:
+            target = staging_dir / name
+            _require(
+                target.resolve().parent == staging_dir_resolved,
+                f"artifact path escaped staging directory: {name}",
+            )
+            payload = artifacts[name]
+            _require(isinstance(payload, (bytes, bytearray)), f"artifact payload must be bytes: {name}")
+            target.write_bytes(payload)
+            _reject_symlink(target, f"staged artifact {name}")
+            written_order.append(name)
+            manifest_rows.append(
+                {"name": name, "sha256": _sha256_bytes(payload), "byte_length": len(payload)}
+            )
+
+        manifest: dict[str, Any] = {
+            "schema": PACKAGE_MANIFEST_SCHEMA,
+            "package_id": package_id,
+            "create_only": True,
+            "repository_summary_target": repository_summary_target,
+            "artifacts": manifest_rows,
+        }
+        manifest["manifest_content_hash"] = _canonical_json_hash(manifest, drop_field="manifest_content_hash")
+        (staging_dir / "package_manifest.json").write_bytes(_canonical_json_bytes(manifest))
+        written_order.append("package_manifest.json")
+
         _require(
-            target.resolve().parent == package_dir_resolved,
-            f"artifact path escaped package directory: {name}",
+            not package_dir.exists(),
+            f"external package path already exists (create-only contract): {package_dir}",
         )
-        payload = artifacts[name]
-        _require(isinstance(payload, (bytes, bytearray)), f"artifact payload must be bytes: {name}")
-        target.write_bytes(payload)
-        _reject_symlink(target, f"rendered artifact {name}")
-        written_order.append(name)
-        manifest_rows.append(
-            {"name": name, "sha256": _sha256_bytes(payload), "byte_length": len(payload)}
-        )
-
-    manifest: dict[str, Any] = {
-        "schema": PACKAGE_MANIFEST_SCHEMA,
-        "package_id": package_id,
-        "create_only": True,
-        "repository_summary_target": repository_summary_target,
-        "artifacts": manifest_rows,
-    }
-    manifest["manifest_content_hash"] = _canonical_json_hash(manifest, drop_field="manifest_content_hash")
-    manifest_path = package_dir / "package_manifest.json"
-    manifest_path.write_bytes(_canonical_json_bytes(manifest))
-    written_order.append("package_manifest.json")
+        os.rename(staging_dir, package_dir)
+    except BaseException:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        raise
 
     return package_dir, tuple(written_order)
 

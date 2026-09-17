@@ -42,6 +42,9 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from raptor.rescuescreen.package_v2 import (  # noqa: E402
     PackageV2Error,
+    _mkdir_tracked,
+    _reject_symlink_ancestry,
+    _require_outside_repo,
     build_r611q_package_v2_addendum,
     build_repository_summary,
     render_external_package,
@@ -93,6 +96,11 @@ def _resolve_output_root(config: dict[str, Any]) -> Path:
         return Path(os.environ[env_var]).expanduser()
     default_root = output_config.get("default_root", "~/raptor-data/external/r611q-package-v2")
     return Path(default_root).expanduser()
+
+
+def _require_or_raise(condition: bool, message: str) -> None:
+    if not condition:
+        raise PackageV2Error(message)
 
 
 # ---------------------------------------------------------------------------
@@ -445,11 +453,18 @@ def main(argv: list[str] | None = None) -> int:
             v1_packet_path = args.v1_packet or fixture.packet_path
             v1_form_path = args.v1_form or fixture.form_path
             delta_bundle_root = args.delta_bundle_root or fixture.delta_bundle_root
+            # Offline convenience mode is internally adapted to always use the
+            # synthetic fixture's own configured repository-summary path; a
+            # caller-provided --repository-summary-dir that does not match it
+            # is not passed through, so the production create-only/
+            # exact-target rule below is never relaxed for a real run.
+            effective_repository_summary_dir = None
         else:
             repo_root = args.repo_root or _default_repo_root()
             v1_packet_path = args.v1_packet
             v1_form_path = args.v1_form
             delta_bundle_root = args.delta_bundle_root
+            effective_repository_summary_dir = args.repository_summary_dir
             missing = [
                 flag
                 for flag, value in (
@@ -484,20 +499,59 @@ def main(argv: list[str] | None = None) -> int:
             print("R611Q package-v2 addendum dry run: OK (no files written)")
             return 0
 
+        repo_root_resolved = Path(repo_root).resolve()
         output_root = args.output_root if args.output_root is not None else _resolve_output_root(config)
         output_root = Path(output_root).expanduser().resolve()
         package_id = config["output"]["package_id"]
         repository_summary_target = config["output"]["repository_summary"]["directory"]
+        package_dir = output_root / package_id
+        write_repository_summary = not args.no_write_repository_summary
 
-        package_dir, written = render_external_package(
-            output_root,
-            package_id=package_id,
-            repository_summary_target=repository_summary_target,
-            artifacts=result["external_artifacts"],
+        # --- Preflight everything before any write, in the required order:
+        # (1) repository-summary target, (2) external output root/package
+        # path. Building the summary bytes below is pure/in-memory only.
+        summary_dir: Path | None = None
+        summary_json_path: Path | None = None
+        summary_readme_path: Path | None = None
+        if write_repository_summary:
+            configured_summary_dir = (repo_root_resolved / repository_summary_target).resolve()
+            if effective_repository_summary_dir is not None:
+                provided_summary_dir = Path(effective_repository_summary_dir).resolve()
+                if provided_summary_dir != configured_summary_dir:
+                    raise PackageV2Error(
+                        "--repository-summary-dir must resolve exactly to the configured "
+                        f"summary directory {configured_summary_dir}; got {provided_summary_dir}"
+                    )
+            summary_dir = configured_summary_dir
+            _reject_symlink_ancestry(summary_dir, "repository summary directory")
+            _require_or_raise(
+                not summary_dir.exists(),
+                f"repository summary directory already exists (create-only contract): {summary_dir}",
+            )
+            json_name = Path(config["output"]["repository_summary"]["json_path"]).name
+            readme_name = Path(config["output"]["repository_summary"]["readme_path"]).name
+            summary_json_path = summary_dir / json_name
+            summary_readme_path = summary_dir / readme_name
+            _reject_symlink_ancestry(summary_json_path, "repository summary JSON path")
+            _reject_symlink_ancestry(summary_readme_path, "repository summary README path")
+            _require_or_raise(
+                not summary_json_path.exists() and not summary_readme_path.exists(),
+                f"repository summary target already exists (create-only contract): {summary_dir}",
+            )
+
+        _require_outside_repo(output_root, repo_root_resolved, "external package output root")
+        _reject_symlink_ancestry(output_root, "external package output root")
+        _reject_symlink_ancestry(package_dir, "external package path")
+        _require_or_raise(
+            not package_dir.exists(),
+            f"external package path already exists (create-only contract): {package_dir}",
         )
-        print(f"R611Q package-v2 addendum: external package written: {package_dir} ({len(written)} files)")
 
-        if not args.no_write_repository_summary:
+        # --- Publish the repository summary first (its own staged, tracked,
+        # all-or-nothing write), then the external package last, so a summary
+        # failure never leaves a finalized external package behind.
+        if write_repository_summary:
+            assert summary_dir is not None and summary_json_path is not None and summary_readme_path is not None
             summary, readme = build_repository_summary(
                 input_hashes=result["input_hashes_summary"],
                 output_hashes=result["output_hashes_summary"],
@@ -505,28 +559,33 @@ def main(argv: list[str] | None = None) -> int:
                 gate_8_state=result["impact"]["gate_8"],
                 stage_execution_authorized=result["impact"]["stage_execution_authorized"],
             )
-            if args.repository_summary_dir is not None:
-                summary_dir = Path(args.repository_summary_dir)
-            else:
-                summary_dir = Path(repo_root) / config["output"]["repository_summary"]["directory"]
+            summary_json_text = json.dumps(summary, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
 
-            json_name = Path(config["output"]["repository_summary"]["json_path"]).name
-            readme_name = Path(config["output"]["repository_summary"]["readme_path"]).name
-            summary_json_path = summary_dir / json_name
-            summary_readme_path = summary_dir / readme_name
-            if summary_json_path.exists() or summary_readme_path.exists():
-                raise PackageV2Error(
-                    f"repository summary target already exists (create-only contract): {summary_dir}"
-                )
-            summary_dir.mkdir(parents=True, exist_ok=True)
-            summary_json_path.write_text(
-                json.dumps(summary, sort_keys=True, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-            )
-            summary_readme_path.write_text(readme, encoding="utf-8")
+            created_summary_root = _mkdir_tracked(summary_dir)
+            try:
+                summary_json_path.write_text(summary_json_text, encoding="utf-8")
+                summary_readme_path.write_text(readme, encoding="utf-8")
+            except BaseException:
+                if created_summary_root is not None:
+                    shutil.rmtree(created_summary_root, ignore_errors=True)
+                else:
+                    for path in (summary_json_path, summary_readme_path):
+                        if path.exists():
+                            path.unlink()
+                raise
             print(f"R611Q package-v2 addendum: repository summary written: {summary_dir}")
 
+        package_dir, written = render_external_package(
+            output_root,
+            package_id=package_id,
+            repository_summary_target=repository_summary_target,
+            artifacts=result["external_artifacts"],
+            repo_root=repo_root_resolved,
+        )
+        print(f"R611Q package-v2 addendum: external package written: {package_dir} ({len(written)} files)")
+
         return 0
-    except PackageV2Error as exc:
+    except (PackageV2Error, OSError) as exc:
         print(f"r611q-package-v2-addendum error: {exc}", file=sys.stderr)
         return 1
     finally:
