@@ -19,6 +19,7 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import tempfile
 from pathlib import Path, PurePosixPath
 import re
@@ -1094,22 +1095,60 @@ def _publish_directory_no_replace(staging_dir: Path, destination_dir: Path) -> t
     pre-existing empty directory, file, or symlink at that path -- never a
     silent replace -- and this function never calls ``os.rename``.
 
-    Each non-manifest staged file is then copied into ``destination_dir``
-    with an exclusive (``xb``) create (any needed subdirectories are created
-    with a plain, non-existing ``mkdir`` and tracked); ``staging_dir`` is
-    removed once every non-manifest file has been copied (pre-commit); and
-    the manifest is written last, also via an exclusive create. A
+    A racing attacker can still try to swap the claimed path for a symlink
+    in the instant between ``os.mkdir`` returning and the next filesystem
+    call. To defend against that: immediately after claiming, the directory
+    is opened with ``os.open(..., O_RDONLY | O_DIRECTORY | O_NOFOLLOW)``. If
+    the path was already swapped to a symlink, ``O_NOFOLLOW`` makes that
+    open fail before anything is written through it. The resulting
+    descriptor's ``fstat`` device/inode is then compared against a fresh
+    ``lstat`` of the path; any mismatch (including the path no longer being
+    a real, non-symlink directory) aborts before any write. Every artifact
+    -- including the manifest -- is then written using descriptor-relative
+    ``os.open(name, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, dir_fd=...)``.
+    Because these writes are anchored to the open file descriptor rather
+    than the path, even a symlink swap performed *after* the identity check
+    (mid-publication) cannot redirect them: the descriptor stays pinned to
+    the original directory regardless of what the path currently names.
+
+    Non-manifest files are copied first; ``staging_dir`` is removed once
+    they are all in place (pre-commit); the manifest is written last, also
+    descriptor-relative and exclusive, as the final commit marker. A
     ``destination_dir`` that exists without a manifest is therefore
     unpublished/invalid.
 
-    On any failure, only the files/subdirectories this call created inside
-    ``destination_dir`` are removed, and ``destination_dir`` itself is
-    removed only because this call is the one that created it (via the
-    ``os.mkdir`` above) and only once it is empty again -- a pre-existing or
-    racing destination directory is never touched or removed.
+    On any failure, only the files this call wrote through the directory
+    descriptor are removed (descriptor-relative, so this remains safe even
+    if the path has been swapped), the descriptor is closed, and the
+    original path is removed only if a fresh ``lstat`` shows it is still
+    the exact directory this call claimed (same device/inode, still a real
+    directory, not a symlink) and it is now empty. A racing symlink or an
+    outside target is never touched or removed.
+
+    On a platform or filesystem lacking the required ``O_DIRECTORY`` /
+    ``O_NOFOLLOW`` / descriptor-relative-open support, this fails closed
+    with ``PackageV2Error`` before copying anything -- there is no
+    path-based fallback.
     """
 
     manifest_name = "package_manifest.json"
+
+    missing_capabilities = [
+        flag
+        for flag in ("O_DIRECTORY", "O_NOFOLLOW", "O_EXCL", "O_CREAT", "O_WRONLY", "O_RDONLY")
+        if not hasattr(os, flag)
+    ]
+    if not missing_capabilities:
+        if os.open not in os.supports_dir_fd:
+            missing_capabilities.append("dir_fd support for os.open")
+        if os.unlink not in os.supports_dir_fd:
+            missing_capabilities.append("dir_fd support for os.unlink")
+    if missing_capabilities:
+        raise PackageV2Error(
+            "this platform/filesystem lacks required no-replace publication support "
+            f"({', '.join(missing_capabilities)}); refusing to fall back to path-based writes"
+        )
+
     try:
         os.mkdir(destination_dir)
     except FileExistsError as exc:
@@ -1119,78 +1158,128 @@ def _publish_directory_no_replace(staging_dir: Path, destination_dir: Path) -> t
     except OSError as exc:
         raise PackageV2Error(f"could not create destination directory {destination_dir}: {exc}") from exc
 
-    destination_resolved = destination_dir.resolve()
-    staged_names = sorted(
-        path.relative_to(staging_dir).as_posix()
-        for path in staging_dir.rglob("*")
-        if path.is_file()
-    )
-    _require(
-        manifest_name in staged_names,
-        f"staging directory is missing its manifest: {staging_dir / manifest_name}",
-    )
-    manifest_bytes = (staging_dir / manifest_name).read_bytes()
-    non_manifest_names = [name for name in staged_names if name != manifest_name]
-
-    written_order: list[str] = []
-    created_subdirs: list[Path] = []
+    # Immediately re-open with O_NOFOLLOW: if the path was already swapped to
+    # a symlink in the instant after os.mkdir returned, this raises before
+    # anything is written through it.
     try:
+        dest_fd = os.open(destination_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except OSError as exc:
+        raise PackageV2Error(
+            "destination directory was replaced immediately after claim "
+            f"(possible symlink race): {destination_dir}"
+        ) from exc
+
+    claimed_dev_ino: tuple[int, int] | None = None
+    written_order: list[str] = []
+    try:
+        fd_stat = os.fstat(dest_fd)
+        try:
+            path_lstat = os.lstat(destination_dir)
+        except OSError as exc:
+            raise PackageV2Error(
+                f"destination directory vanished immediately after claim: {destination_dir}"
+            ) from exc
+        identity_ok = (
+            stat.S_ISDIR(fd_stat.st_mode)
+            and not stat.S_ISLNK(path_lstat.st_mode)
+            and stat.S_ISDIR(path_lstat.st_mode)
+            and (fd_stat.st_dev, fd_stat.st_ino) == (path_lstat.st_dev, path_lstat.st_ino)
+        )
+        if not identity_ok:
+            raise PackageV2Error(
+                "destination directory identity mismatch after claim "
+                f"(possible symlink race): {destination_dir}"
+            )
+        # Only remember the claimed identity once it has been verified: this
+        # is also what gates whether the exception handler below is allowed
+        # to touch the path at all.
+        claimed_dev_ino = (fd_stat.st_dev, fd_stat.st_ino)
+
+        staged_names = sorted(
+            path.relative_to(staging_dir).as_posix()
+            for path in staging_dir.rglob("*")
+            if path.is_file()
+        )
+        _require(
+            manifest_name in staged_names,
+            f"staging directory is missing its manifest: {staging_dir / manifest_name}",
+        )
+        for name in staged_names:
+            _require("/" not in name, f"staged artifact must be root-level: {name}")
+        manifest_bytes = (staging_dir / manifest_name).read_bytes()
+        non_manifest_names = [name for name in staged_names if name != manifest_name]
+
         for name in non_manifest_names:
             payload = (staging_dir / name).read_bytes()
-            target = destination_dir / name
-            target_resolved_parent = target.resolve().parent
-            _require(
-                target_resolved_parent == destination_resolved
-                or str(target_resolved_parent).startswith(str(destination_resolved) + os.sep),
-                f"artifact path escaped destination directory: {name}",
-            )
-            to_make: list[Path] = []
-            current = target.parent
-            while current != destination_dir and not current.exists():
-                to_make.append(current)
-                current = current.parent
-            for directory in reversed(to_make):
-                directory.mkdir()
-                created_subdirs.append(directory)
-            try:
-                with open(target, "xb") as handle:
-                    handle.write(payload)
-            except FileExistsError as exc:
-                raise PackageV2Error(
-                    f"artifact already exists in claimed destination directory: {target}"
-                ) from exc
-            _reject_symlink(target, f"published artifact {name}")
+            _write_exclusive_via_dir_fd(dest_fd, name, payload)
             written_order.append(name)
 
         shutil.rmtree(staging_dir, ignore_errors=True)
 
-        manifest_target = destination_dir / manifest_name
-        try:
-            with open(manifest_target, "xb") as handle:
-                handle.write(manifest_bytes)
-        except FileExistsError as exc:
-            raise PackageV2Error(
-                f"manifest already exists in claimed destination directory: {manifest_target}"
-            ) from exc
+        _write_exclusive_via_dir_fd(dest_fd, manifest_name, manifest_bytes)
         written_order.append(manifest_name)
     except BaseException:
         for name in reversed(written_order):
-            path = destination_dir / name
-            if path.exists():
-                path.unlink()
-        for directory in reversed(created_subdirs):
-            if directory.exists():
-                try:
-                    directory.rmdir()
-                except OSError:
-                    pass
-        try:
-            destination_dir.rmdir()
-        except OSError:
-            pass
+            try:
+                os.unlink(name, dir_fd=dest_fd)
+            except FileNotFoundError:
+                pass
+        os.close(dest_fd)
+        # The destination path is touched only if a fresh lstat shows it is
+        # still, right now, the exact directory this call claimed (verified
+        # above) -- never a racing symlink or anything else standing there.
+        if claimed_dev_ino is not None:
+            try:
+                current_lstat = os.lstat(destination_dir)
+                still_ours = (
+                    not stat.S_ISLNK(current_lstat.st_mode)
+                    and stat.S_ISDIR(current_lstat.st_mode)
+                    and (current_lstat.st_dev, current_lstat.st_ino) == claimed_dev_ino
+                )
+                if still_ours and not os.listdir(destination_dir):
+                    os.rmdir(destination_dir)
+            except OSError:
+                pass
         raise
+    else:
+        os.close(dest_fd)
 
     return tuple(written_order)
+
+
+def _write_exclusive_via_dir_fd(dir_fd: int, name: str, payload: bytes) -> None:
+    """Write ``payload`` to ``name`` inside the directory identified by
+    ``dir_fd``, exclusively and without ever following a symlink.
+
+    Uses ``os.open(name, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, dir_fd=dir_fd)``
+    -- resolved purely relative to the open directory descriptor, never via
+    a path string -- then writes the full payload with a short-write-safe
+    loop before closing.
+    """
+
+    try:
+        file_fd = os.open(
+            name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+            0o644,
+            dir_fd=dir_fd,
+        )
+    except FileExistsError as exc:
+        raise PackageV2Error(f"artifact already exists in claimed destination directory: {name}") from exc
+    except OSError as exc:
+        raise PackageV2Error(f"could not create artifact {name} in claimed destination directory: {exc}") from exc
+
+    try:
+        view = memoryview(payload)
+        total_written = 0
+        while total_written < len(view):
+            total_written += os.write(file_fd, view[total_written:])
+        _require(
+            total_written == len(payload),
+            f"short write publishing artifact {name}: wrote {total_written} of {len(payload)} bytes",
+        )
+    finally:
+        os.close(file_fd)
 
 
 def render_external_package(
