@@ -1562,18 +1562,36 @@ def test_r611q_pv2a_publication_no_replace_race_preserves_racing_directory_on_fi
         "R611Q_PACKAGE_V2_SUMMARY.md": b"# summary\n",
     }
 
-    real_rename = module.os.rename
+    publish_seam = getattr(module, "_publish_directory_no_replace", None)
+    assert callable(publish_seam), (
+        "render_external_package must use an explicit no-replace publish seam "
+        "such as _publish_directory_no_replace(staging_dir, destination_dir)"
+    )
+
+    real_mkdir = module.os.mkdir
     race_inode: dict[str, int] = {}
+    race_injected = {"done": False}
 
-    def racing_rename(src: Any, dst: Any) -> None:
-        dst_path = Path(dst)
-        dst_path.mkdir(parents=False, exist_ok=False)
-        race_inode["value"] = dst_path.stat().st_ino
-        real_rename(src, dst)
+    def race_on_destination_claim(path: Any, mode: int = 0o777) -> None:
+        path_obj = Path(path)
+        if path_obj == package_dir and not race_injected["done"]:
+            # Simulate an external racer claiming destination first:
+            # create empty destination with a real mkdir and then force the
+            # production destination-claim call to receive FileExistsError.
+            real_mkdir(path, mode)
+            race_inode["value"] = path_obj.stat().st_ino
+            race_injected["done"] = True
+            real_mkdir(path, mode)  # raises FileExistsError on POSIX/WSL
+            return
+        real_mkdir(path, mode)
 
-    monkeypatch.setattr(module.os, "rename", racing_rename)
+    def forbid_rename(*_args: Any, **_kwargs: Any) -> None:
+        raise AssertionError("render_external_package must not use os.rename for no-replace destination claim")
 
-    with pytest.raises((module.PackageV2Error, OSError)):
+    monkeypatch.setattr(module.os, "mkdir", race_on_destination_claim)
+    monkeypatch.setattr(module.os, "rename", forbid_rename)
+
+    with pytest.raises((module.PackageV2Error, FileExistsError)):
         module.render_external_package(
             output_root,
             package_id=package_id,
@@ -1581,6 +1599,7 @@ def test_r611q_pv2a_publication_no_replace_race_preserves_racing_directory_on_fi
             artifacts=artifacts,
         )
 
+    assert race_injected["done"], "test must inject the destination-claim race at final package directory"
     assert package_dir.exists(), "racing directory must remain present"
     assert package_dir.is_dir(), "racing path must stay a directory"
     assert package_dir.stat().st_ino == race_inode["value"], "racing directory must not be replaced"
