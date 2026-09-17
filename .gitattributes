@@ -23,3 +23,6 @@ data/rescuescreen/r611q/synthesis-v1/* text eol=lf
 # binary so they are never subject to text/eol conversion.
 data/rescuescreen/r611q/structure-readiness-v1/** text eol=lf
 data/rescuescreen/r611q/structure-readiness-v1/**/*.gz -text
+
+# RescueScreen package-v2 summaries are byte-hash pinned by AC11.
+data/rescuescreen/r611q/package-v2-addendum/* text eol=lf
