@@ -1366,8 +1366,15 @@ def test_r611q_pv2a_ac11_pilot_repo_summary_files_exist_then_pin_aggregate_only_
             "data/rescuescreen/r611q/package-v2-addendum/package_summary.json and/or README.md"
         )
 
-    summary = json.loads(PILOT_SUMMARY_JSON_PATH.read_text(encoding="utf-8"))
-    readme = PILOT_SUMMARY_README_PATH.read_text(encoding="utf-8")
+    summary_bytes = PILOT_SUMMARY_JSON_PATH.read_bytes()
+    readme_bytes = PILOT_SUMMARY_README_PATH.read_bytes()
+    assert len(summary_bytes) == 1561
+    assert _sha256_bytes(summary_bytes) == "694b164a8004202b80e3fbe4b8eb09c23d5debb19f54cf55b93401e2eefb800f"
+    assert len(readme_bytes) == 385
+    assert _sha256_bytes(readme_bytes) == "cc7f6e1bc3b724046b8e0f1baaaafcc08ddf4980ee292a266a1c150b7f43f08b"
+
+    summary = json.loads(summary_bytes.decode("utf-8"))
+    readme = readme_bytes.decode("utf-8")
 
     expected_summary = {
         "schema": "raptor.repository.r611q_package_v2_addendum_summary.v1",
