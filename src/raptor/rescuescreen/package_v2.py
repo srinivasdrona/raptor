@@ -1439,19 +1439,30 @@ def _traverse_dir_nofollow(start_fd: int, components: Sequence[str], *, descript
 
 
 def _cleanup_staging_via_dir_fd(
-    root_fd: int, staging_fd: int, staging_name: str, staged_names: Sequence[str]
+    root_fd: int,
+    staging_fd: int,
+    staging_name: str,
+    staged_names: Sequence[str],
+    staging_dev_ino: tuple[int, int] | None,
 ) -> None:
     """Best-effort, descriptor-relative removal of everything this
-    invocation staged: unlink each staged file via ``staging_fd``, then
-    remove the staging directory entry itself via ``root_fd``. Idempotent --
-    safe to call even if publication already removed some or all of it."""
+    invocation staged: unlink each staged file via ``staging_fd`` (safe
+    regardless of what ``staging_name`` currently names, since this is
+    anchored to the open descriptor, not the name), then remove the staging
+    directory *entry* itself via ``root_fd`` -- but only if a fresh,
+    non-following stat of ``staging_name`` still shows the exact directory
+    this invocation claimed (matching device/inode, a real directory, not a
+    symlink). If ``_publish_directory_no_replace`` already removed the
+    original entry pre-commit and something else has since reused the same
+    name (a competitor), that stat will show a different identity (or a
+    missing entry), and this function leaves it completely untouched --
+    idempotent and safe to call even if publication already removed some or
+    all of the original staging content.
+    """
 
     for name in staged_names:
         _unlink_via_dir_fd_best_effort(staging_fd, name)
-    try:
-        os.rmdir(staging_name, dir_fd=root_fd)
-    except OSError:
-        pass
+    _rmdir_if_still_ours(root_fd, staging_name, staging_dev_ino)
 
 
 def _publish_directory_no_replace(
@@ -1460,6 +1471,7 @@ def _publish_directory_no_replace(
     root_path: Path,
     staging_name: str,
     staging_fd: int,
+    staging_dev_ino: tuple[int, int],
     payload_names: Sequence[str],
     destination_name: str,
 ) -> tuple[str, ...]:
@@ -1497,9 +1509,12 @@ def _publish_directory_no_replace(
     root swapped out from under the whole operation.
 
     Non-manifest files are copied first; the staging directory is removed
-    once they are all in place (pre-commit); the manifest is written last.
-    A destination that exists without a manifest is therefore
-    unpublished/invalid.
+    once they are all in place (pre-commit) -- but only if a fresh,
+    non-following stat of ``staging_name`` still shows the exact directory
+    identified by ``staging_dev_ino`` (the identity verified when the caller
+    opened it): if something else has since reused that name, it is left
+    untouched. The manifest is written last. A destination that exists
+    without a manifest is therefore unpublished/invalid.
 
     On any failure, only the files this call wrote through the destination
     descriptor are removed (descriptor-relative, so this remains safe even
@@ -1535,14 +1550,13 @@ def _publish_directory_no_replace(
             _write_exclusive_via_dir_fd(dest_fd, name, payload)
             written_order.append(name)
 
-        # Remove staging pre-commit: unlink its contents then the directory
-        # entry itself, all descriptor-relative.
+        # Remove staging pre-commit: unlink its contents (descriptor-
+        # relative via staging_fd, safe regardless of naming), then remove
+        # the staging directory entry itself via root_fd -- but only if it
+        # still identifies the exact directory this invocation claimed.
         for name in (*payload_names, manifest_name):
             _unlink_via_dir_fd_best_effort(staging_fd, name)
-        try:
-            os.rmdir(staging_name, dir_fd=root_fd)
-        except OSError:
-            pass
+        _rmdir_if_still_ours(root_fd, staging_name, staging_dev_ino)
 
         _write_exclusive_via_dir_fd(dest_fd, manifest_name, manifest_bytes)
         written_order.append(manifest_name)
@@ -1640,9 +1654,10 @@ def render_external_package(
 
         staging_name = _create_unique_child_dir(root_fd, prefix=f".{package_id}.staging-")
         staged_names_for_cleanup: list[str] = []
+        staging_dev_ino: tuple[int, int] | None = None
         staging_fd = _open_dir_nofollow(staging_name, dir_fd=root_fd, description="staging directory")
         try:
-            _verify_dir_fd_identity(
+            staging_dev_ino = _verify_dir_fd_identity(
                 staging_fd, staging_name, dir_fd=root_fd, description="staging directory"
             )
 
@@ -1673,11 +1688,14 @@ def render_external_package(
                 root_path=output_root,
                 staging_name=staging_name,
                 staging_fd=staging_fd,
+                staging_dev_ino=staging_dev_ino,
                 payload_names=payload_names,
                 destination_name=package_id,
             )
         except BaseException:
-            _cleanup_staging_via_dir_fd(root_fd, staging_fd, staging_name, staged_names_for_cleanup)
+            _cleanup_staging_via_dir_fd(
+                root_fd, staging_fd, staging_name, staged_names_for_cleanup, staging_dev_ino
+            )
             raise
         finally:
             os.close(staging_fd)
