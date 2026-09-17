@@ -1368,6 +1368,68 @@ def test_r611q_pv2a_ac11_pilot_repo_summary_files_exist_then_pin_aggregate_only_
 
     summary = json.loads(PILOT_SUMMARY_JSON_PATH.read_text(encoding="utf-8"))
     readme = PILOT_SUMMARY_README_PATH.read_text(encoding="utf-8")
+
+    expected_summary = {
+        "schema": "raptor.repository.r611q_package_v2_addendum_summary.v1",
+        "inputs": {
+            "atlas_form_v1_sha256": "0e9d096559f36fcfde2f3340cf9af54a4328ddb74791d9ddef4df1edc54151ba",
+            "atlas_packet_v1_sha256": "ac456eeac4bd6e0c6a41320d3687575e058d1016e92ddd2e8b140dabfdcbe4e2",
+            "delta_manifest_sha256": "490ee47a68e1ec24fee4453524e6cd7ca825687f3002347c3b93097afc7a3930",
+            "literature_manifest_sha256": "3546b6e20fe0abd945f2079c381c6a9551d55c2c6d44dc8c573f1df4917020c3",
+            "readiness_summary_sha256": "8cacf0ff4bb026f851cf7779ac27496d5ee083869281b509cc01d1057acda1a7",
+            "structure_readiness_manifest_sha256": "5e0ecb473ff906eb45c9c76007bfcd7c3877d411cbaf6b8c63c398493484e82a",
+            "synthesis_manifest_sha256": "cd56533c1cdb5735217a18e53e5a5bd72c53379f472d0d79adfa96ba9f0350a7",
+        },
+        "outputs": {
+            "r611q_expert_review_form_v2_sha256": "3d47cd7625a3c3096364760342a78037949cc8e98f8af68fa800228a59ffe45e",
+            "r611q_expert_review_packet_v2_sha256": "a5fd371e87babee389344237d352873a233aad0d341d6c6b8e0cf0a412b95d0b",
+            "r611q_package_v2_impact_sha256": "6ae9689f677e415016e1389240c5b4b75eb5b0dfa0464575ac158da193584cb0",
+            "r611q_package_v2_summary_sha256": "b1e743a4dff1cc3cc0d5a9c416304883bae47c22faf4de87583201f889715a98",
+        },
+        "counts": {"accepted_claims": 0},
+        "state": {
+            "gate_8": "BLOCKED_HUMAN_REVIEW",
+            "historical_tsc2_corpus_expansion": "deferred",
+            "stage_execution_authorized": False,
+        },
+        "decisions": {
+            "broader_historical_corpus_expansion_warranted": False,
+            "package_update_warranted": True,
+        },
+    }
+    assert summary == expected_summary
+
+    expected_readme = (
+        "# R611Q package-v2 addendum repository summary\n\n"
+        "This repository summary is an aggregate-only projection. It records exact input and output "
+        "artifact hashes, aggregate counts, the accepted-claim count, the Gate 8 state, the "
+        "stage-execution state, and the explicit no-historical-expansion decision. It carries no new "
+        "source-identity, quotation, span, sample-level or record-level detail.\n"
+    )
+    assert readme == expected_readme
+
+    input_hashes = list(summary["inputs"].values())
+    output_hashes = list(summary["outputs"].values())
+    all_hashes = input_hashes + output_hashes
+    assert len(input_hashes) == 7
+    assert len(output_hashes) == 4
+    assert len(all_hashes) == 11
+    assert all(re.fullmatch(r"[0-9a-f]{64}", value) for value in all_hashes)
+    assert summary["counts"]["accepted_claims"] == 0
+    assert summary["state"]["gate_8"] == "BLOCKED_HUMAN_REVIEW"
+    assert summary["state"]["historical_tsc2_corpus_expansion"] == "deferred"
+    assert summary["state"]["stage_execution_authorized"] is False
+    assert summary["decisions"]["package_update_warranted"] is True
+    assert summary["decisions"]["broader_historical_corpus_expansion_warranted"] is False
+    assert summary["counts"]["accepted_claims"] + int(summary["state"]["stage_execution_authorized"]) == 0
+    assert int(summary["decisions"]["package_update_warranted"]) - int(
+        summary["decisions"]["broader_historical_corpus_expansion_warranted"]
+    ) == 1
+
+    outputs = summary["outputs"]
+    if "package_manifest_content_hash" in outputs:
+        assert outputs["package_manifest_content_hash"] == "a992c189cf6d0b6e743eeef065c302b77a1ae6cdc9281c0792463cbd3d7c8546"
+
     text = json.dumps(summary, sort_keys=True).lower() + "\n" + readme.lower()
     forbidden = ("pmid", "pmcid", "doi", "title", "candidate_id", "locator", "patient")
     assert all(token not in text for token in forbidden), "repository summary leaked source identity content"
