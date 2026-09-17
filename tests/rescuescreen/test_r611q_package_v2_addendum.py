@@ -567,7 +567,7 @@ def test_r611q_pv2a_ac01_spec_surface_and_exact_pins() -> None:
 
     assert spec["schema"] == "raptor.project.spec.v1"
     assert spec["spec_id"] == "r611q-package-v2-addendum-v1"
-    assert spec["spec_version"] == "1.0.0"
+    assert spec["spec_version"] == "1.0.1"
     assert spec["implementation"] == {
         "package": "src/raptor/rescuescreen/package_v2.py",
         "operator": "scripts/build_r611q_package_v2_addendum.py",
@@ -585,6 +585,15 @@ def test_r611q_pv2a_ac01_spec_surface_and_exact_pins() -> None:
     assert spec["output"]["repository_summary"]["json_path"] == "data/rescuescreen/r611q/package-v2-addendum/package_summary.json"
     assert spec["output"]["repository_summary"]["readme_path"] == "data/rescuescreen/r611q/package-v2-addendum/README.md"
 
+    expected_structure_manifest_pin = {
+        "directory": "data/rescuescreen/r611q/structure-readiness-v1",
+        "manifest_path": "data/rescuescreen/r611q/structure-readiness-v1/manifest.sha256",
+        "manifest_file_sha256": EXPECTED_REPO_V1_MANIFEST_PINS["structure-readiness-v1"]["manifest_sha256"],
+        "manifest_byte_length": EXPECTED_REPO_V1_MANIFEST_PINS["structure-readiness-v1"]["manifest_byte_length"],
+        "files_listed": EXPECTED_REPO_V1_MANIFEST_PINS["structure-readiness-v1"]["files_listed"],
+    }
+    assert spec["inputs"]["v1_repository_package"]["structure_readiness"] == expected_structure_manifest_pin
+
 
 def test_r611q_pv2a_ac01_required_package_operator_and_config_surfaces_exist() -> None:
     missing = [str(path) for path in (PACKAGE_MODULE_PATH, OPERATOR_SCRIPT_PATH, CONFIG_PATH) if not path.is_file()]
@@ -597,7 +606,7 @@ def test_r611q_pv2a_ac01_config_exact_pins_and_output_names() -> None:
 
     config = _read_yaml_mapping(CONFIG_PATH)
     assert config["spec_id"] == "r611q-package-v2-addendum-v1"
-    assert config["spec_version"] == "1.0.0"
+    assert config["spec_version"] == "1.0.1"
     assert config["output"]["package_id"] == "r611q-package-v2-addendum-2026-09-17"
     assert tuple(config["output"]["external_artifacts"]) == EXPECTED_EXTERNAL_ARTIFACTS
 
@@ -932,7 +941,7 @@ def test_r611q_pv2a_ac12_operator_synthetic_end_to_end_contract(tmp_path: Path) 
         yaml.safe_dump(
             {
                 "spec_id": "r611q-package-v2-addendum-v1",
-                "spec_version": "1.0.0",
+                "spec_version": "1.0.1",
                 "output": {
                     "package_id": "r611q-package-v2-addendum-2026-09-17",
                     "external_artifacts": list(EXPECTED_EXTERNAL_ARTIFACTS),
