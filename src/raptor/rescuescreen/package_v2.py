@@ -189,6 +189,128 @@ def _require_outside_repo(candidate: Path, repo_root: Path, description: str) ->
     raise PackageV2Error(f"{description} must resolve outside the repository root: {candidate_resolved}")
 
 
+def _validate_relative_single_component(value: Any, *, description: str) -> str:
+    """Validate ``value`` as a genuine, single-component relative path name
+    (used for ``package_id``): a nonblank string equal to its own stripped
+    form, containing no path separator, drive/colon designator, NUL byte,
+    and not literally ``.`` or ``..``. There is no normalization step here
+    that could turn an unsafe input into a safe one -- every check runs
+    against the exact value supplied.
+    """
+
+    _require(isinstance(value, str), f"{description} must be a string")
+    _require(value == value.strip(), f"{description} must not have leading/trailing whitespace: {value!r}")
+    _require(value != "", f"{description} must be a nonblank string")
+    _require("\x00" not in value, f"{description} must not contain a NUL byte: {value!r}")
+    _require("/" not in value, f"{description} must not contain '/': {value!r}")
+    _require("\\" not in value, f"{description} must not contain a backslash: {value!r}")
+    _require(":" not in value, f"{description} must not contain a colon/drive designator: {value!r}")
+    _require(value not in (".", ".."), f"{description} must not be '.' or '..': {value!r}")
+    return value
+
+
+def _validate_safe_relative_posix_path(
+    value: Any, *, description: str, min_components: int = 1
+) -> tuple[str, ...]:
+    """Validate ``value`` as a genuine, POSIX-style, normalized relative
+    path: a nonblank string equal to its own stripped form, using ``/`` as
+    the only separator, with no leading ``/`` (absolute), no backslash, no
+    NUL byte, no empty component (``//``), no ``.``/``..`` component
+    anywhere, and no colon/drive designator in its first component. The raw
+    string is split on ``/`` and every component is checked as given --
+    nothing here normalizes an unsafe input (for example collapsing ``//``
+    or resolving ``..``) into something that would then look safe.
+    """
+
+    _require(isinstance(value, str), f"{description} must be a string")
+    _require(value == value.strip(), f"{description} must not have leading/trailing whitespace: {value!r}")
+    _require(value != "", f"{description} must be a nonblank string")
+    _require("\x00" not in value, f"{description} must not contain a NUL byte: {value!r}")
+    _require("\\" not in value, f"{description} must not contain a backslash: {value!r}")
+    _require(not value.startswith("/"), f"{description} must be relative (no leading '/'): {value!r}")
+
+    parts = tuple(value.split("/"))
+    _require(
+        len(parts) >= min_components,
+        f"{description} must have at least {min_components} path component(s): {value!r}",
+    )
+    for index, part in enumerate(parts):
+        _require(part != "", f"{description} must not contain an empty path component: {value!r}")
+        _require(part not in (".", ".."), f"{description} must not contain '.' or '..': {value!r}")
+        if index == 0:
+            _require(
+                ":" not in part,
+                f"{description} must not contain a colon/drive designator: {value!r}",
+            )
+    return parts
+
+
+def validate_output_publication_paths(config: Mapping[str, Any]) -> None:
+    """Validate every operator-config path that governs where this
+    invocation will publish, before any build/publish/preflight descriptor
+    call is made.
+
+    Validates ``output.package_id`` as a single safe relative component, and
+    ``output.repository_summary.directory``/``json_path``/``readme_path`` as
+    safe, normalized, POSIX-relative paths whose ``json_path``/``readme_path``
+    parents equal the configured directory exactly and whose file names are
+    exactly ``package_summary.json``/``README.md``. Pure and read-only: it
+    never touches the filesystem, and raises ``PackageV2Error`` on the first
+    unsafe value found.
+    """
+
+    output = config.get("output") if isinstance(config, Mapping) else None
+    _require(isinstance(output, Mapping), "config is missing an 'output' mapping")
+    assert isinstance(output, Mapping)
+
+    _validate_relative_single_component(output.get("package_id"), description="output.package_id")
+
+    repository_summary = output.get("repository_summary")
+    _require(
+        isinstance(repository_summary, Mapping),
+        "config is missing an 'output.repository_summary' mapping",
+    )
+    assert isinstance(repository_summary, Mapping)
+
+    directory_parts = _validate_safe_relative_posix_path(
+        repository_summary.get("directory"),
+        description="output.repository_summary.directory",
+        min_components=2,
+    )
+
+    json_parts = _validate_safe_relative_posix_path(
+        repository_summary.get("json_path"),
+        description="output.repository_summary.json_path",
+        min_components=len(directory_parts) + 1,
+    )
+    _require(
+        json_parts[:-1] == directory_parts,
+        "output.repository_summary.json_path parent must equal the configured "
+        f"directory exactly: {repository_summary.get('json_path')!r}",
+    )
+    _require(
+        json_parts[-1] == "package_summary.json",
+        "output.repository_summary.json_path must be named exactly "
+        f"'package_summary.json': {repository_summary.get('json_path')!r}",
+    )
+
+    readme_parts = _validate_safe_relative_posix_path(
+        repository_summary.get("readme_path"),
+        description="output.repository_summary.readme_path",
+        min_components=len(directory_parts) + 1,
+    )
+    _require(
+        readme_parts[:-1] == directory_parts,
+        "output.repository_summary.readme_path parent must equal the configured "
+        f"directory exactly: {repository_summary.get('readme_path')!r}",
+    )
+    _require(
+        readme_parts[-1] == "README.md",
+        f"output.repository_summary.readme_path must be named exactly 'README.md': "
+        f"{repository_summary.get('readme_path')!r}",
+    )
+
+
 def _mkdir_tracked(path: Path) -> Path | None:
     """Create ``path`` and any missing parents.
 
@@ -1475,7 +1597,18 @@ def render_external_package(
     ``O_NOFOLLOW`` / descriptor-relative-open support, this fails closed
     with ``PackageV2Error`` before writing anything -- there is no
     path-based fallback.
+
+    ``package_id`` and ``repository_summary_target`` are validated as a
+    genuine single relative path component and a safe, normalized,
+    POSIX-relative path (respectively) before any ``os.open``/``os.mkdir``
+    call is made -- see ``_validate_relative_single_component`` and
+    ``_validate_safe_relative_posix_path``.
     """
+
+    _validate_relative_single_component(package_id, description="package_id")
+    _validate_safe_relative_posix_path(
+        repository_summary_target, description="repository_summary_target"
+    )
 
     output_root = Path(output_root)
     _require(output_root.is_absolute(), "external render root must be absolute")

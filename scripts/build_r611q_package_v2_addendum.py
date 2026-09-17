@@ -52,6 +52,7 @@ from raptor.rescuescreen.package_v2 import (  # noqa: E402
     build_repository_summary,
     publish_repository_summary_descriptor_relative,
     render_external_package,
+    validate_output_publication_paths,
 )
 
 DEFAULT_CONFIG_PATH = REPO_ROOT / "configs" / "rescuescreen" / "r611q_package_v2_addendum.yaml"
@@ -482,6 +483,12 @@ def main(argv: list[str] | None = None) -> int:
                 parser.error(
                     "missing required arguments for a non-offline run: " + ", ".join(missing)
                 )
+
+        # Validate every path drawn from config that will govern where this
+        # invocation publishes -- immediately after config load/merge and
+        # strictly before the build step, any publication helper, or any
+        # preflight descriptor call. This runs even in --dry-run mode.
+        validate_output_publication_paths(config)
 
         result = build_r611q_package_v2_addendum(
             config=config,
