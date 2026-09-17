@@ -2328,3 +2328,166 @@ def test_r611q_pv2a_descriptor_relative_escape_operator_accepts_exact_real_shape
     assert summary_dir.is_dir()
     assert summary_json_path.is_file()
     assert summary_readme_path.is_file()
+
+
+def _install_summary_publish_input_guards(
+    module: Any, monkeypatch: pytest.MonkeyPatch
+) -> dict[str, int]:
+    calls = {"open": 0, "mkdir": 0, "write": 0}
+
+    def reject_open(*_args: Any, **_kwargs: Any):
+        calls["open"] += 1
+        raise AssertionError("invalid summary publish inputs must be rejected before any os.open call")
+
+    def reject_mkdir(*_args: Any, **_kwargs: Any):
+        calls["mkdir"] += 1
+        raise AssertionError("invalid summary publish inputs must be rejected before any os.mkdir call")
+
+    def reject_write(*_args: Any, **_kwargs: Any):
+        calls["write"] += 1
+        raise AssertionError(
+            "invalid summary publish inputs must be rejected before any descriptor-relative file write"
+        )
+
+    monkeypatch.setattr(module.os, "open", reject_open)
+    monkeypatch.setattr(module.os, "mkdir", reject_mkdir)
+    monkeypatch.setattr(module, "_write_exclusive_via_dir_fd", reject_write)
+    return calls
+
+
+@pytest.mark.parametrize(
+    ("label", "repository_summary_target_template"),
+    [
+        ("blank", ""),
+        ("absolute_posix", "{ABS}/summary-target"),
+        ("dot", "."),
+        ("dotdot", ".."),
+        ("leading_dot_component", "./data/rescuescreen/r611q/package-v2-addendum"),
+        ("leading_dotdot_component", "../data/rescuescreen/r611q/package-v2-addendum"),
+        ("dot_component", "data/rescuescreen/./r611q/package-v2-addendum"),
+        ("dotdot_component", "data/rescuescreen/r611q/../package-v2-addendum"),
+        ("empty_component", "data/rescuescreen/r611q//package-v2-addendum"),
+        ("backslash", "data\\rescuescreen\\r611q\\package-v2-addendum"),
+        ("drive_colon", "C:/rescuescreen/r611q/package-v2-addendum"),
+        ("drive_colon_relative", "C:rescuescreen/r611q/package-v2-addendum"),
+        ("nul", "data/rescuescreen/r611q/package-v2-addendum\x00x"),
+        ("leading_whitespace", " data/rescuescreen/r611q/package-v2-addendum"),
+        ("trailing_whitespace", "data/rescuescreen/r611q/package-v2-addendum "),
+    ],
+)
+def test_r611q_pv2a_summary_publish_helper_rejects_unsafe_target_before_open_mkdir_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    label: str,
+    repository_summary_target_template: str,
+) -> None:
+    module = _require_package_v2_module()
+    repo_root = (tmp_path / f"repo-{label}").resolve()
+    trusted_parent = repo_root / "data" / "rescuescreen" / "r611q"
+    trusted_parent.mkdir(parents=True, exist_ok=True)
+    canonical_target_dir = (repo_root / "data" / "rescuescreen" / "r611q" / "package-v2-addendum").resolve()
+    outside_abs_root = (tmp_path / "outside-summary-target").resolve()
+    repository_summary_target = repository_summary_target_template.replace("{ABS}", outside_abs_root.as_posix())
+
+    calls = _install_summary_publish_input_guards(module, monkeypatch)
+    with pytest.raises(module.PackageV2Error):
+        module.publish_repository_summary_descriptor_relative(
+            repo_root,
+            repository_summary_target,
+            json_name="package_summary.json",
+            readme_name="README.md",
+            json_bytes=b"{\"schema\":\"summary\"}\n",
+            readme_bytes=b"# summary\n",
+        )
+
+    assert calls == {"open": 0, "mkdir": 0, "write": 0}
+    assert not canonical_target_dir.exists(), "invalid target must fail with no summary directory creation"
+    assert not outside_abs_root.exists(), "invalid target must not create outside directories"
+
+
+@pytest.mark.parametrize(
+    ("field_name", "bad_value"),
+    [
+        ("json_name", "/package_summary.json"),
+        ("json_name", "."),
+        ("json_name", ".."),
+        ("json_name", "nested/package_summary.json"),
+        ("json_name", "nested\\package_summary.json"),
+        ("json_name", "C:package_summary.json"),
+        ("json_name", "package_summary.json\x00x"),
+        ("json_name", " package_summary.json"),
+        ("json_name", "package_summary.json "),
+        ("json_name", "summary.json"),
+        ("json_name", "README.md"),
+        ("readme_name", "/README.md"),
+        ("readme_name", "."),
+        ("readme_name", ".."),
+        ("readme_name", "nested/README.md"),
+        ("readme_name", "nested\\README.md"),
+        ("readme_name", "C:README.md"),
+        ("readme_name", "README.md\x00x"),
+        ("readme_name", " README.md"),
+        ("readme_name", "README.md "),
+        ("readme_name", "README.txt"),
+        ("readme_name", "package_summary.json"),
+    ],
+)
+def test_r611q_pv2a_summary_publish_helper_rejects_unsafe_names_before_open_mkdir_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field_name: str,
+    bad_value: str,
+) -> None:
+    module = _require_package_v2_module()
+    repo_root = (tmp_path / "repo").resolve()
+    trusted_parent = repo_root / "data" / "rescuescreen" / "r611q"
+    trusted_parent.mkdir(parents=True, exist_ok=True)
+    canonical_target_dir = (trusted_parent / "package-v2-addendum").resolve()
+
+    json_name = "package_summary.json"
+    readme_name = "README.md"
+    if field_name == "json_name":
+        json_name = bad_value
+    else:
+        readme_name = bad_value
+
+    calls = _install_summary_publish_input_guards(module, monkeypatch)
+    with pytest.raises(module.PackageV2Error):
+        module.publish_repository_summary_descriptor_relative(
+            repo_root,
+            "data/rescuescreen/r611q/package-v2-addendum",
+            json_name=json_name,
+            readme_name=readme_name,
+            json_bytes=b"{\"schema\":\"summary\"}\n",
+            readme_bytes=b"# summary\n",
+        )
+
+    assert calls == {"open": 0, "mkdir": 0, "write": 0}
+    assert not canonical_target_dir.exists(), "invalid summary filenames must fail before any directory creation"
+
+
+def test_r611q_pv2a_summary_publish_helper_accepts_canonical_target_and_names(
+    tmp_path: Path,
+) -> None:
+    module = _require_package_v2_module()
+    repo_root = (tmp_path / "repo-positive").resolve()
+    trusted_parent = repo_root / "data" / "rescuescreen" / "r611q"
+    trusted_parent.mkdir(parents=True, exist_ok=True)
+
+    json_bytes = b"{\"schema\":\"summary\"}\n"
+    readme_bytes = b"# summary\n"
+    publication = module.publish_repository_summary_descriptor_relative(
+        repo_root,
+        "data/rescuescreen/r611q/package-v2-addendum",
+        json_name="package_summary.json",
+        readme_name="README.md",
+        json_bytes=json_bytes,
+        readme_bytes=readme_bytes,
+    )
+    try:
+        final_dir = trusted_parent / "package-v2-addendum"
+        assert final_dir.is_dir()
+        assert (final_dir / "package_summary.json").read_bytes() == json_bytes
+        assert (final_dir / "README.md").read_bytes() == readme_bytes
+    finally:
+        publication.commit()
