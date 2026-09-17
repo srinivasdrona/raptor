@@ -54,6 +54,8 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 _MANIFEST_LINE_RE = re.compile(r"^([0-9a-f]{64})  ([^\x00]+)$")
+_TEXT_CHAR_LOCATOR_RE = re.compile(r"^text-char:(\d+):(\d+)$")
+_SHA256_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
 
 EXPECTED_EXTERNAL_ARTIFACTS: tuple[str, ...] = (
     "R611Q_EXPERT_REVIEW_PACKET_V2.md",
@@ -235,6 +237,11 @@ def _derive_source_identity(article_identity: Any) -> str | None:
         if value:
             return f"{prefix}:{value}"
     return None
+
+
+def _require_nonblank_str(value: Any, message: str) -> str:
+    _require(isinstance(value, str) and value.strip() != "", message)
+    return value
 
 
 def _extract_delta_counts(manifest: Mapping[str, Any]) -> dict[str, Any]:
@@ -574,6 +581,25 @@ def select_boundary_observation(
     multiple matches, an accepted state, a contradiction relation/state, or
     any Gate 8 change, and cross-binds candidate_id/article_identity/
     source/quote/locator/quote-hash against the matching candidate span.
+
+    For every review record considered: candidate_id and source_id must be
+    nonblank strings; article_identity must be a nonempty mapping providing
+    at least one canonical identity (PMID > PMCID > DOI precedence); the
+    record's source_id must equal that canonical identity exactly;
+    acceptance_state must equal ``PROPOSED_UNACCEPTED`` exactly (missing,
+    null, or any other value rejects); and, where present, ``gate_effect``,
+    ``gate_8_change``, and ``human_gate_8_effect`` must each equal ``NONE``
+    exactly (a present-but-null value rejects).
+
+    For the uniquely selected candidate span: its article_identity must be a
+    nonempty mapping exactly equal to the record's article_identity; if it
+    carries its own source_id, that must equal the canonical identity too;
+    its exact_quote must be a nonblank string; its locator must have the
+    exact ``text-char:<start>:<end>`` shape with ``start < end``; and its
+    exact_quote_sha256/quote_sha256 must be valid lowercase 64-hex and match
+    the sha256 of exact_quote. A synthetic record that duplicates
+    exact_quote/locator/quote_sha256 must agree with the span exactly; a
+    real record may omit those duplicate fields entirely.
     """
 
     span_by_candidate: dict[Any, list[Mapping[str, Any]]] = {}
@@ -582,23 +608,47 @@ def select_boundary_observation(
 
     matches: list[Mapping[str, Any]] = []
     for record in review_records:
-        candidate_id = record.get("candidate_id")
+        candidate_id = _require_nonblank_str(
+            record.get("candidate_id"), "delta review record is missing a nonblank candidate_id"
+        )
+        source_id = _require_nonblank_str(
+            record.get("source_id"), f"delta review record is missing a nonblank source_id: {candidate_id}"
+        )
+        article_identity = record.get("article_identity")
+        _require(
+            isinstance(article_identity, Mapping) and len(article_identity) > 0,
+            f"delta review record is missing a nonempty article_identity: {candidate_id}",
+        )
+        canonical_source_id = _derive_source_identity(article_identity)
+        _require(
+            canonical_source_id is not None,
+            f"delta review record article_identity has no canonical PMID/PMCID/DOI: {candidate_id}",
+        )
+        _require(
+            canonical_source_id == source_id,
+            f"delta review record source_id does not match its canonical article_identity: {candidate_id}",
+        )
 
         gate_8_state = record.get("gate_8_state")
         _require(
             gate_8_state is None or gate_8_state == "BLOCKED_HUMAN_REVIEW",
             f"delta review record Gate 8 effect must remain blocked: {candidate_id}",
         )
-        gate_8_change = record.get("gate_8_change")
-        _require(
-            gate_8_change is None or gate_8_change == "NONE",
-            f"delta review record must not change Gate 8: {candidate_id}",
-        )
-        human_gate_8_effect = record.get("human_gate_8_effect")
-        _require(
-            human_gate_8_effect is None or human_gate_8_effect == "NONE",
-            f"delta review record must not affect human Gate 8: {candidate_id}",
-        )
+        if "gate_effect" in record:
+            _require(
+                record["gate_effect"] == "NONE",
+                f"delta review record must not change Gate 8: {candidate_id}",
+            )
+        if "gate_8_change" in record:
+            _require(
+                record["gate_8_change"] == "NONE",
+                f"delta review record must not change Gate 8: {candidate_id}",
+            )
+        if "human_gate_8_effect" in record:
+            _require(
+                record["human_gate_8_effect"] == "NONE",
+                f"delta review record must not affect human Gate 8: {candidate_id}",
+            )
         contradiction_state = record.get("contradiction_state")
         _require(
             contradiction_state is None or contradiction_state in {"NONE", "NO_CONTRADICTION"},
@@ -608,10 +658,9 @@ def select_boundary_observation(
             record.get("baseline_relation") != "CONTRADICTS",
             f"delta review record baseline_relation must not contradict: {candidate_id}",
         )
-        acceptance_state = record.get("acceptance_state")
         _require(
-            acceptance_state is None or acceptance_state != "ACCEPTED",
-            f"delta review record must remain unaccepted: {candidate_id}",
+            record.get("acceptance_state") == "PROPOSED_UNACCEPTED",
+            f"delta review record acceptance_state must be exactly PROPOSED_UNACCEPTED: {candidate_id}",
         )
         accepted_claim_count = record.get("accepted_claim_count")
         _require(
@@ -643,7 +692,10 @@ def select_boundary_observation(
     _require(len(matches) == 1, f"expected exactly one semantic boundary match; found {len(matches)}")
 
     record = matches[0]
-    candidate_id = record.get("candidate_id")
+    candidate_id = record["candidate_id"]
+    record_source_id = record["source_id"]
+    record_article_identity = record["article_identity"]
+
     spans = span_by_candidate.get(candidate_id, [])
     _require(
         len(spans) == 1,
@@ -651,42 +703,69 @@ def select_boundary_observation(
     )
     span = spans[0]
 
-    record_source_id = record.get("source_id")
-    span_source_id = span.get("source_id")
-    if span_source_id is None:
-        span_source_id = _derive_source_identity(span.get("article_identity"))
+    span_article_identity = span.get("article_identity")
     _require(
-        record_source_id is None or span_source_id is None or record_source_id == span_source_id,
-        f"source identity mismatch between review record and candidate span: {candidate_id}",
+        isinstance(span_article_identity, Mapping) and len(span_article_identity) > 0,
+        f"selected candidate span is missing a nonempty article_identity: {candidate_id}",
+    )
+    _require(
+        span_article_identity == record_article_identity,
+        f"selected candidate span article_identity does not match the review record: {candidate_id}",
     )
 
-    quote = span.get("exact_quote")
-    locator = span.get("locator")
-    quote_hash = span.get("exact_quote_sha256") or span.get("quote_sha256")
-    if isinstance(quote, str) and isinstance(quote_hash, str):
+    if "source_id" in span:
         _require(
-            _sha256_bytes(quote.encode("utf-8")) == quote_hash,
-            f"candidate span quote hash does not match its quote text: {candidate_id}",
+            span["source_id"] == record_source_id,
+            f"selected candidate span source_id does not match its canonical article_identity: {candidate_id}",
         )
+
+    quote = _require_nonblank_str(
+        span.get("exact_quote"), f"selected candidate span is missing a nonblank exact_quote: {candidate_id}"
+    )
+    locator = span.get("locator")
+    _require(isinstance(locator, str), f"selected candidate span is missing a locator: {candidate_id}")
+    locator_match = _TEXT_CHAR_LOCATOR_RE.fullmatch(locator)
+    _require(
+        locator_match is not None,
+        f"selected candidate span locator must have the exact text-char:<start>:<end> shape: {candidate_id}",
+    )
+    assert locator_match is not None
+    _require(
+        int(locator_match.group(1)) < int(locator_match.group(2)),
+        f"selected candidate span locator must have start < end: {candidate_id}",
+    )
+
+    quote_hash = span.get("exact_quote_sha256")
+    if quote_hash is None:
+        quote_hash = span.get("quote_sha256")
+    _require(
+        isinstance(quote_hash, str) and _SHA256_HEX_RE.fullmatch(quote_hash) is not None,
+        f"selected candidate span quote hash must be valid lowercase 64-hex: {candidate_id}",
+    )
+    _require(
+        _sha256_bytes(quote.encode("utf-8")) == quote_hash,
+        f"candidate span quote hash does not match its quote text: {candidate_id}",
+    )
 
     for record_field, span_value in (
         ("exact_quote", quote),
         ("locator", locator),
         ("quote_sha256", quote_hash),
     ):
-        record_value = record.get(record_field)
+        if record_field not in record:
+            continue
         _require(
-            record_value is None or span_value is None or record_value == span_value,
+            record[record_field] == span_value,
             f"review record {record_field!r} does not match candidate span: {candidate_id}",
         )
 
     return {
         "candidate_id": candidate_id,
-        "source_id": record_source_id or span_source_id,
+        "source_id": record_source_id,
         "source_role": record["source_role"],
         "primary_result_state": record["primary_result_state"],
         "baseline_relation": record["baseline_relation"],
-        "article_identity": span.get("article_identity"),
+        "article_identity": span_article_identity,
         "locator": locator,
         "quote_sha256": quote_hash,
         "related_claims": list(PACKET_V2_RELATED_CLAIMS),

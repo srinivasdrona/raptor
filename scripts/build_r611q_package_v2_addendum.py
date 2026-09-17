@@ -251,6 +251,7 @@ class _OfflineFixture:
             {
                 "candidate_id": "offline-cand-001",
                 "source_id": "PMID:00000001",
+                "article_identity": {"pmid": "00000001"},
                 "source_role": "DIRECT_ALLELE_EXPERIMENT",
                 "primary_result_state": "PRIMARY_R611Q_RESULT",
                 "baseline_relation": "NARROWS",
@@ -263,6 +264,7 @@ class _OfflineFixture:
             {
                 "candidate_id": "offline-cand-002",
                 "source_id": "PMID:00000002",
+                "article_identity": {"pmid": "00000002"},
                 "source_role": "SECONDARY_REVIEW",
                 "primary_result_state": "SECONDARY_SYNTHESIS_ONLY",
                 "baseline_relation": "NO_DIRECT_RELATION",
