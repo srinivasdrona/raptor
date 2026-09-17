@@ -1,6 +1,6 @@
 schema: raptor.project.spec.v1
 spec_id: r611q-package-v2-addendum-v1
-spec_version: 1.0.3
+spec_version: 1.0.4
 status: APPROVED_BUILD
 created_at: '2026-09-17'
 owner: human-terminal-authority
@@ -232,10 +232,16 @@ output:
     publication_protocol:
       platform: POSIX_dir_fd_required
       root_open: O_DIRECTORY_and_O_NOFOLLOW
-      staging_and_final_creation: descriptor_relative
+      payload_source: verified_in_memory_bytes
+      final_creation: descriptor_relative_exclusive_claim
       artifact_writes: O_CREAT_O_EXCL_O_NOFOLLOW
       commit_marker: package_manifest.json_written_last
       final_root_identity_check: required
+      failure_cleanup: >-
+        Remove only invocation-created files through the pinned directory
+        descriptor. Never remove the claimed directory by name; an empty
+        directory may remain as an unpublished tombstone and requires explicit
+        owner cleanup before retry.
       unsupported_platform: fail_closed
     artifacts:
       - R611Q_EXPERT_REVIEW_PACKET_V2.md
@@ -251,9 +257,15 @@ output:
       trusted_existing_parent: data/rescuescreen/r611q
       parent_open: descriptor_relative_from_repo_root_with_O_NOFOLLOW
       final_directory_creation: descriptor_relative_create_only
-      file_writes: O_CREAT_O_EXCL_O_NOFOLLOW
+      file_writes:
+        - README.md_first
+        - package_summary.json_last_as_commit_marker
+      write_flags: O_CREAT_O_EXCL_O_NOFOLLOW
       final_identity_check: required
-      rollback: descriptor_relative_invocation_created_paths_only
+      rollback: >-
+        Descriptor-relative removal of invocation-created files only. Never
+        remove the claimed directory by name; an empty unpublished tombstone
+        may remain after failure.
     contains:
       - exact input and external artifact hashes
       - aggregate counts and impact states
@@ -304,9 +316,12 @@ delivery_checks:
   - stage execution remains unauthorized
   - output is external/create-only, path-contained and manifest-last
   - the external output root must pre-exist and is pinned by a no-follow directory descriptor
-  - external staging, destination claims and writes are relative to the pinned root descriptor
+  - external destination claims and writes are relative to the pinned root descriptor
+  - external payloads and manifest are built in memory; no staging directory is created
   - repository-summary parent traversal, directory creation and writes are descriptor-relative
-  - swapping either checked path to a symlink cannot redirect a staging, payload, summary or manifest write
+  - swapping either checked path to a symlink cannot redirect a payload, summary or manifest write
+  - cleanup never rmdirs a claimed directory by name after a separate identity check
+  - a failure may leave an empty directory without its commit marker; it is unpublished and never silently resumed
   - unsupported non-POSIX publication platforms fail closed
   - repository summary is an exact aggregate-only projection
   - the RescueScreen firewall admits only package_v2.py as the additive module and remains otherwise unchanged
