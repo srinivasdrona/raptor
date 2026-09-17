@@ -4,7 +4,9 @@ immutable literature-v1/synthesis-v1/structure-readiness-v1 RescueScreen
 evidence pack, the unreviewed Atlas expert packet/form, and the reviewed
 2026-09-16 literature delta bundle.
 
-Real (post-Terra-approval) usage::
+Real (post-Terra-approval) usage (the external output root must already
+exist as a real directory; publication is fully descriptor-relative and
+POSIX-only, so run this from WSL/Linux)::
 
     python scripts/build_r611q_package_v2_addendum.py \\
         --repo-root /path/to/raptor \\
@@ -13,8 +15,10 @@ Real (post-Terra-approval) usage::
         --delta-bundle-root /path/to/raptor-data/external/r611q-literature-delta-review/r611q-literature-delta-review-2026-09-16 \\
         --output-root /path/to/raptor-data/external/r611q-package-v2
 
-Offline self-test usage (no real repository/external files are touched)::
+Offline self-test usage (no real repository/external files are touched; the
+output root must be pre-created)::
 
+    mkdir -p /tmp/external-out
     python scripts/build_r611q_package_v2_addendum.py \\
         --config configs/rescuescreen/r611q_package_v2_addendum.yaml \\
         --output-root /tmp/external-out \\
@@ -42,11 +46,11 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from raptor.rescuescreen.package_v2 import (  # noqa: E402
     PackageV2Error,
-    _mkdir_tracked,
     _reject_symlink_ancestry,
     _require_outside_repo,
     build_r611q_package_v2_addendum,
     build_repository_summary,
+    publish_repository_summary_descriptor_relative,
     render_external_package,
 )
 
@@ -506,6 +510,7 @@ def main(argv: list[str] | None = None) -> int:
         package_id = config["output"]["package_id"]
         repository_summary_target = config["output"]["repository_summary"]["directory"]
         write_repository_summary = not args.no_write_repository_summary
+        root_must_preexist = bool(config.get("output", {}).get("root_must_preexist", True))
 
         # --- Preflight everything before any write, in the required order:
         # (1) repository-summary target, (2) external output root/package
@@ -554,17 +559,24 @@ def main(argv: list[str] | None = None) -> int:
         _require_outside_repo(output_root, repo_root_resolved, "external package output root")
         _reject_symlink_ancestry(output_root, "external package output root")
         _reject_symlink_ancestry(package_dir, "external package path")
+        if root_must_preexist:
+            _require_or_raise(
+                output_root.is_dir() and not output_root.is_symlink(),
+                f"external package output root must already exist as a real directory: {output_root}",
+            )
         _require_or_raise(
             not package_dir.exists(),
             f"external package path already exists (create-only contract): {package_dir}",
         )
 
-        # --- Publish the repository summary first (its own staged, tracked,
-        # all-or-nothing write), then the external package last, so a summary
-        # failure never leaves a finalized external package behind.
-        created_summary_root: Path | None = None
+        # --- Publish the repository summary first (fully descriptor-
+        # relative; its parent/final directory descriptors are retained
+        # open in the returned handle), then the external package last, so
+        # a summary failure never leaves a finalized external package
+        # behind, and an external-render failure can still precisely roll
+        # the already-published summary back before either exits.
+        summary_publication = None
         if write_repository_summary:
-            assert summary_dir is not None and summary_json_path is not None and summary_readme_path is not None
             summary, readme = build_repository_summary(
                 input_hashes=result["input_hashes_summary"],
                 output_hashes=result["output_hashes_summary"],
@@ -572,25 +584,19 @@ def main(argv: list[str] | None = None) -> int:
                 gate_8_state=result["impact"]["gate_8"],
                 stage_execution_authorized=result["impact"]["stage_execution_authorized"],
             )
-            summary_json_text = json.dumps(summary, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
+            summary_json_bytes = (
+                json.dumps(summary, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
+            ).encode("utf-8")
+            summary_readme_bytes = readme.encode("utf-8")
 
-            created_summary_root = _mkdir_tracked(summary_dir)
-            try:
-                # Re-check ancestry after possibly creating summary_dir's
-                # parents: a symlink introduced during that creation must
-                # not be trusted either.
-                _reject_symlink_ancestry(summary_json_path, "repository summary JSON path")
-                _reject_symlink_ancestry(summary_readme_path, "repository summary README path")
-                summary_json_path.write_text(summary_json_text, encoding="utf-8")
-                summary_readme_path.write_text(readme, encoding="utf-8")
-            except BaseException:
-                if created_summary_root is not None:
-                    shutil.rmtree(created_summary_root, ignore_errors=True)
-                else:
-                    for path in (summary_json_path, summary_readme_path):
-                        if path.exists():
-                            path.unlink()
-                raise
+            summary_publication = publish_repository_summary_descriptor_relative(
+                repo_root_resolved,
+                repository_summary_target,
+                json_name=json_name,
+                readme_name=readme_name,
+                json_bytes=summary_json_bytes,
+                readme_bytes=summary_readme_bytes,
+            )
             print(f"R611Q package-v2 addendum: repository summary written: {summary_dir}")
 
         try:
@@ -603,20 +609,16 @@ def main(argv: list[str] | None = None) -> int:
             )
         except BaseException:
             # The repository summary already succeeded (if enabled); an
-            # external-publication failure must not leave it behind. Remove
-            # only what this invocation created: prefer the single tracked
-            # created root (preflight already guaranteed summary_dir did not
-            # exist beforehand), falling back to the two specific files if
-            # for some reason the root was not tracked. Never a pre-existing
-            # ancestor and never a broad/wildcard deletion.
-            if write_repository_summary:
-                if created_summary_root is not None:
-                    shutil.rmtree(created_summary_root, ignore_errors=True)
-                elif summary_json_path is not None and summary_readme_path is not None:
-                    for path in (summary_json_path, summary_readme_path):
-                        if path.exists():
-                            path.unlink()
+            # external-publication failure must not leave it behind. The
+            # retained handle rolls back exactly what this invocation wrote,
+            # descriptor-relative, and never touches a racing/pre-existing
+            # entry.
+            if summary_publication is not None:
+                summary_publication.rollback()
             raise
+        else:
+            if summary_publication is not None:
+                summary_publication.commit()
         print(f"R611Q package-v2 addendum: external package written: {package_dir} ({len(written)} files)")
 
         return 0

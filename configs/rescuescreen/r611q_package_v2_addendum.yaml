@@ -1,6 +1,6 @@
 schema: raptor.rescuescreen.r611q_package_v2_addendum_config.v1
 spec_id: r611q-package-v2-addendum-v1
-spec_version: 1.0.2
+spec_version: 1.0.3
 
 v1_repository_package:
   literature:
@@ -73,6 +73,15 @@ output:
   run_name: r611q-package-v2-addendum-2026-09-17
   environment_variable: RAPTOR_R611Q_PACKAGE_V2_ROOT
   default_root: ~/raptor-data/external/r611q-package-v2
+  root_must_preexist: true
+  publication_protocol:
+    platform: POSIX_dir_fd_required
+    root_open: O_DIRECTORY_and_O_NOFOLLOW
+    staging_and_final_creation: descriptor_relative
+    artifact_writes: O_CREAT_O_EXCL_O_NOFOLLOW
+    commit_marker: package_manifest.json_written_last
+    final_root_identity_check: required
+    unsupported_platform: fail_closed
   external_artifacts:
     - R611Q_EXPERT_REVIEW_PACKET_V2.md
     - R611Q_EXPERT_REVIEW_FORM_V2.yaml
@@ -83,3 +92,10 @@ output:
     directory: data/rescuescreen/r611q/package-v2-addendum
     json_path: data/rescuescreen/r611q/package-v2-addendum/package_summary.json
     readme_path: data/rescuescreen/r611q/package-v2-addendum/README.md
+    publication_protocol:
+      trusted_existing_parent: data/rescuescreen/r611q
+      parent_open: descriptor_relative_from_repo_root_with_O_NOFOLLOW
+      final_directory_creation: descriptor_relative_create_only
+      file_writes: O_CREAT_O_EXCL_O_NOFOLLOW
+      final_identity_check: required
+      rollback: descriptor_relative_invocation_created_paths_only

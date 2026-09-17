@@ -18,9 +18,8 @@ import copy
 import hashlib
 import json
 import os
-import shutil
+import secrets as _secrets
 import stat
-import tempfile
 from pathlib import Path, PurePosixPath
 import re
 from typing import Any, Mapping, MutableMapping, Sequence
@@ -1080,171 +1079,104 @@ def _render_package_summary_markdown(*, boundary: Mapping[str, Any], impact: Map
 # 8. render_external_package
 # ---------------------------------------------------------------------------
 
+_REQUIRED_DESCRIPTOR_OS_FLAGS: tuple[str, ...] = (
+    "O_DIRECTORY",
+    "O_NOFOLLOW",
+    "O_EXCL",
+    "O_CREAT",
+    "O_WRONLY",
+    "O_RDONLY",
+)
+_REQUIRED_DIR_FD_FUNCTIONS: tuple[str, ...] = ("open", "unlink", "mkdir", "rmdir", "stat")
+# Captured once at import time, before any test (or caller) can monkeypatch
+# os.mkdir/os.open/etc. with a plain-Python wrapper. Capability must reflect
+# the true underlying platform, not whatever object currently happens to be
+# bound to os.<name> -- a wrapper that faithfully forwards dir_fd is not
+# itself a member of os.supports_dir_fd, so checking the *live* attribute
+# would spuriously report "unsupported" the moment anything wraps it.
+_ORIGINAL_DIR_FD_FUNCTIONS: dict[str, Any] = {
+    func_name: getattr(os, func_name, None) for func_name in _REQUIRED_DIR_FD_FUNCTIONS
+}
 
-def _publish_directory_no_replace(staging_dir: Path, destination_dir: Path) -> tuple[str, ...]:
-    """Publish every file staged under ``staging_dir`` into a freshly
-    claimed ``destination_dir``, with ``package_manifest.json`` copied last
-    as the commit marker.
 
-    This is the genuine cross-platform no-clobber replacement for a plain
-    ``os.rename(staging_dir, destination_dir)``: on POSIX, renaming a
-    directory onto an existing *empty* directory silently replaces it, which
-    is unsafe if some other process or a leftover run already claimed that
-    exact path. ``destination_dir`` is instead claimed with a bare
-    ``os.mkdir``, which unconditionally raises ``FileExistsError`` for any
-    pre-existing empty directory, file, or symlink at that path -- never a
-    silent replace -- and this function never calls ``os.rename``.
+def _require_descriptor_capabilities() -> None:
+    """Fail closed if this platform/filesystem lacks the POSIX primitives the
+    descriptor-relative, no-replace publication protocol requires.
 
-    A racing attacker can still try to swap the claimed path for a symlink
-    in the instant between ``os.mkdir`` returning and the next filesystem
-    call. To defend against that: immediately after claiming, the directory
-    is opened with ``os.open(..., O_RDONLY | O_DIRECTORY | O_NOFOLLOW)``. If
-    the path was already swapped to a symlink, ``O_NOFOLLOW`` makes that
-    open fail before anything is written through it. The resulting
-    descriptor's ``fstat`` device/inode is then compared against a fresh
-    ``lstat`` of the path; any mismatch (including the path no longer being
-    a real, non-symlink directory) aborts before any write. Every artifact
-    -- including the manifest -- is then written using descriptor-relative
-    ``os.open(name, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, dir_fd=...)``.
-    Because these writes are anchored to the open file descriptor rather
-    than the path, even a symlink swap performed *after* the identity check
-    (mid-publication) cannot redirect them: the descriptor stays pinned to
-    the original directory regardless of what the path currently names.
-
-    Non-manifest files are copied first; ``staging_dir`` is removed once
-    they are all in place (pre-commit); the manifest is written last, also
-    descriptor-relative and exclusive, as the final commit marker. A
-    ``destination_dir`` that exists without a manifest is therefore
-    unpublished/invalid.
-
-    On any failure, only the files this call wrote through the directory
-    descriptor are removed (descriptor-relative, so this remains safe even
-    if the path has been swapped), the descriptor is closed, and the
-    original path is removed only if a fresh ``lstat`` shows it is still
-    the exact directory this call claimed (same device/inode, still a real
-    directory, not a symlink) and it is now empty. A racing symlink or an
-    outside target is never touched or removed.
-
-    On a platform or filesystem lacking the required ``O_DIRECTORY`` /
-    ``O_NOFOLLOW`` / descriptor-relative-open support, this fails closed
-    with ``PackageV2Error`` before copying anything -- there is no
-    path-based fallback.
+    RAPTOR publishes from WSL/Linux. There is no path-based fallback: a
+    missing capability must stop publication before anything is written.
     """
 
-    manifest_name = "package_manifest.json"
-
-    missing_capabilities = [
-        flag
-        for flag in ("O_DIRECTORY", "O_NOFOLLOW", "O_EXCL", "O_CREAT", "O_WRONLY", "O_RDONLY")
-        if not hasattr(os, flag)
-    ]
-    if not missing_capabilities:
-        if os.open not in os.supports_dir_fd:
-            missing_capabilities.append("dir_fd support for os.open")
-        if os.unlink not in os.supports_dir_fd:
-            missing_capabilities.append("dir_fd support for os.unlink")
-    if missing_capabilities:
+    missing: list[str] = [flag for flag in _REQUIRED_DESCRIPTOR_OS_FLAGS if not hasattr(os, flag)]
+    for func_name in _REQUIRED_DIR_FD_FUNCTIONS:
+        original_func = _ORIGINAL_DIR_FD_FUNCTIONS.get(func_name)
+        if original_func is None or original_func not in os.supports_dir_fd:
+            missing.append(f"dir_fd support for os.{func_name}")
+    if missing:
         raise PackageV2Error(
             "this platform/filesystem lacks required no-replace publication support "
-            f"({', '.join(missing_capabilities)}); refusing to fall back to path-based writes"
+            f"({', '.join(missing)}); refusing to fall back to path-based writes"
         )
 
-    try:
-        os.mkdir(destination_dir)
-    except FileExistsError as exc:
-        raise PackageV2Error(
-            f"destination directory already exists (create-only, no-replace contract): {destination_dir}"
-        ) from exc
-    except OSError as exc:
-        raise PackageV2Error(f"could not create destination directory {destination_dir}: {exc}") from exc
 
-    # Immediately re-open with O_NOFOLLOW: if the path was already swapped to
-    # a symlink in the instant after os.mkdir returned, this raises before
-    # anything is written through it.
+def _open_dir_nofollow(name: str | os.PathLike, *, dir_fd: int | None, description: str) -> int:
+    """Open ``name`` (a path, or a bare name relative to ``dir_fd``) as a
+    directory with ``O_DIRECTORY | O_NOFOLLOW``: a symlink at that exact
+    location fails this open instead of being silently followed."""
+
     try:
-        dest_fd = os.open(destination_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        return os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=dir_fd)
     except OSError as exc:
         raise PackageV2Error(
-            "destination directory was replaced immediately after claim "
-            f"(possible symlink race): {destination_dir}"
+            f"could not open {description} as a real, non-symlink directory: {name}"
         ) from exc
 
-    claimed_dev_ino: tuple[int, int] | None = None
-    written_order: list[str] = []
+
+def _verify_dir_fd_identity(
+    fd: int, name: str | os.PathLike, *, dir_fd: int | None, description: str
+) -> tuple[int, int]:
+    """Compare the open descriptor's ``fstat`` against a fresh, non-following
+    ``stat`` of the same name/path. Any mismatch -- including the path no
+    longer naming a real, non-symlink directory -- means a race occurred
+    between opening and this check, and is rejected."""
+
+    fd_stat = os.fstat(fd)
     try:
-        fd_stat = os.fstat(dest_fd)
-        try:
-            path_lstat = os.lstat(destination_dir)
-        except OSError as exc:
-            raise PackageV2Error(
-                f"destination directory vanished immediately after claim: {destination_dir}"
-            ) from exc
-        identity_ok = (
-            stat.S_ISDIR(fd_stat.st_mode)
-            and not stat.S_ISLNK(path_lstat.st_mode)
-            and stat.S_ISDIR(path_lstat.st_mode)
-            and (fd_stat.st_dev, fd_stat.st_ino) == (path_lstat.st_dev, path_lstat.st_ino)
+        path_stat = os.stat(name, dir_fd=dir_fd, follow_symlinks=False)
+    except OSError as exc:
+        raise PackageV2Error(f"{description} vanished immediately after open: {name}") from exc
+    identity_ok = (
+        stat.S_ISDIR(fd_stat.st_mode)
+        and stat.S_ISDIR(path_stat.st_mode)
+        and not stat.S_ISLNK(path_stat.st_mode)
+        and (fd_stat.st_dev, fd_stat.st_ino) == (path_stat.st_dev, path_stat.st_ino)
+    )
+    if not identity_ok:
+        raise PackageV2Error(
+            f"{description} identity mismatch after open (possible symlink race): {name}"
         )
-        if not identity_ok:
-            raise PackageV2Error(
-                "destination directory identity mismatch after claim "
-                f"(possible symlink race): {destination_dir}"
-            )
-        # Only remember the claimed identity once it has been verified: this
-        # is also what gates whether the exception handler below is allowed
-        # to touch the path at all.
-        claimed_dev_ino = (fd_stat.st_dev, fd_stat.st_ino)
+    return (fd_stat.st_dev, fd_stat.st_ino)
 
-        staged_names = sorted(
-            path.relative_to(staging_dir).as_posix()
-            for path in staging_dir.rglob("*")
-            if path.is_file()
+
+def _verify_root_fd_matches_lexical_path(root_fd: int, root_path: Path, *, description: str) -> None:
+    """Re-check, right before declaring success, that the lexical path used
+    to open ``root_fd`` still names the exact same directory -- rejecting a
+    root swapped out from under an in-flight publication."""
+
+    try:
+        path_stat = os.stat(root_path, follow_symlinks=False)
+    except OSError as exc:
+        raise PackageV2Error(f"{description} vanished during publication: {root_path}") from exc
+    fd_stat = os.fstat(root_fd)
+    identity_ok = (
+        stat.S_ISDIR(path_stat.st_mode)
+        and not stat.S_ISLNK(path_stat.st_mode)
+        and (fd_stat.st_dev, fd_stat.st_ino) == (path_stat.st_dev, path_stat.st_ino)
+    )
+    if not identity_ok:
+        raise PackageV2Error(
+            f"{description} was replaced during publication (possible symlink race): {root_path}"
         )
-        _require(
-            manifest_name in staged_names,
-            f"staging directory is missing its manifest: {staging_dir / manifest_name}",
-        )
-        for name in staged_names:
-            _require("/" not in name, f"staged artifact must be root-level: {name}")
-        manifest_bytes = (staging_dir / manifest_name).read_bytes()
-        non_manifest_names = [name for name in staged_names if name != manifest_name]
-
-        for name in non_manifest_names:
-            payload = (staging_dir / name).read_bytes()
-            _write_exclusive_via_dir_fd(dest_fd, name, payload)
-            written_order.append(name)
-
-        shutil.rmtree(staging_dir, ignore_errors=True)
-
-        _write_exclusive_via_dir_fd(dest_fd, manifest_name, manifest_bytes)
-        written_order.append(manifest_name)
-    except BaseException:
-        for name in reversed(written_order):
-            try:
-                os.unlink(name, dir_fd=dest_fd)
-            except FileNotFoundError:
-                pass
-        os.close(dest_fd)
-        # The destination path is touched only if a fresh lstat shows it is
-        # still, right now, the exact directory this call claimed (verified
-        # above) -- never a racing symlink or anything else standing there.
-        if claimed_dev_ino is not None:
-            try:
-                current_lstat = os.lstat(destination_dir)
-                still_ours = (
-                    not stat.S_ISLNK(current_lstat.st_mode)
-                    and stat.S_ISDIR(current_lstat.st_mode)
-                    and (current_lstat.st_dev, current_lstat.st_ino) == claimed_dev_ino
-                )
-                if still_ours and not os.listdir(destination_dir):
-                    os.rmdir(destination_dir)
-            except OSError:
-                pass
-        raise
-    else:
-        os.close(dest_fd)
-
-    return tuple(written_order)
 
 
 def _write_exclusive_via_dir_fd(dir_fd: int, name: str, payload: bytes) -> None:
@@ -1282,6 +1214,231 @@ def _write_exclusive_via_dir_fd(dir_fd: int, name: str, payload: bytes) -> None:
         os.close(file_fd)
 
 
+def _read_via_dir_fd(dir_fd: int, name: str) -> bytes:
+    """Read the full contents of ``name`` relative to ``dir_fd``, never
+    following a symlink at that exact name."""
+
+    try:
+        file_fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=dir_fd)
+    except OSError as exc:
+        raise PackageV2Error(f"could not read {name} via directory descriptor: {exc}") from exc
+    try:
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(file_fd, 1 << 20)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        return b"".join(chunks)
+    finally:
+        os.close(file_fd)
+
+
+def _unlink_via_dir_fd_best_effort(dir_fd: int, name: str) -> None:
+    try:
+        os.unlink(name, dir_fd=dir_fd)
+    except OSError:
+        pass
+
+
+def _rmdir_if_still_ours(dir_fd: int, name: str, claimed_dev_ino: tuple[int, int] | None) -> None:
+    """Remove ``name`` (relative to ``dir_fd``) only if a fresh, non-following
+    stat shows it is still the exact directory this invocation claimed
+    (matching device/inode, a real directory, not a symlink). ``rmdir``
+    itself refuses a non-empty directory, so no separate emptiness probe is
+    needed. A racing symlink or anything else standing there is never
+    touched."""
+
+    if claimed_dev_ino is None:
+        return
+    try:
+        current_stat = os.stat(name, dir_fd=dir_fd, follow_symlinks=False)
+    except OSError:
+        return
+    still_ours = (
+        not stat.S_ISLNK(current_stat.st_mode)
+        and stat.S_ISDIR(current_stat.st_mode)
+        and (current_stat.st_dev, current_stat.st_ino) == claimed_dev_ino
+    )
+    if not still_ours:
+        return
+    try:
+        os.rmdir(name, dir_fd=dir_fd)
+    except OSError:
+        pass
+
+
+def _create_unique_child_dir(dir_fd: int, *, prefix: str, attempts: int = 8) -> str:
+    """Atomically claim a uniquely-named child directory under ``dir_fd``
+    via a bare ``os.mkdir(name, dir_fd=dir_fd)`` (retried on an exceedingly
+    unlikely name collision), returning the claimed name."""
+
+    last_exc: OSError | None = None
+    for _ in range(attempts):
+        candidate = f"{prefix}{_secrets.token_hex(8)}"
+        try:
+            os.mkdir(candidate, 0o700, dir_fd=dir_fd)
+        except FileExistsError as exc:
+            last_exc = exc
+            continue
+        return candidate
+    raise PackageV2Error(
+        f"could not create a unique staging directory name after {attempts} attempts"
+    ) from last_exc
+
+
+def _traverse_dir_nofollow(start_fd: int, components: Sequence[str], *, description: str) -> int:
+    """Open each of ``components`` in turn, descriptor-relative to the
+    previous one (starting from ``start_fd``, which this function never
+    closes), each with ``O_DIRECTORY | O_NOFOLLOW`` and an identity check.
+    Intermediate descriptors are closed as the walk proceeds; only the final
+    one is returned, owned by the caller."""
+
+    current_fd = start_fd
+    owns_current = False
+    for component in components:
+        next_fd = _open_dir_nofollow(
+            component, dir_fd=current_fd, description=f"{description} component {component!r}"
+        )
+        try:
+            _verify_dir_fd_identity(
+                next_fd, component, dir_fd=current_fd, description=f"{description} component {component!r}"
+            )
+        except BaseException:
+            os.close(next_fd)
+            if owns_current:
+                os.close(current_fd)
+            raise
+        if owns_current:
+            os.close(current_fd)
+        current_fd = next_fd
+        owns_current = True
+    return current_fd
+
+
+def _cleanup_staging_via_dir_fd(
+    root_fd: int, staging_fd: int, staging_name: str, staged_names: Sequence[str]
+) -> None:
+    """Best-effort, descriptor-relative removal of everything this
+    invocation staged: unlink each staged file via ``staging_fd``, then
+    remove the staging directory entry itself via ``root_fd``. Idempotent --
+    safe to call even if publication already removed some or all of it."""
+
+    for name in staged_names:
+        _unlink_via_dir_fd_best_effort(staging_fd, name)
+    try:
+        os.rmdir(staging_name, dir_fd=root_fd)
+    except OSError:
+        pass
+
+
+def _publish_directory_no_replace(
+    *,
+    root_fd: int,
+    root_path: Path,
+    staging_name: str,
+    staging_fd: int,
+    payload_names: Sequence[str],
+    destination_name: str,
+) -> tuple[str, ...]:
+    """Publish everything staged under ``staging_name``/``staging_fd`` (a
+    child directory of ``root_fd``, already fully populated with
+    ``payload_names`` plus ``package_manifest.json``) into a freshly claimed
+    child of ``root_fd`` named ``destination_name``, with the manifest
+    copied last as the commit marker.
+
+    This is the genuine cross-platform no-clobber replacement for a plain
+    ``os.rename(staging_dir, destination_dir)``: on POSIX, renaming a
+    directory onto an existing *empty* directory silently replaces it, which
+    is unsafe if some other process or a leftover run already claimed that
+    exact path. ``destination_name`` is instead claimed with a bare
+    ``os.mkdir(destination_name, dir_fd=root_fd)``, which unconditionally
+    raises ``FileExistsError`` for any pre-existing empty directory, file,
+    or symlink at that name -- never a silent replace -- and this function
+    never calls ``os.rename``.
+
+    A racing attacker can still try to swap the claimed name for a symlink
+    in the instant between that ``os.mkdir`` returning and the next
+    filesystem call. To defend against that: immediately after claiming, the
+    entry is re-opened with ``O_DIRECTORY | O_NOFOLLOW`` relative to
+    ``root_fd``. If the name was already swapped to a symlink, that open
+    fails before anything is written through it. The resulting descriptor's
+    identity is then verified (see ``_verify_dir_fd_identity``); any
+    mismatch aborts before any write. Every artifact -- including the
+    manifest -- is then written descriptor-relative and exclusively.
+    Because these writes are anchored to the open descriptor rather than
+    the name, even a symlink swap performed mid-publication cannot redirect
+    them: the descriptor stays pinned to the original directory regardless
+    of what the name currently resolves to. Before declaring success, the
+    destination's identity is re-verified through ``root_fd`` one more time,
+    and ``root_fd`` itself is re-checked against ``root_path`` to catch a
+    root swapped out from under the whole operation.
+
+    Non-manifest files are copied first; the staging directory is removed
+    once they are all in place (pre-commit); the manifest is written last.
+    A destination that exists without a manifest is therefore
+    unpublished/invalid.
+
+    On any failure, only the files this call wrote through the destination
+    descriptor are removed (descriptor-relative, so this remains safe even
+    if the name has been swapped), the descriptor is closed, and the
+    destination entry itself is removed only if a fresh, non-following stat
+    shows it is still the exact entry this call claimed. A racing symlink or
+    an outside target is never touched or removed.
+    """
+
+    manifest_name = "package_manifest.json"
+    manifest_bytes = _read_via_dir_fd(staging_fd, manifest_name)
+
+    try:
+        os.mkdir(destination_name, 0o755, dir_fd=root_fd)
+    except FileExistsError as exc:
+        raise PackageV2Error(
+            f"destination directory already exists (create-only, no-replace contract): {destination_name}"
+        ) from exc
+    except OSError as exc:
+        raise PackageV2Error(f"could not create destination directory {destination_name}: {exc}") from exc
+
+    dest_fd = _open_dir_nofollow(destination_name, dir_fd=root_fd, description="destination directory")
+
+    claimed_dev_ino: tuple[int, int] | None = None
+    written_order: list[str] = []
+    try:
+        claimed_dev_ino = _verify_dir_fd_identity(
+            dest_fd, destination_name, dir_fd=root_fd, description="destination directory"
+        )
+
+        for name in payload_names:
+            payload = _read_via_dir_fd(staging_fd, name)
+            _write_exclusive_via_dir_fd(dest_fd, name, payload)
+            written_order.append(name)
+
+        # Remove staging pre-commit: unlink its contents then the directory
+        # entry itself, all descriptor-relative.
+        for name in (*payload_names, manifest_name):
+            _unlink_via_dir_fd_best_effort(staging_fd, name)
+        try:
+            os.rmdir(staging_name, dir_fd=root_fd)
+        except OSError:
+            pass
+
+        _write_exclusive_via_dir_fd(dest_fd, manifest_name, manifest_bytes)
+        written_order.append(manifest_name)
+
+        _verify_dir_fd_identity(dest_fd, destination_name, dir_fd=root_fd, description="destination directory")
+        _verify_root_fd_matches_lexical_path(root_fd, root_path, description="external package output root")
+    except BaseException:
+        for name in reversed(written_order):
+            _unlink_via_dir_fd_best_effort(dest_fd, name)
+        os.close(dest_fd)
+        _rmdir_if_still_ours(root_fd, destination_name, claimed_dev_ino)
+        raise
+    else:
+        os.close(dest_fd)
+
+    return tuple(written_order)
+
+
 def render_external_package(
     output_root: Path,
     *,
@@ -1292,17 +1449,32 @@ def render_external_package(
 ) -> tuple[Path, tuple[str, ...]]:
     """Render the four payload artifacts plus package_manifest.json.
 
-    ``output_root`` must be absolute and neither it nor any ancestor may be a
-    symlink/reparse point. When ``repo_root`` is given (used by the CLI),
-    ``output_root`` must additionally resolve outside it -- this keyword is
-    optional and preserves compatibility with existing callers that omit it.
+    ``output_root`` must already exist as a real, non-symlink directory --
+    this function never creates it. ``output_root`` must be absolute, and
+    neither it nor any ancestor may be a symlink/reparse point (checked
+    lexically, before resolution). When ``repo_root`` is given (used by the
+    CLI), ``output_root`` must additionally resolve outside it -- this
+    keyword is optional and preserves compatibility with existing callers
+    that omit it.
 
-    All payloads and the manifest are first written into a private staging
-    directory, then published into the create-only package directory via
-    ``_publish_directory_no_replace`` -- a genuine cross-platform no-clobber,
-    manifest-last protocol (see that function for the exact contract). Any
-    failure removes only the paths this invocation created -- never a
-    pre-existing/racing final directory.
+    Publication is fully descriptor-relative and POSIX-only (RAPTOR
+    publishes from WSL/Linux): ``output_root`` is opened once with
+    ``O_DIRECTORY | O_NOFOLLOW`` and that descriptor is held open for the
+    entire operation. A uniquely-named staging directory is created and
+    opened the same way, descriptor-relative to the root, and every payload
+    plus the manifest is written into it with exclusive, no-follow creates
+    (never ``tempfile.mkdtemp`` or a path-based write under ``output_root``).
+    Publication into the create-only package directory then goes through
+    ``_publish_directory_no_replace`` -- see that function for the exact
+    no-clobber, manifest-last, symlink-swap-resistant contract. Any failure
+    removes only the paths this invocation created -- never a
+    pre-existing/racing final directory -- and every descriptor opened here
+    is closed on every path, success or failure.
+
+    On a platform or filesystem lacking the required ``O_DIRECTORY`` /
+    ``O_NOFOLLOW`` / descriptor-relative-open support, this fails closed
+    with ``PackageV2Error`` before writing anything -- there is no
+    path-based fallback.
     """
 
     output_root = Path(output_root)
@@ -1310,6 +1482,13 @@ def render_external_package(
     _reject_symlink_ancestry(output_root, "external package output root")
     if repo_root is not None:
         _require_outside_repo(output_root, Path(repo_root), "external package output root")
+
+    _require_descriptor_capabilities()
+
+    _require(
+        output_root.is_dir() and not output_root.is_symlink(),
+        f"external package output root must already exist as a real directory: {output_root}",
+    )
 
     payload_names = EXPECTED_EXTERNAL_ARTIFACTS[:-1]
     _require(
@@ -1319,52 +1498,58 @@ def render_external_package(
 
     package_dir = output_root / package_id
     _reject_symlink_ancestry(package_dir, "external package path")
-    _require(
-        not package_dir.exists(),
-        f"external package path already exists (create-only contract): {package_dir}",
-    )
 
-    output_root.mkdir(parents=True, exist_ok=True)
-    # Re-check ancestry after possibly creating output_root's parents: a
-    # symlink introduced during that creation must not be trusted either.
-    _reject_symlink_ancestry(output_root, "external package output root")
-    _reject_symlink_ancestry(package_dir, "external package path")
-
-    # --- Stage: write every payload plus the manifest to a private,
-    # uniquely-named staging directory. The manifest is written here too so
-    # its bytes can be read back verbatim for the final publish below.
-    staging_dir = Path(tempfile.mkdtemp(prefix=f".{package_id}.staging-", dir=str(output_root)))
+    root_fd = _open_dir_nofollow(output_root, dir_fd=None, description="external package output root")
     try:
-        staging_dir_resolved = staging_dir.resolve()
-        manifest_rows: list[dict[str, Any]] = []
-        for name in payload_names:
-            target = staging_dir / name
-            _require(
-                target.resolve().parent == staging_dir_resolved,
-                f"artifact path escaped staging directory: {name}",
-            )
-            payload = artifacts[name]
-            _require(isinstance(payload, (bytes, bytearray)), f"artifact payload must be bytes: {name}")
-            target.write_bytes(payload)
-            _reject_symlink(target, f"staged artifact {name}")
-            manifest_rows.append(
-                {"name": name, "sha256": _sha256_bytes(payload), "byte_length": len(payload)}
+        _verify_dir_fd_identity(
+            root_fd, output_root, dir_fd=None, description="external package output root"
+        )
+
+        staging_name = _create_unique_child_dir(root_fd, prefix=f".{package_id}.staging-")
+        staged_names_for_cleanup: list[str] = []
+        staging_fd = _open_dir_nofollow(staging_name, dir_fd=root_fd, description="staging directory")
+        try:
+            _verify_dir_fd_identity(
+                staging_fd, staging_name, dir_fd=root_fd, description="staging directory"
             )
 
-        manifest: dict[str, Any] = {
-            "schema": PACKAGE_MANIFEST_SCHEMA,
-            "package_id": package_id,
-            "create_only": True,
-            "repository_summary_target": repository_summary_target,
-            "artifacts": manifest_rows,
-        }
-        manifest["manifest_content_hash"] = _canonical_json_hash(manifest, drop_field="manifest_content_hash")
-        (staging_dir / "package_manifest.json").write_bytes(_canonical_json_bytes(manifest))
+            manifest_rows: list[dict[str, Any]] = []
+            for name in payload_names:
+                payload = artifacts[name]
+                _require(isinstance(payload, (bytes, bytearray)), f"artifact payload must be bytes: {name}")
+                _write_exclusive_via_dir_fd(staging_fd, name, payload)
+                staged_names_for_cleanup.append(name)
+                manifest_rows.append(
+                    {"name": name, "sha256": _sha256_bytes(payload), "byte_length": len(payload)}
+                )
 
-        written_order = _publish_directory_no_replace(staging_dir, package_dir)
-    except BaseException:
-        shutil.rmtree(staging_dir, ignore_errors=True)
-        raise
+            manifest: dict[str, Any] = {
+                "schema": PACKAGE_MANIFEST_SCHEMA,
+                "package_id": package_id,
+                "create_only": True,
+                "repository_summary_target": repository_summary_target,
+                "artifacts": manifest_rows,
+            }
+            manifest["manifest_content_hash"] = _canonical_json_hash(manifest, drop_field="manifest_content_hash")
+            manifest_bytes = _canonical_json_bytes(manifest)
+            _write_exclusive_via_dir_fd(staging_fd, "package_manifest.json", manifest_bytes)
+            staged_names_for_cleanup.append("package_manifest.json")
+
+            written_order = _publish_directory_no_replace(
+                root_fd=root_fd,
+                root_path=output_root,
+                staging_name=staging_name,
+                staging_fd=staging_fd,
+                payload_names=payload_names,
+                destination_name=package_id,
+            )
+        except BaseException:
+            _cleanup_staging_via_dir_fd(root_fd, staging_fd, staging_name, staged_names_for_cleanup)
+            raise
+        finally:
+            os.close(staging_fd)
+    finally:
+        os.close(root_fd)
 
     return package_dir, written_order
 
@@ -1424,6 +1609,173 @@ def build_repository_summary(
         _require(token not in serialized, f"repository summary leaked restricted identity content: {token!r}")
 
     return summary, readme
+
+
+class RepositorySummaryPublication:
+    """Handle for a repository summary that has been written descriptor-
+    relative but not yet finally disposed of.
+
+    Returned by ``publish_repository_summary_descriptor_relative``. The
+    parent and final directory descriptors are held open across the call so
+    that, if the subsequent external-package render fails, ``rollback()``
+    can undo the summary precisely (descriptor-relative unlink of exactly
+    the files this invocation wrote, then an identity-checked ``rmdir`` of
+    exactly the final directory entry this invocation created) before an
+    external package is ever finalized. If the external render succeeds,
+    call ``commit()`` instead, which simply closes the descriptors and
+    leaves the summary in place. Exactly one of ``commit``/``rollback`` must
+    be called exactly once; both are safe to call at most once.
+    """
+
+    def __init__(
+        self,
+        *,
+        parent_fd: int,
+        final_fd: int,
+        final_name: str,
+        written_names: tuple[str, ...],
+        claimed_dev_ino: tuple[int, int] | None,
+    ) -> None:
+        self._parent_fd = parent_fd
+        self._final_fd = final_fd
+        self._final_name = final_name
+        self._written_names = written_names
+        self._claimed_dev_ino = claimed_dev_ino
+        self._disposed = False
+
+    def commit(self) -> None:
+        """Keep the summary in place; close the held descriptors."""
+
+        if self._disposed:
+            return
+        self._disposed = True
+        os.close(self._final_fd)
+        os.close(self._parent_fd)
+
+    def rollback(self) -> None:
+        """Undo the summary: descriptor-relative unlink of the files this
+        invocation wrote, then remove the final directory entry only if a
+        fresh, non-following stat shows it is still the exact entry this
+        invocation claimed. A racing symlink or anything else is untouched.
+        """
+
+        if self._disposed:
+            return
+        self._disposed = True
+        for name in reversed(self._written_names):
+            _unlink_via_dir_fd_best_effort(self._final_fd, name)
+        os.close(self._final_fd)
+        _rmdir_if_still_ours(self._parent_fd, self._final_name, self._claimed_dev_ino)
+        os.close(self._parent_fd)
+
+
+def publish_repository_summary_descriptor_relative(
+    repo_root: Path,
+    repository_summary_target: str,
+    *,
+    json_name: str,
+    readme_name: str,
+    json_bytes: bytes,
+    readme_bytes: bytes,
+) -> RepositorySummaryPublication:
+    """Publish the repository summary JSON + README fully descriptor-relative.
+
+    ``repository_summary_target`` (for example
+    ``data/rescuescreen/r611q/package-v2-addendum``) is split into its
+    trusted, already-existing parent components and a final directory name.
+    ``repo_root`` is opened once with ``O_DIRECTORY | O_NOFOLLOW`` and its
+    identity verified; each parent component is then opened the same way,
+    descriptor-relative to the previous one -- these components must already
+    exist (this function never creates them). The final directory name is
+    created create-only with a bare ``os.mkdir(name, dir_fd=parent_fd)``,
+    then re-opened with ``O_NOFOLLOW`` and identity-checked exactly like the
+    external package's destination claim (see
+    ``_publish_directory_no_replace``): a post-claim symlink swap fails the
+    re-open or the identity check before any write. Both JSON and README are
+    then written via the final directory's descriptor, exclusively and
+    without ever following a symlink -- never ``Path.write_text`` or any
+    other path-based create. Identity is re-verified once more before this
+    function returns successfully.
+
+    The parent and final descriptors are intentionally *not* closed here;
+    they are held open in the returned ``RepositorySummaryPublication`` so
+    the caller can roll the summary back precisely if the external package
+    render that follows fails, or commit (closing the descriptors, leaving
+    the summary in place) once that render succeeds. On any failure inside
+    this function itself, everything it created is rolled back and every
+    descriptor it opened is closed before the exception propagates.
+
+    On a platform or filesystem lacking the required ``O_DIRECTORY`` /
+    ``O_NOFOLLOW`` / descriptor-relative-open support, this fails closed
+    with ``PackageV2Error`` before writing anything -- there is no
+    path-based fallback.
+    """
+
+    _require_descriptor_capabilities()
+
+    parts = PurePosixPath(repository_summary_target).parts
+    _require(len(parts) >= 1, "repository summary target must be a nonblank relative path")
+    parent_components = parts[:-1]
+    final_name = parts[-1]
+
+    repo_root = Path(repo_root)
+    repo_root_fd = _open_dir_nofollow(repo_root, dir_fd=None, description="repository root")
+    try:
+        _verify_dir_fd_identity(repo_root_fd, repo_root, dir_fd=None, description="repository root")
+        parent_fd = _traverse_dir_nofollow(
+            repo_root_fd, parent_components, description="repository summary trusted parent"
+        )
+    finally:
+        os.close(repo_root_fd)
+
+    try:
+        try:
+            os.mkdir(final_name, 0o755, dir_fd=parent_fd)
+        except FileExistsError as exc:
+            raise PackageV2Error(
+                "repository summary directory already exists "
+                f"(create-only, no-replace contract): {repository_summary_target}"
+            ) from exc
+        except OSError as exc:
+            raise PackageV2Error(
+                f"could not create repository summary directory {repository_summary_target}: {exc}"
+            ) from exc
+
+        final_fd = _open_dir_nofollow(
+            final_name, dir_fd=parent_fd, description="repository summary directory"
+        )
+        claimed_dev_ino: tuple[int, int] | None = None
+        written_names: list[str] = []
+        try:
+            claimed_dev_ino = _verify_dir_fd_identity(
+                final_fd, final_name, dir_fd=parent_fd, description="repository summary directory"
+            )
+
+            _write_exclusive_via_dir_fd(final_fd, json_name, json_bytes)
+            written_names.append(json_name)
+            _write_exclusive_via_dir_fd(final_fd, readme_name, readme_bytes)
+            written_names.append(readme_name)
+
+            _verify_dir_fd_identity(
+                final_fd, final_name, dir_fd=parent_fd, description="repository summary directory"
+            )
+        except BaseException:
+            for name in reversed(written_names):
+                _unlink_via_dir_fd_best_effort(final_fd, name)
+            os.close(final_fd)
+            _rmdir_if_still_ours(parent_fd, final_name, claimed_dev_ino)
+            raise
+    except BaseException:
+        os.close(parent_fd)
+        raise
+
+    return RepositorySummaryPublication(
+        parent_fd=parent_fd,
+        final_fd=final_fd,
+        final_name=final_name,
+        written_names=tuple(written_names),
+        claimed_dev_ino=claimed_dev_ino,
+    )
 
 
 # ---------------------------------------------------------------------------
