@@ -1543,3 +1543,94 @@ def test_r611q_pv2a_publication_rolls_back_summary_when_external_render_fails(
     assert not summary_json_path.exists(), "summary JSON must be rolled back when external render fails"
     assert not summary_readme_path.exists(), "summary README must be rolled back when external render fails"
     assert not summary_dir.exists(), "newly created summary directory must be removed on second-phase failure"
+
+
+def test_r611q_pv2a_publication_no_replace_race_preserves_racing_directory_on_finalize(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _require_package_v2_module()
+    output_root = (tmp_path / "external-root").resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    package_id = "r611q-package-v2-addendum-2026-09-17"
+    package_dir = output_root / package_id
+
+    artifacts = {
+        "R611Q_EXPERT_REVIEW_PACKET_V2.md": b"# packet\n",
+        "R611Q_EXPERT_REVIEW_FORM_V2.yaml": b"schema: atlas.expert_review_form.v2\n",
+        "R611Q_PACKAGE_V2_IMPACT.json": b"{\"impact\":\"bounded\"}\n",
+        "R611Q_PACKAGE_V2_SUMMARY.md": b"# summary\n",
+    }
+
+    real_rename = module.os.rename
+    race_inode: dict[str, int] = {}
+
+    def racing_rename(src: Any, dst: Any) -> None:
+        dst_path = Path(dst)
+        dst_path.mkdir(parents=False, exist_ok=False)
+        race_inode["value"] = dst_path.stat().st_ino
+        real_rename(src, dst)
+
+    monkeypatch.setattr(module.os, "rename", racing_rename)
+
+    with pytest.raises((module.PackageV2Error, OSError)):
+        module.render_external_package(
+            output_root,
+            package_id=package_id,
+            repository_summary_target="data/rescuescreen/r611q/package-v2-addendum",
+            artifacts=artifacts,
+        )
+
+    assert package_dir.exists(), "racing directory must remain present"
+    assert package_dir.is_dir(), "racing path must stay a directory"
+    assert package_dir.stat().st_ino == race_inode["value"], "racing directory must not be replaced"
+    assert list(package_dir.iterdir()) == [], "racing directory must remain untouched and empty"
+
+
+def test_r611q_pv2a_publication_symlink_ancestry_rejected_for_output_and_summary_paths(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    (
+        module,
+        fixture,
+        config_path,
+        summary_dir,
+        summary_json_path,
+        summary_readme_path,
+        repo_root,
+        package_id,
+    ) = _prepare_operator_fixture_and_config(tmp_path)
+
+    outside_target = (tmp_path / "outside-target").resolve()
+    outside_target.mkdir(parents=True, exist_ok=True)
+    output_link = tmp_path / "output-root-symlink"
+    summary_ancestor_link = repo_root / "data-symlink"
+    try:
+        output_link.symlink_to(outside_target, target_is_directory=True)
+        summary_ancestor_link.symlink_to(repo_root / "data", target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation unavailable in this environment")
+
+    supplied_summary_dir = summary_ancestor_link / "rescuescreen" / "r611q" / "package-v2-addendum"
+    package_dir = outside_target / package_id
+    assert supplied_summary_dir.resolve() == summary_dir.resolve(), "symlinked summary path must resolve to canonical target"
+
+    exit_code = _run_operator_main(
+        module,
+        config_path=config_path,
+        repo_root=repo_root,
+        v1_packet_path=fixture.packet_path.resolve(),
+        v1_form_path=fixture.form_path.resolve(),
+        delta_bundle_root=fixture.delta_bundle_root.resolve(),
+        output_root=output_link,
+        repository_summary_dir=supplied_summary_dir,
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "r611q-package-v2-addendum error:" in captured.err
+    assert "Traceback" not in captured.err
+    assert not package_dir.exists(), "symlinked output-root ancestry must be rejected before external publication"
+    assert not summary_json_path.exists(), "symlinked summary path ancestry must be rejected before summary publication"
+    assert not summary_readme_path.exists(), "symlinked summary path ancestry must be rejected before summary publication"
