@@ -2491,3 +2491,84 @@ def test_r611q_pv2a_summary_publish_helper_accepts_canonical_target_and_names(
         assert (final_dir / "README.md").read_bytes() == readme_bytes
     finally:
         publication.commit()
+
+
+def test_r611q_pv2a_publication_staging_name_cleanup_ownership_race(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _require_package_v2_module()
+    output_root = (tmp_path / "external-root").resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    package_id = "r611q-package-v2-addendum-2026-09-17"
+    package_dir = output_root / package_id
+
+    artifacts = {
+        "R611Q_EXPERT_REVIEW_PACKET_V2.md": b"# packet\n",
+        "R611Q_EXPERT_REVIEW_FORM_V2.yaml": b"schema: atlas.expert_review_form.v2\n",
+        "R611Q_PACKAGE_V2_IMPACT.json": b"{\"impact\":\"bounded\"}\n",
+        "R611Q_PACKAGE_V2_SUMMARY.md": b"# summary\n",
+    }
+
+    real_mkdir = module.os.mkdir
+    real_stat = module.os.stat
+    real_write_exclusive = module._write_exclusive_via_dir_fd
+
+    staging_capture: dict[str, Any] = {
+        "name": None,
+        "root_fd": None,
+        "staging_inode": None,
+    }
+    competitor: dict[str, Any] = {"created": False, "inode": None}
+
+    def capture_staging_name(path: Any, mode: int = 0o777, *, dir_fd: int | None = None) -> None:
+        real_mkdir(path, mode, dir_fd=dir_fd) if dir_fd is not None else real_mkdir(path, mode)
+        if dir_fd is None:
+            return
+        path_str = os.fsdecode(path) if isinstance(path, (bytes, bytearray)) else str(path)
+        if path_str.startswith(f".{package_id}.staging-") and staging_capture["name"] is None:
+            inode_stat = real_stat(path, dir_fd=dir_fd, follow_symlinks=False)
+            staging_capture["name"] = path_str
+            staging_capture["root_fd"] = dir_fd
+            staging_capture["staging_inode"] = inode_stat.st_ino
+
+    def fail_final_manifest_write_after_staging_name_reuse(dir_fd: int, name: str, payload: bytes) -> None:
+        if name != "package_manifest.json":
+            real_write_exclusive(dir_fd, name, payload)
+            return
+
+        dir_stat = module.os.fstat(dir_fd)
+        if dir_stat.st_ino == staging_capture["staging_inode"]:
+            real_write_exclusive(dir_fd, name, payload)
+            return
+
+        assert staging_capture["name"] is not None
+        assert staging_capture["root_fd"] is not None
+        staged_path = output_root / str(staging_capture["name"])
+        assert not staged_path.exists(), "original staging entry must already be removed before final manifest write"
+        real_mkdir(staging_capture["name"], 0o700, dir_fd=staging_capture["root_fd"])
+        competitor_stat = real_stat(staging_capture["name"], dir_fd=staging_capture["root_fd"], follow_symlinks=False)
+        competitor["inode"] = competitor_stat.st_ino
+        competitor["created"] = True
+        raise module.PackageV2Error("simulated final manifest write failure after staging-name reuse race")
+
+    monkeypatch.setattr(module.os, "mkdir", capture_staging_name)
+    monkeypatch.setattr(module, "_write_exclusive_via_dir_fd", fail_final_manifest_write_after_staging_name_reuse)
+
+    with pytest.raises(module.PackageV2Error):
+        module.render_external_package(
+            output_root,
+            package_id=package_id,
+            repository_summary_target="data/rescuescreen/r611q/package-v2-addendum",
+            artifacts=artifacts,
+        )
+
+    assert staging_capture["name"] is not None, "test must capture the descriptor-relative staging child name"
+    assert competitor["created"], "test must recreate a competitor directory under the reused staging name"
+    competitor_path = output_root / str(staging_capture["name"])
+    assert competitor_path.exists(), "cleanup must not remove a competitor directory created under reused staging name"
+    assert competitor_path.is_dir(), "reused staging-name competitor must remain a directory"
+    assert competitor_path.stat().st_ino == competitor["inode"], "cleanup must preserve competitor directory identity"
+    assert list(competitor_path.iterdir()) == [], "competitor directory must remain untouched and empty"
+    assert not package_dir.exists(), "final package directory must be rolled back on final-manifest failure"
+    assert not (package_dir / "package_manifest.json").exists(), "no final package manifest may be published"
