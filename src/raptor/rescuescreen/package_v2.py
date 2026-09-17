@@ -1080,6 +1080,119 @@ def _render_package_summary_markdown(*, boundary: Mapping[str, Any], impact: Map
 # ---------------------------------------------------------------------------
 
 
+def _publish_directory_no_replace(staging_dir: Path, destination_dir: Path) -> tuple[str, ...]:
+    """Publish every file staged under ``staging_dir`` into a freshly
+    claimed ``destination_dir``, with ``package_manifest.json`` copied last
+    as the commit marker.
+
+    This is the genuine cross-platform no-clobber replacement for a plain
+    ``os.rename(staging_dir, destination_dir)``: on POSIX, renaming a
+    directory onto an existing *empty* directory silently replaces it, which
+    is unsafe if some other process or a leftover run already claimed that
+    exact path. ``destination_dir`` is instead claimed with a bare
+    ``os.mkdir``, which unconditionally raises ``FileExistsError`` for any
+    pre-existing empty directory, file, or symlink at that path -- never a
+    silent replace -- and this function never calls ``os.rename``.
+
+    Each non-manifest staged file is then copied into ``destination_dir``
+    with an exclusive (``xb``) create (any needed subdirectories are created
+    with a plain, non-existing ``mkdir`` and tracked); ``staging_dir`` is
+    removed once every non-manifest file has been copied (pre-commit); and
+    the manifest is written last, also via an exclusive create. A
+    ``destination_dir`` that exists without a manifest is therefore
+    unpublished/invalid.
+
+    On any failure, only the files/subdirectories this call created inside
+    ``destination_dir`` are removed, and ``destination_dir`` itself is
+    removed only because this call is the one that created it (via the
+    ``os.mkdir`` above) and only once it is empty again -- a pre-existing or
+    racing destination directory is never touched or removed.
+    """
+
+    manifest_name = "package_manifest.json"
+    try:
+        os.mkdir(destination_dir)
+    except FileExistsError as exc:
+        raise PackageV2Error(
+            f"destination directory already exists (create-only, no-replace contract): {destination_dir}"
+        ) from exc
+    except OSError as exc:
+        raise PackageV2Error(f"could not create destination directory {destination_dir}: {exc}") from exc
+
+    destination_resolved = destination_dir.resolve()
+    staged_names = sorted(
+        path.relative_to(staging_dir).as_posix()
+        for path in staging_dir.rglob("*")
+        if path.is_file()
+    )
+    _require(
+        manifest_name in staged_names,
+        f"staging directory is missing its manifest: {staging_dir / manifest_name}",
+    )
+    manifest_bytes = (staging_dir / manifest_name).read_bytes()
+    non_manifest_names = [name for name in staged_names if name != manifest_name]
+
+    written_order: list[str] = []
+    created_subdirs: list[Path] = []
+    try:
+        for name in non_manifest_names:
+            payload = (staging_dir / name).read_bytes()
+            target = destination_dir / name
+            target_resolved_parent = target.resolve().parent
+            _require(
+                target_resolved_parent == destination_resolved
+                or str(target_resolved_parent).startswith(str(destination_resolved) + os.sep),
+                f"artifact path escaped destination directory: {name}",
+            )
+            to_make: list[Path] = []
+            current = target.parent
+            while current != destination_dir and not current.exists():
+                to_make.append(current)
+                current = current.parent
+            for directory in reversed(to_make):
+                directory.mkdir()
+                created_subdirs.append(directory)
+            try:
+                with open(target, "xb") as handle:
+                    handle.write(payload)
+            except FileExistsError as exc:
+                raise PackageV2Error(
+                    f"artifact already exists in claimed destination directory: {target}"
+                ) from exc
+            _reject_symlink(target, f"published artifact {name}")
+            written_order.append(name)
+
+        shutil.rmtree(staging_dir, ignore_errors=True)
+
+        manifest_target = destination_dir / manifest_name
+        try:
+            with open(manifest_target, "xb") as handle:
+                handle.write(manifest_bytes)
+        except FileExistsError as exc:
+            raise PackageV2Error(
+                f"manifest already exists in claimed destination directory: {manifest_target}"
+            ) from exc
+        written_order.append(manifest_name)
+    except BaseException:
+        for name in reversed(written_order):
+            path = destination_dir / name
+            if path.exists():
+                path.unlink()
+        for directory in reversed(created_subdirs):
+            if directory.exists():
+                try:
+                    directory.rmdir()
+                except OSError:
+                    pass
+        try:
+            destination_dir.rmdir()
+        except OSError:
+            pass
+        raise
+
+    return tuple(written_order)
+
+
 def render_external_package(
     output_root: Path,
     *,
@@ -1094,12 +1207,13 @@ def render_external_package(
     symlink/reparse point. When ``repo_root`` is given (used by the CLI),
     ``output_root`` must additionally resolve outside it -- this keyword is
     optional and preserves compatibility with existing callers that omit it.
-    The package directory (``output_root / package_id``) must not already
-    exist (create-only). All payloads are written to a staging directory
-    first, with ``package_manifest.json`` written last inside staging; the
-    staging directory is then published with a single no-replace rename. Any
-    failure removes only the staging directory this call created -- never a
-    partial final package directory.
+
+    All payloads and the manifest are first written into a private staging
+    directory, then published into the create-only package directory via
+    ``_publish_directory_no_replace`` -- a genuine cross-platform no-clobber,
+    manifest-last protocol (see that function for the exact contract). Any
+    failure removes only the paths this invocation created -- never a
+    pre-existing/racing final directory.
     """
 
     output_root = Path(output_root)
@@ -1122,10 +1236,17 @@ def render_external_package(
     )
 
     output_root.mkdir(parents=True, exist_ok=True)
+    # Re-check ancestry after possibly creating output_root's parents: a
+    # symlink introduced during that creation must not be trusted either.
+    _reject_symlink_ancestry(output_root, "external package output root")
+    _reject_symlink_ancestry(package_dir, "external package path")
+
+    # --- Stage: write every payload plus the manifest to a private,
+    # uniquely-named staging directory. The manifest is written here too so
+    # its bytes can be read back verbatim for the final publish below.
     staging_dir = Path(tempfile.mkdtemp(prefix=f".{package_id}.staging-", dir=str(output_root)))
     try:
         staging_dir_resolved = staging_dir.resolve()
-        written_order: list[str] = []
         manifest_rows: list[dict[str, Any]] = []
         for name in payload_names:
             target = staging_dir / name
@@ -1137,7 +1258,6 @@ def render_external_package(
             _require(isinstance(payload, (bytes, bytearray)), f"artifact payload must be bytes: {name}")
             target.write_bytes(payload)
             _reject_symlink(target, f"staged artifact {name}")
-            written_order.append(name)
             manifest_rows.append(
                 {"name": name, "sha256": _sha256_bytes(payload), "byte_length": len(payload)}
             )
@@ -1151,18 +1271,13 @@ def render_external_package(
         }
         manifest["manifest_content_hash"] = _canonical_json_hash(manifest, drop_field="manifest_content_hash")
         (staging_dir / "package_manifest.json").write_bytes(_canonical_json_bytes(manifest))
-        written_order.append("package_manifest.json")
 
-        _require(
-            not package_dir.exists(),
-            f"external package path already exists (create-only contract): {package_dir}",
-        )
-        os.rename(staging_dir, package_dir)
+        written_order = _publish_directory_no_replace(staging_dir, package_dir)
     except BaseException:
         shutil.rmtree(staging_dir, ignore_errors=True)
         raise
 
-    return package_dir, tuple(written_order)
+    return package_dir, written_order
 
 
 # ---------------------------------------------------------------------------

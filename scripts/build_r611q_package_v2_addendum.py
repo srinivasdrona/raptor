@@ -500,23 +500,30 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         repo_root_resolved = Path(repo_root).resolve()
-        output_root = args.output_root if args.output_root is not None else _resolve_output_root(config)
-        output_root = Path(output_root).expanduser().resolve()
+        output_root_raw = (
+            Path(args.output_root) if args.output_root is not None else _resolve_output_root(config)
+        ).expanduser()
         package_id = config["output"]["package_id"]
         repository_summary_target = config["output"]["repository_summary"]["directory"]
-        package_dir = output_root / package_id
         write_repository_summary = not args.no_write_repository_summary
 
         # --- Preflight everything before any write, in the required order:
         # (1) repository-summary target, (2) external output root/package
-        # path. Building the summary bytes below is pure/in-memory only.
+        # path. Every lexical (raw, caller-supplied or derived) path is
+        # checked for symlink/reparse ancestry BEFORE it is resolved, so a
+        # symlink is rejected even when it happens to point at a otherwise
+        # valid target -- resolving first would silently normalize away the
+        # very thing being checked for. Building the summary bytes below is
+        # pure/in-memory only.
         summary_dir: Path | None = None
         summary_json_path: Path | None = None
         summary_readme_path: Path | None = None
         if write_repository_summary:
             configured_summary_dir = (repo_root_resolved / repository_summary_target).resolve()
             if effective_repository_summary_dir is not None:
-                provided_summary_dir = Path(effective_repository_summary_dir).resolve()
+                provided_summary_dir_raw = Path(effective_repository_summary_dir).expanduser()
+                _reject_symlink_ancestry(provided_summary_dir_raw, "repository summary directory")
+                provided_summary_dir = provided_summary_dir_raw.resolve()
                 if provided_summary_dir != configured_summary_dir:
                     raise PackageV2Error(
                         "--repository-summary-dir must resolve exactly to the configured "
@@ -539,6 +546,11 @@ def main(argv: list[str] | None = None) -> int:
                 f"repository summary target already exists (create-only contract): {summary_dir}",
             )
 
+        package_dir_raw = output_root_raw / package_id
+        _reject_symlink_ancestry(output_root_raw, "external package output root")
+        _reject_symlink_ancestry(package_dir_raw, "external package path")
+        output_root = output_root_raw.resolve()
+        package_dir = output_root / package_id
         _require_outside_repo(output_root, repo_root_resolved, "external package output root")
         _reject_symlink_ancestry(output_root, "external package output root")
         _reject_symlink_ancestry(package_dir, "external package path")
@@ -564,6 +576,11 @@ def main(argv: list[str] | None = None) -> int:
 
             created_summary_root = _mkdir_tracked(summary_dir)
             try:
+                # Re-check ancestry after possibly creating summary_dir's
+                # parents: a symlink introduced during that creation must
+                # not be trusted either.
+                _reject_symlink_ancestry(summary_json_path, "repository summary JSON path")
+                _reject_symlink_ancestry(summary_readme_path, "repository summary README path")
                 summary_json_path.write_text(summary_json_text, encoding="utf-8")
                 summary_readme_path.write_text(readme, encoding="utf-8")
             except BaseException:
