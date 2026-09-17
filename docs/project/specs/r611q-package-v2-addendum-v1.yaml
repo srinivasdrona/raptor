@@ -1,0 +1,288 @@
+schema: raptor.project.spec.v1
+spec_id: r611q-package-v2-addendum-v1
+spec_version: 1.0.0
+status: APPROVED_BUILD
+created_at: '2026-09-17'
+owner: human-terminal-authority
+branch: feature/r611q-package-v2-addendum
+base:
+  branch: design/panel-products-rescue-screen-2026-08
+  commit: e7f48612a46a825f871c2fe474c7609937142154
+
+objective: >-
+  Create a versioned $R611Q$ package addendum that composes the immutable
+  literature-v1, synthesis-v1, structure-readiness-v1 and unreviewed Atlas
+  expert packet with the verified 2026-09-16 literature delta. Preserve every
+  v1 artifact, add one group-attributed $TSC2$-$TSC2$ self-association boundary
+  review unit, and record the downstream model, clinical and review sources as
+  context without transferring them into mechanism, rescue or treatment claims.
+
+decision:
+  package_update_warranted: true
+  reason: >-
+    The delta contains one new primary grouped observation that narrows the
+    complex-binding hypothesis and changes how a future complex assay should be
+    interpreted.
+  broader_historical_corpus_expansion_warranted: false
+  reason_not_to_expand: >-
+    The bounded delta already answered the package question. Further retrieval
+    should be driven by a specific package gap or priority variant, not the
+    approximately 4,169-publication historical $TSC2$ union.
+
+non_goals:
+  - modify, overwrite or silently regenerate any v1 package artifact
+  - merge source-ingestion implementation into the RescueScreen package branch
+  - accept, reject or adjudicate either existing Atlas claim
+  - treat model-assisted triage as named-human Gate 8 review
+  - add downstream patient-621 results as direct $R611Q$ mechanism or rescue evidence
+  - infer genotype-specific treatment response from clinical occurrences
+  - treat secondary reviews as proposition support
+  - assign $PS3$, $BS3$, pathogenicity, clinical significance or evidence strength
+  - authorize docking, screening, stage execution, procurement or treatment
+  - retrieve any additional publication or make a network request
+  - revise structural mappings, coordinates or structure-readiness conclusions
+
+variant:
+  gene: TSC2
+  spdi: NC_000016.10:2070570:G:A
+  hgvs_c: NM_000548.5:c.1832G>A
+  hgvs_p: NP_000539.2:p.Arg611Gln
+
+inputs:
+  v1_repository_package:
+    literature:
+      directory: data/rescuescreen/r611q/literature-v1
+      manifest_path: data/rescuescreen/r611q/literature-v1/manifest.sha256
+      manifest_file_sha256: 3546b6e20fe0abd945f2079c381c6a9551d55c2c6d44dc8c573f1df4917020c3
+      manifest_byte_length: 548
+      files_listed: 6
+    synthesis:
+      directory: data/rescuescreen/r611q/synthesis-v1
+      manifest_path: data/rescuescreen/r611q/synthesis-v1/manifest.sha256
+      manifest_file_sha256: cd56533c1cdb5735217a18e53e5a5bd72c53379f472d0d79adfa96ba9f0350a7
+      manifest_byte_length: 551
+      files_listed: 6
+    structure_readiness:
+      directory: data/rescuescreen/r611q/structure-readiness-v1
+      manifest_path: data/rescuescreen/r611q/structure-readiness-v1/manifest.sha256
+      manifest_file_sha256: 5e0ecb473ff906eb45c9c76007bfcd7c3877d411cbaf6b8c63c398493484e82a
+      manifest_byte_length: 2633
+      files_listed: 29
+    readiness_summary:
+      path: data/rescuescreen/r611q/RESCUESCREEN_EVIDENCE_READINESS_SUMMARY.md
+      sha256: 8cacf0ff4bb026f851cf7779ac27496d5ee083869281b509cc01d1057acda1a7
+      byte_length: 29865
+    rule: >-
+      Every manifest file and every file it lists is recomputed from disk.
+      Exact file-set coverage is required. No v1 byte may be changed by this
+      package.
+
+  atlas_expert_packet_v1:
+    packet:
+      path_role: external_explicit_input
+      sha256: ac456eeac4bd6e0c6a41320d3687575e058d1016e92ddd2e8b140dabfdcbe4e2
+      byte_length: 8094
+    form:
+      path_role: external_explicit_input
+      sha256: 0e9d096559f36fcfde2f3340cf9af54a4328ddb74791d9ddef4df1edc54151ba
+      byte_length: 2148
+    state:
+      proposed_claims: 2
+      accepted_claims: 0
+      gate_8: BLOCKED_HUMAN_REVIEW
+    preservation:
+      packet_v2_prefix_is_exact_v1_bytes: true
+      form_v2_first_two_claim_records_equal_v1: true
+
+  literature_delta:
+    bundle:
+      schema: raptor.external.r611q_literature_delta_review_bundle.v1
+      manifest_content_hash: ea48e5d0572c1a7d5d6c929abf842ab34fa0e3723bf02a4e6c213942e3e85404
+      manifest_file_sha256: 490ee47a68e1ec24fee4453524e6cd7ca825687f3002347c3b93097afc7a3930
+      manifest_byte_length: 2475
+    required_artifacts:
+      candidate_spans:
+        relative_path: normalized/candidate-spans.jsonl
+        sha256: 1d6d27cf1c14ad980d4ef808028c57be344236364a88a3d33d949e6df943efba
+        byte_length: 26087
+      review_records:
+        relative_path: reviewed/review-records.jsonl
+        sha256: 6032d95d16617313c4d3572081d8f86419f8e55088ee8f9cb7618ba52e0ba683
+        byte_length: 17029
+      addendum:
+        relative_path: reviewed/R611Q_LITERATURE_DELTA_ADDENDUM.md
+        sha256: 6c58e04853863a76134449942ca2e9a218339efb5f7354280222dba5b36a795c
+        byte_length: 15253
+    frozen_counts:
+      article_rows: 69
+      exact_alias_candidate_sources: 10
+      candidate_spans: 14
+      direct_grouped_experiments: 1
+      patient_621_model_contexts: 4
+      clinical_occurrences: 2
+      secondary_reviews: 3
+      narrowing_relations: 1
+      contradictions: 0
+      accepted_claims: 0
+
+composition:
+  version: r611q-package-v2-addendum
+  rule: >-
+    v2 is a wrapper over immutable v1 components plus the delta. It does not
+    copy the v1 repository directories, redefine their source records or
+    rewrite their manifests.
+
+  expert_packet_v2:
+    construction:
+      - copy the v1 expert packet bytes exactly
+      - append one clearly delimited v2 addendum section
+      - append the delta context and transfer-boundary summary
+      - retain the final overall outcome as unreviewed
+    new_review_unit:
+      claim_id: r611q-claim-2
+      unit_type: BOUNDARY_OBSERVATION
+      source_role: DIRECT_ALLELE_EXPERIMENT
+      primary_result_state: PRIMARY_R611Q_RESULT
+      baseline_relation: NARROWS
+      related_claims:
+        - r611q-claim-0
+        - r611q-claim-1
+      proposed_statement: >-
+        In the reported HEK293T co-immunoprecipitation assay, a grouped set of
+        GFP-tagged $TSC2$ constructs containing $R611Q$, $R905Q$ or $N1620S$
+        co-immunoprecipitated with V5-tagged $TSC2$; the source reported no
+        effect of those substitutions on $TSC2$-$TSC2$ association.
+      claim_kind: complex_boundary
+      directionality: no_observed_effect
+      required_qualifiers:
+        - the result is group-attributed and has no $R611Q$-specific magnitude
+        - the assay uses transient tagged overexpression in HEK293T cells
+        - preserved $TSC2$ self-association does not establish preserved $TSC1$ binding
+        - the result narrows but does not contradict the existing claim units
+      acceptance_state: PROPOSED_UNACCEPTED
+
+  expert_form_v2:
+    schema: atlas.expert_review_form.v2
+    requirements:
+      - preserve the v1 variant, bindings, reviewer fields and scope statement
+      - preserve the first two claim records exactly
+      - append r611q-claim-2 with a null decision and the same four decision options
+      - add base packet/form hashes and delta manifest hash
+      - accepted claim count remains zero
+      - packet status remains unreviewed
+
+  delta_context:
+    patient_621_model_contexts:
+      count: 4
+      package_effect: CONTEXT_ONLY
+      rule: >-
+        These records may expand downstream model and assay context, but they
+        do not support direct allele mechanism, mutant-protein rescue or
+        biological independence because the patient-621 lineage is reused.
+    clinical_occurrences:
+      count: 2
+      package_effect: OCCURRENCE_ONLY
+      rule: >-
+        These records may add occurrence context. They do not establish
+        genotype-specific phenotype, prognosis or treatment response.
+    secondary_reviews:
+      count: 3
+      package_effect: NO_PROPOSITION_SUPPORT
+      rule: >-
+        These records remain discovery/context sources and support no
+        proposition without inspection of their cited primary sources.
+
+  synthesis_impact:
+    mechanism_baseline_v1:
+      mutation: NONE
+      addendum_boundary: >-
+        The v1 complex-binding finding is not a claim that every $TSC2$
+        interaction is disrupted. Grouped preservation of $TSC2$-$TSC2$
+        association narrows the defect toward $TSC1$ association, abundance or
+        another complex/function dimension.
+    rescue_hypothesis_map_v1:
+      mutation: NONE
+      route_effect:
+        RH-2: RETAIN_PLAUSIBLE_NOT_DEMONSTRATED
+      new_constraint: >-
+        Generic $TSC2$-$TSC2$ co-immunoprecipitation alone is not a
+        discriminating endpoint for $R611Q$ interface rescue.
+    assay_falsifier_matrix_v1:
+      mutation: NONE
+      AF-4_constraint: >-
+        A future complex-rescue assay must measure $TSC1$-$TSC2$ complex
+        formation with matched abundance controls. Preserved $TSC2$-$TSC2$
+        association neither demonstrates nor falsifies route-specific rescue.
+    structure_readiness_v1:
+      mutation: NONE
+      effect: UNCHANGED
+    stage_execution:
+      authorized: false
+      decision: DO_NOT_START_RESCUESCREEN_STAGE_WORK
+
+output:
+  external_package:
+    environment_variable: RAPTOR_R611Q_PACKAGE_V2_ROOT
+    default_root: ~/raptor-data/external/r611q-package-v2
+    run_name: r611q-package-v2-addendum-2026-09-17
+    package_id: r611q-package-v2-addendum-2026-09-17
+    create_only: true
+    artifacts:
+      - R611Q_EXPERT_REVIEW_PACKET_V2.md
+      - R611Q_EXPERT_REVIEW_FORM_V2.yaml
+      - R611Q_PACKAGE_V2_IMPACT.json
+      - R611Q_PACKAGE_V2_SUMMARY.md
+      - package_manifest.json
+  repository_summary:
+    directory: data/rescuescreen/r611q/package-v2-addendum
+    json_path: data/rescuescreen/r611q/package-v2-addendum/package_summary.json
+    readme_path: data/rescuescreen/r611q/package-v2-addendum/README.md
+    contains:
+      - exact input and external artifact hashes
+      - aggregate counts and impact states
+      - accepted claim and Gate 8 state
+      - stage-execution state
+      - explicit no-historical-expansion decision
+    excludes:
+      - new PMID, PMCID, DOI or article title
+      - source quote, locator or candidate identifier
+      - patient-level information
+      - reviewer identity or model chain of thought
+      - accepted mechanism, classification or treatment statement
+
+implementation:
+  package: src/raptor/rescuescreen/package_v2.py
+  operator: scripts/build_r611q_package_v2_addendum.py
+  config: configs/rescuescreen/r611q_package_v2_addendum.yaml
+  tests: tests/rescuescreen/test_r611q_package_v2_addendum.py
+  network: forbidden
+
+delivery_checks:
+  - every v1 manifest file hash and every listed v1 file hash is reverified
+  - v1 manifest file sets remain exact and no v1 file is written
+  - expert packet/form v1 bytes match their pins
+  - delta manifest self-hash, file hash and required artifact hashes match
+  - the selected boundary span and review record agree exactly by source and candidate identity
+  - packet v2 begins with the exact v1 packet bytes
+  - form v2 preserves the first two v1 claim records exactly
+  - r611q-claim-2 remains decision-null and PROPOSED_UNACCEPTED
+  - the boundary statement preserves grouped attribution and assay limitations
+  - model contexts cannot become direct mechanism/rescue support
+  - clinical occurrences cannot become genotype-specific treatment evidence
+  - secondary reviews cannot support propositions
+  - synthesis-v1, structure-readiness-v1 and entry-gate states are unchanged
+  - $TSC2$-$TSC2$ co-immunoprecipitation is recorded as non-discriminating for AF-4
+  - accepted claims remain zero and Gate 8 remains BLOCKED_HUMAN_REVIEW
+  - stage execution remains unauthorized
+  - output is external/create-only, path-contained and manifest-last
+  - repository summary is an exact aggregate-only projection
+
+boundaries:
+  model_assisted_review_is_human_review: false
+  accepted_claims: 0
+  atlas_gate_8: BLOCKED_HUMAN_REVIEW
+  stage_execution_authorized: false
+  clinical_use: forbidden
+  evidence_strength_use: forbidden
+  treatment_recommendation: forbidden
+  historical_tsc2_corpus_expansion: deferred
