@@ -1653,3 +1653,67 @@ def test_r611q_pv2a_publication_symlink_ancestry_rejected_for_output_and_summary
     assert not package_dir.exists(), "symlinked output-root ancestry must be rejected before external publication"
     assert not summary_json_path.exists(), "symlinked summary path ancestry must be rejected before summary publication"
     assert not summary_readme_path.exists(), "symlinked summary path ancestry must be rejected before summary publication"
+
+
+def test_r611q_pv2a_publication_rejects_post_claim_symlink_swap_race(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _require_package_v2_module()
+    publish_seam = getattr(module, "_publish_directory_no_replace", None)
+    assert callable(publish_seam), "render_external_package must publish through _publish_directory_no_replace"
+
+    output_root = (tmp_path / "external-root").resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    package_id = "r611q-package-v2-addendum-2026-09-17"
+    package_dir = output_root / package_id
+    attacker_target = (tmp_path / "attacker-outside-target").resolve()
+    attacker_target.mkdir(parents=True, exist_ok=True)
+
+    probe_link = tmp_path / "symlink-probe"
+    try:
+        probe_link.symlink_to(attacker_target, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation unavailable in this environment")
+    finally:
+        if probe_link.is_symlink():
+            probe_link.unlink()
+
+    artifacts = {
+        "R611Q_EXPERT_REVIEW_PACKET_V2.md": b"# packet\n",
+        "R611Q_EXPERT_REVIEW_FORM_V2.yaml": b"schema: atlas.expert_review_form.v2\n",
+        "R611Q_PACKAGE_V2_IMPACT.json": b"{\"impact\":\"bounded\"}\n",
+        "R611Q_PACKAGE_V2_SUMMARY.md": b"# summary\n",
+    }
+
+    real_mkdir = module.os.mkdir
+    real_rmdir = module.os.rmdir
+    injected = {"done": False}
+
+    def swap_destination_to_symlink(path: Any, mode: int = 0o777) -> None:
+        path_obj = Path(path)
+        if path_obj == package_dir and not injected["done"]:
+            # Simulate winning the race immediately after destination claim:
+            # claim destination, replace with attacker symlink, then return.
+            real_mkdir(path, mode)
+            real_rmdir(path)
+            path_obj.symlink_to(attacker_target, target_is_directory=True)
+            injected["done"] = True
+            return
+        real_mkdir(path, mode)
+
+    monkeypatch.setattr(module.os, "mkdir", swap_destination_to_symlink)
+
+    with pytest.raises((module.PackageV2Error, OSError)):
+        module.render_external_package(
+            output_root,
+            package_id=package_id,
+            repository_summary_target="data/rescuescreen/r611q/package-v2-addendum",
+            artifacts=artifacts,
+        )
+
+    assert injected["done"], "test must inject a post-claim symlink swap on destination mkdir claim"
+    assert package_dir.is_symlink(), "racing destination symlink should remain untouched by failed publication"
+    assert package_dir.resolve() == attacker_target, "racing symlink target should remain attacker-controlled"
+    assert list(attacker_target.rglob("*")) == [], "failed publication must not materialize payload/manifest in attacker target"
+    assert not list(output_root.glob(f".{package_id}.staging-*")), "staging directories must be cleaned on publication failure"
