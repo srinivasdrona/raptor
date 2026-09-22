@@ -11,6 +11,10 @@ ADR/Architecture/Strategy documents and the frozen tests under
 `tests/atlas/`. Where this README and the spec disagree, the spec and the
 frozen tests govern.
 
+For a consolidated reader-facing reference to current capabilities, exact
+promotion gates, frozen real-run status, and downstream boundaries, see
+[`docs/project/atlas/ATLAS_CAPABILITIES_AND_GATES.md`](../../../docs/project/atlas/ATLAS_CAPABILITIES_AND_GATES.md).
+
 ## Boundaries
 
 * **No disease specifics in code.** Nothing in this package -- no module,
