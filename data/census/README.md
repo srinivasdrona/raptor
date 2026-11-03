@@ -132,6 +132,26 @@ Article identities, abstracts, raw responses, and full text remain outside Git.
 This acquisition assigns no evidence strength, $PS3$/$BS3$, Atlas claim,
 classification, or clinical authorization.
 
+`r611q_literature_delta_review_2026-09-16.json` records the aggregate-only
+review of that 69-lead delta against the existing $R611Q$ RescueScreen
+inventory and unreviewed Atlas packet. Deterministic scanning found 10
+exact-alias sources and 14 spans: eight through canonical aliases and two
+through contextual legacy $G1832A$ notation. Model-assisted, unaccepted
+triage identified one direct grouped allele experiment, four
+patient-621-lineage model contexts, two clinical occurrences and three
+secondary reviews. In a group containing $R611Q$, $R905Q$ and $N1620S$, the
+co-immunoprecipitation experiment reported preserved $TSC2$-$TSC2$
+self-association. This group-attributed result narrows the existing
+complex-binding hypothesis; it is not an $R611Q$-specific magnitude and does
+not contradict the reported $TSC1$-association defect. The patient-621 model
+records are indirect context, not direct allele or rescue evidence; the
+clinical occurrences do not establish genotype-specific treatment response;
+and the secondary reviews support no proposition. No accepted claim or
+contradiction was added, and Atlas Gate 8 remains `BLOCKED_HUMAN_REVIEW`.
+The external addendum is pinned by manifest content hash
+`ea48e5d0572c1a7d5d6c929abf842ab34fa0e3723bf02a4e6c213942e3e85404`;
+article identities, quotes, locators and review records remain outside Git.
+
 `tsc2_functional_identity_normalization_pilot_2026-09-11.json` records the
 aggregate-only identity normalization of the three frozen functional datasets.
 All 9,914 input rows were conserved: 423 SGE rows resolved to reference-verified
