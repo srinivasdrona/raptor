@@ -11,7 +11,12 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RESCUESCREEN_SRC_DIR = REPO_ROOT / "src" / "raptor" / "rescuescreen"
 EXPECTED_MODULE_FILES = {"__init__.py", "model.py", "gates.py", "cli.py"}
-BASELINE_HEAD = "5919fc091534e04e9cebd1f9e5a3f299aba13e54"
+# Approved mainline snapshot immediately before this RescueScreen package is
+# integrated. Branch-local changes remain forbidden on pre-existing surfaces.
+BASELINE_HEAD = "42363de3fa1df1c157b2d03c12b1783055332446"
+# The entry-gate specification is itself introduced by this stack and remains
+# pinned to its approved planning commit.
+ENTRY_GATE_BASELINE_HEAD = "5919fc091534e04e9cebd1f9e5a3f299aba13e54"
 
 FORBIDDEN_IMPORT_PREFIXES = (
     "subprocess",
@@ -84,7 +89,9 @@ def _import_names(tree: ast.AST) -> set[str]:
     return names
 
 
-def _git_diff_is_clean(*pathspecs: str) -> tuple[bool, str]:
+def _git_diff_is_clean(
+    *pathspecs: str, baseline_head: str = BASELINE_HEAD
+) -> tuple[bool, str]:
     git_context: list[str] = []
     dot_git = REPO_ROOT / ".git"
     if dot_git.is_file():
@@ -108,7 +115,7 @@ def _git_diff_is_clean(*pathspecs: str) -> tuple[bool, str]:
         *git_context,
         "diff",
         "--exit-code",
-        f"{BASELINE_HEAD}..HEAD",
+        f"{baseline_head}..HEAD",
         "--",
         *pathspecs,
     ]
@@ -177,8 +184,13 @@ def test_rseg_ac11_no_screening_docking_compound_vendor_treatment_execution_surf
 
 
 def test_rseg_ac12_higher_authority_files_are_byte_identical_to_prompt_head() -> None:
-    protected_files = (
+    clean, output = _git_diff_is_clean(
         "docs/project/specs/rescuescreen-entry-gates-v1.yaml",
+        baseline_head=ENTRY_GATE_BASELINE_HEAD,
+    )
+    assert clean, output or "entry-gate specification was modified"
+
+    protected_files = (
         "docs/project/specs/structural-rescue-screen-v1.yaml",
         "docs/project/specs/mechanism-atlas-starter.yaml",
         "docs/DECISIONS.md",
