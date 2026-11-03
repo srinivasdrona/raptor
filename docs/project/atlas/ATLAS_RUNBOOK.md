@@ -5,6 +5,10 @@
 > ADR/Architecture/Strategy documents, and the frozen tests under
 > `tests/atlas/`. This runbook explains boundaries and usage; it asserts no
 > real mechanistic claim, span, or classification of its own.
+>
+> For a consolidated current reference that reconciles the implemented gates,
+> frozen real-run status, generalization boundary, and RescueScreen handoff, see
+> [`ATLAS_CAPABILITIES_AND_GATES.md`](ATLAS_CAPABILITIES_AND_GATES.md).
 
 ## What Phase 1 delivers
 
