@@ -165,6 +165,20 @@ non-variant. The external promoted-row bundle is pinned by manifest SHA-256
 No per-row identity or raw score is committed, and no functional result is
 authorized for classification or assay-specific $PS3$/$BS3$ evidence.
 
+`tsc2_functional_coverage_map_2026-09-14.json` records the aggregate-only,
+exact-SPDI coverage map over the 9,552 verified $TSC2$ functional identities.
+Coverage reaches 335 of the 6,618 frozen VUS identities, four of the 164
+internal priority identities, 171 of the 2,608 protected prospective-holdout
+identities and six of the 25 resolved Atlas contrast identities. All four
+priority overlaps are candidate-LP review rows covered by SGE. The $R611Q$
+Atlas anchor is covered by cliPE and is also present in the protected holdout.
+Leakage markers identify 171 holdout-covered identities, seven Atlas-context
+identities and four carrying both markers. The external row-level coverage
+bundle is pinned by manifest SHA-256
+`b079eca8d126eab468e42af140ebc646e5e3f021b5c2d819bb7fbb890cd7d101`.
+No row identity, functional score, holdout label or Atlas claim is committed
+or authorized for classification, calibration or $PS3$/$BS3$ evidence.
+
 `tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json` (ADR-0012) is the
 packet-free, non-identifying binding census aggregate over the same
 6,618-VUS TSC1/TSC2 run under the PP3/BP4-disabled-automated-emission /
