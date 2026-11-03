@@ -1,0 +1,424 @@
+schema: raptor.project.spec.v1
+spec_id: raptor-v2-functional-identity-normalization-v1
+spec_version: 1.0.1
+status: APPROVED_BUILD
+created_at: '2026-09-11'
+owner: human-terminal-authority
+branch: feature/raptor-v2-functional-normalization-v1
+stacked_on:
+  branch: feature/raptor-v2-missense-sources-v1
+  commit: 4b319058d6f40ab68a62de36eea4322d25266032
+
+objective: >-
+  Build and execute one offline, deterministic $TSC2$ functional-row identity
+  normalization slice over the frozen MaveDB cliPE and IGVF VAMP-seq/SGE
+  artifacts. Emit a create-only external normalized-row bundle plus an
+  aggregate committed summary. Resolve genomic SPDI only where the source
+  supplies a GRCh38 SNV whose reference allele is independently verified
+  against the pinned $\text{NC\_000016.10}$ FASTA. Every other row remains
+  present with an explicit unresolved/control state; no mapping is guessed.
+
+non_goals:
+  - abundance, activity or cliPE score transformation reproduction
+  - functional threshold calibration
+  - ClinVar, VUS, prospective-holdout or Atlas overlap
+  - $PS3$ or $BS3$ evidence assignment
+  - classification, pathogenicity or benignity inference
+  - promotion of the legacy MAVE or SourceOps registries
+  - live network acquisition
+  - cDNA-to-genome projection without a real injected projector
+  - protein-to-transcript projection without a frozen nucleotide crosswalk
+
+workflow:
+  planner: GPT-5.6-Sol
+  red_tests: GPT-5.3-Codex
+  builder: Claude-Sonnet-5
+  checker: GPT-5.6-Terra-xhigh
+  integrator: GPT-5.6-Sol
+  terminal_authority: human-owner
+
+implementation:
+  package: src/raptor/external/tsc2_functional/
+  operator: scripts/normalize_tsc2_functional_bundle.py
+  config: configs/external/tsc2_functional_identity_normalization_v1.yaml
+  tests: tests/external/test_tsc2_functional_normalization.py
+
+inputs:
+  source_bundle:
+    bundle_id: tsc2-source-pilot-2026-09-09
+    environment_variable: RAPTOR_TSC2_SOURCE_ROOT
+    run_name: tsc2-source-pilot-2026-09-09
+    manifest_filename: bundle_manifest.json
+    manifest_content_hash: 63bd6eb4e7182b7f2d345cd78b3a110a59c361c72d521b88990c475919865808
+    required_artifacts:
+      mavedb_clipe:
+        artifact_id: mavedb_clipe-scores-csv
+        relative_path: mavedb/mavedb_clipe-scores.csv
+        sha256: 74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717
+        byte_length: 14277
+      igvf_vamp_seq:
+        artifact_id: igvf_vamp_seq-download-tsv-gz
+        relative_path: igvf/igvf_vamp_seq-IGVFFI9747KART.tsv.gz
+        sha256: 39f052e6e4819ff245fcee8d63fa1b4c3b09b2d9a0d529f5c14de5deaafa497e
+        md5: 1a397944b7a5158b3d63999dfcf926db
+        byte_length: 439700
+      igvf_sge:
+        artifact_id: igvf_sge-download-tsv-gz
+        relative_path: igvf/igvf_sge-IGVFFI3097DFGF.tsv.gz
+        sha256: b0bfb98a8213535afc28672f16807c68a6b421d01b485334259c0d6e251ec975
+        md5: c188e0a9dd4c67dfac13381d3879aedf
+        byte_length: 35101
+  genomic_reference:
+    environment_variable: RAPTOR_TSC2_REFERENCE_ROOT
+    accession: NC_000016.10
+    assembly: GRCh38
+    fasta_filename: NC_000016.10.fasta
+    sha256: 22dc1bb93de407e0653791c36e4097fbaf64c9efa2510c83b7777f607a61e4d0
+    normalizer: raptor.ingest.normalizer.SeqRepoGenomicNormalizer
+  identity_pins:
+    gene: TSC2
+    transcript: NM_000548.5
+    genomic_accession: NC_000016.10
+    assembly: GRCh38
+    sge_source_transcript: NM_000548_5
+    sge_source_genomic_accession: NC_000016_10
+    vamp_source_protein: ENSP00000219476.3
+
+output:
+  external_bundle:
+    environment_variable: RAPTOR_TSC2_FUNCTIONAL_NORMALIZATION_ROOT
+    default_root: ~/raptor-data/external/tsc2-functional-normalization
+    run_name: tsc2-functional-identity-normalization-pilot-2026-09-11
+    bundle_id: tsc2-functional-identity-normalization-pilot-2026-09-11
+    manifest_schema: raptor.external.tsc2_functional_identity_bundle.v1
+    rule: >-
+      Per-row normalized JSONL remains outside Git. The run directory is
+      create-only, symlink-safe and published through the already-tested
+      no-clobber external publication primitive. The manifest is the commit
+      marker and is written last.
+  committed_summary:
+    path: data/census/tsc2_functional_identity_normalization_pilot_2026-09-11.json
+    schema: raptor.external.tsc2_functional_identity_summary.v1
+    contains:
+      - input source-bundle and reference hashes
+      - exact source and row counts
+      - identity-state and variant-kind counts
+      - normalized output artifact SHA-256, byte length and row count
+      - aggregate unresolved reasons
+      - known follow-on gaps
+    excludes:
+      - per-row identities
+      - HGVS or SPDI strings
+      - raw scores
+      - source functional classes
+      - patient information
+      - clinical labels or evidence strengths
+
+normalized_row:
+  schema: raptor.external.normalized_functional_row.v1
+  required_exact:
+    - schema
+    - source_id
+    - source_row
+    - source_record_id
+    - gene
+    - assembly
+    - transcript
+    - protein_accession
+    - hgvs_c
+    - hgvs_p
+    - hgvs_g
+    - spdi
+    - variant_kind
+    - identity_state
+    - unresolved_reason
+    - score_name
+    - score_raw
+  variant_kind_values:
+    - MISSENSE
+    - SYNONYMOUS
+    - STOP_GAINED
+    - OTHER
+    - REFERENCE_CONTROL
+  identity_state_values:
+    - GENOMIC_SPDI_VERIFIED
+    - GENOMIC_REFERENCE_MISMATCH
+    - TRANSCRIPT_ONLY_PROJECTOR_REQUIRED
+    - PROTEIN_ONLY_CROSSWALK_REQUIRED
+    - REFERENCE_CONTROL
+  unresolved_reason_values:
+    - null
+    - REFERENCE_ALLELE_MISMATCH
+    - CDNA_PROJECTOR_REQUIRED
+    - NUCLEOTIDE_CROSSWALK_REQUIRED
+    - NOT_A_VARIANT
+  invariants:
+    - schema equals raptor.external.normalized_functional_row.v1
+    - gene equals TSC2
+    - source_row is one-based and unique within source_id
+    - source_record_id is non-empty
+    - score_raw is a finite numeric string copied without numeric transformation
+    - spdi is present only for GENOMIC_SPDI_VERIFIED
+    - GENOMIC_SPDI_VERIFIED requires assembly GRCh38 and transcript NM_000548.5
+    - verified SPDI must be a canonical NC_000016.10 SNV matching the normalized source hgvs_g
+    - every non-verified state has spdi null and an explicit unresolved_reason
+    - no source functional_class value is copied into the normalized row
+
+source_rules:
+  mavedb_clipe:
+    source_id: mavedb_clipe
+    format: csv
+    exact_header: [accession, hgvs_nt, hgvs_splice, hgvs_pro, score]
+    expected_rows: 208
+    identity:
+      transcript: NM_000548.5
+      hgvs_c_rule: prefix bare c. value with NM_000548.5
+      assembly: null
+      spdi: null
+      identity_state: TRANSCRIPT_ONLY_PROJECTOR_REQUIRED
+      unresolved_reason: CDNA_PROJECTOR_REQUIRED
+    expected_variant_kinds:
+      MISSENSE: 131
+      SYNONYMOUS: 30
+      STOP_GAINED: 47
+  igvf_vamp_seq:
+    source_id: igvf_vamp_seq
+    format: tsv_gzip
+    exact_header:
+      - variant
+      - score
+      - standard_error
+      - rep1
+      - rep2
+      - rep3
+      - functional_class
+    expected_rows: 9253
+    identity:
+      protein_accession: ENSP00000219476.3
+      transcript: null
+      assembly: null
+      spdi: null
+      identity_state: PROTEIN_ONLY_CROSSWALK_REQUIRED
+      unresolved_reason: NUCLEOTIDE_CROSSWALK_REQUIRED
+    expected_variant_kinds:
+      MISSENSE: 8891
+      SYNONYMOUS: 362
+    prohibited_projection: >-
+      Protein substitution alone cannot identify a unique nucleotide change.
+      A future slice must acquire and freeze the source library's nucleotide
+      variant crosswalk before transcript or genomic identity is emitted.
+  igvf_sge:
+    source_id: igvf_sge
+    format: tsv_gzip
+    exact_header:
+      - sequence
+      - reference
+      - hgvs_nt
+      - hgvs_p
+      - hgvs_g
+      - presort__replicate_1
+      - pS6_Hi__replicate_1
+      - pS6_Lo__replicate_1
+      - pS6_log2_score__replicate_1
+      - presort__replicate_2
+      - pS6_Hi__replicate_2
+      - pS6_Lo__replicate_2
+      - pS6_log2_score__replicate_2
+      - presort__replicate_3
+      - pS6_Hi__replicate_3
+      - pS6_Lo__replicate_3
+      - pS6_log2_score__replicate_3
+      - presort__replicate_4
+      - pS6_Hi__replicate_4
+      - pS6_Lo__replicate_4
+      - pS6_log2_score__replicate_4
+      - pS6_score
+    expected_rows: 453
+    normalization:
+      - require source accessions NM_000548_5 and NC_000016_10
+      - normalize accession separators to NM_000548.5 and NC_000016.10
+      - treat the three c.=/g.=/p.= rows as REFERENCE_CONTROL
+      - parse every other hgvs_g as one genomic SNV
+      - send the genomic SNV through SeqRepoGenomicNormalizer
+      - accept SPDI only when the declared reference allele matches the pinned FASTA
+      - convert REF_MISMATCH manual outcomes to GENOMIC_REFERENCE_MISMATCH
+      - abort the run on every other manual/error outcome
+    expected_identity_states:
+      GENOMIC_SPDI_VERIFIED: 423
+      GENOMIC_REFERENCE_MISMATCH: 27
+      REFERENCE_CONTROL: 3
+    expected_variant_kinds:
+      MISSENSE: 318
+      SYNONYMOUS: 104
+      STOP_GAINED: 16
+      OTHER: 12
+      REFERENCE_CONTROL: 3
+    verified_missense_rows: 308
+    blocked_missense_rows: 10
+
+bundle_manifest:
+  required_exact:
+    - schema
+    - bundle_id
+    - created_at
+    - input_bundle
+    - reference
+    - artifacts
+    - counts
+    - identity_state_counts
+    - variant_kind_counts
+    - boundaries
+    - content_hash
+  hash_basis: >-
+    SHA-256 of UTF-8 canonical JSON with sorted object keys, comma/colon
+    separators, array order preserved, and only top-level content_hash omitted.
+  artifacts:
+    required_exact:
+      - artifact_id
+      - source_id
+      - relative_path
+      - byte_length
+      - sha256
+      - row_count
+    expected:
+      - source_id: mavedb_clipe
+        relative_path: normalized/mavedb_clipe.jsonl
+      - source_id: igvf_vamp_seq
+        relative_path: normalized/igvf_vamp_seq.jsonl
+      - source_id: igvf_sge
+        relative_path: normalized/igvf_sge.jsonl
+
+expected_pilot:
+  total_rows: 9914
+  source_rows:
+    mavedb_clipe: 208
+    igvf_vamp_seq: 9253
+    igvf_sge: 453
+  identity_state_counts:
+    GENOMIC_SPDI_VERIFIED: 423
+    GENOMIC_REFERENCE_MISMATCH: 27
+    TRANSCRIPT_ONLY_PROJECTOR_REQUIRED: 208
+    PROTEIN_ONLY_CROSSWALK_REQUIRED: 9253
+    REFERENCE_CONTROL: 3
+  variant_kind_counts:
+    MISSENSE: 9340
+    SYNONYMOUS: 496
+    STOP_GAINED: 63
+    OTHER: 12
+    REFERENCE_CONTROL: 3
+  conservation:
+    input_rows: 9914
+    output_rows: 9914
+    dropped_rows: 0
+    duplicated_rows: 0
+
+acceptance_criteria:
+  - id: FN-01
+    rule: >-
+      The operator rejects any source manifest, artifact SHA-256/MD5/byte
+      length or bundle content hash that differs from the frozen input pins.
+      Required payloads are selected by exact artifact_id and read from the
+      pinned relative paths only after manifest validation; first-artifact
+      selection and unvalidated manifest paths are forbidden.
+  - id: FN-02
+    rule: >-
+      The operator performs no network I/O and imports no scorer, eval, packet,
+      census, KB, Atlas promotion or RescueScreen module.
+  - id: FN-03
+    rule: >-
+      The $\text{NC\_000016.10}$ FASTA must match its pinned SHA-256 before
+      any SGE row is normalized.
+  - id: FN-04
+    rule: >-
+      All three input files require their exact headers, exact row counts,
+      finite score strings, non-empty source identities, source-valid HGVS
+      shapes and one output row per input row.
+  - id: FN-05
+    rule: >-
+      cliPE rows are normalized to $NM\_000548.5$ c.HGVS but never receive
+      genomic SPDI without an injected cDNA projector.
+  - id: FN-06
+    rule: >-
+      VAMP-seq rows retain ENSP00000219476.3 protein identity but never receive
+      transcript, assembly or SPDI without a frozen nucleotide crosswalk.
+  - id: FN-07
+    rule: >-
+      SGE source accession separators are normalized only after exact source
+      accession checks; every non-control row must be a genomic SNV.
+  - id: FN-08
+    rule: >-
+      SGE SPDI is emitted only by SeqRepoGenomicNormalizer against the pinned
+      GRCh38 FASTA; direct arithmetic without reference validation is forbidden.
+      The returned SPDI must be a canonical NC_000016.10 SNV matching the
+      source genomic position/ref/alt exactly.
+  - id: FN-09
+    rule: >-
+      The frozen SGE file yields exactly 423 verified SPDI rows, 27 explicit
+      reference mismatches and three reference controls, with no silent drops.
+  - id: FN-10
+    rule: >-
+      Every reference mismatch retains source HGVS and score externally but has
+      spdi=null, identity_state=GENOMIC_REFERENCE_MISMATCH and
+      unresolved_reason=REFERENCE_ALLELE_MISMATCH.
+  - id: FN-11
+    rule: >-
+      Reordering input dictionaries or JSON keys cannot change semantic output;
+      changing any normalized row byte changes the output artifact and manifest
+      hashes.
+  - id: FN-12
+    rule: >-
+      Normalized JSONL is deterministic, one canonical sorted-key JSON object
+      per source row, UTF-8 with LF line endings and a final newline.
+  - id: FN-13
+    rule: >-
+      The external run is create-only, confined outside the repository,
+      ancestry-symlink-safe, race-safe and manifest-last; failed publication
+      leaves no committed manifest and never replaces another writer.
+  - id: FN-14
+    rule: >-
+      The committed summary contains aggregate pins and counts only and binds
+      to the external normalization manifest content hash.
+  - id: FN-15
+    rule: >-
+      No normalized row, manifest or summary emits source functional_class,
+      $PS3$, $BS3$, a clinical classification or an evidence-strength claim.
+  - id: FN-16
+    rule: >-
+      The pilot output conserves exactly 9,914 input rows into 9,914 normalized
+      rows with zero drops and zero duplicate source row keys.
+
+failure_cases:
+  - source bundle hash drift
+  - missing or altered source artifact
+  - wrong artifact selected because a source has multiple artifacts
+  - source artifact path escaping the pinned source run directory
+  - compressed-file decode failure
+  - unexpected header or row count
+  - blank, non-numeric, NaN or infinite score
+  - malformed HGVS shape
+  - unexpected source accession
+  - reference FASTA missing or checksum mismatch
+  - SGE normalizer outcome other than success or REF_MISMATCH
+  - duplicate source row key
+  - output root inside repository
+  - unsafe run name or symlinked ancestry
+  - pre-existing or concurrently-created run directory
+  - output artifact or manifest hash mismatch
+  - forbidden clinical/evidence vocabulary
+  - missing source/reference root argument or environment variable
+
+pilot_command: >-
+  PYTHONPATH=src python scripts/normalize_tsc2_functional_bundle.py
+  --source-root "$RAPTOR_TSC2_SOURCE_ROOT"
+  --reference-root "$RAPTOR_TSC2_REFERENCE_ROOT"
+  --output-root "$RAPTOR_TSC2_FUNCTIONAL_NORMALIZATION_ROOT"
+  --summary-output data/census/tsc2_functional_identity_normalization_pilot_2026-09-11.json
+
+follow_on:
+  - acquire and freeze the VAMP-seq nucleotide-library crosswalk
+  - inject a real $NM\_000548.5$ cDNA-to-genome projector for cliPE
+  - adjudicate the 27 SGE reference-mismatch rows with source owners
+  - reproduce source-specific score transformations
+  - define calibration and leakage partitions
+  - compute VUS, prospective-holdout and Atlas overlaps
+  - evaluate assay-specific $PS3$/$BS3$ policy in a separately approved slice
