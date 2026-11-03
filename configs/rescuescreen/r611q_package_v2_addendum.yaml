@@ -1,0 +1,111 @@
+schema: raptor.rescuescreen.r611q_package_v2_addendum_config.v1
+spec_id: r611q-package-v2-addendum-v1
+spec_version: 1.0.4
+
+v1_repository_package:
+  literature:
+    directory: data/rescuescreen/r611q/literature-v1
+    manifest_path: data/rescuescreen/r611q/literature-v1/manifest.sha256
+    manifest_sha256: 3546b6e20fe0abd945f2079c381c6a9551d55c2c6d44dc8c573f1df4917020c3
+    manifest_byte_length: 548
+    files_listed: 6
+  synthesis:
+    directory: data/rescuescreen/r611q/synthesis-v1
+    manifest_path: data/rescuescreen/r611q/synthesis-v1/manifest.sha256
+    manifest_sha256: cd56533c1cdb5735217a18e53e5a5bd72c53379f472d0d79adfa96ba9f0350a7
+    manifest_byte_length: 551
+    files_listed: 6
+  structure_readiness:
+    directory: data/rescuescreen/r611q/structure-readiness-v1
+    manifest_path: data/rescuescreen/r611q/structure-readiness-v1/manifest.sha256
+    manifest_sha256: 5e0ecb473ff906eb45c9c76007bfcd7c3877d411cbaf6b8c63c398493484e82a
+    manifest_byte_length: 2633
+    files_listed: 29
+  readiness_summary:
+    path: data/rescuescreen/r611q/RESCUESCREEN_EVIDENCE_READINESS_SUMMARY.md
+    sha256: 8cacf0ff4bb026f851cf7779ac27496d5ee083869281b509cc01d1057acda1a7
+    byte_length: 29865
+
+atlas_expert_packet_v1:
+  packet:
+    sha256: ac456eeac4bd6e0c6a41320d3687575e058d1016e92ddd2e8b140dabfdcbe4e2
+    byte_length: 8094
+  form:
+    sha256: 0e9d096559f36fcfde2f3340cf9af54a4328ddb74791d9ddef4df1edc54151ba
+    byte_length: 2148
+  state:
+    proposed_claims: 2
+    accepted_claims: 0
+    gate_8: BLOCKED_HUMAN_REVIEW
+
+literature_delta:
+  manifest_relative_path: bundle_manifest.json
+  schema: raptor.external.r611q_literature_delta_review_bundle.v1
+  manifest_file_sha256: 490ee47a68e1ec24fee4453524e6cd7ca825687f3002347c3b93097afc7a3930
+  manifest_byte_length: 2475
+  required_artifacts:
+    candidate_spans:
+      relative_path: normalized/candidate-spans.jsonl
+      sha256: 1d6d27cf1c14ad980d4ef808028c57be344236364a88a3d33d949e6df943efba
+      byte_length: 26087
+    review_records:
+      relative_path: reviewed/review-records.jsonl
+      sha256: 6032d95d16617313c4d3572081d8f86419f8e55088ee8f9cb7618ba52e0ba683
+      byte_length: 17029
+    addendum:
+      relative_path: reviewed/R611Q_LITERATURE_DELTA_ADDENDUM.md
+      sha256: 6c58e04853863a76134449942ca2e9a218339efb5f7354280222dba5b36a795c
+      byte_length: 15253
+  frozen_counts:
+    article_rows: 69
+    exact_alias_candidate_sources: 10
+    candidate_spans: 14
+    direct_grouped_experiments: 1
+    patient_621_model_contexts: 4
+    clinical_occurrences: 2
+    secondary_reviews: 3
+    narrowing_relations: 1
+    contradictions: 0
+    accepted_claims: 0
+
+output:
+  package_id: r611q-package-v2-addendum-2026-09-17
+  run_name: r611q-package-v2-addendum-2026-09-17
+  environment_variable: RAPTOR_R611Q_PACKAGE_V2_ROOT
+  default_root: ~/raptor-data/external/r611q-package-v2
+  root_must_preexist: true
+  publication_protocol:
+    platform: POSIX_dir_fd_required
+    root_open: O_DIRECTORY_and_O_NOFOLLOW
+    payload_source: verified_in_memory_bytes
+    final_creation: descriptor_relative_exclusive_claim
+    artifact_writes: O_CREAT_O_EXCL_O_NOFOLLOW
+    commit_marker: package_manifest.json_written_last
+    final_root_identity_check: required
+    failure_cleanup: >-
+      Remove only invocation-created files through the pinned directory descriptor.
+      Never remove the claimed directory by name; an empty directory may remain as an
+      unpublished tombstone and requires explicit owner cleanup before retry.
+    unsupported_platform: fail_closed
+  external_artifacts:
+    - R611Q_EXPERT_REVIEW_PACKET_V2.md
+    - R611Q_EXPERT_REVIEW_FORM_V2.yaml
+    - R611Q_PACKAGE_V2_IMPACT.json
+    - R611Q_PACKAGE_V2_SUMMARY.md
+    - package_manifest.json
+  repository_summary:
+    directory: data/rescuescreen/r611q/package-v2-addendum
+    json_path: data/rescuescreen/r611q/package-v2-addendum/package_summary.json
+    readme_path: data/rescuescreen/r611q/package-v2-addendum/README.md
+    publication_protocol:
+      trusted_existing_parent: data/rescuescreen/r611q
+      parent_open: descriptor_relative_from_repo_root_with_O_NOFOLLOW
+      final_directory_creation: descriptor_relative_create_only
+      file_writes:
+        - README.md_first
+        - package_summary.json_last_as_commit_marker
+      write_flags: O_CREAT_O_EXCL_O_NOFOLLOW
+      final_identity_check: required
+      rollback: >-
+        Descriptor-relative removal of invocation-created files only. Never remove the
+        claimed directory by name; an empty unpublished tombstone may remain after failure.

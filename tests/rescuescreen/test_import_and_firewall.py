@@ -10,10 +10,10 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RESCUESCREEN_SRC_DIR = REPO_ROOT / "src" / "raptor" / "rescuescreen"
-EXPECTED_MODULE_FILES = {"__init__.py", "model.py", "gates.py", "cli.py"}
+EXPECTED_MODULE_FILES = {"__init__.py", "model.py", "gates.py", "cli.py", "package_v2.py"}
 # Approved mainline snapshot immediately before this RescueScreen package is
 # integrated. Branch-local changes remain forbidden on pre-existing surfaces.
-BASELINE_HEAD = "42363de3fa1df1c157b2d03c12b1783055332446"
+BASELINE_HEAD = "e6b628b3bd7e2a9757216d32470aa92423660876"
 # The entry-gate specification is itself introduced by this stack and remains
 # pinned to its approved planning commit.
 ENTRY_GATE_BASELINE_HEAD = "5919fc091534e04e9cebd1f9e5a3f299aba13e54"
