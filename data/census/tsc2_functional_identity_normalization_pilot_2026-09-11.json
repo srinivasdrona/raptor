@@ -1,0 +1,64 @@
+{
+  "artifact_integrity": {
+    "igvf_sge-normalized-jsonl": {
+      "byte_length": 227381,
+      "row_count": 453,
+      "sha256": "2292e5770911e13fcd2536287fd04fc7f23354c9bc81ebf01533aa441114ea52",
+      "source_id": "igvf_sge"
+    },
+    "igvf_vamp_seq-normalized-jsonl": {
+      "byte_length": 4522418,
+      "row_count": 9253,
+      "sha256": "26f34a7a8d52d01ffbdef50427ac1ab0b268a523a29a55ce77452fc56bb83adb",
+      "source_id": "igvf_vamp_seq"
+    },
+    "mavedb_clipe-normalized-jsonl": {
+      "byte_length": 102100,
+      "row_count": 208,
+      "sha256": "2328f46bf5a2ae087eddeaa2ad0fb6f44de2b60a2e9e3ad0c034c73907f5031e",
+      "source_id": "mavedb_clipe"
+    }
+  },
+  "bundle_id": "tsc2-functional-identity-normalization-pilot-2026-09-11",
+  "counts": {
+    "artifacts": 3,
+    "rows": 9914,
+    "sources": 3
+  },
+  "identity_state_counts": {
+    "GENOMIC_REFERENCE_MISMATCH": 27,
+    "GENOMIC_SPDI_VERIFIED": 423,
+    "PROTEIN_ONLY_CROSSWALK_REQUIRED": 9253,
+    "REFERENCE_CONTROL": 3,
+    "TRANSCRIPT_ONLY_PROJECTOR_REQUIRED": 208
+  },
+  "input_bundle_content_hash": "63bd6eb4e7182b7f2d345cd78b3a110a59c361c72d521b88990c475919865808",
+  "manifest_content_hash": "74f15f22cfb6e876a8fab3a16c841e6f33317eadd58ef04547e4c060162afb48",
+  "normalization_gaps": [
+    "VAMP-seq protein-level scores lack a frozen nucleotide crosswalk needed to project transcript or genomic identity",
+    "cliPE cDNA scores lack an injected NM_000548.5-to-genome projector needed for genomic SPDI resolution",
+    "SGE genomic-reference-mismatch rows require adjudication with the source owners",
+    "source-specific score transformations have not been reproduced in this slice",
+    "no calibration, leakage-partition or knowledge-base overlap computation has been performed for this slice"
+  ],
+  "reference_sha256": "22dc1bb93de407e0653791c36e4097fbaf64c9efa2510c83b7777f607a61e4d0",
+  "schema": "raptor.external.tsc2_functional_identity_summary.v1",
+  "source_row_counts": {
+    "igvf_sge": 453,
+    "igvf_vamp_seq": 9253,
+    "mavedb_clipe": 208
+  },
+  "unresolved_reason_counts": {
+    "CDNA_PROJECTOR_REQUIRED": 208,
+    "NOT_A_VARIANT": 3,
+    "NUCLEOTIDE_CROSSWALK_REQUIRED": 9253,
+    "REFERENCE_ALLELE_MISMATCH": 27
+  },
+  "variant_kind_counts": {
+    "MISSENSE": 9340,
+    "OTHER": 12,
+    "REFERENCE_CONTROL": 3,
+    "STOP_GAINED": 63,
+    "SYNONYMOUS": 496
+  }
+}

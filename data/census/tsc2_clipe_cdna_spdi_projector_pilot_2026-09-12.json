@@ -1,0 +1,32 @@
+{
+  "boundaries": {
+    "clinical_use": "forbidden",
+    "evidence_strength_use": "forbidden",
+    "network": "operator_only"
+  },
+  "bundle_id": "tsc2-clipe-cdna-spdi-projector-2026-09-12",
+  "endpoint_sequence": [
+    "contextuals",
+    "canonical_representative"
+  ],
+  "failure_count": 0,
+  "input_scores_sha256": "74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717",
+  "manifest_content_hash": "247665b9758860124b196d037b913626b7699b87ba1bb1c32b0e461bb4473529",
+  "pilot_uncertainties": [],
+  "reference_sha256": "22dc1bb93de407e0653791c36e4097fbaf64c9efa2510c83b7777f607a61e4d0",
+  "request_budget_observed": {
+    "step1": 208,
+    "step2": 208,
+    "wall_clock_seconds": 1261.6
+  },
+  "schema": "raptor.external.clipe_cdna_spdi_projector_summary.v1",
+  "shape_counts": {
+    "DELINS": 47,
+    "SNV": 161
+  },
+  "status_counts": {
+    "PROJECTED_FASTA_VERIFIED": 208
+  },
+  "success_count": 208,
+  "total_rows": 208
+}

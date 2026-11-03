@@ -1,0 +1,25 @@
+# ADR-0020 / docs/project/specs/clinvar-2026-08-prospective-amendment-v2.yaml
+# prospective_eval_overlay_lifecycle -- dataset-identity partition ONLY.
+#
+# This file exists to satisfy the amendment's pre-approval implementation
+# requirement ("Before PRE-DATA approval, implementation must create the
+# contract's exact prospective eval-overlay path"). Every value below is a
+# literal, already-registered pin copied from
+# prospective_eval_overlay_lifecycle.required_values in the registration
+# spec -- nothing here was derived from, or requires, any archive access.
+# It carries no transport/raw checksum: those are written later, separately,
+# by stage 1 / stage 2 into the two immutable freeze-record paths named
+# below, never edited into this overlay.
+#
+# Immutable after PRE-DATA approval (prospective_eval_overlay_lifecycle
+# .immutability): any semantic change requires a new explicit pre-data
+# amendment and a new registration id.
+schema: "raptor.eval.prospective_dataset_overlay.v1"
+registration_id: "clinvar-2026-08-amendment-v2"
+base_config_path: "configs/eval/tsc2.yaml"
+base_config_canonical_lf_sha256: "45358c2e66d09d8ba32937b1d2751659f382a8444679fdd0244bbde3b63f7206"
+base_scoring_semantics_projection_sha256: "a19f0b1825a3b5b9c5886cc783750cd907045601447cfd132329d3ab9b9e10b5"
+effective_labels_snapshot: "clinvar_2026-08-monthly-amendment-v2"
+exact_archive_url: "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08.txt.gz"
+transport_freeze_record: "data/census/tsc_prospective_validation_2026-08_amendment_v2_transport_freeze.json"
+raw_freeze_record: "data/census/tsc_prospective_validation_2026-08_amendment_v2_raw_freeze.json"

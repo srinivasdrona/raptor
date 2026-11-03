@@ -1,0 +1,106 @@
+{
+  "candidate_free": true,
+  "contains_membership": false,
+  "content_sha256": "32f085ccf7ee9236a5fda48e7877bd282e137cc679faf3492f70f123f94ab696",
+  "content_sha256_basis": "SHA-256 over canonical JSON with content_sha256 removed: json.dumps(record, sort_keys=True, indent=2), UTF-8, exactly one terminal LF.",
+  "generated_at_utc": "2026-08-15T05:05:36Z",
+  "eligible_substrate_characterization": {
+    "assay_kind_counts": {
+      "tsc2:in_vitro_minigene_splicing_assay": 2,
+      "tsc2:torc1_s6k_phosphorylation_reporter_assay": 14
+    },
+    "distinct_assay_kinds": 2,
+    "distinct_model_system_categories": 1,
+    "evidence_absent_records": 2,
+    "evidence_bearing_records": 12,
+    "model_system_counts": {
+      "cell_line": 16
+    },
+    "observation_count": 16,
+    "primary_stratum_counts": {
+      "S1": 6,
+      "S2": 2,
+      "S3": 3,
+      "S5": 1,
+      "S6": 2
+    },
+    "source": "Aggregate recomputation over the 14 eligible NS_NOT_IN_SOLUTION universe records; no candidate identity or membership is stored."
+  },
+  "interpretation": {
+    "correct_statement": "At strict levels L0-R5, removing P2 and D3 was still insufficient because other active diversity constraints remained unsatisfied. At R6 and R7, after the preregistered ladder had already relaxed C5, P1, D1, P3 and D2, removing P2 alone or D3 alone remained infeasible, while removing both produced feasible subsets.",
+    "limit": "This is a post-hoc diagnostic of constraint interaction, not a selection, not a panel, not a proposed rubric change and not authorization to weaken any constraint.",
+    "original_machine_outcome": "INFEASIBLE_PANEL",
+    "original_machine_outcome_preserved": true
+  },
+  "kind": "DIAGNOSTIC_POST_HOC_NOT_A_SELECTION",
+  "matrix": {
+    "L0": {
+      "5": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 0, "remove_p2_only": 0},
+      "6": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 0, "remove_p2_only": 0},
+      "7": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 0, "remove_p2_only": 0}
+    },
+    "R1": {
+      "5": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 0, "remove_p2_only": 0},
+      "6": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 0, "remove_p2_only": 0},
+      "7": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 0, "remove_p2_only": 0}
+    },
+    "R2": {
+      "5": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 0, "remove_p2_only": 0},
+      "6": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 0, "remove_p2_only": 0},
+      "7": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 0, "remove_p2_only": 0}
+    },
+    "R3": {
+      "5": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 0, "remove_p2_only": 0},
+      "6": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 0, "remove_p2_only": 0},
+      "7": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 0, "remove_p2_only": 0}
+    },
+    "R4": {
+      "5": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 0, "remove_p2_only": 0},
+      "6": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 0, "remove_p2_only": 0},
+      "7": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 0, "remove_p2_only": 0}
+    },
+    "R5": {
+      "5": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 0, "remove_p2_only": 0},
+      "6": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 0, "remove_p2_only": 0},
+      "7": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 0, "remove_p2_only": 0}
+    },
+    "R6": {
+      "5": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 48, "remove_p2_only": 0},
+      "6": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 24, "remove_p2_only": 0},
+      "7": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 72, "remove_p2_only": 0}
+    },
+    "R7": {
+      "5": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 48, "remove_p2_only": 0},
+      "6": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 24, "remove_p2_only": 0},
+      "7": {"baseline": 0, "remove_d3_only": 0, "remove_p2_and_d3": 72, "remove_p2_only": 0}
+    }
+  },
+  "method": {
+    "all_other_constraints": "The ActiveConstraints values for the stated registered ladder level and panel size remained unchanged.",
+    "eligible_pool_definition": "The 14 records with disposition NS_NOT_IN_SOLUTION in the immutable source run.",
+    "enumeration": "Exhaustive itertools.combinations over sizes 7, 6 and 5; each combination evaluated with raptor.atlas.panel._check_constraints.",
+    "remove_d3_only": "Set d3_max_per_assay_kind to n for the diagnostic evaluation.",
+    "remove_p2_and_d3": "Set p2_min_established_groups to 0 and d3_max_per_assay_kind to n.",
+    "remove_p2_only": "Set p2_min_established_groups to 0 for the diagnostic evaluation."
+  },
+  "schema": "raptor.atlas_panel_constraint_diagnostic.v1",
+  "source_inputs": {
+    "candidate_universe_content_hash": "98edd3bf3cef36b7a1231bc389a37be6efdae7deb2210c869c317dfb6e8bef30",
+    "candidate_universe_raw_sha256": "8e94b84ff0316534d9fc19cc4fafc5f40a4d8090788ec68e41644ff4ae1e786b",
+    "eligible_record_count": 14,
+    "identity_map_content_hash": "3adbf3484de28607fa3c133b2bebc4a9d7926b4c2d5b3863b0634507c599cd26",
+    "identity_map_raw_sha256": "f993d069a8d679953eff2af10c07dfe993746cf3211e8ac2f678fce94e0dcbf7",
+    "protocol_doc_hash": "7b0596ab4a52601566c85a3a2c7ca42aead9c35916890397e58b3e11876e5823",
+    "registration_content_hash": "5b8980024bd88f9f3c7269badf7fc3e709fef4ba135b3575a7513e5d17ad1653",
+    "selector_panel_py_committed_blob_sha256": "165d627f4b3dab62febc32f75edb10a524c815a8cef4363e89ec495fd76718b9",
+    "source_run_path": "data/atlas/tsc2_phase2_panel_selection_run_2026-08-06.json",
+    "source_run_sha256": "5f5b0918a24fcaa737877a15e393773f20c584c531517133e9c8b7e7574cfffd"
+  },
+  "summary": {
+    "baseline_feasible_subsets_all_levels_and_sizes": 0,
+    "first_levels_with_feasible_remove_p2_and_d3_subsets": ["R6", "R7"],
+    "remove_d3_only_feasible_subsets_all_levels_and_sizes": 0,
+    "remove_p2_only_feasible_subsets_all_levels_and_sizes": 0,
+    "strict_levels_L0_through_R5_remove_both_feasible_subsets": 0
+  }
+}

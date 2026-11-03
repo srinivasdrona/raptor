@@ -1,0 +1,175 @@
+{
+  "artifact_integrity": {
+    "igvf_sge-analysis-json": {
+      "byte_length": 45089,
+      "md5": "42aa3ffd5da85b07f07419e3c1f0888f",
+      "sha256": "649d449ce37829001acdfa875fbfef3d52fef8ab7f4d115842ca9e5562d73cd6",
+      "verification": "METADATA_ONLY"
+    },
+    "igvf_sge-download-tsv-gz": {
+      "byte_length": 35101,
+      "md5": "c188e0a9dd4c67dfac13381d3879aedf",
+      "sha256": "b0bfb98a8213535afc28672f16807c68a6b421d01b485334259c0d6e251ec975",
+      "verification": "PUBLISHED_MD5_VERIFIED"
+    },
+    "igvf_sge-file-json": {
+      "byte_length": 24247,
+      "md5": "d75691ab30970082f9932b77e24d772f",
+      "sha256": "d1399747a652352e7a90fcad8a8834f49d74e5c9072ffb7ff404538b407a5f42",
+      "verification": "METADATA_ONLY"
+    },
+    "igvf_vamp_seq-analysis-json": {
+      "byte_length": 29918,
+      "md5": "a0f9ffd6c5c5031879543e60b85ecf16",
+      "sha256": "2f3d6478f86217fa0091c879090ebb8ea8ab5e5dd0d6e05fc1b1e05ce5d8b14b",
+      "verification": "METADATA_ONLY"
+    },
+    "igvf_vamp_seq-download-tsv-gz": {
+      "byte_length": 439700,
+      "md5": "1a397944b7a5158b3d63999dfcf926db",
+      "sha256": "39f052e6e4819ff245fcee8d63fa1b4c3b09b2d9a0d529f5c14de5deaafa497e",
+      "verification": "PUBLISHED_MD5_VERIFIED"
+    },
+    "igvf_vamp_seq-file-json": {
+      "byte_length": 17227,
+      "md5": "b0ef4bbe033b71e6a57cef99d56ccac8",
+      "sha256": "2e74445ed48eaee79a68be193837cab045cfbdc016a82627adf3e38599869b58",
+      "verification": "METADATA_ONLY"
+    },
+    "litvar2-gene-mappings-jsonl": {
+      "byte_length": 357161,
+      "md5": "1e604cd18e0be26e1ca5a6d9fab172e3",
+      "sha256": "951997b15c6910db6974e9ae4ae93ecd8dae28e5af5959098278d5e15800b598",
+      "verification": "HASHED"
+    },
+    "mavedb_clipe-metadata-json": {
+      "byte_length": 10821,
+      "md5": "0dd833c576487dafb46110c960bc300f",
+      "sha256": "66625a10a31901304e4dc26c02ef603f8560e35d2b04655bd0a297741ad12b19",
+      "verification": "METADATA_ONLY"
+    },
+    "mavedb_clipe-scores-csv": {
+      "byte_length": 14277,
+      "md5": "fdf2fe03a8119c53070004fde5ec7e7e",
+      "sha256": "74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717",
+      "verification": "HASHED"
+    },
+    "pmc-fulltext-xml": {
+      "byte_length": 163272,
+      "md5": "096e0e4c9d0fd96b6b7fa66f138e3bfb",
+      "sha256": "d1bf730a623b12091ce23d0c98972640b71843be59693332201c6e732afd8d28",
+      "verification": "HASHED"
+    },
+    "pubmed-efetch-xml": {
+      "byte_length": 2363121,
+      "md5": "fb6deb874b5623c6ee881613234f366a",
+      "sha256": "4d2a58132aad9e0f72fd3d03b3e5ff374b0f8f019a9ccc81f629d593c0fadf98",
+      "verification": "HASHED"
+    },
+    "pubmed-esearch-json": {
+      "byte_length": 1331,
+      "md5": "e6cb5255f5bf760517da917a9cc8f021",
+      "sha256": "8aec470cf0137122ba97e97f29b56b17658dd500beb75e1163cb398c0463cafe",
+      "verification": "HASHED"
+    }
+  },
+  "bundle_id": "tsc2-source-pilot-2026-09-09",
+  "counts": {
+    "artifacts": 12,
+    "sources": 6
+  },
+  "manifest_content_hash": "63bd6eb4e7182b7f2d345cd78b3a110a59c361c72d521b88990c475919865808",
+  "missing_source_ids": [],
+  "normalization_gaps": [
+    "functional-dataset rows are not yet normalized to a canonical transcript/assembly identity",
+    "abundance/activity score transformations and interpretive thresholds are not yet reproduced",
+    "no overlap or calibration audit against any external knowledge base has been computed",
+    "no assay-specific evidentiary-strength policy has been implemented for this slice"
+  ],
+  "schema": "raptor.external.tsc2_source_pilot_summary.v1",
+  "source_ids": [
+    "pubmed",
+    "litvar2",
+    "pmc",
+    "mavedb_clipe",
+    "igvf_vamp_seq",
+    "igvf_sge"
+  ],
+  "source_observations": {
+    "igvf_sge": {
+      "assembly": "GRCh38",
+      "byte_length": 35101,
+      "status": "released"
+    },
+    "igvf_vamp_seq": {
+      "assembly": "GRCh38",
+      "byte_length": 439700,
+      "status": "released"
+    },
+    "litvar2": {
+      "mapping_count": 3946,
+      "rsid_mapping_count": 2902,
+      "rsidless_mapping_count": 1044
+    },
+    "mavedb_clipe": {
+      "gene": "TSC2",
+      "license": "CC0-1.0",
+      "transcript": "NM_000548.5",
+      "variant_count": 208
+    },
+    "pmc": {
+      "raw_xml_sha256": "d1bf730a623b12091ce23d0c98972640b71843be59693332201c6e732afd8d28"
+    },
+    "pubmed": {
+      "count": 189,
+      "is_truncated": true,
+      "metadata_row_count": 100,
+      "returned_count": 100
+    }
+  },
+  "source_states": {
+    "igvf_sge": {
+      "access_state": "PUBLIC",
+      "licence_state": "REVIEW_REQUIRED",
+      "lifecycle_state": "STAGED_LICENCE_REVIEW_REQUIRED",
+      "source_kind": "igvf"
+    },
+    "igvf_vamp_seq": {
+      "access_state": "PUBLIC",
+      "licence_state": "REVIEW_REQUIRED",
+      "lifecycle_state": "STAGED_LICENCE_REVIEW_REQUIRED",
+      "source_kind": "igvf"
+    },
+    "litvar2": {
+      "access_state": "PUBLIC",
+      "licence_state": "PUBLIC_METADATA",
+      "lifecycle_state": "STAGED_VERIFIED",
+      "source_kind": "litvar2"
+    },
+    "mavedb_clipe": {
+      "access_state": "PUBLIC",
+      "licence_state": "EXPLICIT_LICENSE_DECLARED",
+      "lifecycle_state": "STAGED_VERIFIED",
+      "source_kind": "mavedb"
+    },
+    "pmc": {
+      "access_state": "PUBLIC",
+      "licence_state": "EXPLICIT_LICENSE_DECLARED",
+      "lifecycle_state": "STAGED_VERIFIED",
+      "source_kind": "pmc"
+    },
+    "pubmed": {
+      "access_state": "PUBLIC",
+      "licence_state": "PUBLIC_METADATA",
+      "lifecycle_state": "STAGED_VERIFIED",
+      "source_kind": "pubmed"
+    }
+  },
+  "truncation": {
+    "pubmed": {
+      "count": 189,
+      "is_truncated": true,
+      "returned_count": 100
+    }
+  }
+}

@@ -26,3 +26,6 @@ data/rescuescreen/r611q/structure-readiness-v1/**/*.gz -text
 
 # RescueScreen package-v2 summaries are byte-hash pinned by AC11.
 data/rescuescreen/r611q/package-v2-addendum/* text eol=lf
+
+# Public Atlas gate result is byte-hash pinned from approved CRLF bytes.
+data/atlas/runs/2026-08-03/r611q_gate_result.json text eol=crlf

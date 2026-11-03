@@ -1,0 +1,313 @@
+schema: raptor.project.spec.v1
+spec_id: raptor-v2-vamp-genomic-crosswalk-acquisition-v1
+spec_version: 1.0.4
+status: APPROVED_BUILD
+created_at: '2026-09-12'
+owner: human-terminal-authority
+branch: feature/raptor-v2-identity-crosswalk-v1
+stacked_on:
+  - spec_id: raptor-v2-missense-source-ingestion-v1
+    role: supplies frozen IGVF VAMP-seq scores
+  - spec_id: raptor-v2-functional-identity-normalization-v1
+    role: defines the PROTEIN_ONLY_CROSSWALK_REQUIRED gap
+
+objective: >-
+  Acquire the immutable FowlerLab TSC2 analysis V1 archive, extract only its
+  two VAMP-seq GMM identity tables, and build a deterministic protein-to-
+  transcript/genome crosswalk for every row of the frozen IGVF VAMP-seq score
+  file. Resolve genomic SPDI only where the archive identity is unique and its
+  declared $\text{GRCh38}$ reference interval matches the pinned
+  $\text{NC\_000016.10}$ FASTA. Preserve every unresolved score row with an
+  explicit reason; do not infer a nucleotide allele from protein identity.
+
+workflow:
+  planner: GPT-5.6-Sol
+  red_tests: GPT-5.3-Codex
+  builder: Claude-Sonnet-5
+  checker: GPT-5.6-Terra-xhigh
+  integrator: GPT-5.6-Sol
+  terminal_authority: human-owner
+
+non_goals:
+  - downloading or reconstructing the two approximately 1.2 GB PacBio FASTQs
+  - inferring codons from amino-acid substitutions
+  - changing VAMP-seq abundance scores or functional classes
+  - $PS3$/$BS3$, classification or evidence-strength assignment
+  - resolving the 49 source-coordinate conflicts heuristically
+  - resolving score rows absent from the archived GMM tables
+  - promotion of the legacy MAVE or SourceOps registries
+
+go_no_go:
+  pacbio_fastq_download: NO_GO
+  reason: >-
+    The immutable V1 archive already carries a one-to-one hgvs_p to hgvs_c and
+    genomic-coordinate crosswalk for 9,107 frozen score variants. The PacBio
+    files are useful for barcode-level ORF reconstruction but are unnecessary
+    for this bounded score-row identity slice, cost approximately 2.45 GB, and
+    would add alignment/consensus assumptions without resolving the 146
+    archive-absent rows.
+
+inputs:
+  frozen_vamp_scores:
+    source_bundle_id: tsc2-source-pilot-2026-09-09
+    source_manifest_content_hash: 63bd6eb4e7182b7f2d345cd78b3a110a59c361c72d521b88990c475919865808
+    artifact_id: igvf_vamp_seq-download-tsv-gz
+    relative_path: igvf/igvf_vamp_seq-IGVFFI9747KART.tsv.gz
+    sha256: 39f052e6e4819ff245fcee8d63fa1b4c3b09b2d9a0d529f5c14de5deaafa497e
+    md5: 1a397944b7a5158b3d63999dfcf926db
+    byte_length: 439700
+    row_count: 9253
+    protein_accession: ENSP00000219476.3
+  zenodo_archive:
+    record_id: 20837254
+    doi: 10.5281/zenodo.20837254
+    version: V1
+    publication_date: '2026-06-24'
+    access_right: open
+    license: MIT
+    filename: FowlerLab/TSC2_analysis-V1.zip
+    download_url: https://zenodo.org/api/records/20837254/files/FowlerLab/TSC2_analysis-V1.zip/content
+    request_accept: '*/*'
+    observed_content_type: application/octet-stream
+    byte_length: 5746881
+    md5: 8c35d120b65dbd93bc38d07c11b9538b
+    sha256: f9ceaec5d4608d3d2f804b4f919d42030aceb7d72170efb7e1c49ec0c725f403
+    github_repository: https://github.com/FowlerLab/TSC2_analysis
+    github_tag: V1
+    github_commit: 956161278134d56f1a043f56ed1dc6d0deeea1e7
+    required_members:
+      library1:
+        path: FowlerLab-TSC2_analysis-9561612/GMM_classifications/TSC2.lib1.gmm.tsv
+        byte_length: 3248988
+        sha256: 08841e283e2a59a4013cf9c85aba87c76dac268c2d083753cbff3970bcbe29b4
+        md5: 03c9e3c0e6924832262f7aa89ceddd80
+        row_count: 3567
+      library2:
+        path: FowlerLab-TSC2_analysis-9561612/GMM_classifications/TSC2.lib2.gmm.tsv
+        byte_length: 4933368
+        sha256: aec6e4da43096bbb947b1e0cc762913c3f0049c793af4d59b4005da09528be8c
+        md5: 31ba2f9f0f5aeca4cea9047ded48e157
+        row_count: 5540
+  genomic_reference:
+    environment_variable: RAPTOR_TSC2_REFERENCE_ROOT
+    accession: NC_000016.10
+    assembly: GRCh38
+    fasta_filename: NC_000016.10.fasta
+    sha256: 22dc1bb93de407e0653791c36e4097fbaf64c9efa2510c83b7777f607a61e4d0
+    normalizer: raptor.ingest.normalizer.SeqRepoGenomicNormalizer
+
+archive_table_contract:
+  delimiter: tab
+  required_columns:
+    - ID
+    - Gene
+    - Chrom
+    - STRAND
+    - hg38_start
+    - hg38_end
+    - ref_allele
+    - alt_allele
+    - hgvs_c
+    - hgvs_p
+    - Ref_seq_transcript_ID
+    - Ensembl_transcript_ID
+  required_values:
+    Gene: TSC2
+    Chrom: '16'
+    Ref_seq_transcript_ID: NM_000548.5
+    Ensembl_transcript_ID: ENST00000219476.9
+  ignored_columns: >-
+    Every non-required column, including abundance, GMM densities, clinical,
+    population, predictor and evidence-code columns, is ignored and must never
+    enter crosswalk outputs or summaries.
+  uniqueness:
+    total_rows: 9107
+    unique_hgvs_p: 9107
+    unique_hgvs_c: 9107
+    duplicate_protein_groups: 0
+    duplicate_cdna_groups: 0
+
+join_contract:
+  frozen_score_key: >-
+    Exact frozen score variant token ENSP00000219476.3:{hgvs_p}; no amino-acid
+    normalization, synonym substitution or residue-only match.
+  expected:
+    score_rows: 9253
+    archive_rows_joined: 9107
+    archive_absent_score_rows: 146
+    archive_extra_rows: 0
+  source_order: >-
+    Emit one crosswalk row for every frozen score row in frozen score-file
+    order. Archive-only ordering never controls output ordering.
+
+coordinate_contract:
+  accepted_source_coordinates: >-
+    First derive the affected cDNA length from hgvs_c. Accept a genomic
+    coordinate only when cDNA affected length, len(ref_allele),
+    len(alt_allele), and hg38_end-hg38_start+1 are all identical. Then treat
+    hg38_start/hg38_end as 1-based inclusive only when the pinned FASTA slice
+    [hg38_start-1:hg38_end] equals ref_allele exactly.
+  normalized_spdi: >-
+    For accepted rows, construct RawVariant(NC_000016.10, position=hg38_start,
+    ref=ref_allele, alt=alt_allele) and require
+    SeqRepoGenomicNormalizer to return NormalizedVariant. The returned
+    variant_id is the only accepted genomic SPDI.
+  rejected_coordinates: >-
+    A cDNA/genomic/ref/alt length mismatch is
+    SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH. After that gate, a FASTA mismatch
+    is SOURCE_COORDINATE_REFERENCE_MISMATCH. Do not reinterpret failed rows as
+    zero-based/half-open and do not search nearby offsets.
+  observed:
+    genomic_spdi_verified: 9050
+    source_coordinate_cdna_length_mismatch: 57
+    source_coordinate_reference_mismatch: 0
+    unique_verified_spdi: 9050
+    normalizer_manual_or_error_outcomes: 0
+
+crosswalk_row:
+  schema: raptor.external.vamp_genomic_crosswalk_row.v1
+  required_exact:
+    - schema
+    - source_id
+    - source_row
+    - protein_variant
+    - archive_member
+    - archive_row
+    - transcript
+    - hgvs_c
+    - assembly
+    - genomic_spdi
+    - status
+    - unresolved_reason
+  status_values:
+    - CROSSWALK_SPDI_VERIFIED
+    - SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH
+    - SOURCE_COORDINATE_REFERENCE_MISMATCH
+    - ARCHIVE_CROSSWALK_ABSENT
+  unresolved_reason_values:
+    - null
+    - SOURCE_GENOMIC_INTERVAL_NOT_EQUIVALENT_TO_CDNA_REPLACEMENT
+    - SOURCE_REF_DOES_NOT_MATCH_PINNED_FASTA
+    - PROTEIN_VARIANT_NOT_IN_ARCHIVE
+  invariants:
+    - source_id equals igvf_vamp_seq
+    - source_row is one-based and unique
+    - protein_variant retains the exact ENSP00000219476.3:p... score token
+    - verified rows carry archive provenance, NM_000548.5 hgvs_c, GRCh38 and genomic_spdi
+    - unresolved rows carry genomic_spdi null and the exact reason for their status
+    - no abundance score, functional class, clinical label or evidence strength is copied
+
+outputs:
+  external_bundle:
+    environment_variable: RAPTOR_TSC2_VAMP_CROSSWALK_ROOT
+    default_root: ~/raptor-data/external/tsc2-vamp-crosswalk
+    run_name: tsc2-vamp-genomic-crosswalk-2026-09-12
+    bundle_id: tsc2-vamp-genomic-crosswalk-2026-09-12
+    create_only: true
+    symlink_safe: true
+    manifest_last: true
+    artifacts:
+      - raw/FowlerLab-TSC2_analysis-V1.zip
+      - crosswalk/igvf_vamp_seq_genomic_crosswalk.jsonl
+      - bundle_manifest.json
+  committed_summary:
+    path: data/census/tsc2_vamp_genomic_crosswalk_2026-09-12.json
+    schema: raptor.external.vamp_genomic_crosswalk_summary.v1
+    contains:
+      - archive DOI/version/size/hashes and required-member hashes
+      - frozen score artifact hash
+      - reference hash
+      - exact row/status counts
+      - output artifact hashes and manifest content hash
+      - explicit PacBio no-go decision
+      - follow-on unresolved counts
+    excludes:
+      - protein variants
+      - hgvs_c or genomic_spdi rows
+      - scores or functional classes
+      - clinical/evidence fields
+
+implementation:
+  package: src/raptor/external/tsc2_vamp_crosswalk/
+  operator: scripts/fetch_tsc2_vamp_genomic_crosswalk.py
+  config: configs/external/tsc2_vamp_genomic_crosswalk_v1.yaml
+  tests: tests/external/test_tsc2_vamp_genomic_crosswalk.py
+  network_boundary: >-
+    Only the operator downloads the immutable Zenodo archive. Library code
+    accepts injected archive and score bytes and performs no network I/O.
+  publication: >-
+    Reuse the hardened create-only no-clobber external bundle primitive.
+
+expected_pilot:
+  total_score_rows: 9253
+  archive_crosswalk_rows: 9107
+  status_counts:
+    CROSSWALK_SPDI_VERIFIED: 9050
+    SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH: 57
+    SOURCE_COORDINATE_REFERENCE_MISMATCH: 0
+    ARCHIVE_CROSSWALK_ABSENT: 146
+  status_histogram_rule: >-
+    Emit every expected status key explicitly, including zero-valued
+    SOURCE_COORDINATE_REFERENCE_MISMATCH, before manifest construction and
+    expected-pilot validation.
+  verified_unique_spdi: 9050
+  conservation:
+    input_score_rows: 9253
+    output_crosswalk_rows: 9253
+    dropped_rows: 0
+    duplicate_source_rows: 0
+
+acceptance_criteria:
+  - id: VX-01
+    rule: The Zenodo record, archive filename, byte length, MD5 and SHA-256 match all pins.
+  - id: VX-02
+    rule: Required GMM members match exact paths, sizes, hashes, headers and row counts.
+  - id: VX-03
+    rule: Only required identity columns are parsed; clinical and score columns are ignored.
+  - id: VX-04
+    rule: Frozen VAMP score bytes/hash/count and exact ENSP protein tokens are verified.
+  - id: VX-05
+    rule: The archive hgvs_p join is exact, one-to-one and conserves all 9,253 score rows.
+  - id: VX-06
+    rule: Archive-absent score rows remain explicit unresolved rows with no inferred allele.
+  - id: VX-07
+    rule: >-
+      Source coordinates are accepted only when cDNA/genomic/ref/alt lengths
+      agree, followed by the pinned 1-based-inclusive reference rule.
+  - id: VX-08
+    rule: Reference-consistent rows are normalized only through SeqRepoGenomicNormalizer.
+  - id: VX-09
+    rule: The observed 9,050/57/0/146 status split is required by the real pilot gate.
+  - id: VX-10
+    rule: The two PacBio FASTQs are not downloaded or required by this slice.
+  - id: VX-11
+    rule: Crosswalk JSONL is deterministic, sorted-key, LF-terminated and byte-sensitive.
+  - id: VX-12
+    rule: External publication is create-only, symlink-safe, race-safe and outside Git.
+  - id: VX-13
+    rule: The committed summary is aggregate-only and binds to the external manifest hash.
+  - id: VX-14
+    rule: No output assigns clinical status, $PS3$/$BS3$ or evidence strength.
+  - id: VX-15
+    rule: >-
+      Actual total/archive/status/unique-SPDI/conservation counts must exactly
+      match expected_pilot before external publication.
+
+failure_cases:
+  - Zenodo redirect/resource substitution
+  - archive checksum or size mismatch
+  - zip traversal, duplicate member or unexpected required-member identity
+  - GMM header, row-count or hash drift
+  - score artifact hash or row-count drift
+  - duplicate score protein token
+  - duplicate archive hgvs_p or hgvs_c
+  - archive transcript/gene/assembly field drift
+  - source reference mismatch
+  - normalizer manual/error outcome for a reference-consistent row
+  - output conservation or manifest hash mismatch
+
+follow_on:
+  - adjudicate 57 cross-exon/coordinate-inconsistent rows using a separately frozen alignment authority
+  - investigate 146 archive-absent score rows without inferring codons
+  - consume the frozen crosswalk in a new functional-normalization bundle
+  - perform VUS, prospective-holdout and Atlas overlap only after identity promotion

@@ -1,0 +1,431 @@
+# RAPTOR v2 source expansion: first executable missense-evidence vertical slice.
+#
+# This specification authorizes implementation and a bounded real-source pilot.
+# It does not authorize ACMG evidence, classification, packet promotion, clinical
+# use, or automatic source activation.
+
+schema: raptor.v2.missense_source_ingestion_spec.v1
+spec_version: 1.0.5
+task_id: v2-missense-source-ingestion-v1
+status: APPROVED_TO_BUILD
+owner: '@dronasrinivas'
+created_at: '2026-09-09T00:47:16+05:30'
+branch: feature/raptor-v2-missense-sources-v1
+
+objective: >-
+  Build and execute one reproducible $TSC2$ source-ingestion slice that
+  discovers current PubMed and LitVar2 records, acquires lawfully accessible
+  publication and functional-dataset artifacts, and writes a hash-bound
+  external bundle plus a compact non-identifying pilot summary. The measurable
+  outcome is live source coverage and pinned bytes, not a new policy document.
+
+why_now:
+  prospective_result:
+    path: data/census/tsc_prospective_validation_2026-08_amendment_v3_result.json
+    missense_pathogenic: NO_CALLS
+    missense_benign: UNDERPOWERED_UNMET
+    implication: >-
+      Missense progress requires additional functional and primary-literature
+      evidence; thresholds are not changed.
+  existing_assets:
+    - src/raptor/external/mave/
+    - scripts/fetch_mave_scoreset.py
+    - src/raptor/atlas/citation.py
+    - src/raptor/sourceops/
+    - configs/external/mave_sources.yaml
+  stale_assumption_corrected: >-
+    IGVF analysis sets IGVFDS5595BTYJ and IGVFDS1782FCXW and their principal
+    score files are released and public as of this specification. The current
+    legacy MAVE register remains the protected pre-pilot declaration and is not
+    edited by this slice. The released observations are staged in
+    configs/external/tsc2_source_ingestion_v1.yaml and the external bundle;
+    SourceOps promotion may update the authoritative legacy register only after
+    the pilot and licence review. Licence permission remains unresolved.
+
+delivery:
+  implementation:
+    package_root: src/raptor/external/tsc2_sources/
+    operator: scripts/fetch_tsc2_source_bundle.py
+    config: configs/external/tsc2_source_ingestion_v1.yaml
+    tests: tests/external/test_tsc2_source_ingestion.py
+  external_bundle:
+    environment_variable: RAPTOR_TSC2_SOURCE_ROOT
+    default_relative_run: tsc2-source-pilot-2026-09-09
+    rule: >-
+      Raw publication, API, XML, TSV and compressed dataset bytes stay outside
+      the Git repository. A run directory is create-only and may never be
+      overwritten or silently resumed from unverified partial output.
+  committed_summary:
+    path: data/census/tsc2_source_ingestion_pilot_2026-09-09.json
+    contains:
+      - external bundle manifest content hash
+      - source and artifact counts
+      - exact staged source IDs and explicit missing-source IDs
+      - observed access and licence states
+      - aggregate source observations
+      - per-artifact SHA-256, MD5, byte length and verification state
+      - query result counts and explicit truncation
+      - missing-source and follow-on normalization gaps
+    excludes:
+      - full text
+      - per-variant functional rows
+      - patient information
+      - classification or evidence-strength claims
+
+architecture:
+  network_boundary:
+    rule: >-
+      Only scripts/fetch_tsc2_source_bundle.py performs network I/O. The
+      raptor.external.tsc2_sources package is deterministic parsing,
+      validation, hashing and manifest construction over injected bytes.
+    transport_result: >-
+      Every response must be a typed mapping with HTTPS requested/final URLs,
+      integer HTTP 200 status, nonblank media type and bytes body. Network,
+      timeout, TLS, DNS, malformed-response and non-200 failures are converted
+      to a source-specific error with sanitized URLs.
+    source_identity: >-
+      Final URL validation binds every source-defining path and canonical query
+      parameter, not only the host. PubMed term/date/retmax and EFetch PMID set,
+      MaveDB URN, IGVF accession/path and IGVF S3 object identity may not change
+      across redirects. Only explicitly nonsemantic signed query parameters may
+      differ.
+    secret_handling: >-
+      API keys, contact values and signed-object credentials are redacted before
+      entering any exception, stderr output, manifest, artifact record or log.
+    sourceops_boundary: >-
+      raptor.sourceops remains offline and imports no network or domain
+      package. The external bundle and committed declaration config become
+      later SourceOps inputs; no external package imports raptor.sourceops.
+    atlas_boundary: >-
+      Source records are untrusted leads. Atlas may later resolve and verify
+      exact spans from admitted artifacts, but ingestion never promotes an
+      Atlas claim or changes Gate 8.
+    mave_boundary: >-
+      Reuse the existing MaveDB register/fetch semantics. Functional score
+      files remain non-gating until a later, separately tested normalization,
+      calibration, circularity and $PS3/BS3$ policy slice.
+  filesystem:
+    - reject an output root inside the repository
+    - reject symlinks or reparse-like destination leaves
+    - write each artifact to a unique temporary sibling
+    - hash and validate before atomic publication
+    - refuse every pre-existing final run directory
+    - require run_name to be exactly one safe relative path component
+    - resolve the final path beneath the approved external root
+    - reject symlink/reparse ancestry, not only a symlink leaf
+    - reserve or publish the final directory without replacing a concurrent writer
+    - clean the staging directory on publication failure
+    - write the bundle manifest last
+  deterministic_manifest:
+    schema: raptor.external.tsc2_source_bundle.v1
+    hash_basis: >-
+      SHA-256 of UTF-8 canonical JSON with sorted object keys, separators
+      comma/colon, arrays preserved, and only top-level content_hash omitted.
+
+sources:
+  pubmed:
+    role: literature_discovery_and_metadata
+    service: NCBI Entrez E-utilities
+    search_endpoint: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi
+    fetch_endpoint: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi
+    database: pubmed
+    query: 'TSC2[Title/Abstract]'
+    publication_date_start: '2026/01/01'
+    publication_date_end: '2026/09/09'
+    retmax: 100
+    retmode_search: json
+    retmode_fetch: xml
+    date_type: pdat
+    required_known_pmid: '42425971'
+    rate_limit:
+      without_api_key_requests_per_second: 3
+      implementation_minimum_delay_seconds: 0.34
+    interpretation: >-
+      Search results and PubMed metadata are discovery records, not proof that
+      a paper contains variant-level evidence.
+    date_rule: >-
+      Preserve valid PubMed date precision without invention: YYYY, YYYY-MM or
+      YYYY-MM-DD are accepted, and a MedlineDate string is retained explicitly
+      when structured fields are unavailable. Missing day/month is not a parse
+      failure and is never filled with synthetic values.
+
+  litvar2:
+    role: variant_publication_leads
+    service: NCBI LitVar2
+    documentation: https://www.ncbi.nlm.nih.gov/research/litvar2/doc/api
+    gene_endpoint: https://www.ncbi.nlm.nih.gov/research/litvar2-api/variant/search/gene/TSC2
+    response_shape: line_delimited_mapping_records
+    required_fields: [_id, pmids_count]
+    optional_fields: [rsid, clingen_id]
+    projection_fields: [_id, rsid, pmids_count]
+    projection_nullable_fields: [rsid]
+    interpretation: >-
+      Every returned mapping is an untrusted lead. A LitVar association never
+      becomes an Atlas span, ACMG criterion or accepted evidence without source
+      retrieval and deterministic verification.
+    field_rule: >-
+      Required fields must exist, optional rsid and clingen_id fields may be
+      present, all other fields are rejected, and accepted records are
+      projected to the three projection fields with rsid=null when absent.
+    identity_rule: >-
+      Records without an rsid are retained by their unique _id. Records sharing
+      an rsid are one alias group: prefer the unique canonical aggregate record
+      whose _id is litvar@{rsid}## and has no clingen_id; if no canonical record
+      exists, retain the sole group member, but fail closed if multiple
+      non-canonical records compete. Every narrower alias pmids_count must be
+      less than or equal to the canonical aggregate pmids_count. Preserve the
+      first-seen order of resulting identity groups.
+    live_shape_observed_2026_09_09:
+      total_records: 4785
+      records_with_rsid: 3741
+      records_without_rsid: 1044
+      unique_rsid_groups: 2902
+      note: >-
+        Counts describe the failed-closed pilot observation and are diagnostic,
+        not immutable acceptance pins; exact acquired bytes are hash-bound by
+        the successful bundle.
+
+  pmc:
+    role: lawful_full_text_when_explicitly_permitted
+    legacy_oa_service_status: RETIRED_2026_08_25
+    current_bulk_documentation: https://pmc.ncbi.nlm.nih.gov/tools/textmining/
+    pilot_full_text_endpoint: https://www.ebi.ac.uk/europepmc/webservices/rest/PMC13478581/fullTextXML
+    pilot_pmcid: PMC13478581
+    pilot_pmid: '42425971'
+    pilot_doi: 10.1038/s41467-026-75442-6
+    rule: >-
+      The pilot acquires the final Nature Communications JATS XML, not the
+      earlier preprint representation, and must parse and preserve its own
+      licence declaration. General PMC acquisition may not call the retired OA
+      Web Service and may not infer open reuse from the existence of a PMC
+      record.
+
+  mavedb_clipe:
+    role: functional_dataset
+    urn: urn:mavedb:00001201-a-1
+    metadata_endpoint: https://api.mavedb.org/api/v1/score-sets/urn:mavedb:00001201-a-1
+    scores_endpoint: https://api.mavedb.org/api/v1/score-sets/urn:mavedb:00001201-a-1/scores
+    expected_gene: TSC2
+    expected_urn: urn:mavedb:00001201-a-1
+    expected_transcript: NM_000548.5
+    expected_variant_count: 208
+    expected_license: CC0-1.0
+    expected_sha256: 74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717
+
+  igvf_vamp_seq:
+    role: functional_dataset
+    analysis_set: IGVFDS5595BTYJ
+    file_accession: IGVFFI9747KART
+    analysis_endpoint: https://api.data.igvf.org/analysis-sets/IGVFDS5595BTYJ/
+    file_endpoint: https://api.data.igvf.org/tabular-files/IGVFFI9747KART/
+    download_endpoint: https://api.data.igvf.org/tabular-files/IGVFFI9747KART/@@download/IGVFFI9747KART.tsv.gz
+    required_status: released
+    required_controlled_access: false
+    expected_file_size: 439700
+    expected_md5: 1a397944b7a5158b3d63999dfcf926db
+    expected_assembly: GRCh38
+    licence_state: REVIEW_REQUIRED
+    redistribution: FORBIDDEN_UNTIL_REVIEW
+
+  igvf_sge:
+    role: functional_dataset
+    analysis_set: IGVFDS1782FCXW
+    file_accession: IGVFFI3097DFGF
+    analysis_endpoint: https://api.data.igvf.org/analysis-sets/IGVFDS1782FCXW/
+    file_endpoint: https://api.data.igvf.org/tabular-files/IGVFFI3097DFGF/
+    download_endpoint: https://api.data.igvf.org/tabular-files/IGVFFI3097DFGF/@@download/IGVFFI3097DFGF.tsv.gz
+    required_status: released
+    required_controlled_access: false
+    expected_file_size: 35101
+    expected_md5: c188e0a9dd4c67dfac13381d3879aedf
+    expected_assembly: GRCh38
+    licence_state: REVIEW_REQUIRED
+    redistribution: FORBIDDEN_UNTIL_REVIEW
+
+schemas:
+  fetched_artifact:
+    required_exact:
+      - artifact_id
+      - source_id
+      - role
+      - requested_url
+      - final_url
+      - http_status
+      - media_type
+      - relative_path
+      - byte_length
+      - sha256
+      - md5
+      - fetched_at
+      - verification
+    verification_values:
+      - HASHED
+      - PUBLISHED_MD5_VERIFIED
+      - METADATA_ONLY
+  source_record:
+    required_exact:
+      - source_id
+      - source_kind
+      - lifecycle_state
+      - access_state
+      - licence_state
+      - permitted_use
+      - identifiers
+      - artifact_ids
+      - observations
+      - limitations
+    lifecycle_values:
+      - STAGED_VERIFIED
+      - STAGED_LICENCE_REVIEW_REQUIRED
+      - METADATA_ONLY
+      - BLOCKED
+  bundle_manifest:
+    required_exact:
+      - schema
+      - bundle_id
+      - created_at
+      - query
+      - artifacts
+      - sources
+      - counts
+      - truncation
+      - boundaries
+      - content_hash
+
+acceptance_criteria:
+  - id: AC-01
+    rule: >-
+      URL builders encode query values, bind PubMed datetype=pdat, and accept no
+      arbitrary scheme, host, path or source-defining query substitution.
+  - id: AC-02
+    rule: All network operations are injected into pure package functions; tests make zero network calls.
+  - id: AC-03
+    rule: >-
+      PubMed search count, returned PMIDs and truncation are parsed and
+      preserved; date bounds and retmax are bound to the final URL; EFetch
+      metadata PMIDs equal the requested ESearch PMID set; PMID 42425971 is
+      present in the real pilot.
+  - id: AC-04
+    rule: >-
+      PubMed XML parser emits PMID, DOI, title, publication date with explicit
+      precision, and abstract text without inferring evidence; valid partial
+      dates and MedlineDate do not abort ingestion.
+  - id: AC-05
+    rule: >-
+      LitVar2 line records are parsed without eval or code execution, require
+      _id and pmids_count, allow only optional rsid and clingen_id, retain
+      rsid-less protein mappings, project to three fields with nullable rsid,
+      and collapse RSID aliases only by the deterministic canonical-aggregate
+      identity rule while preserving pmids_count.
+  - id: AC-06
+    rule: PMC JATS acquisition preserves raw XML and its explicit licence text; missing licence becomes LICENCE_REVIEW_REQUIRED.
+  - id: AC-07
+    rule: >-
+      MaveDB metadata/final paths and CSV match the exact registered URN, gene,
+      transcript, licence, row count and SHA-256.
+  - id: AC-08
+    rule: >-
+      Each IGVF metadata/final path matches its exact analysis/file accession,
+      released status, public access, assembly, file size and published MD5.
+  - id: AC-09
+    rule: Each downloaded IGVF file is verified against metadata MD5 and file size before publication.
+  - id: AC-10
+    rule: >-
+      IGVF remains STAGED_LICENCE_REVIEW_REQUIRED and cannot be marked
+      classification-ready. The staged config records released/public metadata
+      while the legacy MAVE register remains confirm_pending until promotion.
+  - id: AC-11
+    rule: >-
+      Output paths are external, create-only, race-safe, atomically published,
+      ancestry-symlink-safe and confined to one safe run-name child; partial or
+      publication failures leave no manifest or staging directory and never
+      replace a competing writer.
+  - id: AC-12
+    rule: Reordering source dictionaries cannot change semantic output; changing any artifact byte changes the bundle content hash.
+  - id: AC-13
+    rule: The package and pilot import no scorer, eval, packet, census, KB or RescueScreen module.
+  - id: AC-14
+    rule: >-
+      The committed pilot summary binds to the external manifest content hash,
+      records exact/missing source IDs, aggregate source observations and
+      per-artifact SHA-256/MD5/byte-length/verification values, with no
+      per-variant rows or full text.
+  - id: AC-15
+    rule: No output uses classification, pathogenic, benign, PS3, BS3, validated mechanism or accepted claim as an inferred status.
+  - id: AC-16
+    rule: >-
+      Real pilot failure reports the exact source and observed invariant with
+      sanitized URLs; it validates HTTP 200 and response types, wraps all
+      transport failures, never leaks credentials, substitutes another
+      endpoint or silently drops a source.
+
+test_requirements:
+  author: GPT-5.3-Codex
+  before_build: true
+  required_failure_cases:
+    - wrong PubMed database or malformed count
+    - missing required PMID
+    - valid partial PubMed date and MedlineDate
+    - PubMed final query/date/PMID-set substitution
+    - duplicate or malformed LitVar RSID
+    - LitVar optional clingen_id and unknown extra field
+    - unsafe LitVar line payload
+    - PMC XML without explicit licence
+    - MaveDB transcript, licence, row-count or hash drift
+    - MaveDB URN/final-path drift
+    - IGVF accession, status, access, assembly, size or MD5 drift
+    - IGVF metadata path or S3 object substitution
+    - redirected final host outside the allowlist
+    - pre-existing output directory
+    - symlinked output path
+    - interrupted download
+    - non-200 or malformed transport result
+    - credential-bearing failure URL
+    - absolute/nested run name and symlinked output ancestry
+    - concurrent final-path publication
+    - failed atomic publication cleanup
+    - manifest hash mismatch
+    - attempted clinical or ACMG status
+  command: python -m pytest tests/external/test_tsc2_source_ingestion.py -q
+
+build_requirements:
+  implementer: Claude-Sonnet-5
+  checker: GPT-5.6-Terra-xhigh
+  reuse:
+    - raptor.external.mave.register
+    - raptor.external.mave.metadata
+    - raptor.atlas.citation.normalize_identifier
+    - existing canonical JSON and atomic-write conventions
+  prohibited:
+    - network import inside raptor.sourceops
+    - direct source activation
+    - ACMG criterion emission
+    - threshold or classification policy
+    - per-variant committed data
+    - blanket PMC licence assumption
+    - use of the retired PMC OA Web Service
+    - in-place promotion of configs/external/mave_sources.yaml
+
+real_pilot:
+  required: true
+  gene: TSC2
+  output_run: tsc2-source-pilot-2026-09-09
+  required_sources:
+    - pubmed
+    - litvar2
+    - pmc
+    - mavedb_clipe
+    - igvf_vamp_seq
+    - igvf_sge
+  success: >-
+    All six sources produce verified staged records or an explicit
+    licence-limited state, the external manifest is complete and hash-valid,
+    and the committed summary reports real counts and hashes.
+
+follow_on_not_in_this_slice:
+  - normalize IGVF and MaveDB rows to $NM_000548.5$/GRCh38/SPDI
+  - reproduce abundance/activity transformations and thresholds
+  - audit calibration and ClinVar overlap
+  - compute overlap with 6,618 VUS, the 164-priority set, prospective holdout and Atlas variants
+  - implement assay-specific $PS3/BS3$ policy
+  - generate v2 packet addenda and the v1-to-v2 transition matrix
