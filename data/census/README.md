@@ -120,6 +120,18 @@ Raw publication and functional-dataset bytes remain outside Git. IGVF licence
 review remains required, and no source is activated for classification or
 assay-specific evidence.
 
+`tsc2_functional_identity_normalization_pilot_2026-09-11.json` records the
+aggregate-only identity normalization of the three frozen functional datasets.
+All 9,914 input rows were conserved: 423 SGE rows resolved to reference-verified
+$\text{GRCh38}$ SPDI, 27 SGE rows were blocked on reference-allele mismatch,
+three rows were retained as reference controls, 208 cliPE rows remained
+$NM\_000548.5$ transcript-only pending a real cDNA projector, and 9,253
+VAMP-seq rows remained protein-only pending the source nucleotide crosswalk.
+The external normalized-row bundle is pinned by manifest SHA-256
+`74f15f22cfb6e876a8fab3a16c841e6f33317eadd58ef04547e4c060162afb48`.
+No per-row identity or raw score is committed, and no functional score is
+promoted to classification or assay-specific evidence.
+
 `tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json` (ADR-0012) is the
 packet-free, non-identifying binding census aggregate over the same
 6,618-VUS TSC1/TSC2 run under the PP3/BP4-disabled-automated-emission /

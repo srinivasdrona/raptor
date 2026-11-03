@@ -1,0 +1,132 @@
+schema: raptor.external.tsc2_functional_identity_normalization_config.v1
+config_id: tsc2-functional-identity-normalization-v1
+spec: docs/project/specs/raptor-v2-functional-identity-normalization-v1.yaml
+spec_version: "1.0.1"
+
+inputs:
+  source_bundle:
+    bundle_id: tsc2-source-pilot-2026-09-09
+    environment_variable: RAPTOR_TSC2_SOURCE_ROOT
+    run_name: tsc2-source-pilot-2026-09-09
+    manifest_filename: bundle_manifest.json
+    manifest_content_hash: 63bd6eb4e7182b7f2d345cd78b3a110a59c361c72d521b88990c475919865808
+    required_artifacts:
+      mavedb_clipe:
+        artifact_id: mavedb_clipe-scores-csv
+        relative_path: mavedb/mavedb_clipe-scores.csv
+        sha256: 74fef301d3b3cf6b6958161f7eaf8fa1ebab7ae35befae3879d0a9841c769717
+        byte_length: 14277
+      igvf_vamp_seq:
+        artifact_id: igvf_vamp_seq-download-tsv-gz
+        relative_path: igvf/igvf_vamp_seq-IGVFFI9747KART.tsv.gz
+        sha256: 39f052e6e4819ff245fcee8d63fa1b4c3b09b2d9a0d529f5c14de5deaafa497e
+        md5: 1a397944b7a5158b3d63999dfcf926db
+        byte_length: 439700
+      igvf_sge:
+        artifact_id: igvf_sge-download-tsv-gz
+        relative_path: igvf/igvf_sge-IGVFFI3097DFGF.tsv.gz
+        sha256: b0bfb98a8213535afc28672f16807c68a6b421d01b485334259c0d6e251ec975
+        md5: c188e0a9dd4c67dfac13381d3879aedf
+        byte_length: 35101
+  genomic_reference:
+    environment_variable: RAPTOR_TSC2_REFERENCE_ROOT
+    accession: NC_000016.10
+    assembly: GRCh38
+    fasta_filename: NC_000016.10.fasta
+    sha256: 22dc1bb93de407e0653791c36e4097fbaf64c9efa2510c83b7777f607a61e4d0
+    normalizer: raptor.ingest.normalizer.SeqRepoGenomicNormalizer
+  identity_pins:
+    gene: TSC2
+    transcript: NM_000548.5
+    genomic_accession: NC_000016.10
+    assembly: GRCh38
+    sge_source_transcript: NM_000548_5
+    sge_source_genomic_accession: NC_000016_10
+    vamp_source_protein: ENSP00000219476.3
+
+source_rules:
+  mavedb_clipe:
+    source_id: mavedb_clipe
+    format: csv
+    exact_header: [accession, hgvs_nt, hgvs_splice, hgvs_pro, score]
+    expected_rows: 208
+  igvf_vamp_seq:
+    source_id: igvf_vamp_seq
+    format: tsv_gzip
+    exact_header:
+      - variant
+      - score
+      - standard_error
+      - rep1
+      - rep2
+      - rep3
+      - functional_class
+    expected_rows: 9253
+  igvf_sge:
+    source_id: igvf_sge
+    format: tsv_gzip
+    exact_header:
+      - sequence
+      - reference
+      - hgvs_nt
+      - hgvs_p
+      - hgvs_g
+      - presort__replicate_1
+      - pS6_Hi__replicate_1
+      - pS6_Lo__replicate_1
+      - pS6_log2_score__replicate_1
+      - presort__replicate_2
+      - pS6_Hi__replicate_2
+      - pS6_Lo__replicate_2
+      - pS6_log2_score__replicate_2
+      - presort__replicate_3
+      - pS6_Hi__replicate_3
+      - pS6_Lo__replicate_3
+      - pS6_log2_score__replicate_3
+      - presort__replicate_4
+      - pS6_Hi__replicate_4
+      - pS6_Lo__replicate_4
+      - pS6_log2_score__replicate_4
+      - pS6_score
+    expected_rows: 453
+    expected_variant_kinds:
+      MISSENSE: 318
+      SYNONYMOUS: 104
+      STOP_GAINED: 16
+      OTHER: 12
+      REFERENCE_CONTROL: 3
+
+output:
+  external_bundle:
+    environment_variable: RAPTOR_TSC2_FUNCTIONAL_NORMALIZATION_ROOT
+    default_root: ~/raptor-data/external/tsc2-functional-normalization
+    run_name: tsc2-functional-identity-normalization-pilot-2026-09-11
+    bundle_id: tsc2-functional-identity-normalization-pilot-2026-09-11
+    manifest_schema: raptor.external.tsc2_functional_identity_bundle.v1
+  committed_summary:
+    path: data/census/tsc2_functional_identity_normalization_pilot_2026-09-11.json
+    schema: raptor.external.tsc2_functional_identity_summary.v1
+
+expected_pilot:
+  total_rows: 9914
+  source_rows:
+    mavedb_clipe: 208
+    igvf_vamp_seq: 9253
+    igvf_sge: 453
+  identity_state_counts:
+    GENOMIC_SPDI_VERIFIED: 423
+    GENOMIC_REFERENCE_MISMATCH: 27
+    TRANSCRIPT_ONLY_PROJECTOR_REQUIRED: 208
+    PROTEIN_ONLY_CROSSWALK_REQUIRED: 9253
+    REFERENCE_CONTROL: 3
+  variant_kind_counts:
+    MISSENSE: 9340
+    SYNONYMOUS: 496
+    STOP_GAINED: 63
+    OTHER: 12
+    REFERENCE_CONTROL: 3
+  conservation:
+    input_rows: 9914
+    output_rows: 9914
+    dropped_rows: 0
+    duplicated_rows: 0
