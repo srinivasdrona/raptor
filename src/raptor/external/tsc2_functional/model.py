@@ -65,11 +65,28 @@ ALLOWED_IDENTITY_STATES: frozenset[str] = frozenset(
         "TRANSCRIPT_ONLY_PROJECTOR_REQUIRED",
         "PROTEIN_ONLY_CROSSWALK_REQUIRED",
         "REFERENCE_CONTROL",
+        # Added by the raptor-v2-functional-identity-promotion-v1 amendment
+        # (spec ``row_contract_amendment.add_identity_states``): a VAMP row
+        # whose archive-matched cDNA replacement length does not equal its
+        # source genomic interval length, and a VAMP row whose protein
+        # variant has no archive match at all.
+        "GENOMIC_CROSSWALK_LENGTH_MISMATCH",
+        "PROTEIN_ONLY_ARCHIVE_CROSSWALK_ABSENT",
     }
 )
 
 ALLOWED_UNRESOLVED_REASONS: frozenset[Any] = frozenset(
-    {None, "REFERENCE_ALLELE_MISMATCH", "CDNA_PROJECTOR_REQUIRED", "NUCLEOTIDE_CROSSWALK_REQUIRED", "NOT_A_VARIANT"}
+    {
+        None,
+        "REFERENCE_ALLELE_MISMATCH",
+        "CDNA_PROJECTOR_REQUIRED",
+        "NUCLEOTIDE_CROSSWALK_REQUIRED",
+        "NOT_A_VARIANT",
+        # Added by the raptor-v2-functional-identity-promotion-v1 amendment
+        # (spec ``row_contract_amendment.add_unresolved_reasons``).
+        "SOURCE_GENOMIC_INTERVAL_NOT_EQUIVALENT_TO_CDNA_REPLACEMENT",
+        "PROTEIN_VARIANT_NOT_IN_ARCHIVE",
+    }
 )
 
 #: Every ``identity_state`` binds to EXACTLY one ``unresolved_reason`` (this
@@ -81,6 +98,10 @@ IDENTITY_STATE_TO_UNRESOLVED_REASON: dict[str, str | None] = {
     "TRANSCRIPT_ONLY_PROJECTOR_REQUIRED": "CDNA_PROJECTOR_REQUIRED",
     "PROTEIN_ONLY_CROSSWALK_REQUIRED": "NUCLEOTIDE_CROSSWALK_REQUIRED",
     "REFERENCE_CONTROL": "NOT_A_VARIANT",
+    # raptor-v2-functional-identity-promotion-v1 amendment
+    # (spec ``row_contract_amendment.state_reason_bindings``).
+    "GENOMIC_CROSSWALK_LENGTH_MISMATCH": "SOURCE_GENOMIC_INTERVAL_NOT_EQUIVALENT_TO_CDNA_REPLACEMENT",
+    "PROTEIN_ONLY_ARCHIVE_CROSSWALK_ABSENT": "PROTEIN_VARIANT_NOT_IN_ARCHIVE",
 }
 
 #: Fixed identity pins a ``GENOMIC_SPDI_VERIFIED`` row must carry (spec
@@ -89,10 +110,20 @@ _VERIFIED_ASSEMBLY = "GRCh38"
 _VERIFIED_TRANSCRIPT = "NM_000548.5"
 _VERIFIED_GENOMIC_ACCESSION = "NC_000016.10"
 
-#: A canonical SNV SPDI string: ``<accession>:<position0>:<ref>:<alt>``.
-_SPDI_SNV_RE = re.compile(r"^(?P<accession>[A-Za-z0-9_.]+):(?P<position>\d+):(?P<ref>[ACGT]+):(?P<alt>[ACGT]+)$")
+#: A canonical SPDI string: ``<accession>:<position0>:<deleted>:<inserted>``
+#: -- ``deleted``/``inserted`` are non-empty ACGT strings (spec
+#: ``row_contract_amendment.verified_spdi.invariants``: "SPDI deleted and
+#: inserted sequences are non-empty uppercase ACGT"). Equal-length checking
+#: (SNV vs. equal-length delins) is done separately below, since a regex
+#: alone cannot express a cross-group length equality.
+_SPDI_RE = re.compile(r"^(?P<accession>[A-Za-z0-9_.]+):(?P<position>-?\d+):(?P<deleted>[ACGT]+):(?P<inserted>[ACGT]+)$")
 #: A canonical genomic HGVS SNV string: ``<accession>:g.<position1><ref>><alt>``.
 _HGVS_G_SNV_RE = re.compile(r"^(?P<accession>[A-Za-z0-9_.]+):g\.(?P<position>\d+)(?P<ref>[ACGT])>(?P<alt>[ACGT])$")
+#: A canonical genomic HGVS equal-length delins string:
+#: ``<accession>:g.<start1>_<end1>delins<inserted>``.
+_HGVS_G_DELINS_RE = re.compile(
+    r"^(?P<accession>[A-Za-z0-9_.]+):g\.(?P<start>\d+)_(?P<end>\d+)delins(?P<inserted>[ACGT]+)$"
+)
 
 
 class NormalizationContractError(ValueError):
@@ -197,38 +228,75 @@ class NormalizedFunctionalRow:
                     f"{_VERIFIED_ASSEMBLY!r} and transcript {_VERIFIED_TRANSCRIPT!r}, got "
                     f"assembly={self.assembly!r} transcript={self.transcript!r}"
                 )
-            spdi_match = _SPDI_SNV_RE.match(self.spdi)
+            spdi_match = _SPDI_RE.match(self.spdi)
             if spdi_match is None:
                 raise NormalizationContractError(
-                    f"spdi {self.spdi!r} is not a canonical <accession>:<position>:<ref>:<alt> SNV string"
+                    f"spdi {self.spdi!r} is not a canonical <accession>:<position>:<deleted>:<inserted> "
+                    "string with non-empty ACGT deleted/inserted sequences"
                 )
             if spdi_match["accession"] != _VERIFIED_GENOMIC_ACCESSION:
                 raise NormalizationContractError(
                     f"spdi {self.spdi!r} accession must be {_VERIFIED_GENOMIC_ACCESSION!r}"
                 )
+            position0 = int(spdi_match["position"])
+            if position0 < 0:
+                raise NormalizationContractError(f"spdi {self.spdi!r} position must be non-negative")
+            deleted = spdi_match["deleted"]
+            inserted = spdi_match["inserted"]
+            if len(deleted) != len(inserted):
+                raise NormalizationContractError(
+                    f"spdi {self.spdi!r} deleted/inserted lengths must be equal (only exact SNV or "
+                    "equal-length delins are a verified genomic identity), got "
+                    f"deleted={deleted!r} inserted={inserted!r}"
+                )
             if self.hgvs_g is None:
                 raise NormalizationContractError(
                     "GENOMIC_SPDI_VERIFIED requires a non-null hgvs_g to cross-validate spdi against"
                 )
-            hgvs_g_match = _HGVS_G_SNV_RE.match(self.hgvs_g)
-            if hgvs_g_match is None:
-                raise NormalizationContractError(
-                    f"hgvs_g {self.hgvs_g!r} is not a canonical <accession>:g.<position><ref>><alt> SNV string"
-                )
-            if hgvs_g_match["accession"] != _VERIFIED_GENOMIC_ACCESSION:
-                raise NormalizationContractError(
-                    f"hgvs_g {self.hgvs_g!r} accession must be {_VERIFIED_GENOMIC_ACCESSION!r}"
-                )
-            expected_position = int(hgvs_g_match["position"]) - 1
-            if (
-                int(spdi_match["position"]) != expected_position
-                or spdi_match["ref"] != hgvs_g_match["ref"]
-                or spdi_match["alt"] != hgvs_g_match["alt"]
-            ):
-                raise NormalizationContractError(
-                    f"spdi {self.spdi!r} does not match the normalized hgvs_g {self.hgvs_g!r} "
-                    "(expected position = hgvs_g position - 1, same ref/alt)"
-                )
+            if len(deleted) == 1:
+                hgvs_g_match = _HGVS_G_SNV_RE.match(self.hgvs_g)
+                if hgvs_g_match is None:
+                    raise NormalizationContractError(
+                        f"hgvs_g {self.hgvs_g!r} is not a canonical <accession>:g.<position><ref>><alt> "
+                        "SNV string"
+                    )
+                if hgvs_g_match["accession"] != _VERIFIED_GENOMIC_ACCESSION:
+                    raise NormalizationContractError(
+                        f"hgvs_g {self.hgvs_g!r} accession must be {_VERIFIED_GENOMIC_ACCESSION!r}"
+                    )
+                expected_position = position0 + 1
+                if (
+                    int(hgvs_g_match["position"]) != expected_position
+                    or spdi_match["deleted"] != hgvs_g_match["ref"]
+                    or spdi_match["inserted"] != hgvs_g_match["alt"]
+                ):
+                    raise NormalizationContractError(
+                        f"spdi {self.spdi!r} does not match the normalized hgvs_g {self.hgvs_g!r} "
+                        "(expected hgvs_g position = spdi position + 1, same ref/alt)"
+                    )
+            else:
+                hgvs_g_match = _HGVS_G_DELINS_RE.match(self.hgvs_g)
+                if hgvs_g_match is None:
+                    raise NormalizationContractError(
+                        f"hgvs_g {self.hgvs_g!r} is not a canonical <accession>:g.<start>_<end>delins"
+                        "<inserted> equal-length delins string"
+                    )
+                if hgvs_g_match["accession"] != _VERIFIED_GENOMIC_ACCESSION:
+                    raise NormalizationContractError(
+                        f"hgvs_g {self.hgvs_g!r} accession must be {_VERIFIED_GENOMIC_ACCESSION!r}"
+                    )
+                expected_start = position0 + 1
+                expected_end = expected_start + len(deleted) - 1
+                if (
+                    int(hgvs_g_match["start"]) != expected_start
+                    or int(hgvs_g_match["end"]) != expected_end
+                    or hgvs_g_match["inserted"] != inserted
+                ):
+                    raise NormalizationContractError(
+                        f"spdi {self.spdi!r} does not match the normalized hgvs_g {self.hgvs_g!r} "
+                        "(expected hgvs_g start = spdi position + 1, end = start + len(deleted) - 1, "
+                        "same inserted sequence)"
+                    )
         elif self.spdi is not None:
             raise NormalizationContractError(
                 f"only GENOMIC_SPDI_VERIFIED rows may carry a non-null spdi (identity_state="

@@ -151,6 +151,20 @@ are pinned by manifest SHA-256
 `f80759aa43874d201efb69c52b611d9ebd8c40712159bf1f291c86195dd33ba0`.
 The approximately 2.45 GB PacBio raw-read download was not required.
 
+`tsc2_functional_identity_promotion_2026-09-14.json` records the
+aggregate-only promotion of the frozen cliPE and VAMP-seq crosswalks into the
+functional normalization set. All 9,914 rows were conserved, yielding 9,681
+reference-verified $\text{GRCh38}$ SPDI observations across cliPE, VAMP-seq
+and SGE, representing 9,552 unique identities and 129 duplicate observations.
+The pairwise overlaps were 38 for cliPE–SGE, 85 for VAMP-seq–SGE and 13 for
+cliPE–VAMP-seq, with seven identities shared by all three assays. The 27
+reference mismatches, 57 cDNA/genomic-length conflicts, 146 archive-absent
+VAMP-seq rows and three reference controls remain explicitly unresolved or
+non-variant. The external promoted-row bundle is pinned by manifest SHA-256
+`c66639976bf9369cfd07568011a85f5ac50fd0ea9467c54210768574645941ed`.
+No per-row identity or raw score is committed, and no functional result is
+authorized for classification or assay-specific $PS3$/$BS3$ evidence.
+
 `tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json` (ADR-0012) is the
 packet-free, non-identifying binding census aggregate over the same
 6,618-VUS TSC1/TSC2 run under the PP3/BP4-disabled-automated-emission /
