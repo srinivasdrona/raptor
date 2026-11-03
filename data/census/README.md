@@ -152,6 +152,65 @@ The external addendum is pinned by manifest content hash
 `ea48e5d0572c1a7d5d6c929abf842ab34fa0e3723bf02a4e6c213942e3e85404`;
 article identities, quotes, locators and review records remain outside Git.
 
+`tsc2_functional_identity_normalization_pilot_2026-09-11.json` records the
+aggregate-only identity normalization of the three frozen functional datasets.
+All 9,914 input rows were conserved: 423 SGE rows resolved to reference-verified
+$\text{GRCh38}$ SPDI, 27 SGE rows were blocked on reference-allele mismatch,
+three rows were retained as reference controls, 208 cliPE rows remained
+$NM\_000548.5$ transcript-only pending a real cDNA projector, and 9,253
+VAMP-seq rows remained protein-only pending the source nucleotide crosswalk.
+The external normalized-row bundle is pinned by manifest SHA-256
+`74f15f22cfb6e876a8fab3a16c841e6f33317eadd58ef04547e4c060162afb48`.
+No per-row identity or raw score is committed, and no functional score is
+promoted to classification or assay-specific evidence.
+
+`tsc2_clipe_cdna_spdi_projector_pilot_2026-09-12.json` records the
+aggregate-only cliPE cDNA projector pilot. All 208 frozen
+$NM\_000548.5$ rows—161 SNVs and 47 equal-length delins—were projected
+through the two-step NCBI Variation Services path and independently
+reference-verified on $\text{NC\_000016.10}$. The external mapping and 416
+raw response bodies are pinned by manifest SHA-256
+`247665b9758860124b196d037b913626b7699b87ba1bb1c32b0e461bb4473529`.
+No mapping row or raw response is committed.
+
+`tsc2_vamp_genomic_crosswalk_2026-09-12.json` records the aggregate-only
+VAMP-seq genomic crosswalk from the immutable Zenodo V1 analysis archive.
+Of 9,253 frozen VAMP score rows, 9,050 resolved to unique reference-backed
+$\text{GRCh38}$ SPDI, 57 were blocked because the archive genomic interval
+was not equivalent in length to the cDNA replacement, and 146 were absent
+from the archived GMM identity tables. The external archive and crosswalk
+are pinned by manifest SHA-256
+`f80759aa43874d201efb69c52b611d9ebd8c40712159bf1f291c86195dd33ba0`.
+The approximately 2.45 GB PacBio raw-read download was not required.
+
+`tsc2_functional_identity_promotion_2026-09-14.json` records the
+aggregate-only promotion of the frozen cliPE and VAMP-seq crosswalks into the
+functional normalization set. All 9,914 rows were conserved, yielding 9,681
+reference-verified $\text{GRCh38}$ SPDI observations across cliPE, VAMP-seq
+and SGE, representing 9,552 unique identities and 129 duplicate observations.
+The pairwise overlaps were 38 for cliPE–SGE, 85 for VAMP-seq–SGE and 13 for
+cliPE–VAMP-seq, with seven identities shared by all three assays. The 27
+reference mismatches, 57 cDNA/genomic-length conflicts, 146 archive-absent
+VAMP-seq rows and three reference controls remain explicitly unresolved or
+non-variant. The external promoted-row bundle is pinned by manifest SHA-256
+`c66639976bf9369cfd07568011a85f5ac50fd0ea9467c54210768574645941ed`.
+No per-row identity or raw score is committed, and no functional result is
+authorized for classification or assay-specific $PS3$/$BS3$ evidence.
+
+`tsc2_functional_coverage_map_2026-09-14.json` records the aggregate-only,
+exact-SPDI coverage map over the 9,552 verified $TSC2$ functional identities.
+Coverage reaches 335 of the 6,618 frozen VUS identities, four of the 164
+internal priority identities, 171 of the 2,608 protected prospective-holdout
+identities and six of the 25 resolved Atlas contrast identities. All four
+priority overlaps are candidate-LP review rows covered by SGE. The $R611Q$
+Atlas anchor is covered by cliPE and is also present in the protected holdout.
+Leakage markers identify 171 holdout-covered identities, seven Atlas-context
+identities and four carrying both markers. The external row-level coverage
+bundle is pinned by manifest SHA-256
+`b079eca8d126eab468e42af140ebc646e5e3f021b5c2d819bb7fbb890cd7d101`.
+No row identity, functional score, holdout label or Atlas claim is committed
+or authorized for classification, calibration or $PS3$/$BS3$ evidence.
+
 `tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json` (ADR-0012) is the
 packet-free, non-identifying binding census aggregate over the same
 6,618-VUS TSC1/TSC2 run under the PP3/BP4-disabled-automated-emission /
