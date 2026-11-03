@@ -1,0 +1,377 @@
+{
+  "assay_lineage_dependence": [
+    {
+      "description": "Nellist/Erasmus parental-HEK293/HEK293T functional-assay and construct lineage; repeated positive-control use is not independent replication.",
+      "lineage_id": "L1_NELLIST_PARENTAL"
+    },
+    {
+      "description": "Nellist/Erasmus CRISPR 3H9-1B1 double-knockout assay generation reused across 2020-2024 papers.",
+      "lineage_id": "L2_NELLIST_3H9_DKO"
+    },
+    {
+      "description": "Independent Pam/MYCBP2 ubiquitination laboratory; imports the R611Q binding premise.",
+      "lineage_id": "L3_RAMESH_PAM"
+    },
+    {
+      "description": "Patient-621 R611Q-plus-LOH tumor and derivative 621-101/621-327 lineage; derivatives are not independent allele models.",
+      "lineage_id": "L4_HENSKE_621"
+    },
+    {
+      "description": "Independent endogenous cliPE program plus later integrated MAVE/VAMP work; publication and released datasets must be deduplicated.",
+      "lineage_id": "L5_CALHOUN_MAVE"
+    },
+    {
+      "description": "Independent COS-1 Rac1/ROS/motility study.",
+      "lineage_id": "L6_SUZUKI_RAC1"
+    },
+    {
+      "description": "External laboratory using R611Q plasmids supplied by Mark Nellist.",
+      "lineage_id": "L7_EXTERNAL_NELLIST_REAGENT"
+    },
+    {
+      "description": "Independent clinical molecular cohorts/cases; occurrence does not establish mechanism.",
+      "lineage_id": "L8_CLINICAL_COHORTS"
+    },
+    {
+      "description": "Independent tumor sequencing/two-hit contexts.",
+      "lineage_id": "L9_TUMOR_GENETICS"
+    },
+    {
+      "description": "Independent non-mTOR cell-cycle study; allele-specific extraction incomplete.",
+      "lineage_id": "L10_HENSKE_G1"
+    },
+    {
+      "description": "General HERC1/Hsp90/TSC1 proteostasis mechanisms without R611Q testing.",
+      "lineage_id": "L11_GENERAL_PROTEOSTASIS"
+    },
+    {
+      "description": "Wild-type structural and GAP-biochemistry studies; no mutant or ligand-bound R611Q structure.",
+      "lineage_id": "L12_STRUCTURAL"
+    }
+  ],
+  "cutoff_date": "2026-08-17",
+  "generated_at": "2026-08-17T11:51:44.034+05:30",
+  "global_findings": {
+    "accepted_atlas_claims": 0,
+    "direct_contradictions_found": 0,
+    "gate_8_changed": false,
+    "rescuescreen_status": "EXPLORATORY_EVIDENCE_ONLY"
+  },
+  "propositions": [
+    {
+      "conclusion": "R611Q recurs in clinical and tumor reports; occurrence and phenotype do not establish a RescueScreen mechanism.",
+      "contradictory_sources": [],
+      "direct_support_sources": [
+        "PMID:10823953",
+        "PMID:15595939",
+        "PMID:16032769",
+        "PMID:16981987",
+        "PMID:24271014",
+        "PMID:29221145",
+        "PMID:31083211",
+        "PMID:32313033",
+        "PMID:32555378",
+        "PMID:38601768",
+        "PMID:40225170"
+      ],
+      "evidence_status": "DIRECT_OCCURRENCE_NO_MECHANISM_INFERENCE",
+      "grouped_or_control_reuse_sources": [],
+      "indirect_context_sources": [],
+      "measured_indeterminate_sources": [],
+      "proposition": "R611Q was observed in a reported person, family, cohort, or tumor.",
+      "proposition_id": "P_CLINICAL_OCCURRENCE",
+      "verified_not_measured_sources": []
+    },
+    {
+      "conclusion": "The exact score is fixed; its categorical interpretation changed with calibration version.",
+      "contradictory_sources": [],
+      "direct_support_sources": [
+        "MAVEDB:urn:mavedb:00001201-a-1",
+        "PMID:38895336"
+      ],
+      "evidence_status": "DIRECT_DATASET_WITH_CALIBRATION_DEPENDENCE",
+      "grouped_or_control_reuse_sources": [],
+      "indirect_context_sources": [
+        "DOI:10.64898/2026.01.16.699909"
+      ],
+      "measured_indeterminate_sources": [],
+      "proposition": "R611Q has an allele-specific cliPE CMAS observation.",
+      "proposition_id": "P_CLIPE_SCORE",
+      "verified_not_measured_sources": []
+    },
+    {
+      "conclusion": "Direct co-IP/binding support exists, concentrated in the Nellist lineage; several later sources measure associated TSC1/TSC2 signals rather than binding itself.",
+      "contradictory_sources": [],
+      "direct_support_sources": [
+        "PMID:18230340",
+        "PMID:18302728"
+      ],
+      "evidence_status": "DIRECT_SUPPORT_CONTEXT_BOUND",
+      "grouped_or_control_reuse_sources": [
+        "PMID:18854862",
+        "PMID:26703369",
+        "PMID:39596632"
+      ],
+      "indirect_context_sources": [
+        "PMID:11741832",
+        "PMID:18308511"
+      ],
+      "measured_indeterminate_sources": [],
+      "proposition": "R611Q reduces TSC1 binding or TSC-complex formation/associated TSC1 abundance.",
+      "proposition_id": "P_COMPLEX_BINDING",
+      "verified_not_measured_sources": [
+        "PMID:10823953",
+        "PMID:38601768"
+      ]
+    },
+    {
+      "conclusion": "No direct-binding, stabilization, complex-rescue, or functional-rescue compound has been reported for R611Q in this corpus.",
+      "contradictory_sources": [],
+      "direct_support_sources": [],
+      "evidence_status": "UNSUPPORTED_NOT_MEASURED",
+      "grouped_or_control_reuse_sources": [],
+      "indirect_context_sources": [],
+      "measured_indeterminate_sources": [],
+      "proposition": "A compound directly binds and stabilizes/rescues R611Q TSC2.",
+      "proposition_id": "P_COMPOUND_RESCUE",
+      "verified_not_measured_sources": [
+        "PMID:27216612",
+        "PMID:38601768"
+      ]
+    },
+    {
+      "conclusion": "No R611Q-specific degron was mapped; loss of TSC1 protection is an alternative explanation.",
+      "contradictory_sources": [],
+      "direct_support_sources": [],
+      "evidence_status": "UNSUPPORTED_NOT_MEASURED",
+      "grouped_or_control_reuse_sources": [],
+      "indirect_context_sources": [
+        "PMID:16464865",
+        "PMID:18308511"
+      ],
+      "measured_indeterminate_sources": [],
+      "proposition": "R611Q creates or exposes a defined degron.",
+      "proposition_id": "P_DEFINED_DEGRON",
+      "verified_not_measured_sources": [
+        "PMID:18308511"
+      ]
+    },
+    {
+      "conclusion": "Wild-type coordinates exist, but no mutant structure, residue-specific contact proof, pocket calculation, fragment screen, or ligand-bound structure was found.",
+      "contradictory_sources": [],
+      "direct_support_sources": [],
+      "evidence_status": "UNSUPPORTED_NOT_MEASURED",
+      "grouped_or_control_reuse_sources": [],
+      "indirect_context_sources": [
+        "PDB:7DL2",
+        "PDB:9CE3",
+        "PMID:33436626",
+        "PMID:39565846"
+      ],
+      "measured_indeterminate_sources": [],
+      "proposition": "R611Q has a validated ligandable/druggable pocket or defined Arg611-TSC1 contact.",
+      "proposition_id": "P_DRUGGABLE_POCKET",
+      "verified_not_measured_sources": [
+        "PMID:33436626",
+        "PMID:39565846"
+      ]
+    },
+    {
+      "conclusion": "Rapalogs suppress downstream pathway/tumor readouts in several R611Q-containing contexts, but no source shows stabilization or restored R611Q complex/GAP function.",
+      "contradictory_sources": [],
+      "direct_support_sources": [
+        "PMID:27216612"
+      ],
+      "evidence_status": "DIRECT_DOWNSTREAM_ONLY",
+      "grouped_or_control_reuse_sources": [
+        "PMID:22719903",
+        "PMID:23555865",
+        "PMID:38601768"
+      ],
+      "indirect_context_sources": [],
+      "measured_indeterminate_sources": [],
+      "proposition": "Rapalog treatment suppresses downstream mTORC1 readouts in an R611Q-containing context.",
+      "proposition_id": "P_EVEROLIMUS_DOWNSTREAM",
+      "verified_not_measured_sources": []
+    },
+    {
+      "conclusion": "No study restored abundance/complex formation and then measured intrinsic Rheb-GTP hydrolysis.",
+      "contradictory_sources": [],
+      "direct_support_sources": [],
+      "evidence_status": "UNSUPPORTED_NOT_MEASURED",
+      "grouped_or_control_reuse_sources": [],
+      "indirect_context_sources": [
+        "DOI:10.64898/2026.07.14.738392",
+        "PMID:18302728"
+      ],
+      "measured_indeterminate_sources": [],
+      "proposition": "R611Q retains intrinsic Rheb-GAP activity after abundance and complex formation are restored.",
+      "proposition_id": "P_INTRINSIC_GAP_RESCUE",
+      "verified_not_measured_sources": [
+        "PMID:18302728"
+      ]
+    },
+    {
+      "conclusion": "No direct folding, aggregation, thermal-stability, limited-proteolysis, or hydrophobic-exposure assay was found.",
+      "contradictory_sources": [],
+      "direct_support_sources": [],
+      "evidence_status": "UNSUPPORTED_NOT_MEASURED",
+      "grouped_or_control_reuse_sources": [],
+      "indirect_context_sources": [
+        "DOI:10.64898/2026.01.16.699909",
+        "IGVF:IGVFFI9747KART",
+        "PDB:7DL2",
+        "PDB:9CE3"
+      ],
+      "measured_indeterminate_sources": [],
+      "proposition": "R611Q directly misfolds, aggregates, or exposes hydrophobic surface.",
+      "proposition_id": "P_MISFOLDING",
+      "verified_not_measured_sources": [
+        "PMID:18308511"
+      ]
+    },
+    {
+      "conclusion": "Low-throughput support is concentrated in related overexpression lineages. The independent cliPE score is indeterminate under 2024 thresholds and abnormal under the 2026 cutoff; this is calibration dependence, not biological contradiction.",
+      "contradictory_sources": [],
+      "direct_support_sources": [
+        "PMID:18302728",
+        "PMID:18854862",
+        "PMID:26703369",
+        "PMID:27216612"
+      ],
+      "evidence_status": "DIRECT_SUPPORT_WITH_LINEAGE_AND_CALIBRATION_DEPENDENCE",
+      "grouped_or_control_reuse_sources": [
+        "PMID:21309039",
+        "PMID:22719903",
+        "PMID:39596632"
+      ],
+      "indirect_context_sources": [
+        "DOI:10.64898/2026.01.16.699909"
+      ],
+      "measured_indeterminate_sources": [
+        "MAVEDB:urn:mavedb:00001201-a-1",
+        "PMID:38895336"
+      ],
+      "proposition": "R611Q impairs TSC-complex-dependent suppression of mTORC1/TORC1 readouts.",
+      "proposition_id": "P_MTORC1_SUPPRESSION",
+      "verified_not_measured_sources": []
+    },
+    {
+      "conclusion": "Pam/MYCBP2-associated ubiquitination is directly observed once; proteasomal turnover and rescue are not demonstrated.",
+      "contradictory_sources": [],
+      "direct_support_sources": [
+        "PMID:18308511"
+      ],
+      "evidence_status": "DIRECT_SUPPORT_SINGLE_LAB",
+      "grouped_or_control_reuse_sources": [],
+      "indirect_context_sources": [
+        "PMID:16464865",
+        "PMID:29127155"
+      ],
+      "measured_indeterminate_sources": [],
+      "proposition": "R611Q remains susceptible to Pam/MYCBP2-associated ubiquitination despite TSC1 co-expression.",
+      "proposition_id": "P_PAM_UBIQUITINATION",
+      "verified_not_measured_sources": [
+        "PMID:18854862",
+        "PMID:26703369"
+      ]
+    },
+    {
+      "conclusion": "Multiple overexpression assays and an independent R611Q VAMP-seq row support lower steady-state abundance; this is not a half-life or folding measurement.",
+      "contradictory_sources": [],
+      "direct_support_sources": [
+        "IGVF:IGVFFI9747KART",
+        "PMID:18854862",
+        "PMID:26703369",
+        "PMID:27216612"
+      ],
+      "evidence_status": "DIRECT_SUPPORT_ASSAY_DEPENDENT",
+      "grouped_or_control_reuse_sources": [
+        "PMID:21309039",
+        "PMID:22719903",
+        "PMID:39596632"
+      ],
+      "indirect_context_sources": [
+        "DOI:10.64898/2026.01.16.699909"
+      ],
+      "measured_indeterminate_sources": [],
+      "proposition": "R611Q lowers steady-state TSC2 abundance in the stated assay.",
+      "proposition_id": "P_STEADY_STATE_ABUNDANCE",
+      "verified_not_measured_sources": []
+    },
+    {
+      "conclusion": "Several tumors show R611Q with LOH/copy loss; these biallelic tumor contexts are not heterozygous patient-cell models.",
+      "contradictory_sources": [],
+      "direct_support_sources": [
+        "PMID:10823953",
+        "PMID:29221145",
+        "PMID:38601768"
+      ],
+      "evidence_status": "DIRECT_TUMOR_CONTEXT",
+      "grouped_or_control_reuse_sources": [],
+      "indirect_context_sources": [
+        "PMID:22719903"
+      ],
+      "measured_indeterminate_sources": [],
+      "proposition": "R611Q occurred with loss/inactivation of the other TSC2 allele in the reported tumor context.",
+      "proposition_id": "P_TUMOR_TWO_HIT",
+      "verified_not_measured_sources": []
+    },
+    {
+      "conclusion": "No R611Q-specific half-life, cycloheximide chase, MG132 rescue, or proteasome-dependent turnover result was found.",
+      "contradictory_sources": [],
+      "direct_support_sources": [],
+      "evidence_status": "UNSUPPORTED_NOT_MEASURED",
+      "grouped_or_control_reuse_sources": [],
+      "indirect_context_sources": [
+        "PMID:16464865",
+        "PMID:18308511",
+        "PMID:29127155"
+      ],
+      "measured_indeterminate_sources": [],
+      "proposition": "R611Q has a measured shortened half-life or demonstrated proteasome-dependent turnover.",
+      "proposition_id": "P_TURNOVER_PROTEASOME",
+      "verified_not_measured_sources": [
+        "IGVF:IGVFFI9747KART",
+        "PMID:18308511"
+      ]
+    },
+    {
+      "conclusion": "The released R611Q VAMP row is functionally_abnormal for steady-state GFP-fusion abundance; it does not demonstrate misfolding or turnover.",
+      "contradictory_sources": [],
+      "direct_support_sources": [
+        "DOI:10.64898/2026.01.16.699909",
+        "IGVF:IGVFFI9747KART"
+      ],
+      "evidence_status": "DIRECT_DATASET",
+      "grouped_or_control_reuse_sources": [],
+      "indirect_context_sources": [],
+      "measured_indeterminate_sources": [],
+      "proposition": "R611Q has an allele-specific VAMP-seq abundance observation.",
+      "proposition_id": "P_VAMP_ABUNDANCE",
+      "verified_not_measured_sources": []
+    }
+  ],
+  "relationship_vocabulary": [
+    "SUPPORTS",
+    "CONTRADICTS",
+    "MEASURED_INDETERMINATE",
+    "NOT_MEASURED",
+    "INDIRECT_CONTEXT",
+    "CONTROL_REUSE"
+  ],
+  "schema": "rescuescreen.r611q.mechanism_evidence_matrix.v1",
+  "variant": {
+    "aliases": [
+      "R611Q",
+      "G1832A",
+      "rs28934872"
+    ],
+    "gene": "TSC2",
+    "hgvs_c": "NM_000548.5:c.1832G>A",
+    "hgvs_p": "NP_000539.2:p.Arg611Gln",
+    "spdi": "NC_000016.10:2070570:G:A",
+    "uniprot": "P49815",
+    "uniprot_feature": "VAR_005650"
+  }
+}

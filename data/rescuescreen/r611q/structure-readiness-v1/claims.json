@@ -1,0 +1,147 @@
+{
+  "claim_status_vocabulary": [
+    "SOURCE_REPORTED",
+    "UNTRUSTED"
+  ],
+  "claims": [
+    {
+      "claim_id": "SR-E001",
+      "claim_text": "UniProt P49815 sequence residue 611 is R (Arg).",
+      "evidence_id": "E001",
+      "exact_quote": "UniProt P49815 sequence residue 611 is R (Arg).",
+      "locator": "text-char:7:54",
+      "raw_source_refs": [
+        "raw/uniprot-P49815.fasta",
+        "raw/uniprot-P49815.json"
+      ],
+      "verification_status": "SOURCE_REPORTED"
+    },
+    {
+      "claim_id": "SR-E002",
+      "claim_text": "7DL2 model 1 TSC2 entity 2 auth A/asym B label_seq 562/auth_seq 611 is wild-type ARG with 11 expected heavy-atom records, alt_id '.', and occupancy 1.00.",
+      "evidence_id": "E002",
+      "exact_quote": "7DL2 model 1 TSC2 entity 2 auth A/asym B label_seq 562/auth_seq 611 is wild-type ARG with 11 expected heavy-atom records, alt_id '.', and occupancy 1.00.",
+      "locator": "text-char:62:215",
+      "raw_source_refs": [
+        "raw/pdb-7dl2.cif"
+      ],
+      "verification_status": "SOURCE_REPORTED"
+    },
+    {
+      "claim_id": "SR-E003",
+      "claim_text": "7DL2 model 1 TSC2 entity 2 auth B/asym C label_seq 562/auth_seq 611 is wild-type ARG with 11 expected heavy-atom records, alt_id '.', and occupancy 1.00.",
+      "evidence_id": "E003",
+      "exact_quote": "7DL2 model 1 TSC2 entity 2 auth B/asym C label_seq 562/auth_seq 611 is wild-type ARG with 11 expected heavy-atom records, alt_id '.', and occupancy 1.00.",
+      "locator": "text-char:223:376",
+      "raw_source_refs": [
+        "raw/pdb-7dl2.cif"
+      ],
+      "verification_status": "SOURCE_REPORTED"
+    },
+    {
+      "claim_id": "SR-E004",
+      "claim_text": "7DL2 validation auth A/asym B label_seq 562 reports Q_score 0.303, residue_inclusion 1.0000, and rotamer mpp80.",
+      "evidence_id": "E004",
+      "exact_quote": "7DL2 validation auth A/asym B label_seq 562 reports Q_score 0.303, residue_inclusion 1.0000, and rotamer mpp80.",
+      "locator": "text-char:384:495",
+      "raw_source_refs": [
+        "extracted/pdb-7dl2-validation.xml"
+      ],
+      "verification_status": "SOURCE_REPORTED"
+    },
+    {
+      "claim_id": "SR-E005",
+      "claim_text": "7DL2 validation auth B/asym C label_seq 562 reports Q_score 0.268, residue_inclusion 0.8182, and rotamer mtt180.",
+      "evidence_id": "E005",
+      "exact_quote": "7DL2 validation auth B/asym C label_seq 562 reports Q_score 0.268, residue_inclusion 0.8182, and rotamer mtt180.",
+      "locator": "text-char:503:615",
+      "raw_source_refs": [
+        "extracted/pdb-7dl2-validation.xml"
+      ],
+      "verification_status": "SOURCE_REPORTED"
+    },
+    {
+      "claim_id": "SR-E006",
+      "claim_text": "9CE3 model 1 TSC2 entity 1 auth A/asym A and auth B/asym B label_seq 619/auth_seq 611 are wild-type ARG with 11 expected heavy-atom records, alt_id '.', and occupancy 1.00.",
+      "evidence_id": "E006",
+      "exact_quote": "9CE3 model 1 TSC2 entity 1 auth A/asym A and auth B/asym B label_seq 619/auth_seq 611 are wild-type ARG with 11 expected heavy-atom records, alt_id '.', and occupancy 1.00.",
+      "locator": "text-char:623:795",
+      "raw_source_refs": [
+        "raw/pdb-9ce3.cif"
+      ],
+      "verification_status": "SOURCE_REPORTED"
+    },
+    {
+      "claim_id": "SR-E007",
+      "claim_text": "9CE3 validation auth A/asym A label_seq 619 reports Q_score 0.454, residue_inclusion 0.8182, and rotamer mtm180; auth B/asym B reports Q_score 0.483, residue_inclusion 1.0000, and rotamer mtm180.",
+      "evidence_id": "E007",
+      "exact_quote": "9CE3 validation auth A/asym A label_seq 619 reports Q_score 0.454, residue_inclusion 0.8182, and rotamer mtm180; auth B/asym B reports Q_score 0.483, residue_inclusion 1.0000, and rotamer mtm180.",
+      "locator": "text-char:803:998",
+      "raw_source_refs": [
+        "extracted/pdb-9ce3-validation.xml"
+      ],
+      "verification_status": "SOURCE_REPORTED"
+    },
+    {
+      "claim_id": "SR-E008",
+      "claim_text": "PDBe deposited entry summaries report ligand=0 and water=0 for both 7DL2 and 9CE3; this is deposited inventory only and does not establish non-ligandability.",
+      "evidence_id": "E008",
+      "exact_quote": "PDBe deposited entry summaries report ligand=0 and water=0 for both 7DL2 and 9CE3; this is deposited inventory only and does not establish non-ligandability.",
+      "locator": "text-char:1006:1163",
+      "raw_source_refs": [
+        "raw/pdbe-7dl2-summary.json",
+        "raw/pdbe-9ce3-summary.json"
+      ],
+      "verification_status": "SOURCE_REPORTED"
+    },
+    {
+      "claim_id": "SR-E009",
+      "claim_text": "PMC7804450 reports: \"The structure was determined by cryo-EM single particle reconstruction, and the cryo-EM map was refined to an overall resolution of 4.4 Å (Fig. 1b ). The core and two wings were locally refined to 3.6, 3.9, and 4.1 Å resolution, respectively\"",
+      "evidence_id": "E009",
+      "exact_quote": "PMC7804450 reports: \"The structure was determined by cryo-EM single particle reconstruction, and the cryo-EM map was refined to an overall resolution of 4.4 Å (Fig. 1b ). The core and two wings were locally refined to 3.6, 3.9, and 4.1 Å resolution, respectively\"",
+      "locator": "text-char:1171:1434",
+      "raw_source_refs": [
+        "raw/pmc7804450.xml"
+      ],
+      "verification_status": "SOURCE_REPORTED"
+    },
+    {
+      "claim_id": "SR-E010",
+      "claim_text": "PMC11578170 reports: \"Here, focused refinement and classification stepped along the 40 nm length of the TSC:WIPI3 complex enabled us to achieve a final composite reconstruction with an average nominal resolution of 2.8 Å\"",
+      "evidence_id": "E010",
+      "exact_quote": "PMC11578170 reports: \"Here, focused refinement and classification stepped along the 40 nm length of the TSC:WIPI3 complex enabled us to achieve a final composite reconstruction with an average nominal resolution of 2.8 Å\"",
+      "locator": "text-char:1442:1663",
+      "raw_source_refs": [
+        "raw/pmc11578170.xml"
+      ],
+      "verification_status": "SOURCE_REPORTED"
+    },
+    {
+      "claim_id": "SR-E011",
+      "claim_text": "The scoped primary-article XML contains no R611 or R611Q statement, and the scoped coordinates contain wild-type ARG611 rather than a GLN mutant structure.",
+      "evidence_id": "E011",
+      "exact_quote": "The scoped primary-article XML contains no R611 or R611Q statement, and the scoped coordinates contain wild-type ARG611 rather than a GLN mutant structure.",
+      "locator": "text-char:1671:1826",
+      "raw_source_refs": [
+        "raw/pmc7804450.xml",
+        "raw/pmc11578170.xml",
+        "raw/pdb-7dl2.cif",
+        "raw/pdb-9ce3.cif"
+      ],
+      "verification_status": "SOURCE_REPORTED"
+    },
+    {
+      "claim_id": "SR-E012",
+      "claim_text": "No coordinate contact calculation is included in this pack; a direct Arg611-TSC1 contact or salt bridge, a pocket, and ligandability remain unsupported or unmeasured.",
+      "evidence_id": "E012",
+      "exact_quote": "No coordinate contact calculation is included in this pack; a direct Arg611-TSC1 contact or salt bridge, a pocket, and ligandability remain unsupported or unmeasured.",
+      "locator": "text-char:1834:2000",
+      "raw_source_refs": [
+        "raw/pdb-7dl2.cif",
+        "raw/pdb-9ce3.cif"
+      ],
+      "verification_status": "UNTRUSTED"
+    }
+  ],
+  "schema": "rescuescreen.r611q.structure_claims.v1"
+}

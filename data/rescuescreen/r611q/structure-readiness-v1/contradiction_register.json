@@ -1,0 +1,36 @@
+{
+  "entries": [
+    {
+      "classification": "NUMBERING_HAZARD",
+      "id": "CR-1",
+      "resolution": "Retain both author and label identifiers in every target record.",
+      "statement": "Author chain identifiers and label asym identifiers differ in 7DL2 (A/B to B/C), and target label sequence numbers differ between entries."
+    },
+    {
+      "classification": "COPY_LEVEL_DISAGREEMENT",
+      "id": "CR-2",
+      "resolution": "Report copy-specific raw metrics; do not average Q-scores or assign a threshold.",
+      "statement": "7DL2 target copies have different reported rotamers: mpp80 for auth A/asym B and mtt180 for auth B/asym C."
+    },
+    {
+      "classification": "CONTEXT_DIFFERENCE_NOT_CONTRADICTION",
+      "id": "CR-3",
+      "resolution": "Retain both labels because they describe different reporting contexts.",
+      "statement": "9CE3 repository global resolution is 2.9 Å, while the publication reports a final composite average nominal resolution of 2.8 Å."
+    },
+    {
+      "classification": "EVIDENCE_LIMIT",
+      "id": "CR-4",
+      "resolution": "Wild-type context only.",
+      "statement": "No R611Q mutant structure occurs in the scoped coordinate sources."
+    },
+    {
+      "classification": "UNMEASURED",
+      "id": "CR-5",
+      "resolution": "Do not infer contacts, pockets, or ligandability.",
+      "statement": "A direct Arg611-TSC1 contact or salt bridge, a pocket, and ligandability are not measured in this pack."
+    }
+  ],
+  "schema": "rescuescreen.r611q.structure_contradiction_register.v1",
+  "true_contradiction_detected": false
+}

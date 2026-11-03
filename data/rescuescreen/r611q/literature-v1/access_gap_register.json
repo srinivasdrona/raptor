@@ -1,0 +1,223 @@
+{
+  "cutoff_date": "2026-08-17",
+  "gaps": [
+    {
+      "description": "Foundational publisher full text or exact allele tables were not lawfully accessible; original R611Q spans remain unverified or cross-source only.",
+      "gap_id": "AG-001",
+      "impact": "These sources cannot ground stronger allele-specific statements in this bundle.",
+      "priority": "HIGH",
+      "resolution": "Obtain lawful full text/supplements and pin exact spans and licenses.",
+      "sources": [
+        "PMID:11741832",
+        "PMID:15483652",
+        "PMID:22903760"
+      ],
+      "status": "OPEN",
+      "type": "SOURCE_ACCESS"
+    },
+    {
+      "description": "Full text is publicly readable or archived, but NCBI PMC OA API does not report an open-content license.",
+      "gap_id": "AG-002",
+      "impact": "Evidence may be summarized with short spans; redistribution of source content is not assumed.",
+      "priority": "MEDIUM",
+      "resolution": "Verify publisher-specific reuse terms before broader redistribution.",
+      "sources": [
+        "PMID:18854862",
+        "PMID:18308511",
+        "PMID:10823953",
+        "PMID:24271014",
+        "PMID:12205112"
+      ],
+      "status": "OPEN",
+      "type": "LICENSE"
+    },
+    {
+      "description": "The IGVF file is public and controlled_access=false, but the file record exposes no explicit reuse license.",
+      "gap_id": "AG-003",
+      "impact": "The exact row can be cited; downstream redistribution terms remain unresolved.",
+      "priority": "MEDIUM",
+      "resolution": "Pin IGVF data-use/terms statement for this released file.",
+      "sources": [
+        "IGVF:IGVFFI9747KART"
+      ],
+      "status": "OPEN",
+      "type": "DATA_LICENSE"
+    },
+    {
+      "description": "The contradiction report could not extract the compressed R611Q VAMP row.",
+      "gap_id": "AG-004",
+      "impact": "Resolved: row 8168, hashes, score, uncertainty and functional class are now pinned.",
+      "priority": "HIGH",
+      "resolution": "No further extraction required; preserve file/version hashes.",
+      "sources": [
+        "IGVF:IGVFFI9747KART"
+      ],
+      "status": "CLOSED",
+      "type": "DATA_ROW"
+    },
+    {
+      "description": "The same cliPE score is indeterminate under 2024 thresholds and abnormal under the 2026 cutoff.",
+      "gap_id": "AG-005",
+      "impact": "Categorical interpretation is calibration-version dependent.",
+      "priority": "HIGH",
+      "resolution": "Always report raw score plus named threshold version; never count as replication.",
+      "sources": [
+        "MAVEDB:urn:mavedb:00001201-a-1",
+        "PMID:38895336",
+        "DOI:10.64898/2026.01.16.699909"
+      ],
+      "status": "OPEN",
+      "type": "CALIBRATION"
+    },
+    {
+      "description": "No R611Q-specific half-life or proteasome-dependence measurement exists.",
+      "gap_id": "AG-006",
+      "impact": "Ubiquitination and low abundance cannot be restated as demonstrated rapid degradation.",
+      "priority": "CRITICAL",
+      "resolution": "Measure controlled turnover, proteasome dependence and abundance rescue.",
+      "sources": [
+        "PMID:18308511",
+        "IGVF:IGVFFI9747KART"
+      ],
+      "status": "OPEN",
+      "type": "MECHANISM"
+    },
+    {
+      "description": "No direct R611Q folding, aggregation, thermal-stability, limited-proteolysis, hydrophobic-exposure, or degron-mapping assay was found.",
+      "gap_id": "AG-007",
+      "impact": "Misfolding and a defined degron remain unsupported.",
+      "priority": "CRITICAL",
+      "resolution": "Perform orthogonal direct biophysical/proteostasis assays.",
+      "sources": [],
+      "status": "OPEN",
+      "type": "MECHANISM"
+    },
+    {
+      "description": "No study restores R611Q abundance/complex formation and then measures intrinsic Rheb-GAP activity.",
+      "gap_id": "AG-008",
+      "impact": "Catalytic competence after stabilization cannot be assumed.",
+      "priority": "CRITICAL",
+      "resolution": "Use normalized/reconstituted rescue conditions with direct Rheb-GTP hydrolysis.",
+      "sources": [
+        "PMID:18302728",
+        "DOI:10.64898/2026.07.14.738392"
+      ],
+      "status": "OPEN",
+      "type": "MECHANISM"
+    },
+    {
+      "description": "Wild-type residue 611 is modeled, but no R611Q mutant structure, defined Arg611-TSC1 contact, local ligandability analysis, fragment screen, or ligand-bound structure exists.",
+      "gap_id": "AG-009",
+      "impact": "No residue-local druggable pocket premise is supported.",
+      "priority": "CRITICAL",
+      "resolution": "Complete residue-level structure-quality review before any falsifiable pocket hypothesis.",
+      "sources": [
+        "PDB:7DL2",
+        "PDB:9CE3"
+      ],
+      "status": "OPEN",
+      "type": "STRUCTURE"
+    },
+    {
+      "description": "Most low-throughput functional results are concentrated in one Nellist/Erasmus construct and assay lineage.",
+      "gap_id": "AG-010",
+      "impact": "Publication count overstates independent replication.",
+      "priority": "HIGH",
+      "resolution": "Report lineage-adjusted evidence and seek orthogonal independent-laboratory assays.",
+      "sources": [
+        "PMID:11741832",
+        "PMID:18302728",
+        "PMID:18854862",
+        "PMID:21309039",
+        "PMID:26703369",
+        "PMID:31799751",
+        "PMID:32555378",
+        "PMID:39596632"
+      ],
+      "status": "OPEN",
+      "type": "LINEAGE"
+    },
+    {
+      "description": "621-101/621-327 carry R611Q plus loss of the wild-type allele and are tumor-derived/immortalized derivatives.",
+      "gap_id": "AG-011",
+      "impact": "They are not heterozygous patient-cell models and do not isolate R611Q stabilization.",
+      "priority": "HIGH",
+      "resolution": "Use genotype-defined orthogonal models and isogenic controls.",
+      "sources": [
+        "PMID:10823953",
+        "PMID:23555865",
+        "PMID:22719903"
+      ],
+      "status": "OPEN",
+      "type": "MODEL_CONTEXT"
+    },
+    {
+      "description": "Literature alternates between NM_000548.3/.5 and exon 16/17 numbering.",
+      "gap_id": "AG-012",
+      "impact": "Alias mismatch can create false deduplication or structure-mapping errors.",
+      "priority": "MEDIUM",
+      "resolution": "Retain c.1832G>A/p.Arg611Gln and authoritative transcript/protein mappings with every record.",
+      "sources": [
+        "DBSNP:rs28934872",
+        "UNIPROT:P49815/VAR_005650"
+      ],
+      "status": "OPEN",
+      "type": "IDENTITY_MAPPING"
+    },
+    {
+      "description": "No compound has demonstrated direct binding, R611Q stabilization, complex rescue, or proximal functional rescue.",
+      "gap_id": "AG-013",
+      "impact": "No compound ranking or rescue claim is evidence-supported.",
+      "priority": "CRITICAL",
+      "resolution": "Entry gates and the ordered assay cascade must be satisfied before screening claims.",
+      "sources": [],
+      "status": "OPEN",
+      "type": "RESCUE_EVIDENCE"
+    },
+    {
+      "description": "Atlas Gate 8 remains BLOCKED_HUMAN_REVIEW and accepted_claim_count remains 0.",
+      "gap_id": "AG-014",
+      "impact": "All mechanism statements remain source-reported exploratory evidence, not accepted Atlas claims.",
+      "priority": "CRITICAL",
+      "resolution": "Only the existing named-human Atlas review process can change claim status; this bundle does not.",
+      "sources": [],
+      "status": "OPEN",
+      "type": "ATLAS_BOUNDARY"
+    },
+    {
+      "description": "The search is bounded to named/frozen sources, verified citation tracing and records available through 2026-08-17.",
+      "gap_id": "AG-015",
+      "impact": "Absence of a contradiction is not proof that none exists.",
+      "priority": "MEDIUM",
+      "resolution": "Repeat the documented protocol after the cutoff and on newly available lawful full text.",
+      "sources": [],
+      "status": "OPEN",
+      "type": "SEARCH_LIMIT"
+    }
+  ],
+  "generated_at": "2026-08-17T11:51:44.034+05:30",
+  "hard_boundaries": [
+    "No clinical interpretation.",
+    "No Atlas claim acceptance or Gate 8 change.",
+    "No inference of misfolding, degron, intrinsic GAP rescue, druggable pocket, or compound rescue."
+  ],
+  "schema": "rescuescreen.r611q.access_gap_register.v1",
+  "summary": {
+    "closed": 1,
+    "critical_open": 6,
+    "open": 14
+  },
+  "variant": {
+    "aliases": [
+      "R611Q",
+      "G1832A",
+      "rs28934872"
+    ],
+    "gene": "TSC2",
+    "hgvs_c": "NM_000548.5:c.1832G>A",
+    "hgvs_p": "NP_000539.2:p.Arg611Gln",
+    "spdi": "NC_000016.10:2070570:G:A",
+    "uniprot": "P49815",
+    "uniprot_feature": "VAR_005650"
+  }
+}

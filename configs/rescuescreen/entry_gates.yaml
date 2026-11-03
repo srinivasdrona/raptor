@@ -1,0 +1,37 @@
+schema: rescuescreen.entry_gate_manifest.v1
+lane_id: raptor-rescuescreen
+lane_version: v1
+manifest_version: 1.0.0
+created_at: '2026-08-16T15:23:00+05:30'
+manifest_content_hash: 86c63f1915d967de948d73c9b11fae5bcce313aa509745c0b944d52eb4f8b1ef
+hash_basis: rescuescreen.entry_gate_manifest_content_hash.v1
+gates:
+  - gate_id: EG-1
+    status: NOT_SATISFIED
+    fail_state: MECHANISM_UNVERIFIED
+    evidence_refs: []
+    note: No named human Gate 8 acceptance exists and the accepted Atlas claim count is zero.
+  - gate_id: EG-2
+    status: NOT_SATISFIED
+    fail_state: MAPPING_UNVERIFIED
+    evidence_refs: []
+    note: No reviewed transcript-to-structure residue mapping artifact is registered.
+  - gate_id: EG-3
+    status: NOT_SATISFIED
+    fail_state: STRUCTURE_COVERAGE_INSUFFICIENT
+    evidence_refs: []
+    note: No reviewed experimental-structure coverage and uncertainty assessment is registered.
+  - gate_id: EG-4
+    status: NOT_SATISFIED
+    fail_state: LICENCE_INCOMPATIBLE
+    evidence_refs: []
+    note: No complete per-artifact tool, data, model-weight, and licence registry is verified.
+  - gate_id: EG-5
+    status: NOT_SATISFIED
+    fail_state: NO_TRACTABLE_ASSAY
+    evidence_refs: []
+    note: No reviewed construct and orthogonal assay feasibility plan is registered.
+preservation_rules:
+  - Evaluation never changes a gate status or opens an evidence reference.
+  - READY_FOR_S1_REVIEW never authorizes stage execution.
+  - No RescueScreen stage, scientific inference, or patient-facing workflow is executed.

@@ -1,0 +1,26 @@
+{
+  "atlas_boundary": {
+    "accepted_claim_count": 0,
+    "changed_by_this_pack": false,
+    "gate_8": "BLOCKED_HUMAN_REVIEW"
+  },
+  "authorization_ceiling": {
+    "compound_screening_authorized": false,
+    "docking_authorized": false,
+    "treatment_authorized": false
+  },
+  "first_blocker": {
+    "fail_state": "MECHANISM_UNVERIFIED",
+    "gate_id": "EG-1"
+  },
+  "gate_states": {
+    "EG-1": "NOT_SATISFIED",
+    "EG-2": "NOT_SATISFIED",
+    "EG-3": "NOT_SATISFIED",
+    "EG-4": "NOT_SATISFIED",
+    "EG-5": "NOT_SATISFIED"
+  },
+  "readiness": "EVIDENCE_PACK_READY_FOR_HUMAN_REVIEW",
+  "schema": "rescuescreen.r611q.structure_readiness_assessment.v1",
+  "stage_execution_authorized": false
+}

@@ -1449,6 +1449,75 @@ todos:
   - panel-products-independent-freeze
   - atlas-phase2-human-span-review
   created: '2026-08-15'
+- id: rescuescreen-entry-gate-status
+  title: Implementing deterministic RescueScreen entry-gate status
+  description: 'Track: RESCUESCREEN / PLATFORM (gate infrastructure only; screens no
+    compound and executes no RescueScreen stage). Implement the closed, hash-bound
+    rescuescreen.entry_gate_manifest.v1 model, deterministic offline validator and
+    rescuescreen.entry_gate_status.v1 report defined by
+    docs/project/specs/rescuescreen-entry-gates-v1.yaml. The committed manifest must
+    retain EG-1..EG-5 as NOT_SATISFIED, report EG-1 / MECHANISM_UNVERIFIED as the first
+    block, open no evidence artifact, import no network or downstream domain module,
+    and keep stage_execution_authorized=false even for an independently constructed
+    all-satisfied test fixture. This task cannot satisfy an entry gate, start S1, or
+    change any Atlas claim, ACMG criterion, classification, screen, docking, compound,
+    vendor, assay or treatment state.'
+  status: done
+  depends_on:
+  - panel-products-rescuescreen-design
+  created: '2026-08-16'
+- id: rescuescreen-r611q-literature-baseline
+  title: Freezing the RescueScreen R611Q literature baseline
+  description: 'Track: RESCUESCREEN / EVIDENCE DISCOVERY (exploratory, non-Atlas).
+    Completed 2026-08-17. A globally broadened, deduplicated R611Q inventory,
+    mechanism matrix, contradiction report, access-gap register and reproducible
+    search protocol are committed under data/rescuescreen/r611q/literature-v1/.
+    The bundle contains 33 publication records, two direct datasets and four
+    identity/structure records, all bound by manifest.sha256. It supports
+    context-limited hypotheses about impaired complex behaviour, lower
+    steady-state abundance, Pam-associated ubiquitination and impaired mTORC1
+    suppression while retaining explicit unknowns for misfolding, half-life,
+    degrons, intrinsic GAP rescue, mutant structure, ligandability and compound
+    rescue. This product does not modify the Atlas catalog, Gate 8, or
+    accepted_claim_count=0 and is not a classification or treatment artifact.'
+  status: done
+  depends_on:
+  - rescuescreen-entry-gate-status
+  created: '2026-08-17'
+- id: rescuescreen-r611q-synthesis-package
+  title: Synthesizing the R611Q RescueScreen mechanism baseline
+  description: 'Track: RESCUESCREEN / EVIDENCE SYNTHESIS (exploratory,
+    non-Atlas). Completed 2026-08-17. The literature-v1 evidence bundle is
+    translated into a traceable mechanism baseline, four-route rescue hypothesis
+    map, ordered assay/falsifier matrix, synthesis report and laboratory
+    feasibility brief under data/rescuescreen/r611q/synthesis-v1/. The package
+    supports local-stabilization, TSC1-TSC2-interface, distal-allosteric and
+    no-route hypotheses without selecting one, screening a compound or claiming
+    rescue. It records misfolding, half-life, degron exposure, intrinsic GAP
+    rescue, mutant structure and ligandability as unresolved. The package is
+    byte-bound by manifest.sha256 and does not change the Atlas catalog, Gate 8,
+    accepted_claim_count=0, classification or stage authorization.'
+  status: done
+  depends_on:
+  - rescuescreen-r611q-literature-baseline
+  created: '2026-08-17'
+- id: rescuescreen-r611q-structure-readiness-pack
+  title: Building the R611Q structure-readiness evidence pack
+  description: 'Track: RESCUESCREEN / EVIDENCE (exploratory, non-Atlas).
+    Completed 2026-08-21. A deterministic, stdlib-only builder validates the
+    frozen UniProt, PDB, PDBe, wwPDB validation and primary-article sources and
+    writes the hash-bound pack at data/rescuescreen/r611q/structure-readiness-v1/.
+    It records wild-type coordinate coverage, chain/numbering hazards,
+    copy-specific raw validation metrics, deposited inventory and bounded
+    publication context with exact evidence spans. It does not establish a
+    RefSeq-to-construct equivalence, mutant structure, direct contact, pocket or
+    ligandability; EG-1 through EG-5 remain NOT_SATISFIED, Gate 8 remains
+    BLOCKED_HUMAN_REVIEW, accepted_claim_count remains 0, and no RescueScreen
+    stage is authorized.'
+  status: done
+  depends_on:
+  - rescuescreen-r611q-synthesis-package
+  created: '2026-08-21'
 - id: rescuescreen-mechanism-structure-gate
   title: Verifying the RescueScreen mechanism and structure entry gate
   description: 'Track: RESCUESCREEN / ENTRY (research-only; asserts no clinical result and
@@ -1468,6 +1537,8 @@ todos:
   status: blocked
   depends_on:
   - panel-products-rescuescreen-design
+  - rescuescreen-r611q-literature-baseline
+  - rescuescreen-r611q-synthesis-package
   - atlas-phase2-human-span-review
   created: '2026-08-15'
 - id: rescuescreen-tool-licence-registry

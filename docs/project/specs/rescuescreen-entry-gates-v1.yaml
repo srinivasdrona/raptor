@@ -1,0 +1,254 @@
+# RAPTOR RescueScreen entry-gate status contract.
+#
+# RESEARCH-ONLY INFRASTRUCTURE. This specification authorizes no screening,
+# docking, simulation, compound, vendor, assay, treatment or clinical work.
+# It validates and reports gate state only. It cannot execute or authorize a
+# RescueScreen stage.
+
+schema: raptor-rescuescreen-entry-gates-v1
+status: planner_contract_ready_for_test_authoring
+task_id: rescuescreen-entry-gate-status
+title: Deterministic RescueScreen entry-gate manifest and offline status report
+authority:
+  - docs/DECISIONS.md#adr-0018
+  - docs/project/specs/structural-rescue-screen-v1.yaml
+  - docs/project/specs/mechanism-atlas-starter.yaml
+  - docs/PROGRAM.md
+authority_order:
+  - accepted ADRs
+  - structural-rescue-screen-v1
+  - mechanism-atlas-starter
+  - this specification
+
+purpose: >-
+  Implement the earliest gate-safe RescueScreen infrastructure: a closed,
+  hash-bound manifest for EG-1 through EG-5 and a deterministic offline report
+  that explains why the lane is blocked or ready for S1 review. The evaluator
+  changes no gate, reads no external content, performs no scientific
+  inference, and starts no stage.
+
+implementation_surface:
+  create:
+    - configs/rescuescreen/entry_gates.yaml
+    - src/raptor/rescuescreen/__init__.py
+    - src/raptor/rescuescreen/model.py
+    - src/raptor/rescuescreen/gates.py
+    - src/raptor/rescuescreen/cli.py
+    - tests/rescuescreen/test_entry_gate_contract.py
+    - tests/rescuescreen/test_entry_gate_cli.py
+    - tests/rescuescreen/test_import_and_firewall.py
+  may_update:
+    - docs/project/TODOS.yaml
+  must_not_update:
+    - docs/project/specs/structural-rescue-screen-v1.yaml
+    - docs/DECISIONS.md
+    - docs/PROGRAM.md
+    - METHOD.md
+    - README.md
+    - src/raptor/atlas/
+    - src/raptor/eval/
+    - src/raptor/packet/
+    - src/raptor/scorer/
+    - data/
+  runtime_dependencies:
+    - Python standard library
+    - PyYAML
+  new_dependencies_allowed: false
+
+public_api:
+  module: raptor.rescuescreen
+  exports:
+    - GateEvidenceRef
+    - EntryGateAssessment
+    - EntryGateManifest
+    - EntryGateReport
+    - RescueScreenError
+    - RescueScreenSchemaError
+    - RescueScreenHashError
+    - RescueScreenPathError
+    - entry_gate_manifest_content_hash
+    - load_entry_gate_manifest
+    - evaluate_entry_gates
+    - entry_gate_report_to_dict
+  command:
+    - >-
+      python -m raptor.rescuescreen.cli status --manifest
+      configs/rescuescreen/entry_gates.yaml
+  exit_codes:
+    0: manifest valid and all five gates SATISFIED; ready for S1 review only
+    2: malformed manifest, unsafe path, hash mismatch or invariant failure
+    3: manifest valid but one or more gates NOT_SATISFIED
+
+closed_vocabulary:
+  gate_ids: [EG-1, EG-2, EG-3, EG-4, EG-5]
+  gate_order: [EG-1, EG-2, EG-3, EG-4, EG-5]
+  gate_statuses: [SATISFIED, NOT_SATISFIED]
+  overall_statuses: [BLOCKED, READY_FOR_S1_REVIEW]
+  gate_fail_states:
+    EG-1: MECHANISM_UNVERIFIED
+    EG-2: MAPPING_UNVERIFIED
+    EG-3: STRUCTURE_COVERAGE_INSUFFICIENT
+    EG-4: LICENCE_INCOMPATIBLE
+    EG-5: NO_TRACTABLE_ASSAY
+  next_stage_when_ready: S1
+  rule: >-
+    The evaluator never emits any later stage id, earned RescueScreen output
+    term, or scientific result.
+
+manifest_contract:
+  schema_id: rescuescreen.entry_gate_manifest.v1
+  hash_algorithm: rescuescreen.entry_gate_manifest_content_hash.v1
+  top_level_required:
+    - schema
+    - lane_id
+    - lane_version
+    - manifest_version
+    - created_at
+    - manifest_content_hash
+    - hash_basis
+    - gates
+    - preservation_rules
+  unknown_keys: rejected at every closed schema level
+  hash_rule: >-
+    Parse with yaml.safe_load, validate the mapping, remove only the top-level
+    manifest_content_hash, serialize the remaining object as canonical JSON
+    with sorted mapping keys, compact separators, ensure_ascii=false and
+    sequence order preserved, then compute lowercase SHA-256.
+  gate_required:
+    - gate_id
+    - status
+    - fail_state
+    - evidence_refs
+    - note
+  evidence_ref_required:
+    - artifact_id
+    - artifact_schema
+    - content_hash
+    - reviewed_by
+    - reviewed_at
+  evidence_rules:
+    - NOT_SATISFIED may have zero evidence_refs.
+    - SATISFIED requires at least one evidence_ref.
+    - Every evidence_ref field is a non-blank string.
+    - content_hash is exactly 64 lowercase hexadecimal characters.
+    - reviewed_at is a quoted string; YAML date/datetime coercion is rejected.
+    - Evidence references are identifiers and hashes only; this slice opens no referenced artifact.
+  current_repository_state:
+    - All five gates are NOT_SATISFIED.
+    - EG-1 remains first-blocking because there is no named human Gate 8 acceptance.
+    - The accepted Atlas claim count remains zero.
+    - No evidence reference is allowed to imply an OBSERVED mechanism claim.
+    - The committed manifest must not report READY_FOR_S1_REVIEW.
+
+path_and_loading_rules:
+  - Manifest path must exist, be a regular file and not be a symlink.
+  - Loader reads only the explicit manifest path supplied by the caller.
+  - No evidence artifact, external content root, environment variable, argv-derived path or network resource is read.
+  - YAML parse errors and non-mapping documents raise RescueScreenSchemaError.
+  - Loaded collections are converted to frozen dataclasses and tuples; callers cannot mutate the validated model.
+
+evaluation_contract:
+  report_schema: rescuescreen.entry_gate_status.v1
+  report_fields:
+    - schema
+    - lane_id
+    - lane_version
+    - manifest_version
+    - manifest_content_hash
+    - overall_status
+    - first_blocking_gate
+    - blocking_fail_state
+    - blocking_gates
+    - eligible_next_stage
+    - stage_execution_authorized
+    - gates
+    - validation_ceiling
+  rules:
+    - Exact gate identity, order and fail-state binding are validated before evaluation.
+    - Any NOT_SATISFIED gate yields overall_status BLOCKED.
+    - first_blocking_gate and blocking_fail_state come from the first gate in EG-1..EG-5 order.
+    - blocking_gates contains every NOT_SATISFIED gate in canonical order.
+    - BLOCKED reports eligible_next_stage as null.
+    - All five SATISFIED yields READY_FOR_S1_REVIEW and eligible_next_stage S1.
+    - stage_execution_authorized is always false.
+    - The report never changes, persists or upgrades any gate status.
+    - Identical validated input yields byte-identical canonical JSON output.
+  validation_ceiling: >-
+    Gate status is an operational assertion about registered evidence
+    references. It does not establish scientific sufficiency, binding,
+    functional rescue, clinical relevance, treatment value or permission to
+    execute a RescueScreen stage.
+
+typed_errors:
+  RescueScreenSchemaError:
+    - missing or unknown field
+    - wrong type or enum
+    - duplicate, missing or out-of-order gate
+    - wrong gate-to-fail-state binding
+    - blank required value
+    - SATISFIED without evidence
+    - invalid evidence content hash
+    - YAML-coerced date or datetime
+  RescueScreenHashError:
+    - manifest_content_hash does not equal the recomputed self-excluding hash
+  RescueScreenPathError:
+    - missing path
+    - non-regular file
+    - symlink
+    - unreadable path
+
+firewalls:
+  - No compound, chemical identifier, vendor, docking, simulation or screening input exists.
+  - No stage implementation is imported or called.
+  - No network-capable module is imported.
+  - No Atlas claim is promoted and no mechanism ledger status is changed.
+  - No ACMG, classification, packet, submission or patient-facing artifact is read or written.
+  - READY_FOR_S1_REVIEW is not stage execution authorization.
+  - No generic source/licence record can satisfy a lane-specific gate without an explicit reviewed evidence_ref.
+
+acceptance_criteria:
+  - id: RSEG-AC01
+    text: Closed manifest schemas reject every missing, unknown, mistyped or invalid enum field.
+  - id: RSEG-AC02
+    text: Gate ids, order and fail-state bindings are exactly EG-1..EG-5 from the parent design.
+  - id: RSEG-AC03
+    text: SATISFIED without at least one complete reviewed evidence reference fails closed.
+  - id: RSEG-AC04
+    text: Self-excluding canonical hashing is stable across mapping order and LF/CRLF checkout differences, while semantic or sequence changes alter the hash.
+  - id: RSEG-AC05
+    text: The committed manifest validates and reports BLOCKED with EG-1 / MECHANISM_UNVERIFIED first.
+  - id: RSEG-AC06
+    text: Every unsatisfied gate is included in blocking_gates in canonical order; partial pass never yields readiness.
+  - id: RSEG-AC07
+    text: An independently built all-satisfied fixture reports READY_FOR_S1_REVIEW and S1 but stage_execution_authorized remains false.
+  - id: RSEG-AC08
+    text: The loader rejects missing, non-regular and symlink manifest paths and opens no evidence reference.
+  - id: RSEG-AC09
+    text: CLI JSON is deterministic; current manifest exits 3, all-satisfied exits 0 and invalid input exits 2.
+  - id: RSEG-AC10
+    text: Static import tests prove no network client, subprocess, Atlas, scorer, packet or evaluation implementation dependency.
+  - id: RSEG-AC11
+    text: The implementation contains no screening, docking, compound enumeration, vendor or treatment execution surface.
+  - id: RSEG-AC12
+    text: Existing RescueScreen design, ADRs, program status, Atlas source and data artifacts remain byte-identical.
+
+required_tests:
+  - strict schema, enum, ordering and fail-state binding tests
+  - evidence reference and YAML date-coercion tests
+  - canonical hash tests with an independent oracle
+  - immutable model tests
+  - committed manifest repository test
+  - first-blocking and all-blocking gate truth-table tests
+  - all-satisfied ready-for-review but never-authorized test
+  - path and symlink rejection tests
+  - deterministic CLI JSON and exit-code tests
+  - static import and forbidden-surface tests
+  - targeted existing Atlas import-guard and project TODO tests
+
+definition_of_done:
+  - tests are authored before implementation
+  - implementation passes all required tests
+  - committed manifest remains all NOT_SATISFIED
+  - no RescueScreen stage becomes executable or authorized
+  - independent checker reports CLEAN
+  - docs/project/TODOS.yaml records the unit without unblocking any downstream task
