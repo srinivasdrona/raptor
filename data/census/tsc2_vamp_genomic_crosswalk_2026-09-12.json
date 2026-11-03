@@ -1,0 +1,37 @@
+{
+  "archive": {
+    "byte_length": 5746881,
+    "doi": "10.5281/zenodo.20837254",
+    "filename": "FowlerLab/TSC2_analysis-V1.zip",
+    "md5": "8c35d120b65dbd93bc38d07c11b9538b",
+    "record_id": 20837254,
+    "sha256": "f9ceaec5d4608d3d2f804b4f919d42030aceb7d72170efb7e1c49ec0c725f403"
+  },
+  "boundaries": {
+    "clinical_use": "forbidden",
+    "evidence_strength_use": "forbidden",
+    "network": "operator_only"
+  },
+  "bundle_id": "tsc2-vamp-genomic-crosswalk-2026-09-12",
+  "counts": {
+    "rows": 9253,
+    "status_rows": 9253
+  },
+  "follow_on_unresolved": {
+    "ARCHIVE_CROSSWALK_ABSENT": 146,
+    "SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH": 57,
+    "SOURCE_COORDINATE_REFERENCE_MISMATCH": 0
+  },
+  "input_scores_sha256": "39f052e6e4819ff245fcee8d63fa1b4c3b09b2d9a0d529f5c14de5deaafa497e",
+  "manifest_content_hash": "f80759aa43874d201efb69c52b611d9ebd8c40712159bf1f291c86195dd33ba0",
+  "pacbio_fastq_download": "NO_GO",
+  "reference_sha256": "22dc1bb93de407e0653791c36e4097fbaf64c9efa2510c83b7777f607a61e4d0",
+  "schema": "raptor.external.vamp_genomic_crosswalk_summary.v1",
+  "status_counts": {
+    "ARCHIVE_CROSSWALK_ABSENT": 146,
+    "CROSSWALK_SPDI_VERIFIED": 9050,
+    "SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH": 57,
+    "SOURCE_COORDINATE_REFERENCE_MISMATCH": 0
+  },
+  "verified_unique_spdi": 9050
+}
