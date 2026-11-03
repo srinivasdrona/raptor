@@ -18,6 +18,9 @@ scripts/run_masked_holdout_eval.py text eol=crlf
 data/rescuescreen/r611q/literature-v1/* text eol=lf
 data/rescuescreen/r611q/synthesis-v1/* text eol=lf
 
+# RescueScreen evidence-readiness summary is approved and hash-pinned from CRLF bytes.
+data/rescuescreen/r611q/RESCUESCREEN_EVIDENCE_READINESS_SUMMARY.md text eol=crlf
+
 # RescueScreen structure-readiness pack: force LF for every tracked text
 # artifact regardless of core.autocrlf, then restore the gzip artifacts to
 # binary so they are never subject to text/eol conversion.
