@@ -1,0 +1,67 @@
+{
+  "baseline_relation_counts": {
+    "CONTRADICTS": 0,
+    "NARROWS": 1,
+    "NO_DIRECT_RELATION": 9,
+    "ORTHOGONAL": 0,
+    "SUPPORTS": 0
+  },
+  "boundaries": {
+    "accepted_claims": 0,
+    "atlas_gate_8_change": "forbidden",
+    "clinical_use": "forbidden",
+    "evidence_strength_use": "forbidden",
+    "existing_package_mutation": "forbidden",
+    "ps3_bs3_use": "forbidden",
+    "treatment_recommendation": "forbidden"
+  },
+  "bundle_id": "r611q-literature-delta-review-2026-09-16",
+  "counts": {
+    "accepted_claims": 0,
+    "acquired_fulltexts_without_exact_alias": 16,
+    "article_rows": 69,
+    "candidate_span_count": 14,
+    "canonical_alias_candidate_sources": 8,
+    "conditional_legacy_only_candidate_sources": 2,
+    "exact_alias_candidate_sources": 10,
+    "fulltext_body_candidate_sources": 10,
+    "review_record_count": 10,
+    "sources_without_acquired_fulltext": 43,
+    "title_or_abstract_candidate_sources": 0
+  },
+  "delta_value_counts": {
+    "NEW_ASSAY_OR_MODEL_CONTEXT": 4,
+    "NEW_CLINICAL_OCCURRENCE": 2,
+    "NEW_PRIMARY_OBSERVATION": 1,
+    "NO_MATERIAL_DELTA": 0,
+    "SECONDARY_ONLY": 3
+  },
+  "external_artifact_hashes": {
+    "normalized/article-dispositions.jsonl": "dda3b0d7b9571a1f4bc1d7516850ebeffdfb44beb451a0ccd43b82e566d5b0af",
+    "normalized/candidate-spans.jsonl": "1d6d27cf1c14ad980d4ef808028c57be344236364a88a3d33d949e6df943efba",
+    "reviewed/R611Q_LITERATURE_DELTA_ADDENDUM.md": "6c58e04853863a76134449942ca2e9a218339efb5f7354280222dba5b36a795c",
+    "reviewed/review-records.jsonl": "6032d95d16617313c4d3572081d8f86419f8e55088ee8f9cb7618ba52e0ba683"
+  },
+  "input_hashes": {
+    "acquisition_manifest_content_hash": "ed14ea509857e22f1ae058632e61599f080d033d64a0057f9aad10c55bd360f5",
+    "acquisition_manifest_file_sha256": "e827db16d9052a10b47ad2cdf620b07b9773b2ccc8641b034fe2986de82d1c7a",
+    "atlas_expert_form_sha256": "0e9d096559f36fcfde2f3340cf9af54a4328ddb74791d9ddef4df1edc54151ba",
+    "atlas_expert_packet_sha256": "ac456eeac4bd6e0c6a41320d3687575e058d1016e92ddd2e8b140dabfdcbe4e2",
+    "rescuescreen_master_inventory_sha256": "b0717d711eb9203868b3c956562cc8c0297f197ec1bf19599c11d819603154ef",
+    "rescuescreen_source_manifest_sha256": "8dd13997581fc06998edd0bc73042ae1e8a059bbd2d0dccef4656da1166d1468"
+  },
+  "manifest_content_hash": "ea48e5d0572c1a7d5d6c929abf842ab34fa0e3723bf02a4e6c213942e3e85404",
+  "schema": "raptor.external.r611q_literature_delta_review_committed_summary.v1",
+  "source_role_counts": {
+    "ALLELE_BEARING_MODEL_CONTEXT": 4,
+    "CLINICAL_CASE_IDENTITY": 2,
+    "DIRECT_ALLELE_EXPERIMENT": 1,
+    "NOT_RELEVANT": 0,
+    "SECONDARY_REVIEW": 3
+  },
+  "state": {
+    "accepted_claims": 0,
+    "gate_8": "BLOCKED_HUMAN_REVIEW",
+    "human_gate_8_effect": "NONE"
+  }
+}

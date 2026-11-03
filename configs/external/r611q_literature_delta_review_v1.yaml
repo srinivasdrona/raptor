@@ -1,0 +1,279 @@
+schema: raptor.external.r611q_literature_delta_review_config.v1
+config_version: 1.0.3
+spec: docs/project/specs/raptor-v2-r611q-literature-delta-review-v1.yaml
+
+bundle_id: r611q-literature-delta-review-2026-09-16
+run_name: r611q-literature-delta-review-2026-09-16
+committed_summary_path: data/census/r611q_literature_delta_review_2026-09-16.json
+
+output:
+  environment_variable: RAPTOR_R611Q_DELTA_REVIEW_ROOT
+  default_root: ~/raptor-data/external/r611q-literature-delta-review
+  create_only: true
+  artifacts:
+    - normalized/article-dispositions.jsonl
+    - normalized/candidate-spans.jsonl
+    - reviewed/review-records.jsonl
+    - reviewed/R611Q_LITERATURE_DELTA_ADDENDUM.md
+    - bundle_manifest.json
+
+inputs:
+  acquisition_bundle:
+    schema: raptor.external.r611q_literature_bundle.v1
+    bundle_id: r611q-literature-expansion-2026-09-15
+    manifest_content_hash: ed14ea509857e22f1ae058632e61599f080d033d64a0057f9aad10c55bd360f5
+    manifest_file_sha256: e827db16d9052a10b47ad2cdf620b07b9773b2ccc8641b034fe2986de82d1c7a
+    manifest_byte_length: 29156
+    article_index:
+      relative_path: normalized/article-index.jsonl
+      sha256: dbc3ed426f4381e15321e77dcb8beab820df6ad9cffd2c1f13af72f9e2809e26
+      byte_length: 132645
+      rows: 69
+    fulltext:
+      acquired_cc_by: 26
+      metadata_cc_by_candidates: 27
+      jats_licence_rejected: 1
+    rule: >-
+      The bundle is immutable input. Every referenced artifact byte length and
+      digest is recomputed from disk before review.
+
+  rescuescreen_baseline:
+    source_manifest:
+      schema: rescuescreen.r611q.discovery_shelf_sources.v1
+      sha256: 8dd13997581fc06998edd0bc73042ae1e8a059bbd2d0dccef4656da1166d1468
+      byte_length: 26297
+      pmid_publications: 31
+      doi_only_publications: 2
+    master_source_inventory:
+      sha256: b0717d711eb9203868b3c956562cc8c0297f197ec1bf19599c11d819603154ef
+      byte_length: 112258
+      publications: 33
+      rule: >-
+        Read only for source-identity deduplication, proposition vocabulary,
+        assay-lineage comparison and delta assessment. Existing records are
+        never rewritten.
+
+  atlas_baseline:
+    expert_packet:
+      sha256: ac456eeac4bd6e0c6a41320d3687575e058d1016e92ddd2e8b140dabfdcbe4e2
+      byte_length: 8094
+    expert_form:
+      sha256: 0e9d096559f36fcfde2f3340cf9af54a4328ddb74791d9ddef4df1edc54151ba
+      byte_length: 2148
+    state:
+      proposed_claims: 2
+      accepted_claims: 0
+      scientific_sufficiency_reviewed: false
+      gate_8: BLOCKED_HUMAN_REVIEW
+    rule: >-
+      Delta records may describe their relation to the two existing proposed
+      claims but cannot edit, accept, reject or supersede either claim.
+
+#: The RescueScreen master-inventory pin also supplies the ONLY vocabulary
+#: `proposition_ids` may be drawn from -- this config never redefines,
+#: extends or hard-codes proposition identifiers itself.
+proposition_vocabulary_source:
+  description: >-
+    proposition_ids in review records must be drawn only from the pinned
+    RescueScreen master-inventory identifier vocabulary referenced above
+    (inputs.rescuescreen_baseline.master_source_inventory); this config
+    never redefines or extends that vocabulary itself.
+  pin:
+    sha256: b0717d711eb9203868b3c956562cc8c0297f197ec1bf19599c11d819603154ef
+    byte_length: 112258
+
+variant:
+  gene: TSC2
+  rsid: rs28934872
+  spdi: NC_000016.10:2070570:G:A
+  hgvs_c: NM_000548.5:c.1832G>A
+  hgvs_p: NP_000539.2:p.Arg611Gln
+
+deterministic_preselection:
+  article_surfaces:
+    - title
+    - abstract
+    - acquired_cc_by_jats_body
+  jats_extraction:
+    parser: standard_library_xml
+    doctype_policy:
+      absent: allowed
+      external_standard_jats: allowlisted_without_resolution
+      internal_subset: forbidden
+      system_only: forbidden
+      allowed:
+        - public_id: >-
+            -//NLM//DTD JATS (Z39.96) Journal Archiving and Interchange DTD
+            with MathML3 v1.4 20241031//EN
+          system_id: JATS-archivearticle1-4-mathml3.dtd
+      parser_network_behavior: >-
+        The standard-library parser does not resolve or fetch the external DTD.
+        The declaration is syntax-checked against this exact allowlist before
+        parsing.
+    reject_entity_declaration: true
+    required_root_content: article/body
+    excluded_subtrees:
+      - ref-list
+    block_tags:
+      - p
+      - tr
+      - caption
+    block_selection: >-
+      Emit a paragraph, complete table row or caption rather than an isolated
+      table cell. Do not emit an ancestor block when a configured descendant
+      block already contains the same text.
+    context_capture:
+      paragraph:
+        - ordered section-title path
+      table_row:
+        - table label
+        - table caption
+        - column headers
+        - matching cell coordinates
+      rule: >-
+        Context fields aid review but never replace the exact quote or locator.
+        A transposed table must preserve enough header information to associate
+        the matching allele cell with its case or column.
+    block_normalization:
+      unicode: NFC
+      whitespace: collapse_to_single_ascii_space
+      join_blocks: LF
+    locator: "text-char:<start>:<end>"
+    locator_surface: deterministic_joined_body_text
+
+  alias_classes:
+    canonical:
+      - rs28934872
+      - c.1832G>A
+      - NM_000548.5:c.1832G>A
+      - p.Arg611Gln
+      - NP_000539.2:p.Arg611Gln
+      - Arg611Gln
+      - p.R611Q
+      - R611Q
+    conditional_legacy:
+      - 1832G>A
+      - G1832A
+    conditional_rule: >-
+      A legacy nucleotide-only alias is a candidate only when its smallest
+      block also names $TSC2$, tuberin or another canonical alias.
+    matching:
+      case_sensitive: false
+      require_token_boundaries: true
+      allow_whitespace_around_hgvs_arrow: true
+      deduplicate_multiple_aliases_within_one_block: true
+
+  dispositions:
+    - EXACT_ALIAS_CANDIDATE
+    - NO_EXACT_ALIAS_IN_AVAILABLE_TEXT
+    - SOURCE_TEXT_UNAVAILABLE
+  interpretation_boundary: >-
+    Preselection is lexical recall, not scientific relevance. A source with no
+    match remains unreviewed rather than being labelled irrelevant.
+  frozen_input_observation:
+    role: deterministic_regression_for_pinned_bytes
+    article_rows: 69
+    exact_alias_candidate_sources: 10
+    title_or_abstract_candidate_sources: 0
+    fulltext_body_candidate_sources: 10
+    canonical_alias_candidate_sources: 8
+    conditional_legacy_only_candidate_sources: 2
+    candidate_spans: 14
+    acquired_fulltexts_without_exact_alias: 16
+    sources_without_acquired_fulltext: 43
+    correction_note: >-
+      The preliminary canonical-alias probe found eight sources. The complete
+      pinned-rule replay added two genuine $TSC2$-contextual $G1832A$ sources
+      from the patient-621 lineage. They are model-context candidates, not new
+      independent allele observations.
+
+candidate_span:
+  schema: raptor.external.r611q_literature_delta_candidate_span.v1
+  exact_fields:
+    - schema
+    - candidate_id
+    - article_identity
+    - source_artifact_id
+    - source_artifact_sha256
+    - surface
+    - block_index
+    - block_tag
+    - context
+    - locator
+    - exact_quote
+    - exact_quote_sha256
+    - matched_aliases
+    - review_state
+  invariants:
+    - candidate_id is deterministic from source identity, surface and block index
+    - article_identity agrees exactly with the acquisition article index
+    - source artifact bytes and hash agree exactly with the acquisition manifest
+    - locator reproduces exact_quote from the deterministic extracted surface
+    - context is deterministic from the containing section or table structure
+    - matched_aliases is a sorted, unique, non-empty list
+    - review_state is exactly PROPOSED_UNACCEPTED
+
+supervised_delta_review:
+  purpose: >-
+    Classify only the ten lexical candidates by source role and delta value,
+    preserving exact source wording, assay context and lineage limitations.
+    This is model-assisted preparation for future human review, not Gate 8.
+  record_schema: raptor.external.r611q_literature_delta_review_record.v1
+  one_record_per: exact alias candidate source
+  source_roles:
+    - DIRECT_ALLELE_EXPERIMENT
+    - ALLELE_BEARING_MODEL_CONTEXT
+    - CLINICAL_CASE_IDENTITY
+    - SECONDARY_REVIEW
+    - NOT_RELEVANT
+  primary_result_states:
+    - PRIMARY_R611Q_RESULT
+    - PRIMARY_VARIANT_BEARING_MODEL_RESULT
+    - CASE_OR_COHORT_OBSERVATION
+    - SECONDARY_SYNTHESIS_ONLY
+    - NO_R611Q_RESULT
+  baseline_relation:
+    allowed:
+      - SUPPORTS
+      - NARROWS
+      - CONTRADICTS
+      - ORTHOGONAL
+      - NO_DIRECT_RELATION
+    claims:
+      - r611q-claim-0
+      - r611q-claim-1
+  delta_value:
+    allowed:
+      - NEW_PRIMARY_OBSERVATION
+      - NEW_ASSAY_OR_MODEL_CONTEXT
+      - NEW_CLINICAL_OCCURRENCE
+      - SECONDARY_ONLY
+      - NO_MATERIAL_DELTA
+  required_context_fields:
+    - r611q_role
+    - model_system
+    - perturbation
+    - comparator
+    - readout
+    - directness
+    - assay_lineage
+    - independence
+    - limitations
+  proposition_rule: >-
+    Proposition identifiers must come from the pinned RescueScreen inventory.
+    Secondary reviews cannot support or contradict a proposition. Results
+    measured only in an R611Q-bearing model are indirect context and cannot
+    be promoted into direct allele-mechanism statements.
+  required_state:
+    review_kind: MODEL_ASSISTED_SOURCE_TRIAGE
+    acceptance_state: PROPOSED_UNACCEPTED
+    human_gate_8_effect: NONE
+
+boundaries:
+  existing_package_mutation: forbidden
+  accepted_claims: 0
+  atlas_gate_8_change: forbidden
+  clinical_use: forbidden
+  evidence_strength_use: forbidden
+  ps3_bs3_use: forbidden
+  treatment_recommendation: forbidden

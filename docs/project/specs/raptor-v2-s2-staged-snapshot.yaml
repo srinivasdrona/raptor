@@ -1,0 +1,2093 @@
+# RAPTOR v2 V2-S2 binding planner specification.
+#
+# PLAN ONLY. This file authorizes RED-test authoring and later implementation of
+# offline staged-snapshot verification and deterministic fact diffing. It does
+# not authorize source acquisition, promotion, lifecycle changes, materiality
+# decisions, downstream actions, evidence reinterpretation, or clinical use.
+
+schema: raptor.sourceops.v2_s2_staged_snapshot_spec.v1
+status: planner_contract_ready_for_red_test_authoring
+slice_id: V2-S2
+task_id: sourceops-automated-refresh-validation
+title: Offline staged snapshot verification and deterministic fact diff
+authority_file: docs/project/specs/raptor-v2-s2-staged-snapshot.yaml
+roadmap_file: docs/project/specs/raptor-v2-kickoff.yaml
+branch: track/raptor-v2-2026-08
+planned_at: '2026-08-17T10:37:37+05:30'
+
+authority:
+  sole_detailed_v2_s2_authority: true
+  precedence:
+    - docs/DECISIONS.md
+    - docs/STRATEGY.md
+    - docs/EVALUATION.md
+    - docs/PROGRAM.md
+    - docs/ARCHITECTURE.md
+    - METHOD.md
+    - docs/prd/
+    - docs/project/specs/raptor-v2-kickoff.yaml
+    - docs/project/specs/raptor-v2-s2-staged-snapshot.yaml
+  conflict_rule: >-
+    A conflict with a higher-precedence accepted authority is a defect in this
+    file. A test author or implementer must not broaden V2-S2 to make the
+    conflict disappear.
+  planning_only_rule: >-
+    This stage may create this file and make the minimal V2-S2 roadmap pointer
+    update. It changes no production code, tests, configuration, declaration,
+    data, dependency, TODO, preservation, or RescueScreen surface.
+
+planning_baseline:
+  v2_s1:
+    commit: a662276700f1138b1baf5581be8bc76e6e68e314
+    independent_checker_result: OPUS_PASS
+    registry_path: configs/sourceops/source_registry.yaml
+    registry_schema: raptor.source_registry.v1
+    registry_hash_basis: raptor.source_registry_content_hash.v1
+    registry_content_hash_at_planning: ef6995a8822c53a1bef228545b0a01c23963b79212967d3f3c15b66d54b02e90
+    validation_schema: raptor.source_registry.validation.v1
+    compatibility_rule: >-
+      V2-S2 consumes the validated V2-S1 registry and declaration facts. It
+      does not change the registry schema, registry hash algorithm, source or
+      component identifiers, lifecycle semantics, consumer readiness
+      semantics, declaration hashes, or validate/status CLI behavior.
+  observed_source_records:
+    count: 7
+    required_real_binding_for_tests: tsc-ingest-and-reference-declarations
+  sourceops_package:
+    paths:
+      - src/raptor/sourceops/__init__.py
+      - src/raptor/sourceops/model.py
+      - src/raptor/sourceops/registry.py
+      - src/raptor/sourceops/cli.py
+    dependency_ceiling:
+      - Python standard library
+      - PyYAML already declared by the repository
+    new_dependency_allowed: false
+  existing_v2_s1_tests:
+    - tests/sourceops/test_registry_contract.py
+    - tests/sourceops/test_registry_cli.py
+    - tests/sourceops/test_repository_registry.py
+    - tests/sourceops/test_import_and_network_boundary.py
+
+product_contract:
+  operator: RAPTOR source-maintenance operator
+  goal: >-
+    Accept one already-present, operator-supplied staged candidate snapshot;
+    verify its manifest and local bytes offline; bind it to exactly one
+    validated V2-S1 source baseline; and emit byte-reproducible,
+    content-addressed verification and fact-diff artifacts without applying
+    the candidate.
+  outputs_are:
+    - deterministic observations of the supplied manifest and bytes
+    - deterministic comparisons with one hash-bound V2-S1 source record
+    - immutable inputs for a separately specified V2-S3 decision stage
+  outputs_are_not:
+    - source readiness or lifecycle state
+    - a materiality, severity, approval, or promotion decision
+    - an impact route, invalidation instruction, rebuild request, or rollback plan
+    - scientific, legal, clinical, evidentiary, or product authorization
+  validation_ceiling: >-
+    V2-S2 records offline deterministic observations about supplied staged
+    bytes and their declared comparison to one V2-S1 baseline. It makes no
+    materiality, approval, promotion, lifecycle, scientific, legal, clinical,
+    consumer-impact, or rollback decision.
+
+scope:
+  exact_in:
+    - one staged manifest bound to one V2-S1 source_id and registry_content_hash
+    - strict closed manifest parsing and immutable typed input models
+    - safe repository-relative staging and generated-output boundaries
+    - offline reads of manifest-listed local staged files only
+    - raw-byte or canonical-LF-text checksum verification
+    - exact inventory, duplicate, missing, unknown, type, and size checks
+    - two-pass input immutability detection
+    - validation of the current V2-S1 registry and declaration preconditions
+    - deterministic source, content, declaration, and optional component fact diff
+    - canonical JSON, content hashes, idempotent output writes, and CLI result JSON
+  exact_out:
+    - source download, URL dereference, network client, credential, or egress
+    - live refresh, detector, scheduler, Prefect flow, service, database, UI, or API
+    - archive extraction, decompression, candidate JSON/YAML domain parsing, or code execution
+    - candidate promotion, activation, installation, copying into a domain path, or deletion
+    - mutation of configs/sourceops/source_registry.yaml or any domain declaration
+    - registry lifecycle advancement or V2-S1 READY/BLOCKED calculation
+    - material-drift thresholds, severity, approval, action routing, or rollback rehearsal
+    - consumer invalidation, benchmark rebuild, packet invalidation, Atlas regrounding, or validation rerun
+    - evidence reinterpretation, scoring, classification, scientific/legal sufficiency, or clinical authorization
+    - RescueScreen entry gates, behavior, files, structure work, screening, assays, or vendor work
+  future_slice_guard: >-
+    V2-S3 alone may interpret a valid V2-S2 diff for materiality, downstream
+    impact routing, approval, or rollback rehearsal. V2-S2 must not import,
+    copy, execute, or summarize V2-S1 drift_policy actions or consumer routes
+    into its output.
+
+preservation_and_cross_lane_boundaries:
+  registry_and_domain:
+    immutable_inputs:
+      - configs/sourceops/source_registry.yaml
+      - every declaration_refs.path selected from the validated registry
+      - every path named by registry preservation_rules
+    assertion: >-
+      Success and every handled failure leave these files byte-identical and
+      do not create, rename, delete, chmod, or replace them.
+  frozen_evidence:
+    required_zero_diff:
+      - data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json
+      - data/census/tsc_tiered_readjudication_2026-07-21.json
+      - configs/eval/tsc2.yaml
+      - configs/eval/tiered_gate_v3.yaml
+      - configs/eval/bp4pp3_predictor_policy.json
+      - configs/eval/core_annotation_bundle.yaml
+  rescuescreen:
+    must_not_read_or_write:
+      - docs/project/specs/structural-rescue-screen-v1.yaml
+      - configs/rescuescreen/
+      - src/raptor/rescuescreen/
+      - tests/rescuescreen/
+    semantic_rule: >-
+      No staged fact, matching checksum, or no-difference outcome satisfies a
+      RescueScreen or panel-product gate. Reserved consumer identifiers remain
+      non-activatable and are not queried by V2-S2.
+
+terminology:
+  baseline: >-
+    The one selected source record and its declaration references in the
+    currently validated canonical V2-S1 registry, provided that its
+    registry_content_hash exactly equals the manifest binding.
+  staged_candidate: >-
+    The manifest and exact listed local files already present below one
+    designated staging root. V2-S2 did not acquire them and makes no truth
+    claim about their external origin.
+  valid_staging_input: >-
+    A manifest and file tree that pass every schema, boundary, hash,
+    inventory, baseline-binding, and two-pass immutability check.
+  observed_difference: >-
+    A deterministic inequality between a before fact and an after fact. It is
+    not material drift and carries no action implication.
+  stage_outcomes:
+    OBSERVED_NO_DIFFERENCE: every emitted diff fact is UNCHANGED
+    OBSERVED_DIFFERENCE: at least one emitted diff fact is ADDED, REMOVED, or CHANGED
+  forbidden_outcome_terms:
+    - READY
+    - BLOCKED
+    - APPROVED
+    - REJECTED
+    - PROMOTE
+    - ROLLBACK
+
+runtime_boundaries:
+  repository_root: >-
+    The package repository root resolved from installed SourceOps code, using
+    the same repository-root concept as V2-S1. The CLI exposes no repository
+    root override.
+  canonical_registry:
+    cli_argument: configs/sourceops/source_registry.yaml
+    rule: >-
+      After converting backslashes to forward slashes, --registry must equal
+      this exact path and must resolve to a regular non-link file inside the
+      repository. Alternative registries are not accepted by the production
+      CLI.
+  staging:
+    parent: .raptor/sourceops/staging
+    root_shape: .raptor/sourceops/staging/<stage-directory>
+    stage_directory_regex: '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'
+    manifest_name: manifest.yaml
+    rules:
+      - --staging-root is required and is repository-relative
+      - after separator normalization it has exactly four path segments
+      - it is a direct child of .raptor/sourceops/staging
+      - it must already exist and V2-S2 never creates it
+      - it must be a real directory, not a symlink, junction, mount/reparse point, or special file
+  generated_output:
+    parent: .raptor/sourceops/generated/staged-snapshots
+    cli_override_allowed: false
+    leaf_shape: >-
+      .raptor/sourceops/generated/staged-snapshots/
+      <manifest_content_hash>
+    files:
+      verification: v-<verification_artifact_content_hash>.json
+      diff: d-<diff_artifact_content_hash>.json
+    rules:
+      - manifest_content_hash already binds registry_content_hash, so no second 64-character registry path segment is needed
+      - output parents may be created only below the fixed generated parent
+      - output is never inside, equal to, an ancestor of, or a descendant of the staging root
+      - every existing output ancestor and entry must be a real directory/file with no link or reparse point
+      - no --force, overwrite, cleanup, latest pointer, mutable index, or timestamp directory exists
+  path_normalization:
+    cli_paths: >-
+      Convert backslash to forward slash before validation and output only
+      canonical forward-slash paths.
+    manifest_paths: >-
+      Backslash is forbidden; forward slash is the only separator.
+    segment_regex: '^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$'
+    rejected:
+      - empty path or empty segment
+      - URI or URI-like scheme
+      - absolute, drive-qualified, UNC, device, or root-relative path
+      - dot or dot-dot segment
+      - colon in a segment
+      - NUL or Unicode control character
+      - segment ending in a space or period
+      - Windows device basename CON, PRN, AUX, NUL, COM1-COM9, or LPT1-LPT9, case-insensitive
+    limits:
+      maximum_path_characters: 120
+      maximum_segments_below_staging_root: 8
+      maximum_segment_characters: 100
+      rationale: keeps the designated current worktree paths below classic Windows path limits
+    collision_rule: >-
+      Paths are unique both as exact canonical strings and after Unicode
+      casefold. A case-only collision is invalid on every operating system.
+  link_and_escape_check:
+    rule: >-
+      Inspect each path component with lstat without following it. Reject
+      Path.is_symlink(), non-regular final entries, and on Windows any
+      FILE_ATTRIBUTE_REPARSE_POINT, including junctions, even when it targets a
+      location inside the allowed root. Resolved paths must still be descendants
+      of the allowed root.
+    race_rule: >-
+      Repeat no-follow type and containment checks at each read and final write;
+      one earlier resolve() result is not sufficient protection against a
+      path-component swap.
+
+manifest_contract:
+  schema_id: raptor.sourceops.staged_snapshot_manifest.v1
+  hash_basis: raptor.sourceops.staged_snapshot_manifest_content_hash.v1
+  raw_manifest_limits:
+    maximum_bytes: 262144
+    encoding: UTF-8 strict
+    nul_allowed: false
+    yaml_documents: exactly_one_non_empty_document
+    aliases_anchors_merge_keys_custom_tags: forbidden
+    maximum_parsed_nodes: 10000
+    maximum_parsed_depth: 16
+    duplicate_mapping_keys: rejected_before_value_overwrite
+  scalar_rules:
+    identifier_regex: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'
+    file_identifier_regex: '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'
+    hash_regex: '^[0-9a-f]{64}$'
+    general_string:
+      minimum_characters: 1
+      maximum_characters: 1024
+      leading_or_trailing_whitespace: forbidden
+      Unicode_control_characters: forbidden
+    integer_rule: >-
+      A size is a JSON integer whose Python type is int rather than bool; it is
+      greater than zero and within the stated limit.
+  top_level:
+    required_exact:
+      - schema
+      - manifest_content_hash
+      - hash_basis
+      - observed_at
+      - source_binding
+      - candidate
+      - files
+      - content_bindings
+      - component_projection
+    unknown_keys: rejected
+    fields:
+      schema:
+        type: string
+        exact: raptor.sourceops.staged_snapshot_manifest.v1
+      manifest_content_hash:
+        type: lowercase_sha256
+      hash_basis:
+        type: string
+        exact: raptor.sourceops.staged_snapshot_manifest_content_hash.v1
+      observed_at:
+        type: utc_timestamp
+      source_binding:
+        type: SourceBinding
+      candidate:
+        type: CandidateFacts
+      files:
+        type: list[StagedFile]
+        minimum_items: 1
+        maximum_items: 64
+      content_bindings:
+        type: list[ContentBinding]
+        minimum_items: 1
+        maximum_items: 64
+      component_projection:
+        type: ComponentProjection_or_null
+  timestamp_rules:
+    lexical_form: YYYY-MM-DDTHH:MM:SSZ
+    timezone: UTC_only
+    fractional_seconds: forbidden
+    leap_second: forbidden
+    wall_clock_comparison: forbidden
+    ordering:
+      - candidate.release.retrieved_at must be less than or equal to observed_at
+      - a non-null candidate.release.release_date must be less than or equal to the UTC date of observed_at
+    output_rule: >-
+      observed_at is copied byte-for-byte from the valid manifest into both
+      artifacts. datetime.now(), filesystem times, and command-start time never
+      enter artifact bytes, hashes, paths, or successful stdout.
+
+  SourceBinding:
+    required_exact:
+      - source_id
+      - registry_content_hash
+      - declaration_refs
+    fields:
+      source_id:
+        type: identifier
+      registry_content_hash:
+        type: lowercase_sha256
+      declaration_refs:
+        type: list[DeclarationBinding]
+        minimum_items: 1
+        maximum_items: 16
+    rules:
+      - exactly one scalar source_id is accepted; source-id lists are invalid
+      - source_id must exist exactly once in the validated current V2-S1 registry
+      - registry_content_hash must equal the current validated registry hash exactly
+      - declaration_refs must equal the selected source record declaration_refs sequence exactly
+      - no declaration binding is inferred, defaulted, sorted, added, or removed
+
+  DeclarationBinding:
+    required_exact:
+      - path
+      - role
+      - canonical_lf_sha256
+      - authority_scope
+    fields:
+      path:
+        type: canonical_repository_relative_path
+      role:
+        type: non_empty_string
+      canonical_lf_sha256:
+        type: lowercase_sha256
+      authority_scope:
+        type: non_empty_string
+
+  CandidateFacts:
+    required_exact:
+      - snapshot_id
+      - identity
+      - release
+      - licence
+      - acquisition
+    fields:
+      snapshot_id:
+        type: identifier
+        note: operator-supplied candidate identity; it is reported but is not a V2-S1 lifecycle id
+      identity:
+        type: CandidateIdentity
+      release:
+        type: CandidateRelease
+      licence:
+        type: CandidateLicence
+      acquisition:
+        type: CandidateAcquisition
+    forbidden_fields:
+      - lifecycle_state
+      - readiness
+      - materiality
+      - severity
+      - approval
+      - recommendation
+      - action
+      - consumer_impacts
+      - rollback
+
+  CandidateIdentity:
+    required_exact:
+      - display_name
+      - record_kind
+      - owner
+      - authoritative_locator
+    fields:
+      display_name:
+        type: non_empty_string
+      record_kind:
+        type: enum
+        values:
+          - SINGLE_SOURCE
+          - COMPOSITE_MANIFEST
+          - POLICY_SOURCE_REGISTER
+          - METADATA_CATALOG_TEMPLATE
+      owner:
+        type: non_empty_string
+      authoritative_locator:
+        type: non_empty_string
+        dereferenced: false
+
+  CandidateRelease:
+    required_exact:
+      - version_or_snapshot
+      - release_date
+      - retrieved_at
+      - content_pin_status
+    fields:
+      version_or_snapshot:
+        type: non_empty_string
+      release_date:
+        type: YYYY-MM-DD_or_explicit_null
+      retrieved_at:
+        type: utc_timestamp
+      content_pin_status:
+        type: non_empty_string
+
+  CandidateLicence:
+    required_exact:
+      - status
+      - identifier_or_family
+      - terms_locator
+      - permitted_use
+      - redistribution
+      - cloud_egress
+      - verification_basis
+    field_type: non_empty_string
+    rule: >-
+      These are operator-declared comparison facts. V2-S2 compares their exact
+      strings with the baseline but does not decide that the strings are legally
+      correct or grant permission.
+
+  CandidateAcquisition:
+    required_exact:
+      - method
+      - operator_contract
+      - writes_outside_repository
+    fields:
+      method:
+        type: non_empty_string
+      operator_contract:
+        type: non_empty_string
+      writes_outside_repository:
+        type: boolean
+    rule: >-
+      This describes the supplied candidate. V2-S2 performs no acquisition and
+      rejects any manifest or output instruction that asks it to write outside
+      the repository boundary.
+
+  StagedFile:
+    required_exact:
+      - file_id
+      - path
+      - role
+      - media_type
+      - checksum
+      - component_ids
+    fields:
+      file_id:
+        type: file_identifier
+      path:
+        type: canonical_path_relative_to_staging_root
+      role:
+        type: enum
+        values:
+          - SNAPSHOT_CONTENT
+          - CANDIDATE_DECLARATION
+          - AUXILIARY_METADATA
+      media_type:
+        type: enum
+        values:
+          - application/octet-stream
+          - application/gzip
+          - application/json
+          - application/x-yaml
+          - text/plain
+          - text/csv
+          - text/tab-separated-values
+      checksum:
+        type: ChecksumDeclaration
+      component_ids:
+        type: list[identifier]
+        minimum_items: 0
+        maximum_items: 64
+    ordering_and_uniqueness:
+      - files is strictly ascending by file_id using Unicode code-point order
+      - file_id is unique exactly and after casefold
+      - path is unique exactly and after casefold
+      - path cannot equal manifest.yaml
+      - no file path is an ancestor of another file path
+      - component_ids is strictly ascending and contains no duplicate
+    mapping_rules:
+      - when component_projection is null, every component_id exists in the selected baseline source
+      - when component_projection is COMPLETE, every component_id exists in the candidate component list
+      - one component_id may be mapped by at most one staged file
+      - one staged file may map to multiple components
+      - an empty component_ids list is explicit and valid
+
+  ChecksumDeclaration:
+    required_exact:
+      - mode
+      - raw_byte_size
+      - raw_sha256
+      - canonical_lf_utf8_bytes
+      - canonical_lf_sha256
+    modes:
+      RAW_BYTES:
+        required_non_null:
+          - raw_byte_size
+          - raw_sha256
+        required_null:
+          - canonical_lf_utf8_bytes
+          - canonical_lf_sha256
+        semantics: >-
+          SHA-256 is computed over the file's exact bytes. No decoding,
+          decompression, newline conversion, Unicode normalization, BOM
+          handling, or trailing-byte change occurs. Non-UTF-8 bytes are valid.
+      CANONICAL_LF_TEXT:
+        required_non_null:
+          - canonical_lf_utf8_bytes
+          - canonical_lf_sha256
+        required_null:
+          - raw_byte_size
+          - raw_sha256
+        allowed_media_types:
+          - application/json
+          - application/x-yaml
+          - text/plain
+          - text/csv
+          - text/tab-separated-values
+        semantics: >-
+          Decode exact file bytes as strict UTF-8, replace CRLF with LF, then
+          replace every remaining CR with LF, encode as UTF-8, and hash those
+          bytes. Do not strip a UTF-8 BOM, normalize Unicode, trim whitespace,
+          parse the content, add or remove a terminal LF, or otherwise change
+          it. A BOM therefore remains U+FEFF and affects the canonical hash.
+    cross_platform_rule: >-
+      A CANONICAL_LF_TEXT manifest binds only canonical byte size and hash; its
+      raw size/hash are explicit null and raw observations are used only
+      transiently for the two-pass mutation check. Thus LF and CRLF copies of
+      the same text produce identical successful artifact bytes. An operator
+      requiring exact newline bytes must select RAW_BYTES.
+
+  ContentBinding:
+    required_exact:
+      - binding_id
+      - baseline_kind
+      - baseline_id
+      - candidate_file_id
+    fields:
+      binding_id:
+        type: file_identifier
+      baseline_kind:
+        type: enum
+        values:
+          - NONE
+          - DECLARATION_REF
+          - COMPONENT_CHECKSUM
+      baseline_id:
+        type: string_or_explicit_null
+      candidate_file_id:
+        type: file_identifier_or_explicit_null
+    variant_rules:
+      NONE:
+        baseline_id: null
+        candidate_file_id: required_non_null
+        meaning: candidate file is explicitly ADDED relative to no V2-S1 content fact
+      DECLARATION_REF:
+        baseline_id: exact_path_from_source_binding_declaration_refs
+        candidate_file_id: string_or_null
+        candidate_constraints:
+          - when present, the file role is CANDIDATE_DECLARATION
+          - when present, the file checksum mode is CANONICAL_LF_TEXT
+        baseline_hash: declaration_ref.canonical_lf_sha256
+      COMPONENT_CHECKSUM:
+        baseline_id: exact_component_id_from_selected_source
+        candidate_file_id: string_or_null
+        baseline_constraints:
+          - component version_or_snapshot matches the lowercase SHA-256 regex
+          - component source_role contains the case-insensitive token checksum when split on hyphen, underscore, or whitespace
+        candidate_constraints:
+          - when present, the file checksum mode is RAW_BYTES
+          - when present, the file component_ids contains baseline_id
+        baseline_hash: component.version_or_snapshot
+    ordering_and_uniqueness:
+      - content_bindings is strictly ascending by binding_id
+      - binding_id is unique exactly and after casefold
+      - each non-NONE baseline target occurs at most once
+      - each non-null candidate_file_id occurs exactly once in content_bindings
+      - every files.file_id occurs exactly once in content_bindings
+    explicit_scope_rule: >-
+      Omission of a baseline declaration or checksum from content_bindings
+      means it is not compared as staged content; it does not mean removal.
+      Removal is represented only by an explicit DECLARATION_REF or
+      COMPONENT_CHECKSUM binding whose candidate_file_id is null. V2-S2 never
+      invents a raw baseline checksum.
+
+  ComponentProjection:
+    nullable: true
+    null_meaning: >-
+      The operator supplied no complete candidate component projection. No
+      component diff facts are emitted, and the diff records
+      component_projection_status=NOT_PROVIDED.
+    non_null_required_exact:
+      - mode
+      - components
+    mode:
+      exact: COMPLETE
+    components:
+      type: list[CandidateComponent]
+      minimum_items: 0
+      maximum_items: 256
+      order: strictly_ascending_by_component_id
+      uniqueness: exact_and_casefold
+    complete_semantics: >-
+      The list is the complete candidate component projection. A baseline
+      component omitted from it is REMOVED; an unknown candidate component is
+      ADDED. Partial component lists are forbidden because omission would be
+      ambiguous.
+    record_kind_rule: >-
+      A COMPLETE projection for candidate record_kind SINGLE_SOURCE or
+      METADATA_CATALOG_TEMPLATE must contain zero components. A non-empty
+      COMPLETE projection is allowed only for COMPOSITE_MANIFEST or
+      POLICY_SOURCE_REGISTER. A null projection remains an explicit
+      NOT_PROVIDED observation for any record kind.
+
+  CandidateComponent:
+    required_exact:
+      - component_id
+      - display_name
+      - source_role
+      - version_or_snapshot
+      - licence_status
+      - declaration_locator
+    field_types:
+      component_id: identifier
+      display_name: non_empty_string
+      source_role: non_empty_string
+      version_or_snapshot: non_empty_string
+      licence_status: non_empty_string
+      declaration_locator: non_empty_string
+    excluded_baseline_governance_fields:
+      - lifecycle_state
+    rule: >-
+      Component lifecycle is a V2-S1 governance state, not a staged candidate
+      fact. V2-S2 neither accepts nor emits a candidate lifecycle value.
+
+  inventory_and_size_limits:
+    staged_file_count:
+      minimum: 1
+      maximum: 64
+    each_observed_raw_file_bytes:
+      minimum: 1
+      maximum: 16777216
+    each_bound_content_bytes:
+      minimum: 1
+      maximum: 16777216
+    total_observed_raw_file_bytes:
+      maximum: 67108864
+    total_bound_content_bytes:
+      maximum: 67108864
+    directories_below_staging_root:
+      maximum: 64
+    rules:
+      - manifest.yaml is not a files entry and does not count toward file limits
+      - zero-byte raw files and text files canonicalizing to zero bytes are invalid
+      - directories cannot be inventory items
+      - archive members and compressed sizes are never inspected
+
+  exact_tree_rule:
+    allowed_entries:
+      - manifest.yaml
+      - regular files named exactly by files.path
+      - real directories that are non-empty ancestors of at least one listed file
+    rejected_entries:
+      - unlisted regular file, including hidden files and checksum sidecars
+      - empty or otherwise unneeded directory
+      - symlink, junction, reparse point, socket, FIFO, device, mount, or special entry
+    missing_rule: every listed file must exist exactly once
+    unknown_rule: every on-disk entry must be accounted for by the allowed set
+
+  canonical_manifest_hash_algorithm:
+    steps:
+      - read and validate the manifest limits, UTF-8, single-document YAML, duplicate-key, tag, alias, and closed-schema rules
+      - require a JSON-compatible tree with string mapping keys and no float, date, timestamp object, binary scalar, set, or Python-specific value
+      - deep-copy the validated raw mapping
+      - remove only the top-level manifest_content_hash
+      - serialize with json.dumps sort_keys=true, separators=(',', ':'), ensure_ascii=false, allow_nan=false
+      - preserve every sequence exactly; explicit null remains present
+      - encode as UTF-8 without a trailing newline
+      - compute lowercase SHA-256
+      - compare with manifest_content_hash
+    sequence_semantics:
+      - declaration_refs preserves the V2-S1 source-record sequence exactly
+      - files, content_bindings, component_ids, and non-null components must already satisfy their canonical sort rules
+      - sequence reordering is never silently normalized
+    mapping_semantics: YAML mapping key order and manifest LF versus CRLF bytes do not affect the hash
+
+verification_model:
+  success_preconditions:
+    - manifest structure and manifest_content_hash are valid
+    - canonical V2-S1 registry path is safe, loads, and validates under V2-S1
+    - selected source_id exists exactly once
+    - manifest registry_content_hash equals current registry_content_hash
+    - declaration bindings exactly equal the selected source declaration_refs
+    - staging tree and all cross-references are exact and safe
+    - every file's mode-specific size and checksum match its manifest declaration
+    - every baseline content binding resolves under its variant rules
+    - the registry and selected declaration files are unchanged during the run
+    - the manifest and staged tree are unchanged across both snapshots
+  baseline_validation:
+    order:
+      - load the canonical V2-S1 registry with the V2-S1 loader
+      - run the V2-S1 registry validator against the repository root
+      - if any V2-S1 error code is DECLARATION_DRIFT or DECLARATION_REFERENCE_INVALID, fail BASELINE_DECLARATION_INVALID
+      - if any other V2-S1 error exists, fail BASELINE_REGISTRY_INVALID
+      - locate source_id; fail UNKNOWN_SOURCE before comparing the bound hash
+      - compare registry_content_hash; fail BASELINE_REGISTRY_HASH_MISMATCH on inequality
+      - compare declaration_refs sequence; fail BASELINE_DECLARATION_BINDING_MISMATCH on inequality
+    no_readiness_call: status_for_consumer is never invoked
+    source_record_hash:
+      basis_id: raptor.sourceops.source_record_content_hash.v1
+      algorithm: >-
+        Serialize the selected raw source-record mapping as canonical JSON with
+        sorted mapping keys, compact separators, ensure_ascii=false,
+        allow_nan=false, and preserved sequences; hash its UTF-8 bytes with
+        SHA-256. No field is removed.
+    immutable_during_run:
+      first_snapshot: >-
+        Capture the canonical registry and every selected declaration
+        reference with the same raw-byte and stable-lstat fields used for
+        staged-input immutability after the V2-S1 validation succeeds.
+      second_snapshot: >-
+        Immediately before the staged-input second snapshot, re-enumerate and
+        re-read those exact baseline files without following links. Compare
+        entry type, stable lstat fields, and raw bytes with the first baseline
+        snapshot, then rerun the V2-S1 registry validator.
+      failure: >-
+        Any byte, identity, type, path, validation-result, registry hash, or
+        selected declaration change is BASELINE_CHANGED_DURING_RUN, exit 6,
+        and produces no artifact.
+  staged_content_read:
+    allowed: true
+    locality: repository_local_staging_root_only
+    parsing: >-
+      Only manifest.yaml is parsed. Candidate files are read as bytes and, for
+      CANONICAL_LF_TEXT, decoded only for the stated newline hash. Their JSON,
+      YAML, CSV, TSV, gzip, or domain semantics are never parsed, executed,
+      decompressed, scored, or interpreted.
+    syntax_rule: >-
+      media_type and file extension are descriptive facts, not parser
+      dispatch. A checksum-valid UTF-8 candidate declaration with invalid YAML
+      syntax remains valid staged content and may differ from baseline; a later
+      source-specific slice must define semantic validation.
+  immutable_input_algorithm:
+    first_snapshot:
+      - enumerate the complete staging tree without following links
+      - capture manifest raw bytes and every listed file's raw bytes
+      - for each entry capture lstat type, st_dev, st_ino, st_size, st_mtime_ns, and st_ctime_ns where supplied by the platform
+      - hash transient raw bytes and compute declared mode-specific observations
+      - stat each file before and after its read; inequality is immediate STAGING_INPUT_MUTATED
+    second_snapshot:
+      - after diff objects are fully computed and after the baseline second snapshot passes, but before any output directory or file is created, repeat complete enumeration, lstat, reads, and hashes
+      - compare entry names, types, captured stable stat fields, manifest bytes, file raw bytes, and mode-specific observations with the first snapshot
+      - ignore st_atime and access-time changes caused by reading
+    failure_rule: >-
+      Any difference is STAGING_INPUT_MUTATED. No final artifact or output
+      directory for this run may be created before the second snapshot passes.
+  invalid_vs_different:
+    invalid: >-
+      Any schema, boundary, baseline-binding, inventory, checksum, encoding,
+      cross-reference, or mutation failure. Invalid input emits no verification
+      or diff artifact.
+    valid_but_different: >-
+      All verification checks pass and one or more generated facts classify as
+      ADDED, REMOVED, or CHANGED. This is a successful exit 0 with
+      OBSERVED_DIFFERENCE.
+    valid_no_difference: >-
+      All verification checks pass and every generated fact classifies as
+      UNCHANGED. This is a successful exit 0 with OBSERVED_NO_DIFFERENCE.
+  no_mutation:
+    staging_input: never written, renamed, removed, chmodded, or timestamped intentionally
+    registry_and_declarations: never written
+    output: only after complete successful verification and second snapshot
+
+diff_model:
+  schema_id: raptor.sourceops.staged_snapshot_diff.v1
+  hash_basis: raptor.sourceops.staged_snapshot_diff_content_hash.v1
+  comparison_ceiling: deterministic_fact_equality_only
+  difference_kinds:
+    CONTENT: staged byte-content facts compared with an explicit baseline checksum or absence
+    METADATA: source, release, licence, acquisition, manifest-membership, or component metadata facts
+    DECLARATION: declaration content hashes, authoritative locators, or component declaration locators
+  fact_kinds:
+    - IDENTITY
+    - VERSION
+    - CHECKSUM
+    - MANIFEST
+    - COMPONENT
+    - METADATA
+  classifications:
+    ADDED: before.present=false and after.present=true
+    REMOVED: before.present=true and after.present=false
+    UNCHANGED: >-
+      before.present=true and after.present=true and canonical JSON bytes of
+      before.value and after.value are identical
+    CHANGED: >-
+      before.present=true and after.present=true and canonical JSON bytes of
+      before.value and after.value differ
+  absent_fact_rule: before.present=false and after.present=false is impossible and must not be emitted
+  explicit_null_rule: >-
+    An explicit null has present=true and value=null. It differs from omission,
+    whose envelope has present=false and value=null. Null versus non-null is
+    CHANGED, not ADDED or REMOVED.
+  value_equality:
+    serialization: canonical JSON used by artifact hashing
+    type_sensitive: true
+    sequence_order_preserved: true
+    Unicode_normalization: none
+
+  source_fact_projection:
+    subject_type: SOURCE
+    subject_id: manifest.source_binding.source_id
+    facts:
+      - fact_path: /identity/display_name
+        baseline_pointer: /display_name
+        candidate_pointer: /candidate/identity/display_name
+        difference_kind: METADATA
+        fact_kind: IDENTITY
+      - fact_path: /identity/record_kind
+        baseline_pointer: /record_kind
+        candidate_pointer: /candidate/identity/record_kind
+        difference_kind: METADATA
+        fact_kind: IDENTITY
+      - fact_path: /identity/owner
+        baseline_pointer: /owner
+        candidate_pointer: /candidate/identity/owner
+        difference_kind: METADATA
+        fact_kind: METADATA
+      - fact_path: /identity/authoritative_locator
+        baseline_pointer: /authoritative_locator
+        candidate_pointer: /candidate/identity/authoritative_locator
+        difference_kind: DECLARATION
+        fact_kind: IDENTITY
+      - fact_path: /release/version_or_snapshot
+        baseline_pointer: /release/version_or_snapshot
+        candidate_pointer: /candidate/release/version_or_snapshot
+        difference_kind: METADATA
+        fact_kind: VERSION
+      - fact_path: /release/release_date
+        baseline_pointer: /release/release_date
+        candidate_pointer: /candidate/release/release_date
+        difference_kind: METADATA
+        fact_kind: VERSION
+      - fact_path: /release/retrieved_at
+        baseline_pointer: /release/retrieved_at
+        candidate_pointer: /candidate/release/retrieved_at
+        difference_kind: METADATA
+        fact_kind: METADATA
+      - fact_path: /release/content_pin_status
+        baseline_pointer: /release/content_pin_status
+        candidate_pointer: /candidate/release/content_pin_status
+        difference_kind: METADATA
+        fact_kind: CHECKSUM
+      - fact_path: /licence/status
+        baseline_pointer: /licence/status
+        candidate_pointer: /candidate/licence/status
+        difference_kind: METADATA
+        fact_kind: METADATA
+      - fact_path: /licence/identifier_or_family
+        baseline_pointer: /licence/identifier_or_family
+        candidate_pointer: /candidate/licence/identifier_or_family
+        difference_kind: METADATA
+        fact_kind: METADATA
+      - fact_path: /licence/terms_locator
+        baseline_pointer: /licence/terms_locator
+        candidate_pointer: /candidate/licence/terms_locator
+        difference_kind: METADATA
+        fact_kind: METADATA
+      - fact_path: /licence/permitted_use
+        baseline_pointer: /licence/permitted_use
+        candidate_pointer: /candidate/licence/permitted_use
+        difference_kind: METADATA
+        fact_kind: METADATA
+      - fact_path: /licence/redistribution
+        baseline_pointer: /licence/redistribution
+        candidate_pointer: /candidate/licence/redistribution
+        difference_kind: METADATA
+        fact_kind: METADATA
+      - fact_path: /licence/cloud_egress
+        baseline_pointer: /licence/cloud_egress
+        candidate_pointer: /candidate/licence/cloud_egress
+        difference_kind: METADATA
+        fact_kind: METADATA
+      - fact_path: /licence/verification_basis
+        baseline_pointer: /licence/verification_basis
+        candidate_pointer: /candidate/licence/verification_basis
+        difference_kind: METADATA
+        fact_kind: METADATA
+      - fact_path: /acquisition/method
+        baseline_pointer: /acquisition/method
+        candidate_pointer: /candidate/acquisition/method
+        difference_kind: METADATA
+        fact_kind: METADATA
+      - fact_path: /acquisition/operator_contract
+        baseline_pointer: /acquisition/operator_contract
+        candidate_pointer: /candidate/acquisition/operator_contract
+        difference_kind: METADATA
+        fact_kind: METADATA
+      - fact_path: /acquisition/writes_outside_repository
+        baseline_pointer: /acquisition/writes_outside_repository
+        candidate_pointer: /candidate/acquisition/writes_outside_repository
+        difference_kind: METADATA
+        fact_kind: METADATA
+    excluded_from_diff:
+      - source_id, because inequality is an invalid binding rather than a candidate difference
+      - candidate.snapshot_id, which identifies the candidate but has no V2-S1 before fact
+      - lifecycle_state, consumers, drift_policy, rollback, refresh policy, blocked reasons, and readiness
+
+  content_binding_projection:
+    NONE_with_candidate:
+      subject_type: FILE
+      subject_id: candidate_file_id
+      fact_path: /content-bindings/<binding_id>
+      difference_kind_rule: CANDIDATE_DECLARATION_role_means_DECLARATION_otherwise_CONTENT
+      fact_kind: MANIFEST
+      before:
+        present: false
+        value: null
+      after_value_exact:
+        - file_id
+        - role
+        - media_type
+        - checksum_mode
+        - content_byte_size
+        - content_sha256
+    known_baseline_with_null_candidate:
+      subject_type_rule: DECLARATION_REF_means_DECLARATION_otherwise_COMPONENT
+      subject_id: baseline_id
+      fact_path: /content-bindings/<binding_id>
+      difference_kind_rule: DECLARATION_REF_means_DECLARATION_otherwise_CONTENT
+      fact_kind: MANIFEST
+      before_value_exact:
+        - baseline_kind
+        - baseline_id
+        - checksum_mode
+        - content_sha256
+      after:
+        present: false
+        value: null
+    known_baseline_with_candidate:
+      subject_type_rule: DECLARATION_REF_means_DECLARATION_otherwise_COMPONENT
+      subject_id: baseline_id
+      fact_path: /content-bindings/<binding_id>/sha256
+      difference_kind_rule: DECLARATION_REF_means_DECLARATION_otherwise_CONTENT
+      fact_kind: CHECKSUM
+      before_value: baseline lowercase SHA-256 string
+      after_value: candidate mode-specific lowercase SHA-256 string
+    output_count_rule: exactly one diff fact per content binding
+
+  component_projection:
+    when_null:
+      status: NOT_PROVIDED
+      facts_emitted: 0
+    complete:
+      status: COMPLETE
+      union_order: component_id Unicode code-point order
+      baseline_projection_fields:
+        - display_name
+        - source_role
+        - version_or_snapshot
+        - licence_status
+        - declaration_locator
+      candidate_projection_fields:
+        - display_name
+        - source_role
+        - version_or_snapshot
+        - licence_status
+        - declaration_locator
+      added_or_removed_component:
+        facts_emitted: 1
+        subject_type: COMPONENT
+        subject_id: component_id
+        fact_path: /components/<rfc6901_component_id>
+        difference_kind: METADATA
+        fact_kind: COMPONENT
+        value: complete five-field projected component mapping
+      component_present_on_both_sides:
+        facts_emitted: 5
+        per_field:
+          display_name: {difference_kind: METADATA, fact_kind: COMPONENT}
+          source_role: {difference_kind: METADATA, fact_kind: COMPONENT}
+          version_or_snapshot: {difference_kind: METADATA, fact_kind: VERSION}
+          licence_status: {difference_kind: METADATA, fact_kind: COMPONENT}
+          declaration_locator: {difference_kind: DECLARATION, fact_kind: COMPONENT}
+        fact_path: /components/<rfc6901_component_id>/<field>
+    rfc6901_rule: replace '~' with '~0' and then '/' with '~1'
+
+  provenance_assignment:
+    source_fact:
+      baseline_origin: REGISTRY_SOURCE_RECORD
+      candidate_origin: MANIFEST_CANDIDATE
+    content_NONE_with_candidate:
+      baseline_origin: ABSENT
+      candidate_origin: STAGED_FILE_OBSERVATION
+    content_DECLARATION_REF_with_candidate:
+      baseline_origin: REGISTRY_DECLARATION_REF
+      candidate_origin: STAGED_FILE_OBSERVATION
+    content_DECLARATION_REF_with_null_candidate:
+      baseline_origin: REGISTRY_DECLARATION_REF
+      candidate_origin: ABSENT
+    content_COMPONENT_CHECKSUM_with_candidate:
+      baseline_origin: REGISTRY_COMPONENT
+      candidate_origin: STAGED_FILE_OBSERVATION
+    content_COMPONENT_CHECKSUM_with_null_candidate:
+      baseline_origin: REGISTRY_COMPONENT
+      candidate_origin: ABSENT
+    component_present_on_both_sides:
+      baseline_origin: REGISTRY_COMPONENT
+      candidate_origin: MANIFEST_COMPONENT
+    component_added:
+      baseline_origin: ABSENT
+      candidate_origin: MANIFEST_COMPONENT
+    component_removed:
+      baseline_origin: REGISTRY_COMPONENT
+      candidate_origin: ABSENT
+    source_envelope_rule: >-
+      Every source-projection before and after envelope has present=true,
+      including an explicit null candidate release_date.
+
+  DiffFact_closed_schema:
+    required_exact:
+      - difference_kind
+      - fact_kind
+      - subject_type
+      - subject_id
+      - fact_path
+      - classification
+      - before
+      - after
+      - provenance
+    subject_type_values:
+      - SOURCE
+      - FILE
+      - COMPONENT
+      - DECLARATION
+    before_after_schema:
+      required_exact:
+        - present
+        - value
+      present_type: boolean
+      absent_value_rule: present=false requires value=null
+    provenance_schema:
+      required_exact:
+        - baseline_origin
+        - candidate_origin
+      baseline_origin_values:
+        - REGISTRY_SOURCE_RECORD
+        - REGISTRY_DECLARATION_REF
+        - REGISTRY_COMPONENT
+        - ABSENT
+      candidate_origin_values:
+        - MANIFEST_CANDIDATE
+        - STAGED_FILE_OBSERVATION
+        - MANIFEST_COMPONENT
+        - ABSENT
+
+  fact_order:
+    primary_difference_kind:
+      - CONTENT
+      - METADATA
+      - DECLARATION
+    secondary_fact_kind:
+      - IDENTITY
+      - VERSION
+      - CHECKSUM
+      - MANIFEST
+      - COMPONENT
+      - METADATA
+    tertiary_subject_type:
+      - SOURCE
+      - FILE
+      - COMPONENT
+      - DECLARATION
+    remaining:
+      - subject_id by Unicode code-point order
+      - fact_path by Unicode code-point order
+    uniqueness: >-
+      The tuple (difference_kind, fact_kind, subject_type, subject_id,
+      fact_path) is unique.
+
+  summary_schema:
+    required_exact:
+      - total_facts
+      - classifications
+      - difference_kinds
+      - fact_kinds
+    classifications_exact_keys:
+      - ADDED
+      - REMOVED
+      - CHANGED
+      - UNCHANGED
+    difference_kinds_exact_keys:
+      - CONTENT
+      - METADATA
+      - DECLARATION
+    fact_kinds_exact_keys:
+      - IDENTITY
+      - VERSION
+      - CHECKSUM
+      - MANIFEST
+      - COMPONENT
+      - METADATA
+    count_rule: >-
+      Every value is a non-negative integer; each grouping sums to total_facts.
+
+artifact_contracts:
+  validation_ceiling_rule: >-
+    Every successful artifact and every CLI result contains the
+    product_contract validation_ceiling string verbatim.
+  component_projection_status_values:
+    - NOT_PROVIDED
+    - COMPLETE
+  common_canonical_json:
+    mapping_order: sorted keys
+    separators: [',', ':']
+    ensure_ascii: false
+    allow_nan: false
+    encoding: UTF-8
+    hash_input_trailing_newline: false
+    persisted_file_trailing_newline: exactly_one_LF
+    write_mode: bytes_without_platform_newline_translation
+    sequence_rule: algorithm-defined order is preserved
+    explicit_null_rule: retained
+  self_excluding_hash:
+    rule: >-
+      Deep-copy the complete artifact mapping, remove only top-level
+      artifact_content_hash, serialize with common_canonical_json without a
+      trailing LF, and compute lowercase SHA-256.
+  input_tree_hash:
+    basis_id: raptor.sourceops.staged_snapshot_input_tree_content_hash.v1
+    basis: >-
+      Canonical JSON of the verification artifact files sequence only, in
+      file_id order, using each file's mode-specific content size/hash rather
+      than transient raw observations for canonical text.
+
+  verification_artifact:
+    schema_id: raptor.sourceops.staged_snapshot_verification.v1
+    hash_basis: raptor.sourceops.staged_snapshot_verification_content_hash.v1
+    top_level_required_exact:
+      - schema
+      - artifact_content_hash
+      - hash_basis
+      - manifest_content_hash
+      - observed_at
+      - source_binding
+      - candidate_snapshot_id
+      - component_projection_status
+      - input_tree
+      - checks
+      - stage_outcome
+      - diff_artifact_content_hash
+      - validation_ceiling
+    source_binding_required_exact:
+      - source_id
+      - registry_content_hash
+      - source_record_content_hash
+      - declaration_refs
+    input_tree_required_exact:
+      - hash_basis
+      - input_tree_content_hash
+      - files
+      - total_bound_content_bytes
+    observed_file_required_exact:
+      - file_id
+      - path
+      - role
+      - media_type
+      - checksum_mode
+      - content_byte_size
+      - content_sha256
+      - component_ids
+    observed_file_rules:
+      - files is in file_id order
+      - content_byte_size and content_sha256 are raw for RAW_BYTES
+      - content_byte_size and content_sha256 are canonical for CANONICAL_LF_TEXT
+      - no transient raw size/hash appears for CANONICAL_LF_TEXT
+    checks_required_exact:
+      - manifest_schema_valid
+      - manifest_hash_match
+      - baseline_registry_valid
+      - baseline_hash_match
+      - declaration_bindings_match
+      - baseline_immutable_during_run
+      - inventory_complete
+      - content_bindings_valid
+      - component_projection_valid
+      - file_checksums_match
+      - input_immutable_during_run
+      - inputs_not_mutated_by_command
+    check_value_rule: every check is true because no verification artifact exists on failure
+
+  diff_artifact:
+    top_level_required_exact:
+      - schema
+      - artifact_content_hash
+      - hash_basis
+      - manifest_content_hash
+      - observed_at
+      - source_binding
+      - candidate_snapshot_id
+      - input_tree_content_hash
+      - component_projection_status
+      - stage_outcome
+      - summary
+      - facts
+      - validation_ceiling
+    source_binding_schema: same_as_verification_artifact
+    facts_type: list[DiffFact]
+    forbidden_keys_recursively:
+      - ready
+      - blocked
+      - lifecycle_state
+      - materiality
+      - severity
+      - approval
+      - recommendation
+      - promote
+      - action
+      - consumer_impacts
+      - rollback
+
+  output_write_policy:
+    compute_before_write:
+      - complete both artifact objects
+      - compute diff hash
+      - place diff hash in verification object
+      - compute verification hash
+      - compute both canonical persisted byte strings
+      - complete the second immutable-input snapshot
+    leaf_directory:
+      allowed_initial_state:
+        - absent
+        - existing real empty directory
+        - existing real directory containing exactly the two expected artifact files with identical bytes
+      rejected:
+        - link or reparse entry
+        - unknown extra entry
+        - expected path containing different bytes
+        - expected path that is not a regular file
+    idempotency: >-
+      Re-running identical valid input returns the same paths, hashes, stdout,
+      and artifact bytes. Existing identical files are accepted without
+      rewriting them or changing their mtimes.
+    collision: >-
+      Any non-identical existing expected path fails OUTPUT_COLLISION. No
+      existing byte is replaced and there is no force option.
+    concurrent_writer_rule: >-
+      Final-path creation must be exclusive or equivalently race-safe. If
+      another process wins creation, re-read without following links and
+      accept only identical regular-file bytes; never replace the winner.
+    handled_write_failure: >-
+      Temporary files, if used, are created only inside the target leaf and are
+      removed on a handled failure. No new final JSON file remains after a
+      handled write failure.
+
+typed_model_and_api_contract:
+  models:
+    - manifest and every nested manifest row
+    - verification artifact and observed file rows
+    - diff artifact, summary, diff facts, fact envelopes, and provenance
+    - CLI result and error envelope
+  requirements:
+    - closed fields exactly matching this specification
+    - concrete type annotations, never bare dict/list/tuple/set or Any for required fields
+    - immutable public state; sequences exposed as immutable sequences
+    - loader returns a typed immutable manifest rather than a raw dict
+    - serializers return the exact closed mappings used for hashing
+  public_behavior:
+    load_manifest: >-
+      A public SourceOps loader accepts the fixed manifest path and returns the
+      typed immutable model or a typed StagedSnapshotError.
+    verify_stage: >-
+      A public SourceOps operation accepts repository-relative canonical
+      registry/staging paths, performs the complete operation, and returns a
+      typed result used by the CLI.
+  naming_flexibility: >-
+    Class names, private helpers, and internal module partitioning are not test
+    authority. Observable fields, immutability, error codes, hashes, bytes,
+    paths, and CLI behavior are authority.
+  helper_reuse: >-
+    Reuse V2-S1 canonical JSON/hash and repository-path concepts. A behavior-
+    preserving extraction into a shared SourceOps helper is allowed when all
+    V2-S1 tests remain green; coupling new behavior to an unsafe private helper
+    or weakening V2-S1 checks is forbidden.
+
+cli_contract:
+  existing_commands_unchanged:
+    - validate
+    - status
+  new_commands:
+    count: 1
+    command: verify-stage
+    rationale: >-
+      Separate validate and diff commands would duplicate parsing, permit a
+      time-of-check/time-of-use gap, and create overlapping contracts. One
+      command validates, verifies, compares, and writes both immutable
+      artifacts as one coherent operation.
+  invocation: >-
+    python -m raptor.sourceops.cli verify-stage
+    --registry configs/sourceops/source_registry.yaml
+    --staging-root .raptor/sourceops/staging/<stage-directory>
+  arguments:
+    --registry:
+      required: true
+      accepted_value_after_separator_normalization: configs/sourceops/source_registry.yaml
+    --staging-root:
+      required: true
+      accepted_shape: .raptor/sourceops/staging/<stage-directory>
+    forbidden:
+      - --output
+      - --output-root
+      - --force
+      - --network
+      - --promote
+      - --consumer
+      - --materiality
+  exit_codes:
+    0: valid staging input; either OBSERVED_NO_DIFFERENCE or OBSERVED_DIFFERENCE; both artifacts available
+    2: CLI usage or invalid staged manifest/tree/content/mutation input
+    4: source_id is not present in the valid current registry
+    5: manifest baseline registry hash or declaration binding does not match the valid current source
+    6: canonical registry path, registry, or current declaration precondition is invalid
+    7: generated-output boundary, collision, or write failure
+    70: unexpected internal failure caught at the verify-stage boundary
+  reserved_exit_rule:
+    - exit 3 is never emitted because V2-S2 has no BLOCKED outcome
+    - valid observed differences do not change exit 0
+  stdout:
+    schema_id: raptor.sourceops.staged_snapshot_cli_result.v1
+    serialization: common canonical JSON on one line followed by one LF
+    top_level_required_exact:
+      - schema
+      - command
+      - run_status
+      - input_validity
+      - stage_outcome
+      - source_id
+      - registry_content_hash
+      - manifest_content_hash
+      - verification_artifact
+      - diff_artifact
+      - error
+      - validation_ceiling
+    constants:
+      schema: raptor.sourceops.staged_snapshot_cli_result.v1
+      command: verify-stage
+    run_status_values:
+      - COMPLETED
+      - FAILED
+    input_validity_values:
+      - VALID
+      - INVALID
+      - NOT_EVALUATED
+    nullable_rules:
+      - stage_outcome is null until a valid diff is computed
+      - source_id and hashes are null until safely validated or computed
+      - verification_artifact and diff_artifact are null on every failed run
+      - error is null only on COMPLETED
+    success_artifact_ref_required_exact:
+      - path
+      - content_hash
+    success_artifact_ref_rules:
+      - path is the canonical forward-slash repository-relative generated path
+      - content_hash is the lowercase self-excluding artifact hash in the filename
+    success_rules:
+      - run_status=COMPLETED
+      - input_validity=VALID
+      - stage_outcome is one of the two V2-S2 outcomes
+      - both artifact refs are non-null
+      - error=null
+    failure_rules:
+      - run_status=FAILED
+      - error is non-null
+      - artifact refs are null
+      - output failures after a valid second snapshot use input_validity=VALID and retain the computed stage_outcome
+      - current baseline failures use input_validity=NOT_EVALUATED
+      - manifest, source-binding, staging-tree, checksum, and mutation failures use input_validity=INVALID
+      - CLI_USAGE_ERROR and INTERNAL_ERROR use input_validity=NOT_EVALUATED, null hashes, and null stage_outcome
+  stderr:
+    handled_results: exactly_zero_bytes
+    tracebacks_or_os_exception_text: forbidden
+  argument_errors: >-
+    Missing, duplicate, or unknown verify-stage arguments are handled JSON
+    failures with CLI_USAGE_ERROR, exit 2, deterministic stdout, and empty
+    stderr. Existing validate/status argument behavior is not changed.
+
+error_contract:
+  error_envelope_required_exact:
+    - code
+    - type
+    - phase
+    - message
+    - subject
+    - expected
+    - actual
+  value_rules:
+    subject: canonical_path_or_identifier_or_null
+    expected: JSON_value_or_null
+    actual: JSON_value_or_null
+    message: fixed implementation-owned text from this table; never raw OS exception text
+  detail_assignment:
+    mismatch_rule: >-
+      expected is the authoritative contract, current-baseline, or manifest-
+      declared value; actual is the supplied or recomputed value that failed.
+    duplicate_rule: >-
+      subject is the lowest sorted colliding canonical id or path; expected is
+      "unique"; actual is the duplicate occurrence count.
+    missing_or_unknown_rule: >-
+      subject is the normalized missing/unknown id or path; expected names the
+      required set or entry kind; actual is null.
+    type_or_limit_rule: >-
+      subject is the normalized field or path; expected is the exact enum,
+      type, or numeric limit; actual is the observed JSON type, enum, or number.
+    no_natural_detail_rule: subject, expected, and actual are all null
+  deterministic_selection:
+    phase_order:
+      - CLI
+      - BOUNDARY
+      - MANIFEST_READ
+      - MANIFEST_SCHEMA
+      - MANIFEST_HASH
+      - BASELINE
+      - INVENTORY
+      - CONTENT
+      - DIFF
+      - IMMUTABILITY
+      - OUTPUT
+      - INTERNAL
+    rule: >-
+      Fail on the first phase that fails. Within a closed mapping inspect fields
+      in the required_exact order; within a sequence inspect index order; for
+      duplicate/collision sets select the lowest Unicode-sorted offending id or
+      path. Emit exactly one error.
+  errors:
+    - code: CLI_USAGE_ERROR
+      type: CliUsageError
+      phase: CLI
+      exit: 2
+      message: verify-stage arguments do not match the closed command contract
+    - code: BASELINE_REGISTRY_PATH_INVALID
+      type: BaselineRegistryPathError
+      phase: BOUNDARY
+      exit: 6
+      message: baseline registry path is not the canonical safe V2-S1 registry
+    - code: STAGING_ROOT_INVALID
+      type: StagingRootError
+      phase: BOUNDARY
+      exit: 2
+      message: staging root is outside the designated safe staging boundary
+    - code: STAGING_MANIFEST_MISSING
+      type: StagingManifestMissingError
+      phase: MANIFEST_READ
+      exit: 2
+      message: staging root does not contain manifest.yaml
+    - code: STAGING_MANIFEST_TYPE_INVALID
+      type: StagingManifestTypeError
+      phase: MANIFEST_READ
+      exit: 2
+      message: manifest.yaml is a link, reparse point, directory, or special entry
+    - code: STAGING_MANIFEST_READ_FAILED
+      type: StagingManifestReadError
+      phase: MANIFEST_READ
+      exit: 2
+      message: staged manifest could not be read as a bounded local regular file
+    - code: STAGING_MANIFEST_LIMIT_EXCEEDED
+      type: StagingManifestLimitError
+      phase: MANIFEST_READ
+      exit: 2
+      message: staged manifest exceeds a closed size or structure limit
+    - code: STAGING_MANIFEST_ENCODING_INVALID
+      type: StagingManifestEncodingError
+      phase: MANIFEST_READ
+      exit: 2
+      message: staged manifest is not valid strict UTF-8
+    - code: STAGING_MANIFEST_YAML_INVALID
+      type: StagingManifestYamlError
+      phase: MANIFEST_SCHEMA
+      exit: 2
+      message: staged manifest is not one safe YAML mapping document
+    - code: STAGING_MANIFEST_SCHEMA_INVALID
+      type: StagingManifestSchemaError
+      phase: MANIFEST_SCHEMA
+      exit: 2
+      message: staged manifest violates the closed typed schema
+    - code: STAGING_DUPLICATE_ID
+      type: StagingDuplicateIdError
+      phase: MANIFEST_SCHEMA
+      exit: 2
+      message: staged manifest contains a duplicate or case-colliding identifier
+    - code: STAGING_DUPLICATE_PATH
+      type: StagingDuplicatePathError
+      phase: MANIFEST_SCHEMA
+      exit: 2
+      message: staged manifest contains a duplicate or case-colliding file path
+    - code: STAGING_MANIFEST_HASH_MISMATCH
+      type: StagingManifestHashMismatch
+      phase: MANIFEST_HASH
+      exit: 2
+      message: staged manifest content hash does not match its canonical mapping
+    - code: BASELINE_REGISTRY_INVALID
+      type: BaselineRegistryInvalidError
+      phase: BASELINE
+      exit: 6
+      message: current V2-S1 registry is invalid
+    - code: BASELINE_DECLARATION_INVALID
+      type: BaselineDeclarationInvalidError
+      phase: BASELINE
+      exit: 6
+      message: current V2-S1 declaration precondition is invalid or drifted
+    - code: UNKNOWN_SOURCE
+      type: UnknownSourceError
+      phase: BASELINE
+      exit: 4
+      message: source_id is not present in the validated baseline registry
+    - code: BASELINE_REGISTRY_HASH_MISMATCH
+      type: BaselineRegistryHashMismatch
+      phase: BASELINE
+      exit: 5
+      message: manifest registry_content_hash does not match the current validated registry
+    - code: BASELINE_DECLARATION_BINDING_MISMATCH
+      type: BaselineDeclarationBindingMismatch
+      phase: BASELINE
+      exit: 5
+      message: manifest declaration bindings do not match the selected baseline source
+    - code: BASELINE_CHANGED_DURING_RUN
+      type: BaselineChangedDuringRunError
+      phase: BASELINE
+      exit: 6
+      message: validated registry or selected declaration changed during verification
+    - code: STAGING_PATH_INVALID
+      type: StagingPathError
+      phase: INVENTORY
+      exit: 2
+      message: a staged path is unsafe or escapes the designated root
+    - code: STAGING_ENTRY_TYPE_INVALID
+      type: StagingEntryTypeError
+      phase: INVENTORY
+      exit: 2
+      message: staging tree contains a link, reparse point, special entry, or listed directory
+    - code: STAGING_TREE_MISMATCH
+      type: StagingTreeMismatchError
+      phase: INVENTORY
+      exit: 2
+      message: staging tree has a missing, unknown, or unneeded entry
+    - code: STAGING_LIMIT_EXCEEDED
+      type: StagingLimitError
+      phase: INVENTORY
+      exit: 2
+      message: staging tree exceeds a closed file, directory, depth, or byte limit
+    - code: CONTENT_BINDING_INVALID
+      type: ContentBindingError
+      phase: CONTENT
+      exit: 2
+      message: a content binding is unknown, duplicate, ambiguous, or mode-incompatible
+    - code: COMPONENT_MAPPING_INVALID
+      type: ComponentMappingError
+      phase: CONTENT
+      exit: 2
+      message: component projection or file mapping violates complete closed semantics
+    - code: STAGING_FILE_SIZE_MISMATCH
+      type: StagingFileSizeMismatch
+      phase: CONTENT
+      exit: 2
+      message: staged file content size does not match the manifest
+    - code: STAGING_FILE_CHECKSUM_MISMATCH
+      type: StagingFileChecksumMismatch
+      phase: CONTENT
+      exit: 2
+      message: staged file content checksum does not match the manifest
+    - code: STAGING_TEXT_ENCODING_INVALID
+      type: StagingTextEncodingError
+      phase: CONTENT
+      exit: 2
+      message: canonical-LF staged content is not valid strict UTF-8
+    - code: STAGING_FILE_READ_FAILED
+      type: StagingFileReadError
+      phase: CONTENT
+      exit: 2
+      message: staged content could not be read as a bounded local regular file
+    - code: STAGING_INPUT_MUTATED
+      type: StagingInputMutationError
+      phase: IMMUTABILITY
+      exit: 2
+      message: staged manifest or file tree changed during verification
+    - code: OUTPUT_BOUNDARY_INVALID
+      type: OutputBoundaryError
+      phase: OUTPUT
+      exit: 7
+      message: generated artifact path is not a safe real path below the fixed output boundary
+    - code: OUTPUT_COLLISION
+      type: OutputCollisionError
+      phase: OUTPUT
+      exit: 7
+      message: content-addressed output path already contains non-identical or unknown content
+    - code: OUTPUT_WRITE_FAILED
+      type: OutputWriteError
+      phase: OUTPUT
+      exit: 7
+      message: verified artifacts could not be written atomically inside the output boundary
+    - code: INTERNAL_ERROR
+      type: InternalStageError
+      phase: INTERNAL
+      exit: 70
+      message: verify-stage failed closed because of an unexpected internal error
+
+implementation_and_repository_layout:
+  implementation_allowed:
+    create:
+      - src/raptor/sourceops/staged_snapshot.py
+    update:
+      - src/raptor/sourceops/cli.py
+      - src/raptor/sourceops/__init__.py
+      - src/raptor/sourceops/model.py
+      - src/raptor/sourceops/registry.py
+    conditional_shared_helpers:
+      - src/raptor/sourceops/hashing.py
+      - src/raptor/sourceops/paths.py
+    rule: >-
+      model.py/registry.py updates are allowed only for additive typed models,
+      exports, or behavior-preserving helper extraction. Existing public
+      behavior and all V2-S1 tests are preservation gates.
+  test_author_expected:
+    create:
+      - tests/sourceops/test_staged_snapshot_contract.py
+      - tests/sourceops/test_staged_snapshot_cli.py
+      - tests/sourceops/test_staged_snapshot_safety.py
+    may_create_fixture_directory:
+      - tests/sourceops/fixtures/staged_snapshot/
+    must_not_modify:
+      - tests/sourceops/test_registry_contract.py
+      - tests/sourceops/test_registry_cli.py
+      - tests/sourceops/test_repository_registry.py
+      - tests/sourceops/test_import_and_network_boundary.py
+  forbidden_implementation_changes:
+    - configs/sourceops/source_registry.yaml
+    - configs/ingest/
+    - configs/eval/
+    - configs/external/
+    - configs/atlas/
+    - configs/acmg/
+    - data/
+    - docs/project/TODOS.yaml
+    - dependency manifests
+    - any existing domain package
+    - any RescueScreen or panel-product path
+  runtime_artifacts:
+    input: .raptor/sourceops/staging/<stage-directory>/
+    output: .raptor/sourceops/generated/staged-snapshots/<manifest-hash>/
+    tracked: false
+  fixture_decision:
+    checked_in_golden_manifests_or_outputs: false
+    rationale: >-
+      Golden manifests and generated artifacts would embed the current
+      registry hash and become stale or tempt output rewriting. Tests build
+      manifests and expected canonical JSON programmatically from tiny inputs.
+    allowed_checked_in_payloads: >-
+      Optional synthetic text/binary payloads under the fixture directory,
+      each at most 4096 bytes, with no real source data, secret, copyrighted
+      corpus, or generated artifact.
+    required_real_binding: >-
+      At least one integration test binds the actual
+      tsc-ingest-and-reference-declarations source, copies the current
+      configs/ingest/tsc.yaml bytes into an isolated staging root, declares it
+      as CANONICAL_LF_TEXT and CANDIDATE_DECLARATION, and derives matching
+      candidate/component facts from the validated registry. The source
+      declaration itself remains read-only.
+    cleanup: >-
+      Tests remove only uniquely named staging directories and generated leaves
+      they created. They never delete the fixed parents or unrelated operator
+      inputs/artifacts.
+
+acceptance_criteria:
+  - id: V2S2-AC01
+    type: schema
+    text: >-
+      manifest.yaml is strict UTF-8, one safe YAML mapping, duplicate-key-safe,
+      alias/tag-free, closed at every level, typed, bounded, and self-hashed
+      exactly as specified; unknown keys and implicit defaults fail.
+  - id: V2S2-AC02
+    type: binding
+    text: >-
+      One scalar source_id resolves exactly once in the valid canonical V2-S1
+      registry, registry_content_hash matches exactly, and declaration_refs are
+      an exact sequence match. Unknown source and baseline hash mismatch have
+      distinct codes and exits.
+  - id: V2S2-AC03
+    type: safety
+    text: >-
+      CLI and manifest paths reject URI, absolute, drive, UNC, traversal,
+      device, case-collision, symlink, junction/reparse, special-file, and
+      resolved escape cases on every platform.
+  - id: V2S2-AC04
+    type: inventory
+    text: >-
+      The complete staging tree equals manifest.yaml plus listed regular files
+      and necessary non-empty real directories. Missing, unknown, duplicate,
+      empty, unlisted, or over-limit content fails closed.
+  - id: V2S2-AC05
+    type: checksum
+    text: >-
+      RAW_BYTES and CANONICAL_LF_TEXT implement the exact byte, null-field,
+      size, encoding, CRLF/CR, BOM, whitespace, and terminal-newline rules.
+      Hash or size mismatch is invalid, while non-UTF-8 RAW_BYTES is valid.
+  - id: V2S2-AC06
+    type: baseline
+    text: >-
+      Current registry/declaration drift is a baseline precondition failure,
+      not a candidate difference. V2-S2 never calls consumer status or repairs,
+      rewrites, or rebinds the baseline.
+  - id: V2S2-AC07
+    type: immutability
+    text: >-
+      The validated registry/selected declarations and the manifest/full
+      staging tree are snapshotted twice with before/after read stability. Any
+      baseline change fails exit 6; any staged manifest, byte, entry, type,
+      stat, or path change is STAGING_INPUT_MUTATED. Neither writes an artifact.
+  - id: V2S2-AC08
+    type: diff
+    text: >-
+      Source facts, every explicit content binding, and optional complete
+      component facts produce the exact closed DiffFact schema, provenance,
+      ordering, classification, explicit-null, and sequence semantics.
+  - id: V2S2-AC09
+    type: outcome
+    text: >-
+      A valid all-unchanged candidate returns exit 0 and
+      OBSERVED_NO_DIFFERENCE; a valid added/removed/changed candidate returns
+      exit 0 and OBSERVED_DIFFERENCE. Neither path emits READY/BLOCKED or a
+      decision field.
+  - id: V2S2-AC10
+    type: determinism
+    text: >-
+      Repeated runs over identical inputs, YAML mapping reordering, and
+      manifest checkout LF/CRLF differences produce identical hashes, artifact
+      bytes, paths, and stdout. Canonical text payload LF/CRLF variants also
+      produce identical outputs.
+  - id: V2S2-AC11
+    type: artifacts
+    text: >-
+      Verification and diff artifacts have exact schemas, self-excluding
+      hashes, canonical UTF-8 JSON bytes with one LF, fixed content-addressed
+      paths, stable summaries, and no wall-clock-derived bytes.
+  - id: V2S2-AC12
+    type: idempotency
+    text: >-
+      Existing identical artifacts are accepted without rewrite. A differing,
+      linked, special, or extra output entry fails exit 7 with no overwrite,
+      no force path, and no write outside the fixed generated boundary.
+  - id: V2S2-AC13
+    type: cli
+    text: >-
+      verify-stage is the sole new command. Every handled success, usage error,
+      validation failure, baseline failure, and output failure emits one
+      deterministic closed JSON object to stdout, zero stderr bytes, and the
+      exact exit partition.
+  - id: V2S2-AC14
+    type: typed_model
+    text: >-
+      Manifest and artifact surfaces are closed typed immutable models with
+      immutable sequences; public loaders do not expose mutable raw
+      dictionaries or unparameterized/Any required fields.
+  - id: V2S2-AC15
+    type: non_mutation
+    text: >-
+      Success and all failures leave operator staging input, the V2-S1
+      registry, domain declarations, preservation paths, frozen evidence, and
+      RescueScreen paths byte-identical; only successful generated artifacts
+      appear under the fixed output boundary.
+  - id: V2S2-AC16
+    type: dependency
+    text: >-
+      SourceOps remains offline and uses only standard library plus PyYAML; no
+      network import, external-content dereference, archive parser, database,
+      service, scheduler, or domain-package import is introduced.
+  - id: V2S2-AC17
+    type: v2_s3_handoff
+    text: >-
+      The diff contains observed CONTENT/METADATA/DECLARATION facts and hashes
+      only. It contains no lifecycle, materiality, severity, approval,
+      recommendation, consumer impact, action, promotion, or rollback field.
+  - id: V2S2-AC18
+    type: compatibility
+    text: >-
+      Existing validate/status output and exits remain unchanged, the complete
+      V2-S1 SourceOps suite and established external/Atlas/eval/scorer
+      regression selector pass, and no pre-existing assertion is weakened.
+
+inversion_and_falsifier_probes:
+  - id: V2S2-FM01
+    threat: lexical or resolved path escape
+    probe: >-
+      Try ../, nested .., absolute, drive, UNC, file URI, device name, and a
+      real directory that resolves outside staging. Each fails before file
+      content is accepted and writes nothing.
+  - id: V2S2-FM02
+    threat: symlink or Windows junction launders an external file
+    probe: >-
+      Place a link/reparse point at the staging root, an ancestor directory, a
+      nested directory, and the final file. Each is STAGING_ENTRY_TYPE_INVALID
+      even when its target is inside the repository.
+  - id: V2S2-FM03
+    threat: duplicate identity or path becomes platform-dependent
+    probe: >-
+      Duplicate and case-collide file_id, file path, binding_id, component_id,
+      and component_ids entries. Exact deterministic duplicate codes result.
+  - id: V2S2-FM04
+    threat: checksum or size mismatch is reported as ordinary drift
+    probe: >-
+      Alter one byte, declared size, raw hash, canonical hash, CR handling, or
+      terminal newline without recomputing the manifest. Verification fails
+      invalid; no OBSERVED_DIFFERENCE artifact is written.
+  - id: V2S2-FM05
+    threat: stale manifest silently rebinds to a new registry
+    probe: >-
+      Use a well-formed manifest with one different registry hash. It returns
+      BASELINE_REGISTRY_HASH_MISMATCH, exit 5, not UNKNOWN_SOURCE or a diff.
+  - id: V2S2-FM06
+    threat: unknown source is conflated with hash mismatch
+    probe: >-
+      Use the current correct registry hash and an absent source_id. It returns
+      UNKNOWN_SOURCE and exit 4.
+  - id: V2S2-FM07
+    threat: manifest mutation after parsing evades verification
+    probe: >-
+      Change manifest bytes or replace manifest.yaml between snapshots while
+      preserving valid YAML. It returns STAGING_INPUT_MUTATED and no artifact.
+  - id: V2S2-FM08
+    threat: staged file or tree mutation after hashing evades verification
+    probe: >-
+      Change bytes, size, mtime/ctime, file identity, entry set, or entry type
+      between snapshots. It returns STAGING_INPUT_MUTATED before output.
+  - id: V2S2-FM09
+    threat: nondeterministic ordering or current time changes bytes
+    probe: >-
+      Run twice, perturb mapping insertion order, environment timezone, locale,
+      file mtimes, and command time. Successful paths, hashes, bytes, and
+      stdout remain equal.
+  - id: V2S2-FM10
+    threat: V2-S2 mutates registry, domain declaration, or operator input
+    probe: >-
+      Hash and lstat the registry, every selected declaration, preservation
+      paths, and staging tree before and after success plus representative
+      failures. Raw bytes and stable metadata remain unchanged.
+  - id: V2S2-FM10B
+    threat: concurrent registry or selected declaration mutation creates a mixed baseline
+    probe: >-
+      Replace or modify the registry or selected declaration after the first
+      baseline validation and before output. The run returns
+      BASELINE_CHANGED_DURING_RUN, exit 6, and no artifact.
+  - id: V2S2-FM11
+    threat: malformed or non-UTF-8 data receives success-shaped output
+    probe: >-
+      Exercise non-UTF-8 manifest, duplicate YAML key, aliases, multiple
+      documents, custom tag, non-mapping root, non-UTF-8 canonical text, and
+      non-UTF-8 raw bytes. Only the final raw-byte case is valid.
+  - id: V2S2-FM12
+    threat: stdout, stderr, and exit meanings overlap
+    probe: >-
+      Assert exact JSON schema, one LF, empty stderr, and exits 0/2/4/5/6/7 for
+      success, staging invalidity, unknown source, hash binding mismatch,
+      baseline invalidity, and output collision. Exit 3 is never used.
+  - id: V2S2-FM13
+    threat: all-matching candidate cannot be represented
+    probe: >-
+      Build a real-source candidate whose compared metadata, declaration hash,
+      and complete component projection equal the V2-S1 baseline. Every fact is
+      UNCHANGED and the outcome is OBSERVED_NO_DIFFERENCE.
+  - id: V2S2-FM14
+    threat: valid changed candidate is rejected or given a decision
+    probe: >-
+      Change candidate version, one declaration canonical hash with matching
+      manifest checksum, add one explicit file, and alter one component fact.
+      The valid diff reports the exact changed facts, exit 0, and no
+      materiality, approval, action, or promotion key.
+  - id: V2S2-FM15
+    threat: explicit null and omission collapse
+    probe: >-
+      Compare candidate release_date=null with a non-null baseline and assert
+      CHANGED with present=true/value=null. Remove a required key and assert
+      manifest schema invalidity rather than the same diff.
+  - id: V2S2-FM16
+    threat: output collision overwrites evidence
+    probe: >-
+      Pre-create one expected artifact with different bytes, an extra leaf
+      file, and a link at an output ancestor. Each returns exit 7 and every
+      pre-existing byte remains unchanged.
+
+test_author_contract:
+  authorship:
+    planner: Sol specifies this independent closed contract only
+    red_test_author: Codex writes failing tests before implementation
+    doer: MAI-Code-1.1-Flash implements without weakening RED or V2-S1 tests
+    checker: Opus 5 independently runs gates and inspects scope
+    final_authority: human adjudication
+  red_stage_rules:
+    - new tests derive expected schemas, hashes, paths, facts, errors, stdout, and exits from this file
+    - implementation imports may be guarded only to produce a clear RED missing-implementation failure
+    - no existing test, assertion, fixture meaning, skip, xfail, or selector is changed
+    - every acceptance criterion and inversion probe maps to at least one named test
+    - tests use isolated uniquely named roots below .raptor/sourceops/staging and clean only their own entries
+    - no network, external data root, clock freeze dependency, or new package is required
+  minimum_new_test_groups:
+    - manifest closed schema, duplicate YAML key, aliases/tags, hash, null, and canonical sequence tests
+    - safe boundary, traversal, drive/UNC/URI/device, case collision, symlink, and junction tests
+    - exact tree, missing/unknown/empty/type/count/depth/size tests
+    - RAW_BYTES and CANONICAL_LF_TEXT byte/hash/encoding/newline property tests
+    - registry validation, unknown source, baseline hash, declaration drift, and binding tests
+    - content-binding and complete/null component-projection truth tables
+    - diff fact generation, ordering, classification, provenance, summaries, and forbidden-key tests
+    - two-pass manifest/file/tree mutation tests
+    - canonical artifact hash, byte serialization, output path, idempotency, and collision tests
+    - CLI success/failure JSON, stderr, and exit partition tests
+    - input/registry/domain/preservation/RescueScreen non-mutation and import/network guards
+    - real V2-S1 source-binding no-change and changed-candidate integrations
+  minimum_commands:
+    - command: >-
+        python -m pytest tests/sourceops/test_staged_snapshot_contract.py
+        tests/sourceops/test_staged_snapshot_cli.py
+        tests/sourceops/test_staged_snapshot_safety.py -q
+      expected_exit_after_implementation: 0
+    - command: >-
+        python -m pytest tests/sourceops/test_registry_contract.py
+        tests/sourceops/test_registry_cli.py
+        tests/sourceops/test_repository_registry.py
+        tests/sourceops/test_import_and_network_boundary.py -q
+      expected_exit: 0
+      gate: complete V2-S1 SourceOps preservation suite
+    - command: python -m pytest tests/sourceops -q
+      expected_exit: 0
+    - command: >-
+        python -m pytest tests/external/test_mave_source_register.py
+        tests/atlas/test_source_registry_claims.py
+        tests/eval/test_core_annotation_bundle.py
+        tests/scorer/test_ac7_config.py -q
+      expected_exit: 0
+      gate: established required regression selector from the V2-S1 authority
+    - command: >-
+        python -m raptor.sourceops.cli validate --registry
+        configs/sourceops/source_registry.yaml
+      expected_exit: 0
+      stdout_compatibility: byte-for-byte unchanged for the same environment and input
+    - command: >-
+        python -m raptor.sourceops.cli status --registry
+        configs/sourceops/source_registry.yaml --consumer eval-gate
+      expected_exit: 0
+      stdout_compatibility: byte-for-byte unchanged for the same environment and input
+    - command: git --no-pager diff --check
+      expected_exit: 0
+  test_oracle_rules:
+    - expected hashes are independently recomputed in tests from the specified canonical algorithms
+    - tests do not copy implementation hash helpers to decide expected values
+    - tests compare complete artifact bytes and complete stdout for representative success/failure cases
+    - tests assert no unlisted final files and no mutations, not merely return codes
+
+v2_s3_handoff:
+  allowed_input:
+    schema: raptor.sourceops.staged_snapshot_diff.v1
+    binding:
+      - artifact_content_hash
+      - manifest_content_hash
+      - registry_content_hash
+      - source_record_content_hash
+      - input_tree_content_hash
+  handoff_rule: >-
+    V2-S3 must independently validate the V2-S2 artifact schema and hashes
+    before applying a separately approved materiality and action-routing
+    policy. A V2-S2 observed difference alone is never a V2-S3 trigger or
+    approval.
+  intentionally_absent:
+    - materiality thresholds
+    - severity ranks
+    - consumer invalidations
+    - benchmark, packet, Atlas, or validation actions
+    - promotion recommendation
+    - rollback target or rehearsal
+    - source lifecycle transition
+
+migration_compatibility_and_backout:
+  migration:
+    registry_schema: none
+    domain_declarations: none
+    database: none
+    service: none
+    existing_artifacts: none
+  additive_compatibility:
+    - existing V2-S1 registry files and reports remain authoritative and unchanged
+    - existing validate/status commands retain schemas and exits
+    - candidate manifests are a new schema and are never inferred from older files
+    - breaking manifest or artifact changes require a new schema/hash-basis id
+    - content-addressed artifacts are immutable and are never upgraded in place
+  registry_change_behavior: >-
+    If the registry changes after a candidate manifest is authored, the old
+    manifest fails BASELINE_REGISTRY_HASH_MISMATCH. The operator may author a
+    new reviewed manifest; V2-S2 never rewrites or auto-rebinds the old one.
+  backout: >-
+    Revert only V2-S2 SourceOps code/exports/CLI additions and new V2-S2 tests.
+    Operator-owned staging input remains untouched. Generated content-addressed
+    artifacts may be retained for audit or manually removed by the operator;
+    no registry, domain, data, evidence, database, or service recovery is
+    required.
+
+human_adjudication_points:
+  points:
+    - whether operator-declared identity, version, retrieval, licence, and acquisition facts are truthful
+    - whether a valid observed difference is material
+    - whether any consumer requires invalidation, rebuild, review, or regrounding
+    - whether a candidate may be promoted or a registry lifecycle may change
+    - whether a rollback should be rehearsed or executed
+    - whether legal terms permit use, redistribution, or cloud egress
+    - whether scientific evidence or clinical scope changes
+  default: no decision and no action
+
+open_questions_resolved_by_planning:
+  - question: separate validate, verify, and diff commands
+    resolution: one verify-stage command prevents overlap and TOCTOU
+  - question: staging and output locations
+    resolution: fixed ignored repository-relative .raptor boundaries with no output override
+  - question: raw versus text portability
+    resolution: explicit mutually exclusive RAW_BYTES and CANONICAL_LF_TEXT modes with null counterpart fields
+  - question: wall-clock timestamps
+    resolution: only manifest observed_at/retrieved_at enter output; current time never does
+  - question: missing raw baseline snapshots
+    resolution: compare only explicit declaration/checksum bindings; never infer a baseline checksum
+  - question: meaning of an omitted baseline content binding
+    resolution: not compared; only an explicit null candidate means REMOVED
+  - question: component partial updates
+    resolution: component_projection is either null or COMPLETE; partial is forbidden
+  - question: candidate lifecycle
+    resolution: excluded from manifest and outputs; lifecycle remains V2-S1/V2-S3 governance
+  - question: valid changed candidate exit
+    resolution: exit 0 with OBSERVED_DIFFERENCE and no recommendation
+  - question: failure artifacts
+    resolution: none; invalid or failed runs emit deterministic stdout only
+  - question: output overwrite
+    resolution: identical bytes are idempotent; any difference is a collision with no force
+  - question: checked-in golden staged artifacts
+    resolution: none; tiny payloads and manifests are generated by tests, with one actual V2-S1 source binding
+  - question: archive and domain parsing
+    resolution: none; bytes/text hashing only
+  - question: dependency additions
+    resolution: none; standard library and existing PyYAML only
+
+definition_of_done:
+  planner_stage:
+    - this file is the sole detailed V2-S2 authority
+    - kickoff V2-S2 entry points here and says planning complete
+    - edited YAML files parse with yaml.safe_load
+    - git --no-pager diff --check succeeds
+    - changed-file scope contains documentation only
+    - no commit or push is made
+  implementation_stage:
+    - every acceptance criterion and inversion probe has a passing test
+    - both valid no-change and valid changed real-source-bound cases pass
+    - all minimum commands pass
+    - generated outputs are byte-reproducible and content-addressed
+    - no existing test is weakened and preservation scope has zero diff
+    - Opus checker records PASS and human adjudication accepts the slice
+  stop_conditions:
+    - V2-S1 registry or declaration baseline is invalid or unexpectedly changed
+    - implementation would require network, a new dependency, external data, or writes outside fixed boundaries
+    - a requested field would encode materiality, approval, action, lifecycle, evidence, clinical, or RescueScreen semantics
+    - deterministic mutation detection or junction rejection cannot be proven on a supported platform
+    - a doer proposes changing registry/domain data to make tests pass
+  not_done_by_v2_s2:
+    - source acquisition or promotion
+    - materiality or impact routing
+    - rollback rehearsal
+    - any evidence or clinical result

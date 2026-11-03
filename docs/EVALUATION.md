@@ -488,15 +488,25 @@ annotation, benchmark read, network access, or data generation (see `no_new_evid
 the record above), and every scope's `authorization_status` is `NOT_AUTHORIZED` or
 `PENDING_PROSPECTIVE` — never `AUTHORIZED`.
 
-**Prospective registration (pre-registered here, before any result exists):** the next real
-evaluation of any v3 scope — including `truncating:pathogenic`, the only scope with
-`SUPPORTED_POSTHOC` evidence — must run against the first eligible NCBI ClinVar GRCh38
-`variant_summary` monthly archive dated on/after 2026-08-01, with its URL/official date/MD5/SHA-256
-frozen *before* labels or scoring. Unavailable/invalid data yields `BLOCKED_DATA`, not an
-outcome-dependent substitute. Until that run completes and clears the unchanged §1 thresholds on
-unseen data, `research_scope_flags.truncating_pathogenic_research_scope_validated` remains `false`
-and no scope is authorized.
+**Prospective registration and result:** a new, explicit amendment registered the correct exact
+NCBI archive-root URL before any archive GET, label read or score. The August 2026 archive was
+downloaded twice and frozen on the x64 worker before decompression. The resulting benchmark
+contained 3,725 variants with a deterministic 2,608-variant holdout. All 2,608 holdout identities
+were removed from the frozen scorer's ClinVar-derived comparator resources with zero survivors,
+and the label-free x64 path returned 2,608 unique BIAS rows with zero PP3/BP4 scored calls.
 
-That contract resolved to `BLOCKED_DATA` on 2026-08-06: the exact preregistered URL returned 404,
-and the same filename at a different URL was not substituted. No archive content or labels were
-downloaded.
+The unchanged registered thresholds produced a mixed result:
+
+- `missense:pathogenic`: 53 actual, 0 called -> `NO_CALLS` / `NOT_ESTIMABLE`, not authorized;
+- `missense:benign`: 110 actual, 10 called -> `UNDERPOWERED` / `UNMET`, not authorized;
+- `truncating:pathogenic`: 237 actual, 219 called, conditional precision/recall lower bounds
+  0.9833/0.9833 -> `VALIDATED_PROSPECTIVE` / `AUTHORIZED_RESEARCH_ONLY`.
+
+Full spectrum remains `BLOCKED_POLICY` and `NOT_AUTHORIZED`; PM1 is still production-unvalidated.
+The narrow result authorizes no clinical classification, public VUS worklist, patient decision or
+ClinVar submission. Source:
+`data/census/tsc_prospective_validation_2026-08_amendment_v3_result.json`.
+
+The earlier 2026-08-06 attempt remains immutable `BLOCKED_DATA`: its exact preregistered URL
+returned 404 and the same filename at a different path was not substituted. It is historical
+evidence of the first attempt, not the outcome of the later amendment-v3 run.

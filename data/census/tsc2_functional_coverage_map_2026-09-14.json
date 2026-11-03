@@ -1,0 +1,159 @@
+{
+  "boundaries": {
+    "atlas_claim_promotion": "forbidden",
+    "clinical_use": "forbidden",
+    "evidence_strength_use": "forbidden",
+    "label_access": "forbidden",
+    "network": "forbidden",
+    "ps3_bs3_use": "forbidden",
+    "score_output": "forbidden",
+    "score_semantic_use": "forbidden"
+  },
+  "bundle_id": "tsc2-functional-coverage-map-2026-09-14",
+  "cohorts": {
+    "atlas_anchor": {
+      "functional_overlap_unique": 1,
+      "identities": 1,
+      "prospective_holdout_overlap": 1,
+      "source_overlap_unique": {
+        "igvf_sge": 0,
+        "igvf_vamp_seq": 0,
+        "mavedb_clipe": 1
+      }
+    },
+    "atlas_contrast": {
+      "functional_overlap_unique": 6,
+      "raw_records": 35,
+      "resolved_unique_spdi": 25,
+      "source_membership_patterns": {
+        "igvf_sge": 2,
+        "igvf_vamp_seq": 1,
+        "igvf_vamp_seq+igvf_sge": 0,
+        "mavedb_clipe": 2,
+        "mavedb_clipe+igvf_sge": 0,
+        "mavedb_clipe+igvf_vamp_seq": 1,
+        "mavedb_clipe+igvf_vamp_seq+igvf_sge": 0
+      },
+      "source_overlap_unique": {
+        "igvf_sge": 2,
+        "igvf_vamp_seq": 2,
+        "mavedb_clipe": 3
+      },
+      "unresolved_records": 10
+    },
+    "priority": {
+      "TSC1": 52,
+      "TSC2": 112,
+      "candidate_LB_review": 7,
+      "candidate_LB_review_overlap": 0,
+      "candidate_LP_review": 157,
+      "candidate_LP_review_overlap": 4,
+      "functional_overlap_unique": 4,
+      "identities": 164,
+      "source_overlap_unique": {
+        "igvf_sge": 4,
+        "igvf_vamp_seq": 0,
+        "mavedb_clipe": 0
+      }
+    },
+    "prospective_holdout": {
+      "TSC1": 718,
+      "TSC2": 1890,
+      "functional_overlap_unique": 171,
+      "identities": 2608,
+      "source_membership_patterns": {
+        "igvf_sge": 26,
+        "igvf_vamp_seq": 111,
+        "igvf_vamp_seq+igvf_sge": 9,
+        "mavedb_clipe": 19,
+        "mavedb_clipe+igvf_sge": 4,
+        "mavedb_clipe+igvf_vamp_seq": 1,
+        "mavedb_clipe+igvf_vamp_seq+igvf_sge": 1
+      },
+      "source_overlap_unique": {
+        "igvf_sge": 40,
+        "igvf_vamp_seq": 122,
+        "mavedb_clipe": 25
+      }
+    },
+    "vus": {
+      "TSC1": 2249,
+      "TSC2": 4369,
+      "functional_overlap_unique": 335,
+      "identities": 6618,
+      "source_membership_patterns": {
+        "igvf_sge": 79,
+        "igvf_vamp_seq": 178,
+        "igvf_vamp_seq+igvf_sge": 12,
+        "mavedb_clipe": 50,
+        "mavedb_clipe+igvf_sge": 12,
+        "mavedb_clipe+igvf_vamp_seq": 2,
+        "mavedb_clipe+igvf_vamp_seq+igvf_sge": 2
+      },
+      "source_overlap_unique": {
+        "igvf_sge": 105,
+        "igvf_vamp_seq": 194,
+        "mavedb_clipe": 66
+      }
+    }
+  },
+  "cross_cohort": {
+    "functional__atlas_contrast_outside_vus_holdout": 2,
+    "functional__prospective_holdout__atlas_contrast": 3,
+    "functional__vus__atlas_contrast": 1,
+    "priority__atlas_contrast": 0,
+    "priority__prospective_holdout": 0,
+    "prospective_holdout__atlas_contrast": 3,
+    "vus__atlas_contrast": 3,
+    "vus__prospective_holdout": 0
+  },
+  "functional": {
+    "source_membership_patterns": {
+      "igvf_sge": 307,
+      "igvf_vamp_seq": 8959,
+      "igvf_vamp_seq+igvf_sge": 78,
+      "mavedb_clipe": 164,
+      "mavedb_clipe+igvf_sge": 31,
+      "mavedb_clipe+igvf_vamp_seq": 6,
+      "mavedb_clipe+igvf_vamp_seq+igvf_sge": 7
+    },
+    "source_unique": {
+      "igvf_sge": 423,
+      "igvf_vamp_seq": 9050,
+      "mavedb_clipe": 208
+    },
+    "unique_spdi": 9552,
+    "verified_observations": 9681
+  },
+  "functional_cohort_membership_patterns": {
+    "ATLAS_CONTRAST": 2,
+    "NONE": 9044,
+    "PROSPECTIVE_HOLDOUT": 167,
+    "PROSPECTIVE_HOLDOUT+ATLAS_ANCHOR": 1,
+    "PROSPECTIVE_HOLDOUT+ATLAS_CONTRAST": 3,
+    "VUS": 334,
+    "VUS+ATLAS_CONTRAST": 1
+  },
+  "input_hashes": {
+    "atlas_identity_map": "3adbf3484de28607fa3c133b2bebc4a9d7926b4c2d5b3863b0634507c599cd26",
+    "functional_identity_promotion": "c66639976bf9369cfd07568011a85f5ac50fd0ea9467c54210768574645941ed",
+    "prospective_holdout_manifest": "809ac116a7e0c33e5749173f683f10fd8cd623b5d04ef4919cb972dd9196ace8",
+    "vus_manifest": "7f9937521a425e73b31422fa9191c90e67fa80cc58f351517ac732b1d32fcbba"
+  },
+  "leakage_markers": {
+    "ATLAS_CONTEXT": 7,
+    "PROSPECTIVE_HOLDOUT": 171,
+    "PROSPECTIVE_HOLDOUT+ATLAS_CONTEXT": 4
+  },
+  "manifest_content_hash": "b079eca8d126eab468e42af140ebc646e5e3f021b5c2d819bb7fbb890cd7d101",
+  "output_artifacts": [
+    {
+      "artifact_id": "tsc2-functional-coverage-jsonl",
+      "byte_length": 2983168,
+      "relative_path": "coverage/functional_identity_coverage.jsonl",
+      "row_count": 9552,
+      "sha256": "5cf08b4747c3f01e5f4f96863a6b1f79617e142941ecd3e51ae9a64ebe4ced33"
+    }
+  ],
+  "schema": "raptor.external.tsc2_functional_coverage_summary.v1"
+}

@@ -1,0 +1,83 @@
+{
+  "artifact_integrity": {
+    "igvf_sge-promoted-jsonl": {
+      "byte_length": 227381,
+      "row_count": 453,
+      "sha256": "2292e5770911e13fcd2536287fd04fc7f23354c9bc81ebf01533aa441114ea52"
+    },
+    "igvf_vamp_seq-promoted-jsonl": {
+      "byte_length": 5116593,
+      "row_count": 9253,
+      "sha256": "dc639dd6ec0f9aeaf4113f5b36d46a2d715d5830eb6dbb370860925a7c9648db"
+    },
+    "mavedb_clipe-promoted-jsonl": {
+      "byte_length": 106045,
+      "row_count": 208,
+      "sha256": "9241052425a0a785b7da23edef678365f485a2ba973568bf3c5b38270399e2ff"
+    }
+  },
+  "boundaries": {
+    "clinical_use": "forbidden",
+    "evidence_strength_use": "forbidden",
+    "network": "forbidden"
+  },
+  "bundle_id": "tsc2-functional-identity-promotion-2026-09-14",
+  "conservation": {
+    "dropped_rows": 0,
+    "duplicate_source_rows": 0,
+    "input_rows": 9914,
+    "output_rows": 9914
+  },
+  "duplicate_verified_observations": 129,
+  "identity_state_counts": {
+    "GENOMIC_CROSSWALK_LENGTH_MISMATCH": 57,
+    "GENOMIC_REFERENCE_MISMATCH": 27,
+    "GENOMIC_SPDI_VERIFIED": 9681,
+    "PROTEIN_ONLY_ARCHIVE_CROSSWALK_ABSENT": 146,
+    "PROTEIN_ONLY_CROSSWALK_REQUIRED": 0,
+    "REFERENCE_CONTROL": 3,
+    "TRANSCRIPT_ONLY_PROJECTOR_REQUIRED": 0
+  },
+  "input_manifest_hashes": {
+    "clipe_projector": "247665b9758860124b196d037b913626b7699b87ba1bb1c32b0e461bb4473529",
+    "functional_normalization": "74f15f22cfb6e876a8fab3a16c841e6f33317eadd58ef04547e4c060162afb48",
+    "vamp_crosswalk": "f80759aa43874d201efb69c52b611d9ebd8c40712159bf1f291c86195dd33ba0"
+  },
+  "manifest_content_hash": "c66639976bf9369cfd07568011a85f5ac50fd0ea9467c54210768574645941ed",
+  "schema": "raptor.external.tsc2_functional_identity_promotion_summary.v1",
+  "source_overlap": {
+    "pairwise": {
+      "igvf_vamp_seq__igvf_sge": 85,
+      "mavedb_clipe__igvf_sge": 38,
+      "mavedb_clipe__igvf_vamp_seq": 13
+    },
+    "triple": 7
+  },
+  "source_row_counts": {
+    "igvf_sge": 453,
+    "igvf_vamp_seq": 9253,
+    "mavedb_clipe": 208
+  },
+  "unresolved_reason_counts": {
+    "CDNA_PROJECTOR_REQUIRED": 0,
+    "NOT_A_VARIANT": 3,
+    "NUCLEOTIDE_CROSSWALK_REQUIRED": 0,
+    "PROTEIN_VARIANT_NOT_IN_ARCHIVE": 146,
+    "REFERENCE_ALLELE_MISMATCH": 27,
+    "SOURCE_GENOMIC_INTERVAL_NOT_EQUIVALENT_TO_CDNA_REPLACEMENT": 57
+  },
+  "variant_kind_counts": {
+    "MISSENSE": 9340,
+    "OTHER": 12,
+    "REFERENCE_CONTROL": 3,
+    "STOP_GAINED": 63,
+    "SYNONYMOUS": 496
+  },
+  "verified_observations": 9681,
+  "verified_observations_by_source": {
+    "igvf_sge": 423,
+    "igvf_vamp_seq": 9050,
+    "mavedb_clipe": 208
+  },
+  "verified_unique_spdi": 9552
+}

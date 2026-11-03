@@ -1,0 +1,727 @@
+# Sol planning contract. Planning and preregistration only: no archive access or run.
+schema: raptor.eval.clinvar_prospective_amendment.v2
+schema_version: 2
+registration:
+  id: clinvar-2026-08-amendment-v3
+  title: ADR-0013 prospective amendment v3
+  registered_at: '2026-09-01T19:25:27+05:30'
+  planner: Sol
+  owner: '@dronasrinivas'
+  branch: fix/clinvar-archive-checksum-policy
+  decision: docs/DECISIONS.md#adr-0022--clinvar-august-2026-amendment-v3-freezes-local-digests-because-ncbi-does-not-publish-archive-checksums
+  policy_source_commit: e640d65fd67ceed496adf3793eb8b58194836cc9
+  execution_state: AWAITING_PRE_DATA_APPROVAL
+  planning_only: true
+  archive_access_authorized: false
+
+current_data_attestation:
+  archive_get_requested: false
+  archive_content_downloaded: false
+  archive_bytes_hashed: false
+  archive_decompressed: false
+  labels_inspected: false
+  rows_inspected: false
+  benchmark_derived: false
+  scoring_performed: false
+
+historical_terminal_result:
+  status: BLOCKED_DATA
+  path: data/census/tsc_prospective_validation_2026-08_blocked_data.json
+  git_blob_sha1: 1fe62b6bba09412582d96b6b923f9bfd4dcb792d
+  canonical_lf_sha256: c8c9c3156dfc8378cff9b359d90c84071fe9626fe8c873c6bbdf2c02c26667b0
+  immutable: true
+  permitted_edits: none
+  original_registered_url: https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary/variant_summary_2026-08.txt.gz
+  terminal_reason: exact preregistered URL returned HTTP 404
+  relation_to_this_registration:
+    kind: NEW_PROSPECTIVE_REGISTRATION
+    not_a_repair: true
+    not_a_substitution: true
+    not_a_retry_of_same_run: true
+    rule: >-
+      The old result remains the complete outcome of the first attempt. This
+      registration creates a separately identified attempt whose evidence and
+      report must never be merged into, substituted for, or described as
+      correcting that result.
+
+dataset_registration:
+  selection_cardinality: EXACTLY_ONE
+  archive_kind: NCBI ClinVar GRCh38 variant_summary monthly archive
+  exact_url: https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08.txt.gz
+  required_final_url: https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08.txt.gz
+  filename: variant_summary_2026-08.txt.gz
+  snapshot_id: clinvar_2026-08-monthly-amendment-v3
+  assembly_filter: GRCh38
+  genes:
+  - TSC1
+  - TSC2
+  allowed_substitutions: []
+  aliases_allowed: false
+  mirrors_allowed: false
+  alternate_paths_allowed: false
+  redirects_to_different_path_allowed: false
+  weekly_release_allowed: false
+  later_month_allowed: false
+  outcome_dependent_fallback_allowed: false
+  observed_transport_metadata_is_not_content_identity: true
+  prior_head_observation:
+    source_artifact: data/census/tsc_prospective_validation_2026-08_blocked_data.json
+    observed_at: '2026-08-06T22:05:32Z'
+    http_status: 200
+    last_modified: '2026-08-06T04:05:02Z'
+    last_modified_date: '2026-08-06'
+    content_length_bytes: 441792560
+    evidentiary_role: >-
+      Historical HTTP HEAD transport metadata only. Last-Modified is not an
+      official archive release date, Content-Length is not a checksum, and
+      neither field establishes archive content identity.
+  stage_1_head_comparison:
+    request_method: HEAD
+    request_url_must_equal: https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08.txt.gz
+    http_status_must_equal: 200
+    final_url_must_equal: https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08.txt.gz
+    last_modified_parse: RFC 7231 HTTP-date normalized to UTC
+    last_modified_must_equal: '2026-08-06T04:05:02Z'
+    content_length_parse: base-10 non-negative integer
+    content_length_bytes_must_equal: 441792560
+    missing_or_mismatch_outcome: BLOCKED_DATA
+    comparison_success_means: transport metadata continuity only; content identity remains unproven
+  metadata_source_pins:
+    published_archive_date: '2026-08-06'
+    published_archive_date_authority: >-
+      NCBI ClinVar tab_delimited archive maintenance-and-use documentation
+      (https://www.ncbi.nlm.nih.gov/clinvar/docs/maintenance_use/) and the
+      tab_delimited archive README
+      (https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/README) both
+      state that monthly archive copies publish on the first Thursday of
+      the month. 2026-08's first Thursday is 2026-08-06, matching this
+      registration's own prior_head_observation.last_modified_date and
+      stage_1_head_comparison.last_modified_must_equal pins above. This is
+      a versioned, reviewed registration fact read from THIS spec file by
+      raptor.eval.prospective_exact_source_metadata_lookups
+      .published_archive_date_lookup, never a runtime fetch of NCBI's
+      general documentation pages and never an inference from the live
+      HTTP HEAD response (Last-Modified is transport metadata only -- see
+      prior_head_observation.evidentiary_role above).
+    upstream_checksum_available: false
+    upstream_checksum_evidence_url: https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/
+    upstream_checksum_unavailable_reason: >-
+      The authorized amendment-v2 metadata lookup returned HTTP 404 for
+      variant_summary_2026-08.txt.gz.md5 before any archive body GET. The
+      official NCBI archive index lists the monthly archive object but no
+      adjacent checksum file or checksum manifest. The rolling
+      tab_delimited directory publishes .md5 companions, but those identify
+      later mutable rolling files and cannot authenticate this archived
+      monthly object.
+    content_verification_mode: EXACT_URL_HEAD_CONTINUITY_PLUS_LOCAL_SHA256_MD5
+  unknown_until_post_approval_freeze:
+    computed_md5: UNFROZEN
+    raw_sha256: UNFROZEN
+  mismatch_rule: >-
+    Any URL, final URL, HTTP status, Last-Modified, Content-Length,
+    checksum-policy, filename, archive-format or schema mismatch yields
+    BLOCKED_DATA. It never selects a replacement object.
+
+authority_partition:
+  new_dataset_locator_authority: dataset_registration in this file
+  historical_locator_only:
+    path: configs/eval/tiered_gate_v3.yaml
+    field: prospective_validation.dataset_rule
+    rule: >-
+      The incorrect locator remains immutable historical evidence for ADR-0013
+      and must not be loaded as the locator for this registration.
+  historical_eval_dataset_identity_only:
+    path: configs/eval/tsc2.yaml
+    field: labels_snapshot
+    value: clinvar_2026-07-07
+    rule: >-
+      This field and its adjacent 2026-07-07 checksum comments identify the
+      historical benchmark only. They are not the runtime dataset binding for
+      this prospective registration.
+  locked_semantics_authority:
+  - configs/eval/tsc2.yaml
+  - configs/eval/tiered_gate_v3.yaml
+  rule: >-
+    All scoring-policy, threshold, split, axis, scope and governance semantics
+    remain locked. Dataset identity is partitioned into the explicit
+    prospective overlay and freeze-manifest chain below.
+  tsc2_scoring_semantics_projection:
+    source: configs/eval/tsc2.yaml
+    excluded_historical_keys:
+    - labels_snapshot
+    canonicalization: parse YAML; remove only top-level labels_snapshot; serialize UTF-8 JSON with sorted keys and separators comma/colon
+    sha256: a19f0b1825a3b5b9c5886cc783750cd907045601447cfd132329d3ab9b9e10b5
+
+hash_contract:
+  algorithm: sha256
+  canonicalization: replace CRLF and CR with LF; hash resulting bytes; no YAML or JSON reserialization
+  git_identity: git blob SHA-1 at policy_source_commit
+
+immutable_inputs:
+  configs/eval/tsc2.yaml:
+    canonical_lf_sha256: 45358c2e66d09d8ba32937b1d2751659f382a8444679fdd0244bbde3b63f7206
+    git_blob_sha1: 7aea622c2fa3f2b218b438828958efcad6432837
+    role: evaluation criteria, points, cutoffs, power, split, thresholds and scope lattice
+  configs/eval/tiered_gate_v3.yaml:
+    canonical_lf_sha256: d140d041c1582eb1c6e49ea071ebc3d1e7d6d64b9cff29141b1be197c419fe6d
+    git_blob_sha1: 02114e6f38edbfbb78916a0bc9fa8ce457ce19a7
+    role: tiered axes, criterion-scope map, evidence and authorization vocabulary
+    locator_field_is_historical_only: true
+  configs/acmg/tsc.yaml:
+    canonical_lf_sha256: 734c5c376d900b8564caa9838d7ca4b1adc0eca494b869b3621963956413d458
+    git_blob_sha1: 1280d222e337821d4ee6f64f452c965d089eb0f1
+    role: production criterion inclusion, evidence vocabulary and TSC transcript scope
+  configs/acmg/strength_policy.yaml:
+    canonical_lf_sha256: 13904267c170402b4594961c658fda5185a501f0cea07620209cd60d1259da09
+    git_blob_sha1: 55c4f3e366fbe540bbb6927998da7b3701137aec
+    role: inactive unapproved strength-policy decision support; must remain fail-closed/manual
+  configs/eval/bias_strength_ladder.yaml:
+    canonical_lf_sha256: ef87b344d334b5fee5d046da14841f2e34d42164d686fd6508a97e95470c4605
+    git_blob_sha1: 28c13e8755d9c7df6fb7f67842b0e4c373d91ed4
+    role: pinned BIAS criterion-strength emission ladder
+  configs/eval/bp4pp3_predictor_policy.json:
+    canonical_lf_sha256: 85e9e92fa9f4c221c02af30e787315a88ed2bef51f6f58d25c5dc267eb55a34a
+    git_blob_sha1: bdc97a8cd1b14c5b3007bb102df3d331fe257a20
+    role: approved disabled_manual PP3/BP4 policy
+  configs/eval/bias_lineage.yaml:
+    canonical_lf_sha256: 2c31a21c03bbb1a5a5340b9892b97ed3fd8902768a1cad972c745f39089f1118
+    git_blob_sha1: 33845387e3c58738fb1e1cfaddcd7ecbad25a917
+    role: criterion lineage, leakage and deferral policy
+  configs/eval/mask.yaml:
+    canonical_lf_sha256: d30ad0a7d610ccf091a5e35f1fe058b0f3d481f2b41b86192662830dfa581318
+    git_blob_sha1: 79ddb513d58df2e782700136103853b207fcf740
+    role: ClinVar-derived comparator masking policy
+  configs/eval/predictor_aggregation.yaml:
+    canonical_lf_sha256: 4d216517c187b5a3bcc63929de9a23d61a9853370e113cbf6eefdfe10f574bb0
+    git_blob_sha1: 25c355ee54cd944a8b0b604f44648be987f6c3ff
+    role: predictor aggregation contract retained inactive under disabled_manual
+  configs/eval/export.yaml:
+    canonical_lf_sha256: 63659a321f3c277becc0eb84ac2e0db1cd2124008ffa872404d224fb8ca8b01d
+    git_blob_sha1: 5028ea6cca33036e208e0140628884866d72f5d2
+    role: label-free holdout VCF export contract
+  configs/ingest/tsc.yaml:
+    canonical_lf_sha256: dcd02fde77a711afe2e47cb5a01449fc0a926708476ff07cfb756458459ffad2
+    git_blob_sha1: b7b8bf1a481adfe79d09d30d78daabf2753a96e4
+    role: GRCh38 normalization, accessions and reference checksums
+  configs/packet/candidate_direction.yaml:
+    canonical_lf_sha256: c699d236bad66bb0a2b1b35dfe1d478f50f9890a1c646ef0bab30ca1302aed61
+    git_blob_sha1: 8f3ddcd8a37638a76de4c2c63bad8458acbd020f
+    role: downstream governance hash required by disabled_manual policy
+
+prospective_eval_overlay_lifecycle:
+  state_now: IMPLEMENTED
+  required_path: configs/eval/tsc2_clinvar_2026_08_amendment_v3.overlay.yaml
+  required_schema: raptor.eval.prospective_dataset_overlay.v1
+  creation_deadline: before APPROVED_PRE_DATA and before any archive GET
+  allowed_top_level_keys_exact:
+  - schema
+  - registration_id
+  - base_config_path
+  - base_config_canonical_lf_sha256
+  - base_scoring_semantics_projection_sha256
+  - effective_labels_snapshot
+  - exact_archive_url
+  - transport_freeze_record
+  - raw_freeze_record
+  required_values:
+    schema: raptor.eval.prospective_dataset_overlay.v1
+    registration_id: clinvar-2026-08-amendment-v3
+    base_config_path: configs/eval/tsc2.yaml
+    base_config_canonical_lf_sha256: 45358c2e66d09d8ba32937b1d2751659f382a8444679fdd0244bbde3b63f7206
+    base_scoring_semantics_projection_sha256: a19f0b1825a3b5b9c5886cc783750cd907045601447cfd132329d3ab9b9e10b5
+    effective_labels_snapshot: clinvar_2026-08-monthly-amendment-v3
+    exact_archive_url: https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/archive/variant_summary_2026-08.txt.gz
+    transport_freeze_record: data/census/tsc_prospective_validation_2026-08_amendment_v3_transport_freeze.json
+    raw_freeze_record: data/census/tsc_prospective_validation_2026-08_amendment_v3_raw_freeze.json
+  merge_rule: >-
+    Load the exact base config, verify its whole-file hash and scoring-semantics
+    projection, then replace only the parsed labels_snapshot value with
+    effective_labels_snapshot. No other base key may be added, removed or
+    changed.
+  checksum_runtime_binding: >-
+    The overlay names immutable record paths but never stores a mutable
+    checksum placeholder. Stage 1 writes the transport-freeze record; stage 2
+    writes the raw-freeze record. Benchmark construction must verify the
+    archive bytes against those records and this registration ID before
+    decompression.
+  runtime_rules:
+  - No CLI, environment-variable or ad hoc mapping override may replace the overlay.
+  - The historical tsc2.yaml labels_snapshot value must never be silently accepted for this run.
+  - The benchmark builder must not use hard-coded July checksums or a skip-verification option.
+  - Overlay hash drift after APPROVED_PRE_DATA is INVALID and stops before label access.
+  - Freeze-record data mismatch is BLOCKED_DATA; freeze-record schema/hash-chain corruption is INVALID.
+  - Scoring semantics may not be edited after registration or after data access.
+  immutability:
+    overlay_hash_recorded_in_pre_data_approval: true
+    editable_after_approval: false
+    semantic_change_requires: new explicit pre-data amendment and registration id
+
+locked_policy_values:
+  confidence: 0.95
+  minimum_count_per_truth_class: 36
+  sufficiency_rule: min(actual_count, called_count) >= 36
+  confidence_interval: exact two-sided Clopper-Pearson lower bound
+  split:
+    seed: 20260701
+    holdout_fraction: 0.7
+  tavtigian_points:
+    supporting: 1
+    moderate: 2
+    strong: 4
+    very_strong: 8
+    stand_alone: 8
+  tavtigian_cutoffs:
+    pathogenic_min: 10
+    likely_pathogenic_min: 6
+    vus_min: 0
+    vus_max: 5
+    likely_benign_max: -1
+    benign_max: -7
+  thresholds:
+    missense:
+      directions:
+      - pathogenic
+      - benign
+      precision_lower_bound_min: 0.90
+      recall_lower_bound_min: 0.85
+    truncating:
+      directions:
+      - pathogenic
+      precision_lower_bound_min: 0.95
+      recall_lower_bound_min: 0.95
+  full_spectrum_requires:
+  - missense:pathogenic
+  - missense:benign
+  - truncating:pathogenic
+  research_scope:
+    key: truncating_pathogenic_research_scope_validated
+    requires:
+    - truncating:pathogenic
+  criterion_scope_applicability:
+    PM1:
+    - missense:pathogenic
+    PP3:
+    - missense:pathogenic
+    - other:pathogenic
+    BP4:
+    - missense:benign
+    - other:benign
+    PP5:
+    - missense:pathogenic
+    - truncating:pathogenic
+    - other:pathogenic
+    BP6:
+    - missense:benign
+    - truncating:benign
+    - other:benign
+    PS4:
+    - missense:pathogenic
+    - truncating:pathogenic
+    - other:pathogenic
+  policy_posture:
+    pp3_bp4: disabled_manual
+    pp3_bp4_scored_calls_required: 0
+    strength_policy: unapproved_inactive_manual
+    direct_copy_criteria_forbidden:
+    - PP5
+    - BP6
+    - PS4
+    allowed_evaluation_skip:
+    - PM1
+    all_other_skips_forbidden: true
+    no_threshold_tuning_after_registration: true
+    no_scope_tuning_after_registration: true
+
+implementation_freeze_required_before_approval:
+  production_change_in_this_planning_pr: forbidden
+  later_additive_implementation_required: true
+  required_capabilities:
+  - Accept dataset identity from this registration without editing the historical ADR-0013 locator.
+  - Implement the exact prospective eval-overlay lifecycle without changing locked scoring semantics.
+  - Remove executable-path dependence on the hard-coded 2026-07-07 snapshot and checksums.
+  - Verify exact URL/final URL and exact observed HEAD Last-Modified/Content-Length as transport continuity only.
+  - Implement the published-archive-date and official-MD5 lookup ports as a single, hard-wired, production-owned module bound to dataset_registration.metadata_source_pins -- no CLI-selectable substitute, no runtime-resolved import.
+  - Require and freeze the NCBI-published MD5, then verify computed MD5 and raw SHA-256.
+  - Prevent decompression or label parsing until the raw archive freeze record is durably written.
+  - Build the GRCh38 TSC1/TSC2 benchmark and deterministic split from the frozen archive.
+  - Preserve label isolation through masking, x64 annotation, return verification and terminal scoring.
+  - Emit prospective tiered outcomes without invoking the post-hoc-only readjudicator as though it were prospective.
+  - Preserve every historical artifact and existing regression test.
+  protected_tests_required:
+  - historical BLOCKED_DATA artifact identity
+  - exact dataset URL and no-fallback behavior
+  - exact stage-1 HEAD comparison and transport-metadata-not-content-identity semantics
+  - config/hash drift rejection
+  - tsc2 labels_snapshot partition and overlay-only runtime binding
+  - rejection of every unregistered dataset/checksum override
+  - no label access before raw archive freeze
+  - no score access before benchmark and masking freeze
+  - independent A0/A1/A2/A3/A4/A5/A6 axis outputs
+  - INVALID distinct from performance FAIL
+  - BLOCKED_POLICY distinct from performance FAIL
+  - full-spectrum BLOCKED_POLICY authorization behavior
+  - terminal outcome truth table
+  - narrow-scope independence from full-spectrum outcome
+  - hard-wired single production-owned metadata-lookup module reached with zero caller-selected import before GET; pinned published-archive-date and bounded, exact-URL-only official-MD5-checksum lookup
+  freeze_record_must_pin:
+  - implementation commit
+  - implementation module and operator-harness file hashes (also bound to the code and file bytes actually used, not the commit reference alone; MUST include every entry in raptor.eval.prospective_freeze.REQUIRED_IMPLEMENTATION_FREEZE_MODULES and REQUIRED_IMPLEMENTATION_FREEZE_FILES)
+  - immutable input hashes (scoring-stage evidence only -- see scoring_stage_approval; never part of pre_data_approval)
+  - prospective eval-overlay canonical-LF SHA-256
+  - tsc2 scoring-semantics projection SHA-256
+  - test command and result
+  # NOTE: x64/BIAS/Nirvana/resource-manifest freeze identities are NOT part
+  # of this acquisition-stage freeze record. They are pinned separately in
+  # `scoring_stage_approval.approval_record_must_include` below, gating
+  # ADR-0022 stage 4 only -- ClinVar archive acquisition (stages 1-2) has no
+  # x86-only requirement.
+  # NOTE: implementation module/file hashes bind APPROVED_PRE_DATA to BOTH the
+  # named historical commit's committed tree content AND the bytes actually
+  # loaded/executing in the validating process right now
+  # (raptor.eval.prospective_freeze implementation-freeze checks).
+  # A technically-reachable commit reference whose content no longer matches
+  # what is actually running (e.g. a post-commit edit with no fresh
+  # approval) fails this check even though the git-history comparison alone
+  # would have passed. Once this amendment is merged, the draft's
+  # implementation_freeze.commit must be repinned to the final merged
+  # commit and module_hashes/file_hashes recomputed against that commit's content --
+  # never fabricated ahead of that merge.
+  # NOTE (round 6): `module_hashes` missing ANY entry in
+  # `raptor.eval.prospective_freeze.REQUIRED_IMPLEMENTATION_FREEZE_MODULES`
+  # is `PRE_DATA_IMPLEMENTATION_NOT_READY`, not a silently-accepted partial
+  # freeze -- the metadata-lookup module's own identity materially affects
+  # confirmed live `--execute` behavior exactly as much as the transport
+  # module's does, so it can never be an optional freeze-record omission.
+
+pre_data_approval:
+  current_state: AWAITING_PRE_DATA_APPROVAL
+  approver_required: '@dronasrinivas'
+  allowed_decisions:
+  - APPROVED_PRE_DATA
+  - REJECTED_PRE_DATA
+  approval_record_must_include:
+  - registration id, path, Git blob and canonical-LF SHA-256
+  - ADR-0022 identity
+  - prospective eval-overlay path and canonical-LF SHA-256
+  - implementation commit, module hashes and operator-harness file hash (bound to actually-used bytes, not the commit reference alone)
+  - protected-test evidence
+  - timestamp strictly before first archive GET
+  - complete false-valued pre-data access attestation
+  # NOTE: pre-data approval never includes or verifies tsc2 scoring-semantics
+  # projection SHA-256 or any base eval config identity. Acquisition (stages
+  # 1-2) never reads scoring semantics; that verification belongs solely to
+  # raptor.eval.prospective_freeze.merge_prospective_overlay, invoked only
+  # when building the effective eval config for ADR-0022 stage 3+ scoring.
+  # NOTE (independent review, boundary correction): pre-data approval also
+  # never includes or verifies `immutable_inputs` (tsc2.yaml, ACMG/BIAS
+  # strength/lineage policy, masking/predictor-aggregation policy, ...).
+  # Every one of those inputs is a SCORING-stage concern; ClinVar archive
+  # acquisition never reads or depends on any of them. That verification
+  # (an itemized, independently-recomputed hash check, never a bare claimed
+  # boolean) belongs solely to `scoring_stage_approval.approval_record_must_include`
+  # below, gating ADR-0022 stage 4.
+  approved_scope: >-
+    APPROVED_PRE_DATA permits transport freeze and then GET of only the exact
+    registered archive. It does not permit a substitute, threshold change,
+    label-dependent implementation change or clinical use.
+  stop_states:
+    PRE_DATA_REVIEW_REQUIRED: approval record missing
+    PRE_DATA_REJECTED: owner recorded REJECTED_PRE_DATA
+    PRE_DATA_IMPLEMENTATION_NOT_READY: required additive implementation or tests missing
+    PRE_DATA_DRIFT: contract, policy, config or code identity differs from its freeze
+    PRE_DATA_ATTESTATION_BREACH: any archive bytes, archive hash, labels, rows, benchmark or score accessed early
+  stop_rule: >-
+    In every stop state, request no archive GET and produce no validation
+    result. Resolution requires a reviewed pre-data change; in-place waiver is
+    forbidden.
+
+scoring_stage_approval:
+  current_state: AWAITING_SCORING_STAGE_APPROVAL
+  approver_required: '@dronasrinivas'
+  independent_of_pre_data_approval: >-
+    This is a SEPARATE, LATER approval from pre_data_approval above. It gates
+    ONLY ADR-0022 stage 4 (4_MASK_AND_LABEL_FREE_SCORE) -- no BIAS/Nirvana
+    execution or label-dependent evaluation may run before it is recorded and
+    verified. It has no bearing on, and is never required for, ClinVar
+    archive acquisition (stages 1-2), which has no x86-only requirement.
+  required_before:
+  - any BIAS/Nirvana execution
+  - any label-dependent evaluation
+  allowed_decisions:
+  - APPROVED_SCORING_STAGE
+  - REJECTED_SCORING_STAGE
+  approval_record_must_include:
+  - registration id
+  - explicit decision (APPROVED_SCORING_STAGE or REJECTED_SCORING_STAGE)
+  - approver and approval timestamp
+  - x64 BIAS 3.0.0 commit ade13f206f3e2c2efe3ec92715d974645fc8da8f
+  - Nirvana 3.18.1 runtime banner 3.18.1-0-g05f88047
+  - x64 resource manifests and checksums (ADR-0008 resource_manifest_sha256)
+  - immutable input verification (tsc2.yaml, ACMG/BIAS strength and lineage policy, masking/predictor-aggregation policy, ...)
+  - immutable first-scoring-execution timestamp, strictly after approval timestamp
+  verification_rule: >-
+    The approval record's claimed x64_freeze block, its claimed
+    immutable_inputs_verified flag, and any caller-supplied "observed
+    runtime identity" are never trusted as-is.
+    raptor.eval.prospective_freeze.validate_scoring_stage_approval always
+    independently OBSERVES worker designation, architecture, BIAS commit
+    and Nirvana banner (platform.machine() plus a read of the three
+    dedicated marker files under the ADR-0008 designated x64 worker root --
+    never a caller-claimed value), always independently RECOMPUTES
+    resource_manifest_sha256 from the three pinned resource-manifest
+    checksum files at that one designated location, and always
+    independently RECOMPUTES every immutable_inputs entry's hash from the
+    actual current repository file bytes. Approval is accepted only when
+    the claimed x64_freeze block is byte-for-byte identical to the
+    observed-plus-recomputed identity and every immutable_inputs entry
+    matches its recomputation; a well-formed, all-zero, or otherwise
+    fabricated digest that does not match a real recomputation always
+    fails closed, and a static pinned literal supplied on a
+    non-designated runtime always fails closed too, because that
+    runtime's own independent observation genuinely differs.
+  first_scoring_execution_at_rule: >-
+    first_scoring_execution_at is a MANDATORY, immutable timestamp -- not
+    optional. Absent/blank, malformed, future-dated, or at/after
+    approved_at all fail closed with INVALID; a post-scoring or
+    future-dated approval can never pass.
+  approved_scope: >-
+    APPROVED_SCORING_STAGE permits stage 4 (mask-and-label-free score) to run
+    on the designated x64 worker under the pinned BIAS/Nirvana/resource
+    identities. It does not permit a substitute worker, tool version or
+    resource-manifest set.
+  failure_outcome: INVALID
+  stop_rule: >-
+    A missing approval record, schema breach, non-APPROVED_SCORING_STAGE
+    decision, wrong approver, a missing/future/mistimed
+    first_scoring_execution_at (including approval timestamp at or after
+    first scoring execution), an immutable_inputs mismatch, or any
+    runtime-identity mismatch (worker designation,
+    architecture, BIAS commit, Nirvana banner, or resource-manifest SHA-256,
+    including a claimed digest that fails to match independent
+    recomputation) is an A0 run-integrity failure raised as INVALID -- never
+    a PRE_DATA_* stop state and never reported as a performance FAIL.
+    Resolution requires a reviewed scoring-stage change; in-place waiver is
+    forbidden. This gate is mandatory before any label-dependent
+    adjudication (raptor.eval.prospective_freeze.adjudicate_prospective_outcomes
+    invokes it unconditionally as its first action; no outcome, including
+    PASS or AUTHORIZED_RESEARCH_ONLY, may be emitted without it).
+
+ordered_execution_after_approval:
+  - stage: 1_TRANSPORT_FREEZE
+    actions:
+    - HEAD the exact registered URL; require HTTP 200 and the exact final URL.
+    - Parse Last-Modified as an RFC 7231 date and require 2026-08-06T04:05:02Z exactly.
+    - Parse Content-Length as a base-10 integer and require 441792560 exactly.
+    - Record that both comparisons are transport continuity checks, not content identity.
+    - Require and freeze the separately NCBI-published archive date without inferring it from Last-Modified.
+    - Freeze the reviewed fact that NCBI publishes no checksum for monthly archive copies.
+    - Freeze the exact local content-verification mode before the archive GET.
+    forbidden:
+    - archive body GET
+    - decompression
+    - label inspection
+    failure_outcome: BLOCKED_DATA
+    missing_published_archive_date_outcome: BLOCKED_DATA
+    malformed_checksum_policy_outcome: BLOCKED_DATA
+  - stage: 2_ARCHIVE_ACQUIRE_AND_RAW_FREEZE
+    actions:
+    - GET only the exact registered archive into a new run-scoped immutable location.
+    - Verify the exact byte length.
+    - Compute and record local MD5 and raw archive SHA-256.
+    - Record explicitly that neither local digest is an upstream NCBI checksum.
+    - Durably write the raw freeze manifest before decompression.
+    failure_outcome: BLOCKED_DATA
+  - stage: 3_LABEL_AND_BENCHMARK_FREEZE
+    actions:
+    - Verify archive format and required variant_summary schema.
+    - Derive only GRCh38 TSC1/TSC2 labels under the pinned label hierarchy and exclusions.
+    - Apply the deterministic seed 20260701 and holdout fraction 0.7.
+    - Freeze benchmark, train/dev, holdout, statistics and all hashes.
+    failure_outcome: BLOCKED_DATA
+  - stage: 4_MASK_AND_LABEL_FREE_SCORE
+    actions:
+    - Verify scoring_stage_approval (validate_scoring_stage_approval) before any of the following.
+    - Export holdout identities without labels.
+    - Rebuild and verify all registered ClinVar-derived masked resources.
+    - Run the frozen x64 BIAS/Nirvana path under ADR-0008.
+    - Verify return manifests, zero held-out comparator survivors and zero PP3/BP4 scored calls.
+    integrity_failure_outcome: INVALID
+    rule: >-
+      Manifest, masking, identity, tool, resource, return or policy-execution
+      drift is an A0 run-integrity failure. It is never reported as a
+      performance FAIL.
+  - stage: 5_TERMINAL_SCORE_AND_ADJUDICATE
+    actions:
+    - Join frozen labels only after the label-free scorer output is frozen.
+    - Compute registered confidence bounds, data sufficiency, policy parity and coverage.
+    - Apply the terminal truth table without manual override.
+    integrity_failure_outcome: INVALID
+    completed_adjudication_outcomes:
+    - PASS
+    - FAIL
+    - NOT_ESTIMABLE
+    - BLOCKED_POLICY
+    rule: >-
+      Join, config, schema, count, metric or hash integrity failure is INVALID.
+      FAIL is reachable only from an integrity-valid, policy-clear, adequately
+      powered scope whose registered performance lower bound is UNMET.
+  - stage: 6_IMMUTABLE_REPORT
+    actions:
+    - Write a new run artifact and human-readable report; never overwrite the historical artifact.
+    - Record exact data, config, code, tool, resource, benchmark, scorer and report hashes.
+    - Report full-spectrum and truncating-pathogenic outcomes independently.
+    - State limitations and the research-only authorization boundary.
+
+terminal_outcomes:
+  vocabulary:
+  - PASS
+  - FAIL
+  - NOT_ESTIMABLE
+  - BLOCKED_POLICY
+  - BLOCKED_DATA
+  - INVALID
+  axis_outputs:
+    preservation_rule: >-
+      Terminal outcomes are projections for reporting and aggregation only.
+      They never replace, collapse or erase the independent ADR-0013 axis
+      outputs or their reasons.
+    A0_run_integrity:
+    - PASS
+    - INVALID
+    A1_data_sufficiency:
+    - ADEQUATE
+    - UNDERPOWERED
+    - NO_CALLS
+    A2_conditional_performance:
+    - MET
+    - UNMET
+    - NOT_ESTIMABLE
+    - NOT_APPLICABLE
+    A3_policy_parity:
+    - CLEAR
+    - BLOCKED
+    A4_end_to_end_correct_call_coverage: correct_calls/actual_count
+    A5_scope_evidence_status:
+    - INVALID
+    - NOT_APPLICABLE
+    - NO_CALLS
+    - UNDERPOWERED
+    - BLOCKED_POLICY
+    - NOT_SUPPORTED
+    - SUPPORTED_POSTHOC
+    - VALIDATED_PROSPECTIVE
+    A6_authorization_status:
+    - NOT_AUTHORIZED
+    - PENDING_PROSPECTIVE
+    - AUTHORIZED_RESEARCH_ONLY
+    A5_precedence_preserved: >-
+      INVALID > NOT_APPLICABLE > NO_CALLS > UNDERPOWERED > BLOCKED_POLICY >
+      NOT_SUPPORTED > VALIDATED_PROSPECTIVE. A3 remains separately visible
+      even when A5 is NO_CALLS or UNDERPOWERED.
+  scope_truth_table:
+    projection_scope: registered gating scopes only; descriptive scopes retain NOT_APPLICABLE axes without a terminal performance projection
+    BLOCKED_DATA: exact archive cannot be acquired, verified, parsed or frozen under this contract
+    INVALID: A0 run integrity is INVALID; no performance conclusion is emitted
+    BLOCKED_POLICY: A0 is PASS and A3 policy parity is BLOCKED; A1, A2 and A5 remain separately reported
+    NOT_ESTIMABLE: A0 is PASS, A3 is CLEAR and A1 is NO_CALLS or UNDERPOWERED
+    FAIL: A0 is PASS, A3 is CLEAR, A1 is ADEQUATE and a registered A2 lower bound is UNMET
+    PASS: A0 is PASS, A3 is CLEAR, A1 is ADEQUATE and every registered A2 lower bound is MET
+  full_spectrum_aggregation:
+    required_scopes:
+    - missense:pathogenic
+    - missense:benign
+    - truncating:pathogenic
+    precedence:
+    - BLOCKED_DATA
+    - INVALID
+    - BLOCKED_POLICY
+    - FAIL
+    - NOT_ESTIMABLE
+    - PASS
+    pass_rule: every required scope is PASS
+    policy_block_rule: >-
+      When data is available and global A0=PASS, if any required scope has
+      A3=BLOCKED, full-spectrum terminal outcome is BLOCKED_POLICY even if
+      another required scope is FAIL, NOT_ESTIMABLE or PASS. Every required
+      scope's independent axes and terminal projection remain visible.
+    outcome_to_status_and_authorization:
+      BLOCKED_DATA:
+        full_spectrum_status: NOT_VALIDATED
+        full_spectrum_authorization: NOT_AUTHORIZED
+      INVALID:
+        full_spectrum_status: INVALID
+        full_spectrum_authorization: NOT_AUTHORIZED
+      BLOCKED_POLICY:
+        full_spectrum_status: BLOCKED_POLICY
+        full_spectrum_authorization: NOT_AUTHORIZED
+      FAIL:
+        full_spectrum_status: NOT_VALIDATED
+        full_spectrum_authorization: NOT_AUTHORIZED
+      NOT_ESTIMABLE:
+        full_spectrum_status: NOT_VALIDATED
+        full_spectrum_authorization: NOT_AUTHORIZED
+      PASS:
+        full_spectrum_status: VALIDATED_PROSPECTIVE
+        full_spectrum_authorization: AUTHORIZED_RESEARCH_ONLY
+  narrow_scope_independence:
+    scope: truncating:pathogenic
+    rule: >-
+      Adjudicate independently. Its PASS is not cancelled by a missense FAIL,
+      NOT_ESTIMABLE or BLOCKED_POLICY result, and it cannot conceal the
+      full-spectrum result. BLOCKED_DATA or global A0=INVALID prevents every
+      scope authorization.
+  authorization_mapping:
+    BLOCKED_DATA: no scope authorized
+    INVALID: no scope authorized
+    BLOCKED_POLICY: policy-blocked scope not authorized
+    NOT_ESTIMABLE: affected scope not authorized
+    FAIL: failed scope not authorized
+    truncating_pathogenic_PASS: >-
+      Set evidence to VALIDATED_PROSPECTIVE and authorize only the
+      truncating-pathogenic research-evidence scope under the approved
+      preregistered mapping.
+    full_spectrum_PASS: full_spectrum_status VALIDATED_PROSPECTIVE and authorization AUTHORIZED_RESEARCH_ONLY
+    always_forbidden:
+    - clinical classification
+    - patient-facing use
+    - VUS worklist release
+    - ClinVar submission
+
+required_report_fields:
+- registration id and PRE-DATA approval identity
+- historical BLOCKED_DATA artifact identity and non-repair statement
+- exact URL and final URL
+- prior and stage-1 HEAD observed-at, HTTP status, Last-Modified and Content-Length values
+- explicit statement that HEAD metadata is not content identity
+- separately NCBI-published archive date, reviewed upstream-checksum unavailability, and computed local MD5/SHA-256
+- policy source commit and every immutable input hash
+- tsc2 historical labels_snapshot partition, scoring-semantics projection and overlay hash
+- implementation, BIAS, Nirvana and resource identities
+- archive, benchmark, masking, scorer and report freeze hashes
+- independent per-scope A0/A1/A2/A3/A4/A5/A6 axes, counts, confidence bounds, thresholds and reasons
+- overall and narrow-scope terminal outcomes
+- explicit full-spectrum status and authorization for every terminal outcome
+- authorization mapping and prohibited surfaces
+- data-access timeline proving registration and approval preceded archive GET
+
+known_blockers:
+- PRE-DATA approval has not been recorded.
+- The benchmark builder and eval config are executable-path pinned to the 2026-07-07 snapshot.
+- The prospective eval-overlay and immutable transport/raw freeze-manifest loaders do not exist.
+- The existing tiered gate implementation is post-hoc-only and cannot emit a prospective result.
+- The historical tiered config contains the incorrect locator and must remain unchanged.
+- The additive implementation, protected tests and execution freeze do not yet exist.
+- Local archive MD5 and raw SHA-256 remain intentionally unfrozen until after approval.
+- The x64 BIAS/Nirvana worker and resource freeze must be reverified via scoring_stage_approval before stage 4 -- independent of, and later than, PRE-DATA approval above.
+
+change_control:
+  after_pre_data_approval:
+    editable_fields: []
+    any_change_requires: new explicit pre-data amendment and new registration id
+  forbidden_forever:
+  - editing or replacing the historical BLOCKED_DATA artifact
+  - describing this attempt as a repair, continuation or successful retry of the first attempt
+  - choosing data based on labels, benchmark composition or score
+  - changing thresholds, scope requirements, split or policy after data access
+  - supplying an unregistered labels_snapshot, checksum or dataset override
+  - using a substitute archive

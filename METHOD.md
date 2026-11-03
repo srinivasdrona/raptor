@@ -91,6 +91,56 @@ is a separate 6,618-variant aggregate. The frozen R2 evaluation is negative or n
 the binding missense scopes; its tiered interpretation is post-hoc. Prospective validation and
 expert adjudication remain separate gates.
 
+## Versioned rubric evolution
+
+Rubrics get things wrong. The failure mode that matters is not a wrong threshold — it is
+*changing* a threshold after seeing a result you did not like. RAPTOR has hit the same shape
+twice: a coarse `FAIL` that conflated data insufficiency with performance and policy
+([ADR-0013](docs/DECISIONS.md#adr-0013--tiered-gate-v3-post-hoc-re-adjudication-and-prospective-validation-lock)),
+and an `INFEASIBLE_PANEL` that conflated "no strictly independent panel is assemblable" with
+"the evidence failed"
+([ADR-0019](docs/DECISIONS.md#adr-0019--versioned-atlas-interpretation-rubrics-a-scarcity-aware-post-hoc-contextual-layer-over-an-immutable-machine-result)).
+Both were answered the same way: freeze the result, add a versioned interpretation beside it,
+and label it post-hoc.
+
+The workflow is fixed:
+
+1. **Record the nuance** the rubric in force cannot express — before touching any threshold.
+2. **Classify the cause** as exactly one of implementation defect, policy defect, data scarcity,
+   disease-context mismatch, or new evidence. An implementation defect is fixed in code, never
+   by a rubric change; a scarcity finding is never relabelled a policy defect.
+3. **Freeze** the old rubric and every result produced under it, byte-identical and published.
+4. **Draft a new semantic version** — major changes outcome semantics or a claim ceiling, minor
+   changes thresholds or a context profile, patch changes nothing executable.
+5. **Prefer aggregate or blinded evidence** over the record whose outcome prompted the change.
+6. **Separate authorship from review**; domain review is independent of whoever wants the
+   outcome to change.
+7. **Apply symmetrically** to the complete eligible universe, never to the motivating record
+   alone.
+8. **Rerun side by side** and publish a transition matrix; neither outcome replaces the other.
+9. **Mark `POST_HOC`** until prospectively validated. Post-hoc status is not removed by review,
+   agreement or elapsed time.
+10. **Activate prospectively only through a new registration** frozen before the run it governs.
+
+Every output then carries seven fields: rubric version, context profile, machine result,
+contextual interpretation, expert decision, claim ceiling, and prospective/post-hoc status.
+
+**Non-waivable versus contextually adjudicable.** A human adjudicator can contextualize scarcity;
+they cannot waive integrity. The split is explicit and machine-readable in
+[`atlas-panel-rubric-v2.yaml`](docs/project/specs/atlas-panel-rubric-v2.yaml):
+
+| Non-waivable by anyone | Contextually adjudicable when the literature is intrinsically sparse |
+|---|---|
+| canonical identity and official replay; source provenance and lawful access; exact-span verification; assay and model-system context; contradiction and null-result disclosure; deduplication and collision accounting; complete dispositions; the classification/leakage firewall; immutable inputs and run records | minimum number of independent laboratories or source lineages; assay-concentration cap; model-system diversity; panel balance and size |
+
+Two rules bound the adjudicable column. **Scarcity lowers claim ceilings; it never strengthens
+evidence** — contextualizing a threshold buys a lower-ceiling outcome, never a higher one. And
+**no expert can convert dependent evidence into independent replication**; adjudicated
+same-lineage evidence is still same-lineage evidence. Any adjudication is a signed record with
+reviewer identity, qualifications, conflicts, scope, rationale, dimensions contextualized and
+explicitly not waived, claim ceiling, limitations, expiry and re-review triggers — a missing
+field voids the record rather than making it provisional.
+
 ## Controls around agents and data
 
 - **One task, one worktree, one scoped diff.** Independent work runs on separate branches and is
@@ -117,6 +167,7 @@ This method has changed RAPTOR's implementation and conclusions, not merely docu
 | ClinVar-derived PP5/BP6/PS4 and comparator leakage | Direct-copy criteria banned; upstream masking and criterion-lineage audit added ([ADR-0009](docs/DECISIONS.md#adr-0009--clinvar-derived-acmg-criteria-direct-copy-banned-pp5bp6ps4-transitive-deferred-to-audit)) |
 | BIAS PP3/BP4 aggregation defects and uncalibrated composite policy | Reconstruction retained for audit; automated PP3/BP4 emission disabled ([ADR-0012](docs/DECISIONS.md#adr-0012--pp3bp4-automated-emission-disabled-for-the-current-masked-rerun)) |
 | A coarse FAIL that conflated insufficient data, policy exclusion, and performance | Independent data-sufficiency, performance, parity, coverage, and authorization axes added; post-hoc status kept non-authorizing ([ADR-0013](docs/DECISIONS.md#adr-0013--tiered-gate-v3-post-hoc-re-adjudication-and-prospective-validation-lock)) |
+| An `INFEASIBLE_PANEL` that read as "the evidence failed" when the evidence packages had not failed and the source lineage was simply unestablished | Versioned interpretation rubrics with named context profiles, paired machine + contextual outcomes, an explicit claim ceiling, nine non-waivable dimensions, and a mandatory `POST_HOC` stamp; the frozen run stays byte-identical ([ADR-0019](docs/DECISIONS.md#adr-0019--versioned-atlas-interpretation-rubrics-a-scarcity-aware-post-hoc-contextual-layer-over-an-immutable-machine-result)) |
 | Tests that passed while constructors, fixtures, or APIs were wrong | Separate test authorship, strict-stub probes, hash oracles, and repeated checker loops |
 | Raw-byte versus canonical-LF hash confusion | Hash provenance labeled by surface; configs and committed artifacts use explicit, different rules |
 | Citation/source spoofing, alias laundering, path traversal, and fabricated spans | Offline catalog resolver, checked local content, exact alias ownership, and `text-char` span binding ([ADR-0016](docs/DECISIONS.md#adr-0016--deterministic-offline-citation-resolver-and-phase-2-promotion-span-verification)) |
@@ -129,10 +180,11 @@ not zero first attempts; it is zero tolerated recurrence.
 
 1. Read the two public checkpoints:
    [before scoring](docs/blog/2026-07-10-before-the-first-score.md) and
-   [after the rerun](docs/blog/2026-07-23-after-the-first-rerun.md).
+   [after the rerun](docs/blog/2026-07-23-after-the-first-rerun.md), then
+   [the human-review boundary](docs/blog/2026-08-15-seven-variants-human-review-boundary.md).
 2. Inspect [`docs/PROGRAM.md`](docs/PROGRAM.md) for current state and
    [`docs/EVALUATION.md`](docs/EVALUATION.md) for the frozen/prospective gate.
-3. Read ADRs 0009, 0010, 0012, 0013, 0014, 0015, and 0016 in
+3. Read ADRs 0009, 0010, 0012, 0013, 0014, 0015, 0016, 0017, 0018, and 0019 in
    [`docs/DECISIONS.md`](docs/DECISIONS.md).
 4. Inspect the committed non-identifying records in [`data/census/`](data/census/) and the packet
    and Atlas runbooks.

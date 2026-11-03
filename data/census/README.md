@@ -88,12 +88,128 @@ Its external manifest is
 `tsc_tiered_readjudication_2026-07-21.sha256`.
 
 `tsc_prospective_validation_2026-08_blocked_data.json` records the locked
-prospective outcome. The exact preregistered August URL returned HTTP 404.
+first prospective attempt. The exact preregistered August URL returned HTTP 404.
 The same filename was visible at a different archive-root URL, but substituting
 that location is prohibited by ADR-0013. No archive GET occurred; no bytes,
 labels, rows or scores were inspected; MD5 and SHA-256 remain unfrozen. The
 terminal status is `BLOCKED_DATA`, and all research/clinical authorization
 remains false.
+
+`tsc_prospective_validation_2026-08_amendment_v3_result.json` records the
+completed, non-identifying August prospective result. The exact archive was
+frozen before labels, 2,608/2,608 holdout identities were removed from the
+frozen scorer's ClinVar-derived resources with zero survivors, and 2,608
+unique BIAS rows were evaluated with zero PP3/BP4 scored calls. Full spectrum
+is `BLOCKED_POLICY` and not authorized. Missense remains unvalidated.
+`truncating:pathogenic` is `VALIDATED_PROSPECTIVE` and
+`AUTHORIZED_RESEARCH_ONLY`: 219/237 correct-call coverage, with conditional
+precision and recall 95% lower bounds of 0.9833 against the registered 0.95
+thresholds. This is not clinical, full-spectrum, public-worklist or
+ClinVar-submission authorization. The complete external evidence artifact is
+pinned by SHA-256
+`145f3ea2146cbc6cf3a1657d7bc30a1aa9698290ed8124acfe9b8b87354c6c10`.
+
+`tsc2_source_ingestion_pilot_2026-09-09.json` records the aggregate-only
+$TSC2$ missense source-expansion pilot. Six staged sources produced 12
+hash-bound external artifacts: 189 PubMed results (100 returned under the
+registered cap), 3,946 retained LitVar2 mappings, the final Europe PMC article,
+the 208-row MaveDB cliPE scoreset, and the released IGVF VAMP-seq and SGE
+files. The external bundle is pinned by manifest SHA-256
+`63bd6eb4e7182b7f2d345cd78b3a110a59c361c72d521b88990c475919865808`.
+Raw publication and functional-dataset bytes remain outside Git. IGVF licence
+review remains required, and no source is activated for classification or
+assay-specific evidence.
+
+`r611q_literature_expansion_2026-09-15.json` records the bounded,
+aggregate-only $TSC2$ $R611Q$ literature expansion. The LitVar2/ClinVar union
+added 69 PMID leads beyond the pinned baseline; PubMed resolved 68, Europe PMC
+resolved 68 with 64 abstracts, and 27 metadata-level CC BY candidates were
+independently checked against their JATS licence declarations. Twenty-six full
+texts were retained externally and one was licence-rejected. The external
+bundle is pinned by manifest content hash
+`ed14ea509857e22f1ae058632e61599f080d033d64a0057f9aad10c55bd360f5`.
+Article identities, abstracts, raw responses, and full text remain outside Git.
+This acquisition assigns no evidence strength, $PS3$/$BS3$, Atlas claim,
+classification, or clinical authorization.
+
+`r611q_literature_delta_review_2026-09-16.json` records the aggregate-only
+review of that 69-lead delta against the existing $R611Q$ RescueScreen
+inventory and unreviewed Atlas packet. Deterministic scanning found 10
+exact-alias sources and 14 spans: eight through canonical aliases and two
+through contextual legacy $G1832A$ notation. Model-assisted, unaccepted
+triage identified one direct grouped allele experiment, four
+patient-621-lineage model contexts, two clinical occurrences and three
+secondary reviews. In a group containing $R611Q$, $R905Q$ and $N1620S$, the
+co-immunoprecipitation experiment reported preserved $TSC2$-$TSC2$
+self-association. This group-attributed result narrows the existing
+complex-binding hypothesis; it is not an $R611Q$-specific magnitude and does
+not contradict the reported $TSC1$-association defect. The patient-621 model
+records are indirect context, not direct allele or rescue evidence; the
+clinical occurrences do not establish genotype-specific treatment response;
+and the secondary reviews support no proposition. No accepted claim or
+contradiction was added, and Atlas Gate 8 remains `BLOCKED_HUMAN_REVIEW`.
+The external addendum is pinned by manifest content hash
+`ea48e5d0572c1a7d5d6c929abf842ab34fa0e3723bf02a4e6c213942e3e85404`;
+article identities, quotes, locators and review records remain outside Git.
+
+`tsc2_functional_identity_normalization_pilot_2026-09-11.json` records the
+aggregate-only identity normalization of the three frozen functional datasets.
+All 9,914 input rows were conserved: 423 SGE rows resolved to reference-verified
+$\text{GRCh38}$ SPDI, 27 SGE rows were blocked on reference-allele mismatch,
+three rows were retained as reference controls, 208 cliPE rows remained
+$NM\_000548.5$ transcript-only pending a real cDNA projector, and 9,253
+VAMP-seq rows remained protein-only pending the source nucleotide crosswalk.
+The external normalized-row bundle is pinned by manifest SHA-256
+`74f15f22cfb6e876a8fab3a16c841e6f33317eadd58ef04547e4c060162afb48`.
+No per-row identity or raw score is committed, and no functional score is
+promoted to classification or assay-specific evidence.
+
+`tsc2_clipe_cdna_spdi_projector_pilot_2026-09-12.json` records the
+aggregate-only cliPE cDNA projector pilot. All 208 frozen
+$NM\_000548.5$ rows—161 SNVs and 47 equal-length delins—were projected
+through the two-step NCBI Variation Services path and independently
+reference-verified on $\text{NC\_000016.10}$. The external mapping and 416
+raw response bodies are pinned by manifest SHA-256
+`247665b9758860124b196d037b913626b7699b87ba1bb1c32b0e461bb4473529`.
+No mapping row or raw response is committed.
+
+`tsc2_vamp_genomic_crosswalk_2026-09-12.json` records the aggregate-only
+VAMP-seq genomic crosswalk from the immutable Zenodo V1 analysis archive.
+Of 9,253 frozen VAMP score rows, 9,050 resolved to unique reference-backed
+$\text{GRCh38}$ SPDI, 57 were blocked because the archive genomic interval
+was not equivalent in length to the cDNA replacement, and 146 were absent
+from the archived GMM identity tables. The external archive and crosswalk
+are pinned by manifest SHA-256
+`f80759aa43874d201efb69c52b611d9ebd8c40712159bf1f291c86195dd33ba0`.
+The approximately 2.45 GB PacBio raw-read download was not required.
+
+`tsc2_functional_identity_promotion_2026-09-14.json` records the
+aggregate-only promotion of the frozen cliPE and VAMP-seq crosswalks into the
+functional normalization set. All 9,914 rows were conserved, yielding 9,681
+reference-verified $\text{GRCh38}$ SPDI observations across cliPE, VAMP-seq
+and SGE, representing 9,552 unique identities and 129 duplicate observations.
+The pairwise overlaps were 38 for cliPE–SGE, 85 for VAMP-seq–SGE and 13 for
+cliPE–VAMP-seq, with seven identities shared by all three assays. The 27
+reference mismatches, 57 cDNA/genomic-length conflicts, 146 archive-absent
+VAMP-seq rows and three reference controls remain explicitly unresolved or
+non-variant. The external promoted-row bundle is pinned by manifest SHA-256
+`c66639976bf9369cfd07568011a85f5ac50fd0ea9467c54210768574645941ed`.
+No per-row identity or raw score is committed, and no functional result is
+authorized for classification or assay-specific $PS3$/$BS3$ evidence.
+
+`tsc2_functional_coverage_map_2026-09-14.json` records the aggregate-only,
+exact-SPDI coverage map over the 9,552 verified $TSC2$ functional identities.
+Coverage reaches 335 of the 6,618 frozen VUS identities, four of the 164
+internal priority identities, 171 of the 2,608 protected prospective-holdout
+identities and six of the 25 resolved Atlas contrast identities. All four
+priority overlaps are candidate-LP review rows covered by SGE. The $R611Q$
+Atlas anchor is covered by cliPE and is also present in the protected holdout.
+Leakage markers identify 171 holdout-covered identities, seven Atlas-context
+identities and four carrying both markers. The external row-level coverage
+bundle is pinned by manifest SHA-256
+`b079eca8d126eab468e42af140ebc646e5e3f021b5c2d819bb7fbb890cd7d101`.
+No row identity, functional score, holdout label or Atlas claim is committed
+or authorized for classification, calibration or $PS3$/$BS3$ evidence.
 
 `tsc_vus_clinvar_2026-07-07_disabled_manual_stats.json` (ADR-0012) is the
 packet-free, non-identifying binding census aggregate over the same

@@ -1,0 +1,156 @@
+schema: raptor.external.tsc2_vamp_genomic_crosswalk_config.v1
+config_id: tsc2-vamp-genomic-crosswalk-v1
+spec: docs/project/specs/raptor-v2-vamp-genomic-crosswalk-acquisition-v1.yaml
+spec_id: raptor-v2-vamp-genomic-crosswalk-acquisition-v1
+spec_version: "1.0.4"
+
+go_no_go:
+  pacbio_fastq_download: NO_GO
+  reason: >-
+    The immutable V1 archive already carries a one-to-one hgvs_p to hgvs_c and
+    genomic-coordinate crosswalk for the frozen score variants. The two PacBio
+    FASTQ files are never downloaded, imported or referenced by this slice.
+
+inputs:
+  frozen_vamp_scores:
+    source_bundle_id: tsc2-source-pilot-2026-09-09
+    environment_variable: RAPTOR_TSC2_SOURCE_ROOT
+    run_name: tsc2-source-pilot-2026-09-09
+    manifest_filename: bundle_manifest.json
+    source_manifest_content_hash: 63bd6eb4e7182b7f2d345cd78b3a110a59c361c72d521b88990c475919865808
+    artifact_id: igvf_vamp_seq-download-tsv-gz
+    relative_path: igvf/igvf_vamp_seq-IGVFFI9747KART.tsv.gz
+    sha256: 39f052e6e4819ff245fcee8d63fa1b4c3b09b2d9a0d529f5c14de5deaafa497e
+    md5: 1a397944b7a5158b3d63999dfcf926db
+    byte_length: 439700
+    row_count: 9253
+    protein_accession: ENSP00000219476.3
+  zenodo_archive:
+    record_id: 20837254
+    doi: 10.5281/zenodo.20837254
+    version: V1
+    publication_date: '2026-06-24'
+    access_right: open
+    license: MIT
+    filename: FowlerLab/TSC2_analysis-V1.zip
+    download_url: https://zenodo.org/api/records/20837254/files/FowlerLab/TSC2_analysis-V1.zip/content
+    # Zenodo's content-negotiation for this file-download endpoint returns
+    # HTTP 406 Not Acceptable for a narrow "Accept: application/zip" -- the
+    # real request MUST send the universal wildcard instead, and the
+    # observed response Content-Type is a generic octet-stream, not a zip
+    # media type.
+    request_accept: '*/*'
+    observed_content_type: application/octet-stream
+    byte_length: 5746881
+    md5: 8c35d120b65dbd93bc38d07c11b9538b
+    sha256: f9ceaec5d4608d3d2f804b4f919d42030aceb7d72170efb7e1c49ec0c725f403
+    github_repository: https://github.com/FowlerLab/TSC2_analysis
+    github_tag: V1
+    github_commit: 956161278134d56f1a043f56ed1dc6d0deeea1e7
+    required_members:
+      library1:
+        path: FowlerLab-TSC2_analysis-9561612/GMM_classifications/TSC2.lib1.gmm.tsv
+        byte_length: 3248988
+        sha256: 08841e283e2a59a4013cf9c85aba87c76dac268c2d083753cbff3970bcbe29b4
+        md5: 03c9e3c0e6924832262f7aa89ceddd80
+        row_count: 3567
+      library2:
+        path: FowlerLab-TSC2_analysis-9561612/GMM_classifications/TSC2.lib2.gmm.tsv
+        byte_length: 4933368
+        sha256: aec6e4da43096bbb947b1e0cc762913c3f0049c793af4d59b4005da09528be8c
+        md5: 31ba2f9f0f5aeca4cea9047ded48e157
+        row_count: 5540
+  genomic_reference:
+    environment_variable: RAPTOR_TSC2_REFERENCE_ROOT
+    accession: NC_000016.10
+    assembly: GRCh38
+    fasta_filename: NC_000016.10.fasta
+    sha256: 22dc1bb93de407e0653791c36e4097fbaf64c9efa2510c83b7777f607a61e4d0
+    normalizer: raptor.ingest.normalizer.SeqRepoGenomicNormalizer
+  identity_pins:
+    gene: TSC2
+    transcript: NM_000548.5
+    ensembl_transcript: ENST00000219476.9
+    chrom: '16'
+    genomic_accession: NC_000016.10
+    assembly: GRCh38
+
+archive_table_contract:
+  delimiter: tab
+  required_columns:
+    - ID
+    - Gene
+    - Chrom
+    - STRAND
+    - hg38_start
+    - hg38_end
+    - ref_allele
+    - alt_allele
+    - hgvs_c
+    - hgvs_p
+    - Ref_seq_transcript_ID
+    - Ensembl_transcript_ID
+  required_values:
+    Gene: TSC2
+    Chrom: '16'
+    Ref_seq_transcript_ID: NM_000548.5
+    Ensembl_transcript_ID: ENST00000219476.9
+
+score_table_contract:
+  header: [variant, score, standard_error, rep1, rep2, rep3, functional_class]
+
+rate_limits_retries:
+  min_interval_seconds: 1.0
+  timeout_seconds:
+    connect: 10
+    read: 120
+  retry_policy:
+    retryable_http: [408, 429, 500, 502, 503, 504]
+    non_retryable_http: [400, 401, 403, 404, 422]
+    max_attempts_per_request: 4
+    backoff_base_seconds: 2.0
+    backoff_cap_seconds: 60.0
+
+outputs:
+  external_bundle:
+    environment_variable: RAPTOR_TSC2_VAMP_CROSSWALK_ROOT
+    default_root: ~/raptor-data/external/tsc2-vamp-crosswalk
+    run_name: tsc2-vamp-genomic-crosswalk-2026-09-12
+    bundle_id: tsc2-vamp-genomic-crosswalk-2026-09-12
+    manifest_filename: bundle_manifest.json
+    artifacts:
+      raw_archive:
+        artifact_id: raw-archive
+        relative_path: raw/FowlerLab-TSC2_analysis-V1.zip
+      crosswalk_jsonl:
+        artifact_id: crosswalk-jsonl
+        relative_path: crosswalk/igvf_vamp_seq_genomic_crosswalk.jsonl
+        schema: raptor.external.vamp_genomic_crosswalk_row.v1
+  committed_summary:
+    path: data/census/tsc2_vamp_genomic_crosswalk_2026-09-12.json
+    schema: raptor.external.vamp_genomic_crosswalk_summary.v1
+    boundaries:
+      clinical_use: forbidden
+      evidence_strength_use: forbidden
+
+expected_pilot:
+  total_score_rows: 9253
+  archive_crosswalk_rows: 9107
+  status_counts:
+    CROSSWALK_SPDI_VERIFIED: 9050
+    SOURCE_COORDINATE_CDNA_LENGTH_MISMATCH: 57
+    SOURCE_COORDINATE_REFERENCE_MISMATCH: 0
+    ARCHIVE_CROSSWALK_ABSENT: 146
+  verified_unique_spdi: 9050
+  conservation:
+    input_score_rows: 9253
+    output_crosswalk_rows: 9253
+    dropped_rows: 0
+    duplicate_source_rows: 0
+
+boundaries:
+  clinical_use: forbidden
+  evidence_strength_use: forbidden
+  network_in_library: forbidden
+  git_raw_responses: forbidden
+  git_full_crosswalk_jsonl: forbidden
