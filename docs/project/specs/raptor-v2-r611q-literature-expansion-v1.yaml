@@ -1,0 +1,236 @@
+schema: raptor.project.spec.v1
+spec_id: raptor-v2-r611q-literature-expansion-v1
+spec_version: 1.0.2
+status: APPROVED_BUILD
+created_at: '2026-09-15'
+owner: human-terminal-authority
+branch: feature/raptor-v2-r611q-literature-expansion-v1
+stacked_on:
+  branch: feature/raptor-v2-missense-sources-v1
+  commit: 4b319058d6f40ab68a62de36eea4322d25266032
+
+objective: >-
+  Increase the lawful primary-literature coverage available for the $TSC2$
+  $R611Q$ Atlas anchor. Union LitVar2 and ClinVar citation leads, subtract the
+  existing discovery shelf, acquire the new PubMed records and abstracts,
+  enrich article identities and licences through Europe PMC, and download
+  JATS full text only for articles explicitly reported as CC BY.
+
+non_goals:
+  - score transformation, calibration or threshold selection
+  - $PS3$/$BS3$ or any other ACMG evidence assignment
+  - claim extraction, Atlas claim promotion or Gate 8 adjudication
+  - clinical classification, public worklist or ClinVar submission
+  - full historical $TSC2$ literature retrieval
+  - bulk acquisition of all LitVar2 $TSC2$ gene results
+  - download of CC BY-NC, CC BY-NC-ND, CC BY-NC-SA or licence-absent full text
+
+variant:
+  gene: TSC2
+  rsid: rs28934872
+  spdi: NC_000016.10:2070570:G:A
+  hgvs_c: NM_000548.5:c.1832G>A
+  hgvs_p: NP_000539.2:p.Arg611Gln
+  litvar_id: litvar@rs28934872##
+  clinvar_uid: '12397'
+
+baseline:
+  environment_variable: RAPTOR_R611Q_BASELINE_MANIFEST
+  schema: rescuescreen.r611q.discovery_shelf_sources.v1
+  sha256: 8dd13997581fc06998edd0bc73042ae1e8a059bbd2d0dccef4656da1166d1468
+  byte_length: 26297
+  expected:
+    pmid_publications: 31
+    doi_only_publications: 2
+  rule: >-
+    The baseline is read only to identify already-known publication IDs.
+    Existing cards, text and source records are never modified by this slice.
+
+sources:
+  litvar2_publications:
+    role: variant_publication_discovery
+    endpoint: >-
+      https://www.ncbi.nlm.nih.gov/research/litvar2-api/variant/get/litvar%40rs28934872%23%23/publications?format=json
+    expected:
+      pmids: 51
+      pmcids: 48
+    note: >-
+      PMID and PMCID arrays are independent sets and must never be zipped by
+      index. LitVar2 is a discovery index, not primary evidence.
+
+  clinvar_uid_search:
+    role: variant_record_resolution
+    endpoint: >-
+      https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=clinvar&term=rs28934872&retmode=json&retmax=20&tool=raptor
+    expected_uid: '12397'
+
+  clinvar_pubmed_links:
+    role: citation_discovery
+    endpoint: >-
+      https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi?dbfrom=clinvar&db=pubmed&id=12397&linkname=clinvar_pubmed&retmode=json&tool=raptor
+    expected_pmids: 50
+    note: ClinVar citations are discovery leads and never substitute for the cited paper.
+
+  pubmed:
+    role: bibliographic_metadata_and_abstracts
+    endpoint: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi
+    request:
+      method: GET
+      db: pubmed
+      rettype: abstract
+      retmode: xml
+      tool: raptor
+      id_source: derived_new_pmid_union
+    batch_size: 200
+    bounded_slice_rule: >-
+      The derived new-PMID set must fit in one batch for this slice. The raw
+      PubMed artifact records the exact derived EFetch requested and final URLs;
+      synthetic "batched" URL placeholders are forbidden.
+
+  europe_pmc:
+    role: article_identity_access_and_licence_enrichment
+    endpoint: https://www.ebi.ac.uk/europepmc/webservices/rest/search
+    request:
+      query_source: derived_new_pmid_union
+      resultType: core
+      pageSize: 1000
+      format: json
+
+  fulltext:
+    role: explicitly_licensed_primary_text
+    endpoint_template: >-
+      https://www.ebi.ac.uk/europepmc/webservices/rest/{pmcid}/fullTextXML
+    allowed_metadata_licences: [CC BY]
+    required_jats_licence: CC BY
+    rule: >-
+      Fetch only PMCID records whose Europe PMC core metadata reports exactly
+      CC BY. The JATS document must identify the expected PMCID and contain an
+      explicit attribution-only Creative Commons licence declaration without
+      NC, ND or SA restrictions.
+
+probe_observation:
+  observed_at: '2026-09-15'
+  role: planning_reference_not_acceptance_gate
+  raw_response_sha256:
+    litvar2_publications: ad783af1751db255d6349be963aba85ff2573e584ba5541b509d6b51f8c17e21
+    clinvar_uid_search: d49f7a05d5a9bc20fc93d1db04fc53385699119e1cc3df5b03c21a8692ae0ceb
+    clinvar_pubmed_links: 1e991d68bcc15628cc55e0e81580d8ebaaf8a2b36ff8095255f2792b6a848a46
+    pubmed_efetch: c74e9d94fa4bd29e674f15a6fff54a28a9480d343829cfdd9dea63c1022fa46f
+    europe_pmc_core: de760b883b12f7086442facbe6d74fbc89278b02a82804397989d887fbf26c45
+  counts:
+    litvar2_pmids: 51
+    clinvar_pmids: 50
+    litvar2_clinvar_intersection: 9
+    discovery_union_pmids: 92
+    baseline_union_overlap: 23
+    new_pmid_leads: 69
+    pubmed_records_returned: 68
+    pubmed_records_unresolved: 1
+    pubmed_abstracts: 64
+    pubmed_pmcids: 45
+    pubmed_dois: 68
+    europe_pmc_records_returned: 67
+    europe_pmc_abstracts: 63
+    europe_pmc_pmcids: 44
+    europe_pmc_open_access: 35
+    licence_cc_by: 27
+    licence_cc_by_nc_nd: 6
+    licence_cc_by_nc_sa: 1
+    licence_absent: 33
+    fulltext_candidates: 27
+
+article_index:
+  schema: raptor.external.r611q_literature_article.v1
+  one_row_per: new PMID lead
+  exact_fields:
+    - schema
+    - pmid
+    - discovery_sources
+    - pubmed_status
+    - pmcid
+    - doi
+    - title
+    - publication_date
+    - publication_date_precision
+    - abstract
+    - europe_pmc_status
+    - is_open_access
+    - licence
+    - fulltext_status
+    - fulltext_artifact_id
+  invariants:
+    - exactly 69 unique PMID rows sorted numerically
+    - discovery_sources is a non-empty ordered subset of [litvar2, clinvar]
+    - unresolved PubMed rows retain null bibliographic fields explicitly
+    - fulltext_artifact_id is non-null only when fulltext_status is ACQUIRED_CC_BY
+    - no evidence claim, pathogenicity assertion or classification is present
+
+output:
+  external_bundle:
+    environment_variable: RAPTOR_R611Q_LITERATURE_ROOT
+    default_root: ~/raptor-data/external/r611q-literature
+    run_name: r611q-literature-expansion-2026-09-15
+    bundle_id: r611q-literature-expansion-2026-09-15
+    create_only: true
+    artifacts:
+      - raw/litvar2-publications.json
+      - raw/clinvar-esearch.json
+      - raw/clinvar-pubmed-links.json
+      - raw/pubmed-efetch.xml
+      - raw/europepmc-core.json
+      - normalized/article-index.jsonl
+      - fulltext/{pmcid}.xml
+      - bundle_manifest.json
+  committed_summary:
+    path: data/census/r611q_literature_expansion_2026-09-15.json
+    contains:
+      - baseline and source-response hashes
+      - lead, record, abstract, PMCID, DOI and licence counts
+      - full-text candidate/acquisition counts and hashes
+      - unresolved source counts
+      - explicit non-clinical boundaries
+    excludes:
+      - article title or abstract text
+      - PMID, PMCID, DOI or per-article identity
+      - full text or extracted spans
+      - evidence claims or classifications
+
+implementation:
+  package: src/raptor/external/r611q_literature/
+  operator: scripts/fetch_r611q_literature_expansion.py
+  config: configs/external/r611q_literature_expansion_v1.yaml
+  tests: tests/external/test_r611q_literature_expansion.py
+  reuse:
+    - raptor.external.tsc2_sources endpoint/transport validation patterns
+    - raptor.external.tsc2_sources.pubmed partial-date parsing
+    - raptor.external.tsc2_sources.pmc JATS PMCID/licence parsing
+    - raptor.external.tsc2_sources.bundle create-only publication primitive
+
+delivery_checks:
+  - exact endpoint and redirect identity for every request
+  - raw response bytes are preserved and hashed before parsing
+  - baseline, LitVar2 and ClinVar PMID sets are deduplicated deterministically
+  - PubMed missing records are explicit rather than silently dropped
+  - PMID, PMCID and DOI are crosswalked from article-level metadata, never array position
+  - only exact CC BY records are eligible for full-text download
+  - every downloaded JATS licence is independently checked
+  - all output is external/create-only and the manifest is written last
+  - the committed summary is aggregate-only
+  - live source counts are recorded; the planning reference is diagnostic only,
+    and source additions/removals never fail publication when structural and
+    arithmetic checks pass
+  - source_response_hashes exactly equal the hashes of all RAW_RESPONSE artifacts
+  - fulltext_artifact_hashes exactly equal the sorted hashes of all FULLTEXT_XML artifacts
+  - caller rate-limit overrides are finite and may only increase configured minimum intervals
+
+boundaries:
+  discovery_indices_are_not_evidence: true
+  claim_promotion: forbidden
+  clinical_use: forbidden
+  evidence_strength_use: forbidden
+  ps3_bs3_use: forbidden
+  score_use: forbidden
+
+follow_on:
+  - measure new exact-span and variant-level evidence yield from the expanded corpus
+  - expand to the historical $TSC2$ PubMed/Gene union only if the bounded slice produces useful primary-source yield

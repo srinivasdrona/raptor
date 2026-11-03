@@ -17,3 +17,8 @@ scripts/run_masked_holdout_eval.py text eol=crlf
 # RescueScreen literature bundles carry byte-level SHA-256 manifests.
 data/rescuescreen/r611q/literature-v1/* text eol=lf
 data/rescuescreen/r611q/synthesis-v1/* text eol=lf
+data/rescuescreen/r611q/structure-readiness-v1/** text eol=lf
+data/rescuescreen/r611q/structure-readiness-v1/**/*.gz -text
+
+# Public Atlas gate result is byte-hash pinned from approved CRLF bytes.
+data/atlas/runs/2026-08-03/r611q_gate_result.json text eol=crlf

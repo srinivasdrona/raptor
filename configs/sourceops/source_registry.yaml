@@ -1,0 +1,1078 @@
+schema: raptor.source_registry.v1
+registry_id: raptor-sourceops-registry-v1
+registry_version: 1.0.0
+created_at: '2026-08-16T09:30:50Z'
+registry_content_hash: ef6995a8822c53a1bef228545b0a01c23963b79212967d3f3c15b66d54b02e90
+hash_basis: raptor.source_registry_content_hash.v1
+source_records:
+- source_id: tsc-ingest-and-reference-declarations
+  display_name: TSC ingest and reference declarations
+  record_kind: COMPOSITE_MANIFEST
+  lifecycle_state: CONFIRM_PENDING
+  owner: raptor.ingest
+  authoritative_locator: configs/ingest/tsc.yaml
+  declaration_refs:
+  - path: configs/ingest/tsc.yaml
+    role: authoritative_root
+    canonical_lf_sha256: dcd02fde77a711afe2e47cb5a01449fc0a926708476ff07cfb756458459ffad2
+    authority_scope: repository
+  licence:
+    status: open_repository_reference
+    identifier_or_family: raptor-ingest-reference-config
+    terms_locator: configs/ingest/tsc.yaml
+    permitted_use: governed_repository_reference_only
+    redistribution: allowed_with_repo_workflow
+    cloud_egress: forbidden_without_explicit_review
+    verification_basis: authoritative_declared_reference_file
+  release:
+    version_or_snapshot: '1.4'
+    release_date: '2026-08-16'
+    retrieved_at: '2026-08-16T00:00:00Z'
+    content_pin_status: hash_bound_reference_file
+  acquisition:
+    method: repository_declared_configuration
+    operator_contract: no_network_fetching
+    writes_outside_repository: false
+  refresh:
+    cadence: manual
+    freshness_sla: P365D
+    last_checked_at: '2026-08-16T00:00:00Z'
+    next_check_rule: manual operator review
+  consumers:
+  - ingest
+  - scorer
+  - eval-benchmark
+  - census
+  - packet
+  - atlas
+  - external-mave
+  drift_policy:
+    materiality_basis: declaration and downstream evidence route integrity
+    actions:
+    - record_only
+    - block_consumer
+    - stage_diff
+    - rebuild_benchmark
+    - review_policy
+    - invalidate_packets
+    - reground_atlas
+    - rerun_validation
+    - rollback
+    approval_required: true
+  rollback:
+    predecessor_source_id: null
+    immutable_predecessor_required: true
+    rollback_artifact: configs/sourceops/rollbacks/tsc-ingest-baseline.yaml
+    origin_reason: baseline declaration pin
+  components:
+  - component_id: tsc-ingest-clinvar-snapshot-id
+    display_name: ClinVar snapshot ID pin
+    lifecycle_state: CONFIRM_PENDING
+    source_role: reference_pin
+    version_or_snapshot: confirm-pending-snapshot
+    licence_status: confirm_pending
+    declaration_locator: configs/ingest/tsc.yaml#clinvar_snapshot_id
+  - component_id: tsc-ingest-clinvar-snapshot-date
+    display_name: ClinVar snapshot date pin
+    lifecycle_state: CONFIRM_PENDING
+    source_role: reference_pin
+    version_or_snapshot: confirm-pending-date
+    licence_status: confirm_pending
+    declaration_locator: configs/ingest/tsc.yaml#clinvar_snapshot_date
+  - component_id: tsc-ingest-clinvar-snapshot-file-checksum
+    display_name: ClinVar snapshot file checksum pin
+    lifecycle_state: CONFIRM_PENDING
+    source_role: reference_checksum
+    version_or_snapshot: confirm-pending-checksum
+    licence_status: confirm_pending
+    declaration_locator: configs/ingest/tsc.yaml#clinvar_snapshot_file_checksum
+  - component_id: tsc-ingest-assembly
+    display_name: Genome assembly pin
+    lifecycle_state: VERIFIED_ACTIVE
+    source_role: reference_pin
+    version_or_snapshot: GRCh38
+    licence_status: open_repository_reference
+    declaration_locator: configs/ingest/tsc.yaml#assembly
+  - component_id: tsc-ingest-mane-release
+    display_name: MANE release pin
+    lifecycle_state: VERIFIED_ACTIVE
+    source_role: reference_pin
+    version_or_snapshot: '1.4'
+    licence_status: open_repository_reference
+    declaration_locator: configs/ingest/tsc.yaml#mane_release
+  - component_id: tsc-ingest-reference-checksum-NC_000016.10
+    display_name: TSC2 genomic checksum
+    lifecycle_state: VERIFIED_ACTIVE
+    source_role: reference_checksum
+    version_or_snapshot: 22dc1bb93de407e0653791c36e4097fbaf64c9efa2510c83b7777f607a61e4d0
+    licence_status: open_repository_reference
+    declaration_locator: configs/ingest/tsc.yaml#reference_checksums["NC_000016.10"]
+  - component_id: tsc-ingest-reference-checksum-NC_000009.12
+    display_name: TSC1 genomic checksum
+    lifecycle_state: VERIFIED_ACTIVE
+    source_role: reference_checksum
+    version_or_snapshot: 650011382f44e91b90c85271833737af2afdb6f9e92ef56f1f8f58f2389e3351
+    licence_status: open_repository_reference
+    declaration_locator: configs/ingest/tsc.yaml#reference_checksums["NC_000009.12"]
+  - component_id: tsc-ingest-reference-checksum-NM_000548.5
+    display_name: TSC2 transcript checksum
+    lifecycle_state: CONFIRM_PENDING
+    source_role: reference_checksum
+    version_or_snapshot: confirm-pending
+    licence_status: confirm_pending
+    declaration_locator: configs/ingest/tsc.yaml#reference_checksums["NM_000548.5"]
+  - component_id: tsc-ingest-reference-checksum-NM_000368.5
+    display_name: TSC1 transcript checksum
+    lifecycle_state: CONFIRM_PENDING
+    source_role: reference_checksum
+    version_or_snapshot: confirm-pending
+    licence_status: confirm_pending
+    declaration_locator: configs/ingest/tsc.yaml#reference_checksums["NM_000368.5"]
+  - component_id: tsc-ingest-assembly-patch
+    display_name: Assembly patch pin
+    lifecycle_state: VERIFIED_ACTIVE
+    source_role: reference_pin
+    version_or_snapshot: p14
+    licence_status: open_repository_reference
+    declaration_locator: configs/ingest/tsc.yaml#assembly_patch
+  - component_id: tsc-ingest-normalizer-version
+    display_name: Normalizer version pin
+    lifecycle_state: VERIFIED_ACTIVE
+    source_role: reference_pin
+    version_or_snapshot: bioutils-0.6.1
+    licence_status: open_repository_reference
+    declaration_locator: configs/ingest/tsc.yaml#normalizer.version
+  - component_id: tsc-ingest-tsc1-protein-accession
+    display_name: TSC1 protein accession
+    lifecycle_state: VERIFIED_ACTIVE
+    source_role: reference_pin
+    version_or_snapshot: NP_000359.2
+    licence_status: open_repository_reference
+    declaration_locator: configs/ingest/tsc.yaml#TSC1.protein_accession
+  - component_id: tsc-ingest-tsc2-protein-accession
+    display_name: TSC2 protein accession
+    lifecycle_state: VERIFIED_ACTIVE
+    source_role: reference_pin
+    version_or_snapshot: NP_000539.2
+    licence_status: open_repository_reference
+    declaration_locator: configs/ingest/tsc.yaml#TSC2.protein_accession
+  blocked_reasons:
+  - ClinVar snapshot identity, date, checksum, and transcript checksum pins remain
+    confirm-pending
+  - TSC ingest root is not verified for active consumption until pending review inputs
+    are confirmed
+  missing_inputs:
+  - ClinVar snapshot identity and checksum review
+  - ClinVar snapshot date confirmation
+  - TSC2/TSC1 transcript checksum confirmations
+  unblock_condition: ClinVar snapshot identity/date/checksum and TSC1/TSC2 transcript
+    checksum pins are reviewed and locked before any active use
+  reviewed_by: raptor.ingest
+  reviewed_at: '2026-08-16T00:00:00Z'
+- source_id: frozen-core-annotation-bundle
+  display_name: Frozen core annotation bundle
+  record_kind: COMPOSITE_MANIFEST
+  lifecycle_state: PINNED_HISTORICAL
+  owner: raptor.eval
+  authoritative_locator: configs/eval/core_annotation_bundle.yaml
+  declaration_refs:
+  - path: configs/eval/core_annotation_bundle.yaml
+    role: authoritative_root
+    canonical_lf_sha256: fd175a1e77e3cf65a148038c6f06d5acd10078411ce6077100081cd881ad2815
+    authority_scope: repository
+  licence:
+    status: restricted_historical_evidence
+    identifier_or_family: raptor-core-annotation-bundle-v1
+    terms_locator: configs/eval/core_annotation_bundle.yaml#reuse_vs_reannotate
+    permitted_use: historical_reference_only_blocked_policy_only_reuse
+    redistribution: forbidden_without_immutable_history_approval
+    cloud_egress: forbidden
+    verification_basis: historical_run_attestation_and_immutable_runtime_manifest
+  release:
+    version_or_snapshot: Nirvana-3.18.1/BIAS-3.0.0
+    release_date: '2026-07-21'
+    retrieved_at: '2026-08-16T00:00:00Z'
+    content_pin_status: hash_bound_historical_manifest
+  acquisition:
+    method: immutable_runtime_manifest_record
+    operator_contract: no_network_fetching
+    writes_outside_repository: false
+  refresh:
+    cadence: frozen
+    freshness_sla: P365D
+    last_checked_at: '2026-08-16T00:00:00Z'
+    next_check_rule: manual operator review
+  consumers:
+  - eval-gate
+  - scorer
+  - census
+  - packet
+  - atlas
+  - eval-benchmark
+  components:
+  - component_id: core-data-01
+    display_name: VEP
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '91'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[0]
+  - component_id: core-data-02
+    display_name: MultiZ100Way
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '20171006'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[1]
+  - component_id: core-data-03
+    display_name: AlphaMissense
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: AlphaMissense_hg38.nirvana.tsv
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[2]
+  - component_id: core-data-04
+    display_name: ClinVar
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: 2026-02
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[3]
+  - component_id: core-data-05
+    display_name: ClinVar
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '20240301'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[4]
+  - component_id: core-data-06
+    display_name: dbSNP
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '156'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[5]
+  - component_id: core-data-07
+    display_name: dbSNP
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '151'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[6]
+  - component_id: core-data-08
+    display_name: GME
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '20160618'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[7]
+  - component_id: core-data-09
+    display_name: gnomAD
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '4.0'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[8]
+  - component_id: core-data-10
+    display_name: gnomAD_exome
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '4.0'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[9]
+  - component_id: core-data-11
+    display_name: MITOMAP
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '20200819'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[10]
+  - component_id: core-data-12
+    display_name: 1000 Genomes Project
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: Phase 3 v3plus
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[11]
+  - component_id: core-data-13
+    display_name: REVEL
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '20200205'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[12]
+  - component_id: core-data-14
+    display_name: TOPMed
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: freeze_5
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[13]
+  - component_id: core-data-15
+    display_name: ClinGen
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '20160414'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[14]
+  - component_id: core-data-16
+    display_name: ClinGen Dosage Sensitivity Map
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '20240110'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[15]
+  - component_id: core-data-17
+    display_name: DECIPHER
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '201509'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[16]
+  - component_id: core-data-18
+    display_name: gnomAD_SV
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '4.0'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[17]
+  - component_id: core-data-19
+    display_name: MITOMAP_SV
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '20200819'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[18]
+  - component_id: core-data-20
+    display_name: 1000 Genomes Project (SV)
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: Phase 3 v5a
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[19]
+  - component_id: core-data-21
+    display_name: FusionCatcher
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '1.33'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[20]
+  - component_id: core-data-22
+    display_name: DANN
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '20200205'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[21]
+  - component_id: core-data-23
+    display_name: Gerp
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '20110522'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[22]
+  - component_id: core-data-24
+    display_name: ClinGen disease validity curations
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '20240110'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[23]
+  - component_id: core-data-25
+    display_name: gnomAD_gene_scores
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '4.0'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[24]
+  - component_id: core-data-26
+    display_name: phyloP
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: hg38
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[25]
+  - component_id: core-data-27
+    display_name: gnomAD_LCR
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '2.1'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[26]
+  - component_id: core-data-28
+    display_name: MitochondrialHeteroplasmy
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: historical_data_source
+    version_or_snapshot: '20180410'
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#data_sources[27]
+  - component_id: core-runtime-nirvana
+    display_name: Nirvana runtime pin
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: runtime_pin
+    version_or_snapshot: Nirvana 3.18.1
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#runtime.annotator
+  - component_id: core-runtime-bias
+    display_name: BIAS runtime pin
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: runtime_pin
+    version_or_snapshot: 3.0.0
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#runtime.bias_version
+  - component_id: core-runtime-nirvana-data-version
+    display_name: Nirvana data version pin
+    lifecycle_state: PINNED_HISTORICAL
+    source_role: runtime_pin
+    version_or_snapshot: 91.27.66
+    licence_status: historical_evidence_bundle
+    declaration_locator: configs/eval/core_annotation_bundle.yaml#runtime.nirvana_data_version
+  drift_policy:
+    materiality_basis: declaration and downstream evidence route integrity
+    actions:
+    - record_only
+    - block_consumer
+    - stage_diff
+    - rebuild_benchmark
+    - review_policy
+    - invalidate_packets
+    - reground_atlas
+    - rerun_validation
+    - rollback
+    approval_required: true
+  rollback:
+    predecessor_source_id: null
+    immutable_predecessor_required: true
+    rollback_artifact: configs/sourceops/rollbacks/core-annotation-bundle-rollback.yaml
+    origin_reason: immutable historical declaration pin
+- source_id: pp3bp4-shadow-source-register
+  display_name: PP3/BP4 shadow source register
+  record_kind: POLICY_SOURCE_REGISTER
+  lifecycle_state: METADATA_ONLY
+  owner: raptor.eval
+  authoritative_locator: configs/eval/pp3bp4_source_register.yaml
+  declaration_refs:
+  - path: configs/eval/pp3bp4_source_register.yaml
+    role: authoritative_root
+    canonical_lf_sha256: 642f964176910c7b3356b1126a856e4cdc029eb0a5c27a1d34a12500321b9581
+    authority_scope: repository
+  licence:
+    status: proposal_only
+    identifier_or_family: shadow-policy-register
+    terms_locator: configs/eval/pp3bp4_source_register.yaml#required_primary_sources
+    permitted_use: shadow_only_non_authoritative
+    redistribution: forbidden_without_policy_approval
+    cloud_egress: forbidden
+    verification_basis: designated_shadow_proposal_only
+  release:
+    version_or_snapshot: '1'
+    release_date: '2026-07-21'
+    retrieved_at: '2026-08-16T00:00:00Z'
+    content_pin_status: shadow_register_pin
+  acquisition:
+    method: repository_declared_shadow_register
+    operator_contract: no_network_fetching
+    writes_outside_repository: false
+  refresh:
+    cadence: manual
+    freshness_sla: P365D
+    last_checked_at: '2026-08-16T00:00:00Z'
+    next_check_rule: manual operator review
+  consumers: []
+  components:
+  - component_id: pp3bp4-primary-pejaver-2022
+    display_name: Pejaver 2022 PP3/BP4 primary citation
+    lifecycle_state: VERIFIED_ACTIVE
+    source_role: primary_source
+    version_or_snapshot: 10.1016/j.ajhg.2022.10.013
+    licence_status: verified_reference
+    declaration_locator: configs/eval/pp3bp4_source_register.yaml#required_primary_sources.pejaver_2022.doi
+  - component_id: pp3bp4-primary-stenton-2024
+    display_name: Stenton 2024 PP3/BP4 primary citation
+    lifecycle_state: VERIFIED_ACTIVE
+    source_role: primary_source
+    version_or_snapshot: '39030733'
+    licence_status: verified_reference
+    declaration_locator: configs/eval/pp3bp4_source_register.yaml#required_primary_sources.stenton_2024.pmid
+  - component_id: pp3bp4-primary-richards-2015
+    display_name: Richards 2015 PP3/BP4 primary citation
+    lifecycle_state: VERIFIED_ACTIVE
+    source_role: primary_source
+    version_or_snapshot: '25741868'
+    licence_status: verified_reference
+    declaration_locator: configs/eval/pp3bp4_source_register.yaml#required_primary_sources.richards_2015.pmid
+  - component_id: pp3bp4-primary-tavtigian-2018
+    display_name: Tavtigian 2018 PP3/BP4 primary citation
+    lifecycle_state: VERIFIED_ACTIVE
+    source_role: primary_source
+    version_or_snapshot: Bayesian evidence-strength model
+    licence_status: verified_reference
+    declaration_locator: configs/eval/pp3bp4_source_register.yaml#required_primary_sources.tavtigian_2018.locus
+  - component_id: pp3bp4-revel
+    display_name: REVEL
+    lifecycle_state: METADATA_ONLY
+    source_role: shadow
+    version_or_snapshot: meta_predictor
+    licence_status: proposal_only
+    declaration_locator: configs/eval/pp3bp4_source_register.yaml#candidates.revel.kind
+  - component_id: pp3bp4-bayesdel-noaf
+    display_name: BayesDel noAF
+    lifecycle_state: METADATA_ONLY
+    source_role: shadow
+    version_or_snapshot: meta_predictor
+    licence_status: proposal_only
+    declaration_locator: configs/eval/pp3bp4_source_register.yaml#candidates.bayesdel_noaf.kind
+  - component_id: pp3bp4-mutpred2
+    display_name: MutPred2
+    lifecycle_state: METADATA_ONLY
+    source_role: shadow
+    version_or_snapshot: predictor
+    licence_status: proposal_only
+    declaration_locator: configs/eval/pp3bp4_source_register.yaml#candidates.mutpred2.kind
+  - component_id: pp3bp4-vest4
+    display_name: VEST4
+    lifecycle_state: METADATA_ONLY
+    source_role: shadow
+    version_or_snapshot: predictor
+    licence_status: proposal_only
+    declaration_locator: configs/eval/pp3bp4_source_register.yaml#candidates.vest4.kind
+  - component_id: pp3bp4-bias
+    display_name: BIAS composite
+    lifecycle_state: METADATA_ONLY
+    source_role: shadow
+    version_or_snapshot: pinned_bias_3_0_0_commit_ade13f2
+    licence_status: proposal_only
+    declaration_locator: configs/eval/pp3bp4_source_register.yaml#candidates.bias_composite.version_status
+  drift_policy:
+    materiality_basis: declaration and downstream evidence route integrity
+    actions:
+    - record_only
+    - block_consumer
+    - stage_diff
+    - rebuild_benchmark
+    - review_policy
+    - invalidate_packets
+    - reground_atlas
+    - rerun_validation
+    - rollback
+    approval_required: true
+  rollback:
+    predecessor_source_id: null
+    immutable_predecessor_required: true
+    rollback_artifact: configs/sourceops/rollbacks/pp3bp4-shadow-rollback.yaml
+    origin_reason: proposal-only register remains non-authoritative
+- source_id: tsc2-mave-source-register
+  display_name: TSC2 MAVE source register
+  record_kind: POLICY_SOURCE_REGISTER
+  lifecycle_state: CONFIRM_PENDING
+  owner: raptor.external
+  authoritative_locator: configs/external/mave_sources.yaml
+  declaration_refs:
+  - path: configs/external/mave_sources.yaml
+    role: authoritative_root
+    canonical_lf_sha256: 34bdaff3c9d3ecff31942dfc73b47f34b0ab808419a1fa945141082a8d3fa9d1
+    authority_scope: repository
+  licence:
+    status: mixed_verified_and_pending
+    identifier_or_family: mave-register
+    terms_locator: configs/external/mave_sources.yaml#circularity_guard
+    permitted_use: orthogonal_validation_only
+    redistribution: forbidden_until_access_and_licensing_are_confirmed
+    cloud_egress: forbidden
+    verification_basis: one_verified_primary_source_and_three_unverified_candidates
+  release:
+    version_or_snapshot: phase-0-1
+    release_date: '2026-07-13'
+    retrieved_at: '2026-08-16T00:00:00Z'
+    content_pin_status: mixed_verification_state
+  acquisition:
+    method: registered_external_reference_catalog
+    operator_contract: no_network_fetching
+    writes_outside_repository: false
+  refresh:
+    cadence: manual
+    freshness_sla: P365D
+    last_checked_at: '2026-08-16T00:00:00Z'
+    next_check_rule: manual operator review
+  consumers: []
+  components:
+  - component_id: mave-primary
+    display_name: MaveDB TSC2 CLIPE primary source
+    lifecycle_state: VERIFIED_ACTIVE
+    source_role: verified
+    version_or_snapshot: urn:mavedb:00001201-a-1
+    licence_status: CC0-1.0
+    declaration_locator: configs/external/mave_sources.yaml#sources[0]
+  - component_id: mave-igvf-vamp
+    display_name: IGVF VAMP-seq TSC2 assay
+    lifecycle_state: CONFIRM_PENDING
+    source_role: provenance_only
+    version_or_snapshot: IGVF:analysis-set:IGVFDS5595BTYJ
+    licence_status: unconfirmed
+    declaration_locator: configs/external/mave_sources.yaml#sources[1]
+  - component_id: mave-igvf-sge
+    display_name: IGVF SGE TSC2 assay
+    lifecycle_state: CONFIRM_PENDING
+    source_role: provenance_only
+    version_or_snapshot: IGVF:analysis-set:IGVFDS1782FCXW
+    licence_status: unconfirmed
+    declaration_locator: configs/external/mave_sources.yaml#sources[2]
+  - component_id: mave-cagi7
+    display_name: CAGI7 TSC2 stability challenge
+    lifecycle_state: CONFIRM_PENDING
+    source_role: provenance_only
+    version_or_snapshot: CAGI7:TSC2-stability-challenge
+    licence_status: unconfirmed
+    declaration_locator: configs/external/mave_sources.yaml#sources[3]
+  drift_policy:
+    materiality_basis: declaration and downstream evidence route integrity
+    actions:
+    - record_only
+    - block_consumer
+    - stage_diff
+    - rebuild_benchmark
+    - review_policy
+    - invalidate_packets
+    - reground_atlas
+    - rerun_validation
+    - rollback
+    approval_required: true
+  rollback:
+    predecessor_source_id: null
+    immutable_predecessor_required: true
+    rollback_artifact: configs/sourceops/rollbacks/mave-register-rollback.yaml
+    origin_reason: external validation register remains repository-bound and non-authoritative
+      until access review completes
+  blocked_reasons:
+  - external access and licensing review still pending
+  missing_inputs:
+  - verified MAVE access path
+  - permitted-use confirmation
+  unblock_condition: external review complete and access verified for MAVE register
+  reviewed_by: raptor.external
+  reviewed_at: '2026-08-16T00:00:00Z'
+- source_id: atlas-tsc2-pack-source-pins
+  display_name: Atlas TSC2 pack source pins
+  record_kind: POLICY_SOURCE_REGISTER
+  lifecycle_state: CONFIRM_PENDING
+  owner: raptor.atlas
+  authoritative_locator: configs/atlas/packs/tsc2/pack.yaml
+  declaration_refs:
+  - path: configs/atlas/packs/tsc2/pack.yaml
+    role: authoritative_root
+    canonical_lf_sha256: 158861d7026b9be6b8fa80625c7c07157d75a04d26ffb7ababfedf2a6c711a2f
+    authority_scope: repository
+  licence:
+    status: provenance_only_unverified
+    identifier_or_family: atlas-pack-source-pins
+    terms_locator: configs/atlas/packs/tsc2/pack.yaml#source_register_pins
+    permitted_use: metadata_template_only
+    redistribution: forbidden_without_template_approval
+    cloud_egress: forbidden
+    verification_basis: three_provenance_only_confirm_pending_pins
+  release:
+    version_or_snapshot: 1.0.0-phase1
+    release_date: '2026-08-16'
+    retrieved_at: '2026-08-16T00:00:00Z'
+    content_pin_status: provenance_only_confirm_pending
+  acquisition:
+    method: repository_declared_atlas_pack_registration
+    operator_contract: no_network_fetching
+    writes_outside_repository: false
+  refresh:
+    cadence: manual
+    freshness_sla: P365D
+    last_checked_at: '2026-08-16T00:00:00Z'
+    next_check_rule: manual operator review
+  consumers: []
+  components:
+  - component_id: atlas-pack-biorxiv
+    display_name: bioRxiv TSC2 paper
+    lifecycle_state: CONFIRM_PENDING
+    source_role: provenance_only
+    version_or_snapshot: bioRxiv-2024.06.07.597916
+    licence_status: CC-BY-NC-ND-4.0
+    declaration_locator: configs/atlas/packs/tsc2/pack.yaml#source_register_pins[0]
+  - component_id: atlas-pack-clinvar
+    display_name: ClinVar variation pin
+    lifecycle_state: CONFIRM_PENDING
+    source_role: provenance_only
+    version_or_snapshot: clinvar-VCV000012397
+    licence_status: public-domain-us-gov
+    declaration_locator: configs/atlas/packs/tsc2/pack.yaml#source_register_pins[1]
+  - component_id: atlas-pack-mavedb
+    display_name: MaveDB TSC2 pilot dataset
+    lifecycle_state: CONFIRM_PENDING
+    source_role: provenance_only
+    version_or_snapshot: mavedb-tsc2-pilot-dataset
+    licence_status: CC0-1.0
+    declaration_locator: configs/atlas/packs/tsc2/pack.yaml#source_register_pins[2]
+  - component_id: atlas-pack-assembly-pin-0
+    display_name: Atlas assembly pin
+    lifecycle_state: CONFIRM_PENDING
+    source_role: provenance_only
+    version_or_snapshot: GRCh38
+    licence_status: confirm_pending
+    declaration_locator: configs/atlas/packs/tsc2/pack.yaml#assembly_pins[0]
+  - component_id: atlas-pack-transcript-pin-0
+    display_name: Atlas transcript pin
+    lifecycle_state: CONFIRM_PENDING
+    source_role: provenance_only
+    version_or_snapshot: NM_000548.5
+    licence_status: confirm_pending
+    declaration_locator: configs/atlas/packs/tsc2/pack.yaml#transcript_pins[0]
+  drift_policy:
+    materiality_basis: declaration and downstream evidence route integrity
+    actions:
+    - record_only
+    - block_consumer
+    - stage_diff
+    - rebuild_benchmark
+    - review_policy
+    - invalidate_packets
+    - reground_atlas
+    - rerun_validation
+    - rollback
+    approval_required: true
+  rollback:
+    predecessor_source_id: null
+    immutable_predecessor_required: true
+    rollback_artifact: configs/sourceops/rollbacks/atlas-pack-rollback.yaml
+    origin_reason: provenance-only Atlas pin set remains repository-authored and non-authoritative
+  blocked_reasons:
+  - Atlas provenance pins are not yet approved for evidence use
+  missing_inputs:
+  - Atlas provenance review
+  - approved evidence pin set
+  unblock_condition: Atlas review complete and provenance pins approved for use
+  reviewed_by: raptor.atlas
+  reviewed_at: '2026-08-16T00:00:00Z'
+- source_id: atlas-tsc2-catalog-template
+  display_name: Atlas TSC2 catalog template
+  record_kind: METADATA_CATALOG_TEMPLATE
+  lifecycle_state: METADATA_ONLY
+  owner: raptor.atlas
+  authoritative_locator: configs/atlas/catalogs/tsc2/catalog.yaml
+  declaration_refs:
+  - path: configs/atlas/catalogs/tsc2/catalog.yaml
+    role: authoritative_root
+    canonical_lf_sha256: b9d90a2d490cbb8bf7b49d59fd0bc5e98417eb847a7ba9febecd5c090a8f17e1
+    authority_scope: repository
+  licence:
+    status: template_only
+    identifier_or_family: atlas-citation-catalog-template
+    terms_locator: configs/atlas/catalogs/tsc2/catalog.yaml#content_root_policy
+    permitted_use: metadata_template_only
+    redistribution: forbidden_without_template_approval
+    cloud_egress: forbidden
+    verification_basis: committed_template_with_zero_source_rows
+  release:
+    version_or_snapshot: 1.0.0-phase2-template
+    release_date: '2026-08-16'
+    retrieved_at: '2026-08-16T00:00:00Z'
+    content_pin_status: metadata_template_only
+  acquisition:
+    method: repository_declared_catalog_template
+    operator_contract: no_network_fetching
+    writes_outside_repository: false
+  refresh:
+    cadence: manual
+    freshness_sla: P365D
+    last_checked_at: '2026-08-16T00:00:00Z'
+    next_check_rule: manual operator review
+  consumers: []
+  components: []
+  drift_policy:
+    materiality_basis: declaration and downstream evidence route integrity
+    actions:
+    - record_only
+    - block_consumer
+    - stage_diff
+    - rebuild_benchmark
+    - review_policy
+    - invalidate_packets
+    - reground_atlas
+    - rerun_validation
+    - rollback
+    approval_required: true
+  rollback:
+    predecessor_source_id: null
+    immutable_predecessor_required: true
+    rollback_artifact: configs/sourceops/rollbacks/atlas-catalog-template-rollback.yaml
+    origin_reason: template remains metadata-only and never grounds evidence
+- source_id: tsc-acmg-runtime-source-pins
+  display_name: TSC ACMG runtime source pins
+  record_kind: POLICY_SOURCE_REGISTER
+  lifecycle_state: CONFIRM_PENDING
+  owner: raptor.scorer
+  authoritative_locator: configs/acmg/tsc.yaml
+  declaration_refs:
+  - path: configs/acmg/tsc.yaml
+    role: authoritative_root
+    canonical_lf_sha256: 734c5c376d900b8564caa9838d7ca4b1adc0eca494b869b3621963956413d458
+    authority_scope: repository
+  licence:
+    status: policy_pin_pending
+    identifier_or_family: bias-runtime-pin-register
+    terms_locator: configs/acmg/tsc.yaml#bias_version
+    permitted_use: policy_reference_only
+    redistribution: forbidden_until_biased_release_and_data_are_confirmed
+    cloud_egress: forbidden
+    verification_basis: bias_version_and_data_version_remain_confirm_pending
+  release:
+    version_or_snapshot: bias-confirm-pending
+    release_date: '2026-08-16'
+    retrieved_at: '2026-08-16T00:00:00Z'
+    content_pin_status: confirm_pending_runtime_pins
+  acquisition:
+    method: repository_declared_bias_runtime_policy
+    operator_contract: no_network_fetching
+    writes_outside_repository: false
+  refresh:
+    cadence: manual
+    freshness_sla: P365D
+    last_checked_at: '2026-08-16T00:00:00Z'
+    next_check_rule: manual operator review
+  consumers:
+  - scorer
+  components:
+  - component_id: acmg-bias-version
+    display_name: BIAS version pin
+    lifecycle_state: CONFIRM_PENDING
+    source_role: runtime_pin
+    version_or_snapshot: confirm-pending-bias-release
+    licence_status: confirm_pending
+    declaration_locator: configs/acmg/tsc.yaml#bias_version
+  - component_id: acmg-bias-data-version
+    display_name: BIAS data version pin
+    lifecycle_state: CONFIRM_PENDING
+    source_role: runtime_pin
+    version_or_snapshot: confirm-pending-bias-data
+    licence_status: confirm_pending
+    declaration_locator: configs/acmg/tsc.yaml#bias_data_version
+  - component_id: acmg-licensing-revel
+    display_name: REVEL licensing tag
+    lifecycle_state: CONFIRM_PENDING
+    source_role: licensing_tag
+    version_or_snapshot: non-commercial
+    licence_status: non-commercial
+    declaration_locator: configs/acmg/tsc.yaml#licensing.revel
+  - component_id: acmg-licensing-cadd
+    display_name: CADD licensing tag
+    lifecycle_state: CONFIRM_PENDING
+    source_role: licensing_tag
+    version_or_snapshot: non-commercial
+    licence_status: non-commercial
+    declaration_locator: configs/acmg/tsc.yaml#licensing.cadd
+  - component_id: acmg-licensing-splice-ai
+    display_name: SpliceAI licensing tag
+    lifecycle_state: CONFIRM_PENDING
+    source_role: licensing_tag
+    version_or_snapshot: non-commercial
+    licence_status: non-commercial
+    declaration_locator: configs/acmg/tsc.yaml#licensing.splice_ai
+  - component_id: acmg-licensing-alpha-missense
+    display_name: AlphaMissense licensing tag
+    lifecycle_state: CONFIRM_PENDING
+    source_role: licensing_tag
+    version_or_snapshot: non-commercial
+    licence_status: non-commercial
+    declaration_locator: configs/acmg/tsc.yaml#licensing.alpha_missense
+  - component_id: acmg-licensing-gnomad
+    display_name: gnomAD licensing tag
+    lifecycle_state: CONFIRM_PENDING
+    source_role: licensing_tag
+    version_or_snapshot: open
+    licence_status: open
+    declaration_locator: configs/acmg/tsc.yaml#licensing.gnomad
+  - component_id: acmg-tsc1-gene
+    display_name: TSC1 gene declaration
+    lifecycle_state: CONFIRM_PENDING
+    source_role: runtime_pin
+    version_or_snapshot: NM_000368.5
+    licence_status: confirm_pending
+    declaration_locator: configs/acmg/tsc.yaml#genes.TSC1
+  - component_id: acmg-tsc2-gene
+    display_name: TSC2 gene declaration
+    lifecycle_state: CONFIRM_PENDING
+    source_role: runtime_pin
+    version_or_snapshot: NM_000548.5
+    licence_status: confirm_pending
+    declaration_locator: configs/acmg/tsc.yaml#genes.TSC2
+  drift_policy:
+    materiality_basis: declaration and downstream evidence route integrity
+    actions:
+    - record_only
+    - block_consumer
+    - stage_diff
+    - rebuild_benchmark
+    - review_policy
+    - invalidate_packets
+    - reground_atlas
+    - rerun_validation
+    - rollback
+    approval_required: true
+  rollback:
+    predecessor_source_id: null
+    immutable_predecessor_required: true
+    rollback_artifact: configs/sourceops/rollbacks/acmg-runtime-pins-rollback.yaml
+    origin_reason: runtime pins remain repository-authored and non-authoritative
+  blocked_reasons:
+  - BIAS version and bias data version remain confirm-pending
+  missing_inputs:
+  - runtime bias release approval
+  - bias data version approval
+  unblock_condition: BIAS release and data pins confirmed by review
+  reviewed_by: raptor.scorer
+  reviewed_at: '2026-08-16T00:00:00Z'
+consumers:
+- consumer_id: ingest
+  owner: raptor.ingest
+  required_sources:
+  - tsc-ingest-and-reference-declarations
+  freshness_required: false
+  on_blocked_source: block_consumer
+  forbidden_source_roles:
+  - metadata_only
+  - provenance_only
+  - shadow
+  - proposed
+- consumer_id: scorer
+  owner: raptor.scorer
+  required_sources:
+  - tsc-ingest-and-reference-declarations
+  - frozen-core-annotation-bundle
+  - tsc-acmg-runtime-source-pins
+  freshness_required: false
+  on_blocked_source: block_consumer
+  forbidden_source_roles:
+  - metadata_only
+  - provenance_only
+  - shadow
+  - proposed
+- consumer_id: eval-benchmark
+  owner: raptor.eval
+  required_sources:
+  - tsc-ingest-and-reference-declarations
+  - frozen-core-annotation-bundle
+  freshness_required: false
+  on_blocked_source: block_consumer
+  forbidden_source_roles:
+  - metadata_only
+  - provenance_only
+  - shadow
+  - proposed
+- consumer_id: eval-gate
+  owner: raptor.eval
+  required_sources:
+  - frozen-core-annotation-bundle
+  freshness_required: true
+  on_blocked_source: block_consumer
+  forbidden_source_roles:
+  - metadata_only
+  - provenance_only
+  - shadow
+  - proposed
+- consumer_id: census
+  owner: raptor.census
+  required_sources:
+  - tsc-ingest-and-reference-declarations
+  - frozen-core-annotation-bundle
+  freshness_required: false
+  on_blocked_source: block_consumer
+  forbidden_source_roles:
+  - metadata_only
+  - provenance_only
+  - shadow
+  - proposed
+- consumer_id: packet
+  owner: raptor.packet
+  required_sources:
+  - tsc-ingest-and-reference-declarations
+  - frozen-core-annotation-bundle
+  freshness_required: false
+  on_blocked_source: block_consumer
+  forbidden_source_roles:
+  - metadata_only
+  - provenance_only
+  - shadow
+  - proposed
+- consumer_id: atlas
+  owner: raptor.atlas
+  required_sources:
+  - tsc-ingest-and-reference-declarations
+  - frozen-core-annotation-bundle
+  freshness_required: false
+  on_blocked_source: block_consumer
+  forbidden_source_roles:
+  - metadata_only
+  - provenance_only
+  - shadow
+  - proposed
+- consumer_id: external-mave
+  owner: raptor.external
+  required_sources:
+  - tsc-ingest-and-reference-declarations
+  freshness_required: false
+  on_blocked_source: block_consumer
+  forbidden_source_roles:
+  - metadata_only
+  - provenance_only
+  - shadow
+  - proposed
+- consumer_id: rescuescreen
+  owner: raptor.rescuescreen
+  required_sources: []
+  freshness_required: false
+  on_blocked_source: block_consumer
+  forbidden_source_roles: []
+- consumer_id: atlas-technical-coverage-panel
+  owner: raptor.atlas
+  required_sources: []
+  freshness_required: false
+  on_blocked_source: block_consumer
+  forbidden_source_roles: []
+- consumer_id: atlas-independent-validation-panel
+  owner: raptor.atlas
+  required_sources: []
+  freshness_required: false
+  on_blocked_source: block_consumer
+  forbidden_source_roles: []
+coverage_exclusions: []
+preservation_rules:
+- rule_id: preserve-r2-census
+  path: data/census/tsc_masked_holdout_gate_disabled_manual_2026-07-21.json
+  owner: raptor.census
+  reason: frozen masked holdout gate evidence remains immutable
+- rule_id: preserve-r2-tiered
+  path: data/census/tsc_tiered_readjudication_2026-07-21.json
+  owner: raptor.census
+  reason: frozen tiered readjudication evidence remains immutable
+- rule_id: preserve-eval-tsc2
+  path: configs/eval/tsc2.yaml
+  owner: raptor.eval
+  reason: domain evaluation config remains authoritative
+- rule_id: preserve-eval-tiered
+  path: configs/eval/tiered_gate_v3.yaml
+  owner: raptor.eval
+  reason: domain evaluation config remains authoritative
+- rule_id: preserve-bp4pp3-policy
+  path: configs/eval/bp4pp3_predictor_policy.json
+  owner: raptor.eval
+  reason: domain policy remains authoritative
+- rule_id: preserve-core-annotation
+  path: configs/eval/core_annotation_bundle.yaml
+  owner: raptor.eval
+  reason: historical evidence bundle remains authoritative
+- rule_id: preserve-mave
+  path: configs/external/mave_sources.yaml
+  owner: raptor.external
+  reason: external source register remains authoritative
+- rule_id: preserve-atlas-catalog
+  path: configs/atlas/catalogs/tsc2/catalog.yaml
+  owner: raptor.atlas
+  reason: atlas template stays metadata-only and authoritative
+- rule_id: preserve-atlas-pack
+  path: configs/atlas/packs/tsc2/pack.yaml
+  owner: raptor.atlas
+  reason: atlas pack declaration remains authoritative
